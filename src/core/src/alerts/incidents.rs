@@ -2478,6 +2478,8 @@ fn model_to_incident_with_topology(
         alert_count: db_model.alert_count,
         title: db_model.title,
         assigned_to: db_model.assigned_to,
+        acknowledged_by: db_model.acknowledged_by,
+        acknowledged_at: db_model.acknowledged_at,
         created_at: db_model.created_at,
         updated_at: db_model.updated_at,
         group_values: db_model.group_values,
@@ -2493,7 +2495,17 @@ pub async fn update_status(
     status: &str,
     user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
-    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
+    // Acknowledging goes through a dedicated atomic path so the actor and
+    // timestamp land on the row itself (not just the event log) and a
+    // second/concurrent acknowledge can't silently overwrite the first
+    // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    let updated = if status == "acknowledged" {
+        infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Incident not found"))?
+    } else {
+        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
+    };
 
     // Every resolution path lands here — manual, auto-resolve and external —
     // so closing the on-call record once, here, covers all of them.

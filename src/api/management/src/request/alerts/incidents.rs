@@ -1216,6 +1216,8 @@ mod tests {
             alert_count: 5,
             title: Some("Test Incident".to_string()),
             assigned_to: None,
+            acknowledged_by: None,
+            acknowledged_at: None,
             created_at: 1000,
             updated_at: 2000,
             group_values: serde_json::Value::Object(Default::default()),

@@ -41,6 +41,8 @@ export interface Incident {
   alert_count: number;
   title?: string;
   assigned_to?: string;
+  acknowledged_by?: string;
+  acknowledged_at?: number;
   created_at: number;
   updated_at: number;
 }

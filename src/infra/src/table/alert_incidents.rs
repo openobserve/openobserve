@@ -19,7 +19,8 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait, sea_query::LockType,
+    QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, LockType},
 };
 use svix_ksuid::KsuidLike;
 
@@ -67,6 +68,8 @@ pub async fn create(
         alert_count: Set(0), // Will be incremented by add_alert_to_incident
         title: Set(title),
         assigned_to: Set(None),
+        acknowledged_by: Set(None),
+        acknowledged_at: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -181,6 +184,38 @@ pub async fn update_status(
         .update(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Acknowledges an incident. Returns `None` if it is gone, and the current
+/// record (possibly unchanged) if the WHERE guard didn't match — e.g.
+/// somebody else already acknowledged it, or it's already resolved/reopened.
+///
+/// The state filter is part of the UPDATE itself, so of two people clicking
+/// acknowledge at once exactly one row is written and the loser reads back
+/// who actually has it. Read-then-write (what `update_status` does) would
+/// let both pass the check and the second overwrite the first's attribution.
+pub async fn acknowledge(
+    org_id: &str,
+    id: &str,
+    user_id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp_micros();
+    alert_incidents::Entity::update_many()
+        .col_expr(alert_incidents::Column::Status, Expr::value("acknowledged"))
+        .col_expr(
+            alert_incidents::Column::AcknowledgedBy,
+            Expr::value(user_id.to_string()),
+        )
+        .col_expr(alert_incidents::Column::AcknowledgedAt, Expr::value(now))
+        .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.eq("open"))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    get(org_id, id).await
 }
 
 /// Update incident title

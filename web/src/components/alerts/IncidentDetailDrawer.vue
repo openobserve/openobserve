@@ -56,6 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
 
+          <span v-if="incidentDetails.acknowledged_by" class="inline-flex items-center gap-1 cursor-default">
+            <span class="text-text-secondary text-xs">{{ t("alerts.incidents.acknowledgedBy") }}</span>
+            <OUserCell :value="incidentDetails.acknowledged_by" />
+          </span>
+
           <span class="inline-flex cursor-default">
             <OTag type="severity" :value="incidentDetails.severity" />
             <OTooltip
@@ -93,8 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             :loading="updating"
+            :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
             @click="acknowledgeIncident"
-            ><OIcon name="visibility" size="sm" />{{ t("alerts.incidents.acknowledge")
+            ><OIcon name="check-circle" size="sm" aria-hidden="true" />{{ t("alerts.incidents.acknowledge")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
           /></OButton>
           <OButton
@@ -2694,6 +2700,8 @@ export default defineComponent({
         );
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
+        incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
+        incidentDetails.value.acknowledged_at = response.data.acknowledged_at;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
         toast({
@@ -2724,7 +2732,17 @@ export default defineComponent({
       }
     };
 
-    const acknowledgeIncident = () => updateStatus("acknowledged");
+    const acknowledgeIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.acknowledgeConfirmTitle"),
+        message: t("alerts.incidents.acknowledgeConfirmMessage"),
+        confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
+        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      updateStatus("acknowledged");
+    };
     const resolveIncident = () => updateStatus("resolved");
     const reopenIncident = () => updateStatus("open");
 
