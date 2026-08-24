@@ -2069,7 +2069,7 @@ async fn process_function_node(
                 // since apply_vrl_fn can produce unflattened data
                 for record in result.as_array().unwrap().iter() {
                     // use usize::MAX as a flag to disregard original_value
-                    channels.send_output(&metadata, &node.id, &record).await;
+                    channels.send_output(&metadata, &node.id, record).await;
                     send_to_children(
                         &mut channels.child_senders,
                         PipelineItem {
@@ -2123,7 +2123,7 @@ async fn process_function_node(
                 if let Some(result_arr) = result.as_array() {
                     for record in result_arr.iter() {
                         // use usize::MAX as a flag to disregard original_value
-                        channels.send_output(&metadata, &node.id, &record).await;
+                        channels.send_output(&metadata, &node.id, record).await;
                         send_to_children(
                             &mut channels.child_senders,
                             PipelineItem {
