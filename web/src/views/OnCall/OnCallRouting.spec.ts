@@ -70,6 +70,11 @@ const stubs = {
     props: ["rules", "aliases", "loading", "showTeam"],
     template: "<div />",
   },
+  OnCallRuleEditor: {
+    name: "OnCallRuleEditor",
+    props: ["open", "rule", "initialDimensions", "teams", "aliases", "catalogue", "services", "signals", "saving"],
+    template: "<div />",
+  },
   OnCallUnroutedQueue: {
     name: "OnCallUnroutedQueue",
     props: ["signals", "loading", "teams", "filterable"],
@@ -152,7 +157,12 @@ type Wrapper = ReturnType<typeof render>;
 
 const rulesPanel = (w: Wrapper) => w.findComponent({ name: "OnCallOwnershipRules" });
 const unrouted = (w: Wrapper) => w.findComponent({ name: "OnCallUnroutedQueue" });
-const dialog = (w: Wrapper) => w.findComponent({ name: "ODialog" });
+/// The rule form is a shared component, not this view's own dialog. Asserting
+/// against the editor rather than reaching through it to an ODialog is what
+/// keeps this test honest when the editor's internals change — and the page
+/// carried a near-duplicate of that dialog until 2026-08-21, which is exactly
+/// the drift a test pointed at the contract would have caught.
+const editor = (w: Wrapper) => w.findComponent({ name: "OnCallRuleEditor" });
 const simulator = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingSimulator" });
 
 /// The queue lives behind the second tab, so a test about it starts by asking
@@ -215,16 +225,18 @@ describe("OnCallRouting", () => {
 
     unrouted(wrapper).vm.$emit("claim", signal);
     await flushPromises();
-    expect(dialog(wrapper).props("open")).toBe(true);
-    // No team chosen yet — the rule cannot be written.
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(editor(wrapper).props("open")).toBe(true);
+    // The evidence dimensions are dropped before the editor ever sees them: a
+    // pod name survives neither a restart nor a redeploy.
+    expect(editor(wrapper).props("initialDimensions")).toEqual({
+      service: "disputes-api",
+      "k8s-namespace": "payments-edge",
+    });
 
-    await wrapper
-      .findComponent('[data-test="oncall-routing-rule-team"]')
-      .vm.$emit("update:modelValue", "team_2");
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
-
-    dialog(wrapper).vm.$emit("click:primary");
+    editor(wrapper).vm.$emit("save", {
+      team_id: "team_2",
+      dimensions: { service: "disputes-api", "k8s-namespace": "payments-edge" },
+    });
     await flushPromises();
     expect(service.createOwnershipRule).toHaveBeenCalledWith({
       org_identifier: ORG,
@@ -271,7 +283,7 @@ describe("OnCallRouting", () => {
     expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(true);
 
     await wrapper.find('[data-test="oncall-routing-add-rule"]').trigger("click");
-    expect(dialog(wrapper).props("open")).toBe(true);
+    expect(editor(wrapper).props("open")).toBe(true);
 
     await showSignals(wrapper);
     expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(false);

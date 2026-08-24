@@ -188,99 +188,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </ODrawer>
 
-    <!-- One dialog for add, edit and claim: a rule is dimensions plus the team
-         they route to. A claim arrives with the dimensions already filled —
-         the click removed is the one where the user re-types what the queue
-         already knew (G4). -->
-    <ODialog
+    <!-- The same editor the team-level routing tab uses.
+         It was a second dialog with the same fields, which is how the two
+         drifted: the team tab learned to claim a discovered service and this
+         one still asked for a dimension and a value. One editor, both pages. -->
+    <OnCallRuleEditor
       :open="dialogOpen"
-      :title="dialogTitle"
-      :primary-button-label="t('oncall.saveRule')"
-      :secondary-button-label="t('oncall.cancel')"
-      :primary-button-disabled="!draftPairs.length || !draftTeam"
-      :primary-button-loading="saving"
-      data-test="oncall-routing-rule-dialog"
+      :rule="editingRule"
+      :initial-dimensions="claimingDimensions"
+      :teams="teams"
+      :aliases="aliases"
+      :catalogue="catalogue"
+      :services="services"
+      :signals="openSignals"
+      :saving="saving"
       @update:open="(v: boolean) => (dialogOpen = v)"
-      @click:primary="saveRule"
-      @click:secondary="dialogOpen = false"
-    >
-      <div class="flex flex-col gap-4">
-        <OSelect
-          :model-value="draftTeam"
-          :options="teamOptions"
-          :label="t('oncall.ruleRoutesTo')"
-          :placeholder="t('oncall.ruleTeamPlaceholder')"
-          searchable
-          data-test="oncall-routing-rule-team"
-          @update:model-value="(v: unknown) => (draftTeam = String(v))"
-        />
-
-        <div v-if="draftPairs.length" class="flex flex-wrap gap-2">
-          <span
-            v-for="(pair, index) in draftPairs"
-            :key="index"
-            class="border-border-default rounded-default flex items-center gap-1 border px-2 py-1"
-          >
-            <code class="text-text-body text-compact">{{ raw(`${pair.name}=${pair.value}`) }}</code>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="close"
-              :aria-label="t('oncall.removeDimension')"
-              @click="draftPairs.splice(index, 1)"
-            />
-          </span>
-        </div>
-
-        <!-- Pair by pair, from the org's vocabulary: free text is how a rule
-             ends up matching a dimension nothing ever emits. -->
-        <div class="flex flex-wrap items-end gap-2">
-          <OSelect
-            v-model="draftName"
-            :options="dimensionOptions"
-            :label="t('oncall.dimensionName')"
-            :placeholder="t('oncall.dimensionNamePlaceholder')"
-            width="sm"
-            searchable
-            data-test="oncall-routing-dimension-name"
-          />
-          <OInput
-            v-model="draftValue"
-            :label="t('oncall.dimensionValue')"
-            :placeholder="t('oncall.dimensionValuePlaceholder')"
-            width="sm"
-            data-test="oncall-routing-dimension-value"
-          />
-          <OButton
-            variant="outline"
-            size="sm-action"
-            :disabled="!canAddPair"
-            data-test="oncall-routing-add-dimension"
-            @click="addPair"
-          >
-            {{ t("oncall.add") }}
-          </OButton>
-        </div>
-
-        <!-- The dialog used to go quiet here: no request, no message, and a
-             disabled Save with nothing on screen saying what was missing. -->
-        <p
-          v-if="addPairProblem"
-          class="text-text-secondary text-xs"
-          data-test="oncall-routing-dimension-problem"
-        >
-          {{ addPairProblem }}
-        </p>
-
-        <!-- Values are lowercased on the server to match what the extractor
-             pulls off a record. Showing the normalised form means the rule
-             read back is the rule that will match. -->
-        <p v-if="draftPairs.length" class="text-text-muted text-xs">
-          {{ t("oncall.ownershipPreviewPath") }}
-          <code class="text-text-body">{{ raw(draftPath) }}</code>
-        </p>
-      </div>
-    </ODialog>
+      @save="saveRule"
+    />
 
     <ConfirmDialog
       :model-value="!!ruleToDelete"
@@ -306,6 +230,8 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallDefaultTeamCard from "@/components/oncall/OnCallDefaultTeamCard.vue";
 import OnCallOwnershipRules from "@/components/oncall/OnCallOwnershipRules.vue";
 import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
+import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
+import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.vue";
 import OnCallUnroutedQueue from "@/components/oncall/OnCallUnroutedQueue.vue";
 import type { UnroutedFilters } from "@/components/oncall/OnCallUnroutedQueue.vue";
@@ -321,8 +247,11 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import alertsService from "@/services/alerts";
+import { getDimensionAnalytics, getServicesList } from "@/services/service_streams";
 import oncallService from "@/services/oncall";
 import type {
+  DimensionCatalogue,
+  DiscoveredService,
   OnCallTeam,
   OwnershipRuleStats,
   RoutingPreview,
@@ -368,11 +297,21 @@ const testerOpen = ref(false);
 const dialogOpen = ref(false);
 const editingRule = ref<OwnershipRuleStats | null>(null);
 const claimingSignal = ref<UnroutedSignal | null>(null);
+
+/// The conditions a claim opens with: the failing path, identity only. The
+/// editor owns the draft from there.
+const claimingDimensions = computed(() =>
+  claimingSignal.value ? routableDimensions(claimingSignal.value) : null,
+);
+
+/// A dismissed row is the record, not the worklist.
+const openSignals = computed(() => signals.value.filter((signal) => !signal.dismissed_at));
+
+/// What this org emits, and the services it has seen — the editor offers both
+/// instead of the whole field vocabulary and a text box.
+const catalogue = ref<DimensionCatalogue>({ present: [], values: {} });
+const services = ref<DiscoveredService[]>([]);
 const ruleToDelete = ref<OwnershipRuleStats | null>(null);
-const draftTeam = ref("");
-const draftPairs = ref<{ name: string; value: string }[]>([]);
-const draftName = ref("");
-const draftValue = ref("");
 
 /// The header actions only make sense once the page has something to act on —
 /// not over the unavailable, error or no-teams states.
@@ -403,35 +342,6 @@ const dialogTitle = computed<I18nText>(() => {
   return editingRule.value ? t("oncall.editOwnershipRule") : t("oncall.addOwnershipRule");
 });
 
-
-/// Why `Add` is refused, in the reader's terms. A disabled button beside a
-/// select whose placeholder was a real dimension key read as a filled form
-/// that simply would not save — no request, no validation message, nothing on
-/// screen saying what was missing.
-const addPairProblem = computed<I18nText | "">(() => {
-  const name = draftName.value.trim();
-  if (!name) return t("oncall.dimensionNeedsName");
-  if (!draftValue.value.trim()) return t("oncall.dimensionNeedsValue");
-  if (draftPairs.value.some((pair) => pair.name === name))
-    return t("oncall.dimensionAlreadyUsed", { name: raw(name) });
-  return "";
-});
-
-const canAddPair = computed(() => !addPairProblem.value);
-
-const draftPath = computed(() =>
-  ownershipPath(Object.fromEntries(draftPairs.value.map((pair) => [pair.name, pair.value]))),
-);
-
-function addPair() {
-  if (!canAddPair.value) return;
-  draftPairs.value.push({
-    name: draftName.value.trim(),
-    value: normalizeDimensionValue(draftValue.value),
-  });
-  draftName.value = "";
-  draftValue.value = "";
-}
 
 function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -518,6 +428,41 @@ async function fetchAliases() {
   }
 }
 
+/// Which of those field names this org has ever emitted, and with what values.
+/// Both degrade to empty, which is what this screen did before they existed.
+async function fetchCatalogue() {
+  try {
+    const res = await getDimensionAnalytics(orgId.value);
+    const dims = res.data?.dimensions ?? [];
+    catalogue.value = {
+      present: res.data?.recommended_priority_dimensions ?? dims.map((d) => d.dimension_name),
+      values: Object.fromEntries(dims.map((d) => [d.dimension_name, d.value_counts ?? {}])),
+    };
+  } catch {
+    catalogue.value = { present: [], values: {} };
+  }
+}
+
+async function fetchServices() {
+  try {
+    const res = await getServicesList(orgId.value);
+    const rows: unknown[] = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    const seen = new Map<string, DiscoveredService>();
+    for (const row of rows as Record<string, any>[]) {
+      const name = String(row.service_name ?? "");
+      if (!name) continue;
+      const identity = (row.disambiguation ?? {}) as Record<string, string>;
+      const existing = seen.get(name);
+      if (!existing || (!Object.keys(existing.identity).length && Object.keys(identity).length)) {
+        seen.set(name, { name, setId: String(row.set_id ?? "default"), identity });
+      }
+    }
+    services.value = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    services.value = [];
+  }
+}
+
 function goToTeams() {
   router.push({
     name: "onCallTeams",
@@ -528,19 +473,12 @@ function goToTeams() {
 function openAdd() {
   editingRule.value = null;
   claimingSignal.value = null;
-  draftTeam.value = "";
-  draftPairs.value = [];
   dialogOpen.value = true;
 }
 
 function openEdit(rule: OwnershipRuleStats) {
   editingRule.value = rule;
   claimingSignal.value = null;
-  draftTeam.value = rule.team_id;
-  draftPairs.value = Object.entries(rule.dimensions ?? {}).map(([name, value]) => ({
-    name,
-    value: String(value),
-  }));
   dialogOpen.value = true;
 }
 
@@ -558,11 +496,6 @@ function routableDimensions(signal: UnroutedSignal): Record<string, string> {
 function openClaim(signal: UnroutedSignal) {
   editingRule.value = null;
   claimingSignal.value = signal;
-  draftTeam.value = "";
-  draftPairs.value = Object.entries(routableDimensions(signal)).map(([name, value]) => ({
-    name,
-    value: String(value),
-  }));
   dialogOpen.value = true;
 }
 
@@ -571,12 +504,9 @@ function openClaim(signal: UnroutedSignal) {
 /// refuses the create while the original still holds the path, so repointing a
 /// rule to another team failed with "another team already owns this path". The
 /// update route does the same job atomically.
-async function saveRule() {
+async function saveRule(draft: RuleDraft) {
   saving.value = true;
-  const data = {
-    team_id: draftTeam.value,
-    dimensions: Object.fromEntries(draftPairs.value.map((pair) => [pair.name, pair.value])),
-  };
+  const data = { team_id: draft.team_id, dimensions: draft.dimensions };
   try {
     if (editingRule.value) {
       await oncallService.updateOwnershipRule({
@@ -591,7 +521,6 @@ async function saveRule() {
     const claimed = !!claimingSignal.value;
     editingRule.value = null;
     claimingSignal.value = null;
-    draftPairs.value = [];
     dialogOpen.value = false;
     toast({
       variant: "success",

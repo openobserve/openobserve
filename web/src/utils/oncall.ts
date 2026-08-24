@@ -1239,8 +1239,12 @@ export function resolveLadder(
  * process, so a rule against it matches until the next restart and then
  * nothing, forever. Evidence stays on the signal; identity goes in the rule.
  */
+/// The canonical service dimension, matching the backend's `SERVICE_DIMENSION`.
+/// A claim on a service with no infrastructure identity falls back to this.
+export const SERVICE_DIMENSION = "service";
+
 export const IDENTITY_DIMENSION_IDS = new Set([
-  "service",
+  SERVICE_DIMENSION,
   "service-namespace",
   "k8s-cluster",
   "k8s-namespace",

@@ -1411,3 +1411,39 @@ export const MICROS_PER_MINUTE = 60_000_000;
 export const MICROS_PER_HOUR = 60 * MICROS_PER_MINUTE;
 export const MICROS_PER_DAY = 24 * MICROS_PER_HOUR;
 export const MICROS_PER_WEEK = 7 * MICROS_PER_DAY;
+
+/**
+ * What this org's telemetry actually carries, read from
+ * `service_streams/_analytics`.
+ *
+ * The semantic groups say what a dimension COULD be called across every
+ * platform the product understands; this says which of those names this org has
+ * ever emitted, and with what values. A rule pinned to a dimension nothing sends
+ * reads as "never matched", which is indistinguishable from a rule that is
+ * simply wrong.
+ */
+export interface DimensionCatalogue {
+  /** Dimension ids seen in this org, most useful first. */
+  present: string[];
+  /** `values[dimension][value]` = how many services carry it. */
+  values: Record<string, Record<string, number>>;
+}
+
+/**
+ * A service discovery has seen, reduced to what a routing rule needs.
+ *
+ * `identity` is the record's `disambiguation` — the dimensions the org's
+ * identity sets say make this deployment of this service distinct. Claiming a
+ * service means writing exactly those as a rule, which is why the rule editor
+ * can offer it as one choice rather than three fields.
+ *
+ * It is empty for anything the identity sets do not cover — bare metal, a VM,
+ * an appliance. Those are claimable by service name alone, and the form says so
+ * rather than pretending the claim is narrower than it is.
+ */
+export interface DiscoveredService {
+  name: string;
+  /** Which identity set matched, e.g. `kubernetes`. `default` means none did. */
+  setId: string;
+  identity: Record<string, string>;
+}
