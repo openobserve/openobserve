@@ -124,11 +124,15 @@
         </div>
       </header>
 
+      <!-- Five rows then scroll inside the group: the header row is h-9 and the
+           body rows are OTable's normal density, so one dataset with many runs
+           can't push every other group off the page. -->
       <OTable
         v-if="isGroupExpanded(group.id)"
         :data="group.children"
         :columns="buildColumns(group.children)"
         :loading="loading"
+        max-height="calc(2.25rem + 5 * var(--table-row-height-normal, 2.75rem))"
         row-key="id"
         show-index
         :show-global-filter="false"

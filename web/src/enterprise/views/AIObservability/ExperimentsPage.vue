@@ -19,8 +19,8 @@
       </OButton>
     </template>
 
-    <div class="grid min-h-0 gap-4 p-4">
-      <section class="min-w-0 space-y-3">
+    <div class="flex h-full min-h-0 flex-col p-4">
+      <section class="min-h-0 min-w-0 flex-1 space-y-3 overflow-auto">
         <OEmptyState
           v-if="!loading && !experiments.length"
           size="hero"
