@@ -10687,11 +10687,9 @@
       },
       "form": {
         "namePlaceholder": "Untitled experiment",
-        "nameEditHint": "Click to rename",
         "descriptionLabel": "Description",
         "descriptionPlaceholder": "Add a description",
-        "descriptionEditHint": "Click to edit the description",
-        "datasetSection": "Dataset",
+        "identitySection": "Identity",
         "datasetPlaceholder": "Select a dataset",
         "datasetPinned": "Pinned at version v{version} — later dataset edits never change this experiment's results.",
         "datasetRows": "{rows} rows matched.",
@@ -10749,7 +10747,9 @@
         "temperatureLabel": "Temperature",
         "temperatureHelp": "0–2. Higher varies the output.",
         "temperatureDeterministic": "0 — the model answers the same way every time.",
-        "trialsDeterministicWarning": "At temperature 0 every trial returns the same answer."
+        "trialsDeterministicWarning": "At temperature 0 every trial returns the same answer.",
+        "pageTitle": "New Experiment",
+        "nameLabel": "Name"
       },
       "columns": {
         "name": "Name",

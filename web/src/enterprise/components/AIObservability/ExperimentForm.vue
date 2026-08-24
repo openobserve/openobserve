@@ -23,48 +23,49 @@
       title-overflow="visible"
       bleed
     >
-      <!-- The name is the heading, not a boxed field: creating an experiment
-         starts by naming the thing, and it stays editable in place. -->
       <template #title>
-        <OFormInlineEdit
-          name="name"
-          size="md"
-          :placeholder="t('aiObservability.experiments.form.namePlaceholder')"
-          :aria-label="t('aiObservability.experiments.name')"
-          :edit-hint="t('aiObservability.experiments.form.nameEditHint')"
-          data-test="ai-experiment-form-name-input"
-        />
-      </template>
-
-      <template #subtitle>
-        <OFormInlineEdit
-          name="description"
-          tone="meta"
-          :placeholder="t('aiObservability.experiments.form.descriptionPlaceholder')"
-          :aria-label="t('aiObservability.experiments.form.descriptionLabel')"
-          :edit-hint="t('aiObservability.experiments.form.descriptionEditHint')"
-          data-test="ai-experiment-form-description-input"
-        />
+        <span data-test="ai-experiment-form-title">
+          {{ t("aiObservability.experiments.form.pageTitle") }}
+        </span>
       </template>
 
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
           class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto]"
         >
-          <!-- Dataset — the comparability anchor. It sits above the tabs and
-             outside them because nothing below it means anything until a
-             dataset is chosen, and only same-dataset experiments compare. -->
+          <!-- Identity — what this run IS: its name, what it measures, and the
+             dataset it is pinned to. The dataset lives here because nothing
+             below means anything until one is chosen, and only same-dataset
+             experiments can ever be compared. -->
           <section
             class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
-            data-test="ai-experiment-form-dataset-section"
+            data-test="ai-experiment-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
               <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
-                {{ t("aiObservability.experiments.form.datasetSection") }}
+                {{ t("aiObservability.experiments.form.identitySection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-2 px-4 py-3.5">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <OFormInput
+                name="name"
+                :label="t('aiObservability.experiments.form.nameLabel')"
+                :placeholder="t('aiObservability.experiments.form.namePlaceholder')"
+                size="sm"
+                required
+                data-test="ai-experiment-form-name-input"
+              />
+
+              <OFormTextarea
+                name="description"
+                :label="t('aiObservability.experiments.form.descriptionLabel')"
+                :placeholder="t('aiObservability.experiments.form.descriptionPlaceholder')"
+                size="sm"
+                :rows="3"
+                data-test="ai-experiment-form-description-input"
+              />
+
               <div class="flex flex-wrap items-start gap-4">
                 <div class="min-w-0 flex-1">
                   <OFormSelect
@@ -393,7 +394,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
-import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";

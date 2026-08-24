@@ -240,6 +240,27 @@ describe("ExperimentForm", () => {
     expect(save.attributes("disabled")).toBeUndefined();
   });
 
+  // Name and description are labelled fields inside Identity, not inline-edits
+  // in the page header — same shape as the New LLM Judge Scorer form.
+  it("puts name, description and the dataset in one Identity section", async () => {
+    wrapper = await createWrapper();
+    const identity = wrapper.find('[data-test="ai-experiment-form-identity-section"]');
+    expect(identity.exists()).toBe(true);
+
+    for (const field of ["name-input", "description-input", "dataset-select"]) {
+      const el = wrapper.find(`[data-test="ai-experiment-form-${field}"]`);
+      expect(el.exists()).toBe(true);
+      expect(identity.element.contains(el.element)).toBe(true);
+    }
+
+    // The heading is static text now; the name is no longer the page title.
+    const title = wrapper.find('[data-test="ai-experiment-form-title"]');
+    expect(title.exists()).toBe(true);
+    expect(
+      title.element.contains(wrapper.find('[data-test="ai-experiment-form-name-input"]').element),
+    ).toBe(false);
+  });
+
   // Task and Scorers are both required, so neither may sit behind a tab where
   // an untouched required field only surfaces as a validation error.
   it("shows the task and scorer sections at the same time", async () => {
