@@ -289,7 +289,7 @@ mod tests {
         let mut file = vortex_file_with_rows(12);
         file.statistics = None;
 
-        assert!(generate_vortex_access_plan_from_ranges(&file, [1..3]).is_none());
+        assert!(generate_vortex_access_plan_from_ranges(&file, [1..3, 5..8]).is_none());
     }
 
     #[test]
