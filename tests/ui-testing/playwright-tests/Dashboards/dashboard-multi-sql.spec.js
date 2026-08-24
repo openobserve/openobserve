@@ -1738,14 +1738,9 @@ test.describe("Multi-SQL Query Support", () => {
           await expect(warningIcon).toBeVisible({ timeout: 30000 });
 
           // Both queries are restricted — "Data returned for:" must appear twice.
-          //
-          // Poll rather than reading the tooltip once. Both queries are batched
-          // into a single _search_multi_stream call, and the warning text is
-          // rebuilt as each query's result metadata lands (the metadata watcher
-          // is deep and fires per mutation), so a completed stream body does not
-          // guarantee Vue has already flushed the final render. Read once and
-          // this assertion can catch the tooltip mid-build, holding only Q1's
-          // message.
+          // Poll: the queries share one _search_multi_stream call and the text is
+          // rebuilt as each query's metadata lands, so a single read can catch it
+          // mid-build with only Q1's message.
           let tooltipText = "";
           await expect
             .poll(
@@ -1821,9 +1816,7 @@ test.describe("Multi-SQL Query Support", () => {
           await expect(mqr.warningIcon.first()).toBeVisible({ timeout: 30000 });
 
           // Only Q1 is restricted: exactly one "Data returned for:" occurrence.
-          // Polled for the same reason as the two-restricted-streams test — the
-          // warning text is rebuilt as result metadata lands, so a single read
-          // can catch it before Q1's message is in it.
+          // Polled for the same reason as the two-stream test above.
           let tooltipText = "";
           await expect
             .poll(

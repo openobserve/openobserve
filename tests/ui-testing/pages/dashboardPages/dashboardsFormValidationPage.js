@@ -190,18 +190,10 @@ export class DashboardsFormValidationPage {
     }
 
     /**
-     * Wait until a dialog's form is actually interactive, not merely rendered.
-     *
-     * The dialog element becomes visible before OForm has seeded its fields and
-     * before the ODialog primary button is wired to submit the form by id. A
-     * submit issued in that window silently no-ops: the Zod schema never runs,
-     * so no validation error is produced and the assertion that follows fails
-     * with "element(s) not found" rather than anything describing the cause.
-     *
-     * Gating on the name input being present and enabled is the cheap proxy for
-     * "the form mounted", and it is the difference between the two sibling
-     * tests here — the one that happened to assert dialog visibility first
-     * passed, the one that submitted immediately did not.
+     * Wait until a dialog's form is interactive, not merely rendered.
+     * The dialog is visible before OForm seeds its fields and the primary button
+     * is wired, and a submit in that window silently no-ops — no validation
+     * error, so the assertion that follows fails with "element not found".
      *
      * @param {string} nameFieldSelector the form's `-field` input selector
      */
@@ -509,16 +501,8 @@ export class DashboardsFormValidationPage {
 
     /**
      * Enter annotation mode on the first rendered panel.
-     *
-     * The annotation button is HOVER-REVEALED: PanelContainer.vue binds
-     * :class="hoverRevealClass", which is "invisible pointer-events-none" until
-     * the panel's own @mouseover sets isCurrentlyHoveredPanel. Waiting for the
-     * button to be visible without hovering first can therefore only ever time
-     * out — which is exactly what every annotation test was doing.
-     *
-     * It is also gated on the panel being a time series (checkIfPanelIsTimeSeries)
-     * and on a chart type from the line/bar family, so the caller must have built
-     * a panel that keeps its histogram(_timestamp) x-axis.
+     * The button is hover-revealed and gated on the panel being a time series,
+     * so the chart must have drawn before hovering.
      */
     async enterAnnotationMode() {
         // The button is gated on extras.isTimeSeries, which is only set once the
@@ -563,11 +547,8 @@ export class DashboardsFormValidationPage {
 
     /**
      * Open the AddAnnotation dialog by brushing across the chart.
-     *
-     * A plain click cannot do this. PanelSchemaRenderer routes annotation
-     * creation through onDataZoom -> handleAddAnnotation, which is ECharts'
-     * brush/zoom event, so it needs a horizontal DRAG. The old tests clicked the
-     * canvas centre and then waited for a dialog that was never going to open.
+     * A click cannot do it — creation is routed through ECharts' dataZoom event,
+     * so it needs a horizontal drag.
      */
     async openAnnotationDialogByBrush() {
         const chart = this.page.locator('[data-test="chart-renderer"]').first();
@@ -593,12 +574,9 @@ export class DashboardsFormValidationPage {
 
     /**
      * Add a filter condition row in the panel editor's Filters section.
-     *
-     * `dashboard-add-condition-add` is NOT a plain "add" button — Group.vue makes
-     * it the TRIGGER of an ODropdown offering "Add Condition" / "Add Group".
-     * Clicking it only opens that menu, so a test that clicks it and then waits
-     * for `dashboard-add-condition-column-0` waits for a row that was never asked
-     * for. The condition is created by selecting the menu item.
+     * `dashboard-add-condition-add` is an ODropdown TRIGGER, not a plain button,
+     * and the created row is only a label chip — the column/operator/value
+     * controls live in a popup that chip opens.
      */
     async addConditionRow() {
         const trigger = this.page.locator(this.addConditionAddBtn);
@@ -625,13 +603,8 @@ export class DashboardsFormValidationPage {
     }
 
     /**
-     * Switch the open condition popup to its "Condition" tab.
-     *
-     * The popup opens on the LIST tab. `dashboard-add-condition-value` lives
-     * inside `<OTabPanel name="condition">`, so on the list tab it is not in the
-     * DOM at all (probe against alpha: value count = 0 straight after opening).
-     * `dashboard-add-condition-condition-0` is that tab's TRIGGER, not the value
-     * control — asserting the two together only works once the tab is active.
+     * Switch the open condition popup to its "Condition" tab. The popup opens on
+     * the List tab, where `dashboard-add-condition-value` is not rendered at all.
      */
     async openConditionTab(index = 0) {
         const tab = this.page.locator(`[data-test="dashboard-add-condition-condition-${index}"]`);

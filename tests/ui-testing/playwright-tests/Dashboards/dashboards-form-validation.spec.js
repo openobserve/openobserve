@@ -1,36 +1,14 @@
 // Copyright 2026 OpenObserve Inc.
-// Dashboards domain — form validation E2E tests
+// Dashboards domain — form validation E2E tests.
 //
-// Covers:
-//   - AddDashboard: empty name → required error / submit triggered; valid name → dashboard created
-//   - AddFolder:    empty name → required error after submit attempt; valid name → folder created
-//   - AddTab:       empty name → required error after submit attempt; valid name → tab created
-//   - Panel-editor forms: Drilldown, Variables, Conditions, Annotations, Layout,
-//     ConfigPanel, AddPanel name, BuildFieldPopUp
+// Covers AddDashboard / AddFolder / AddTab plus the panel-editor forms
+// (Drilldown, Variables, Conditions, Annotations, Layout, ConfigPanel,
+// AddPanel name, BuildFieldPopUp).
 //
-// FIXTURES — every test owns its own dashboard/folder, created in beforeEach
-// under a unique name and deleted in afterEach.
-//
-// This replaces a shared-fixture model that used fixed names (e2e_dash_fv_001,
-// e2e_fv_drilldown_001, …) and a "does it already exist?" probe:
-//
-//     const exists = await dashLink.isVisible().catch(() => false);
-//     if (!exists) { …create… } else { …open… }
-//
-// That probe could not work. isVisible() does not wait, and the dashboards list
-// is paginated and unsorted, so an existing fixture sitting on page 2 — or a
-// list still loading — both read as "missing". Since neither the AddDashboard
-// nor AddFolder schema rejects a duplicate name (both only enforce min(1), and
-// the folders table's unique index is on (org, folder_id), not name), the
-// create branch always succeeded and quietly added ANOTHER copy. Against alpha
-// all 12 fixtures existed and the probe still reported every one missing; two
-// were already duplicated. Each run made the list longer, which made dashboard
-// creation slower, which is what finally broke the run: 13 failed / 24 skipped,
-// timing out in createDashboard() at whichever stage it happened to be in.
-//
-// Unique-per-run names remove the probe, the branch, and the leak together, and
-// they let these tests run in parallel with each other. Nothing is shared, so
-// nothing has to be reasoned about across tests.
+// Fixtures: every test creates its own dashboard under a unique name and
+// deletes it in afterEach. Fixed names with an "already exists?" probe were
+// unreliable — the list is paginated so existing fixtures read as missing, and
+// duplicate names are not rejected, so each run leaked another copy.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -45,25 +23,12 @@ const uniqueName = (prefix) =>
     `${prefix}_${Math.random().toString(36).slice(2, 9)}_${Date.now()}`;
 
 /**
- * Create a dashboard owned by the current test and leave the browser on its
- * view page.
- *
- * setupTestDashboard() is used rather than dashboardCreate.createDashboard()
- * because it also waits for the view to actually finish mounting, and re-opens
- * the view URL once if that first load wedges — which is exactly the failure
- * this spec kept hitting on alpha (createDashboard timing out on
- * dashboard-back-btn / the empty-state add-panel button).
+ * Create a dashboard owned by the current test, leaving the browser on its view
+ * page. Uses setupTestDashboard() for its re-open-on-wedged-load recovery.
  */
 async function createOwnedDashboard(page, pm, prefix) {
-    // Ingest first. Several assertions here need the panel to return ROWS, not
-    // merely to render: the annotation button is gated on the panel being a time
-    // series, and applyAutoSQLTimeSeries() requires options.xAxis[0].data.length
-    // > 0 — an empty chart is never a time series, so the button is not rendered
-    // at all and no amount of waiting or hovering will produce it.
-    //
-    // This spec was the only Dashboards spec with no ingestion of its own; it
-    // relied on whatever rows other specs happened to leave in e2e_automate
-    // inside the dashboard's default time range.
+    // Ingest first: the annotation button is gated on the panel being a time
+    // series, which needs actual rows (an empty chart never qualifies).
     await ingestion(page);
     const dashName = uniqueName(prefix);
     await setupTestDashboard(page, pm, dashName);
@@ -86,29 +51,16 @@ async function addBarPanel(pm, panelName) {
 }
 
 /**
- * Delete the dashboard this test created.
- *
- * Escape first: a test may end with a dialog still open (asserting a validation
- * error does not close it), and its modal overlay would swallow the back-button
- * click that cleanup starts with.
- *
- * A cleanup failure is logged, not thrown — it must not turn a passing test red.
- * Names are unique per run, so a stray leftover cannot affect a later run the
- * way the old fixed-name fixtures did.
+ * Delete the dashboard this test created. Failures are logged, not thrown, so
+ * cleanup can never turn a passing test red.
  */
 async function cleanupOwnedDashboard(page, pm, dashName) {
     const candidates = (Array.isArray(dashName) ? dashName : [dashName]).filter(Boolean);
     if (!candidates.length) return;
 
-    // Navigate to the list by URL rather than clicking Back.
-    //
-    // backToDashboardList() walks back one view at a time, and a test can end in
-    // a state that swallows those clicks — annotation mode with an open dialog is
-    // the reproducible case, where all four back clicks no-op and cleanup dies
-    // still on /dashboards/view. A direct goto leaves from anywhere. Escape first
-    // to drop any modal, and accept the unsaved-changes confirm that leaving the
-    // panel editor fires (Playwright auto-DISMISSES dialogs, which would cancel
-    // the navigation).
+    // Go to the list by URL, not by clicking Back: a test can end with a modal
+    // open that swallows back clicks. Accept the unsaved-changes confirm, since
+    // Playwright auto-dismisses dialogs and that would cancel the navigation.
     page.once('dialog', (d) => d.accept());
     await page.keyboard.press('Escape').catch(() => {});
 
@@ -317,12 +269,8 @@ test.describe("Dashboard AddTab form validation", () => {
     let dashName;
 
     // Each test builds its own dashboard and lands on its view page.
-    //
-    // The previous version created the dashboard through the AddDashboard dialog
-    // and then called openDashboardByName() UNCONDITIONALLY — but creating a
-    // dashboard navigates straight into /dashboards/view, so on the create path
-    // that click hunted for a list row that was no longer on screen and spent
-    // 15s failing. setupTestDashboard() leaves us exactly where we need to be.
+    // (The old version called openDashboardByName() even on the create path,
+    // which hunts for a list row that creation has already navigated away from.)
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
@@ -712,26 +660,17 @@ test.describe("Dashboard GeneralSettings form validation", () => {
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Renaming retargets cleanup: the dashboard is deleted BY NAME, so
-        // afterEach has to look for whichever name the row ends up carrying.
-        //
-        // Register the new name BEFORE clicking save, and keep the old one as a
-        // fallback. Assigning after the assertion below is not good enough: a
-        // save that lands but closes the panel slowly fails the assertion, and
-        // cleanup is then left hunting a name the dashboard no longer has.
-        // (The original fixed-name version was worse still — it renamed its
-        // shared fixture permanently, so every later run recreated the original
-        // and orphaned the renamed copy for good.)
+        // Cleanup deletes BY NAME, so register the new name before saving and
+        // keep the old one as a fallback — a slow-closing panel must not leave
+        // cleanup hunting a name the dashboard no longer has.
         const renamed = uniqueName('e2e_fv_general_settings_renamed');
         cleanupCandidates = [renamed, dashName];
         await nameField.fill(renamed);
         await pm.dashboardsFormValidation.getGeneralSettingSaveBtnLocator().click();
 
-        // Saving does NOT close the panel: GeneralSettings.vue emits "save", and
-        // DashboardSettings.vue wires that to refreshRequired — only "close" ever
-        // closes the drawer. The old `expect(nameField).not.toBeVisible()` was
-        // asserting behaviour the product does not have, so it could not pass.
-        // The success toast is what actually marks the save.
+        // Saving does NOT close the panel — GeneralSettings emits "save", which
+        // DashboardSettings wires to refreshRequired, not close. The success
+        // toast is what marks the save.
         await expect(
             pm.dashboardsFormValidation.getSuccessToastLocator()
         ).toBeVisible({ timeout: 15000 });

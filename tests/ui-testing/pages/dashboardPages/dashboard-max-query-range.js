@@ -177,28 +177,15 @@ export default class DashboardMaxQueryRange {
   }
 
   /**
-   * Wait until the dashboard view reports that no panel is still loading.
+   * Wait until no panel on the dashboard view is still loading.
    *
-   * createSearchResponsePromise() only tells you the search STARTED: it resolves
-   * off page.waitForResponse(), which fires the moment response headers arrive.
-   * With streaming enabled (ZO_STREAMING_ENABLED, which is how alpha runs) a
-   * panel search is an SSE body, so headers land almost immediately while the
-   * result metadata that drives the max-query-range warning arrives at the far
-   * end of that body. Asserting straight after the header wait races the stream,
-   * and a NEGATIVE assertion ("no warning") passes vacuously — it runs before a
-   * warning could have rendered at all. Pair the two: header wait to confirm the
-   * request fired, then this to confirm it finished.
+   * createSearchResponsePromise() only proves the search STARTED — it resolves on
+   * response headers, while streaming bodies deliver the max-query-range metadata
+   * at the end. Pair the two: headers to confirm the request fired, this to
+   * confirm it finished. (Reading the body is not an option: the SQL executor
+   * aborts its controller on completion, so response.text() rejects.)
    *
-   * Reading the response body is deliberately NOT how this is done. The SQL
-   * executor aborts its AbortController in a `finally` as soon as the stream is
-   * consumed (usePanelSQLExecutor.ts, "abort on done"), so Playwright cannot
-   * read the body afterwards — response.text() rejects, and a waitForResponse
-   * predicate that depends on it can never match.
-   *
-   * ViewDashboard drives both buttons off `arePanelsLoading`: on enterprise the
-   * refresh button is REPLACED by a cancel button while any panel loads, and
-   * elsewhere the refresh button stays but is disabled. Idle is therefore
-   * "no cancel button, and a refresh button that is not disabled".
+   * Idle = no cancel button, and a refresh button that is not disabled.
    *
    * @param {number} timeout
    */
@@ -279,24 +266,11 @@ export default class DashboardMaxQueryRange {
   // ---------------------------------------------------------------------------
 
   /**
-   * Assert that a max-query-range tooltip actually reports a range restriction,
-   * whichever backend path produced it.
+   * Assert a tooltip reports a range restriction, whichever backend produced it.
    *
-   * The backend emits TWO different messages for the same condition:
-   *
-   *   non-streaming (api/search/src/search/mod.rs)
-   *     "Query duration is modified due to query range restriction of N hours"
-   *   streaming (search_service/src/streaming/execution.rs)
-   *     "reached max query range limit", wrapped in PARTIAL_ERROR_RESPONSE_MESSAGE
-   *
-   * Which one you get depends on whether the deployment runs streaming search,
-   * so asserting either literal pins the test to one deployment mode. That is a
-   * wrong-environment failure, not a flake — retrying cannot fix it, which is
-   * why these tests failed all three CI attempts while passing against a
-   * non-streaming alpha.
-   *
-   * Both paths carry the adjusted window as "Data returned for: <from> to <to>",
-   * so that part is asserted unconditionally.
+   * Non-streaming says "Query duration is modified due to query range restriction
+   * of N hours"; streaming says "reached max query range limit". Asserting either
+   * literal pins the test to one deployment mode. Both carry "Data returned for:".
    *
    * @param {Function} expect - Playwright expect
    * @param {string} tooltipText
@@ -311,10 +285,8 @@ export default class DashboardMaxQueryRange {
   }
 
   /**
-   * True when the tooltip came from the NON-streaming path, which is the only
-   * one that names the restriction in hours ("restriction of 3 hours"). The
-   * streaming path reports the cached window instead and never states the limit,
-   * so an hours assertion is only meaningful when this returns true.
+   * True when the tooltip names the limit in hours — only the non-streaming
+   * backend does, so an hours assertion is only meaningful when this is true.
    *
    * @param {string} tooltipText
    */
