@@ -16726,6 +16726,8 @@
     "page": {
       "tabs": {
         "overview": "Overview",
+        "metrics": "Metrics",
+        "metricsHint": "Database load by wait event, and every metric your database receivers collect.",
         "queries": "Top queries",
         "samples": "Slowest calls",
         "samplesHintClient": "Finished calls your instrumented services observed in this window — callers without tracing are not counted, so this is a floor, not the total. The table shows the slowest of them.",
@@ -16742,6 +16744,113 @@
         "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
         "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
         "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
+      }
+    },
+    "metrics": {
+      "title": "Metrics",
+      "subtitle": "Database load and every metric your database receivers collect, charted over this window",
+      "load": {
+        "title": "Database load",
+        "hint": "Average sessions actively working per interval, stacked by the chosen dimension. Idle connections are excluded; a session waiting on nothing is on CPU. Drag across a spike to zoom every chart to it.",
+        "timeAxis": "Time",
+        "sessionsAxis": "Avg active sessions",
+        "waitEventAxis": "Wait event",
+        "viewActivity": "View in Activity",
+        "breakdowns": {
+          "waitEvent": "By wait event",
+          "query": "By query",
+          "database": "By database",
+          "user": "By user"
+        }
+      },
+      "limitLegend": "connection limit",
+      "explore": "Open in Metrics Explorer",
+      "byDims": {
+        "query": "by query",
+        "database": "by database",
+        "service": "by service",
+        "operation": "by operation",
+        "mode": "by mode",
+        "lockType": "by lock type",
+        "table": "by table",
+        "index": "by index",
+        "client": "by client",
+        "state": "by state"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Activity",
+          "desc": "Throughput, transactions and row churn"
+        },
+        "locks": {
+          "title": "Locks",
+          "desc": "Locking pressure and what holds it"
+        },
+        "replication": {
+          "title": "Replication",
+          "desc": "WAL pressure and replica lag"
+        },
+        "indexes": {
+          "title": "Indexes",
+          "desc": "Index usage and size per table"
+        },
+        "blocks": {
+          "title": "Blocks",
+          "desc": "Shared-buffer I/O attributed to queries, from the database's own counters"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Live and dead rows per table"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Query calls",
+        "avgDuration": "Average duration",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Rows modified",
+        "locks": "Locks",
+        "walLag": "WAL lag",
+        "indexScans": "Index scans",
+        "indexSize": "Index size",
+        "blksHit": "Shared blocks hit",
+        "blksRead": "Shared blocks read",
+        "blksDirtied": "Shared blocks dirtied",
+        "rowsByState": "Rows by state"
+      },
+      "searchPlaceholder": "Filter metrics…",
+      "triageOrder": "ordered by triage relevance",
+      "sections": {
+        "featured": "Key health metrics",
+        "postgresql": "PostgreSQL metrics",
+        "mysql": "MySQL and MariaDB metrics"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Cache hit ratio",
+        "connections": "Connections",
+        "connectionLimit": "Connection limit",
+        "replicationLag": "Replication lag",
+        "cacheHit": "Cache hits",
+        "cacheRead": "Cache disk reads",
+        "deadlocks": "Deadlocks"
+      },
+      "notCollecting": {
+        "title": "No database metrics are arriving",
+        "description": "The load chart above reads the activity samples, but no metric streams from a database receiver exist in this organization yet. The collector recipes on the database setup cards ship them.",
+        "checklistTitle": "What to check",
+        "checks": {
+          "receivers": {
+            "no": "No database receiver is sending metrics",
+            "noDetail": "The PostgreSQL and MySQL setup cards under Data sources configure the collector's metric receiver alongside the monitoring feeds."
+          },
+          "enabled": {
+            "ok": "Database monitoring is enabled",
+            "okDetail": "so the metrics will chart here as soon as a receiver ships them",
+            "no": "Database monitoring is disabled",
+            "noDetail": "ZO_DB_MONITORING_ENABLED is off for this deployment, so the database tabs are not collecting."
+          }
+        }
       }
     },
     "samples": {
