@@ -62,6 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-graph-node-panel-view-related-traces-btn"
             >{{ t("traces.serviceGraphNodeSidePanel.traces") }}</ODropdownItem
           >
+          <!-- FR-7's missing direction: service → the databases it queries.
+               Database Monitoring already accepts a `service` scope; this is
+               the entry point that sets it. Hidden when the feature is off. -->
+          <ODropdownItem
+            v-if="dbmEnabled"
+            @select="viewRelatedDatabases"
+            data-test="service-graph-node-panel-view-related-databases-btn"
+            >{{ t("traces.serviceGraphNodeSidePanel.databases") }}</ODropdownItem
+          >
         </ODropdown>
       </div>
     </template>
@@ -2357,6 +2366,33 @@ export default defineComponent({
       navigateToTraces({ mode: "traces" });
     };
 
+    /** Database Monitoring is on for this instance, so the service→databases
+     *  entry point may render. Same flag the DBM routes and nav gate on. */
+    const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
+
+    /**
+     * Service → databases (DBM FR-7). Top queries scoped to this service over
+     * the panel's window: the question from a service is "which of MY queries
+     * is hurting", which is the query grain — the databases tab cannot scope
+     * to a service without collapsing to estimated per-query totals. The name
+     * goes in RAW (the router encodes it); `buildServiceName` is SQL-escaped
+     * and would corrupt an O'Reilly-style name in a URL.
+     */
+    const viewRelatedDatabases = () => {
+      const node = props.selectedNode;
+      const serviceName = node?.name || node?.label || node?.id;
+      if (!serviceName) return;
+      router.push({
+        name: "dbmQueries",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          service: String(serviceName),
+          from: String(props.timeRange.startTime),
+          to: String(props.timeRange.endTime),
+        },
+      });
+    };
+
     const viewRelatedLogs = async () => {
       const serviceName = buildServiceName();
       if (!serviceName) return;
@@ -2499,6 +2535,8 @@ export default defineComponent({
       handleClose,
       viewRelatedTraces,
       viewRelatedLogs,
+      dbmEnabled,
+      viewRelatedDatabases,
       handleShowTelemetry,
       // RED Charts
       dashboardData,

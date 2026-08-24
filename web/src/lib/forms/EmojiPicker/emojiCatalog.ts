@@ -60,7 +60,8 @@ export const EMOJI_GROUPS: readonly EmojiGroup[] = [
     labelKey: "components.emojiPicker.groups.services",
     emojis: [
       { token: "o2:postgresql", keywords: ["postgres", "postgresql", "pgsql"] },
-      { token: "o2:mysql", keywords: ["mysql", "mariadb"] },
+      { token: "o2:mysql", keywords: ["mysql"] },
+      { token: "o2:mariadb", keywords: ["mariadb"] },
       { token: "o2:mongodb", keywords: ["mongo", "mongodb"] },
       { token: "o2:redis", keywords: ["redis", "valkey"] },
       { token: "o2:oracle", keywords: ["oracle"] },

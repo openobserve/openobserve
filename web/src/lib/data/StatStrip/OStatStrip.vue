@@ -48,6 +48,7 @@ const onCardClick = (item: StatItem) => {
       class="grow basis-52"
       :label="item.label"
       :value="item.value"
+      :sub="item.sub"
       :icon="item.icon"
       :tone="item.tone"
       :trend="item.trend"

@@ -1,0 +1,132 @@
+[
+  {
+    "id": "redis-hget-uuid-key-a",
+    "dialect": "redis",
+    "input": {
+      "attrs": {
+        "db.system": "redis",
+        "db.statement": "HGET session:1672d3b0-8a84-11f1-9a18-eae17e9be2ff"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "HGET session:?",
+      "operation": "HGET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis_hget_session",
+    "literals": ["1672d3b0-8a84-11f1-9a18-eae17e9be2ff"],
+    "source": "authored"
+  },
+  {
+    "id": "redis-hget-uuid-key-b-producer-kind",
+    "dialect": "redis",
+    "input": {
+      "attrs": {
+        "db.system": "redis",
+        "db.statement": "HGET session:99887766-1122-4455-8899-aabbccddeeff"
+      },
+      "span_kind": 4
+    },
+    "expect": {
+      "query_norm": "HGET session:?",
+      "operation": "HGET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis_hget_session",
+    "literals": ["99887766-1122-4455-8899-aabbccddeeff"],
+    "source": "authored"
+  },
+  {
+    "id": "redis-email-key-segment",
+    "dialect": "redis",
+    "input": {
+      "attrs": {
+        "db.system": "redis",
+        "db.statement": "GET user:ashish@openobserve.ai:profile"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "GET user:?:profile",
+      "operation": "GET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis_get_user_profile",
+    "literals": ["ashish@openobserve.ai"],
+    "source": "authored"
+  },
+  {
+    "id": "redis-base64-key-segment",
+    "dialect": "redis",
+    "input": {
+      "attrs": {
+        "db.system": "redis",
+        "db.statement": "GET cache:dGhpc2lzYXNlY3JldHRva2Vu"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "GET cache:?",
+      "operation": "GET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis_get_cache",
+    "literals": ["dGhpc2lzYXNlY3JldHRva2Vu"],
+    "source": "authored"
+  },
+  {
+    "id": "redis-js-contrib-other-arguments-suffix",
+    "dialect": "redis",
+    "input": {
+      "attrs": {
+        "db.system": "redis",
+        "db.statement": "SET session:9f31c2aa payload-token-x91 [3 other arguments]"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SET session:?",
+      "operation": "SET",
+      "stmt_class": "query",
+      "system": "redis",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "redis_set_session",
+    "literals": ["9f31c2aa", "payload-token-x91", "[3 other arguments]"],
+    "source": "authored"
+  }
+]
