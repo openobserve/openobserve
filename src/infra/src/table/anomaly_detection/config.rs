@@ -39,7 +39,6 @@ pub async fn get_by_id<C: ConnectionTrait>(
     org_id: &str,
     anomaly_id: &str,
 ) -> Result<Option<Model>> {
-    let _lock = super::super::get_lock().await;
     let model = anomaly_detection_config::Entity::find_by_id(anomaly_id)
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
         .one(conn)
@@ -50,7 +49,6 @@ pub async fn get_by_id<C: ConnectionTrait>(
 
 /// Lists all configs for an organisation, ordered by `created_at` descending.
 pub async fn list_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<Vec<Model>> {
-    let _lock = super::super::get_lock().await;
     let models = anomaly_detection_config::Entity::find()
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
         .order_by_desc(anomaly_detection_config::Column::CreatedAt)
@@ -63,7 +61,6 @@ pub async fn list_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<V
 /// Lists all enabled configs across all organisations.
 /// Used by startup recovery to re-create any missing detection triggers.
 pub async fn list_all_enabled<C: ConnectionTrait>(conn: &C) -> Result<Vec<Model>> {
-    let _lock = super::super::get_lock().await;
     let models = anomaly_detection_config::Entity::find()
         .filter(anomaly_detection_config::Column::Enabled.eq(true))
         .all(conn)
@@ -83,7 +80,6 @@ pub async fn create<C: TransactionTrait + ConnectionTrait>(
     conn: &C,
     config: Model,
 ) -> Result<Model> {
-    let _lock = super::super::get_lock().await;
     let txn = conn.begin().await?;
 
     let folder_exists = folders::Entity::find_by_id(&config.folder_id)
@@ -114,7 +110,6 @@ pub async fn create_if_not_exists<C: TransactionTrait + ConnectionTrait>(
     conn: &C,
     config: Model,
 ) -> Result<()> {
-    let _lock = super::super::get_lock().await;
     let txn = conn.begin().await?;
 
     let anomaly_id = config.anomaly_id.clone();
@@ -150,7 +145,6 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
     conn: &C,
     incoming: Model,
 ) -> Result<Model> {
-    let _lock = super::super::get_lock().await;
     let txn = conn.begin().await?;
 
     let existing = anomaly_detection_config::Entity::find_by_id(&incoming.anomaly_id)
@@ -198,7 +192,6 @@ pub async fn put<C: TransactionTrait + ConnectionTrait>(
     conn: &C,
     incoming: Model,
 ) -> Result<Model> {
-    let _lock = super::super::get_lock().await;
     let txn = conn.begin().await?;
 
     let anomaly_id = incoming.anomaly_id.clone();
@@ -233,7 +226,6 @@ pub async fn put<C: TransactionTrait + ConnectionTrait>(
 
 /// Deletes a config by `anomaly_id` + `org_id`.
 pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str) -> Result<()> {
-    let _lock = super::super::get_lock().await;
     anomaly_detection_config::Entity::delete_many()
         .filter(anomaly_detection_config::Column::AnomalyId.eq(anomaly_id))
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id))

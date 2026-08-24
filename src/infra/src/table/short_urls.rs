@@ -22,11 +22,9 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 use crate::{
     db::{
-        IndexStatement, ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl, postgres,
-        sqlite,
+        IndexStatement, get_orm_client_ddl, get_orm_client_ro, get_orm_client_rw, postgres, sqlite,
     },
     errors::{self, DbError, Error},
 };
@@ -90,7 +88,7 @@ pub async fn init() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -113,7 +111,7 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         &["created_ts"],
     );
 
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     match client.get_database_backend() {
         DatabaseBackend::Postgres => {
             postgres::create_index(index1).await?;
@@ -137,10 +135,7 @@ pub async fn add(short_id: &str, original_url: &str, org_id: &str) -> Result<boo
         ..Default::default()
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let inserted = Entity::insert(record)
         .on_conflict(
             sea_orm::sea_query::OnConflict::column(Column::ShortId)
@@ -154,10 +149,7 @@ pub async fn add(short_id: &str, original_url: &str, org_id: &str) -> Result<boo
 }
 
 pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::ShortId.eq(short_id))
         .exec(client)
@@ -167,7 +159,7 @@ pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(short_id: &str, org_id: &str) -> Result<ShortUrlRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find()
         .select_only()
         .column(Column::ShortId)
@@ -195,7 +187,7 @@ pub async fn get(short_id: &str, org_id: &str) -> Result<ShortUrlRecord, errors:
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find()
         .select_only()
         .column(Column::ShortId)
@@ -211,7 +203,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
 }
 
 pub async fn len() -> usize {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await;
 
     match len {
@@ -224,10 +216,7 @@ pub async fn len() -> usize {
 }
 
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database (only for SQLite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)
@@ -237,10 +226,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
@@ -254,7 +240,7 @@ pub async fn get_expired(
     expired_before: i64,
     limit: Option<i64>,
 ) -> Result<Vec<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find()
         .select_only()
         .column(Column::ShortId)
@@ -267,10 +253,7 @@ pub async fn get_expired(
 }
 
 pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::ShortId.is_in(short_ids))
         .exec(client)

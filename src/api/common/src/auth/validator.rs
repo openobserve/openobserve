@@ -1271,11 +1271,7 @@ fn _extract_full_url(req: &Request) -> String {
 
 #[cfg(test)]
 mod tests {
-    use infra::{
-        db as infra_db,
-        db::{ORM_CLIENT, connect_to_orm},
-        table as infra_table,
-    };
+    use infra::{db as infra_db, db::get_orm_client_ro, table as infra_table};
     use openobserve_core::{organization, users};
 
     use super::*;
@@ -1631,7 +1627,7 @@ mod tests {
         let pwd = "Complexpass#123";
 
         // Initialize ORM client and clear database tables for test isolation
-        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let _ = get_orm_client_ro().await;
         let _ = infra::table::org_users::clear().await;
         let _ = infra::table::users::clear().await;
         let _ = infra::table::organizations::clear().await;

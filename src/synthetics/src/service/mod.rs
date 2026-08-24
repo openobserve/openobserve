@@ -33,12 +33,9 @@ use config::meta::{
         for_each_string_at_path, take_strings_at_path,
     },
 };
-use infra::{
-    db::ORM_CLIENT,
-    table::{
-        cipher, folders, synthetics_agents, synthetics_checks, synthetics_jobs,
-        synthetics_locations, synthetics_runs,
-    },
+use infra::table::{
+    cipher, folders, synthetics_agents, synthetics_checks, synthetics_jobs, synthetics_locations,
+    synthetics_runs,
 };
 // ── OpenFGA ───────────────────────────────────────────────────────────────────
 //
@@ -95,12 +92,6 @@ pub use runs::*;
 pub use tokens::*;
 
 // ── DB helper ─────────────────────────────────────────────────────────────────
-
-fn db() -> anyhow::Result<&'static sea_orm::DatabaseConnection> {
-    ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))
-}
 
 /// Mints this org's default synthetics folder, in THIS region only.
 ///
