@@ -7293,12 +7293,17 @@
       "matchingGroups": "các nhóm khớp",
       "dataPoint": "điểm dữ liệu",
       "dataPoints": "các điểm dữ liệu",
+      "matchingSeries": "chuỗi",
+      "matchingSeriesPlural": "chuỗi",
       "row": "hàng",
       "rows": "các hàng",
       "result": "kết quả",
       "results": "các kết quả",
       "reasonMatch": "{count} {label} khớp ({comparison})",
-      "reasonNoMatch": "{count} {label} được tìm thấy - không đáp ứng {comparison}"
+      "reasonNoMatch": "{count} {label} được tìm thấy - không đáp ứng {comparison}",
+      "levelCritical": "Nghiêm trọng",
+      "levelWarning": "Cảnh báo",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "Không được phép chọn tất cả các cột",
     "customSql": "SQL tùy chỉnh",

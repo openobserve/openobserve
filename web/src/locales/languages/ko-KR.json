@@ -7293,12 +7293,17 @@
       "matchingGroups": "일치 그룹",
       "dataPoint": "데이터 포인트",
       "dataPoints": "데이터 포인트",
+      "matchingSeries": "시계열",
+      "matchingSeriesPlural": "시계열",
       "row": "행",
       "rows": "행",
       "result": "결과",
       "results": "결과",
       "reasonMatch": "{count} {label} 일치 ({comparison})",
-      "reasonNoMatch": "{count} {label} 발견됨 - {comparison} 충족하지 않음"
+      "reasonNoMatch": "{count} {label} 발견됨 - {comparison} 충족하지 않음",
+      "levelCritical": "심각",
+      "levelWarning": "경고",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "모든 열을 선택할 수 없습니다",
     "customSql": "사용자 지정 SQL",

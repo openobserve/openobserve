@@ -18,7 +18,7 @@ use std::sync::Arc;
 use anyhow::{Context, anyhow};
 use chrono::Utc;
 use common::infra::config::SHORT_URLS;
-use config::get_config;
+use config::{get_config, utils::json};
 use infra::{db::Event, table::short_urls};
 
 use crate as db;
@@ -30,12 +30,10 @@ const SHORT_URL_GC_INTERVAL: i64 = 1; // days
 const SHORT_URL_CACHE_LIMIT: i64 = 10_000; // records
 
 pub async fn get(short_id: &str, org_id: &str) -> Result<String, anyhow::Error> {
-    // Check cache first; re-validate org_id ownership (legacy rows have empty org_id).
-    if let Some(v) = SHORT_URLS.get(short_id) {
-        if v.org_id.is_empty() || v.org_id == org_id {
-            return Ok(v.original_url.to_string());
-        }
-        return Err(anyhow!("Short URL not found"));
+    // Check cache first; a cached row that fails the org check must not fall
+    // through to the db.
+    if SHORT_URLS.contains_key(short_id) {
+        return get_cached(short_id, org_id).ok_or_else(|| anyhow!("Short URL not found"));
     }
 
     let val = short_urls::get(short_id, org_id)
@@ -46,19 +44,30 @@ pub async fn get(short_id: &str, org_id: &str) -> Result<String, anyhow::Error> 
     Ok(original_url)
 }
 
-pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<(), anyhow::Error> {
-    if let Err(e) = short_urls::add(short_id, &entry.original_url, &entry.org_id).await {
-        log::error!("Failed to add short URL to DB : {e}");
-        return Err(e).context("Failed to add short URL to DB");
+/// Cache-only lookup; re-validates org_id ownership (legacy rows have empty org_id).
+pub fn get_cached(short_id: &str, org_id: &str) -> Option<String> {
+    let v = SHORT_URLS.get(short_id)?;
+    (v.org_id.is_empty() || v.org_id == org_id).then(|| v.original_url.to_string())
+}
+
+/// Returns `false` when a row with the same `short_id` already exists (nothing
+/// written, no events emitted).
+pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<bool, anyhow::Error> {
+    let inserted = short_urls::add(short_id, &entry.original_url, &entry.org_id)
+        .await
+        .inspect_err(|e| log::error!("Failed to add short URL to DB : {e}"))
+        .context("Failed to add short URL to DB")?;
+    if !inserted {
+        return Ok(false);
     }
 
     // trigger watch event cluster coordinator
-    cluster::emit_put_event(short_id).await?;
+    cluster::emit_put_event(short_id, &entry).await?;
     // trigger watch event super cluster
     #[cfg(feature = "enterprise")]
     super_cluster::emit_put_event(short_id, entry).await?;
 
-    Ok(())
+    Ok(true)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -87,12 +96,26 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                // Load with empty org_id so the lookup succeeds regardless of tenant.
-                let item_value = match short_urls::get(item_key, "").await {
-                    Ok(val) => val,
-                    Err(e) => {
-                        log::error!("Error getting value: {e}");
-                        continue;
+                // Prefer the record carried in the event body; fall back to a
+                // db read for events from nodes that send an empty body.
+                let item_value = if let Some(val) = &ev.value
+                    && !val.is_empty()
+                {
+                    match json::from_slice::<short_urls::ShortUrlRecord>(val) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error parsing short URL event value: {e}");
+                            continue;
+                        }
+                    }
+                } else {
+                    // Load with empty org_id so the lookup succeeds regardless of tenant.
+                    match short_urls::get(item_key, "").await {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {e}");
+                            continue;
+                        }
                     }
                 };
                 SHORT_URLS.insert(item_key.to_string(), item_value);
@@ -194,13 +217,18 @@ mod tests {
 
 /// Helper functions for sending events to cache watchers in the cluster.
 mod cluster {
-    use super::SHORT_URL_KEY;
+    use config::utils::json;
+
+    use super::{SHORT_URL_KEY, short_urls};
 
     /// Sends event to the cluster cache watchers indicating that a new short URL entry has been
-    /// added.
-    pub async fn emit_put_event(short_id: &str) -> Result<(), infra::errors::Error> {
+    /// added. The record rides in the event body so watchers can cache it without a db read.
+    pub async fn emit_put_event(
+        short_id: &str,
+        entry: &short_urls::ShortUrlRecord,
+    ) -> Result<(), infra::errors::Error> {
         let key = short_url_key(short_id);
-        let value = bytes::Bytes::new();
+        let value = bytes::Bytes::from(json::to_vec(entry).unwrap());
         let cluster_coordinator = infra::db::get_coordinator().await;
         cluster_coordinator
             .put(&key, value, infra::db::NEED_WATCH, None)

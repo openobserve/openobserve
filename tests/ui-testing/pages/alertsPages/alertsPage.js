@@ -1202,9 +1202,12 @@ export class AlertsPage {
 
     /**
      * Assert an alert with the given name is visible on the list table.
+     * The table paginates at 20 rows, so a freshly created alert is often on a
+     * later page — narrow the list to it first, exactly as clickAlertUpdateButton does.
      * @param {string} name
      */
     async expectAlertVisibleInList(name) {
+        await this.searchAlert(name);
         const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
         await expect(row).toBeVisible({ timeout: 15000 });
         testLogger.info('Alert visible on list', { name });
