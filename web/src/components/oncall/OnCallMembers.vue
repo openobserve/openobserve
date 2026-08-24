@@ -207,7 +207,7 @@
       data-test="oncall-members-unreachable-banner"
     >
       {{ unreachableWarning }}
-      <template #actions>
+      <template v-if="canConfigure" #actions>
         <OButton
           variant="ghost"
           size="xs"
@@ -328,8 +328,17 @@ const props = withDefaults(
     /** Pages carried per person, for the magnitude bars. */
     load?: TeamLoad | null;
     testing?: boolean;
+    /** May change on-call configuration. Hides the test-page action when false. */
+    canConfigure?: boolean;
   }>(),
-  { rotations: () => [], onCallNow: () => [], reachability: null, load: null, testing: false },
+  {
+    rotations: () => [],
+    onCallNow: () => [],
+    reachability: null,
+    load: null,
+    testing: false,
+    canConfigure: true,
+  },
 );
 const emit = defineEmits<{ changed: []; "open-schedule": []; "test-page": [] }>();
 

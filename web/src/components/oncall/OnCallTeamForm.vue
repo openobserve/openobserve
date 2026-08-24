@@ -127,6 +127,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import type { OnCallTeam, Rotation } from "@/ts/interfaces/oncall";
@@ -155,6 +156,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { noteConfigurationDenied } = useOnCallPermissions();
 
 const formKey = ref(0);
 const formRef = ref<{ form: any } | null>(null);
@@ -284,9 +286,13 @@ async function onSubmit(values: OnCallTeamFormValues) {
     });
     emit("saved");
   } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.saveTeamFailed"),
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.saveTeamFailed"),
     });
   }
 }

@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.policiesTitle") }}
       </OButton>
       <OButton
+        v-if="canConfigure"
         variant="primary"
         size="sm"
         icon-left="add"
@@ -154,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            announced. Safe actions first, destructive last. -->
       <template #cell-actions="{ row }">
         <OButton
+          v-if="canConfigure"
           variant="ghost"
           size="icon-sm"
           icon-left="edit"
@@ -164,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip side="bottom" :content="t('oncall.editTeam')" />
         </OButton>
         <OButton
+          v-if="canConfigure"
           variant="ghost"
           size="icon-sm"
           icon-left="delete-outline"
@@ -244,6 +247,7 @@ import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import oncallService from "@/services/oncall";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -254,6 +258,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
+const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
 
 const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
@@ -433,9 +438,13 @@ async function deleteTeam() {
     toast({ variant: "success", message: t("oncall.teamDeleted") });
     await fetchTeams();
   } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.deleteTeamFailed"),
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.deleteTeamFailed"),
     });
   }
 }

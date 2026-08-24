@@ -43,6 +43,7 @@
         {{ t("oncall.takeOverride") }}
       </OButton>
       <OButton
+        v-if="canConfigure"
         variant="primary"
         size="sm-action"
         data-test="oncall-team-detail-edit-btn"
@@ -214,6 +215,7 @@
             :reachability="reachability"
             :load="teamLoad"
             :testing="testingPage"
+            :can-configure="canConfigure"
             @changed="fetchAll"
             @open-schedule="activeTab = 'schedule'"
             @test-page="sendTestPage"
@@ -411,6 +413,7 @@ import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
+import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -442,6 +445,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
+const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
 
 /** The window the activity panel and the recent-pages list describe. */
 const ACTIVITY_WINDOW_DAYS = 7;
@@ -768,9 +772,13 @@ async function sendTestPage() {
       });
     }
   } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
     });
   } finally {
     testingPage.value = false;
