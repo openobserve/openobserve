@@ -607,7 +607,7 @@ fn handle_timestamp_for_map(
     max_ts: i64,
     def_ts: i64,
 ) -> Result<i64, anyhow::Error> {
-    let (timestamp, has_valid_timestamp) = match val.get(TIMESTAMP_COL_NAME) {
+    let (mut timestamp, has_valid_timestamp) = match val.get(TIMESTAMP_COL_NAME) {
         Some(v) if !v.is_null() => match parse_timestamp_micro_from_value(v) {
             Ok(t) => t,
             Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
@@ -622,12 +622,15 @@ fn handle_timestamp_for_map(
         return Err(get_future_discard_error());
     }
     if timestamp == 0 || !has_valid_timestamp {
-        let t = if def_ts > 0 {
+        timestamp = if def_ts > 0 {
             def_ts
         } else {
             Utc::now().timestamp_micros()
         };
-        val.insert(TIMESTAMP_COL_NAME.to_string(), Value::Number(t.into()));
+        val.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            Value::Number(timestamp.into()),
+        );
     }
     Ok(timestamp)
 }
