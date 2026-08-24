@@ -94,7 +94,7 @@ pub async fn merge_parquet_files(
                 &metadata,
                 output.file_format,
                 get_config().compact.max_file_size,
-                &mut rx,
+                rx,
                 read_task,
             )
             .await?

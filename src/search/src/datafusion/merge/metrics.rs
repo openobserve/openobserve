@@ -34,7 +34,7 @@ use vortex::{
     array::ArrayRef,
     arrow::{FromArrowArray, FromArrowType},
     dtype::DType,
-    file::VortexWriteOptions,
+    file::{VortexWriteOptions, Writer as VortexWriter},
     io::session::RuntimeSessionExt,
     session::VortexSession,
 };
@@ -51,7 +51,7 @@ pub(super) async fn write_files(
     metadata: &FileMeta,
     file_format: FileFormat,
     max_file_size: usize,
-    rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
+    rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
     let timestamp_index = schema.index_of(TIMESTAMP_COL_NAME).map_err(|e| {
@@ -60,38 +60,31 @@ pub(super) async fn write_files(
         ))
     })?;
     let max_file_size = i64::try_from(max_file_size).unwrap_or(i64::MAX).max(1);
-    let mut active: Option<ActiveIndexedMetricsWriter> = None;
-    let mut files: Vec<MergedFile> = Vec::new();
-
-    while let Some(batch) = rx.recv().await {
-        if batch.num_rows() == 0 {
-            continue;
-        }
-        // rotate between input batches once the logical size target is reached
-        if let Some(full) = active.take_if(|writer| {
-            proportional_original_size(metadata, writer.file_meta.records) >= max_file_size
-        }) {
-            files.push(full.finish(metadata, max_file_size).await?);
-        }
-        let writer = match active.as_mut() {
-            Some(writer) => writer,
-            None => active.insert(ActiveIndexedMetricsWriter::try_new(
+    let files = match file_format {
+        FileFormat::Parquet => {
+            write_parquet(
                 schema,
                 bloom_filter_fields,
                 metadata,
-                file_format,
+                max_file_size,
                 timestamp_index,
-            )?),
-        };
-        writer.write(&batch).await?;
-    }
-
-    read_task
-        .await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
-    if let Some(active) = active.take() {
-        files.push(active.finish(metadata, max_file_size).await?);
-    }
+                rx,
+                read_task,
+            )
+            .await?
+        }
+        FileFormat::Vortex => {
+            write_vortex(
+                Arc::clone(schema),
+                metadata.clone(),
+                max_file_size,
+                timestamp_index,
+                rx,
+                read_task,
+            )
+            .await?
+        }
+    };
     if files.is_empty() {
         return Err(DataFusionError::Execution(
             "indexed metrics merge produced no rows".to_string(),
@@ -101,27 +94,118 @@ pub(super) async fn write_files(
     Ok(files)
 }
 
-/// One output file in progress: its format-specific data writer, `.midx`
-/// metrics-index writer and running file meta.
-struct ActiveIndexedMetricsWriter {
-    data_writer: IndexedDataWriter,
+async fn write_parquet(
+    schema: &Arc<Schema>,
+    bloom_filter_fields: &[String],
+    metadata: &FileMeta,
+    max_file_size: i64,
+    timestamp_index: usize,
+    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    read_task: tokio::task::JoinHandle<Result<()>>,
+) -> Result<Vec<MergedFile>> {
+    let mut active: Option<ActiveIndexedParquetWriter> = None;
+    let mut files = Vec::new();
+
+    while let Some(batch) = rx.recv().await {
+        if batch.num_rows() == 0 {
+            continue;
+        }
+        if let Some(full) = active.take_if(|writer| {
+            proportional_original_size(metadata, writer.state.file_meta.records) >= max_file_size
+        }) {
+            files.push(full.finish(metadata, max_file_size).await?);
+        }
+        let writer = match active.as_mut() {
+            Some(writer) => writer,
+            None => active.insert(ActiveIndexedParquetWriter::try_new(
+                schema,
+                bloom_filter_fields,
+                metadata,
+                timestamp_index,
+            )?),
+        };
+        writer.write(&batch).await?;
+    }
+
+    await_read_task(read_task).await?;
+    if let Some(active) = active {
+        files.push(active.finish(metadata, max_file_size).await?);
+    }
+    Ok(files)
+}
+
+async fn write_vortex(
+    schema: Arc<Schema>,
+    metadata: FileMeta,
+    max_file_size: i64,
+    timestamp_index: usize,
+    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    read_task: tokio::task::JoinHandle<Result<()>>,
+) -> Result<Vec<MergedFile>> {
+    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
+        VORTEX_RUNTIME.block_on(async move {
+            let session = VortexSession::default().with_tokio();
+            let dtype = DType::from_arrow(schema.as_ref());
+            let strategy = vortex_write_strategy();
+            let mut active: Option<ActiveIndexedVortexWriter> = None;
+            let mut files = Vec::new();
+
+            while let Some(batch) = rx.recv().await {
+                if batch.num_rows() == 0 {
+                    continue;
+                }
+                if let Some(full) = active.take_if(|writer| {
+                    proportional_original_size(&metadata, writer.state.file_meta.records)
+                        >= max_file_size
+                }) {
+                    files.push(full.finish(&metadata, max_file_size).await?);
+                }
+                let writer = match active.as_mut() {
+                    Some(writer) => writer,
+                    None => {
+                        let write_options = VortexWriteOptions::new(session.clone())
+                            .with_strategy(strategy.clone());
+                        active.insert(ActiveIndexedVortexWriter::try_new(
+                            &schema,
+                            timestamp_index,
+                            write_options,
+                            dtype.clone(),
+                        )?)
+                    }
+                };
+                writer.write(batch).await?;
+            }
+
+            if let Some(active) = active {
+                files.push(active.finish(&metadata, max_file_size).await?);
+            }
+            Ok::<Vec<MergedFile>, anyhow::Error>(files)
+        })
+    });
+
+    await_read_task(read_task).await?;
+    writer_task
+        .await
+        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
+        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex files: {e}")))
+}
+
+async fn await_read_task(read_task: tokio::task::JoinHandle<Result<()>>) -> Result<()> {
+    read_task
+        .await
+        .map_err(|e| DataFusionError::External(Box::new(e)))?
+}
+
+/// Format-independent `.midx` state and exact metadata for one active file.
+struct IndexedMetricsFileState {
     metrics_index: MetricsIndexWriter,
     file_meta: FileMeta,
     timestamp_index: usize,
 }
 
-impl ActiveIndexedMetricsWriter {
-    fn try_new(
-        schema: &Arc<Schema>,
-        bloom_filter_fields: &[String],
-        metadata: &FileMeta,
-        file_format: FileFormat,
-        timestamp_index: usize,
-    ) -> Result<Self> {
-        let data_writer =
-            IndexedDataWriter::try_new(schema, bloom_filter_fields, metadata, file_format)?;
+impl IndexedMetricsFileState {
+    fn try_new(schema: &Arc<Schema>, timestamp_index: usize) -> Result<Self> {
         Ok(Self {
-            data_writer,
             metrics_index: MetricsIndexWriter::try_new(schema)?,
             file_meta: FileMeta::default(),
             timestamp_index,
@@ -130,8 +214,7 @@ impl ActiveIndexedMetricsWriter {
 
     /// Append one (hash, ts)-ordered batch to the data file, its runs to the
     /// metrics index and its rows / time range to the file meta.
-    async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.data_writer.write(batch).await?;
+    fn write(&mut self, batch: &RecordBatch) -> Result<()> {
         self.metrics_index.write(batch)?;
 
         let timestamps = batch
@@ -156,9 +239,8 @@ impl ActiveIndexedMetricsWriter {
         Ok(())
     }
 
-    async fn finish(self, source_meta: &FileMeta, max_file_size: i64) -> Result<MergedFile> {
+    fn finish(self, source_meta: &FileMeta, max_file_size: i64) -> Result<(Vec<u8>, FileMeta)> {
         let Self {
-            data_writer,
             metrics_index,
             mut file_meta,
             ..
@@ -167,136 +249,90 @@ impl ActiveIndexedMetricsWriter {
         // below the target so an indexed file never advertises >= max_file_size
         file_meta.original_size =
             proportional_original_size(source_meta, file_meta.records).min(max_file_size - 1);
-        let data_path = data_writer.finish(&file_meta).await?;
+        Ok((metrics_index.finish()?, file_meta))
+    }
+}
 
-        // compressed_size is set by the compactor when it uploads the file
-        Ok(MergedFile::MetricsIndexed {
+struct ActiveIndexedParquetWriter {
+    writer: AsyncArrowWriter<tokio::fs::File>,
+    data_path: tempfile::TempPath,
+    state: IndexedMetricsFileState,
+}
+
+impl ActiveIndexedParquetWriter {
+    fn try_new(
+        schema: &Arc<Schema>,
+        bloom_filter_fields: &[String],
+        metadata: &FileMeta,
+        timestamp_index: usize,
+    ) -> Result<Self> {
+        let (file, data_path) = new_temp_file()?;
+        let writer = new_parquet_writer(file, schema, bloom_filter_fields, metadata, false, None);
+        Ok(Self {
+            writer,
             data_path,
-            metrics_index_path: write_temp_file(metrics_index.finish()?).await?,
+            state: IndexedMetricsFileState::try_new(schema, timestamp_index)?,
+        })
+    }
+
+    async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
+        self.writer.write(batch).await?;
+        self.state.write(batch)
+    }
+
+    async fn finish(mut self, source_meta: &FileMeta, max_file_size: i64) -> Result<MergedFile> {
+        let (metrics_index, file_meta) = self.state.finish(source_meta, max_file_size)?;
+        append_metadata(&mut self.writer, &file_meta)?;
+        self.writer.finish().await?;
+        drop(self.writer.into_inner());
+        Ok(MergedFile::MetricsIndexed {
+            data_path: self.data_path,
+            metrics_index_path: write_temp_file(metrics_index).await?,
             meta: file_meta,
         })
     }
 }
 
-enum IndexedDataWriter {
-    Parquet(Box<IndexedParquetWriter>),
-    Vortex(IndexedVortexWriter),
+struct ActiveIndexedVortexWriter {
+    writer: VortexWriter<'static>,
+    data_path: tempfile::TempPath,
+    state: IndexedMetricsFileState,
 }
 
-impl IndexedDataWriter {
+impl ActiveIndexedVortexWriter {
     fn try_new(
         schema: &Arc<Schema>,
-        bloom_filter_fields: &[String],
-        metadata: &FileMeta,
-        file_format: FileFormat,
-    ) -> Result<Self> {
-        match file_format {
-            FileFormat::Parquet => Ok(Self::Parquet(Box::new(IndexedParquetWriter::try_new(
-                schema,
-                bloom_filter_fields,
-                metadata,
-            )?))),
-            FileFormat::Vortex => Ok(Self::Vortex(IndexedVortexWriter::try_new(schema)?)),
-        }
-    }
-
-    async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        match self {
-            Self::Parquet(writer) => writer.write(batch).await,
-            Self::Vortex(writer) => writer.write(batch).await,
-        }
-    }
-
-    async fn finish(self, file_meta: &FileMeta) -> Result<tempfile::TempPath> {
-        match self {
-            Self::Parquet(writer) => (*writer).finish(file_meta).await,
-            Self::Vortex(writer) => writer.finish().await,
-        }
-    }
-}
-
-/// Parquet keeps its writer in the merge task and appends the exact output
-/// metadata when the active file rotates.
-struct IndexedParquetWriter {
-    writer: AsyncArrowWriter<tokio::fs::File>,
-    data_path: tempfile::TempPath,
-}
-
-impl IndexedParquetWriter {
-    fn try_new(
-        schema: &Arc<Schema>,
-        bloom_filter_fields: &[String],
-        metadata: &FileMeta,
+        timestamp_index: usize,
+        write_options: VortexWriteOptions,
+        dtype: DType,
     ) -> Result<Self> {
         let (file, data_path) = new_temp_file()?;
-        let writer = new_parquet_writer(file, schema, bloom_filter_fields, metadata, false, None);
-        Ok(Self { writer, data_path })
-    }
-
-    async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.writer.write(batch).await.map_err(Into::into)
-    }
-
-    async fn finish(mut self, file_meta: &FileMeta) -> Result<tempfile::TempPath> {
-        append_metadata(&mut self.writer, file_meta)?;
-        self.writer.finish().await?;
-        drop(self.writer.into_inner());
-        Ok(self.data_path)
-    }
-}
-
-/// Vortex runs on its dedicated runtime and receives Arrow batches through a
-/// bounded channel, matching the existing merge Vortex writer. Metrics Vortex
-/// files intentionally have no embedded `o2_file_meta`; file-list owns the
-/// exact metadata calculated when the active file rotates.
-struct IndexedVortexWriter {
-    tx: tokio::sync::mpsc::Sender<RecordBatch>,
-    writer_task: tokio::task::JoinHandle<anyhow::Result<()>>,
-    data_path: tempfile::TempPath,
-}
-
-impl IndexedVortexWriter {
-    fn try_new(schema: &Arc<Schema>) -> Result<Self> {
-        let (file, data_path) = new_temp_file()?;
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-        let schema = Arc::clone(schema);
-        let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
-            VORTEX_RUNTIME.block_on(async move {
-                let session = VortexSession::default().with_tokio();
-                let dtype = DType::from_arrow(schema.as_ref());
-                let write_options =
-                    VortexWriteOptions::new(session).with_strategy(vortex_write_strategy());
-                let mut writer = write_options.writer(file, dtype);
-
-                while let Some(batch) = rx.recv().await {
-                    let array: ArrayRef = ArrayRef::from_arrow(batch, false)?;
-                    writer.push(array).await?;
-                }
-                writer.finish().await?;
-                Ok::<(), anyhow::Error>(())
-            })
-        });
         Ok(Self {
-            tx,
-            writer_task,
+            writer: write_options.writer(file, dtype),
             data_path,
+            state: IndexedMetricsFileState::try_new(schema, timestamp_index)?,
         })
     }
 
-    async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.tx
-            .send(batch.clone())
-            .await
-            .map_err(|e| DataFusionError::Execution(format!("Vortex writer channel closed: {e}")))
+    async fn write(&mut self, batch: RecordBatch) -> anyhow::Result<()> {
+        self.state.write(&batch)?;
+        let array: ArrayRef = ArrayRef::from_arrow(batch, false)?;
+        self.writer.push(array).await?;
+        Ok(())
     }
 
-    async fn finish(self) -> Result<tempfile::TempPath> {
-        drop(self.tx);
-        self.writer_task
-            .await
-            .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
-            .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))?;
-        Ok(self.data_path)
+    async fn finish(
+        self,
+        source_meta: &FileMeta,
+        max_file_size: i64,
+    ) -> anyhow::Result<MergedFile> {
+        let (metrics_index, file_meta) = self.state.finish(source_meta, max_file_size)?;
+        self.writer.finish().await?;
+        Ok(MergedFile::MetricsIndexed {
+            data_path: self.data_path,
+            metrics_index_path: write_temp_file(metrics_index).await?,
+            meta: file_meta,
+        })
     }
 }
 
@@ -387,7 +423,7 @@ mod tests {
             compressed_size: 300,
             ..Default::default()
         };
-        let (tx, mut rx) = tokio::sync::mpsc::channel(3);
+        let (tx, rx) = tokio::sync::mpsc::channel(3);
         tx.send(batch1).await.unwrap();
         tx.send(batch2).await.unwrap();
         tx.send(batch3).await.unwrap();
@@ -400,7 +436,7 @@ mod tests {
             &metadata,
             file_format,
             max_file_size,
-            &mut rx,
+            rx,
             tokio::spawn(async { Ok(()) }),
         )
         .await
