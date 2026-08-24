@@ -21,7 +21,21 @@ const MAX_QUERY_STREAM = "e2e_max_query_range";
 // Serial mode is required: all tests share the same stream (e2e_max_query_range)
 // and its max_query_range setting. Running in parallel would cause tests to
 // reset each other's stream state mid-execution.
-test.describe.configure({ mode: "default" });
+//
+// This said "default", which does NOT deliver that. The config sets
+// fullyParallel: true with workers: 3, and under fullyParallel a describe in
+// "default" mode runs its tests in PARALLEL — the exact thing the comment above
+// says must not happen. So every test here has been racing its siblings over one
+// mutable stream setting: afterEach resets max_query_range to 0 while another
+// test is still querying, so its warning never renders, and the date-time picker
+// (which filters the offered ranges by the active restriction) can drop the
+// 6-week option mid-test. That is the shape of the intermittent
+// "warning icon not found" / "date-time-relative-6-w-btn not found" failures.
+//
+// "serial" is what the comment was asking for. The alternative — a dedicated
+// stream per test, as the multi-SQL partial-error tests use — would allow
+// parallelism, but it is a larger change than this fix warrants.
+test.describe.configure({ mode: "serial" });
 
 
 // ============================================================================
