@@ -621,7 +621,7 @@ fn handle_timestamp_for_map(
     if timestamp > max_ts {
         return Err(get_future_discard_error());
     }
-    if timestamp == 0 || !has_valid_timestamp {
+    if !has_valid_timestamp {
         timestamp = if timestamp > 0 {
             timestamp
         } else if def_ts > 0 {
