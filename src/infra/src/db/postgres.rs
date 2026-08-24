@@ -36,8 +36,8 @@ use tokio::sync::{OnceCell, mpsc};
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub(crate) static CLIENT_RW: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, false));
 pub(crate) static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true, false));
+pub(crate) static CLIENT_RW: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, false));
 pub(crate) static CLIENT_DDL: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
