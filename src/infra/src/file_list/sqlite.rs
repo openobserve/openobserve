@@ -2179,12 +2179,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_batch_add_with_id_unimplemented() {
+    async fn test_batch_add_with_id_skips_invalid_file_key() {
         let sqlite_list = SqliteFileList::new();
         let files = vec![create_test_file_key("account1", "test/key", false)];
 
         let result = sqlite_list.batch_add_with_id(&files).await;
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
