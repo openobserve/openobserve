@@ -51,6 +51,9 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
+const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+const paramsValid = computed(() => SQL_IDENT.test(props.field) && SQL_IDENT.test(props.stream));
+
 // Editable time range (µs); searches read these refs, not the fixed props.
 const rangeStart = ref(props.startTime);
 const rangeEnd = ref(props.endTime);
@@ -511,6 +514,12 @@ async function runSql(sql: string, fromOffset: number) {
     errorMsg.value = props.stream ? "" : `Stream not resolved (field: ${props.field})`;
     return;
   }
+  if (!paramsValid.value) {
+    errorMsg.value = t("panel.logExplorer.invalidParams");
+    events.value = [];
+    total.value = 0;
+    return;
+  }
   loading.value = true;
   errorMsg.value = "";
   try {
@@ -558,8 +567,10 @@ async function goToPage(p: number) {
 
 // Restore the detail drawer from URL param via a 1-row fetch by exact _timestamp.
 async function restoreEventDetail() {
-  const ts = route.query.cell_event_ts;
-  if (!ts || selectedEvent.value) return;
+  if (selectedEvent.value || !paramsValid.value) return;
+  const rawTs = String(route.query.cell_event_ts ?? "");
+  if (!/^\d{1,20}$/.test(rawTs)) return;
+  const ts = Number(rawTs);
   try {
     const res = await searchService.search(
       {

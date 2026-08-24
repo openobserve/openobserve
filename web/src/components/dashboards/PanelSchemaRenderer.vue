@@ -1358,27 +1358,26 @@ export default defineComponent({
     // Restore the cell drawer when navigating to a URL that already carries cell-explorer params.
     onMounted(() => {
       const query = route?.query;
-      if (query && String(query.cell_panel) === String(props.panelSchema.id)) {
-        const field = String(query.cell_field ?? "");
-        const value = String(query.cell_value ?? "");
-        const stream = String(query.cell_stream ?? "");
-        const stype = String(query.cell_stype ?? "logs");
-        const t0 = Number(query.cell_t0 ?? 0);
-        const t1 = Number(query.cell_t1 ?? 0);
-        const where = String(query.cell_where ?? "");
-        if (field && stream && t0 && t1) {
-          cellDrawer.value = {
-            open: true,
-            field,
-            value,
-            stream,
-            streamType: stype,
-            startTime: t0,
-            endTime: t1,
-            baseWhere: where,
-          };
-        }
-      }
+      if (!query || String(query.cell_panel) !== String(props.panelSchema.id)) return;
+      if (props.panelSchema.type !== "table" || props.panelSchema.queryType === "promql") return;
+      const field = String(query.cell_field ?? "");
+      const value = String(query.cell_value ?? "");
+      const stream = String(query.cell_stream ?? "");
+      const stype = String(query.cell_stype ?? "logs");
+      const t0 = Number(query.cell_t0 ?? 0);
+      const t1 = Number(query.cell_t1 ?? 0);
+      const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+      if (!SQL_IDENT.test(field) || !SQL_IDENT.test(stream) || !t0 || !t1) return;
+      cellDrawer.value = {
+        open: true,
+        field,
+        value,
+        stream,
+        streamType: stype,
+        startTime: t0,
+        endTime: t1,
+        baseWhere: "",
+      };
     });
 
     onUnmounted(() => {
@@ -1723,7 +1722,6 @@ export default defineComponent({
           cell_stype: params.streamType,
           cell_t0: String(params.startTime),
           cell_t1: String(params.endTime),
-          ...(params.baseWhere ? { cell_where: params.baseWhere } : {}),
         },
       });
     }

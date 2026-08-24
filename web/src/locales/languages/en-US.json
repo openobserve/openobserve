@@ -5513,6 +5513,7 @@
     "logExplorer": {
       "title": "Logs Explorer",
       "openInLogs": "Open in Logs",
+      "invalidParams": "Invalid drilldown parameters",
       "noEvents": "No events match this filter",
       "filterHint": "Click to explore related logs",
       "timestamp": "Timestamp",
