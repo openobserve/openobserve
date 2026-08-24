@@ -173,6 +173,44 @@ export default class DashboardMaxQueryRange {
   }
 
   /**
+   * Wait until the dashboard view reports that no panel is still loading.
+   *
+   * createSearchResponsePromise() only tells you the search STARTED: it resolves
+   * off page.waitForResponse(), which fires the moment response headers arrive.
+   * With streaming enabled (ZO_STREAMING_ENABLED, which is how alpha runs) a
+   * panel search is an SSE body, so headers land almost immediately while the
+   * result metadata that drives the max-query-range warning arrives at the far
+   * end of that body. Asserting straight after the header wait races the stream,
+   * and a NEGATIVE assertion ("no warning") passes vacuously — it runs before a
+   * warning could have rendered at all. Pair the two: header wait to confirm the
+   * request fired, then this to confirm it finished.
+   *
+   * Reading the response body is deliberately NOT how this is done. The SQL
+   * executor aborts its AbortController in a `finally` as soon as the stream is
+   * consumed (usePanelSQLExecutor.ts, "abort on done"), so Playwright cannot
+   * read the body afterwards — response.text() rejects, and a waitForResponse
+   * predicate that depends on it can never match.
+   *
+   * ViewDashboard drives both buttons off `arePanelsLoading`: on enterprise the
+   * refresh button is REPLACED by a cancel button while any panel loads, and
+   * elsewhere the refresh button stays but is disabled. Idle is therefore
+   * "no cancel button, and a refresh button that is not disabled".
+   *
+   * @param {number} timeout
+   */
+  async waitForPanelsIdle(timeout = 45000) {
+    await this.page.waitForFunction(
+      () => {
+        if (document.querySelector('[data-test="dashboard-cancel-btn"]')) return false;
+        const refresh = document.querySelector('[data-test="dashboard-refresh-btn"]');
+        if (!refresh) return false;
+        return !refresh.disabled && refresh.getAttribute("aria-disabled") !== "true";
+      },
+      { timeout }
+    );
+  }
+
+  /**
    * Wait for the search API response to complete (SSE or JSON).
    * Prefer createSearchResponsePromise() when the listener must be
    * registered before the triggering action.

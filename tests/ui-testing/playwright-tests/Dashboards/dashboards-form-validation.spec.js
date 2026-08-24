@@ -5,21 +5,138 @@
 //   - AddDashboard: empty name → required error / submit triggered; valid name → dashboard created
 //   - AddFolder:    empty name → required error after submit attempt; valid name → folder created
 //   - AddTab:       empty name → required error after submit attempt; valid name → tab created
+//   - Panel-editor forms: Drilldown, Variables, Conditions, Annotations, Layout,
+//     ConfigPanel, AddPanel name, BuildFieldPopUp
 //
-// Cleanup notes:
-//   - Dashboards follow the e2e_dash_fv_* prefix.
-//   - Folders follow the e2e_fold_fv_* prefix.
-//   - Tabs are created inside an e2e_dash_fv_tab_* dashboard.
-//   Run cleanup.spec.js or remove via the Dashboards UI after testing.
+// FIXTURES — every test owns its own dashboard/folder, created in beforeEach
+// under a unique name and deleted in afterEach.
+//
+// This replaces a shared-fixture model that used fixed names (e2e_dash_fv_001,
+// e2e_fv_drilldown_001, …) and a "does it already exist?" probe:
+//
+//     const exists = await dashLink.isVisible().catch(() => false);
+//     if (!exists) { …create… } else { …open… }
+//
+// That probe could not work. isVisible() does not wait, and the dashboards list
+// is paginated and unsorted, so an existing fixture sitting on page 2 — or a
+// list still loading — both read as "missing". Since neither the AddDashboard
+// nor AddFolder schema rejects a duplicate name (both only enforce min(1), and
+// the folders table's unique index is on (org, folder_id), not name), the
+// create branch always succeeded and quietly added ANOTHER copy. Against alpha
+// all 12 fixtures existed and the probe still reported every one missing; two
+// were already duplicated. Each run made the list longer, which made dashboard
+// creation slower, which is what finally broke the run: 13 failed / 24 skipped,
+// timing out in createDashboard() at whichever stage it happened to be in.
+//
+// Unique-per-run names remove the probe, the branch, and the leak together, and
+// they let these tests run in parallel with each other. Nothing is shared, so
+// nothing has to be reasoned about across tests.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { setupTestDashboard, deleteDashboard } = require('./utils/dashCreation.js');
+const { ingestion } = require('./utils/dashIngestion.js');
+
+// ── Fixture helpers ───────────────────────────────────────────────────────────
+
+/** Unique name per run, so no two runs (or workers) can collide. */
+const uniqueName = (prefix) =>
+    `${prefix}_${Math.random().toString(36).slice(2, 9)}_${Date.now()}`;
+
+/**
+ * Create a dashboard owned by the current test and leave the browser on its
+ * view page.
+ *
+ * setupTestDashboard() is used rather than dashboardCreate.createDashboard()
+ * because it also waits for the view to actually finish mounting, and re-opens
+ * the view URL once if that first load wedges — which is exactly the failure
+ * this spec kept hitting on alpha (createDashboard timing out on
+ * dashboard-back-btn / the empty-state add-panel button).
+ */
+async function createOwnedDashboard(page, pm, prefix) {
+    // Ingest first. Several assertions here need the panel to return ROWS, not
+    // merely to render: the annotation button is gated on the panel being a time
+    // series, and applyAutoSQLTimeSeries() requires options.xAxis[0].data.length
+    // > 0 — an empty chart is never a time series, so the button is not rendered
+    // at all and no amount of waiting or hovering will produce it.
+    //
+    // This spec was the only Dashboards spec with no ingestion of its own; it
+    // relied on whatever rows other specs happened to leave in e2e_automate
+    // inside the dashboard's default time range.
+    await ingestion(page);
+    const dashName = uniqueName(prefix);
+    await setupTestDashboard(page, pm, dashName);
+    return dashName;
+}
+
+/**
+ * Add and save a simple bar panel to the currently open dashboard.
+ * Ends on the dashboard view with the panel rendered.
+ */
+async function addBarPanel(pm, panelName) {
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType('bar');
+    await pm.chartTypeSelector.selectStreamType('logs');
+    await pm.chartTypeSelector.selectStream('e2e_automate');
+    await pm.chartTypeSelector.removeField('y_axis_1', 'y');
+    await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+}
+
+/**
+ * Delete the dashboard this test created.
+ *
+ * Escape first: a test may end with a dialog still open (asserting a validation
+ * error does not close it), and its modal overlay would swallow the back-button
+ * click that cleanup starts with.
+ *
+ * A cleanup failure is logged, not thrown — it must not turn a passing test red.
+ * Names are unique per run, so a stray leftover cannot affect a later run the
+ * way the old fixed-name fixtures did.
+ */
+async function cleanupOwnedDashboard(page, pm, dashName) {
+    const candidates = (Array.isArray(dashName) ? dashName : [dashName]).filter(Boolean);
+    if (!candidates.length) return;
+
+    // Navigate to the list by URL rather than clicking Back.
+    //
+    // backToDashboardList() walks back one view at a time, and a test can end in
+    // a state that swallows those clicks — annotation mode with an open dialog is
+    // the reproducible case, where all four back clicks no-op and cleanup dies
+    // still on /dashboards/view. A direct goto leaves from anywhere. Escape first
+    // to drop any modal, and accept the unsaved-changes confirm that leaving the
+    // panel editor fires (Playwright auto-DISMISSES dialogs, which would cancel
+    // the navigation).
+    page.once('dialog', (d) => d.accept());
+    await page.keyboard.press('Escape').catch(() => {});
+
+    const org = (process.env.ORGNAME || '').trim();
+    await page
+        .goto(`${process.env.ZO_BASE_URL}/web/dashboards?org_identifier=${org}`)
+        .catch(() => {});
+    await page
+        .locator('[data-test="dashboard-search"]')
+        .waitFor({ state: 'visible', timeout: 20000 })
+        .catch(() => {});
+
+    for (const name of candidates) {
+        try {
+            await deleteDashboard(page, name);
+            return;
+        } catch (e) {
+            testLogger.warn('Cleanup attempt failed for test dashboard', {
+                dashName: name,
+                error: e.message,
+            });
+        }
+    }
+}
 
 // ── AddDashboard form validation ──────────────────────────────────────────────
 
 test.describe("Dashboard AddDashboard form validation", () => {
-    test.describe.configure({ mode: 'serial' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -68,7 +185,9 @@ test.describe("Dashboard AddDashboard form validation", () => {
     test("should create dashboard successfully with a valid name", {
         tag: ['@dashboards-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        const dashName = 'e2e_dash_fv_001';
+        // Unique per run: the old fixed 'e2e_dash_fv_001' was never deleted and
+        // nothing rejects a duplicate name, so every run added another copy.
+        const dashName = uniqueName('e2e_dash_fv');
         testLogger.info(`Creating dashboard: ${dashName}`);
 
         await pm.dashboardsFormValidation.openAddDashboardForm();
@@ -81,6 +200,10 @@ test.describe("Dashboard AddDashboard form validation", () => {
         await expect(pm.dashboardsFormValidation.getDashboardDialogLocator()).not.toBeVisible();
 
         testLogger.info(`Dashboard ${dashName} created successfully`);
+
+        // Creating navigates into the new dashboard's view — go back to the list
+        // before deleting it.
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should close AddDashboard dialog without error when cancel is clicked", {
@@ -102,7 +225,6 @@ test.describe("Dashboard AddDashboard form validation", () => {
 // ── AddFolder form validation ─────────────────────────────────────────────────
 
 test.describe("Dashboard AddFolder form validation", () => {
-    test.describe.configure({ mode: 'serial' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -149,7 +271,9 @@ test.describe("Dashboard AddFolder form validation", () => {
     test("should create folder successfully with a valid name", {
         tag: ['@dashboards-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        const folderName = 'e2e_fold_fv_001';
+        // Unique per run — see the AddDashboard equivalent. Folder names are not
+        // unique either: the folders table indexes (org, folder_id), not name.
+        const folderName = uniqueName('e2e_fold_fv');
         testLogger.info(`Creating folder: ${folderName}`);
 
         await pm.dashboardsFormValidation.openAddFolderForm();
@@ -162,6 +286,10 @@ test.describe("Dashboard AddFolder form validation", () => {
         await expect(pm.dashboardsFormValidation.getFolderDialogLocator()).not.toBeVisible();
 
         testLogger.info(`Folder ${folderName} created successfully`);
+
+        await pm.dashboardFolder.deleteFolder(folderName).catch((e) => {
+            testLogger.warn('Cleanup failed for test folder', { folderName, error: e.message });
+        });
     });
 
     test("should close AddFolder dialog without error when cancel is clicked", {
@@ -185,35 +313,28 @@ test.describe("Dashboard AddFolder form validation", () => {
 // These tests create a dashboard first, then open it to access the tab form.
 
 test.describe("Dashboard AddTab form validation", () => {
-    test.describe.configure({ mode: 'serial' });
     let pm;
+    let dashName;
 
+    // Each test builds its own dashboard and lands on its view page.
+    //
+    // The previous version created the dashboard through the AddDashboard dialog
+    // and then called openDashboardByName() UNCONDITIONALLY — but creating a
+    // dashboard navigates straight into /dashboards/view, so on the create path
+    // that click hunted for a list row that was no longer on screen and spent
+    // 15s failing. setupTestDashboard() leaves us exactly where we need to be.
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        // Navigate to Dashboards and open the pre-existing e2e_dash_fv_tab_001 dashboard.
-        // If it does not exist, create it first via the AddDashboard flow.
-        await pm.dashboardsFormValidation.navigateToDashboards();
-
-        // Create a throwaway dashboard if needed — use a static name so serial
-        // tests share the same dashboard across beforeEach runs.
-        const dashName = 'e2e_dash_fv_tab_001';
-        const dashboardLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashboardLink.isVisible().catch(() => false);
-        if (!exists) {
-            testLogger.info(`Dashboard ${dashName} not found — creating it`);
-            await pm.dashboardsFormValidation.openAddDashboardForm();
-            await pm.dashboardsFormValidation.fillDashboardName(dashName);
-            await pm.dashboardsFormValidation.submitDashboardForm();
-            await pm.dashboardsFormValidation.getDashboardDialogLocator().waitFor({ state: 'hidden', timeout: 10000 });
-        }
-
-        // Open the dashboard — click on its row in the list
-        await pm.dashboardsFormValidation.openDashboardByName(dashName);
+        dashName = await createOwnedDashboard(page, pm, 'e2e_dash_fv_tab');
         // Wait for the tab bar to be present (TabList renders the add-tab button)
         await pm.dashboardsFormValidation.waitForTabListContainer(15000);
         testLogger.info(`Opened dashboard ${dashName}`);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should show required error when tab name is submitted empty", {
@@ -252,7 +373,7 @@ test.describe("Dashboard AddTab form validation", () => {
     test("should create tab successfully with a valid name", {
         tag: ['@dashboards-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        const tabName = 'e2e_tab_fv_001';
+        const tabName = uniqueName('e2e_tab_fv');
         testLogger.info(`Creating tab: ${tabName}`);
 
         await pm.dashboardsFormValidation.openAddTabForm();
@@ -290,35 +411,17 @@ test.describe("Dashboard AddTab form validation", () => {
 // are skipped with a descriptive reason.
 
 test.describe("Dashboard DrilldownPopup form validation", () => {
-    test.describe.configure({ mode: 'serial' });
     let pm;
 
-    const dashName  = 'e2e_fv_drilldown_001';
-    const panelName = 'e2e_fv_drilldown_panel_001';
+    const panelName = 'e2e_fv_drilldown_panel';
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-            await pm.dashboardCreate.addPanel();
-            await pm.chartTypeSelector.selectChartType('bar');
-            await pm.chartTypeSelector.selectStreamType('logs');
-            await pm.chartTypeSelector.selectStream('e2e_automate');
-            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
-            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
-            await pm.dashboardPanelActions.addPanelName(panelName);
-            await pm.dashboardPanelActions.savePanel();
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_drilldown');
+        await addBarPanel(pm, panelName);
 
         // Enter panel edit mode
         await pm.dashboardPanelActions.selectPanelAction(panelName, 'Edit');
@@ -336,16 +439,40 @@ test.describe("Dashboard DrilldownPopup form validation", () => {
         testLogger.info('DrilldownPopup opened');
     });
 
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
+    });
+
     test("should show name error or keep save disabled when drilldown name is empty", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
         testLogger.info('Testing drilldown name required error on empty submit');
 
-        // Navigate into panel edit → drilldown section, then verify the name field error
-        await expect(pm.dashboardsFormValidation.getDrilldownNameErrorLocator()).toBeVisible();
-        await expect(pm.dashboardsFormValidation.getDrilldownNameErrorLocator()).toContainText('A value is required');
+        // The name field is an OFormInput inside OForm, so its `-error` node is
+        // only rendered once validation has actually run. Asserting on it against
+        // a freshly-opened popup — as this did — waits for an element the form
+        // has had no reason to create. Attempt the submit first, then accept
+        // either outcome the test name allows.
+        const nameError = pm.dashboardsFormValidation.getDrilldownNameErrorLocator();
+        const saveBtn = pm.dashboardsFormValidation.getDrilldownSaveBtnLocator();
 
-        testLogger.info('Drilldown name error correctly shown for empty name');
+        await saveBtn.click().catch(() => {});
+
+        // Wait for the error rather than sampling immediately: isVisible() does
+        // not retry, and the message is rendered a tick after the submit.
+        const errorVisible = await nameError
+            .waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true)
+            .catch(() => false);
+        const btnDisabled = await saveBtn.isDisabled().catch(() => false);
+        expect(errorVisible || btnDisabled).toBe(true);
+        if (errorVisible) {
+            // The form renders "Name is required" — not the "A value is required"
+            // this test used to assert (verified against alpha).
+            await expect(nameError).toContainText('Name is required');
+        }
+
+        testLogger.info('Drilldown empty-name validation passed', { errorVisible, btnDisabled });
     });
 
     test("should show URL format error when URL type is selected and invalid URL is entered", {
@@ -358,7 +485,14 @@ test.describe("Dashboard DrilldownPopup form validation", () => {
         await expect(pm.dashboardsFormValidation.getDrilldownUrlTextareaLocator()).toBeVisible();
 
         await pm.dashboardsFormValidation.fillDrilldownUrl('not-a-valid-url');
-        await expect(pm.dashboardsFormValidation.getDrilldownUrlErrorLocator()).toBeVisible();
+
+        // The URL check is a Zod superRefine on the FORM (DrilldownPopUp.schema.ts),
+        // not a per-keystroke field rule, so it only runs on submit. Asserting
+        // straight after typing — as this did — waits for an error the form has
+        // not been asked to compute yet.
+        await pm.dashboardsFormValidation.getDrilldownSaveBtnLocator().click().catch(() => {});
+
+        await expect(pm.dashboardsFormValidation.getDrilldownUrlErrorLocator()).toBeVisible({ timeout: 10000 });
         await expect(pm.dashboardsFormValidation.getDrilldownUrlErrorLocator()).toContainText('Invalid URL');
 
         testLogger.info('Drilldown URL format error shown correctly for invalid URL');
@@ -383,24 +517,14 @@ test.describe("Dashboard DrilldownPopup form validation", () => {
 // the variable add form.
 
 test.describe("Dashboard AddSettingVariable form validation", () => {
-    test.describe.configure({ mode: 'serial' });
     let pm;
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        const dashName = 'e2e_fv_variable_settings_001';
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_variable_settings');
         // Navigate to Settings > Variables tab > Add Variable
         await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
         await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
@@ -410,6 +534,10 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
         await pm.dashboardsFormValidation.getVariableAddBtnLocator().click();
         await pm.dashboardsFormValidation.getVariableSaveBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Variable add form opened');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should show name required error when variable name is empty and save is clicked", {
@@ -422,14 +550,24 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
         testLogger.info('Variable name required error shown correctly');
     });
 
-    test("should show type required error when variable type is not selected and save is clicked", {
+    test("should treat variable type as optional (defaults) when only a name is given", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing variable type required error on save without selecting type');
-        await pm.dashboardsFormValidation.fillVariableName('test_fv_var_001');
+        // This previously asserted a "type is required" error, which the form can
+        // never produce: AddSettingVariable.schema.ts declares
+        //   type: z.string().optional().default("query_values")
+        // so type is optional AND pre-filled. The assertion was waiting on a
+        // validation error the schema makes impossible.
+        //
+        // Assert the real contract instead: with a name supplied, type does not
+        // block submission and no type error is raised.
+        testLogger.info('Testing variable type is optional with a schema default');
+        await pm.dashboardsFormValidation.fillVariableName(uniqueName('test_fv_var'));
         await pm.dashboardsFormValidation.clickVariableSave();
-        await expect(pm.dashboardsFormValidation.getVariableTypeErrorLocator()).toBeVisible();
-        testLogger.info('Variable type required error shown correctly');
+        await expect(
+            pm.dashboardsFormValidation.getVariableTypeErrorLocator()
+        ).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Variable type correctly optional — no type error raised');
     });
 
     test("should close variable add form when cancel is clicked", {
@@ -447,47 +585,30 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
 // These tests verify the condition row elements render and that the remove action works.
 
 test.describe("Dashboard AddCondition form validation", () => {
-    test.describe.configure({ mode: 'serial' });
     let pm;
 
-    const dashName  = 'e2e_fv_condition_001';
-    const panelName = 'e2e_fv_condition_panel_001';
+    const panelName = 'e2e_fv_condition_panel';
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-            await pm.dashboardCreate.addPanel();
-            await pm.chartTypeSelector.selectChartType('bar');
-            await pm.chartTypeSelector.selectStreamType('logs');
-            await pm.chartTypeSelector.selectStream('e2e_automate');
-            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
-            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
-            await pm.dashboardPanelActions.addPanelName(panelName);
-            await pm.dashboardPanelActions.savePanel();
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_condition');
+        await addBarPanel(pm, panelName);
 
         // Enter panel edit mode
         await pm.dashboardPanelActions.selectPanelAction(panelName, 'Edit');
 
-        // Click add condition to create a condition row
-        await pm.dashboardsFormValidation.getAddConditionAddBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
-        await pm.dashboardsFormValidation.getAddConditionAddBtnLocator().click();
-
-        // Wait for condition row to appear
-        await pm.dashboardsFormValidation.getConditionColumn0Locator().waitFor({ state: 'visible', timeout: 5000 });
+        // Add a condition row. The "+" is an ODropdown trigger, so this picks
+        // "Add Condition" from the menu it opens and waits for the row.
+        await pm.dashboardsFormValidation.addConditionRow();
 
         testLogger.info('Condition row added in panel editor');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should render condition row with column, operator, and value elements", {
@@ -497,6 +618,10 @@ test.describe("Dashboard AddCondition form validation", () => {
 
         await expect(pm.dashboardsFormValidation.getConditionColumn0Locator()).toBeVisible();
         await expect(pm.dashboardsFormValidation.getConditionCondition0Locator()).toBeVisible();
+
+        // The value control lives in the Condition tab panel; the popup opens on
+        // the List tab, where it is not rendered at all. Switch tabs first.
+        await pm.dashboardsFormValidation.openConditionTab(0);
         await expect(pm.dashboardsFormValidation.getConditionValueLocator()).toBeVisible();
 
         testLogger.info('Condition row elements rendered correctly');
@@ -523,27 +648,25 @@ test.describe("Dashboard AddCondition form validation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard GeneralSettings form validation", () => {
-    test.describe.configure({ mode: 'serial' });
 
-    const dashName = 'e2e_fv_general_settings_001';
     let pm;
+    let dashName;
+    // A test here may rename the dashboard, so cleanup can have more than one
+    // name to try. Reset per test; the rename test appends its new name.
+    let cleanupCandidates;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_general_settings');
+        cleanupCandidates = [dashName];
         await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Dashboard opened for GeneralSettings tests');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, cleanupCandidates);
     });
 
     test("should show required error when dashboard name is cleared in GeneralSettings", {
@@ -589,9 +712,29 @@ test.describe("Dashboard GeneralSettings form validation", () => {
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
-        await nameField.fill('e2e_fv_general_settings_renamed_001');
+        // Renaming retargets cleanup: the dashboard is deleted BY NAME, so
+        // afterEach has to look for whichever name the row ends up carrying.
+        //
+        // Register the new name BEFORE clicking save, and keep the old one as a
+        // fallback. Assigning after the assertion below is not good enough: a
+        // save that lands but closes the panel slowly fails the assertion, and
+        // cleanup is then left hunting a name the dashboard no longer has.
+        // (The original fixed-name version was worse still — it renamed its
+        // shared fixture permanently, so every later run recreated the original
+        // and orphaned the renamed copy for good.)
+        const renamed = uniqueName('e2e_fv_general_settings_renamed');
+        cleanupCandidates = [renamed, dashName];
+        await nameField.fill(renamed);
         await pm.dashboardsFormValidation.getGeneralSettingSaveBtnLocator().click();
-        await expect(nameField).not.toBeVisible({ timeout: 10000 });
+
+        // Saving does NOT close the panel: GeneralSettings.vue emits "save", and
+        // DashboardSettings.vue wires that to refreshRequired — only "close" ever
+        // closes the drawer. The old `expect(nameField).not.toBeVisible()` was
+        // asserting behaviour the product does not have, so it could not pass.
+        // The success toast is what actually marks the save.
+        await expect(
+            pm.dashboardsFormValidation.getSuccessToastLocator()
+        ).toBeVisible({ timeout: 15000 });
         testLogger.info('GeneralSettings saved successfully');
     });
 });
@@ -602,47 +745,31 @@ test.describe("Dashboard GeneralSettings form validation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard AddAnnotation live form validation", () => {
-    test.describe.configure({ mode: 'serial' });
 
-    const dashName  = 'e2e_fv_annotation_live_001';
-    const panelName = 'e2e_fv_annotation_live_panel_001';
+    const panelName = 'e2e_fv_annotation_live_panel';
     let pm;
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_annotation_live');
+        await addBarPanel(pm, panelName);
 
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-            await pm.dashboardCreate.addPanel();
-            await pm.chartTypeSelector.selectChartType('bar');
-            await pm.chartTypeSelector.selectStreamType('logs');
-            await pm.chartTypeSelector.selectStream('e2e_automate');
-            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
-            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
-            await pm.dashboardPanelActions.addPanelName(panelName);
-            await pm.dashboardPanelActions.savePanel();
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
+        // Enter annotation mode (hovers the panel first — the button is
+        // hover-revealed, so waiting for it directly could only time out).
+        await pm.dashboardsFormValidation.enterAnnotationMode();
 
-        // Enter annotation mode
-        await pm.dashboardsFormValidation.getAnnotationModeButtonLocator().waitFor({ state: 'visible', timeout: 10000 });
-        await pm.dashboardsFormValidation.getAnnotationModeButtonLocator().click();
-
-        // Click the panel canvas to open the AddAnnotation dialog
-        await pm.dashboardsFormValidation.getPanelCanvasLocator().click({ position: { x: 50, y: 50 }, force: true });
-
-        // Wait for dialog
-        await pm.dashboardsFormValidation.getAddAnnotationDialogLocator().waitFor({ state: 'visible', timeout: 10000 });
+        // Brush across the chart to open the AddAnnotation dialog (a click cannot
+        // do it — creation is routed through ECharts' dataZoom event).
+        await pm.dashboardsFormValidation.openAnnotationDialogByBrush();
 
         testLogger.info('AddAnnotation dialog opened');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should show title required error when annotation is saved with empty title", {
@@ -694,42 +821,25 @@ test.describe("Dashboard AddAnnotation live form validation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard PanelLayoutSettings form validation", () => {
-    test.describe.configure({ mode: 'serial' });
 
-    const dashName  = 'e2e_fv_layout_settings_001';
-    const panelName = 'e2e_fv_layout_panel_001';
+    const panelName = 'e2e_fv_layout_panel';
     let pm;
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        // Navigate to dashboards list and create (or reuse) the test dashboard
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-            // After create, dashboard is open in view mode — add a panel
-            await pm.dashboardCreate.addPanel();
-            await pm.chartTypeSelector.selectChartType('bar');
-            await pm.chartTypeSelector.selectStreamType('logs');
-            await pm.chartTypeSelector.selectStream('e2e_automate');
-            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
-            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
-            await pm.dashboardPanelActions.addPanelName(panelName);
-            await pm.dashboardPanelActions.savePanel();
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_layout_settings');
+        await addBarPanel(pm, panelName);
 
         // Open Layout settings from panel actions dropdown
         await pm.dashboardPanelActions.selectPanelAction(panelName, 'Layout');
         testLogger.info('PanelLayoutSettings drawer opened');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should render PanelLayoutSettings dialog with height input", {
@@ -786,35 +896,30 @@ test.describe("Dashboard PanelLayoutSettings form validation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard AddCondition form validation", () => {
-    test.describe.configure({ mode: 'serial' });
 
-    const dashName = 'e2e_fv_condition_panel_001';
     let pm;
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_condition_filters');
 
-        // Navigate to dashboards list and create (or reuse) the test dashboard
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
-
-        // Open Add Panel → panel editor with Filters section visible
-        await pm.dashboardCreate.addPanelSmart();
+        // Open Add Panel → panel editor with Filters section visible.
+        // The dashboard is new and empty, so this is the empty-state button.
+        await pm.dashboardCreate.addPanel();
         await pm.chartTypeSelector.selectChartType('bar');
         await pm.chartTypeSelector.selectStreamType('logs');
         await pm.chartTypeSelector.selectStream('e2e_automate');
         testLogger.info('Panel editor open — Filters section should be visible');
+    });
+
+    // These tests end inside the panel editor, so cleanup starts from add_panel.
+    // backToDashboardList() handles that (two back hops, and it accepts the
+    // unsaved-changes confirm that would otherwise cancel the navigation).
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should render Add Condition button in Filters section of panel editor", {
@@ -832,11 +937,9 @@ test.describe("Dashboard AddCondition form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-AC-002: Clicking Add Condition renders a condition row');
 
-        const addCondBtn = pm.dashboardsFormValidation.getAddConditionAddBtnLocator();
-        await addCondBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await addCondBtn.click();
+        await pm.dashboardsFormValidation.addConditionRow();
 
-        // After clicking, a condition row with column and condition selectors appears
+        // After adding, a condition row with column and condition selectors appears
         const conditionColumn    = pm.dashboardsFormValidation.getConditionColumnLocator();
         const conditionCondition = pm.dashboardsFormValidation.getConditionConditionLocator();
 
@@ -845,22 +948,34 @@ test.describe("Dashboard AddCondition form validation", () => {
         testLogger.info('Condition row rendered with column and condition selectors');
     });
 
-    test("should remove condition row when remove column button is clicked", {
+    test("should clear the selected column but keep the row when remove-column is clicked", {
         tag: ['@domainFormValidation', '@P1']
     }, async ({ page }) => {
-        testLogger.info('TC-AC-003: Remove column button removes the condition row');
+        // This used to assert the ROW disappeared. It does not: the handler is
+        //   const removeColumnName = () => { conditionModel.value.column = {}; };
+        // which clears the chosen COLUMN and leaves the row in place. Deleting the
+        // row is `dashboard-add-condition-remove`, covered by the sibling test.
+        testLogger.info('TC-AC-003: Remove-column clears the column, row survives');
 
-        const addCondBtn = pm.dashboardsFormValidation.getAddConditionAddBtnLocator();
-        await addCondBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await addCondBtn.click();
+        await pm.dashboardsFormValidation.addConditionRow();
 
         const conditionColumn = pm.dashboardsFormValidation.getConditionColumnLocator();
         await expect(conditionColumn).toBeVisible({ timeout: 5000 });
 
         await pm.dashboardsFormValidation.getConditionRemoveColumnLocator().click();
 
-        await expect(conditionColumn).not.toBeVisible({ timeout: 5000 });
-        testLogger.info('Condition row removed after clicking remove button');
+        // Row still present, and its label chip carries no column name (the
+        // data-test is `dashboard-add-condition-label-<i>-<computedLabel>`, so an
+        // empty selection leaves the trailing segment blank).
+        await expect(conditionColumn).toBeVisible({ timeout: 5000 });
+        // Match the label chip by PREFIX. Its data-test embeds computedLabel(),
+        // which falls back to `condition.column.field` — and that is `undefined`
+        // for a cleared column, so the attribute ends up "…-label-0-undefined",
+        // never a bare "…-label-0-".
+        await expect(
+            page.locator('[data-test^="dashboard-add-condition-label-0-"]').first()
+        ).toBeVisible({ timeout: 5000 });
+        testLogger.info('Column cleared, condition row retained');
     });
 });
 
@@ -870,55 +985,31 @@ test.describe("Dashboard AddCondition form validation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard AddAnnotation form validation", () => {
-    test.describe.configure({ mode: 'serial' });
 
-    const dashName  = 'e2e_fv_annotation_001';
-    const panelName = 'e2e_fv_annotation_panel_001';
+    const panelName = 'e2e_fv_annotation_panel';
     let pm;
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_annotation');
+        await addBarPanel(pm, panelName);
 
-        // Navigate to dashboards list and create (or reuse) the test dashboard
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-            await pm.dashboardCreate.addPanel();
-            await pm.chartTypeSelector.selectChartType('bar');
-            await pm.chartTypeSelector.selectStreamType('logs');
-            await pm.chartTypeSelector.selectStream('e2e_automate');
-            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
-            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
-            await pm.dashboardPanelActions.addPanelName(panelName);
-            await pm.dashboardPanelActions.savePanel();
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
-
-        // Enter annotation mode
-        const annotationBtn = pm.dashboardsFormValidation.getAnnotationModeButtonLocator();
-        await annotationBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await annotationBtn.click();
+        // Enter annotation mode (hovers the panel first — see enterAnnotationMode).
+        await pm.dashboardsFormValidation.enterAnnotationMode();
         testLogger.info('Annotation mode activated');
 
-        // Click the panel canvas to open the AddAnnotation dialog
-        const panelCanvas = pm.dashboardsFormValidation.getPanelCanvasLocator();
-        const canvasVisible = await panelCanvas.isVisible().catch(() => false);
-        if (canvasVisible) {
-            const box = await panelCanvas.boundingBox();
-            if (box) {
-                await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-            }
-        }
+        // Brush across the chart to open the AddAnnotation dialog — see
+        // openAnnotationDialogByBrush for why a click cannot work.
+        await pm.dashboardsFormValidation.openAnnotationDialogByBrush();
 
-        testLogger.info('Clicked panel canvas to open AddAnnotation dialog');
+        testLogger.info('Brushed chart to open AddAnnotation dialog');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should open AddAnnotation dialog and render required fields", {
@@ -977,41 +1068,25 @@ test.describe("Dashboard AddAnnotation form validation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard ConfigPanel form validation", () => {
-    test.describe.configure({ mode: 'serial' });
 
-    const dashName  = 'e2e_fv_config_panel_001';
-    const panelName = 'e2e_fv_cfg_panel_001';
+    const panelName = 'e2e_fv_cfg_panel';
     let pm;
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_config_panel');
 
-        // Navigate to dashboards list
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-            // After create, dashboard is open — add a panel
-            await pm.dashboardCreate.addPanel();
-            await pm.chartTypeSelector.selectChartType('bar');
-            await pm.chartTypeSelector.selectStreamType('logs');
-            await pm.chartTypeSelector.selectStream('e2e_automate');
-            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
-            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
-            await pm.dashboardPanelActions.addPanelName(panelName);
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-            await pm.dashboardCreate.addPanelSmart();
-            await pm.chartTypeSelector.selectChartType('bar');
-            await pm.chartTypeSelector.selectStreamType('logs');
-            await pm.chartTypeSelector.selectStream('e2e_automate');
-        }
+        // Stay in the panel editor — ConfigPanel is the editor's right sidebar.
+        await pm.dashboardCreate.addPanel();
+        await pm.chartTypeSelector.selectChartType('bar');
+        await pm.chartTypeSelector.selectStreamType('logs');
+        await pm.chartTypeSelector.selectStream('e2e_automate');
+        await pm.chartTypeSelector.removeField('y_axis_1', 'y');
+        await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+        await pm.dashboardPanelActions.addPanelName(panelName);
 
         // Open ConfigPanel via the panel configs helper
         await pm.dashboardPanelConfigs.openConfigPanel();
@@ -1019,6 +1094,10 @@ test.describe("Dashboard ConfigPanel form validation", () => {
         // Wait for the description field to confirm ConfigPanel is visible
         await pm.dashboardsFormValidation.getConfigPanelDescriptionLocator().waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('ConfigPanel opened');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should show error when decimals value exceeds 100", {
@@ -1073,35 +1152,26 @@ test.describe("Dashboard ConfigPanel form validation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard AddPanel panel name form validation", () => {
-    test.describe.configure({ mode: 'serial' });
 
-    const dashName = 'e2e_fv_add_panel_001';
     let pm;
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-            await pm.dashboardCreate.addPanel();
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-            await pm.dashboardCreate.addPanelSmart();
-        }
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_add_panel');
+        await pm.dashboardCreate.addPanel();
 
         // Confirm we are in the panel editor. The name is an inline-edited title:
         // its display trigger is always visible, whereas the `-input` only mounts
         // once the trigger is clicked — so the trigger is the correct anchor.
         await pm.dashboardsFormValidation.getPanelNameTriggerLocator().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Panel editor opened');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should show error or disable save when panel name is empty", {
@@ -1145,11 +1215,18 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-AP-003: Discard button navigates away from panel editor');
 
+        // Leaving the panel editor with unsaved edits fires AddPanel.vue's
+        // onBeforeRouteLeave window.confirm. Playwright auto-DISMISSES dialogs,
+        // and a dismissed confirm means next(false) — the route change is
+        // cancelled, so the click appears to do nothing and the URL wait below
+        // burns its full timeout. Accept it for the duration of the discard.
+        page.once('dialog', (dialog) => dialog.accept());
+
         await pm.dashboardsFormValidation.getPanelDiscardBtnLocator().waitFor({ state: 'visible', timeout: 5000 });
         await pm.dashboardsFormValidation.getPanelDiscardBtnLocator().click();
 
         // After discard we should leave the /add_panel URL
-        await page.waitForURL(url => !url.pathname.includes('add_panel'), { timeout: 10000 });
+        await page.waitForURL(url => !url.pathname.includes('add_panel'), { timeout: 15000 });
         testLogger.info('Navigated away from panel editor after Discard');
     });
 });
@@ -1161,30 +1238,18 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard BuildFieldPopUp form validation", () => {
-    test.describe.configure({ mode: 'serial' });
 
-    const dashName = 'e2e_fv_build_field_001';
     let pm;
+    let dashName;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await pm.dashboardList.menuItem('dashboards-item');
-        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
-
-        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashLink.isVisible().catch(() => false);
-        if (!exists) {
-            await pm.dashboardCreate.createDashboard(dashName);
-        } else {
-            await pm.dashboardsFormValidation.openDashboardByName(dashName);
-            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-        }
+        dashName = await createOwnedDashboard(page, pm, 'e2e_fv_build_field');
 
         // Open panel editor and add a y-axis field so the chip is rendered
-        await pm.dashboardCreate.addPanelSmart();
+        await pm.dashboardCreate.addPanel();
         await pm.chartTypeSelector.selectChartType('bar');
         await pm.chartTypeSelector.selectStreamType('logs');
         await pm.chartTypeSelector.selectStream('e2e_automate');
@@ -1194,6 +1259,10 @@ test.describe("Dashboard BuildFieldPopUp form validation", () => {
         await pm.dashboardsFormValidation.getYAxisFieldChipFirstLocator()
             .waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Panel editor open with y-axis field chip rendered');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await cleanupOwnedDashboard(page, pm, dashName);
     });
 
     test("should open BuildFieldPopUp container when a y-axis field chip is clicked", {

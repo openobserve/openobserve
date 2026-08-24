@@ -84,7 +84,10 @@ export class DashboardsFormValidationPage {
         this.drilldownByLogsBtn      = '[data-test="dashboard-drilldown-by-logs-btn"]';
         // URL input and its error
         this.drilldownUrlTextarea    = '[data-test="dashboard-drilldown-url-textarea"]';
-        this.drilldownUrlError       = '[data-test="dashboard-drilldown-url-error-message"]';
+        // OFormTextarea convention: data-test="foo" -> error node "foo-error".
+        // `dashboard-drilldown-url-error-message` does not exist in
+        // DrilldownPopUp.vue, so the old selector could never resolve.
+        this.drilldownUrlError       = '[data-test="dashboard-drilldown-url-textarea-error"]';
         // Dashboard/tab/folder selects (OSelect convention)
         this.drilldownFolderSelect   = '[data-test="dashboard-drilldown-folder-select-popover"]';
         this.drilldownDashboardSelect = '[data-test="dashboard-drilldown-dashboard-select-popover"]';
@@ -94,7 +97,9 @@ export class DashboardsFormValidationPage {
         this.dashboardSettingsBtn    = '[data-test="dashboard-setting-btn"]';
         this.settingsGeneralTab      = '[data-test="dashboard-settings-general-tab"]';
         this.settingsVariablesTab    = '[data-test="dashboard-settings-variable-tab"]';
-        this.variableAddBtn          = '[data-test="dashboard-variable-add-btn"]';
+        // App renders `dashboard-add-variable-btn` (VariableSettings.vue) — the
+        // spec had the words transposed, so this never resolved.
+        this.variableAddBtn          = '[data-test="dashboard-add-variable-btn"]';
 
         // ── PanelLayoutSettings dialog ────────────────────────────────────────
         this.panelLayoutDrawer      = '[data-test="panel-layout-settings-drawer"]';
@@ -114,7 +119,10 @@ export class DashboardsFormValidationPage {
         this.annotationTitleField   = '[data-test="dashboard-add-annotation-title-input-field"]';
         this.annotationTitleError   = '[data-test="dashboard-add-annotation-title-input-error"]';
         this.annotationTextField    = '[data-test="dashboard-add-annotation-text-input-field"]';
-        this.annotationPanelsPopover = '[data-test="dashboard-add-annotation-panels-select-popover"]';
+        // Assert the SELECT, not its popover: OSelect only renders `-popover`
+        // while the dropdown is open, so the "does the field render" tests were
+        // waiting on a node that only exists after a click they never make.
+        this.annotationPanelsPopover = '[data-test="dashboard-add-annotation-panels-select"]';
         // Save/Cancel now use ODialog's built-in footer buttons (scoped to this dialog).
         this.annotationCancelBtn    = '[data-test="add-annotation-dialog"] [data-test="o-dialog-secondary-btn"]';
         this.annotationSaveBtn      = '[data-test="add-annotation-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -154,8 +162,13 @@ export class DashboardsFormValidationPage {
         this.configPanelLimit        = '[data-test="dashboard-config-limit"]';
 
         // ── BuildFieldPopUp ───────────────────────────────────────────────────
-        this.buildFieldPopupContainer = '[data-test="dashboard-build-field-popup-container"]';
-        this.buildFieldLabelInput     = '[data-test="dashboard-x-item-input-field"]';
+        // The y-axis field chip opens an ODropdown whose menu hosts
+        // DynamicFunctionPopUp. There is no `build-field` markup in web/src at
+        // all any more — the old container/label selectors below pointed at a
+        // component that no longer exists, so both BuildFieldPopUp tests could
+        // only ever time out. OInput puts the real <input> on the `-field` node.
+        this.buildFieldPopupContainer = '[data-test="dynamic-function-popup-root"]';
+        this.buildFieldLabelInput     = '[data-test="dynamic-function-popup-label-input-field"]';
         // Y-axis field chip: data-test="dashboard-y-item-${alias}" where alias = y_axis_1 for the first added field
         this.yAxisFieldChipFirst      = '[data-test="dashboard-y-item-y_axis_1"]';
 
@@ -176,11 +189,39 @@ export class DashboardsFormValidationPage {
         await this.page.locator('[data-test="dashboard-table"]').waitFor({ state: 'visible', timeout: 15000 });
     }
 
+    /**
+     * Wait until a dialog's form is actually interactive, not merely rendered.
+     *
+     * The dialog element becomes visible before OForm has seeded its fields and
+     * before the ODialog primary button is wired to submit the form by id. A
+     * submit issued in that window silently no-ops: the Zod schema never runs,
+     * so no validation error is produced and the assertion that follows fails
+     * with "element(s) not found" rather than anything describing the cause.
+     *
+     * Gating on the name input being present and enabled is the cheap proxy for
+     * "the form mounted", and it is the difference between the two sibling
+     * tests here — the one that happened to assert dialog visibility first
+     * passed, the one that submitted immediately did not.
+     *
+     * @param {string} nameFieldSelector the form's `-field` input selector
+     */
+    async waitForDialogFormReady(nameFieldSelector) {
+        await this.page.waitForFunction(
+            (selector) => {
+                const el = document.querySelector(selector);
+                return !!el && !el.disabled && el.offsetParent !== null;
+            },
+            nameFieldSelector,
+            { timeout: 10000 }
+        );
+    }
+
     // ── AddDashboard helpers ──────────────────────────────────────────────────
 
     async openAddDashboardForm() {
         await this.page.locator(this.newDashboardBtn).click();
         await this.page.locator(this.dashboardDialog).waitFor({ state: 'visible', timeout: 8000 });
+        await this.waitForDialogFormReady(this.dashboardNameInput);
     }
 
     async fillDashboardName(name) {
@@ -216,6 +257,7 @@ export class DashboardsFormValidationPage {
     async openAddFolderForm() {
         await this.page.locator(this.newFolderBtn).click();
         await this.page.locator(this.folderDialog).waitFor({ state: 'visible', timeout: 8000 });
+        await this.waitForDialogFormReady(this.folderNameInput);
     }
 
     async fillFolderName(name) {
@@ -247,6 +289,7 @@ export class DashboardsFormValidationPage {
     async openAddTabForm() {
         await this.page.locator(this.addTabBtn).click();
         await this.page.locator(this.tabDialog).waitFor({ state: 'visible', timeout: 8000 });
+        await this.waitForDialogFormReady(this.tabNameInput);
     }
 
     async fillTabName(name) {
@@ -310,7 +353,12 @@ export class DashboardsFormValidationPage {
     }
 
     async fillDrilldownUrl(url) {
-        await this.page.locator(this.drilldownUrlTextarea).fill(url);
+        // OFormTextarea wrapper carries the data-test; the real <textarea> is the
+        // inner `-field` node. Filling the wrapper throws "Element is not an
+        // <input>, <textarea>, <select> or [contenteditable]".
+        await this.page
+            .locator('[data-test="dashboard-drilldown-url-textarea-field"]')
+            .fill(url);
     }
 
     getDrilldownNameInputLocator() {
@@ -459,8 +507,151 @@ export class DashboardsFormValidationPage {
         return this.page.locator('[data-test="panel-schema-renderer-annotation-button"]');
     }
 
+    /**
+     * Enter annotation mode on the first rendered panel.
+     *
+     * The annotation button is HOVER-REVEALED: PanelContainer.vue binds
+     * :class="hoverRevealClass", which is "invisible pointer-events-none" until
+     * the panel's own @mouseover sets isCurrentlyHoveredPanel. Waiting for the
+     * button to be visible without hovering first can therefore only ever time
+     * out — which is exactly what every annotation test was doing.
+     *
+     * It is also gated on the panel being a time series (checkIfPanelIsTimeSeries)
+     * and on a chart type from the line/bar family, so the caller must have built
+     * a panel that keeps its histogram(_timestamp) x-axis.
+     */
+    async enterAnnotationMode() {
+        // The button is gated on extras.isTimeSeries, which is only set once the
+        // chart data has been converted — so the chart has to have DRAWN first.
+        // Verified against alpha: hovering immediately after the panel container
+        // appears finds the button hidden; after the chart renders it is visible.
+        const chart = this.page.locator('[data-test="chart-renderer"]').first();
+        await chart.waitFor({ state: 'visible', timeout: 30000 });
+
+        const panel = this.page.locator('[data-test="dashboard-panel-container"]').first();
+        await panel.waitFor({ state: 'visible', timeout: 15000 });
+
+        const btn = this.getAnnotationModeButtonLocator();
+        // Re-hover on each attempt: the reveal is driven by the panel's own
+        // @mouseover, and a re-render between hover and check drops it. The
+        // settle after hovering matters — checking in the same tick as the hover
+        // samples before Vue has applied the class swap.
+        //
+        // Budget generously: extras.isTimeSeries is only set once the query has
+        // returned AND the data has been converted, which under parallel load on
+        // a shared alpha is a good deal slower than it is on an idle box.
+        for (let attempt = 1; attempt <= 15; attempt++) {
+            await panel.hover().catch(() => {});
+            await this.page.waitForTimeout(1000);
+            if (await btn.isVisible().catch(() => false)) {
+                await btn.click();
+                return;
+            }
+        }
+
+        // Distinguish the two failure modes instead of dying on a bare timeout:
+        // absent from the DOM means the v-if gate (isTimeSeries / chart type)
+        // never went true; present-but-hidden means the hover never registered.
+        const domCount = await btn.count();
+        throw new Error(
+            `enterAnnotationMode: annotation button never became visible ` +
+            `(matches in DOM: ${domCount}). ${domCount === 0
+                ? 'Not rendered — the panel is not being treated as a time series yet.'
+                : 'Rendered but hidden — the panel hover never revealed it.'}`
+        );
+    }
+
+    /**
+     * Open the AddAnnotation dialog by brushing across the chart.
+     *
+     * A plain click cannot do this. PanelSchemaRenderer routes annotation
+     * creation through onDataZoom -> handleAddAnnotation, which is ECharts'
+     * brush/zoom event, so it needs a horizontal DRAG. The old tests clicked the
+     * canvas centre and then waited for a dialog that was never going to open.
+     */
+    async openAnnotationDialogByBrush() {
+        const chart = this.page.locator('[data-test="chart-renderer"]').first();
+        await chart.waitFor({ state: 'visible', timeout: 30000 });
+        const box = await chart.boundingBox();
+        if (!box) throw new Error('openAnnotationDialogByBrush: chart has no bounding box');
+
+        const y = box.y + box.height / 2;
+        await this.page.mouse.move(box.x + box.width * 0.3, y);
+        await this.page.mouse.down();
+        await this.page.mouse.move(box.x + box.width * 0.5, y, { steps: 15 });
+        await this.page.mouse.move(box.x + box.width * 0.7, y, { steps: 15 });
+        await this.page.mouse.up();
+
+        await this.page
+            .locator(this.addAnnotationDialog)
+            .waitFor({ state: 'visible', timeout: 20000 });
+    }
+
     getPanelCanvasLocator() {
         return this.page.locator('[data-test="dashboard-panel-bar"]').first().locator('canvas').first();
+    }
+
+    /**
+     * Add a filter condition row in the panel editor's Filters section.
+     *
+     * `dashboard-add-condition-add` is NOT a plain "add" button — Group.vue makes
+     * it the TRIGGER of an ODropdown offering "Add Condition" / "Add Group".
+     * Clicking it only opens that menu, so a test that clicks it and then waits
+     * for `dashboard-add-condition-column-0` waits for a row that was never asked
+     * for. The condition is created by selecting the menu item.
+     */
+    async addConditionRow() {
+        const trigger = this.page.locator(this.addConditionAddBtn);
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
+        const item = this.page.locator('[data-test="dashboard-add-group-add-condition"]');
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+        await item.click();
+
+        // Adding a condition renders only a LABEL CHIP
+        // (`dashboard-add-condition-label-${i}-${computedLabel}`). The column /
+        // operator / value controls live in a popup that the chip opens, so
+        // `dashboard-add-condition-column-0` does not exist until it is clicked.
+        // Verified against alpha: straight after "Add Condition" the only nodes
+        // present are the label, remove and add buttons.
+        const label = this.page
+            .locator('[data-test^="dashboard-add-condition-label-0"]')
+            .first();
+        await label.waitFor({ state: 'visible', timeout: 15000 });
+        await label.click();
+        await this.page
+            .locator(this.conditionColumn0)
+            .waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /**
+     * Switch the open condition popup to its "Condition" tab.
+     *
+     * The popup opens on the LIST tab. `dashboard-add-condition-value` lives
+     * inside `<OTabPanel name="condition">`, so on the list tab it is not in the
+     * DOM at all (probe against alpha: value count = 0 straight after opening).
+     * `dashboard-add-condition-condition-0` is that tab's TRIGGER, not the value
+     * control — asserting the two together only works once the tab is active.
+     */
+    async openConditionTab(index = 0) {
+        const tab = this.page.locator(`[data-test="dashboard-add-condition-condition-${index}"]`);
+        await tab.waitFor({ state: 'visible', timeout: 10000 });
+        await tab.click();
+        await this.page
+            .locator(this.conditionValue)
+            .waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /** DrilldownPopUp is an ODialog; its Add/Update button is the dialog primary. */
+    getDrilldownSaveBtnLocator() {
+        return this.page.locator(
+            '[data-test="dashboard-drilldown-popup"] [data-test="o-dialog-primary-btn"]'
+        );
+    }
+
+    /** Generic success toast (OToast stamps the variant on its root). */
+    getSuccessToastLocator() {
+        return this.page.locator(this.toastSuccess).first();
     }
 
     // ── AddAnnotation helpers ─────────────────────────────────────────────────
