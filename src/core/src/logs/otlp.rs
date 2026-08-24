@@ -85,7 +85,6 @@ pub async fn handle_request(
     let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::new();
     let mut original_options = Vec::new();
-    let mut timestamps = Vec::new();
     // End pipeline params construction
 
     if !executable_pipelines.is_empty() {
@@ -273,7 +272,6 @@ pub async fn handle_request(
                     // buffer the records and originals for pipeline batch processing
                     pipeline_inputs.push(rec);
                     original_options.push(original_data);
-                    timestamps.push(timestamp);
                 } else {
                     let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
                     *size += json::estimate_json_bytes(&rec);
@@ -411,22 +409,23 @@ pub async fn handle_request(
                         }
 
                         for (idx, mut res) in stream_pl_results {
-                            let timestamp = timestamps.get(idx).copied().unwrap_or_default();
-                            if let Err(e) = super::handle_timestamp_for_value(
-                                &mut res, timestamp, timestamp, timestamp,
-                            ) {
-                                stream_status.status.failed += 1;
-                                stream_status.status.error = e.to_string();
-                                metrics::INGEST_ERRORS
-                                    .with_label_values(&[
-                                        org_id,
-                                        StreamType::Logs.as_str(),
-                                        &stream_name,
-                                        TS_PARSE_FAILED,
-                                    ])
-                                    .inc();
-                                continue;
-                            }
+                            let timestamp =
+                                match super::handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+                                    Ok(ts) => ts,
+                                    Err(e) => {
+                                        stream_status.status.failed += 1;
+                                        stream_status.status.error = e.to_string();
+                                        metrics::INGEST_ERRORS
+                                            .with_label_values(&[
+                                                org_id,
+                                                StreamType::Logs.as_str(),
+                                                &stream_name,
+                                                TS_PARSE_FAILED,
+                                            ])
+                                            .inc();
+                                        continue;
+                                    }
+                                };
 
                             let original_size = json::estimate_json_bytes(&res);
                             // get json object
@@ -523,7 +522,7 @@ pub async fn handle_request(
                             let (ts_data, fn_num) = json_data_by_stream
                                 .entry(destination_stream.clone())
                                 .or_insert((Vec::new(), None));
-                            ts_data.push((timestamps[idx], local_val));
+                            ts_data.push((timestamp, local_val));
                             *fn_num = Some(function_no); // no pl -> no func
                         }
                     }
@@ -538,22 +537,22 @@ pub async fn handle_request(
             .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
             for (idx, mut res) in pipeline_inputs.iter().cloned().enumerate() {
-                let timestamp = timestamps.get(idx).copied().unwrap_or_default();
-                if let Err(e) =
-                    super::handle_timestamp_for_value(&mut res, timestamp, timestamp, timestamp)
-                {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    metrics::INGEST_ERRORS
-                        .with_label_values(&[
-                            org_id,
-                            StreamType::Logs.as_str(),
-                            &stream_name,
-                            TS_PARSE_FAILED,
-                        ])
-                        .inc();
-                    continue;
-                }
+                let timestamp = match super::handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+                    Ok(ts) => ts,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.as_str(),
+                                &stream_name,
+                                TS_PARSE_FAILED,
+                            ])
+                            .inc();
+                        continue;
+                    }
+                };
 
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
                 *size += json::estimate_json_bytes(&res);
@@ -630,7 +629,7 @@ pub async fn handle_request(
                 let (ts_data, fn_num) = json_data_by_stream
                     .entry(stream_name.clone())
                     .or_insert((Vec::new(), None));
-                ts_data.push((timestamps[idx], local_val));
+                ts_data.push((timestamp, local_val));
                 *fn_num = Some(0);
             }
         }
@@ -639,7 +638,6 @@ pub async fn handle_request(
     // drop variables
     drop(executable_pipelines);
     drop(original_options);
-    drop(timestamps);
     drop(user_defined_schema_map);
     drop(streams_need_original_map);
 

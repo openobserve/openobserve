@@ -593,19 +593,17 @@ pub fn handle_timestamp_for_value(
     value: &mut Value,
     min_ts: i64,
     max_ts: i64,
-    def_ts: i64,
 ) -> Result<i64, anyhow::Error> {
     let local_val = value
         .as_object_mut()
         .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
-    handle_timestamp_for_map(local_val, min_ts, max_ts, def_ts)
+    handle_timestamp_for_map(local_val, min_ts, max_ts)
 }
 
 fn handle_timestamp_for_map(
     val: &mut Map<String, Value>,
     min_ts: i64,
     max_ts: i64,
-    def_ts: i64,
 ) -> Result<i64, anyhow::Error> {
     let (mut timestamp, has_valid_timestamp) = match val.get(TIMESTAMP_COL_NAME) {
         Some(v) if !v.is_null() => match parse_timestamp_micro_from_value(v) {
@@ -624,8 +622,6 @@ fn handle_timestamp_for_map(
     if !has_valid_timestamp {
         timestamp = if timestamp > 0 {
             timestamp
-        } else if def_ts > 0 {
-            def_ts
         } else {
             Utc::now().timestamp_micros()
         };
@@ -707,7 +703,7 @@ mod tests {
         // 2024-01-15 in microseconds
         let ts = 1_705_276_800_000_000i64;
         let mut val = json!({TIMESTAMP_COL_NAME: ts});
-        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX, 0);
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), ts);
     }
@@ -717,7 +713,7 @@ mod tests {
         let min_ts = 1_705_276_800_000_000i64;
         let old_ts = 1_000_000_000_000_000i64;
         let mut val = json!({TIMESTAMP_COL_NAME: old_ts});
-        let result = handle_timestamp_for_value(&mut val, min_ts, i64::MAX, 0);
+        let result = handle_timestamp_for_value(&mut val, min_ts, i64::MAX);
         assert!(result.is_err());
     }
 
@@ -726,14 +722,14 @@ mod tests {
         let max_ts = 1_705_276_800_000_000i64;
         let future_ts = 2_000_000_000_000_000i64;
         let mut val = json!({TIMESTAMP_COL_NAME: future_ts});
-        let result = handle_timestamp_for_value(&mut val, 0, max_ts, 0);
+        let result = handle_timestamp_for_value(&mut val, 0, max_ts);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_handle_timestamp_for_value_not_object() {
         let mut val = json!("not an object");
-        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX, 0);
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
         assert!(result.is_err());
     }
 
@@ -741,7 +737,7 @@ mod tests {
     fn test_handle_timestamp_for_value_null_timestamp_uses_now() {
         let mut val = json!({TIMESTAMP_COL_NAME: null});
         let before = chrono::Utc::now().timestamp_micros();
-        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX, 0);
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
         let after = chrono::Utc::now().timestamp_micros();
         assert!(result.is_ok());
         let ts = result.unwrap();
@@ -752,7 +748,7 @@ mod tests {
     fn test_handle_timestamp_for_value_missing_field_uses_now() {
         let mut val = json!({"message": "hello"});
         let before = chrono::Utc::now().timestamp_micros();
-        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX, 0);
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
         let after = chrono::Utc::now().timestamp_micros();
         assert!(result.is_ok());
         let ts = result.unwrap();

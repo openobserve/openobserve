@@ -1613,8 +1613,7 @@ async fn process_remote_stream_node(
             };
         }
         if !record.is_null() && record.is_object() {
-            if let Err(e) = crate::logs::handle_timestamp_for_value(&mut record, min_ts, max_ts, 0)
-            {
+            if let Err(e) = crate::logs::handle_timestamp_for_value(&mut record, min_ts, max_ts) {
                 let err_msg = format!("DestinationNode error handling timestamp: {e}");
                 if let Err(send_err) = channels
                     .error_sender
