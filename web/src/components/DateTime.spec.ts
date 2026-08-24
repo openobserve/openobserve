@@ -535,4 +535,55 @@ describe("DateTime Component", () => {
       expect(wrapper.emitted("on:date-change")).toBeTruthy();
     });
   });
+
+  describe("Relative preset search", () => {
+    it("shows every period with no search term", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual([
+        "s",
+        "m",
+        "h",
+        "d",
+        "w",
+        "M",
+      ]);
+    });
+
+    it("narrows to the matching period when searching its label", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.relativeSearchTerm = "hour";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual(["h"]);
+    });
+
+    it("narrows to periods whose preset values match a numeric search", async () => {
+      wrapper = createWrapper();
+
+      // 45 only appears under seconds and minutes (relativeDates.s / .m).
+      wrapper.vm.relativeSearchTerm = "45";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.filteredRelativePeriods.map((p: any) => p.value)).toEqual(["s", "m"]);
+      expect(wrapper.vm.visibleRelativeItems({ label: "Seconds", value: "s" })).toEqual([45]);
+    });
+
+    it("reports no matches for a query nothing satisfies", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.relativeSearchTerm = "not-a-real-preset";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.filteredRelativePeriods).toEqual([]);
+    });
+
+    it("keeps relativeItemHours indexed to the underlying (unfiltered) preset list", () => {
+      wrapper = createWrapper();
+
+      // Hours row: relativeDates.h = [1, 2, 3, 6, 8, 12], relativeDatesInHour.h same values.
+      expect(wrapper.vm.relativeItemHours("h", 8)).toBe(8);
+    });
+  });
 });
