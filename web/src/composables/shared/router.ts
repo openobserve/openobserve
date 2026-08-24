@@ -22,6 +22,7 @@ import {
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import store from "@/stores";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import About from "@/views/About.vue";
@@ -60,6 +61,74 @@ const redirectToTraceTab =
     name: "traces",
     query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
   });
+
+// Eager, not lazy: the shell hosts the keep-alive that every DBM tab lives in,
+// so it is on the critical path for the first DBM route either way, and it is a
+// single `<router-view>`.
+import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
+
+const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
+const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
+const DbmSamplesPage = () => import("@/views/DatabaseMonitoring/SamplesPage.vue");
+const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailPage.vue");
+const DbmActivityPage = () => import("@/views/DatabaseMonitoring/ActivityPage.vue");
+const DbmDeadlocksPage = () => import("@/views/DatabaseMonitoring/DeadlocksPage.vue");
+const DbmBlockedQueriesPage = () => import("@/views/DatabaseMonitoring/BlockedQueriesPage.vue");
+const DbmTableHealthPage = () => import("@/views/DatabaseMonitoring/TableHealthPage.vue");
+
+/**
+ * The SECTION gate. Runtime flag only — no build-type conjunct, because the
+ * Database Monitoring section itself is not enterprise-only. The build-type
+ * gate for its three enterprise tabs is `dbmEnterpriseGuard` below, applied per
+ * route; adding an isEnterprise conjunct here would close the whole section on
+ * OSS instead.
+ *
+ * The store is IMPORTED, not read off `window`: nothing in the app ever assigns
+ * `window.store`, so the old `(window as any).store` read was permanently
+ * `undefined`. On the negative gates elsewhere in this file that fails OPEN and
+ * goes unnoticed, but this gate is positive — it made every Database Monitoring
+ * route redirect to /traces no matter what `/config` returned, i.e. the feature
+ * was unreachable in a browser. `import store from "@/stores"` is the singleton
+ * `useEnterpriseRoutes.ts` already uses for exactly this kind of runtime
+ * `/config` flag, and it works outside a component where `useStore()` cannot.
+ */
+/**
+ * `main.ts` calls `getConfig()` WITHOUT awaiting it and mounts the app from a
+ * `.finally()` on locale loading, so on a cold load (deep link, refresh, or a
+ * Playwright `page.goto`) this guard can run before `/config` has come back and
+ * `zoConfig` is still `{}`. Treating "not loaded yet" as "disabled" bounced a
+ * direct URL to /traces even with the flag on. Only an explicit `false` — a
+ * config that HAS loaded and says off — is a redirect; an unloaded config lets
+ * the route through, and the page's own `dbmEnabled` check renders the disabled
+ * state if it really is off.
+ */
+const dbMonitoringEnabled = (): boolean => {
+  const zoConfig = store?.state?.zoConfig;
+  const configLoaded = !!zoConfig && Object.keys(zoConfig).length > 0;
+  if (!configLoaded) return true;
+  return Boolean(zoConfig.database_monitoring_enabled);
+};
+
+/**
+ * Guard for the three enterprise-only DBM tabs — Deadlocks, Blocked queries and
+ * Table health, whose reads an OSS backend answers 403 on. Disabling the tabs
+ * cannot stop a PASTED or bookmarked URL, so each route needs its own guard.
+ *
+ * It lands on the DBM overview, keeping the reader inside the section they
+ * aimed at, rather than on a page that renders empty because every fetch was
+ * refused. The scope travels so the window and filters survive the bounce.
+ *
+ * `isEnterprise` is a STRING — compared against the literal `"true"`, never
+ * coerced, since `Boolean("false")` is true and would open the gate on OSS.
+ * Same shape as the `serviceGraph` guard below.
+ */
+const dbmEnterpriseGuard = (to: any, from: any, next: any) => {
+  if (config.isEnterprise !== "true") {
+    next({ name: "dbmDatabases", query: to.query });
+    return;
+  }
+  routeGuard(to, from, next);
+};
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -305,6 +374,113 @@ const useRoutes = () => {
     {
       path: "traces/services",
       redirect: redirectToTraceTab("services-catalog"),
+    },
+    {
+      path: "infra/databases",
+      component: DbmShell,
+      beforeEnter(to: any, from: any, next: any) {
+        if (!dbMonitoringEnabled()) {
+          next({ name: "traces", query: to.query });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "",
+          name: "dbmDatabases",
+          component: DbmDatabasesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "queries",
+          name: "dbmQueries",
+          component: DbmQueriesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "samples",
+          name: "dbmSamples",
+          component: DbmSamplesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "activity",
+          name: "dbmActivity",
+          component: DbmActivityPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "deadlocks",
+          name: "dbmDeadlocks",
+          component: DbmDeadlocksPage,
+          beforeEnter: dbmEnterpriseGuard,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          // `blocking` rather than `blocked`: the URL names the phenomenon the
+          // page is about, and both perspectives of it live on this one route.
+          path: "blocking",
+          name: "dbmBlocking",
+          component: DbmBlockedQueriesPage,
+          beforeEnter: dbmEnterpriseGuard,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "table-health",
+          name: "dbmTableHealth",
+          component: DbmTableHealthPage,
+          beforeEnter: dbmEnterpriseGuard,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          // The query id travels as a query param rather than a path segment:
+          // it is opaque, can be long, and the page needs the rest of the scope
+          // (stream, database, window) alongside it for the URL to be shareable
+          // — which is the whole point of the incident-summary permalink.
+          // `keepAlive` is deliberately off: a cached instance would show the
+          // previous query's charts when arriving from a different span.
+          path: "query",
+          name: "dbmQueryDetail",
+          component: DbmQueryDetailPage,
+          meta: {
+            title: "Query detail",
+          },
+        },
+      ],
+    },
+    {
+      // Database Monitoring moved from `traces/databases` to `infra/databases`.
+      // Every old link keeps working: the wildcard carries the tab segment
+      // (`queries`, `deadlocks`, `table-health`, …) and the `query` object is
+      // forwarded, so a permalink's scope filters and time range survive the
+      // hop rather than dumping the reader on an unfiltered Databases tab.
+      path: "traces/databases/:dbmPath(.*)*",
+      redirect: (to: any) => ({
+        path: `/infra/databases${to.params.dbmPath?.length ? `/${[to.params.dbmPath].flat().join("/")}` : ""}`,
+        query: to.query,
+      }),
     },
     {
       path: "traces/trace-details",

@@ -278,9 +278,33 @@ export const getIngestionURL = () => {
 };
 
 export const getEndPoint = (ingestionURL: string) => {
-  const url = new URL(ingestionURL);
+  /**
+   * Resolve against the page origin rather than requiring an absolute URL.
+   *
+   * A same-origin deployment (and the proxied dev servers) sets the endpoint to
+   * a RELATIVE value — "/" is the common one, which becomes "" once the store
+   * strips its trailing slash. `new URL("")` throws, and because this runs in
+   * the setup() of every ingestion card, that single throw took down the whole
+   * Data Sources page instead of degrading one field.
+   *
+   * The second argument is the documented fix for exactly this: it makes a
+   * relative or empty input resolve to where the app is actually served from,
+   * which is also the correct answer for a same-origin ingest endpoint.
+   */
+  const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  let url: URL;
+  try {
+    url = new URL(ingestionURL, base);
+  } catch {
+    // Still unusable (a malformed absolute URL) — fall back to the origin so
+    // the card renders with a wrong-but-editable host rather than crashing.
+    url = new URL(base);
+  }
+
   const endpoint = {
-    url: ingestionURL,
+    // Keep the caller's own string when it gave one: the snippets embed it
+    // verbatim, and rewriting an absolute URL here would change what users copy.
+    url: ingestionURL || url.origin,
     host: url.hostname,
     port: url.port || (url.protocol === "https:" ? "443" : "80"),
     protocol: url.protocol.replace(":", ""),
