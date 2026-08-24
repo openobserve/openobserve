@@ -145,14 +145,16 @@ async fn write_vortex(
         })
     });
 
+    // join the writer first: its error is the root cause, the read task only
+    // fails with a derived channel SendError
+    let buf = writer_task
+        .await
+        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
+        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))?;
     read_task
         .await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
-
-    writer_task
-        .await
-        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
-        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
+    Ok(buf)
 }
 
 #[cfg(test)]

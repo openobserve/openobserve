@@ -183,11 +183,14 @@ async fn write_vortex(
         })
     });
 
-    await_read_task(read_task).await?;
-    writer_task
+    // join the writer first: its error is the root cause, the read task only
+    // fails with a derived channel SendError
+    let files = writer_task
         .await
         .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
-        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex files: {e}")))
+        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex files: {e}")))?;
+    await_read_task(read_task).await?;
+    Ok(files)
 }
 
 async fn await_read_task(read_task: tokio::task::JoinHandle<Result<()>>) -> Result<()> {

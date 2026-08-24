@@ -103,7 +103,7 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
             }
             FileSelection::RowRanges(ranges) => {
                 if let Some(access_plan) =
-                    generate_vortex_access_plan_from_ranges(ranges.iter().cloned())
+                    generate_vortex_access_plan_from_ranges(file, ranges.iter().cloned())
                 {
                     file.extensions.insert(access_plan);
                 }
@@ -478,6 +478,9 @@ mod tests {
             .remove(0)
             .location;
         let mut partitioned_file = PartitionedFile::new(location.to_string(), 100);
+        let mut stats = Statistics::new_unknown(&Schema::empty());
+        stats.num_rows = Precision::Exact(8);
+        partitioned_file.statistics = Some(Arc::new(stats));
 
         generate_access_plan(&mut partitioned_file);
 

@@ -25,6 +25,7 @@ use std::{
 };
 
 use arrow::buffer::BooleanBuffer;
+use datafusion::{common::stats::Precision, datasource::listing::PartitionedFile};
 use tokio::runtime::Runtime;
 use vortex::{
     array::{ArrayRef, Canonical, ExecutionCtx, IntoArray, arrays::VarBinViewArray},
@@ -212,8 +213,13 @@ pub fn generate_vortex_access_plan(row_ids: &BooleanBuffer) -> Option<VortexAcce
 /// ranges stored in a Metrics index. A roaring selection preserves the compact
 /// range representation instead of expanding every range into row IDs.
 pub fn generate_vortex_access_plan_from_ranges(
+    file: &PartitionedFile,
     ranges: impl IntoIterator<Item = Range<usize>>,
 ) -> Option<VortexAccessPlan> {
+    let stats = file.statistics.as_ref()?;
+    let Precision::Exact(num_rows) = stats.num_rows else {
+        return None;
+    };
     let mut selection = Selection::IncludeRoaring(Default::default());
     let Selection::IncludeRoaring(rows) = &mut selection else {
         unreachable!()
@@ -221,8 +227,9 @@ pub fn generate_vortex_access_plan_from_ranges(
     let mut previous_end = 0;
     for range in ranges {
         assert!(
-            previous_end <= range.start && range.start < range.end,
-            "invalid sorted Vortex row range {range:?}"
+            previous_end <= range.start && range.start < range.end && range.end <= num_rows,
+            "invalid sorted Vortex row range {range:?} for file {} with {num_rows} rows",
+            file.path().as_ref()
         );
         previous_end = range.end;
         rows.insert_range(u64::try_from(range.start).ok()?..u64::try_from(range.end).ok()?);
@@ -233,6 +240,7 @@ pub fn generate_vortex_access_plan_from_ranges(
 
 #[cfg(test)]
 mod tests {
+    use datafusion::common::Statistics;
     use vortex::{
         VortexSessionDefault,
         array::{
@@ -257,14 +265,38 @@ mod tests {
         assert_eq!(options.values_per_page, 8192);
     }
 
+    fn vortex_file_with_rows(num_rows: usize) -> PartitionedFile {
+        let mut file = PartitionedFile::new("test.vortex".to_string(), 100);
+        let mut stats = Statistics::new_unknown(&arrow_schema::Schema::empty());
+        stats.num_rows = Precision::Exact(num_rows);
+        file.statistics = Some(Arc::new(stats));
+        file
+    }
+
     #[test]
     fn test_access_plan_from_metrics_index_ranges() {
-        let plan = generate_vortex_access_plan_from_ranges([1..3, 5..8, 10..12]).unwrap();
+        let file = vortex_file_with_rows(12);
+        let plan = generate_vortex_access_plan_from_ranges(&file, [1..3, 5..8, 10..12]).unwrap();
         let Selection::IncludeRoaring(rows) = plan.selection().unwrap() else {
             panic!("expected roaring row selection")
         };
 
         assert_eq!(rows.iter().collect::<Vec<_>>(), vec![1, 2, 5, 6, 7, 10, 11]);
+    }
+
+    #[test]
+    fn test_access_plan_from_ranges_without_exact_row_count_full_scans() {
+        let mut file = vortex_file_with_rows(12);
+        file.statistics = None;
+
+        assert!(generate_vortex_access_plan_from_ranges(&file, [1..3]).is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid sorted Vortex row range")]
+    fn test_access_plan_from_ranges_rejects_out_of_bounds() {
+        let file = vortex_file_with_rows(7);
+        generate_vortex_access_plan_from_ranges(&file, [1..3, 5..8]);
     }
 
     #[test]
