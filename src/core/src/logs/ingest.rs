@@ -33,7 +33,7 @@ use config::{
         flatten,
         json::{self, estimate_json_bytes},
         schema::format_stream_name,
-        time::{now_micros, parse_timestamp_micro_from_value},
+        time::now_micros,
     },
 };
 use flate2::read::GzDecoder;
@@ -54,12 +54,13 @@ use opentelemetry_proto::tonic::{
     metrics::v1::metric::Data,
 };
 use prost::Message;
-use schema::{get_future_discard_error, get_upto_discard_error};
-use serde_json::json;
 use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
-use crate::{ingestion::check_ingestion_allowed, service::get_formatted_stream_name};
+use crate::{
+    ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
+    service::get_formatted_stream_name,
+};
 
 type LogDataByStream = HashMap<String, (Vec<(i64, json::Map<String, json::Value>)>, Option<usize>)>;
 
@@ -408,23 +409,28 @@ pub async fn ingest(
 
                         for (idx, mut res) in stream_pl_results {
                             // handle timestamp
-                            let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
-                                Ok(ts) => ts,
-                                Err(e) => {
-                                    stream_status.status.failed += 1;
-                                    stream_status.status.error = e.to_string();
-                                    metrics::INGEST_ERRORS
-                                        .with_label_values(&[
-                                            org_id,
-                                            StreamType::Logs.as_str(),
-                                            &stream_name,
-                                            TS_PARSE_FAILED,
-                                        ])
-                                        .inc();
-                                    log_failed_record(log_ingestion_errors, &res, &e.to_string());
-                                    continue;
-                                }
-                            };
+                            let timestamp =
+                                match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+                                    Ok(ts) => ts,
+                                    Err(e) => {
+                                        stream_status.status.failed += 1;
+                                        stream_status.status.error = e.to_string();
+                                        metrics::INGEST_ERRORS
+                                            .with_label_values(&[
+                                                org_id,
+                                                StreamType::Logs.as_str(),
+                                                &stream_name,
+                                                TS_PARSE_FAILED,
+                                            ])
+                                            .inc();
+                                        log_failed_record(
+                                            log_ingestion_errors,
+                                            &res,
+                                            &e.to_string(),
+                                        );
+                                        continue;
+                                    }
+                                };
 
                             // we calculate the size BEFORE applying uds
                             let original_size = estimate_json_bytes(&res);
@@ -690,7 +696,7 @@ fn finalize_and_buffer_record(
             return false;
         }
     };
-    let timestamp = match handle_timestamp(&mut res, ctx.min_ts, ctx.max_ts) {
+    let timestamp = match handle_timestamp_for_value(&mut res, ctx.min_ts, ctx.max_ts) {
         Ok(ts) => ts,
         Err(e) => {
             ctx.stream_status.status.failed += 1;
@@ -785,43 +791,6 @@ fn finalize_and_buffer_record(
         }
     };
     true
-}
-
-pub fn handle_timestamp(
-    value: &mut json::Value,
-    min_ts: i64,
-    max_ts: i64,
-) -> Result<i64, anyhow::Error> {
-    let local_val = value
-        .as_object_mut()
-        .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
-    let (timestamp, has_valid_timestamp) = match local_val.get(TIMESTAMP_COL_NAME) {
-        Some(v) => {
-            if !v.is_null() {
-                match parse_timestamp_micro_from_value(v) {
-                    Ok(t) => t,
-                    Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
-                }
-            } else {
-                (Utc::now().timestamp_micros(), false)
-            }
-        }
-        None => (Utc::now().timestamp_micros(), false),
-    };
-    // check ingestion time
-    if timestamp < min_ts {
-        return Err(get_upto_discard_error());
-    }
-    if timestamp > max_ts {
-        return Err(get_future_discard_error());
-    }
-    if !has_valid_timestamp {
-        local_val.insert(
-            TIMESTAMP_COL_NAME.to_string(),
-            json::Value::Number(timestamp.into()),
-        );
-    }
-    Ok(timestamp)
 }
 
 struct IngestionDataIterator(IngestionDataIter);
@@ -1167,7 +1136,7 @@ fn construct_values_from_open_telemetry_v1_metric(
                         resource_attributes.get("aws.exporter.arn").unwrap(),
                     );
 
-                    let mut mv = json!({
+                    let mut mv = serde_json::json!({
                         "metric_stream_name": resource_id,
                         "account_id": resource_attributes.get("cloud.account.id").unwrap(),
                         "region": resource_attributes.get("cloud.region").unwrap(),
@@ -1217,123 +1186,12 @@ fn construct_values_from_open_telemetry_v1_metric(
 
 #[cfg(test)]
 mod tests {
-    use config::TIMESTAMP_COL_NAME;
-    use ingestion_common::{IngestUser, SystemJobType};
-    use serde_json::json;
 
     use super::{
         decode_and_decompress_to_string, decode_and_decompress_to_vec,
         deserialize_aws_record_from_vec, extract_resource_id_from_amazon_resource_number,
-        get_size_of_var_int_header, get_tuple_from_open_telemetry_key_value, handle_timestamp,
-        is_blocked_internal_rollup_write,
+        get_size_of_var_int_header, get_tuple_from_open_telemetry_key_value,
     };
-
-    #[test]
-    fn test_internal_rollup_write_guard_blocks_users_in_all_editions() {
-        let user = IngestUser::User("someone@example.com".to_string());
-        // User-initiated writes into any _o2_* / _agent_signals stream are
-        // rejected (no cfg gate — this test compiles and runs on OSS).
-        assert!(is_blocked_internal_rollup_write(
-            "_o2_db_stats",
-            &user,
-            false
-        ));
-        assert!(is_blocked_internal_rollup_write(
-            "_o2_service_graph",
-            &user,
-            false
-        ));
-        assert!(is_blocked_internal_rollup_write(
-            "_agent_signals",
-            &user,
-            false
-        ));
-        // Ordinary streams are unaffected.
-        assert!(!is_blocked_internal_rollup_write("default", &user, false));
-        assert!(!is_blocked_internal_rollup_write("o2_stuff", &user, false));
-    }
-
-    #[test]
-    fn test_internal_rollup_write_guard_exempts_internal_writers() {
-        // The gRPC ServiceGraph arm ingests as SystemJob(InternalGrpc) with
-        // is_derived=true — both flags independently pass the guard.
-        let internal = IngestUser::SystemJob(SystemJobType::InternalGrpc);
-        assert!(!is_blocked_internal_rollup_write(
-            "_o2_service_graph",
-            &internal,
-            true
-        ));
-        assert!(!is_blocked_internal_rollup_write(
-            "_o2_db_stats",
-            &internal,
-            false
-        ));
-        let user = IngestUser::User("someone@example.com".to_string());
-        assert!(!is_blocked_internal_rollup_write(
-            "_o2_db_stats",
-            &user,
-            true
-        ));
-    }
-
-    #[test]
-    fn test_handle_timestamp_valid_in_range() {
-        // 2024-01-15 in microseconds
-        let ts = 1_705_276_800_000_000i64;
-        let mut val = json!({TIMESTAMP_COL_NAME: ts});
-        let result = handle_timestamp(&mut val, 0, i64::MAX);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ts);
-    }
-
-    #[test]
-    fn test_handle_timestamp_too_old() {
-        let min_ts = 1_705_276_800_000_000i64;
-        let old_ts = 1_000_000_000_000_000i64;
-        let mut val = json!({TIMESTAMP_COL_NAME: old_ts});
-        let result = handle_timestamp(&mut val, min_ts, i64::MAX);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_handle_timestamp_too_future() {
-        let max_ts = 1_705_276_800_000_000i64;
-        let future_ts = 2_000_000_000_000_000i64;
-        let mut val = json!({TIMESTAMP_COL_NAME: future_ts});
-        let result = handle_timestamp(&mut val, 0, max_ts);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_handle_timestamp_not_object() {
-        let mut val = json!("not an object");
-        let result = handle_timestamp(&mut val, 0, i64::MAX);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_handle_timestamp_null_timestamp_uses_now() {
-        let mut val = json!({TIMESTAMP_COL_NAME: null});
-        let before = chrono::Utc::now().timestamp_micros();
-        let result = handle_timestamp(&mut val, 0, i64::MAX);
-        let after = chrono::Utc::now().timestamp_micros();
-        assert!(result.is_ok());
-        let ts = result.unwrap();
-        assert!(ts >= before && ts <= after);
-    }
-
-    #[test]
-    fn test_handle_timestamp_missing_field_uses_now() {
-        let mut val = json!({"message": "hello"});
-        let before = chrono::Utc::now().timestamp_micros();
-        let result = handle_timestamp(&mut val, 0, i64::MAX);
-        let after = chrono::Utc::now().timestamp_micros();
-        assert!(result.is_ok());
-        let ts = result.unwrap();
-        assert!(ts >= before && ts <= after);
-        // field should be inserted
-        assert!(val.get(TIMESTAMP_COL_NAME).is_some());
-    }
 
     #[test]
     fn test_get_tuple_from_open_telemetry_key_value_string_value() {

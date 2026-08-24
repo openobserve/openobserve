@@ -29,11 +29,7 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{
-        flatten,
-        json::{self, estimate_json_bytes},
-        schema::format_stream_name,
-    },
+    utils::{flatten, json, schema::format_stream_name},
 };
 use infra::{errors::Result, schema::get_flatten_level};
 use ingestion_common::{IngestionStatus, StreamStatus};
@@ -187,7 +183,6 @@ pub async fn handle_request(
                     }
                 }
 
-                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
                 rec["severity"] = if !log_record.severity_text.is_empty() {
                     log_record.severity_text.to_owned().into()
                 } else {
@@ -201,6 +196,7 @@ pub async fn handle_request(
                     rec[local_attr.key.as_str()] =
                         get_val_with_type_retained(&local_attr.value.as_ref());
                 });
+                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
 
                 match TraceId::from_bytes(
                     log_record
@@ -280,7 +276,7 @@ pub async fn handle_request(
                     timestamps.push(timestamp);
                 } else {
                     let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *size += estimate_json_bytes(&rec);
+                    *size += json::estimate_json_bytes(&rec);
                     // JSON Flattening - use per-stream flatten level
                     let flatten_level =
                         get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
@@ -415,7 +411,24 @@ pub async fn handle_request(
                         }
 
                         for (idx, mut res) in stream_pl_results {
-                            let original_size = estimate_json_bytes(&res);
+                            if let Err(e) = super::handle_timestamp_for_value(
+                                &mut res,
+                                timestamps[idx],
+                                timestamps[idx],
+                            ) {
+                                stream_status.status.failed += 1;
+                                stream_status.status.error = e.to_string();
+                                metrics::INGEST_ERRORS
+                                    .with_label_values(&[
+                                        org_id,
+                                        StreamType::Logs.as_str(),
+                                        &stream_name,
+                                        TS_PARSE_FAILED,
+                                    ])
+                                    .inc();
+                            }
+
+                            let original_size = json::estimate_json_bytes(&res);
                             // get json object
                             let mut local_val = match res.take() {
                                 json::Value::Object(v) => v,
@@ -524,14 +537,29 @@ pub async fn handle_request(
             .iter()
             .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
-            for (idx, mut rec) in pipeline_inputs.iter().cloned().enumerate() {
+            for (idx, mut res) in pipeline_inputs.iter().cloned().enumerate() {
+                if let Err(e) =
+                    super::handle_timestamp_for_value(&mut res, timestamps[idx], timestamps[idx])
+                {
+                    stream_status.status.failed += 1;
+                    stream_status.status.error = e.to_string();
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
+                }
+
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                *size += estimate_json_bytes(&rec);
+                *size += json::estimate_json_bytes(&res);
 
                 let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
-                rec = flatten::flatten_with_level(rec, flatten_level)?;
+                res = flatten::flatten_with_level(res, flatten_level)?;
 
-                let mut local_val = match rec.take() {
+                let mut local_val = match res.take() {
                     json::Value::Object(v) => v,
                     _ => unreachable!(),
                 };

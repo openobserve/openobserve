@@ -1612,11 +1612,31 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             return Ok(());
         }
 
+        // Ensure partitions exist for all distinct date keys before batch INSERT
+        let add_items = files
+            .iter()
+            .filter(|v| {
+                if v.deleted {
+                    false
+                } else if v.meta.min_ts == 0 || v.meta.max_ts == 0 {
+                    log::warn!("[SQLITE] min_ts or max_ts is 0 for file: {}", v.key);
+                    false
+                } else {
+                    match parse_file_key_columns(&v.key) {
+                        Ok(_) => true,
+                        Err(_) => {
+                            log::error!("[SQLITE] parse file key failed for file: {}", v.key);
+                            false
+                        }
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
 
-        let add_items = files.iter().filter(|f| !f.deleted).collect::<Vec<_>>();
         if !add_items.is_empty() {
             let chunks = add_items.chunks(100);
             for files in chunks {
@@ -1626,16 +1646,9 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
-                    let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
-                    else {
-                        log::error!("[SQLITE] parse file key failed for file: {}", item.key);
-                        return;
-                    };
+                    let (stream_key, date_key, file_name) =
+                        parse_file_key_columns(&item.key).unwrap();
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                    if item.meta.min_ts == 0 || item.meta.max_ts == 0 {
-                        log::warn!("[SQLITE] min_ts or max_ts is 0 for file: {}", item.key);
-                        return;
-                    }
                     b.push_bind(id)
                         .push_bind(&item.account)
                         .push_bind(org_id)
