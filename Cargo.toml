@@ -569,7 +569,6 @@ sea-orm-migration = { version = "1.1.20", features = [
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
-serde_with = { version = "3", features = ["macros", "json"] }
 sha1 = "0.10.6"
 sha2 = "0.10"
 sha256 = "1.6"
