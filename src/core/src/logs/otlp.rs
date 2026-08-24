@@ -427,6 +427,7 @@ pub async fn handle_request(
                                         TS_PARSE_FAILED,
                                     ])
                                     .inc();
+                                continue;
                             }
 
                             let original_size = json::estimate_json_bytes(&res);
@@ -555,6 +556,7 @@ pub async fn handle_request(
                             TS_PARSE_FAILED,
                         ])
                         .inc();
+                    continue;
                 }
 
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
