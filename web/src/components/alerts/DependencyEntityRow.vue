@@ -22,11 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="group rounded-default flex items-center gap-2 px-2 py-1.5"
-    :class="{ 'hover:bg-interactive-hover-bg': !noHover }"
+    :class="[{ 'hover:bg-interactive-hover-bg': !noHover }, deleting ? 'opacity-50' : '']"
     :data-test="`dependency-impact-row-${node.name}`"
   >
+    <OSpinner v-if="deleting" size="xs" class="shrink-0" />
     <span
-      v-if="node.kind === 'alert'"
+      v-else-if="node.kind === 'alert'"
       class="size-2 shrink-0 rounded-full"
       :class="node.enabled ? 'bg-status-positive' : 'bg-text-muted'"
     >
@@ -55,7 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("alert_dependencies.usedBy", { count }, count) }}
     </OTag>
 
-    <div class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+    <div
+      v-if="!deleting"
+      class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100"
+    >
       <OButton
         v-if="!node.missing"
         variant="ghost"
@@ -86,13 +90,16 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { depKindIcon, depKindColor } from "@/composables/alerts/useDependencyGraph";
 import type { DepNode } from "@/composables/alerts/useDependencyGraph";
 
 // noHover: suppress the row's own hover background where a wrapper already
 // provides the highlight (the destination cards), so hover and selected read the
 // same shade instead of stacking two tints.
-defineProps<{ node: DepNode; count?: number; noHover?: boolean }>();
+// deleting: this row's DELETE is in flight — the only feedback there is, since the
+// confirm dialog closes on confirm and the list no longer reloads behind it.
+defineProps<{ node: DepNode; count?: number; noHover?: boolean; deleting?: boolean }>();
 const emit = defineEmits<{
   (e: "open", node: DepNode): void;
   (e: "delete", node: DepNode): void;

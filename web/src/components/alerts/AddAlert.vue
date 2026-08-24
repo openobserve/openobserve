@@ -309,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :sqlAggColumnOptions="sqlAggColumnOptions"
                     :isAggregationEnabled="isAggregationEnabled"
                     :beingUpdated="beingUpdated"
+                    :isSeeding="isLoadingPrefill"
                     :promqlCondition="formData.query_condition.promql_condition"
                     :triggerCondition="formData.trigger_condition"
                     @update:tab="updateTab"

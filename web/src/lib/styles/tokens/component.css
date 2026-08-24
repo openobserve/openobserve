@@ -362,6 +362,10 @@
   --color-badge-warning-ol-text: var(--color-warning-700);
   --color-badge-warning-soft-bg: var(--color-warning-50);
   --color-badge-warning-soft-text: var(--color-warning-700);
+  /* warning-quiet in LIGHT is the soft treatment: pale wash, deep text. */
+  --color-badge-warning-quiet-bg: var(--color-warning-50);
+  --color-badge-warning-quiet-text: var(--color-warning-700);
+  --color-badge-warning-quiet-border: var(--color-warning-600);
 
   /* Badge — error */
   --color-badge-error-solid-bg: var(--color-error-600);
@@ -550,7 +554,11 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-default);
+  /* `border-control`, not `border-default`: the edge IS the affordance here —
+     it is the only signal that this is something you type into — so WCAG 2.1
+     SC 1.4.11 applies and wants 3:1. `border-default` reaches 1.48:1, which is
+     right for a card outline and not for a control. */
+  --color-input-border: var(--color-border-control);
   --color-input-border-hover: var(--color-primary-300);
   --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
@@ -575,7 +583,11 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-default);
+  /* Same reasoning as --color-input-border: an operable control's edge. */
+  --color-select-border: var(--color-border-control);
+  /* Quieted like the input's, so a disabled select does not keep drawing the
+     3:1 edge that means "you can operate this". */
+  --color-select-disabled-border: var(--color-border-default);
   --color-select-border-hover: var(--color-primary-300);
   --color-select-border-focus: var(--color-primary-300);
   --color-select-border-error: var(--color-error-500);
@@ -1707,6 +1719,9 @@
   --color-badge-warning-ol-text: var(--color-badge-warning-ol-text);
   --color-badge-warning-soft-bg: var(--color-badge-warning-soft-bg);
   --color-badge-warning-soft-text: var(--color-badge-warning-soft-text);
+  --color-badge-warning-quiet-bg: var(--color-badge-warning-quiet-bg);
+  --color-badge-warning-quiet-text: var(--color-badge-warning-quiet-text);
+  --color-badge-warning-quiet-border: var(--color-badge-warning-quiet-border);
 
   /* Badge — error */
   --color-badge-error-solid-bg: var(--color-badge-error-solid-bg);

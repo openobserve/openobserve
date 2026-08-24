@@ -7293,12 +7293,17 @@
       "matchingGroups": "Passende Gruppen",
       "dataPoint": "Datenpunkt",
       "dataPoints": "Datenpunkte",
+      "matchingSeries": "Zeitreihe",
+      "matchingSeriesPlural": "Zeitreihen",
       "row": "Zeile",
       "rows": "Zeilen",
       "result": "Ergebnis",
       "results": "Ergebnisse",
       "reasonMatch": "{count} {label} entsprechen ({comparison})",
-      "reasonNoMatch": "{count} {label} gefunden - entsprechen {comparison} nicht"
+      "reasonNoMatch": "{count} {label} gefunden - entsprechen {comparison} nicht",
+      "levelCritical": "Kritisch",
+      "levelWarning": "Warnung",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "Die Auswahl aller Spalten ist nicht zulässig",
     "customSql": "Benutzerdefiniertes SQL",

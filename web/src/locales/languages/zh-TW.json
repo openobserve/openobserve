@@ -7288,12 +7288,17 @@
       "matchingGroups": "符合的群組",
       "dataPoint": "資料點",
       "dataPoints": "資料點",
+      "matchingSeries": "序列",
+      "matchingSeriesPlural": "序列",
       "row": "列",
       "rows": "列",
       "result": "結果",
       "results": "結果",
       "reasonMatch": "{count} 個 {label} 符合（{comparison}）",
-      "reasonNoMatch": "{count} 個 {label} 找到 - 不符合 {comparison}"
+      "reasonNoMatch": "{count} 個 {label} 找到 - 不符合 {comparison}",
+      "levelCritical": "嚴重",
+      "levelWarning": "警告",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "不允許選取所有欄位",
     "customSql": "自訂 SQL",

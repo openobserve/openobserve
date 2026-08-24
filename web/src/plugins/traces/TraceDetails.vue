@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <!-- Search Results Navigation -->
               <div
-                class="rounded-default border-input-border dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
+                class="rounded-default border-border-default dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
               >
                 <div
                   class="flex items-center gap-[0.0625rem] px-1 text-xs font-medium select-none"

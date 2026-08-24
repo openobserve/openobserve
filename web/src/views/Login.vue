@@ -85,7 +85,11 @@ export default defineComponent({
         await configService
           .get_config()
           .then(async (res) => {
-            store.commit("setConfig", res.data);
+            // Never replace an already-loaded full config with the bootstrap
+            // subset (e.g. a logged-in user navigating to /login).
+            if (!store.state.zoConfig?.version) {
+              store.commit("setConfig", res.data);
+            }
           })
           .catch((err) => {
             console.error("Error while fetching config:", err);
@@ -303,7 +307,12 @@ export default defineComponent({
       configService
         .get_config()
         .then(async (res) => {
-          this.store.commit("setZoConfig", res.data);
+          // "setZoConfig" never existed as a mutation, so this fetch stored
+          // nothing; commit through the real mutation, with the same
+          // don't-clobber-the-full-config guard as everywhere else.
+          if (!this.store.state.zoConfig?.version) {
+            this.store.commit("setConfig", res.data);
+          }
           const token = getUserInfo(this.$route.hash);
 
           if (token !== null && token.email != null) {

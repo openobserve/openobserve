@@ -29,6 +29,8 @@ import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertP
 import { buildPrefillFromPanel } from "./fromPanel";
 import { buildPrefillFromLogs } from "./fromLogs";
 import { buildPrefillFromPatterns } from "./fromPatterns";
+import { buildPrefillFromLibrary } from "./fromLibrary";
+import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 
 interface AdapterCase {
   /** Registered source id. */
@@ -90,6 +92,36 @@ const ADAPTERS: AdapterCase[] = [
         datetime: { type: "relative", relativeTimePeriod: "15m" },
       }),
     degenerate: () => buildPrefillFromPatterns({ streamName: "", templates: [] }),
+  },
+  {
+    name: "library",
+    healthy: () =>
+      buildPrefillFromLibrary({
+        entry: {
+          id: "k8s/go_gc_pause_high",
+          name: "go_gc_pause_high",
+          title: "Go GC Pause High",
+          pack: "k8s",
+          severity: "warning",
+          stream: "go_gc_duration_seconds_sum",
+          stream_type: "metrics",
+          query_type: "promql",
+        } as AlertLibraryEntry,
+        file: {
+          stream_name: "go_gc_duration_seconds_sum",
+          stream_type: "metrics",
+          query_condition: {
+            type: "promql",
+            promql: "rate(go_gc_duration_seconds_sum[5m])",
+            promql_condition: { column: "value", operator: ">", value: 100 },
+          },
+          trigger_condition: { period: 5, frequency: 5, threshold: 1, timezone: "UTC" },
+        },
+      }),
+    // The library's own degenerate case is a file that failed to parse into
+    // anything — there is no partial state between "fetched" and "unusable".
+    degenerate: () =>
+      buildPrefillFromLibrary({ entry: {} as AlertLibraryEntry, file: {} as AlertLibraryFile }),
   },
 ];
 

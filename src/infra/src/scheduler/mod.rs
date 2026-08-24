@@ -16,9 +16,12 @@
 use std::sync::LazyLock as Lazy;
 
 use async_trait::async_trait;
-use config::meta::{
-    meta_store::MetaStore,
-    triggers::{Trigger, TriggerModule, TriggerStatus},
+use config::{
+    meta::{
+        meta_store::MetaStore,
+        triggers::{Trigger, TriggerModule, TriggerStatus},
+    },
+    utils::json,
 };
 use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 
@@ -308,6 +311,22 @@ pub async fn clear() -> Result<()> {
 pub fn get_scheduler_max_retries() -> (bool, i32) {
     let max_retries = config::get_config().limit.scheduler_max_retries;
     (max_retries > 0, max_retries.unsigned_abs() as i32)
+}
+
+/// Realtime alert triggers are cached on every node; the trigger rides in the
+/// event body so watchers can update their cache without a db read.
+async fn emit_realtime_trigger_event(trigger: &Trigger) -> Result<()> {
+    if trigger.module != TriggerModule::Alert || !trigger.is_realtime {
+        return Ok(());
+    }
+    let key = format!(
+        "{TRIGGERS_KEY}{}/{}/{}",
+        trigger.module, trigger.org, trigger.module_key
+    );
+    let cluster_coordinator = crate::db::get_coordinator().await;
+    cluster_coordinator
+        .put(&key, json::to_vec(trigger).unwrap().into(), true, None)
+        .await
 }
 
 #[cfg(test)]

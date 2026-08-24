@@ -7293,12 +7293,17 @@
       "matchingGroups": "pasujące grupy",
       "dataPoint": "punkt danych",
       "dataPoints": "punkty danych",
+      "matchingSeries": "seria",
+      "matchingSeriesPlural": "serie",
       "row": "wiersz",
       "rows": "wiersze",
       "result": "wynik",
       "results": "wyniki",
       "reasonMatch": "Pasujące: {count} {label} ({comparison})",
-      "reasonNoMatch": "Znaleziono: {count} {label} - nie spełnia {comparison}"
+      "reasonNoMatch": "Znaleziono: {count} {label} - nie spełnia {comparison}",
+      "levelCritical": "Krytyczny",
+      "levelWarning": "Ostrzeżenie",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "Nie można zaznaczyć wszystkich kolumn",
     "customSql": "Własny SQL",

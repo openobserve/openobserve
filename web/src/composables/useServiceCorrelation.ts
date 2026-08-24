@@ -40,20 +40,14 @@ import {
   clearAllIdentityConfigCache,
 } from "@/utils/identityConfig";
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
-
-// Cache TTL in milliseconds (5 minutes)
-const SEMANTIC_GROUPS_CACHE_TTL_MS = 5 * 60 * 1000;
-
-// Cache entry with timestamp for TTL support
-interface SemanticGroupsCacheEntry {
-  data: FieldAlias[];
-  timestamp: number;
-}
-
-// Global cache for semantic groups (shared across all instances)
-// Key: org_identifier, Value: cache entry with TTL
-const semanticGroupsGlobalCache = new Map<string, SemanticGroupsCacheEntry>();
-const pendingSemanticGroupsRequests = new Map<string, Promise<FieldAlias[]>>();
+import {
+  loadSemanticGroups as loadSemanticGroupsCached,
+  getCachedSemanticGroups,
+  clearSemanticGroupsCache,
+  clearSemanticGroupsCacheForOrg,
+  getSemanticGroupsCacheStatus as readSemanticGroupsCacheStatus,
+  SEMANTIC_GROUPS_CACHE_TTL_MS,
+} from "@/utils/semanticGroupsCache";
 
 // ---------------------------------------------------------------------------
 // Key fields config — per-stream-type pinned fields (fields + groups)
@@ -108,51 +102,10 @@ export function useServiceCorrelation() {
    * Uses a global cache to avoid redundant API calls across all composable instances
    */
   async function loadSemanticGroups(): Promise<FieldAlias[]> {
-    const org = orgIdentifier.value;
-
-    // Check global cache first and verify TTL
-    if (semanticGroupsGlobalCache.has(org)) {
-      const cached = semanticGroupsGlobalCache.get(org)!;
-      const age = Date.now() - cached.timestamp;
-
-      if (age < SEMANTIC_GROUPS_CACHE_TTL_MS) {
-        return cached.data;
-      } else {
-        semanticGroupsGlobalCache.delete(org);
-      }
-    }
-
-    // Check if there's already a pending request for this org
-    if (pendingSemanticGroupsRequests.has(org)) {
-      // Await the existing promise directly - no polling or recursion needed
-      return await pendingSemanticGroupsRequests.get(org)!;
-    }
-
-    // Create and store the promise for this request
-    const requestPromise = (async (): Promise<FieldAlias[]> => {
-      error.value = null;
-      try {
-        const response = await serviceStreamsApi.getSemanticGroups(org);
-        const cacheEntry: SemanticGroupsCacheEntry = {
-          data: response.data,
-          timestamp: Date.now(),
-        };
-        semanticGroupsGlobalCache.set(org, cacheEntry);
-        return response.data;
-      } catch (err: any) {
-        error.value = gt("traces.semanticGroupsLoadFailed", { error: err.message || err });
-        console.error("Error loading semantic groups:", err);
-        return [];
-      } finally {
-        // Clean up: remove the promise from pending requests
-        pendingSemanticGroupsRequests.delete(org);
-      }
-    })();
-
-    // Store the promise so concurrent requests can await it
-    pendingSemanticGroupsRequests.set(org, requestPromise);
-
-    return await requestPromise;
+    error.value = null;
+    return await loadSemanticGroupsCached(orgIdentifier.value, (err: any) => {
+      error.value = gt("traces.semanticGroupsLoadFailed", { error: err.message || err });
+    });
   }
 
   /**
@@ -290,8 +243,7 @@ export function useServiceCorrelation() {
    */
   function clearCache() {
     const org = orgIdentifier.value;
-    semanticGroupsGlobalCache.delete(org);
-    pendingSemanticGroupsRequests.delete(org);
+    clearSemanticGroupsCacheForOrg(org);
     keyFieldsGlobalCache.delete(org);
     pendingKeyFieldsRequests.delete(org);
     fieldGroupingGlobalCache.delete(org);
@@ -304,8 +256,7 @@ export function useServiceCorrelation() {
    * Use when switching organizations or on logout
    */
   function clearAllCaches() {
-    semanticGroupsGlobalCache.clear();
-    pendingSemanticGroupsRequests.clear();
+    clearSemanticGroupsCache();
     keyFieldsGlobalCache.clear();
     pendingKeyFieldsRequests.clear();
     fieldGroupingGlobalCache.clear();
@@ -394,10 +345,7 @@ export function useServiceCorrelation() {
     // State
     error,
     noMatch,
-    semanticGroups: computed(() => {
-      const cached = semanticGroupsGlobalCache.get(orgIdentifier.value);
-      return cached?.data || [];
-    }),
+    semanticGroups: computed(() => getCachedSemanticGroups(orgIdentifier.value) ?? []),
 
     // Methods
     findRelatedTelemetry,
@@ -416,8 +364,7 @@ export function useServiceCorrelation() {
  * Useful for logout or org switching
  */
 export function clearSemanticGroupsCaches() {
-  semanticGroupsGlobalCache.clear();
-  pendingSemanticGroupsRequests.clear();
+  clearSemanticGroupsCache();
   clearAllIdentityConfigCache();
 }
 
@@ -429,18 +376,5 @@ export function getSemanticGroupsCacheStatus(): Record<
   string,
   { age_seconds: number; expired: boolean; groups_count: number }
 > {
-  const status: Record<string, { age_seconds: number; expired: boolean; groups_count: number }> =
-    {};
-  const now = Date.now();
-
-  for (const [orgIdentifier, entry] of semanticGroupsGlobalCache.entries()) {
-    const age = now - entry.timestamp;
-    status[orgIdentifier] = {
-      age_seconds: Math.round(age / 1000),
-      expired: age >= SEMANTIC_GROUPS_CACHE_TTL_MS,
-      groups_count: entry.data.length,
-    };
-  }
-
-  return status;
+  return readSemanticGroupsCacheStatus();
 }

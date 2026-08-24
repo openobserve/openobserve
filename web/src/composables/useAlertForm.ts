@@ -1644,20 +1644,31 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         data.trigger_condition.period = prefill.periodMinutes;
       }
       if (prefill.frequencyMinutes) {
-        data.trigger_condition.frequency = Math.max(
-          data.trigger_condition.frequency,
-          prefill.frequencyMinutes,
-        );
+        // The source's own schedule wins. The only floor is the org's minimum
+        // evaluation frequency, which is the rule the schema enforces on save;
+        // clamping to the form's DEFAULT instead (as this used to) silently
+        // overrode a curated alert that runs every minute with "every ten".
+        const floorMinutes = Math.max(1, Math.ceil(minAutoRefreshInterval() / 60));
+        data.trigger_condition.frequency = Math.max(floorMinutes, prefill.frequencyMinutes);
+      }
+      if (prefill.silenceMinutes !== undefined) {
+        data.trigger_condition.silence = prefill.silenceMinutes;
       }
       if (prefill.timezone) {
         data.trigger_condition.timezone = prefill.timezone;
       }
 
-      // With a threshold expressed inside the query (HAVING / promql condition),
-      // the trigger itself only needs "at least one row came back".
+      // A source that carries a real trigger says so explicitly, and is believed.
+      // Otherwise: with a threshold expressed inside the query (HAVING / promql
+      // condition), the trigger itself only needs "at least one row came back".
       const hasQueryThreshold =
         !!prefill.promqlCondition || !!prefill.meta?.sqlHaving || !!prefill.aggregation;
-      if (hasQueryThreshold) {
+      if (prefill.triggerThreshold !== undefined) {
+        data.trigger_condition.threshold = prefill.triggerThreshold;
+        if (prefill.triggerOperator) {
+          data.trigger_condition.operator = prefill.triggerOperator;
+        }
+      } else if (hasQueryThreshold) {
         data.trigger_condition.threshold = 1;
         data.trigger_condition.operator = ">=";
       }

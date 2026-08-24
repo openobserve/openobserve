@@ -153,6 +153,12 @@ pub async fn ingest(
                 }
             },
         };
+        // keep the `__name__` column equal to the stream the record is written to;
+        // otherwise `{__name__="..."}` selectors can never match the rows (same
+        // policy as the OTLP writer)
+        if let Some(v) = record.get_mut(NAME_LABEL) {
+            *v = json::Value::String(stream_name.clone());
+        }
 
         // check stream if it is deleting
         let is_deleting = match stream_delete_status.get(&stream_name) {
@@ -659,10 +665,10 @@ pub async fn ingest(
         ])
         .inc();
 
-    // only one trigger per request
+    // only one trigger per request; notification/db work must not block ingestion
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
-            evaluate_trigger(entry).await;
+            tokio::spawn(evaluate_trigger(entry));
         }
     }
 

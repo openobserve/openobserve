@@ -1554,8 +1554,10 @@ async fn write_traces(
         std::io::Error::other(e.to_string())
     })?;
 
-    // only one trigger per request
-    evaluate_trigger(triggers).await;
+    // only one trigger per request; notification/db work must not block ingestion
+    if !triggers.is_empty() {
+        tokio::spawn(evaluate_trigger(triggers));
+    }
 
     Ok(req_stats)
 }
