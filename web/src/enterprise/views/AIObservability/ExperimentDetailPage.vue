@@ -139,25 +139,54 @@
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="ai-experiment-detail-rows"
-          pagination="server"
-          :current-page="page"
-          :page-size="pageSize"
-          :total-count="totalSlots"
+          pagination="client"
           width="100%"
           class="h-full w-full"
           data-test="ai-experiment-detail-table"
-          @update:current-page="onPageChange"
           @row-click="openRow"
         >
-          <template #cell-slotStatus="{ row }: { row: any }">
-            <div class="flex items-center justify-center">
-              <OStatusDot
-                :state="taskStatusDotState(row.taskStatus)"
-                :label="statusVariant(row.taskStatus, 'eval').label"
-                size="md"
-                :data-test="`ai-experiment-slot-status-${row.slotKey}`"
+          <template #toolbar>
+            <div class="flex w-full items-center gap-2">
+              <OInput
+                v-model="rowSearch"
+                class="min-w-0 flex-1"
+                :placeholder="t('aiObservability.experiments.detail.searchPlaceholder')"
+                clearable
+                data-test="ai-experiment-detail-search"
+              />
+              <OSelect
+                v-model="statusFilter"
+                class="shrink-0"
+                width="sm"
+                :options="statusOptions"
+                :placeholder="t('aiObservability.experiments.detail.statusFilterAll')"
+                :searchable="false"
+                clearable
+                data-test="ai-experiment-detail-status-filter"
               />
             </div>
+          </template>
+
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="ai-experiment-detail-refresh"
+              @click="refresh"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" />
+            </OButton>
+          </template>
+
+          <template #cell-slotStatus="{ row }: { row: any }">
+            <OTag
+              size="sm"
+              :variant="statusVariant(row.taskStatus, 'eval').variant"
+              :label="statusVariant(row.taskStatus, 'eval').label"
+              :data-test="`ai-experiment-slot-status-${row.slotKey}`"
+            />
           </template>
 
           <template #cell-input="{ row }: { row: any }">
@@ -211,6 +240,9 @@ import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -218,8 +250,6 @@ import ExperimentComparePickerDialog from "@/enterprise/components/AIObservabili
 import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OStatusDot from "@/lib/core/StatusDot/OStatusDot.vue";
-import type { StatusDotState } from "@/lib/core/StatusDot/OStatusDot.types";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
@@ -247,8 +277,13 @@ const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
-const page = ref(1);
-const pageSize = 50;
+// Meant to fetch the whole run in one request, so the search box and the status
+// filter below cover every slot. Pinned to the server's current
+// MAX_RESULT_PAGE_SIZE until that cap is lifted — while it stands, both controls
+// only see the first page of a longer run.
+const ALL_RESULTS_PAGE_SIZE = 50;
+const rowSearch = ref("");
+const statusFilter = ref("");
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
@@ -258,7 +293,6 @@ const backTarget = computed(() => ({
   to: aiExperimentsRoute(orgId.value),
 }));
 const slots = computed<ExperimentResultSlot[]>(() => detail.value?.results.slots ?? []);
-const totalSlots = computed(() => detail.value?.results.pagination?.totalSlots ?? 0);
 
 /** Scorer columns come from the pinned scorers, so a run with two scorers gets
  *  two score columns exactly like the dataset grouping on the list page. */
@@ -286,7 +320,7 @@ const scorerNames = computed<Record<string, string>>(() => {
   return names;
 });
 
-const visibleSlots = computed(() =>
+const slotRows = computed(() =>
   slots.value.map((slot) => {
     const scores: Record<string, string> = {};
     for (const id of scorerIds.value) {
@@ -303,6 +337,26 @@ const visibleSlots = computed(() =>
     };
   }),
 );
+
+const STATUS_FILTERS = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+
+const statusOptions = computed(() =>
+  STATUS_FILTERS.map((status) => ({
+    label: statusVariant(status, "eval").label,
+    value: status,
+  })),
+);
+
+// Every slot is loaded, so filtering here covers the whole run rather than the
+// page in view.
+const visibleSlots = computed(() => {
+  const term = rowSearch.value.trim().toLowerCase();
+  return slotRows.value.filter((row) => {
+    if (statusFilter.value && row.taskStatus !== statusFilter.value) return false;
+    if (!term) return true;
+    return `${row.input} ${row.output}`.toLowerCase().includes(term);
+  });
+});
 
 // Run-level: a page-local count would show or hide the action depending on
 // which page happened to be loaded.
@@ -402,11 +456,11 @@ const metricCards = computed<MetricCard[]>(() => {
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "slotStatus",
-    header: raw(""),
+    header: t("aiObservability.experiments.detail.slotStatus"),
     accessorKey: "taskStatus",
-    sortable: false,
-    size: 48,
-    meta: { align: "center" as const },
+    sortable: true,
+    size: COL.status,
+    meta: { align: "left" as const },
   },
   {
     id: "input",
@@ -444,28 +498,13 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-function taskStatusDotState(status: ExperimentResultSlot["taskStatus"]): StatusDotState {
-  switch (status) {
-    case "in_progress":
-      return "active";
-    case "ok":
-      return "success";
-    case "skipped":
-      return "warning";
-    case "error":
-      return "error";
-    default:
-      return "pending";
-  }
-}
-
 async function refresh() {
   if (!orgId.value || !experimentId.value) return;
   loading.value = true;
   try {
     detail.value = await llmExperimentsService.get(orgId.value, experimentId.value, {
-      resultPage: page.value,
-      resultPageSize: pageSize,
+      resultPage: 1,
+      resultPageSize: ALL_RESULTS_PAGE_SIZE,
     });
   } catch (error: any) {
     toast({
@@ -476,11 +515,6 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
-}
-
-function onPageChange(next: number) {
-  page.value = next;
-  void refresh();
 }
 
 async function openRow(row: { rowId: string }) {

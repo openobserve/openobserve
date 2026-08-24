@@ -10807,7 +10807,11 @@
           "errors": {
             "baseline": "Select a baseline to compare against."
           }
-        }
+        },
+        "slotStatus": "Status",
+        "searchPlaceholder": "Search input or output",
+        "statusFilter": "Status",
+        "statusFilterAll": "All Statuses"
       },
       "rowDetail": {
         "fallbackTitle": "Experiment Row",

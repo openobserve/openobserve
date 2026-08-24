@@ -124,7 +124,7 @@ describe("ExperimentDetailPage", () => {
     expect(meta).not.toContain("1 scorers");
   });
 
-  it("shows typed score values and a semantic status dot for every slot state", async () => {
+  it("shows typed score values and a labelled status chip for every slot state", async () => {
     const experiment = makeExperiment({
       id: "exp-1",
       name: "typed scores",
@@ -185,12 +185,17 @@ describe("ExperimentDetailPage", () => {
       global: {
         stubs: {
           OTable: {
-            props: ["data", "columns"],
-            template: `<table><tbody><tr v-for="row in data" :key="row.slotKey">
+            props: ["data", "columns", "getRowStyle", "rowClass"],
+            template: `<table><slot name="toolbar-trailing" /><tbody><tr v-for="row in data" :key="row.slotKey"
+                :data-rail="getRowStyle ? 'yes' : ''">
               <td v-for="column in columns" :key="column.id">
                 <slot :name="'cell-' + column.id" :row="row">{{ row[column.accessorKey] }}</slot>
               </td>
             </tr></tbody></table>`,
+          },
+          OTag: {
+            props: ["label", "variant"],
+            template: '<span v-bind="$attrs" :data-variant="variant">{{ label }}</span>',
           },
         },
       },
@@ -200,18 +205,131 @@ describe("ExperimentDetailPage", () => {
     expect(wrapper.text()).toContain("0.718");
     expect(wrapper.text()).toContain("false");
     expect(wrapper.text()).toContain("safe");
-    expect(
-      taskStatuses.map((_, index) =>
-        wrapper.get(`[data-test="ai-experiment-slot-status-row-${index}:0"]`).classes(),
-      ),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.arrayContaining(["bg-status-neutral-text"]),
-        expect.arrayContaining(["bg-status-info-text", "motion-safe:animate-pulse"]),
-        expect.arrayContaining(["bg-status-success-text"]),
-        expect.arrayContaining(["bg-status-warning-text"]),
-        expect.arrayContaining(["bg-status-error-text"]),
-      ]),
+    // Every slot state is a labelled chip in its own column — status is carried
+    // by TEXT, so it never depends on a reader separating red from green.
+    const chipText = taskStatuses.map((_, index) =>
+      wrapper.get(`[data-test="ai-experiment-slot-status-row-${index}:0"]`).text(),
     );
+    expect(chipText.every((label) => label.length > 0)).toBe(true);
+    expect(new Set(chipText).size).toBe(taskStatuses.length);
+
+    // No row rail: the chip is the only status device on the row.
+    expect(wrapper.findAll("tbody tr").every((row) => !row.attributes("data-rail"))).toBe(true);
+  });
+
+  // The whole run is loaded in one request, so search and the status filter
+  // cover every slot rather than the page that happened to be fetched.
+  it("asks for every slot in one request and paginates on the client", async () => {
+    get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
+    const seen: any[] = [];
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: {
+            props: ["pagination", "data"],
+            mounted() {
+              seen.push({ pagination: this.pagination, rows: this.data.length });
+            },
+            template: `<table />`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(get).toHaveBeenCalledWith(
+      "acme",
+      "exp-1",
+      // Pinned to the server's MAX_RESULT_PAGE_SIZE until that cap is lifted.
+      expect.objectContaining({ resultPage: 1, resultPageSize: 50 }),
+    );
+    expect(seen[0].pagination).toBe("client");
+    wrapper.unmount();
+  });
+
+  it("filters the loaded slots by search text and by status", async () => {
+    const experiment = makeExperiment({ id: "exp-1" });
+    const detail = makeExperimentDetail(experiment, {
+      results: {
+        executions: [],
+        scores: [],
+        slots: [
+          {
+            rowId: "r0",
+            logicalId: "c0",
+            trialIndex: 0,
+            input: "alpha question",
+            expectedOutput: null,
+            taskStatus: "ok",
+            execution: null,
+            scores: [],
+          },
+          {
+            rowId: "r1",
+            logicalId: "c1",
+            trialIndex: 0,
+            input: "beta question",
+            expectedOutput: null,
+            taskStatus: "error",
+            execution: null,
+            scores: [],
+          },
+        ],
+      },
+    } as any);
+    get.mockResolvedValue(detail);
+
+    let rows: any[] = [];
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: {
+            props: ["data"],
+            watch: {
+              data: {
+                handler(v: any[]) {
+                  rows = v;
+                },
+                immediate: true,
+              },
+            },
+            template: `<table />`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+    expect(rows).toHaveLength(2);
+
+    (wrapper.vm as any).rowSearch = "alpha";
+    await flushPromises();
+    expect(rows.map((r) => r.input)).toEqual(["alpha question"]);
+
+    (wrapper.vm as any).rowSearch = "";
+    (wrapper.vm as any).statusFilter = "error";
+    await flushPromises();
+    expect(rows.map((r) => r.taskStatus)).toEqual(["error"]);
+  });
+
+  it("re-fetches the results from the table toolbar", async () => {
+    get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: { template: `<table><slot name="toolbar-trailing" /></table>` },
+          OButton: {
+            emits: ["click"],
+            template: `<button v-bind="$attrs" @click="$emit('click')"><slot /></button>`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const calls = get.mock.calls.length;
+
+    await wrapper.get('[data-test="ai-experiment-detail-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(get.mock.calls.length).toBe(calls + 1);
   });
 });

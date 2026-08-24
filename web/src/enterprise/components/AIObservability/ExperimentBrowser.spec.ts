@@ -20,7 +20,12 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  // Params are echoed, not dropped: a label is only correct if the right
+  // numbers reach it, and a key-only mock hides that entirely.
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key} ${Object.values(params).join(" ")}` : key,
+  }),
 }));
 
 const experiment = (id: string, datasetId: string, createdAt: number) =>
@@ -28,19 +33,19 @@ const experiment = (id: string, datasetId: string, createdAt: number) =>
 
 const stubs = {
   OSelect: {
-    props: ["modelValue", "options"],
+    props: ["modelValue", "options", "label"],
     emits: ["update:modelValue"],
     template: `<select data-test="dataset-select" :value="modelValue" @change="$emit('update:modelValue', $event.target.value)"><option value="" /><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>`,
   },
   OInput: {
-    props: ["modelValue"],
+    props: ["modelValue", "label"],
     emits: ["update:modelValue"],
     template: `<input data-test="name-input" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
   OButton: {
     template: `<button v-bind="$attrs"><slot /></button>`,
   },
-  OTag: { template: `<span><slot /></span>` },
+  OTag: { template: `<span v-bind="$attrs"><slot /></span>` },
   OCheckbox: {
     props: ["modelValue", "disabled"],
     emits: ["update:modelValue"],
@@ -101,8 +106,76 @@ beforeEach(() => {
 });
 
 describe("ExperimentBrowser", () => {
+  // A running row is the bar plus its count: the bar already reads as "in
+  // progress", so a Running chip beside it would say the same thing twice.
+  it("shows a running row as a labelled progress bar with no status chip", () => {
+    const running = makeExperiment({
+      id: "run",
+      name: "run",
+      datasetId: "dataset-a",
+      createdAt: 1,
+      status: "running",
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [running, experiment("done", "dataset-a", 2)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+        details: {
+          run: makeExperimentDetail(running, {
+            results: {
+              executions: [],
+              scores: [],
+              slots: [],
+              taskProgress: { completed: 4, total: 10, skipped: 0 },
+            },
+          } as any),
+        },
+      },
+      global: { stubs },
+    });
+
+    const cell = wrapper.get('[data-test="ai-experiment-status-run"]');
+    expect(cell.findComponent({ name: "OProgressBar" }).exists()).toBe(true);
+    expect(cell.find('[data-test="ai-experiment-status-chip-run"]').exists()).toBe(false);
+    // The count sits OUTSIDE the bar, the same shape the Nodes utilisation
+    // columns use, and comes from taskProgress so it is there before the
+    // executions have been counted.
+    expect(cell.text()).toContain("4");
+    expect(cell.text()).toContain("10");
+    // The bar fills the cell rather than sitting at a fixed width, so the count
+    // lands in the same place down the column.
+    expect(cell.findComponent({ name: "OProgressBar" }).classes()).toEqual(
+      expect.arrayContaining(["min-w-0", "flex-1"]),
+    );
+
+    // A settled row is a chip, with no bar.
+    const done = wrapper.get('[data-test="ai-experiment-status-done"]');
+    expect(done.findComponent({ name: "OProgressBar" }).exists()).toBe(false);
+    expect(done.find('[data-test="ai-experiment-status-chip-done"]').exists()).toBe(true);
+  });
+
   // First load has no dataset groups yet, so one section stands up around an
   // OTable in its loading state — the shared skeleton, not a hand-rolled one.
+  // The placeholders already name both controls, so the labels above them were
+  // pure repetition — but the accessible name has to survive their removal.
+  it("drops the visible filter labels while keeping the controls named", () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("one", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    for (const control of ["ai-experiment-dataset-filter", "ai-experiment-name-search"]) {
+      const el = wrapper.getComponent(`[data-test="${control}"]`);
+      expect(el.props("label")).toBeUndefined();
+      expect(el.attributes("aria-label")).toBeTruthy();
+    }
+  });
+
   it("stands up one loading group before any data has arrived", () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {
@@ -358,7 +431,7 @@ describe("ExperimentBrowser", () => {
 
     const count = () => wrapper.get('[data-test="ai-experiment-selection-count"]').text();
     // Present with nothing selected — that is where the rule has to be learned.
-    expect(count()).toBe("aiObservability.experiments.selectionCount");
+    expect(count()).toBe("aiObservability.experiments.selectionCount 0");
 
     await wrapper.get('[data-test="ai-experiment-select-one"]').setValue(true);
     expect(wrapper.find('[data-test="ai-experiment-selection-count"]').exists()).toBe(true);

@@ -2,10 +2,10 @@
 
 <template>
   <section class="space-y-4" data-test="ai-experiment-browser">
-    <div v-if="!compact" class="grid grid-cols-[30%_1fr_auto] items-end gap-3">
+    <div v-if="!compact" class="grid grid-cols-[30%_1fr_auto] items-center gap-3">
       <OSelect
         v-model="datasetFilter"
-        :label="t('aiObservability.experiments.datasetFilter')"
+        :aria-label="t('aiObservability.experiments.datasetFilter')"
         :placeholder="t('aiObservability.experiments.datasetFilterPlaceholder')"
         :options="datasetOptions"
         clearable
@@ -14,7 +14,7 @@
       <OInput
         v-model="nameSearch"
         class="min-w-0"
-        :label="t('aiObservability.experiments.nameSearch')"
+        :aria-label="t('aiObservability.experiments.nameSearch')"
         :placeholder="t('aiObservability.experiments.nameSearchPlaceholder')"
         data-test="ai-experiment-name-search"
       />
@@ -167,14 +167,23 @@
             class="flex min-w-0 items-center gap-2"
             :data-test="`ai-experiment-status-${row.id}`"
           >
-            <ODataBarCell
-              v-if="row.status === 'running'"
-              :value="evidence(row).completedSlots"
-              :max="evidence(row).totalSlots || 1"
-              :display="progressLabel(row)"
-            />
+            <template v-if="row.status === 'running'">
+              <OProgressBar
+                size="sm"
+                class="min-w-0 flex-1"
+                :value="progressFraction(row)"
+                :data-test="`ai-experiment-progress-${row.id}`"
+              />
+              <span class="text-text-secondary shrink-0 text-xs tabular-nums">
+                {{ progressLabel(row) }}
+              </span>
+            </template>
             <template v-else>
-              <OTag size="sm" :variant="statusVariant(row.status, 'eval').variant">
+              <OTag
+                size="sm"
+                :variant="statusVariant(row.status, 'eval').variant"
+                :data-test="`ai-experiment-status-chip-${row.id}`"
+              >
                 {{ statusVariant(row.status, "eval").label }}
               </OTag>
               <span v-if="row.statusReason" class="text-text-secondary truncate text-xs">
@@ -231,7 +240,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
@@ -444,14 +453,23 @@ function evidence(experiment: LlmExperiment) {
   return experimentEvidence(props.details[experiment.id]);
 }
 
-function progressLabel(experiment: LlmExperiment) {
+function progress(experiment: LlmExperiment) {
+  const task = props.details[experiment.id]?.results.taskProgress;
+  if (task?.total) return { done: task.completed, total: task.total };
   const value = evidence(experiment);
-  return value.totalSlots
-    ? t("aiObservability.experiments.progress", {
-        done: value.completedSlots,
-        total: value.totalSlots,
-      })
-    : raw(experiment.status);
+  return { done: value.completedSlots, total: value.totalSlots };
+}
+
+function progressFraction(experiment: LlmExperiment) {
+  const { done, total } = progress(experiment);
+  return total ? done / total : 0;
+}
+
+function progressLabel(experiment: LlmExperiment) {
+  const { done, total } = progress(experiment);
+  return total
+    ? t("aiObservability.experiments.progress", { done, total })
+    : statusVariant(experiment.status, "eval").label;
 }
 
 // One column per scorer in the group: the scores array already carries each
