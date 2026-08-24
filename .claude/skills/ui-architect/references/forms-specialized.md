@@ -5,6 +5,7 @@ The `OForm` container + `useOForm` composable own field registration, validation
 ## Table of contents
 - [OForm + useOForm](#oform--useoform) — container & validation (read first)
 - [OColor](#ocolor) — hex color picker
+- [OEmojiPicker](#oemojipicker) — curated emoji picker
 - [ODate](#odate) — single date
 - [OTime](#otime) — time of day
 - [ODateTimeRange](#odatetimerange) — relative/absolute range picker
@@ -135,6 +136,43 @@ const kind = form.useStore((s) => s.values.kind);
 ```vue
 <OFormColor name="color" label="Series color" required />
 ```
+
+---
+
+## OEmojiPicker
+
+### Icon tokens
+The picker's value is an **icon token**, not plain text — either a Unicode emoji (`"🚀"`) or a service-glyph reference (`"o2:redis"`). Persist it opaquely; only `OGlyph` and `glyphRegistry.ts` need to tell them apart. Type it as `IconToken` from `@/lib/forms/EmojiPicker/OGlyph.types`.
+
+### OEmojiPicker
+**Import:** `@/lib/forms/EmojiPicker/OEmojiPicker.vue`
+**Use when:** Letting a user badge a record (folder, board, saved view) with a single icon — a square trigger opens a searchable, grouped grid of ~200 curated entries: Unicode emoji plus **full-colour** logos for every service on the Ingestion pages (Redis, Kafka, Terraform, Prometheus, Postgres…).
+**Don't use for:** A full Unicode emoji keyboard (the catalog is deliberately curated), or picking an app icon from the Material set — that's `OIcon`'s `IconName` union.
+**Key props:** `modelValue` (`IconToken | null`), `size` (`"sm" | "md"`, default `"md"` — `md` matches OInput's box height so it lines up beside a text field), `disabled` (`boolean`, default `false`), `ariaLabel` (`I18nText`).
+**Emits:** `update:modelValue` (`string | null`), and `select` (`string | null`) which fires **only** on a deliberate pick or clear — use it to stop any auto-fill you drive from another field.
+**Behaviour:** clicking the selected entry deselects it; the panel search matches the catalog's `keywords`; the grid uses a roving tabindex (arrows / Home / End) so it adds one tab stop, not a hundred; the popover z-index rides ODialog's stacking ladder so it works inside a dialog.
+**Example:**
+```vue
+<OEmojiPicker v-model="icon" size="md" @select="userChoseIcon = true" />
+```
+**Form binding:** There is no `OFormEmojiPicker`. Inside `<OForm>`, wrap it in an app component that injects `FORM_CONTEXT_KEY` and renders `form.Field` — see `components/common/sidebar/FolderIconField.vue`, which also shows the suggest-until-touched pattern.
+
+### OGlyph
+**Import:** `@/lib/forms/EmojiPicker/OGlyph.vue`
+**Use when:** Displaying a chosen icon token anywhere outside the picker (a list row, a header, a chip). It renders an emoji as text, an Iconify glyph as an inline SVG, and an asset-backed glyph as an `<img>` — callers never branch on the kind.
+**Key props:** `token` (`IconToken | null` — renders nothing when empty or unresolvable), `size` (`"sm" | "md" | "lg"`, default `"md"`; one scale drives emoji font-size and glyph box so the kinds line up on a row), `alt` (image-backed glyphs only; empty by default = decorative).
+**Dark mode:** brand logos keep their own colours, so they can't adapt to the surface like an `OIcon`. The fix is the **`--color-glyph-plate` token** — transparent on light, a light chip on dark — which keeps near-black marks (GitHub, Kafka, Helm, InfluxDB) legible. It's a token, not a `dark:` class, so the theme owns the decision; don't add per-component conditionals here.
+**Note:** glyphs are `aria-hidden` / empty-alt by design — the adjacent label carries the meaning. A retired `o2:` token renders nothing rather than leaking the raw string.
+```vue
+<OGlyph :token="folder.icon" size="sm" />
+```
+
+### Catalog & glyph registry
+- `emojiCatalog.ts` exports `EMOJI_GROUPS` / `ALL_EMOJIS`. `emojiCatalog.spec.ts` enforces four invariants: **no token appears twice**, **no keyword has two owners** (ties break on catalog order, so a shared keyword silently resolves to whichever group is first), **registry ↔ catalog parity in both directions**, and **every Ingestion-page service is pickable**. The Services group owns product names; the Creatures group keeps only creature names.
+- `glyphRegistry.ts` is a closed, explicitly-imported map with two sources: `@iconify-json/logos` (full-colour marks, compiled inline by `unplugin-icons`) and `@/assets/images/ingestion/*` (the repo's own logos, for services `logos` has no entry for — Fluentd, Telegraf, Databricks, IIS…). Using the ingestion assets keeps the picker and the integrations list from drifting apart. Both resolve at build time — no runtime fetch, air-gapped safe, same contract as `lib/core/Icon/OIcon.icons.ts`.
+- **The list is the bundle cost.** 84 glyphs today: 67 inline colour SVGs ≈ **187 KB in the JS bundle** (tree-shaken from a 2,091-icon collection), plus 17 image-backed ones ≈ 662 KB served as separate lazy assets that the build already emits for the Ingestion pages. Eager rather than lazy so folder-rail icons paint without pop-in. Keep it curated; if it grows much further, switch the registry to `defineAsyncComponent` — `resolveGlyph()` is the only seam that would change.
+- Deliberately **not** `simple-icons`: those marks are monochrome black, which reads as a UI glyph rather than a product logo.
+- To match folder/record names against the same set, import `ALL_EMOJIS` — see `@/utils/folderIcons.ts`.
 
 ---
 

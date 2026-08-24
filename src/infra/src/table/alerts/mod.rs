@@ -1413,6 +1413,7 @@ pub(super) mod tests {
                 name: Set(format!("folder-{slug}")),
                 description: Set(None),
                 r#type: Set(folder_type_into_i16(FolderType::Alerts)),
+                icon: Set(None),
             })
             .exec(db)
             .await
