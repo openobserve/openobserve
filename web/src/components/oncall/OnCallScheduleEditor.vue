@@ -332,6 +332,19 @@
                       :data-test="`oncall-schedule-restriction-remove-${ruleIndex}-${index}`"
                       @click="removeRestriction(rule, index)"
                     />
+
+                    <!-- start === end is zero length regardless of which
+                         minute it is — the engine never matches it, and the
+                         layer beneath silently wins instead. Flagged here
+                         because 0/0 looks like a reasonable "all day" guess
+                         when 1440 is the value that actually means that. -->
+                    <p
+                      v-if="window.start_minute === window.end_minute"
+                      class="text-status-warning-text text-xs sm:col-span-4"
+                      :data-test="`oncall-schedule-restriction-zero-length-${ruleIndex}-${index}`"
+                    >
+                      {{ t("oncall.rotationRestrictionZeroLength") }}
+                    </p>
                   </div>
 
                   <div class="flex">
@@ -738,11 +751,12 @@ const DAY_KEYS: I18nKey[] = [
 
 const dayOptions = computed(() => DAY_KEYS.map((key, value) => ({ label: t(key), value })));
 
-/// Half-hours from local midnight, plus 24:00 as an end — a window ending at
-/// midnight is the common night shift, and 00:00 would read as zero length.
+/// Half-hours from local midnight, plus 1440 as an end — `formatMinuteOfDay`
+/// reads that as "24:00" rather than wrapping it to "00:00", which is what
+/// keeps a window ending at end-of-day from reading as zero length.
 const minuteOptions = computed(() =>
   Array.from({ length: 49 }, (_, index) => index * 30).map((minute) => ({
-    label: raw(minute === 1440 ? "24:00" : formatMinuteOfDay(minute)),
+    label: raw(formatMinuteOfDay(minute)),
     value: minute,
   })),
 );

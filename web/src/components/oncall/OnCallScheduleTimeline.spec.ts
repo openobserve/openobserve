@@ -316,6 +316,51 @@ describe("OnCallScheduleTimeline", () => {
     expect(header).toContain("2 people");
   });
 
+  /// A restriction spanning the whole day (0 -> 1440) used to collapse to
+  /// "00:00 / 00:00" — indistinguishable from a zero-length window that never
+  /// matches. It has to read as covering everything, not as covering nothing.
+  it("says 'All day' for a 0 -> 1440 restriction rather than 00:00 / 00:00", () => {
+    const wrapper = render({
+      rotations: [
+        rotation("Weekend", [
+          {
+            name: "Weekend",
+            members: ["ana@o2.ai"],
+            shift_micros: 7 * MICROS_PER_DAY,
+            anchor_micros: start,
+            restrictions: [{ days: [5, 6], start_minute: 0, end_minute: 1440 }],
+          },
+        ]),
+      ],
+      segments: [seg({ rotation_id: rid("Weekend"), rotation: "Weekend" })],
+    });
+    const header = wrapper.find('[data-test="oncall-lane-cadence-rot_weekend"]').text();
+    expect(header).toContain("All day");
+    expect(header).not.toContain("00:00 / 00:00");
+  });
+
+  /// A restriction ending exactly at end-of-day (`end_minute: 1440`) is not
+  /// the same thing as one that wraps past midnight (`end_minute: 0`) — the
+  /// two must not render identically as "00:00".
+  it("renders a restriction ending at end-of-day as 24:00, not 00:00", () => {
+    const wrapper = render({
+      rotations: [
+        rotation("AMER", [
+          {
+            name: "AMER",
+            members: ["ana@o2.ai"],
+            shift_micros: 7 * MICROS_PER_DAY,
+            anchor_micros: start,
+            restrictions: [{ days: [], start_minute: 16 * 60, end_minute: 1440 }],
+          },
+        ]),
+      ],
+      segments: [seg({ rotation_id: rid("AMER"), rotation: "AMER" })],
+    });
+    const header = wrapper.find('[data-test="oncall-lane-cadence-rot_amer"]').text();
+    expect(header).toContain("16:00 / 24:00");
+  });
+
   /// The loudest answer on the chart was a blank strip. It has to name the
   /// consequence and offer the one act that ends it.
   it("says what an unstaffed rotation costs, and offers to staff it", async () => {

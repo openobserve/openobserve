@@ -947,9 +947,21 @@ export function formatInZone(
   }
 }
 
-/** `HH:MM` from minutes past local midnight — the form the day chips edit. */
+/** Minutes in a day — the exclusive upper bound `end_minute` allows. */
+export const MINUTES_PER_DAY = 1440;
+
+/**
+ * `HH:MM` from minutes past local midnight — the form the day chips edit.
+ *
+ * `MINUTES_PER_DAY` (1440) is the exclusive end-of-day bound, not a wrap to
+ * the next midnight, so it reads "24:00" rather than collapsing to "00:00" —
+ * the collapse is what made a window ending at end-of-day indistinguishable
+ * from one that wraps past midnight (`end_minute: 0`).
+ */
 export function formatMinuteOfDay(minute: number): string {
-  const safe = ((Math.trunc(minute) % 1440) + 1440) % 1440;
+  const truncated = Math.trunc(minute);
+  if (truncated === MINUTES_PER_DAY) return "24:00";
+  const safe = ((truncated % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   const hh = String(Math.floor(safe / 60)).padStart(2, "0");
   const mm = String(safe % 60).padStart(2, "0");
   return `${hh}:${mm}`;
@@ -993,13 +1005,20 @@ export function describeRestrictions(
   const list = windows ?? [];
   if (list.length === 0) return t("oncall.restrictionAlways");
   const described = list
-    .map((w) =>
-      t("oncall.restrictionWindow", {
-        days: describeDays(w.days, t),
+    .map((w) => {
+      const days = describeDays(w.days, t);
+      // 0 -> 1440 is the whole day, not a window "from 00:00 to 00:00" — that
+      // reading collapses to zero length and hides that the layer covers
+      // everything.
+      if (w.start_minute === 0 && w.end_minute === MINUTES_PER_DAY) {
+        return t("oncall.restrictionWindowAllDay", { days });
+      }
+      return t("oncall.restrictionWindow", {
+        days,
         from: formatMinuteOfDay(w.start_minute),
         to: formatMinuteOfDay(w.end_minute),
-      }),
-    )
+      });
+    })
     .join(" · ");
   // Every fragment above is already translated; this last call is the seam a
   // translator uses to reorder or re-punctuate the list.

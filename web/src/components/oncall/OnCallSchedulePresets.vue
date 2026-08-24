@@ -659,8 +659,8 @@ const HALF_HOURS: SelectOption[] = Array.from({ length: 48 }, (_, i) => ({
   label: raw(formatMinuteOfDay(i * 30)),
   value: i * 30,
 }));
-// 1440 is "until end of day" — end_minute's exclusive bound, which
-// formatMinuteOfDay wraps to 00:00 and so cannot spell.
+// 1440 is "until end of day" — end_minute's exclusive bound, kept out of
+// HALF_HOURS' 30-minute stride and appended once on its own.
 const MINUTES: SelectOption[] = [...HALF_HOURS, { label: raw("24:00"), value: MINUTES_PER_DAY }];
 
 const DAY_OPTIONS: SelectOption[] = WEEK_DAYS.map((day) => ({ label: dayName(day), value: day }));

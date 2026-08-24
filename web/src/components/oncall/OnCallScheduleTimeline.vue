@@ -337,7 +337,7 @@ import type { ResolvedSegment, Rotation, TimeWindow } from "@/ts/interfaces/onca
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, rotationMembers } from "@/utils/oncall";
+import { formatInZone, formatMinuteOfDay, MINUTES_PER_DAY, rotationMembers } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
@@ -494,9 +494,6 @@ const WEEKDAYS = computed(() => {
   return Array.from({ length: 7 }, (_, i) => format.format(new Date(Date.UTC(2024, 0, 1 + i))));
 });
 
-const minuteLabel = (minute: number) =>
-  `${String(Math.floor(minute / 60) % 24).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
-
 /// "Mon–Fri" for a run, "Sat, Tue" for anything else. A seven-day window is the
 /// same as no window and says nothing, so it is dropped.
 function dayRange(window: TimeWindow): string {
@@ -565,7 +562,13 @@ const lanes = computed<Lane[]>(() =>
       parts.push(
         String(t("oncall.laneShifts", { duration: raw(formatMicrosDuration(only.shift_micros)) })),
       );
-      parts.push(`${minuteLabel(window.start_minute)} / ${minuteLabel(window.end_minute)}`);
+      // 0 -> 1440 covers the entire day; without this a full-day layer and a
+      // zero-length one both read "00:00 / 00:00".
+      if (window.start_minute === 0 && window.end_minute === MINUTES_PER_DAY) {
+        parts.push(String(t("oncall.laneAllDay")));
+      } else {
+        parts.push(`${formatMinuteOfDay(window.start_minute)} / ${formatMinuteOfDay(window.end_minute)}`);
+      }
     } else if (only) {
       parts.push(cadenceWord(only.shift_micros));
       const handover = nextHandover(rotation.id);

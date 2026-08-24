@@ -955,7 +955,8 @@ describe("formatMinuteOfDay", () => {
     [540, "09:00"],
     [1020, "17:00"],
     [1439, "23:59"],
-    [1440, "00:00"],
+    [1440, "24:00"],
+    [2880, "00:00"],
   ])("%i minutes past midnight is %s", (minute, expected) => {
     expect(formatMinuteOfDay(minute)).toBe(expected);
   });
@@ -970,6 +971,7 @@ describe("describeRestrictions", () => {
       "oncall.restrictionEveryDay": "every day",
       "oncall.restrictionDayRange": "{from}–{to}",
       "oncall.restrictionWindow": "{days} {from}–{to}",
+      "oncall.restrictionWindowAllDay": "{days} all day",
       "oncall.restrictionList": "{windows}",
       "oncall.day_mon": "Mon",
       "oncall.day_tue": "Tue",
@@ -992,8 +994,10 @@ describe("describeRestrictions", () => {
     ["a contiguous run", [window([0, 1, 2, 3, 4], 9 * 60, 17 * 60)], "Mon–Fri 09:00–17:00"],
     ["a weekend pair", [window([5, 6], 13 * 60, 18 * 60)], "Sat, Sun 13:00–18:00"],
     ["a scattered set", [window([0, 2, 4], 9 * 60, 12 * 60)], "Mon, Wed, Fri 09:00–12:00"],
-    ["all seven days", [window([0, 1, 2, 3, 4, 5, 6], 0, 1440)], "every day 00:00–00:00"],
+    ["all seven days, all day", [window([0, 1, 2, 3, 4, 5, 6], 0, 1440)], "every day all day"],
+    ["a weekend, all day", [window([5, 6], 0, 1440)], "Sat, Sun all day"],
     ["a midnight wrap", [window([4], 22 * 60, 6 * 60)], "Fri 22:00–06:00"],
+    ["to end of day, not a wrap", [window([4], 16 * 60, 1440)], "Fri 16:00–24:00"],
   ])("describes %s", (_name, windows, expected) => {
     expect(describeRestrictions(windows, t)).toBe(expected);
   });
