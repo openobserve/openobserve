@@ -93,6 +93,66 @@ beforeEach(() => {
 });
 
 describe("ExperimentBrowser", () => {
+  // First load has no dataset groups yet, so one section stands up around an
+  // OTable in its loading state — the shared skeleton, not a hand-rolled one.
+  it("stands up one loading group before any data has arrived", () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [],
+        datasets: [] as any,
+        loading: true,
+      },
+      global: { stubs },
+    });
+
+    expect(wrapper.find('[data-test="ai-experiment-group-loading"]').exists()).toBe(true);
+    // The toolbar must survive: hiding it would strand the user mid-refresh.
+    for (const control of [
+      "ai-experiment-dataset-filter",
+      "ai-experiment-name-search",
+      "ai-experiment-compare",
+      "ai-experiment-refresh",
+    ]) {
+      expect(wrapper.find(`[data-test="${control}"]`).exists()).toBe(true);
+    }
+  });
+
+  // On refresh the groups are already known, so each keeps its place and its
+  // own OTable renders the skeleton — same as every other listing.
+  it("hands loading to each group table on refresh, not a page-wide placeholder", async () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("one", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+        loading: true,
+      },
+      global: { stubs },
+    });
+
+    expect(wrapper.find('[data-test="ai-experiment-group-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-experiment-group-dataset-a"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(true);
+
+    await wrapper.setProps({ loading: false });
+    expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(false);
+  });
+
+  it("asks the page to re-fetch from the refresh button", async () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("one", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    await wrapper.get('[data-test="ai-experiment-refresh"]').trigger("click");
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+  });
+
   it("preserves independent dataset and name filters in the URL", async () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {

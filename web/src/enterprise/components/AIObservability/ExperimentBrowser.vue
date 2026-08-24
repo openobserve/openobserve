@@ -40,11 +40,45 @@
             {{ t("aiObservability.experiments.compare") }}
           </OButton>
         </OTooltip>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="loading"
+          data-test="ai-experiment-refresh"
+          @click="$emit('refresh')"
+        >
+          <OTooltip side="bottom" :content="t('common.refresh')" />
+        </OButton>
       </div>
     </div>
 
+    <section
+      v-if="loading && !datasetRows.length"
+      class="border-border-default rounded-default overflow-hidden border"
+      data-test="ai-experiment-group-loading"
+    >
+      <header class="px-table-edge flex items-center gap-2 py-2">
+        <OSkeleton type="text" class="h-4 w-40" />
+      </header>
+      <OTable
+        :data="[]"
+        :columns="buildColumns([])"
+        loading
+        row-key="id"
+        show-index
+        :show-global-filter="false"
+        :fill-height="false"
+        :frame="false"
+        pagination="none"
+        :default-columns="false"
+        width="100%"
+        class="w-full"
+      />
+    </section>
+
     <div
-      v-if="!groups.length"
+      v-else-if="!groups.length"
       class="border-border-default text-text-secondary rounded-default border border-dashed p-6 text-center"
     >
       {{ t("aiObservability.experiments.emptyFiltered") }}
@@ -94,6 +128,7 @@
         v-if="isGroupExpanded(group.id)"
         :data="group.children"
         :columns="buildColumns(group.children)"
+        :loading="loading"
         row-key="id"
         show-index
         :show-global-filter="false"
@@ -190,6 +225,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -219,14 +255,17 @@ const props = withDefaults(
     fixedDatasetId?: string;
     compact?: boolean;
     syncUrl?: boolean;
+    /** Spins the refresh icon while the page re-fetches. */
+    loading?: boolean;
   }>(),
-  { details: () => ({}), fixedDatasetId: "", compact: false, syncUrl: false },
+  { details: () => ({}), fixedDatasetId: "", compact: false, syncUrl: false, loading: false },
 );
 
 defineEmits<{
   select: [experimentId: string];
   new: [datasetId: string];
   "open-filtered": [datasetId: string];
+  refresh: [];
 }>();
 
 const { t } = useI18nTyped();

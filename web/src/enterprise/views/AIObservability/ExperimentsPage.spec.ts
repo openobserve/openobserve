@@ -115,3 +115,61 @@ describe("ExperimentsPage empty state", () => {
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "aiExperimentCreate" }));
   });
 });
+
+describe("ExperimentsPage loading", () => {
+  it("shows a shaped skeleton while the first load runs, not a text placeholder", async () => {
+    const service = (await import("@/services/llm-experiments.service")).default;
+    let release: (rows: unknown[]) => void = () => {};
+    (service.list as any).mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve as (rows: unknown[]) => void;
+      }),
+    );
+    route.query = {};
+
+    const wrapper = mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
+          ExperimentBrowser: true,
+          OEmptyState: true,
+        },
+      },
+    });
+    await flushPromises();
+
+    // The browser stays mounted so its toolbar (dataset filter, search, Compare,
+    // Refresh) is never replaced by the skeleton — only the results area is.
+    expect(wrapper.findComponent({ name: "ExperimentBrowser" }).exists()).toBe(true);
+
+    release([]);
+    await flushPromises();
+  });
+
+  it("re-fetches when the browser asks to refresh", async () => {
+    const service = (await import("@/services/llm-experiments.service")).default;
+    (service.list as any).mockResolvedValue([experiment("one")]);
+    route.query = {};
+
+    const wrapper = mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
+          ExperimentBrowser: {
+            props: ["loading"],
+            template: `<div data-test="browser" :data-loading="String(loading)"
+              @click="$emit('refresh')"></div>`,
+          },
+          OEmptyState: true,
+        },
+      },
+    });
+    await flushPromises();
+    const callsBefore = (service.list as any).mock.calls.length;
+
+    await wrapper.get('[data-test="browser"]').trigger("click");
+    await flushPromises();
+
+    expect((service.list as any).mock.calls.length).toBe(callsBefore + 1);
+  });
+});

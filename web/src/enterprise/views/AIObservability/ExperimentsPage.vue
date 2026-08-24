@@ -21,14 +21,8 @@
 
     <div class="grid min-h-0 gap-4 p-4">
       <section class="min-w-0 space-y-3">
-        <div
-          v-if="loading"
-          class="border-border-default text-text-secondary rounded-default border p-6 text-center"
-        >
-          {{ t("common.loading") }}
-        </div>
         <OEmptyState
-          v-else-if="!experiments.length"
+          v-if="!loading && !experiments.length"
           size="hero"
           preset="no-experiments"
           data-test="ai-experiments-empty"
@@ -37,10 +31,12 @@
         <ExperimentBrowser
           v-else
           :org-id="orgId"
+          :loading="loading"
           :experiments="experiments"
           :datasets="datasets"
           :details="experimentDetails"
           @new="openCreate"
+          @refresh="refresh"
           @select="openExperiment"
           sync-url
         />
