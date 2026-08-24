@@ -98,14 +98,14 @@ const sections = computed<Section[]>(() => {
     // (VITE_OPENOBSERVE_ALERT_LIBRARY) skips registration to hide it, exactly
     // as the rail flyout gates its own children through router.hasRoute.
     ...(router.hasRoute("alertLibrary")
-      ? [
+      ? ([
           {
             key: "alertLibrary",
             label: t("alert_library.sectionTab"),
-            icon: "menu-book" as IconName,
+            icon: "menu-book",
             to: { name: "alertLibrary", query },
           },
-        ]
+        ] satisfies Section[])
       : []),
   ];
 });

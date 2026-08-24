@@ -235,6 +235,7 @@ Every new nav entry must decide *where it shows*. There are two gating inputs:
 - `config.isCloud` (`VITE_OPENOBSERVE_CLOUD`)
 - `config.isEnterprise` (`VITE_OPENOBSERVE_ENTERPRISE`)
 - `config.showLLMUI` (`VITE_OPENOBSERVE_LLM_UI`)
+- `config.showAlertLibrary` (`VITE_OPENOBSERVE_ALERT_LIBRARY`)
 - plan/env constants: `freePlan`, `paidPlan`, `enterprisePlan`, `environment`.
 
 **Runtime feature flags** — from the backend `/config` response in Vuex
