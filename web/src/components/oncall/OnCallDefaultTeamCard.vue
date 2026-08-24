@@ -123,6 +123,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
 import type { I18nText } from "@/types/i18n";
@@ -139,6 +140,7 @@ const props = withDefaults(
 );
 
 const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 const store = useStore();
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -189,7 +191,35 @@ async function fetchRoutingConfig() {
   draftDefaultTeam.value = routingConfig.value?.default_team_id ?? "";
 }
 
+/// Nominating a team is the one moment "nobody is on call" is still
+/// avoidable — after this, an unrouted signal reaches this team and finds it
+/// empty. Checked fresh at save time rather than cached from mount, since
+/// membership can change while the picker sits open. A failed check must not
+/// block the save it was only meant to warn about, so it fails open.
+async function isUnstaffed(teamId: string): Promise<boolean> {
+  try {
+    const { data } = await oncallService.coverageGaps({
+      org_identifier: orgId.value,
+      limit: 200,
+    });
+    return data.teams.some((team) => team.id === teamId);
+  } catch {
+    return false;
+  }
+}
+
 async function saveDefaultTeam() {
+  const teamId = draftDefaultTeam.value;
+  if (teamId && (await isUnstaffed(teamId))) {
+    const teamName = props.teams.find((team) => team.id === teamId)?.name || teamId;
+    const proceed = await confirm({
+      title: t("oncall.defaultTeamUnstaffedTitle"),
+      message: t("oncall.defaultTeamUnstaffedMessage", { team: raw(teamName) }),
+      confirmLabel: t("oncall.defaultTeamUnstaffedConfirm"),
+    });
+    if (!proceed) return;
+  }
+
   savingDefault.value = true;
   try {
     await oncallService.setRoutingConfig({
