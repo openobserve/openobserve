@@ -18,12 +18,9 @@ use std::sync::Arc;
 use arrow::{
     array::{Array, Int64Array, RecordBatch},
     compute::{max, min},
-    ipc::{reader::FileReader as ArrowFileReader, writer::FileWriter as ArrowFileWriter},
 };
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME,
-    meta::stream::FileMeta,
-    utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
+    FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileMeta, utils::parquet::new_parquet_writer,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -182,18 +179,8 @@ impl ActiveIndexedMetricsWriter {
 }
 
 enum IndexedDataWriter {
-    Parquet {
-        writer: Box<AsyncArrowWriter<tokio::fs::File>>,
-        data_path: tempfile::TempPath,
-    },
-    /// Vortex metadata must be supplied before writing starts, while the
-    /// exact per-file metadata is only known at rotation. Spool Arrow IPC for
-    /// the active file, then transcode it to Vortex when the file is closed.
-    Vortex {
-        writer: Box<ArrowFileWriter<std::fs::File>>,
-        staging_path: tempfile::TempPath,
-        schema: Arc<Schema>,
-    },
+    Parquet(Box<IndexedParquetWriter>),
+    Vortex(IndexedVortexWriter),
 }
 
 impl IndexedDataWriter {
@@ -204,87 +191,113 @@ impl IndexedDataWriter {
         file_format: FileFormat,
     ) -> Result<Self> {
         match file_format {
-            FileFormat::Parquet => {
-                let (file, data_path) = new_temp_file()?;
-                let writer =
-                    new_parquet_writer(file, schema, bloom_filter_fields, metadata, false, None);
-                Ok(Self::Parquet {
-                    writer: Box::new(writer),
-                    data_path,
-                })
-            }
-            FileFormat::Vortex => {
-                let (file, staging_path) = new_std_temp_file()?;
-                let writer = ArrowFileWriter::try_new(file, schema)?;
-                Ok(Self::Vortex {
-                    writer: Box::new(writer),
-                    staging_path,
-                    schema: Arc::clone(schema),
-                })
-            }
+            FileFormat::Parquet => Ok(Self::Parquet(Box::new(IndexedParquetWriter::try_new(
+                schema,
+                bloom_filter_fields,
+                metadata,
+            )?))),
+            FileFormat::Vortex => Ok(Self::Vortex(IndexedVortexWriter::try_new(schema)?)),
         }
     }
 
     async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
         match self {
-            Self::Parquet { writer, .. } => writer.write(batch).await.map_err(Into::into),
-            Self::Vortex { writer, .. } => writer.write(batch).map_err(Into::into),
+            Self::Parquet(writer) => writer.write(batch).await,
+            Self::Vortex(writer) => writer.write(batch).await,
         }
     }
 
     async fn finish(self, file_meta: &FileMeta) -> Result<tempfile::TempPath> {
         match self {
-            Self::Parquet {
-                mut writer,
-                data_path,
-            } => {
-                append_metadata(writer.as_mut(), file_meta)?;
-                writer.finish().await?;
-                drop((*writer).into_inner());
-                Ok(data_path)
-            }
-            Self::Vortex {
-                mut writer,
-                staging_path,
-                schema,
-            } => {
-                writer.finish()?;
-                drop(writer);
-                write_vortex_file(schema, staging_path, file_meta).await
-            }
+            Self::Parquet(writer) => (*writer).finish(file_meta).await,
+            Self::Vortex(writer) => writer.finish().await,
         }
     }
 }
 
-async fn write_vortex_file(
-    schema: Arc<Schema>,
-    staging_path: tempfile::TempPath,
-    file_meta: &FileMeta,
-) -> Result<tempfile::TempPath> {
-    let (file, data_path) = new_temp_file()?;
-    let encoded_meta = encode_vortex_file_meta(file_meta);
-    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
-        VORTEX_RUNTIME.block_on(async move {
-            let reader = ArrowFileReader::try_new(std::fs::File::open(&staging_path)?, None)?;
-            let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
-            let write_options = VortexWriteOptions::new(session)
-                .with_strategy(vortex_write_strategy())
-                .with_metadata_segment(VORTEX_FILE_META_KEY, encoded_meta);
-            let mut writer = write_options.writer(file, dtype);
-            for batch in reader {
-                let array: ArrayRef = ArrayRef::from_arrow(batch?, false)?;
-                writer.push(array).await?;
-            }
-            writer.finish().await?;
-            Ok::<(), anyhow::Error>(())
+/// Parquet keeps its writer in the merge task and appends the exact output
+/// metadata when the active file rotates.
+struct IndexedParquetWriter {
+    writer: AsyncArrowWriter<tokio::fs::File>,
+    data_path: tempfile::TempPath,
+}
+
+impl IndexedParquetWriter {
+    fn try_new(
+        schema: &Arc<Schema>,
+        bloom_filter_fields: &[String],
+        metadata: &FileMeta,
+    ) -> Result<Self> {
+        let (file, data_path) = new_temp_file()?;
+        let writer = new_parquet_writer(file, schema, bloom_filter_fields, metadata, false, None);
+        Ok(Self { writer, data_path })
+    }
+
+    async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
+        self.writer.write(batch).await.map_err(Into::into)
+    }
+
+    async fn finish(mut self, file_meta: &FileMeta) -> Result<tempfile::TempPath> {
+        append_metadata(&mut self.writer, file_meta)?;
+        self.writer.finish().await?;
+        drop(self.writer.into_inner());
+        Ok(self.data_path)
+    }
+}
+
+/// Vortex runs on its dedicated runtime and receives Arrow batches through a
+/// bounded channel, matching the existing merge Vortex writer. Metrics Vortex
+/// files intentionally have no embedded `o2_file_meta`; file-list owns the
+/// exact metadata calculated when the active file rotates.
+struct IndexedVortexWriter {
+    tx: tokio::sync::mpsc::Sender<RecordBatch>,
+    writer_task: tokio::task::JoinHandle<anyhow::Result<()>>,
+    data_path: tempfile::TempPath,
+}
+
+impl IndexedVortexWriter {
+    fn try_new(schema: &Arc<Schema>) -> Result<Self> {
+        let (file, data_path) = new_temp_file()?;
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+        let schema = Arc::clone(schema);
+        let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
+            VORTEX_RUNTIME.block_on(async move {
+                let session = VortexSession::default().with_tokio();
+                let dtype = DType::from_arrow(schema.as_ref());
+                let write_options =
+                    VortexWriteOptions::new(session).with_strategy(vortex_write_strategy());
+                let mut writer = write_options.writer(file, dtype);
+
+                while let Some(batch) = rx.recv().await {
+                    let array: ArrayRef = ArrayRef::from_arrow(batch, false)?;
+                    writer.push(array).await?;
+                }
+                writer.finish().await?;
+                Ok::<(), anyhow::Error>(())
+            })
+        });
+        Ok(Self {
+            tx,
+            writer_task,
+            data_path,
         })
-    });
-    writer_task
-        .await
-        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
-        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))?;
-    Ok(data_path)
+    }
+
+    async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
+        self.tx
+            .send(batch.clone())
+            .await
+            .map_err(|e| DataFusionError::Execution(format!("Vortex writer channel closed: {e}")))
+    }
+
+    async fn finish(self) -> Result<tempfile::TempPath> {
+        drop(self.tx);
+        self.writer_task
+            .await
+            .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
+            .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))?;
+        Ok(self.data_path)
+    }
 }
 
 fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
@@ -294,12 +307,6 @@ fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
     std::fs::create_dir_all(tmp_dir)?;
     let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
     Ok((tokio::fs::File::from_std(file), path))
-}
-
-fn new_std_temp_file() -> Result<(std::fs::File, tempfile::TempPath)> {
-    let tmp_dir = &config::get_config().common.data_tmp_dir;
-    std::fs::create_dir_all(tmp_dir)?;
-    Ok(tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts())
 }
 
 async fn write_temp_file(buf: Vec<u8>) -> Result<tempfile::TempPath> {
@@ -468,13 +475,10 @@ mod tests {
                         .include_metadata()
                         .open_buffer(vortex::buffer::Buffer::from(bytes.to_vec()))
                         .unwrap();
-                    let segment = vxf.metadata_segment(VORTEX_FILE_META_KEY).unwrap();
-                    let footer: config::utils::json::Value =
-                        config::utils::json::from_slice(segment.as_slice()).unwrap();
-                    assert_eq!(footer["min_ts"], meta.min_ts);
-                    assert_eq!(footer["max_ts"], meta.max_ts);
-                    assert_eq!(footer["records"], meta.records);
-                    assert_eq!(footer["original_size"], meta.original_size);
+                    assert!(
+                        vxf.metadata_segment(config::utils::parquet::VORTEX_FILE_META_KEY)
+                            .is_none()
+                    );
                 }
             }
 

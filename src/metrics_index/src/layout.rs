@@ -49,8 +49,9 @@ pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricsFileLayout {
     /// File ordered by `(__hash__ ASC, _timestamp ASC)` but not finalized:
-    /// written by the ingester and by incremental compactor merges of the
-    /// still-open hour (`hash-sorted-v1-{id}.parquet` or `.vortex`).
+    /// written as Parquet by the ingester and in the configured format by
+    /// incremental compactor merges of the still-open hour
+    /// (`hash-sorted-v1-{id}.parquet` or `.vortex`).
     HashSorted,
     /// Size-bounded file ordered by `(__hash__ ASC, _timestamp ASC)` with a
     /// `.midx` metrics index (see [`MetricsFileLayout::metrics_index_path`]);
@@ -108,7 +109,7 @@ impl MetricsFileLayout {
     /// The `.midx` metrics-index object of an indexed metrics data file. Stored like
     /// the Tantivy index — under its own root instead of next to the data —
     /// but in a distinct tree:
-    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.parquet`
+    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.vortex`
     /// -> `files/{org}/midx/{stream}/{date}/{hour}/indexed-v1-{id}.midx`.
     pub fn metrics_index_path(path: &str) -> Option<String> {
         if Self::of(path) != Some(Self::Indexed) {

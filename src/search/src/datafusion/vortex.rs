@@ -19,7 +19,10 @@
 //! - A custom compressor for UTF8 fields using Zstd compression
 //! - Shared Vortex write strategy and access plan utilities
 
-use std::sync::{Arc, LazyLock};
+use std::{
+    ops::Range,
+    sync::{Arc, LazyLock},
+};
 
 use arrow::buffer::BooleanBuffer;
 use tokio::runtime::Runtime;
@@ -205,6 +208,29 @@ pub fn generate_vortex_access_plan(row_ids: &BooleanBuffer) -> Option<VortexAcce
     Some(selection)
 }
 
+/// Generate a Vortex access plan directly from sorted, non-overlapping row
+/// ranges stored in a Metrics index. A roaring selection preserves the compact
+/// range representation instead of expanding every range into row IDs.
+pub fn generate_vortex_access_plan_from_ranges(
+    ranges: impl IntoIterator<Item = Range<usize>>,
+) -> Option<VortexAccessPlan> {
+    let mut selection = Selection::IncludeRoaring(Default::default());
+    let Selection::IncludeRoaring(rows) = &mut selection else {
+        unreachable!()
+    };
+    let mut previous_end = 0;
+    for range in ranges {
+        assert!(
+            previous_end <= range.start && range.start < range.end,
+            "invalid sorted Vortex row range {range:?}"
+        );
+        previous_end = range.end;
+        rows.insert_range(u64::try_from(range.start).ok()?..u64::try_from(range.end).ok()?);
+    }
+
+    Some(VortexAccessPlan::default().with_selection(selection))
+}
+
 #[cfg(test)]
 mod tests {
     use vortex::{
@@ -229,6 +255,16 @@ mod tests {
 
         assert_eq!(options.zstd_level, 1);
         assert_eq!(options.values_per_page, 8192);
+    }
+
+    #[test]
+    fn test_access_plan_from_metrics_index_ranges() {
+        let plan = generate_vortex_access_plan_from_ranges([1..3, 5..8, 10..12]).unwrap();
+        let Selection::IncludeRoaring(rows) = plan.selection().unwrap() else {
+            panic!("expected roaring row selection")
+        };
+
+        assert_eq!(rows.iter().collect::<Vec<_>>(), vec![1, 2, 5, 6, 7, 10, 11]);
     }
 
     #[test]
