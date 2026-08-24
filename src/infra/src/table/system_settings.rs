@@ -29,6 +29,7 @@ use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
 };
 
+use super::get_lock;
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     table::entity::system_settings::{ActiveModel, Column, Entity, Model},
@@ -181,6 +182,9 @@ pub async fn list_resolved(
 pub async fn set(setting: &SystemSetting) -> Result<SystemSetting, anyhow::Error> {
     setting.validate().map_err(|e| anyhow!(e))?;
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
@@ -283,6 +287,9 @@ pub async fn delete(
         }
     }
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let result = query
         .exec(client)
         .await
@@ -293,6 +300,9 @@ pub async fn delete(
 
 /// Delete all settings for an organization
 pub async fn delete_org_settings(org_id: &str) -> Result<u64, anyhow::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let result = Entity::delete_many()
@@ -306,6 +316,9 @@ pub async fn delete_org_settings(org_id: &str) -> Result<u64, anyhow::Error> {
 
 /// Delete all settings for a user in an organization
 pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64, anyhow::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let result = Entity::delete_many()

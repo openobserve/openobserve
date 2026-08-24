@@ -81,6 +81,10 @@ image.workspace = true
 itertools.workspace = true
 jsonwebtoken.workspace = true
 log.workspace = true
+# Direct (non-workspace) dep on purpose: already in Cargo.lock transitively, and
+# keeping it out of the root [workspace.dependencies] avoids the enterprise-CI
+# Cargo.toml.openobserve swap-manifest drift hazard.
+lru = "0.16"
 md5.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
@@ -122,4 +126,9 @@ lettre.workspace = true
 futures-util.workspace = true
 
 [dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
+
+[[bench]]
+name = "db_enrich"
+harness = false

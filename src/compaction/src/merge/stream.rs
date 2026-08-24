@@ -17,15 +17,13 @@ use ::datafusion::arrow::datatypes::Schema;
 use chrono::{DateTime, TimeZone, Utc};
 use config::{
     get_config,
-    meta::{
-        promql::tsid_layout::MetricsFileLayout,
-        stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
-    },
+    meta::stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
     metrics,
     utils::time::hour_micros,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{file_list as infra_file_list, schema::get_partition_time_level};
+use metrics_index::MetricsFileLayout;
 use search::datafusion::merge::MergeMode;
 use search_service::file_list;
 use tokio::{
@@ -35,7 +33,7 @@ use tokio::{
 
 use super::{
     job::job_range_end,
-    tsid_major::{TsidMajorMergeScope, tsid_major_merge_scope},
+    metrics::{MetricsIndexMergeScope, metrics_index_merge_scope},
 };
 use crate::worker::{MergeBatch, MergeSender};
 
@@ -175,22 +173,22 @@ pub async fn merge_by_stream(
             if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
                 return Ok(vec![]);
             }
-            // what a closed TSID-major hour merges, see [`TsidMajorMergeScope`]
-            if mode.is_tsid_major() {
-                match tsid_major_merge_scope(&files_with_size, cfg.compact.max_file_size) {
-                    TsidMajorMergeScope::Skip => return Ok(vec![]),
-                    TsidMajorMergeScope::LateFilesOnly => {
+            // what a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`]
+            if mode.is_metrics_indexed() {
+                match metrics_index_merge_scope(&files_with_size, cfg.compact.max_file_size) {
+                    MetricsIndexMergeScope::Skip => return Ok(vec![]),
+                    MetricsIndexMergeScope::LateFilesOnly => {
                         files_with_size.retain(|f| {
-                            MetricsFileLayout::of(&f.key) != MetricsFileLayout::TsidMajor
+                            MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed)
                         });
                         log::debug!(
-                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] tsid_major late merge of {} files, finalized files untouched",
+                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed late merge of {} files, indexed files untouched",
                             files_with_size.len()
                         );
                     }
-                    TsidMajorMergeScope::WholeHour => {
+                    MetricsIndexMergeScope::WholeHour => {
                         log::debug!(
-                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] tsid_major fragmentation cap hit, full rewrite of {} files",
+                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed fragmentation cap hit, full rewrite of {} files",
                             files_with_size.len()
                         );
                     }

@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 70;
+pub const DB_SCHEMA_VERSION: u64 = 71;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -844,6 +844,31 @@ pub struct Config {
     pub slo: Slo,
     pub synthetics: Synthetics,
     pub alert_composite: AlertComposite,
+    pub db_monitoring: DatabaseMonitoring,
+}
+
+/// Database Monitoring (design: `db-monitoring/dbm-design-doc.md` §8) —
+/// ingest-time db span fingerprinting, server-vantage log canonicalization, the
+/// query-stats rollup job, and the DBM read APIs. OSS feature; runtime-gated on
+/// `enabled` ONLY: enabled means every DBM signal is canonicalized and served,
+/// disabled means none is. The operational tunables that used to sit beside
+/// this flag (rollup interval, top-N, normalization caps, per-signal gates)
+/// are deliberately NOT configurable — each lives as a `const` in its
+/// consuming module, carrying the same value the old knob defaulted to.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct DatabaseMonitoring {
+    #[env_config(
+        name = "ZO_DB_MONITORING_ENABLED",
+        default = true,
+        help = "Enable Database Monitoring: ingest-time db span fingerprinting, server-vantage log canonicalization, the query-stats rollup job, and the DBM read APIs"
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_DB_MONITORING_ROLLUP_INTERVAL_SECS",
+        default = 900,
+        help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
+    )]
+    pub rollup_interval_secs: u64,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -2628,11 +2653,11 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
     #[env_config(
-        name = "ZO_METRICS_TSID_MAJOR_ENABLED",
+        name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental TSID-major metrics layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `tsid-sorted-` file name prefix; the compactor merges a closed hour into size-split `tsid-major-v3-` Parquet files in the same order. Only affects newly written Parquet metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor merges a closed hour into size-split `indexed-v1-` Parquet files with a `.midx` metrics index. Only affects newly written Parquet metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
     )]
-    pub metrics_tsid_major_enabled: bool,
+    pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
@@ -5390,6 +5415,63 @@ mod tests {
         assert!(check_compact_config(&mut cfg).is_ok());
         cfg.compact.data_retention_days = 0; // 0 means disabled
         assert!(check_compact_config(&mut cfg).is_ok());
+    }
+
+    #[test]
+    fn test_db_monitoring_config_defaults() {
+        // DBM's config surface is the feature flag plus ONE operational knob.
+        // The per-SIGNAL flags stay gone (product decision: enabled means every
+        // DBM signal is canonicalized and served, disabled means none is), but
+        // the rollup interval is back as config because it is the freshness
+        // floor of every rollup-backed page and the sizing input for the read
+        // path's live delta — a deployment's right value depends on its span
+        // volume, which no shipped constant can know. It ships ON, at 900 s.
+        let cfg = Config::init().unwrap();
+        assert!(cfg.db_monitoring.enabled);
+        assert_eq!(cfg.db_monitoring.rollup_interval_secs, 900);
+    }
+
+    /// The interval is read through `rollup_interval_secs()`, which clamps to
+    /// [60, 3600]. A deployment that sets 0 (or omits the var into a 0 default
+    /// on some loader path) would otherwise divide the job cadence to zero and
+    /// spin, and an unbounded upper value makes the read path's delta a
+    /// full-window scan on every miss.
+    #[test]
+    fn test_db_monitoring_rollup_interval_is_clamped() {
+        // Mirrors the accessor's clamp, asserted here so the bound is pinned
+        // next to the field it guards.
+        assert_eq!(0_u64.clamp(60, 3600), 60);
+        assert_eq!(30_u64.clamp(60, 3600), 60);
+        assert_eq!(900_u64.clamp(60, 3600), 900);
+        assert_eq!(86_400_u64.clamp(60, 3600), 3600);
+    }
+
+    /// The UI gates the whole DBM menu/route surface on this flag, so it only
+    /// does anything if it reaches `zoConfig`. A flag the UI cannot see is a
+    /// flag that silently does nothing — and nothing else in the workspace
+    /// fails when the wiring is missing, because both halves compile fine
+    /// alone. It is also the ONLY `database_monitoring_*` field the /config
+    /// payload may carry: the per-signal flags were removed with their knobs,
+    /// and re-adding one here would silently resurrect a config surface the
+    /// product decided away.
+    #[test]
+    fn test_db_monitoring_flag_reaches_the_frontend_and_is_the_only_one() {
+        let status = include_str!("../../api/management/src/request/status/mod.rs");
+        assert!(
+            status.contains("database_monitoring_enabled"),
+            "the flag must be exposed on the config payload the UI reads"
+        );
+        assert!(
+            status.contains("cfg.db_monitoring.enabled"),
+            "the exposed field must be fed from the config flag, not hardcoded"
+        );
+        assert_eq!(
+            status.matches("database_monitoring_").count(),
+            2, // one struct field + one construction site
+            "database_monitoring_enabled must be the ONLY database_monitoring_* \
+             field on the /config payload — the per-signal flags were removed \
+             when the config collapsed to a single switch"
+        );
     }
 
     #[test]

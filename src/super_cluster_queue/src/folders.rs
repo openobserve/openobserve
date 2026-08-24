@@ -40,6 +40,9 @@ pub(crate) async fn process_msg(msg: FolderMessage) -> Result<()> {
                     folder_id,
                     name,
                     description: description.unwrap_or_default(),
+                    // FolderMessage carries no icon yet — see the note in
+                    // db::folders. A replicated folder arrives without one.
+                    icon: None,
                 },
                 folder_type,
             )
@@ -59,6 +62,9 @@ pub(crate) async fn process_msg(msg: FolderMessage) -> Result<()> {
                     folder_id,
                     name,
                     description: description.unwrap_or_default(),
+                    // FolderMessage carries no icon yet — see the note in
+                    // db::folders. A replicated folder arrives without one.
+                    icon: None,
                 },
                 folder_type,
             )

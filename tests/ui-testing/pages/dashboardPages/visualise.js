@@ -199,8 +199,17 @@ export default class LogsVisualise {
     await this.page
       .locator('[data-test="log-search-index-list-select-stream"]')
       .click({ force: true });
+    const popover = this.page.locator(
+      '[data-test="log-search-index-list-select-stream-popover"]'
+    );
+    await popover.waitFor({ state: "visible", timeout: 10000 });
+    // OSelect virtualises past 50 options, so a target stream further down the
+    // list is not in the DOM at all — filter it in through the popover search.
+    const popoverSearch = popover.locator("input").first();
+    await popoverSearch.click();
+    await popoverSearch.fill(stream);
     // OSelect forwards parent data-test to ListboxItems (`*-option`).
-    await this.page
+    await popover
       .locator('[data-test="log-search-index-list-select-stream-option"]', { hasText: stream })
       .first()
       .click();

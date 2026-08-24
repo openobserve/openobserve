@@ -11,6 +11,12 @@
        calendar-picker icon stays dark gray and vanishes on dark inputs. */
   color-scheme: dark;
 
+  /* OGlyph plate — brand logos keep their own colours, and several marks
+     (GitHub, Kafka, Helm, InfluxDB) are near-black, so on a dark surface they
+     need a light chip behind them. Slightly off-white so it reads as a tile
+     rather than a glare. */
+  --color-glyph-plate: rgba(255, 255, 255, 0.92);
+
   /* DARK MODE FOUNDATION — tune these ~16 values to taste. Everything
        below (surfaces, borders, text, per-component overrides) references
        ONLY these vars, so the whole dark theme is tuned from here.
@@ -142,6 +148,10 @@
   /* --- Borders (mapped — solid, clearly visible) --- */
   --color-border-default: var(--d-border);
   --color-border-strong: var(--d-border-strong);
+  /* Control edges. `--d-border-strong` (#6b6b6b) already clears ~3:1 against
+     the dark surfaces, so dark mode reuses it rather than inventing a value —
+     the light theme needs its own only because grey-400 falls short there. */
+  --color-border-control: var(--d-border-strong);
   /* Soft divider — one step quieter than border-default so row/section
        splits don't read as hard structural lines (but still visible). */
   --color-border-subtle: var(--d-divider);
@@ -268,6 +278,12 @@
   /* warning: solid unchanged (yellow + dark text works on any bg); outline brightened */
   --color-badge-warning-ol-border: var(--color-warning-400);
   --color-badge-warning-ol-text: var(--color-warning-400);
+  /* warning-quiet in DARK is the NEUTRAL chip: warning-400 is full-chroma on
+     near-black, and this variant exists for states common enough to tile the
+     screen. Whatever needs to stay amber here does it on the icon. */
+  --color-badge-warning-quiet-bg: var(--color-grey-800);
+  --color-badge-warning-quiet-text: var(--color-grey-300);
+  --color-badge-warning-quiet-border: var(--color-grey-700);
   --color-badge-warning-soft-bg: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
   --color-badge-warning-soft-text: var(--color-warning-400);
 
@@ -360,7 +376,11 @@
        a distinct lighter gray; disabled-bg uses --d-well so disabled fields
        still read as a clearly different, inert surface. */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-default);
+  /* border-control, NOT border-default: this line sits after the
+     --color-border-control definition above and used to override it, so the
+     3:1 fix reached light mode only and dark inputs kept --d-border (#454545
+     on #0d1117 = 1.97:1) — the exact contrast the change existed to fix. */
+  --color-input-border: var(--color-border-control);
   --color-input-disabled-bg: var(--d-well);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-placeholder: var(--color-text-placeholder);
@@ -369,7 +389,8 @@
 
   /* Select (OSelect) — same surface-matching bg + disabled strategy as input. */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-default);
+  /* See --color-input-border above: this override had the same effect. */
+  --color-select-border: var(--color-border-control);
   --color-select-disabled-bg: var(--d-well);
   --color-select-disabled-text: var(--color-text-secondary);
   --color-select-placeholder: var(--color-text-placeholder);

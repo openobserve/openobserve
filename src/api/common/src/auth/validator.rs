@@ -139,6 +139,7 @@ pub async fn validator(
     password: &str,
     auth_info: &AuthExtractor,
     path_prefix: &str,
+    from_session: bool,
 ) -> Result<AuthValidationResult, AuthError> {
     let cfg = get_config();
     let uri_path = req_data.uri.path();
@@ -153,12 +154,14 @@ pub async fn validator(
         let method = req_data.method.to_string();
         validate_credentials_ext(user_id, password, path, auth_token, &method).await
     } else {
+        // from_session, NOT auth_info.bypass_check: a route that bypasses the
+        // permission check must still enforce the allow_static_token policy.
         validate_credentials(
             user_id,
             password.trim(),
             path,
             &req_data.method,
-            auth_info.bypass_check,
+            from_session,
         )
         .await
     } {
@@ -1125,7 +1128,8 @@ async fn oo_validator_internal(
             Some(value) => value,
             None => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
         };
-        // Pass is_from_session flag through a modified auth_info
+        // Sessions bypass the permission check; the raw session flag is passed
+        // separately so credential-level policies can still see it.
         let mut modified_auth_info = auth_info.clone();
         modified_auth_info.bypass_check = is_from_session || auth_info.bypass_check;
         validator(
@@ -1134,6 +1138,7 @@ async fn oo_validator_internal(
             &password,
             &modified_auth_info,
             path_prefix,
+            is_from_session,
         )
         .await
     } else if auth_str.starts_with("Bearer") {
@@ -1161,7 +1166,15 @@ async fn oo_validator_internal(
                 None => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
             };
             log::info!("Auth ext token found: validating: {username}");
-            validator(req_data, &username, &password, auth_info, path_prefix).await
+            validator(
+                req_data,
+                &username,
+                &password,
+                auth_info,
+                path_prefix,
+                false,
+            )
+            .await
         }
     } else {
         // Missing or unrecognized auth - return WWW-Authenticate header
@@ -1554,6 +1567,60 @@ mod tests {
         }
 
         ORG_INGESTION_TOKENS.remove(&format!("{org_id}/{token}"));
+    }
+
+    #[tokio::test]
+    async fn test_bypass_route_still_enforces_allow_static_token_policy() {
+        let org_id = "default";
+        let sa_email = "sa-nostatic@example.com";
+        let token = "sa_static_token_nostatic_test";
+
+        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        let _ = organization::check_and_create_org_without_ofga(org_id).await;
+
+        // The production recipe for a session-only service account: user record
+        // plus org membership with allow_static_token=false.
+        users::create_service_account_if_not_exists(sa_email)
+            .await
+            .unwrap();
+        db::org_users::add_with_flags(
+            org_id,
+            sa_email,
+            config::meta::user::UserRole::ServiceAccount,
+            token,
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+
+        // On a permission-bypass route (bypass_check=true), the raw static
+        // token must still be rejected: bypass_check must not double as
+        // from_session and skip the allow_static_token policy.
+        let req_data = RequestData {
+            uri: "/api/default/config".parse().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        let auth_info = AuthExtractor::bypass(String::new(), String::new());
+        assert!(
+            validator(&req_data, sa_email, token, &auth_info, "/api/", false)
+                .await
+                .is_err(),
+            "static token with allow_static_token=false must be rejected on bypass routes"
+        );
+
+        // The same credentials through an assume_service_account session
+        // (from_session=true) are accepted.
+        assert!(
+            validate_credentials(sa_email, token, "default/config", &Method::GET, true)
+                .await
+                .unwrap()
+                .is_valid,
+            "assume_service_account sessions must still authenticate"
+        );
     }
 
     #[tokio::test]

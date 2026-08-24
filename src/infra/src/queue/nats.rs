@@ -25,7 +25,7 @@ use tokio::{sync::mpsc, task::JoinHandle};
 use crate::{db::nats::get_nats_client, errors::*, queue, queue::format_key};
 
 pub async fn init() -> Result<()> {
-    Ok(())
+    crate::db::nats::init().await
 }
 
 pub struct NatsQueue {

@@ -268,6 +268,7 @@ import RunningWithErrorsIcon from "~icons/material-symbols/error-outline";
 import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
+import SensorsOff from "~icons/material-symbols/sensors-off-outline";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
 import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
@@ -696,6 +697,10 @@ export const iconRegistry = {
   checklist: Checklist,
   "photo-camera": PhotoCamera,
   "smart-display": SmartDisplay,
+
+  // Batch 4: Alert Library (2026-08-20)
+  // "no signal arriving" — the alert library's not-ingesting-this-stream state.
+  "sensors-off": SensorsOff,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

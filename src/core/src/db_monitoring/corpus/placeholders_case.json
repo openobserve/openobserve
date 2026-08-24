@@ -1,0 +1,210 @@
+[
+  {
+    "id": "ph-pg-dollar-n",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM users WHERE id = $1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM users WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_users_by_id",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "ph-npgsql-at-name",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM users WHERE id = @p0"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM users WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_users_by_id",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "ph-colon-name",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM users WHERE id = :id"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM users WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_users_by_id",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "ph-psycopg-percent-s",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM users WHERE id = %s"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM users WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_users_by_id",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "ph-jdbc-question-mark",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM users WHERE id = ?"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM users WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_users_by_id",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "case-lower-keywords",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "select * from users where id = $1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "select * from users where id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_users_by_id",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "case-mixed-keywords",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "Select * From users Where id = $1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "Select * From users Where id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_users_by_id",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "ph-cockroachdb-pg-mode",
+    "dialect": "cockroachdb",
+    "input": {
+      "attrs": {
+        "db.system": "cockroachdb",
+        "db.statement": "SELECT * FROM rides WHERE city = $1 AND id = $2"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM rides WHERE city = ? AND id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "cockroachdb",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "crdb_rides_by_city_id",
+    "literals": [],
+    "source": "authored"
+  }
+]

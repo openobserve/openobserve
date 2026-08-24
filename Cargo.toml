@@ -287,6 +287,7 @@ members = [
     "src/usage_reporting",
     "src/audit",
     "src/promql",
+    "src/metrics_index",
     "src/promql_service",
     "src/jobs",
     "src/mcp",
@@ -343,6 +344,7 @@ search_service = { path = "src/search_service" }
 usage_reporting = { path = "src/usage_reporting" }
 audit = { path = "src/audit" }
 promql = { path = "src/promql" }
+metrics_index = { path = "src/metrics_index" }
 promql-service = { path = "src/promql_service" }
 openobserve-api-common = { path = "src/api/common" }
 openobserve-api-grpc = { path = "src/api/grpc" }

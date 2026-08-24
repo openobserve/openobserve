@@ -2617,6 +2617,7 @@ dependencies = [
  "ingester",
  "itertools 0.14.0",
  "log",
+ "metrics_index",
  "o2_enterprise",
  "object_store",
  "parking_lot 0.12.5",
@@ -5163,9 +5164,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.15"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cb093c84e8bd9b188d4c4a8cb6579fc016968d14c99882163cd3ff402a4f155"
+checksum = "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -6753,6 +6754,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics_index"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "config",
+ "datafusion",
+ "futures",
+ "hashlink 0.11.1",
+ "infra",
+ "log",
+ "promql",
+ "promql-parser",
+ "regex",
+ "tokio",
+]
+
+[[package]]
 name = "mimalloc"
 version = "0.1.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8067,6 +8087,7 @@ dependencies = [
  "chrono",
  "common",
  "config",
+ "criterion",
  "cron",
  "dashmap",
  "datafusion",
@@ -8087,6 +8108,7 @@ dependencies = [
  "jsonwebtoken",
  "lettre",
  "log",
+ "lru",
  "md5",
  "multer",
  "o2_dex",
@@ -8156,6 +8178,7 @@ dependencies = [
  "ingester",
  "ingestion-common",
  "log",
+ "metrics_index",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
@@ -9171,6 +9194,7 @@ dependencies = [
  "infra",
  "itertools 0.14.0",
  "log",
+ "metrics_index",
  "o2_enterprise",
  "promql",
  "promql-parser",
@@ -11011,6 +11035,7 @@ dependencies = [
  "log",
  "md5",
  "memchr",
+ "metrics_index",
  "o2_enterprise",
  "object_store",
  "openobserve-cipher",
@@ -11461,9 +11486,9 @@ checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
 
 [[package]]
 name = "sketches-ddsketch"
-version = "0.4.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "513c3f5f732bfd6fbb187619c2dfe9d2f25f1a2976f01d575f0fd329d565df56"
+checksum = "05e40b6cf54d988dc1a2223531b969c9a9e30906ad90ef64890c27b4bfbb46ea"
 dependencies = [
  "serde",
 ]

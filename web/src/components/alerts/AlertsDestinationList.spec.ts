@@ -181,11 +181,11 @@ describe("AlertsDestinationList", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("renders the list title", async () => {
+    it("titles itself with the SECTION, so the peer tabs never move", async () => {
+      // Identical on all four alerting pages — see TemplateList.spec.ts.
       wrapper = mountComponent();
       await flushPromises();
-      const title = wrapper.find(".app-page-header h1");
-      expect(title.exists()).toBe(true);
+      expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
     });
 
     it("renders the table when no editor is open", async () => {
@@ -386,6 +386,26 @@ describe("AlertsDestinationList", () => {
       expect(destinationService.delete).toHaveBeenCalledWith(
         expect.objectContaining({ destination_name: dest.name }),
       );
+    });
+
+    it("drops the deleted row in place, without refetching the list", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const before = [...(wrapper.vm as any).destinations];
+      const dest = before[0];
+      (destinationService.list as any).mockClear();
+
+      (wrapper.vm as any).confirmDelete.data = dest;
+      (wrapper.vm as any).deleteDestination();
+      await flushPromises();
+
+      // A refetch would blank the table behind its spinner and a loading toast
+      // for a row the server has already confirmed gone.
+      expect(destinationService.list).not.toHaveBeenCalled();
+      const after = (wrapper.vm as any).destinations;
+      expect(after).toHaveLength(before.length - 1);
+      expect(after.map((d: any) => d.name)).not.toContain(dest.name);
     });
 
     it("resets confirmDelete on cancelDeleteDestination()", async () => {

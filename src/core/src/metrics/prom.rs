@@ -275,7 +275,7 @@ pub async fn remote_write(
         // get labels
         let mut replica_label = String::new();
 
-        let labels: FxIndexMap<String, String> = event
+        let mut labels: FxIndexMap<String, String> = event
             .labels
             .drain(..)
             .filter(|label| {
@@ -294,8 +294,15 @@ pub async fn remote_write(
             .map(|label| (format_label_name(&label.name), label.value))
             .collect();
 
-        let metric_name = match labels.get(NAME_LABEL) {
-            Some(v) => format_stream_name(v.to_string()),
+        let metric_name = match labels.get_mut(NAME_LABEL) {
+            Some(v) => {
+                // store the formatted name back so the `__name__` column always
+                // equals the stream name; otherwise `{__name__="..."}` selectors
+                // can never match the rows (same policy as the OTLP writer)
+                let name = format_stream_name(std::mem::take(v));
+                v.clone_from(&name);
+                name
+            }
             None => continue,
         };
 
@@ -800,10 +807,10 @@ pub async fn remote_write(
         ])
         .inc();
 
-    // only one trigger per request
+    // only one trigger per request; notification/db work must not block ingestion
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
-            evaluate_trigger(entry).await;
+            tokio::spawn(evaluate_trigger(entry));
         }
     }
 
@@ -949,8 +956,11 @@ pub async fn get_series(
     let mut sql_where = Vec::new();
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
+            // `__name__` already picked the stream; the stored column may hold the
+            // pre-`format_stream_name` metric name, so filtering on it drops all rows.
             if mat.name == TIMESTAMP_COL_NAME
                 || mat.name == VALUE_LABEL
+                || mat.name == NAME_LABEL
                 || schema.field_with_name(&mat.name).is_err()
             {
                 continue;

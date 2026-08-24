@@ -16,32 +16,24 @@
 use std::sync::Arc;
 
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    get_config,
     meta::{
-        promql::VALUE_LABEL,
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
-use datafusion::{
-    arrow::datatypes::Schema,
-    error::{DataFusionError, Result},
-    sql::TableReference,
-};
-use hashbrown::{HashMap, HashSet};
+use datafusion::error::{DataFusionError, Result};
+use hashbrown::HashMap;
 use infra::{
     cache::file_data,
-    schema::{get_partition_time_level, get_stream_setting_index_fields, unwrap_stream_settings},
+    schema::{get_partition_time_level, unwrap_stream_settings},
 };
 use itertools::Itertools;
-use promql_parser::label::{MatchOp, Matchers};
+use promql_parser::label::Matchers;
 use search::{
     datafusion::exec::register_metrics_table,
     file_cache::{cache_files, calc_target_partitions},
-    index::{Condition, IndexCondition},
-    tantivy::tantivy_search,
-    types::QueryParams,
 };
 use search_service::match_source;
 use tracing::Instrument;
@@ -81,15 +73,8 @@ pub(crate) async fn create_context(
         return Ok(None);
     }
 
-    // get index fields
-    let stream_settings = unwrap_stream_settings(&schema);
-    let index_fields = get_stream_setting_index_fields(&stream_settings)
-        .into_iter()
-        .filter(|field| schema.field_with_name(field).is_ok())
-        .collect::<HashSet<_>>();
-
     // get partition time level
-    let stream_settings = stream_settings.unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level = get_partition_time_level(stream_type);
 
     // rewrite partition filters
@@ -205,37 +190,36 @@ pub(crate) async fn create_context(
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 
-    let query = Arc::new(QueryParams {
-        trace_id: trace_id.to_string(),
-        org_id: org_id.to_string(),
-        stream: TableReference::from(stream_name),
-        stream_type: StreamType::Metrics,
-        stream_name: stream_name.to_string(),
-        time_range,
-        work_group: None,
-        use_inverted_index: true,
-    });
+    // Prune indexed metrics files through their `.midx` metrics indexes: matching
+    // physical rows are attached to each FileKey before the metrics table is
+    // built. Files of any other layout (legacy or not yet finalized hours) are
+    // scanned in full; the PromQL matchers are always applied by the query.
+    match metrics_index::search(
+        trace_id,
+        &mut files,
+        schema.as_ref(),
+        &matchers,
+        target_partitions,
+    )
+    .await
+    {
+        Ok(took) => {
+            scan_stats.idx_took = took.unwrap_or_default() as i64;
+        }
+        Err(error) => {
+            log::warn!(
+                "[trace_id {trace_id}] promql->search->storage: metrics-index query failed, falling back to a full scan: {error}"
+            );
+        }
+    };
 
-    // search tantivy index
-    let mut idx_took = 0;
-    let mut is_add_filter_back = true;
-    let (index_condition, is_full_convert) =
-        convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
-    if !index_condition.conditions.is_empty() && cfg.search.inverted_index_enabled {
-        (idx_took, is_add_filter_back,..) =
-            tantivy_search(query.clone(), &mut files, Some(index_condition), None)
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index error: {e}"
-                    );
-                    DataFusionError::Execution(e.to_string())
-                })?;
-        log::info!(
-            "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {idx_took} ms, is_add_filter_back: {is_add_filter_back}, is_full_convert: {is_full_convert}",
-        );
-    }
-    scan_stats.idx_took = idx_took as i64;
+    log::info!(
+        "[trace_id {trace_id}] promql->search->storage: after metrics-index pruning, files {}, scan_size {}, compressed_size {}, index took: {} ms",
+        scan_stats.files,
+        scan_stats.original_size,
+        scan_stats.compressed_size,
+        scan_stats.idx_took
+    );
 
     let session = SearchSession {
         id: trace_id.to_string(),
@@ -246,14 +230,9 @@ pub(crate) async fn create_context(
 
     let ctx = register_metrics_table(&session, schema.clone(), stream_name, files).await?;
 
-    Ok(Some((
-        ctx,
-        schema,
-        scan_stats,
-        is_add_filter_back
-            || !is_full_convert
-            || !cfg.search.feature_query_remove_filter_with_index,
-    )))
+    // the matchers are always applied by the query: sidecar selections are
+    // exact at series-run granularity only, and other files are scanned in full
+    Ok(Some((ctx, schema, scan_stats, true)))
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]
@@ -294,34 +273,4 @@ async fn get_file_list(
         }
     }
     Ok(files)
-}
-
-fn convert_matchers_to_index_condition(
-    matchers: &Matchers,
-    schema: &Arc<Schema>,
-    index_fields: &HashSet<String>,
-) -> Result<(IndexCondition, bool)> {
-    let mut index_condition = IndexCondition::default();
-    let mut is_full_convert = true;
-    for mat in matchers.matchers.iter() {
-        if mat.name == TIMESTAMP_COL_NAME
-            || mat.name == VALUE_LABEL
-            || !index_fields.contains(&mat.name)
-            || schema.field_with_name(&mat.name).is_err()
-        {
-            is_full_convert = false;
-            continue;
-        }
-        let condition = match &mat.op {
-            MatchOp::Equal => Condition::Equal(mat.name.clone(), mat.value.clone()),
-            MatchOp::NotEqual => Condition::NotEqual(mat.name.clone(), mat.value.clone()),
-            MatchOp::Re(regex) => Condition::Regex(mat.name.clone(), regex.to_string()),
-            _ => {
-                is_full_convert = false;
-                continue;
-            }
-        };
-        index_condition.add_condition(condition);
-    }
-    Ok((index_condition, is_full_convert))
 }
