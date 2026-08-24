@@ -86,8 +86,7 @@ use tracing::{Level, span};
 use crate::auth::check_permissions;
 use crate::{
     alerts::{
-        QueryConditionExt,
-        build_sql, destinations,
+        QueryConditionExt, build_sql, destinations,
         notifications::{
             NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
             custom::{VarValue, process_variable_replace},
@@ -723,8 +722,10 @@ async fn prepare_alert(
             && alert.query_condition.query_type == QueryType::SQL
             && agg.multi_alert
         {
-            let mut query = SearchQuery::default();
-            query.sql = sql.to_owned();
+            let query = SearchQuery {
+                sql: sql.to_owned(),
+                ..Default::default()
+            };
             let sql = Sql::new(&query, &alert.org_id, alert.stream_type, None)
                 .await
                 .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
@@ -737,7 +738,9 @@ async fn prepare_alert(
                         "SQL query projections must contain all group by fields, missing field '{group}'"
                     )));
                 }
-                if let Some(v)=schema.field_alias_map.get(group) && v != group{
+                if let Some(v) = schema.field_alias_map.get(group)
+                    && v != group
+                {
                     return Err(AlertError::MultiAlertGroupingError(format!(
                         "SQL query projections must contain all group by fields without alias, field '{group}' is aliased"
                     )));

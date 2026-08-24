@@ -693,9 +693,9 @@ impl QueryConditionExt for QueryCondition {
                     // GROUP-COUNT threshold. Both axes must hold — dropping the
                     // count silently rewrites "for at least 3 groups" as "for
                     // any group".
-                    let col = if self.query_type == QueryType::SQL{
+                    let col = if self.query_type == QueryType::SQL {
                         &agg.having.column
-                    }else{
+                    } else {
                         "alert_agg_value"
                     };
                     let classified: Vec<_> = records
