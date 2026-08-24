@@ -149,6 +149,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <ODropdownItem
+              :data-test="`status-pages-post-update-item-${(row as any).id}`"
+              @select="emit('post-update', row)"
+            >
+              <template #icon-left>
+                <OIcon name="campaign" size="sm" />
+              </template>
+              {{ t("statusPages.postUpdate.action") }}
+            </ODropdownItem>
+
+            <ODropdownItem
+              :data-test="`status-pages-view-updates-item-${(row as any).id}`"
+              @select="emit('view-updates', row)"
+            >
+              <template #icon-left>
+                <OIcon name="history-toggle-off" size="sm" />
+              </template>
+              {{ t("statusPages.notices.action") }}
+            </ODropdownItem>
+
+            <ODropdownItem
               :data-test="`status-pages-copy-url-item-${(row as any).id}`"
               @select="copyUrl((row as any).slug)"
             >
@@ -227,6 +247,8 @@ const emit = defineEmits<{
   edit: [row: StatusPageListItem];
   delete: [row: StatusPageListItem];
   "new-page": [];
+  "post-update": [row: StatusPageListItem];
+  "view-updates": [row: StatusPageListItem];
 }>();
 
 const { t } = useI18nTyped();

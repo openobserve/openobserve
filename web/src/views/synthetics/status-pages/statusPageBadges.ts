@@ -57,3 +57,35 @@ export function visibilityBadge(visibility: StatusPageVisibility): {
 export function publicStatusPageUrl(slug: string): string {
   return `${window.location.origin}/status/${slug}`;
 }
+
+// impact: 0 none, 1 degraded, 2 partial_outage, 3 major_outage.
+export function impactBadge(impact: number): {
+  variant: BadgeVariant;
+  labelKey: I18nKey;
+} {
+  switch (impact) {
+    case 1:
+      return { variant: "warning-soft", labelKey: "statusPages.postUpdate.impactDegraded" };
+    case 2:
+      return { variant: "error-soft", labelKey: "statusPages.postUpdate.impactPartial" };
+    case 3:
+      return { variant: "error-soft", labelKey: "statusPages.postUpdate.impactMajor" };
+    default:
+      return { variant: "default-soft", labelKey: "statusPages.health.operational" };
+  }
+}
+
+// state: 0 scheduled, 1 active, 2 resolved.
+export function noticeStateBadge(state: number): {
+  variant: BadgeVariant;
+  labelKey: I18nKey;
+} {
+  switch (state) {
+    case 0:
+      return { variant: "default-outline", labelKey: "statusPages.notices.state.scheduled" };
+    case 1:
+      return { variant: "error-outline", labelKey: "statusPages.notices.state.active" };
+    default:
+      return { variant: "success-outline", labelKey: "statusPages.notices.state.resolved" };
+  }
+}

@@ -27,8 +27,8 @@ use sea_orm::{
 
 use super::entity::{
     status_page_check_snoozes, status_page_component_checks, status_page_components,
-    status_page_notice_components, status_page_notices, status_page_snapshots, status_pages,
-    synthetics_checks,
+    status_page_notice_components, status_page_notice_updates, status_page_notices,
+    status_page_snapshots, status_pages, synthetics_checks,
 };
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -173,6 +173,20 @@ pub async fn list_notice_components<C: ConnectionTrait>(
         .await?)
 }
 
+/// Batched read for the rebuilder: every posted update across a shard's
+/// notices in one query, oldest first so the caller can group-by-notice
+/// without a second sort.
+pub async fn list_notice_updates_for<C: ConnectionTrait>(
+    conn: &C,
+    notice_ids: &[String],
+) -> Result<Vec<status_page_notice_updates::Model>, errors::Error> {
+    Ok(status_page_notice_updates::Entity::find()
+        .filter(status_page_notice_updates::Column::NoticeId.is_in(notice_ids.iter().cloned()))
+        .order_by_asc(status_page_notice_updates::Column::CreatedAt)
+        .all(conn)
+        .await?)
+}
+
 pub async fn list_active_snoozes<C: ConnectionTrait>(
     conn: &C,
     now: i64,
@@ -198,6 +212,141 @@ pub async fn insert_notice_component<C: ConnectionTrait>(
 ) -> Result<(), errors::Error> {
     let _lock = super::get_lock().await;
     model.into_active_model().insert(conn).await?;
+    Ok(())
+}
+
+/// Notices for the admin plane: an org's manual + auto notices, newest first,
+/// not soft-deleted. Unlike [`list_notices_since`] this has no resolved-age
+/// cutoff — the admin list shows full history, not just the rebuilder's
+/// 90-day snapshot window.
+pub async fn list_notices_for_org(
+    org_id: &str,
+) -> Result<Vec<status_page_notices::Model>, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(status_page_notices::Entity::find()
+        .filter(status_page_notices::Column::OrgId.eq(org_id))
+        .filter(status_page_notices::Column::DeletedAt.is_null())
+        .order_by_desc(status_page_notices::Column::StartsAt)
+        .all(conn)
+        .await?)
+}
+
+pub async fn get_notice_by_id(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<status_page_notices::Model>, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(status_page_notices::Entity::find_by_id(id)
+        .filter(status_page_notices::Column::OrgId.eq(org_id))
+        .filter(status_page_notices::Column::DeletedAt.is_null())
+        .one(conn)
+        .await?)
+}
+
+/// Full-row replace for the admin write path (create/edit/mark-false-positive
+/// all go through here) — unlike [`update_notice_runtime`] this is not a
+/// column-selective patch, so the caller supplies the complete model.
+pub async fn put_notice(model: &status_page_notices::Model) -> Result<(), errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    let am = model.clone().into_active_model().reset_all();
+    am.update(conn).await?;
+    Ok(())
+}
+
+pub async fn replace_notice_components(
+    org_id: &str,
+    notice_id: &str,
+    component_ids: &[String],
+) -> Result<(), errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    status_page_notice_components::Entity::delete_many()
+        .filter(status_page_notice_components::Column::NoticeId.eq(notice_id))
+        .exec(conn)
+        .await?;
+    for component_id in component_ids {
+        status_page_notice_components::Model {
+            id: config::ider::generate(),
+            notice_id: notice_id.to_string(),
+            component_id: component_id.clone(),
+            org_id: org_id.to_string(),
+        }
+        .into_active_model()
+        .insert(conn)
+        .await?;
+    }
+    Ok(())
+}
+
+pub async fn soft_delete_notice(org_id: &str, id: &str, at: i64) -> Result<bool, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    let res = status_page_notices::Entity::update_many()
+        .col_expr(status_page_notices::Column::DeletedAt, Expr::value(at))
+        .col_expr(status_page_notices::Column::UpdatedAt, Expr::value(at))
+        .filter(status_page_notices::Column::Id.eq(id))
+        .filter(status_page_notices::Column::OrgId.eq(org_id))
+        .filter(status_page_notices::Column::DeletedAt.is_null())
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+pub async fn insert_notice_update(
+    model: status_page_notice_updates::Model,
+) -> Result<(), errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    model.into_active_model().insert(conn).await?;
+    Ok(())
+}
+
+pub async fn list_notice_updates(
+    org_id: &str,
+    notice_id: &str,
+) -> Result<Vec<status_page_notice_updates::Model>, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(status_page_notice_updates::Entity::find()
+        .filter(status_page_notice_updates::Column::NoticeId.eq(notice_id))
+        .filter(status_page_notice_updates::Column::OrgId.eq(org_id))
+        .order_by_asc(status_page_notice_updates::Column::CreatedAt)
+        .all(conn)
+        .await?)
+}
+
+/// Org-wide upsert-by-check: snoozing a false positive silences it on every
+/// page, so the row is keyed on `synthetics_id` alone (unique index).
+pub async fn upsert_check_snooze(
+    org_id: &str,
+    synthetics_id: &str,
+    snoozed_until: i64,
+    owner: Option<&str>,
+    now: i64,
+) -> Result<(), errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    status_page_check_snoozes::Entity::insert(
+        status_page_check_snoozes::Model {
+            id: config::ider::generate(),
+            org_id: org_id.to_string(),
+            synthetics_id: synthetics_id.to_string(),
+            snoozed_until,
+            owner: owner.map(str::to_string),
+            created_at: now,
+        }
+        .into_active_model(),
+    )
+    .on_conflict(
+        sea_orm::sea_query::OnConflict::column(status_page_check_snoozes::Column::SyntheticsId)
+            .update_columns([
+                status_page_check_snoozes::Column::SnoozedUntil,
+                status_page_check_snoozes::Column::Owner,
+            ])
+            .to_owned(),
+    )
+    .exec(conn)
+    .await?;
     Ok(())
 }
 
@@ -411,6 +560,27 @@ pub async fn count_components(org_id: &str, page_id: &str) -> Result<i64, errors
         .await? as i64)
 }
 
+/// The distinct pages a set of components belong to — a notice's write path
+/// needs this to know which pages' cached snapshots to refresh out of band
+/// (a notice is org-scoped and can touch components across several pages).
+pub async fn pages_for_components(
+    org_id: &str,
+    component_ids: &[String],
+) -> Result<Vec<String>, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let ids: std::collections::HashSet<String> = status_page_components::Entity::find()
+        .select_only()
+        .column(status_page_components::Column::StatusPageId)
+        .filter(status_page_components::Column::Id.is_in(component_ids.iter().cloned()))
+        .filter(status_page_components::Column::OrgId.eq(org_id))
+        .into_tuple::<String>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .collect();
+    Ok(ids.into_iter().collect())
+}
+
 // ── Super-cluster apply (raw writes; called by the OSS applier, anti-loop) ────
 // These deserialize a replicated row and upsert/delete it by primary key. They
 // go through the entity layer directly and NEVER the service layer (which
@@ -444,7 +614,8 @@ pub async fn apply_upsert(org_id: &str, tbl: &str, json: &str) -> Result<(), err
 
     use super::entity::{
         status_page_check_snoozes, status_page_component_checks, status_page_components,
-        status_page_notice_components, status_page_notices, status_pages,
+        status_page_notice_components, status_page_notice_updates, status_page_notices,
+        status_pages,
     };
     let _ = org_id; // org is embedded in the row; kept for symmetry/logging
     match tbl {
@@ -463,6 +634,10 @@ pub async fn apply_upsert(org_id: &str, tbl: &str, json: &str) -> Result<(), err
         "status_page_notice_components" => upsert!(
             status_page_notice_components::Entity,
             status_page_notice_components::Model
+        ),
+        "status_page_notice_updates" => upsert!(
+            status_page_notice_updates::Entity,
+            status_page_notice_updates::Model
         ),
         "status_page_check_snoozes" => upsert!(
             status_page_check_snoozes::Entity,
@@ -566,6 +741,11 @@ fn action_code(action: &str) -> i32 {
         "delete_page" => 2,
         "rotate_slug" => 3,
         "set_components" => 4,
+        "create_notice" => 5,
+        "update_notice" => 6,
+        "delete_notice" => 7,
+        "notice_update" => 8,
+        "mark_false_positive" => 9,
         _ => 99,
     }
 }

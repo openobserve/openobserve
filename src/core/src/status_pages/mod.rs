@@ -27,11 +27,16 @@ use argon2::{
 };
 use config::{
     meta::status_pages::{
-        CreatePageRequest, PageAdminView, SetComponentsRequest, UpdatePageRequest,
+        CreateNoticeRequest, CreatePageRequest, NoticeAdminView, NoticeUpdateRequest,
+        PageAdminView, PreviewResponse, SetComponentsRequest, UpdateNoticeRequest,
+        UpdatePageRequest,
     },
     utils::{rand::generate_random_string, time::now_micros},
 };
-use infra::table::{entity::status_pages as page_entity, status_pages as table};
+use infra::table::{
+    entity::{status_page_notice_updates, status_pages as page_entity},
+    status_pages as table,
+};
 
 /// 22 base62 chars ≈ 131 bits of CSPRNG entropy — the public identifier.
 const SLUG_LEN: usize = 22;
@@ -225,9 +230,288 @@ pub async fn set_components(
 // NOTE (R-1): the per-check folder-authz composition lives in the HANDLER
 // layer (`api/management/.../status_pages/admin.rs`), not here — it needs both
 // `openobserve_synthetics::service::get_synthetic` (→ folder_id) and
-// `check_permissions`, and the handler crate already depends on both. Keeping
-// core free of a synthetics dependency avoids a needless crate edge. The
+// `check_permissions`, and the handler crate already depends on both. The
 // handler calls `set_components` only AFTER clearing every mapped check.
+// (core does depend on openobserve-synthetics — see `preview` below, which
+// reuses the rebuilder's snapshot serializer — but that dependency carries no
+// authz responsibility of its own.)
+
+// ── Notices (manual half; auto-incidents are rebuilder-owned) ────────────────
+// Notices are org-scoped objects (design: one outage, one narrative on every
+// page that shows an affected component); `page_id` here is a convenience —
+// it only supplies the default `component_ids` and filters the list view.
+
+/// Posts a manual notice. Impact ≥ partial_outage accrues downtime the same
+/// way an auto-incident does; `starts_at` in the future makes it a scheduled
+/// maintenance window (kind=1 callers set this), not an active incident. An
+/// empty `component_ids` defaults to every component on `page_id`.
+pub async fn create_notice(
+    org_id: &str,
+    page_id: &str,
+    req: CreateNoticeRequest,
+    owner: &str,
+) -> Result<NoticeAdminView, anyhow::Error> {
+    if req.title.trim().is_empty() {
+        anyhow::bail!("validation: title is required");
+    }
+    if !(0..=2).contains(&req.kind) {
+        anyhow::bail!("validation: kind must be 0, 1, or 2");
+    }
+    if !(0..=3).contains(&req.impact) {
+        anyhow::bail!("validation: impact must be 0-3");
+    }
+    let component_ids = if req.component_ids.is_empty() {
+        table::list_components_with_checks(org_id, page_id)
+            .await?
+            .into_iter()
+            .map(|c| c.id)
+            .collect()
+    } else {
+        req.component_ids
+    };
+    let now = now_micros();
+    let starts_at = req.starts_at.unwrap_or(now);
+    // Scheduled (future-dated) maintenance starts life in state=0; everything
+    // else is active immediately — there is no manual "draft" state.
+    let state = if req.kind == 1 && starts_at > now {
+        0
+    } else {
+        1
+    };
+    let model = infra::table::entity::status_page_notices::Model {
+        id: config::ider::generate(),
+        org_id: org_id.to_string(),
+        kind: req.kind,
+        impact: req.impact,
+        source: 1,
+        title: req.title,
+        body: req.body,
+        state,
+        starts_at,
+        resolved_at: None,
+        segments: segments_json(starts_at, state),
+        excluded_from_uptime: false,
+        deleted_at: None,
+        auto_check_id: None,
+        auto_recovery_streak: 0,
+        owner: Some(owner.to_string()),
+        created_at: now,
+        updated_at: now,
+    };
+    let conn = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    table::insert_notice(conn, model.clone()).await?;
+    table::replace_notice_components(org_id, &model.id, &component_ids).await?;
+    emit_notice_upsert(org_id, "status_page_notices", &model).await;
+    refresh_affected_pages(org_id, &component_ids).await;
+    Ok(to_notice_view(model, component_ids))
+}
+
+/// Notices touching any component on `page_id` — a filtered view over the
+/// org's full notice set, for the page's "past updates" panel.
+pub async fn list_notices_for_page(
+    org_id: &str,
+    page_id: &str,
+) -> Result<Vec<NoticeAdminView>, anyhow::Error> {
+    let page_component_ids: std::collections::HashSet<String> =
+        table::list_components_with_checks(org_id, page_id)
+            .await?
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+    let notices = table::list_notices_for_org(org_id).await?;
+    let ids: Vec<String> = notices.iter().map(|n| n.id.clone()).collect();
+    let conn = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    let joins = table::list_notice_components(conn, &ids).await?;
+    Ok(notices
+        .into_iter()
+        .filter_map(|n| {
+            let component_ids: Vec<String> = joins
+                .iter()
+                .filter(|j| j.notice_id == n.id)
+                .map(|j| j.component_id.clone())
+                .collect();
+            component_ids
+                .iter()
+                .any(|c| page_component_ids.contains(c))
+                .then(|| to_notice_view(n, component_ids))
+        })
+        .collect())
+}
+
+/// Edits a manual notice's narrative, impact, mapped components, or resolves
+/// it by hand. Rejects touching an auto-sourced notice's `state`/`impact` —
+/// those are rebuilder-owned; use [`mark_false_positive`] to override one.
+pub async fn update_notice(
+    org_id: &str,
+    id: &str,
+    req: UpdateNoticeRequest,
+) -> Result<NoticeAdminView, anyhow::Error> {
+    let mut model = table::get_notice_by_id(org_id, id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("not found"))?;
+    if model.source == 0 && (req.state.is_some() || req.impact.is_some()) {
+        anyhow::bail!(
+            "validation: this notice is auto-managed; use mark_false_positive to override it"
+        );
+    }
+    if let Some(v) = req.impact {
+        if !(0..=3).contains(&v) {
+            anyhow::bail!("validation: impact must be 0-3");
+        }
+        model.impact = v;
+    }
+    if let Some(v) = req.title {
+        if v.trim().is_empty() {
+            anyhow::bail!("validation: title is required");
+        }
+        model.title = v;
+    }
+    if let Some(v) = req.body {
+        model.body = v;
+    }
+    let now = now_micros();
+    if let Some(v) = req.state {
+        if !(0..=2).contains(&v) {
+            anyhow::bail!("validation: state must be 0, 1, or 2");
+        }
+        if v == 2 && model.state != 2 {
+            close_open_segment(&mut model, now);
+            model.resolved_at = Some(now);
+        }
+        model.state = v;
+    }
+    model.updated_at = now;
+    table::put_notice(&model).await?;
+    let component_ids = match req.component_ids {
+        Some(ids) => {
+            table::replace_notice_components(org_id, id, &ids).await?;
+            ids
+        }
+        None => {
+            let conn = infra::db::ORM_CLIENT
+                .get_or_init(infra::db::connect_to_orm)
+                .await;
+            table::list_notice_components(conn, &[id.to_string()])
+                .await?
+                .into_iter()
+                .map(|j| j.component_id)
+                .collect()
+        }
+    };
+    emit_notice_upsert(org_id, "status_page_notices", &model).await;
+    refresh_affected_pages(org_id, &component_ids).await;
+    Ok(to_notice_view(model, component_ids))
+}
+
+pub async fn delete_notice(org_id: &str, id: &str) -> Result<bool, anyhow::Error> {
+    let component_ids = notice_component_ids(id).await.unwrap_or_default();
+    let deleted = table::soft_delete_notice(org_id, id, now_micros()).await?;
+    if deleted {
+        emit_notice_delete(org_id, "status_page_notices", id).await;
+        refresh_affected_pages(org_id, &component_ids).await;
+    }
+    Ok(deleted)
+}
+
+/// Appends a timestamped narrative update to a notice's public timeline.
+pub async fn add_notice_update(
+    org_id: &str,
+    notice_id: &str,
+    req: NoticeUpdateRequest,
+    owner: &str,
+) -> Result<(), anyhow::Error> {
+    if req.body.trim().is_empty() {
+        anyhow::bail!("validation: body is required");
+    }
+    if table::get_notice_by_id(org_id, notice_id).await?.is_none() {
+        anyhow::bail!("not found");
+    }
+    table::insert_notice_update(status_page_notice_updates::Model {
+        id: config::ider::generate(),
+        notice_id: notice_id.to_string(),
+        org_id: org_id.to_string(),
+        body: req.body,
+        owner: Some(owner.to_string()),
+        created_at: now_micros(),
+    })
+    .await?;
+    // A narrative update never changes impact/state, but it does change what
+    // the public snapshot's `notices[].updates` should show — refresh so it
+    // is not stuck behind the rebuilder's own tick either.
+    let component_ids = notice_component_ids(notice_id).await.unwrap_or_default();
+    refresh_affected_pages(org_id, &component_ids).await;
+    Ok(())
+}
+
+/// The 3am escape hatch: resolves an auto-incident, excludes it from the
+/// uptime math (reversible via a later `update_notice`), and snoozes the
+/// underlying check org-wide so the same flap does not immediately reopen it.
+pub async fn mark_false_positive(
+    org_id: &str,
+    notice_id: &str,
+    snooze_hours: i64,
+    actor: &str,
+) -> Result<(), anyhow::Error> {
+    let mut model = table::get_notice_by_id(org_id, notice_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("not found"))?;
+    let now = now_micros();
+    close_open_segment(&mut model, now);
+    model.state = 2;
+    model.resolved_at = Some(now);
+    model.excluded_from_uptime = true;
+    model.updated_at = now;
+    table::put_notice(&model).await?;
+    if let Some(check_id) = &model.auto_check_id {
+        table::upsert_check_snooze(
+            org_id,
+            check_id,
+            now + snooze_hours.max(1) * 3_600_000_000,
+            Some(actor),
+            now,
+        )
+        .await?;
+    }
+    emit_notice_upsert(org_id, "status_page_notices", &model).await;
+    let component_ids = notice_component_ids(notice_id).await.unwrap_or_default();
+    refresh_affected_pages(org_id, &component_ids).await;
+    Ok(())
+}
+
+pub async fn list_notice_updates(
+    org_id: &str,
+    notice_id: &str,
+) -> Result<Vec<config::meta::status_pages::NoticeUpdateView>, anyhow::Error> {
+    Ok(table::list_notice_updates(org_id, notice_id)
+        .await?
+        .into_iter()
+        .map(|u| config::meta::status_pages::NoticeUpdateView {
+            id: u.id,
+            body: u.body,
+            owner: u.owner,
+            created_at: u.created_at,
+        })
+        .collect())
+}
+
+/// Renders the exact bytes a visitor would see if the page were published
+/// right now, through the same serializer the public plane uses — preview
+/// cannot diverge from production output (design requirement).
+pub async fn preview(
+    org_id: &str,
+    page_id: &str,
+) -> Result<Option<PreviewResponse>, anyhow::Error> {
+    let Some((current, history)) =
+        openobserve_synthetics::status_pages::preview_snapshot(org_id, page_id).await?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(PreviewResponse { current, history }))
+}
 
 // ── Super-cluster emit (enterprise, gated on super_cluster.enabled) ──────────
 // Follows the synthetics idiom: cfg(enterprise) + super_cluster.enabled (NO
@@ -298,6 +582,47 @@ async fn emit_replace_components(
         {
             log::error!("[status_pages] super-cluster replace_components publish failed: {e}");
         }
+    }
+}
+
+async fn emit_notice_upsert(
+    _org_id: &str,
+    _table: &str,
+    _model: &infra::table::entity::status_page_notices::Model,
+) {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let json = match serde_json::to_string(_model) {
+            Ok(j) => j,
+            Err(e) => {
+                log::error!("[status_pages] emit_notice_upsert serialize: {e}");
+                return;
+            }
+        };
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::status_pages_upsert(
+            _org_id, _table, json,
+        )
+        .await
+        {
+            log::error!("[status_pages] super-cluster notice upsert publish failed: {e}");
+        }
+    }
+}
+
+async fn emit_notice_delete(_org_id: &str, _table: &str, _id: &str) {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::status_pages_delete(
+            _org_id, _table, _id,
+        )
+        .await
+    {
+        log::error!("[status_pages] super-cluster notice delete publish failed: {e}");
     }
 }
 
@@ -489,6 +814,95 @@ fn to_admin_view(
     }
 }
 
+fn to_notice_view(
+    m: infra::table::entity::status_page_notices::Model,
+    component_ids: Vec<String>,
+) -> NoticeAdminView {
+    NoticeAdminView {
+        id: m.id,
+        kind: m.kind,
+        impact: m.impact,
+        source: m.source,
+        title: m.title,
+        body: m.body,
+        state: m.state,
+        starts_at: m.starts_at,
+        resolved_at: m.resolved_at,
+        excluded_from_uptime: m.excluded_from_uptime,
+        component_ids,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+    }
+}
+
+/// A fresh notice's initial segment: open (`to: None`) once active, empty
+/// while merely scheduled — scheduled maintenance has not started accruing
+/// anything yet.
+fn segments_json(starts_at: i64, state: i32) -> String {
+    if state == 0 {
+        return "[]".to_string();
+    }
+    serde_json::to_string(&[config::meta::status_pages::Segment {
+        from: starts_at,
+        to: None,
+    }])
+    .unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Closes a notice's still-open segment at `at` — the manual-resolve
+/// counterpart of the rebuilder's own `Resolve` action.
+fn close_open_segment(model: &mut infra::table::entity::status_page_notices::Model, at: i64) {
+    let mut segments: Vec<config::meta::status_pages::Segment> =
+        serde_json::from_str(&model.segments).unwrap_or_default();
+    if let Some(open) = segments.iter_mut().find(|s| s.to.is_none()) {
+        open.to = Some(at);
+    }
+    model.segments = serde_json::to_string(&segments).unwrap_or_else(|_| "[]".to_string());
+}
+
+/// Recomputes and writes the cached snapshot for every page one of a
+/// notice's mapped components belongs to, right after a notice write — so
+/// the admin list's Health column and the public page reflect the change
+/// immediately instead of waiting for the rebuilder's next tick (up to
+/// `ZO_STATUS_PAGE_REBUILD_INTERVAL`, default 60s). Best-effort: a failure
+/// here is logged, not propagated — the write itself already succeeded, and
+/// the next scheduled tick would correct the cache regardless.
+async fn refresh_affected_pages(org_id: &str, component_ids: &[String]) {
+    if component_ids.is_empty() {
+        return;
+    }
+    let page_ids = match table::pages_for_components(org_id, component_ids).await {
+        Ok(ids) => ids,
+        Err(e) => {
+            log::error!("[status_pages] refresh_affected_pages: resolve pages failed: {e}");
+            return;
+        }
+    };
+    for page_id in page_ids {
+        if let Err(e) =
+            openobserve_synthetics::status_pages::refresh_snapshot(org_id, &page_id).await
+        {
+            log::error!("[status_pages] refresh_affected_pages: refresh {page_id} failed: {e}");
+        }
+    }
+}
+
+/// A notice's current mapped component ids — needed by write paths
+/// (delete/mark_false_positive/add_notice_update) that only receive the
+/// notice id, to resolve which pages' caches to refresh.
+async fn notice_component_ids(notice_id: &str) -> Result<Vec<String>, anyhow::Error> {
+    let conn = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    Ok(
+        table::list_notice_components(conn, &[notice_id.to_string()])
+            .await?
+            .into_iter()
+            .map(|j| j.component_id)
+            .collect(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -529,6 +943,63 @@ mod tests {
         let b = pw_version("$argon2id$v=19$...bbb");
         assert_ne!(a, b);
         assert_eq!(a, pw_version("$argon2id$v=19$...aaa")); // stable
+    }
+
+    #[test]
+    fn segments_json_is_empty_for_scheduled_maintenance() {
+        assert_eq!(segments_json(1_000, 0), "[]");
+    }
+
+    #[test]
+    fn segments_json_opens_a_segment_for_active_notices() {
+        let json = segments_json(1_000, 1);
+        let segs: Vec<config::meta::status_pages::Segment> = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            segs,
+            vec![config::meta::status_pages::Segment {
+                from: 1_000,
+                to: None
+            }]
+        );
+    }
+
+    #[test]
+    fn close_open_segment_closes_only_the_open_one() {
+        let mut model = infra::table::entity::status_page_notices::Model {
+            id: "n1".into(),
+            org_id: "org1".into(),
+            kind: 0,
+            impact: 2,
+            source: 0,
+            title: "t".into(),
+            body: "b".into(),
+            state: 1,
+            starts_at: 0,
+            resolved_at: None,
+            segments: serde_json::to_string(&[
+                config::meta::status_pages::Segment {
+                    from: 0,
+                    to: Some(100),
+                },
+                config::meta::status_pages::Segment {
+                    from: 200,
+                    to: None,
+                },
+            ])
+            .unwrap(),
+            excluded_from_uptime: false,
+            deleted_at: None,
+            auto_check_id: None,
+            auto_recovery_streak: 0,
+            owner: None,
+            created_at: 0,
+            updated_at: 0,
+        };
+        close_open_segment(&mut model, 300);
+        let segs: Vec<config::meta::status_pages::Segment> =
+            serde_json::from_str(&model.segments).unwrap();
+        assert_eq!(segs[0].to, Some(100));
+        assert_eq!(segs[1].to, Some(300));
     }
 
     #[test]

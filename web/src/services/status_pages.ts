@@ -58,6 +58,56 @@ export interface StatusPageComponent {
   check_ids: string[];
 }
 
+// kind: 0 incident, 1 maintenance, 2 info. impact: 0 none, 1 degraded, 2 partial_outage, 3 major_outage.
+export interface CreateNoticePayload {
+  kind: 0 | 1 | 2;
+  impact: 0 | 1 | 2 | 3;
+  title: string;
+  body: string;
+  component_ids?: string[];
+  starts_at?: number;
+}
+
+export interface UpdateNoticePayload {
+  impact?: 0 | 1 | 2 | 3;
+  title?: string;
+  body?: string;
+  component_ids?: string[];
+  state?: 0 | 1 | 2;
+}
+
+export interface StatusPageNotice {
+  id: string;
+  kind: 0 | 1 | 2;
+  impact: 0 | 1 | 2 | 3;
+  source: 0 | 1;
+  title: string;
+  body: string;
+  state: 0 | 1 | 2;
+  starts_at: number;
+  resolved_at: number | null;
+  excluded_from_uptime: boolean;
+  component_ids: string[];
+  created_at: number;
+  updated_at: number;
+}
+
+export interface StatusPageNoticeUpdate {
+  id: string;
+  body: string;
+  owner: string | null;
+  created_at: number;
+}
+
+// The subset of the preview response the acting-user optimistic-refresh
+// needs — just enough to patch the list row's health without waiting for
+// the rebuilder's next tick to overwrite the cached snapshot it reads from.
+export interface PreviewResponse {
+  current: {
+    overall: Exclude<StatusPageHealth, null>;
+  };
+}
+
 const statusPagesService = {
   list: (orgIdentifier: string) => http().get(`/api/${orgIdentifier}/status_pages`),
 
@@ -79,6 +129,34 @@ const statusPagesService = {
 
   rotateSlug: (orgIdentifier: string, id: string) =>
     http().post(`/api/${orgIdentifier}/status_pages/${id}/rotate_slug`, {}),
+
+  preview: (orgIdentifier: string, id: string) =>
+    http().get(`/api/${orgIdentifier}/status_pages/${id}/preview`),
+
+  listNotices: (orgIdentifier: string, id: string) =>
+    http().get(`/api/${orgIdentifier}/status_pages/${id}/notices`),
+
+  createNotice: (orgIdentifier: string, id: string, payload: CreateNoticePayload) =>
+    http().post(`/api/${orgIdentifier}/status_pages/${id}/notices`, payload),
+
+  deleteNotice: (orgIdentifier: string, noticeId: string) =>
+    http().delete(`/api/${orgIdentifier}/status_pages/notices/${noticeId}`),
+
+  listNoticeUpdates: (orgIdentifier: string, noticeId: string) =>
+    http().get(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/updates`),
+
+  markFalsePositive: (orgIdentifier: string, noticeId: string, snoozeHours = 6) =>
+    http().post(
+      `/api/${orgIdentifier}/status_pages/notices/${noticeId}/mark_false_positive`,
+      { snooze_hours: snoozeHours },
+    ),
+
+  // Widens impact (never narrows it — see UpdateNoticePayload) on the existing incident.
+  updateNotice: (orgIdentifier: string, noticeId: string, payload: UpdateNoticePayload) =>
+    http().put(`/api/${orgIdentifier}/status_pages/notices/${noticeId}`, payload),
+
+  addNoticeUpdate: (orgIdentifier: string, noticeId: string, body: string) =>
+    http().post(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/updates`, { body }),
 };
 
 export default statusPagesService;

@@ -122,6 +122,7 @@ version-compare.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+openobserve-synthetics.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 futures-util.workspace = true

@@ -35,7 +35,7 @@
   body { margin:0; background:var(--bg); color:var(--ink);
          font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
          -webkit-font-smoothing:antialiased; }
-  main { max-width:46rem; margin:0 auto; padding:2.5rem 1rem 3rem; }
+  main { max-width:64rem; margin:0 auto; padding:2.5rem 1rem 3rem; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
   .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0;
              clip:rect(0 0 0 0); clip-path:inset(50%); overflow:hidden; white-space:nowrap; }
@@ -74,6 +74,10 @@
   .notice h3 { margin:.25rem 0 .2rem; font-size:1rem; }
   .notice .body { margin:0; font-size:.88rem; color:var(--ink2); white-space:pre-line; }
   .notice .meta { margin:.45rem 0 0; font-size:.78rem; color:var(--ink2); }
+  .notice .updates { list-style:none; margin:.6rem 0 0; padding:.6rem 0 0 0;
+    border-top:1px solid var(--line); display:flex; flex-direction:column; gap:.5rem; }
+  .notice .updates li .body { white-space:pre-line; }
+  .notice .updates li .meta { margin:.15rem 0 0; }
 
   h2.sect { font-size:.95rem; margin:1.8rem 0 .6rem; letter-spacing:.01em; }
   .legend { list-style:none; display:flex; flex-wrap:wrap; gap:.35rem 1rem; margin:0 0 .8rem;
@@ -316,6 +320,17 @@
     document.getElementById("page-name").textContent = "Status";
   }
 
+  function updatesList(updates) {
+    var ul = el("ul", "updates");
+    (updates || []).slice().reverse().forEach(function (u) {
+      var li = el("li");
+      li.appendChild(el("p", "body", u.body));
+      li.appendChild(el("p", "meta", fmtTime(u.at)));
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+
   function noticeCard(n) {
     var k = KIND[n.kind] || KIND.info;
     var box = el("article", "notice t-" + k.tone);
@@ -329,6 +344,7 @@
       ? "Scheduled for " + fmtTime(n.starts_at)
       : "Started " + fmtTime(n.starts_at);
     if (n.starts_at) box.appendChild(el("p", "meta", when));
+    if (n.updates && n.updates.length) box.appendChild(updatesList(n.updates));
     return box;
   }
 
@@ -362,6 +378,7 @@
       if (n.resolved_at) meta.push("Resolved " + fmtTime(n.resolved_at));
       if (n.excluded_from_uptime) meta.push("Excluded from uptime");
       if (meta.length) item.appendChild(el("p", "meta", meta.join(" · ")));
+      if (n.updates && n.updates.length) item.appendChild(updatesList(n.updates));
       det.appendChild(item);
     });
     phost.appendChild(det);

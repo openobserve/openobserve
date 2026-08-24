@@ -14240,6 +14240,51 @@
       "noChecks": "No checks available",
       "remove": "Remove component"
     },
+    "postUpdate": {
+      "action": "Post update",
+      "title": "Post update — {name}",
+      "impact": "Impact",
+      "impactDegraded": "Degraded",
+      "impactPartial": "Partial outage",
+      "impactMajor": "Major outage",
+      "affectedComponents": "Affected components",
+      "noComponents": "This page has no components yet.",
+      "openIncidentHint": "An incident is already active on this page:",
+      "mode": "Update type",
+      "modeAttach": "Add to existing incident",
+      "modeNew": "Post as new incident",
+      "escalate": "Escalate impact",
+      "escalateNone": "No change",
+      "titleLabel": "Title",
+      "titlePlaceholder": "e.g. Elevated API errors in US region",
+      "message": "Message",
+      "messagePlaceholder": "Plain text — what visitors should know",
+      "post": "Post",
+      "posting": "Posting update...",
+      "posted": "Update posted",
+      "postFailed": "Failed to post update",
+      "validation": {
+        "componentsRequired": "Select at least one affected component",
+        "titleRequired": "Title is required",
+        "messageRequired": "Message is required"
+      }
+    },
+    "notices": {
+      "action": "View updates",
+      "title": "Updates — {name}",
+      "empty": "No updates posted yet.",
+      "loadFailed": "Failed to load updates",
+      "deleteTitle": "Remove this update?",
+      "deleteBody": "\"{title}\" will no longer appear on the public page.",
+      "deleting": "Removing update...",
+      "deleted": "Update removed",
+      "deleteFailed": "Failed to remove update",
+      "state": {
+        "scheduled": "Scheduled",
+        "active": "Active",
+        "resolved": "Resolved"
+      }
+    },
     "preview": {
       "title": "Live preview",
       "subtitle": "How your public page looks as you edit",

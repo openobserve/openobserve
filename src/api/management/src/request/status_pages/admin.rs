@@ -27,7 +27,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::meta::status_pages::{CreatePageRequest, SetComponentsRequest, UpdatePageRequest};
+use config::meta::status_pages::{
+    CreateNoticeRequest, CreatePageRequest, MarkFalsePositiveRequest, NoticeUpdateRequest,
+    SetComponentsRequest, UpdateNoticeRequest, UpdatePageRequest,
+};
 use openobserve_api_common::extractors::Headers;
 
 use crate::service::auth::UserEmail;
@@ -151,6 +154,116 @@ pub async fn set_components(
             MetaHttpResponse::ok("updated")
         }
         Err(e) => map_err("set_components", e),
+    }
+}
+
+/// Runs the exact serializer the public plane uses, so an admin previewing a
+/// draft page sees precisely what publishing would produce.
+pub async fn preview(Path((org_id, id)): Path<(String, String)>) -> Response {
+    match openobserve_core::status_pages::preview(&org_id, &id).await {
+        Ok(Some(resp)) => MetaHttpResponse::json(resp),
+        Ok(None) => MetaHttpResponse::not_found("not found"),
+        Err(e) => map_err("preview", e),
+    }
+}
+
+/// Notices touching the given page's components — a filtered view over the
+/// org-scoped notice set (design: "a per-page convenience view").
+pub async fn list_page_notices(Path((org_id, id)): Path<(String, String)>) -> Response {
+    match openobserve_core::status_pages::list_notices_for_page(&org_id, &id).await {
+        Ok(notices) => MetaHttpResponse::json(notices),
+        Err(e) => map_err("list_page_notices", e),
+    }
+}
+
+/// `component_ids` in the body may span any page the caller has permission
+/// on; omitting it defaults to every component on the page in the path, the
+/// common "post an update for this page" case.
+pub async fn create_notice(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<CreateNoticeRequest>,
+) -> Response {
+    match openobserve_core::status_pages::create_notice(&org_id, &id, body, &user.user_id).await {
+        Ok(notice) => {
+            audit(&org_id, &user.user_id, "create_notice", Some(&notice.id)).await;
+            MetaHttpResponse::json(notice)
+        }
+        Err(e) => map_err("create_notice", e),
+    }
+}
+
+pub async fn update_notice(
+    Path((org_id, nid)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<UpdateNoticeRequest>,
+) -> Response {
+    match openobserve_core::status_pages::update_notice(&org_id, &nid, body).await {
+        Ok(notice) => {
+            audit(&org_id, &user.user_id, "update_notice", Some(&nid)).await;
+            MetaHttpResponse::json(notice)
+        }
+        Err(e) => map_err("update_notice", e),
+    }
+}
+
+pub async fn delete_notice(
+    Path((org_id, nid)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::status_pages::delete_notice(&org_id, &nid).await {
+        Ok(true) => {
+            audit(&org_id, &user.user_id, "delete_notice", Some(&nid)).await;
+            MetaHttpResponse::ok("deleted")
+        }
+        Ok(false) => MetaHttpResponse::not_found("not found"),
+        Err(e) => map_err("delete_notice", e),
+    }
+}
+
+pub async fn list_notice_updates(Path((org_id, nid)): Path<(String, String)>) -> Response {
+    match openobserve_core::status_pages::list_notice_updates(&org_id, &nid).await {
+        Ok(updates) => MetaHttpResponse::json(updates),
+        Err(e) => map_err("list_notice_updates", e),
+    }
+}
+
+pub async fn add_notice_update(
+    Path((org_id, nid)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<NoticeUpdateRequest>,
+) -> Response {
+    match openobserve_core::status_pages::add_notice_update(&org_id, &nid, body, &user.user_id)
+        .await
+    {
+        Ok(()) => {
+            audit(&org_id, &user.user_id, "notice_update", Some(&nid)).await;
+            MetaHttpResponse::ok("posted")
+        }
+        Err(e) => map_err("add_notice_update", e),
+    }
+}
+
+/// The 3am escape hatch: resolves a false-positive auto-incident and snoozes
+/// the underlying check so it does not immediately reopen.
+pub async fn mark_false_positive(
+    Path((org_id, nid)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<MarkFalsePositiveRequest>,
+) -> Response {
+    match openobserve_core::status_pages::mark_false_positive(
+        &org_id,
+        &nid,
+        body.snooze_hours,
+        &user.user_id,
+    )
+    .await
+    {
+        Ok(()) => {
+            audit(&org_id, &user.user_id, "mark_false_positive", Some(&nid)).await;
+            MetaHttpResponse::ok("marked")
+        }
+        Err(e) => map_err("mark_false_positive", e),
     }
 }
 

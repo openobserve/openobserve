@@ -1486,6 +1486,29 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/status_pages/{id}/rotate_slug",
                     post(status_pages::admin::rotate_slug),
+                )
+                .route(
+                    "/{org_id}/status_pages/{id}/preview",
+                    get(status_pages::admin::preview),
+                )
+                .route(
+                    "/{org_id}/status_pages/{id}/notices",
+                    get(status_pages::admin::list_page_notices)
+                        .post(status_pages::admin::create_notice),
+                )
+                .route(
+                    "/{org_id}/status_pages/notices/{nid}",
+                    put(status_pages::admin::update_notice)
+                        .delete(status_pages::admin::delete_notice),
+                )
+                .route(
+                    "/{org_id}/status_pages/notices/{nid}/updates",
+                    get(status_pages::admin::list_notice_updates)
+                        .post(status_pages::admin::add_notice_update),
+                )
+                .route(
+                    "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
+                    post(status_pages::admin::mark_false_positive),
                 );
         }
 

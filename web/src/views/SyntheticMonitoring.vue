@@ -247,6 +247,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @new-page="showCreateStatusPage = true"
         @edit="openStatusPageEdit"
         @delete="confirmDeleteStatusPage"
+        @post-update="openPostUpdate"
+        @view-updates="openNoticeHistory"
       />
     </div>
 
@@ -375,6 +377,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @created="onStatusPageCreated"
     />
 
+    <!-- Post update -->
+    <PostUpdateDialog
+      v-if="statusPagesEnabled && postUpdatePage"
+      v-model:open="showPostUpdate"
+      :org-identifier="orgIdentifier"
+      :page-id="postUpdatePage.id"
+      :page-name="postUpdatePage.name"
+      :components="postUpdateComponents"
+      @posted="refreshPageHealth(postUpdatePage.id)"
+    />
+
+    <!-- Notice history -->
+    <NoticeHistoryDialog
+      v-if="statusPagesEnabled && noticeHistoryPage"
+      v-model:open="showNoticeHistory"
+      :org-identifier="orgIdentifier"
+      :page-id="noticeHistoryPage.id"
+      :page-name="noticeHistoryPage.name"
+      @deleted="refreshPageHealth(noticeHistoryPage.id)"
+    />
+
   </OPageLayout>
 </template>
 
@@ -396,8 +419,11 @@ import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
 import PrivateLocations from "@/views/synthetics/PrivateLocations.vue";
 import StatusPagesList from "@/views/synthetics/status-pages/StatusPagesList.vue";
 import CreateStatusPageDialog from "@/views/synthetics/status-pages/CreateStatusPageDialog.vue";
+import PostUpdateDialog from "@/views/synthetics/status-pages/PostUpdateDialog.vue";
+import NoticeHistoryDialog from "@/views/synthetics/status-pages/NoticeHistoryDialog.vue";
 import statusPagesService, {
   type StatusPageListItem,
+  type PreviewResponse,
 } from "@/services/status_pages";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
@@ -870,6 +896,28 @@ async function loadStatusPages() {
   }
 }
 
+// Patches one row's Health chip from a fresh, on-demand compute — the same
+// path `preview` uses, not the rebuilder's cached snapshot. The list's
+// `health` column otherwise only catches up on the rebuilder's own cadence
+// (up to ZO_STATUS_PAGE_REBUILD_INTERVAL, default 60s), which reads as "my
+// delete/post didn't do anything" to whoever just acted. Called right after
+// a notice mutation (so the actor sees the true state immediately) and when
+// a page's notices are loaded (so opening its history syncs a stale row).
+async function refreshPageHealth(pageId: string) {
+  if (!orgIdentifier.value) return;
+  try {
+    const res = await statusPagesService.preview(orgIdentifier.value, pageId);
+    const overall = (res.data as PreviewResponse).current?.overall;
+    if (!overall) return;
+    const page = statusPages.value.find((p) => p.id === pageId);
+    if (page && page.health !== overall) page.health = overall;
+  } catch (err) {
+    // Best-effort: the row just keeps showing its last-known (possibly
+    // stale) health rather than blocking on this.
+    console.error(`[status-pages] failed to refresh health for ${pageId}`, err);
+  }
+}
+
 const openStatusPageEdit = (page: StatusPageListItem) => {
   router.push(statusPageEditRoute({ orgIdentifier: orgIdentifier.value }, page.id));
 };
@@ -877,6 +925,34 @@ const openStatusPageEdit = (page: StatusPageListItem) => {
 const onStatusPageCreated = async (page: StatusPageListItem) => {
   // Drop straight into the full-page editor on the freshly created page.
   openStatusPageEdit(page);
+};
+
+const showPostUpdate = ref(false);
+const postUpdatePage = ref<StatusPageListItem | null>(null);
+const postUpdateComponents = ref<{ id: string; name: string }[]>([]);
+
+const openPostUpdate = async (page: StatusPageListItem) => {
+  postUpdatePage.value = page;
+  postUpdateComponents.value = [];
+  showPostUpdate.value = true;
+  try {
+    const res = await statusPagesService.get(orgIdentifier.value, page.id);
+    postUpdateComponents.value = ((res.data as any).components ?? []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+    }));
+  } catch (err) {
+    console.error("[status-pages] failed to load components for post-update", err);
+  }
+};
+
+const showNoticeHistory = ref(false);
+const noticeHistoryPage = ref<StatusPageListItem | null>(null);
+
+const openNoticeHistory = (page: StatusPageListItem) => {
+  noticeHistoryPage.value = page;
+  showNoticeHistory.value = true;
+  refreshPageHealth(page.id);
 };
 
 const confirmDeleteStatusPage = async (page: StatusPageListItem) => {

@@ -278,9 +278,61 @@ pub struct CreateNoticeRequest {
     pub starts_at: Option<i64>,
 }
 
+/// Partial edit of a manual notice. `state`/`resolved_at` are the manual
+/// resolve path; auto-incidents are otherwise owned by the rebuilder and this
+/// must not race it (the handler rejects editing state on an auto-sourced
+/// notice — see R-4 in the design).
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct UpdateNoticeRequest {
+    pub impact: Option<i32>,
+    pub title: Option<String>,
+    pub body: Option<String>,
+    #[serde(default)]
+    pub component_ids: Option<Vec<String>>,
+    /// 0 scheduled, 1 active, 2 resolved.
+    pub state: Option<i32>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct NoticeUpdateRequest {
     pub body: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MarkFalsePositiveRequest {
+    /// Hours to snooze the underlying check org-wide (default 6, per mockup
+    /// B1's "snooze 6h").
+    #[serde(default = "default_snooze_hours")]
+    pub snooze_hours: i64,
+}
+
+/// Admin view of a notice: unlike [`PublicNotice`], this carries the internal
+/// id and mapped component ids the edit UI needs to round-trip — it must
+/// never be reachable from the public plane.
+#[derive(Debug, Clone, Serialize)]
+pub struct NoticeAdminView {
+    pub id: String,
+    pub kind: i32,
+    pub impact: i32,
+    /// 0 auto, 1 manual.
+    pub source: i32,
+    pub title: String,
+    pub body: String,
+    pub state: i32,
+    pub starts_at: i64,
+    pub resolved_at: Option<i64>,
+    pub excluded_from_uptime: bool,
+    pub component_ids: Vec<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NoticeUpdateView {
+    pub id: String,
+    pub body: String,
+    pub owner: Option<String>,
+    pub created_at: i64,
 }
 
 // ── Snapshot types: the ONLY shapes the public plane ever serializes ─────────
@@ -299,6 +351,15 @@ pub struct PublicNotice {
     pub starts_at: i64,
     pub resolved_at: Option<i64>,
     pub excluded_from_uptime: bool,
+    /// The "investigating / mitigated / resolved" narrative timeline, oldest
+    /// first. No internal update id — same IDOR reasoning as the notice.
+    pub updates: Vec<PublicNoticeUpdate>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct PublicNoticeUpdate {
+    pub body: String,
+    pub at: i64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -351,6 +412,19 @@ pub struct HistoryComponent {
 pub struct SnapshotHistory {
     pub generated_at: i64,
     pub components: Vec<HistoryComponent>,
+}
+
+/// The admin preview response: both snapshot halves through the exact same
+/// serializer the public plane uses, so preview cannot diverge from what
+/// visitors will see once published.
+#[derive(Clone, Debug, Serialize)]
+pub struct PreviewResponse {
+    pub current: SnapshotCurrent,
+    pub history: SnapshotHistory,
+}
+
+fn default_snooze_hours() -> i64 {
+    6
 }
 
 impl Default for Thresholds {
@@ -907,6 +981,10 @@ mod tests {
                 starts_at: 1,
                 resolved_at: None,
                 excluded_from_uptime: false,
+                updates: vec![PublicNoticeUpdate {
+                    body: "Mitigation deployed".into(),
+                    at: 2,
+                }],
             }],
         };
         let history = SnapshotHistory {

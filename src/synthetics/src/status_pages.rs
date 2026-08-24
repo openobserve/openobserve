@@ -45,6 +45,107 @@ struct TickData {
     notices: Vec<status_page_notices::Model>,
 }
 
+/// Renders one page's snapshot on demand, through the exact same serializer
+/// the rebuilder writes — the design's requirement that admin preview cannot
+/// diverge from what gets published. Unlike the tick loop this does not touch
+/// check state or the auto-incident engine: it renders whatever notices are
+/// already committed, which is what a human previewing "what would visitors
+/// see right now" wants.
+pub async fn preview_snapshot(
+    org_id: &str,
+    page_id: &str,
+) -> Result<Option<(engine::SnapshotCurrent, engine::SnapshotHistory)>, infra::errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(page) = table::get_page_by_id(org_id, page_id).await? else {
+        return Ok(None);
+    };
+    let now = config::utils::time::now_micros();
+    let page_ids = [page.id.clone()];
+    let components = table::list_components(conn, &page_ids).await?;
+    let component_ids: Vec<String> = components.iter().map(|c| c.id.clone()).collect();
+    let mappings = table::list_component_checks(conn, &component_ids).await?;
+    let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
+    let notice_ids: Vec<String> = notices.iter().map(|n| n.id.clone()).collect();
+    let notice_components = table::list_notice_components(conn, &notice_ids).await?;
+    let notice_updates = table::list_notice_updates_for(conn, &notice_ids).await?;
+
+    let mut notices_by_component: HashMap<&str, Vec<&status_page_notices::Model>> = HashMap::new();
+    let by_id: HashMap<&str, &status_page_notices::Model> =
+        notices.iter().map(|n| (n.id.as_str(), n)).collect();
+    for join in &notice_components {
+        if let Some(n) = by_id.get(join.notice_id.as_str()) {
+            notices_by_component
+                .entry(join.component_id.as_str())
+                .or_default()
+                .push(n);
+        }
+    }
+    let mut updates_by_notice: HashMap<
+        &str,
+        Vec<&infra::table::entity::status_page_notice_updates::Model>,
+    > = HashMap::new();
+    for u in &notice_updates {
+        updates_by_notice
+            .entry(u.notice_id.as_str())
+            .or_default()
+            .push(u);
+    }
+
+    let data = TickData {
+        pages: vec![page.clone()],
+        components,
+        mappings,
+        states: Vec::new(),
+        snoozed: HashSet::new(),
+        notices: notices.clone(),
+    };
+    let (current, history, page_notice_ids) =
+        build_page_snapshot(&page, &data, &notices_by_component, now);
+    let notices_json: Vec<engine::PublicNotice> = page_notice_ids
+        .iter()
+        .filter_map(|id| by_id.get(id.as_str()))
+        .map(|n| {
+            public_notice(
+                n,
+                updates_by_notice.get(n.id.as_str()).map_or(&[][..], |v| v),
+            )
+        })
+        .collect();
+    Ok(Some((
+        engine::SnapshotCurrent {
+            notices: notices_json,
+            ..current
+        },
+        history,
+    )))
+}
+
+/// Recomputes one page's snapshot and writes it straight into
+/// `status_page_snapshots`, out of band from the rebuilder's own cadence —
+/// the admin notice-mutation endpoints call this so the actor's change (and
+/// everyone else's next read of the cache: other admins' list rows, the
+/// public page) is correct immediately, not only after the next tick (up to
+/// `ZO_STATUS_PAGE_REBUILD_INTERVAL`, default 60s). Best-effort by design:
+/// callers log and swallow the error rather than fail the mutation over a
+/// cache-refresh hiccup — the next scheduled tick would fix it regardless.
+pub async fn refresh_snapshot(org_id: &str, page_id: &str) -> Result<(), infra::errors::Error> {
+    let Some((current, history)) = preview_snapshot(org_id, page_id).await? else {
+        return Ok(());
+    };
+    let current_json = serde_json::to_string(&current).unwrap_or_default();
+    let history_json = serde_json::to_string(&history).unwrap_or_default();
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    table::upsert_snapshot(
+        conn,
+        page_id,
+        org_id,
+        Some(history_json.as_str()),
+        Some(current_json.as_str()),
+        config::utils::time::now_micros(),
+    )
+    .await
+}
+
 pub async fn run() {
     let interval = config::get_config()
         .synthetics
@@ -103,12 +204,19 @@ async fn tick(
     // Re-read notices only if actions changed them; a second bounded read per
     // tick is cheaper than tracking per-action deltas in the POC.
     let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
-    let notice_components = table::list_notice_components(
+    let notice_ids: Vec<String> = notices.iter().map(|n| n.id.clone()).collect();
+    let notice_components = table::list_notice_components(conn, &notice_ids).await?;
+    let notice_updates = table::list_notice_updates_for(conn, &notice_ids).await?;
+    write_snapshots(
         conn,
-        &notices.iter().map(|n| n.id.clone()).collect::<Vec<_>>(),
+        &data,
+        &notices,
+        &notice_components,
+        &notice_updates,
+        hashes,
+        now,
     )
-    .await?;
-    write_snapshots(conn, &data, &notices, &notice_components, hashes, now).await
+    .await
 }
 
 async fn load(
@@ -355,6 +463,7 @@ async fn write_snapshots(
     data: &TickData,
     notices: &[status_page_notices::Model],
     notice_components: &[infra::table::entity::status_page_notice_components::Model],
+    notice_updates: &[infra::table::entity::status_page_notice_updates::Model],
     hashes: &mut SnapshotHashes,
     now: i64,
 ) -> Result<(), infra::errors::Error> {
@@ -369,6 +478,16 @@ async fn write_snapshots(
                 .push(n);
         }
     }
+    let mut updates_by_notice: HashMap<
+        &str,
+        Vec<&infra::table::entity::status_page_notice_updates::Model>,
+    > = HashMap::new();
+    for u in notice_updates {
+        updates_by_notice
+            .entry(u.notice_id.as_str())
+            .or_default()
+            .push(u);
+    }
 
     for page in &data.pages {
         let (current, history, page_notice_ids) =
@@ -376,7 +495,12 @@ async fn write_snapshots(
         let notices_json: Vec<engine::PublicNotice> = page_notice_ids
             .iter()
             .filter_map(|id| by_id.get(id.as_str()))
-            .map(|n| public_notice(n))
+            .map(|n| {
+                public_notice(
+                    n,
+                    updates_by_notice.get(n.id.as_str()).map_or(&[][..], |v| v),
+                )
+            })
             .collect();
         let current = engine::SnapshotCurrent {
             notices: notices_json,
@@ -495,7 +619,10 @@ fn build_page_snapshot(
     (current, history, page_notice_ids.into_iter().collect())
 }
 
-fn public_notice(n: &status_page_notices::Model) -> engine::PublicNotice {
+fn public_notice(
+    n: &status_page_notices::Model,
+    updates: &[&infra::table::entity::status_page_notice_updates::Model],
+) -> engine::PublicNotice {
     engine::PublicNotice {
         kind: engine::NoticeKind::from_i16(n.kind as i16),
         impact: engine::Impact::from_i16(n.impact as i16),
@@ -505,6 +632,13 @@ fn public_notice(n: &status_page_notices::Model) -> engine::PublicNotice {
         starts_at: n.starts_at,
         resolved_at: n.resolved_at,
         excluded_from_uptime: n.excluded_from_uptime,
+        updates: updates
+            .iter()
+            .map(|u| engine::PublicNoticeUpdate {
+                body: u.body.clone(),
+                at: u.created_at,
+            })
+            .collect(),
     }
 }
 
