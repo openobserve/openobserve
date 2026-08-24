@@ -71,7 +71,7 @@ async fn connect_to_orm_ro() -> DatabaseConnection {
 async fn connect_to_orm_rw() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::PostgreSQL => {
-            SqlxPostgresConnector::from_sqlx_postgres_pool(postgres::CLIENT.clone())
+            SqlxPostgresConnector::from_sqlx_postgres_pool(postgres::CLIENT_RW.clone())
         }
         _ => SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW.clone()),
     }
