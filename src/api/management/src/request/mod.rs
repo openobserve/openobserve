@@ -32,6 +32,7 @@ pub mod cloud;
 pub mod dashboards;
 #[cfg(feature = "enterprise")]
 pub mod datasets;
+pub mod db_monitoring;
 #[cfg(feature = "enterprise")]
 pub mod discovery;
 #[cfg(feature = "enterprise")]

@@ -700,6 +700,40 @@ describe("getEndPoint", () => {
 
     expect(result.port).toBe("80");
   });
+
+  // A same-origin deployment sets the endpoint to a RELATIVE value. "/" becomes
+  // "" once the store strips its trailing slash, and `new URL("")` throws —
+  // which, since this runs in the setup() of every ingestion card, took the
+  // whole Data Sources page down rather than degrading one field.
+  it("resolves an empty endpoint against the page origin instead of throwing", () => {
+    // Pinned rather than read back off `window.location`: setLocation() above
+    // replaces it with a partial stub that has no `hostname`.
+    setLocation("http://o2.example.com:5190", "/web/");
+
+    expect(() => getEndPoint("")).not.toThrow();
+
+    const result = getEndPoint("");
+    expect(result.host).toBe("o2.example.com");
+    expect(result.port).toBe("5190");
+    expect(result.protocol).toBe("http");
+    // Empty in means the caller has no string of its own to preserve, so the
+    // snippets get a usable absolute origin rather than "undefined/api/...".
+    expect(result.url).toBe("http://o2.example.com:5190");
+  });
+
+  it("resolves a relative endpoint against the page origin", () => {
+    setLocation("http://o2.example.com:5190", "/web/");
+
+    const result = getEndPoint("/");
+
+    expect(result.host).toBe("o2.example.com");
+    // The caller's own string is preserved — snippets embed it verbatim.
+    expect(result.url).toBe("/");
+  });
+
+  it("falls back to the origin rather than throwing on a malformed URL", () => {
+    expect(() => getEndPoint("ht!tp://[not a url")).not.toThrow();
+  });
 });
 
 // ---------------------------------------------------------------------------

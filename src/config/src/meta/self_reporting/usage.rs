@@ -75,6 +75,26 @@ pub fn is_reserved_internal_stream(stream_name: &str) -> bool {
     RESERVED_INTERNAL_STREAMS.contains(&stream_name)
 }
 
+/// Returns true if `stream_name` is an internal rollup stream written only by
+/// OpenObserve's own aggregation jobs — the `_o2_` family (`_o2_service_graph`,
+/// `_o2_db_stats`, future `_o2_dep_stats` siblings) plus the pre-prefix-era
+/// `_agent_signals`. User ingestion into these would poison what the topology,
+/// agent-signals, and Database Monitoring APIs serve, so user-initiated writes
+/// are rejected in ALL editions; the platform's own writers are exempt (they
+/// arrive through the internal gRPC channel as a `SystemJob` user and/or with
+/// `is_derived` set — see the guard in `openobserve_core::logs::ingest`).
+///
+/// Mechanism decision (design §5.3): this is deliberately a PREFIX guard, not
+/// an extension of the named [`RESERVED_INTERNAL_STREAMS`] list. The `_o2_`
+/// family grows with every new rollup job, and a forgotten list entry would
+/// silently reopen the tamper hole; the named list keeps meaning what its name
+/// says (self-reporting + SLO streams, cloud-gated) while this predicate owns
+/// the rollup-stream namespace, un-gated. The two are documented here so they
+/// don't read as half-overlapping accidents.
+pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
+    stream_name.starts_with("_o2_") || stream_name == "_agent_signals"
+}
+
 /// Outcome of a single scheduled evaluation — "did it fire?".
 ///
 /// Part III of `alerts.md`. Replaces the former `TriggerDataStatus`, whose
@@ -1465,6 +1485,25 @@ mod tests {
         assert!(!is_reserved_self_reporting_stream("usage_production"));
         assert!(!is_reserved_self_reporting_stream("_usage"));
         assert!(!is_reserved_self_reporting_stream(""));
+    }
+
+    #[test]
+    fn test_is_internal_rollup_stream() {
+        // The whole _o2_ prefix family — existing rollup streams and any
+        // future sibling — plus the pre-prefix-era _agent_signals.
+        assert!(is_internal_rollup_stream("_o2_service_graph"));
+        assert!(is_internal_rollup_stream("_o2_db_stats"));
+        assert!(is_internal_rollup_stream("_o2_dep_stats"));
+        assert!(is_internal_rollup_stream("_agent_signals"));
+
+        // Ordinary user streams are not — including underscore-prefixed names
+        // that don't use the internal prefix, and near-misses.
+        assert!(!is_internal_rollup_stream("default"));
+        assert!(!is_internal_rollup_stream("o2_stuff"));
+        assert!(!is_internal_rollup_stream("_other"));
+        assert!(!is_internal_rollup_stream("_o2"));
+        assert!(!is_internal_rollup_stream("_agent_signals_backup"));
+        assert!(!is_internal_rollup_stream(""));
     }
 
     #[test]

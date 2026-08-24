@@ -37,10 +37,18 @@ vi.mock("@/aws-exports", () => ({
 // ---------------------------------------------------------------------------
 // Utility mocks
 // ---------------------------------------------------------------------------
+// `router.ts` imports the store singleton (the Database Monitoring gate reads
+// `zoConfig` outside a component, where `useStore()` cannot reach), and
+// `stores/index.ts` calls these at module scope to seed its initial state. A
+// mock missing them throws on import and takes the whole suite down with it,
+// so every export the store touches is stubbed here.
 vi.mock("@/utils/zincutils", () => ({
   routeGuard: vi.fn((to: any, from: any, next: any) => next()),
   useLocalUserInfo: vi.fn(),
   useLocalCurrentUser: vi.fn(),
+  // The three `stores/index.ts` calls at module scope to seed its state.
+  useLocalOrganization: vi.fn(),
+  useLocalTimezone: vi.fn(),
   invalidateLoginData: vi.fn(),
 }));
 
@@ -733,6 +741,65 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       expect(findRoute(homeChildRoutes, "serviceGraph")).toBeUndefined();
       expect(findRoute(homeChildRoutes, "servicesCatalog")).toBeUndefined();
+    });
+  });
+
+  // =========================================================================
+  // 8b. Database Monitoring — the enterprise-only tabs
+  // =========================================================================
+  /**
+   * Deadlocks, Blocked queries and Table health read endpoints the OSS backend
+   * answers 403 on. Disabling the tabs cannot stop a PASTED URL, so each of the
+   * three routes carries its own guard. It lands on the DBM overview — the
+   * section the reader is already inside — rather than a page that renders
+   * empty because every fetch was refused.
+   */
+  describe("homeChildRoutes — Database Monitoring enterprise gate", () => {
+    const GATED = ["dbmDeadlocks", "dbmBlocking", "dbmTableHealth"] as const;
+    const OPEN = ["dbmDatabases", "dbmQueries", "dbmSamples", "dbmActivity"] as const;
+
+    it.each(GATED)("redirects %s to the DBM overview on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      const next = vi.fn();
+      findRoute(homeChildRoutes, name).beforeEnter({ query: { range: "360" } }, {}, next);
+      expect(next).toHaveBeenCalledWith({ name: "dbmDatabases", query: { range: "360" } });
+    });
+
+    it.each(GATED)("lets %s through on an enterprise build", async (name) => {
+      config.isEnterprise = "true";
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const to = { query: {} };
+      const next = vi.fn();
+      findRoute(homeChildRoutes, name).beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    /** Only the literal string unlocks — a truthy-string check would fail open. */
+    it.each(["", "TRUE", "1", "yes"])("treats isEnterprise=%p as OSS", (value) => {
+      config.isEnterprise = value;
+      const { homeChildRoutes } = useRoutes();
+      const next = vi.fn();
+      findRoute(homeChildRoutes, "dbmDeadlocks").beforeEnter({ query: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith({ name: "dbmDatabases", query: {} });
+    });
+
+    /** The four OSS tabs must stay reachable — the gate is three routes, not the section. */
+    it.each(OPEN)("leaves %s reachable on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, name);
+      // No child guard of its own: the parent's Database Monitoring guard is
+      // the only thing standing between an OSS reader and these four pages.
+      expect(route.beforeEnter).toBeUndefined();
+    });
+
+    /** Routes stay REGISTERED on OSS — an unregistered route is a 404, not a redirect. */
+    it.each(GATED)("keeps %s registered on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, name)).toBeDefined();
     });
   });
 
@@ -1889,13 +1956,40 @@ describe("useRoutes (router.ts)", () => {
       expect(nonCloudRoutes.length).toBe(cloudRoutes.length + 2);
     });
 
-    it("should have component defined for every top-level homeChildRoute that is not a redirect", () => {
+    /**
+     * A top-level route must RESOLVE to something: either it renders a component,
+     * it redirects, or it is a grouping parent whose children render.
+     *
+     * The third case is deliberate and load-bearing. `traces/databases` is a
+     * componentless parent: it exists to own the path prefix and to apply the
+     * Database Monitoring guard ONCE for every sub-view, while each child page
+     * renders its own OPageLayout. Giving the parent a shell component instead
+     * would nest two page layouts and push the child's header down — the bug
+     * documented at Functions.vue:18-22. So the invariant is "resolves to
+     * something", not "has a component".
+     */
+    it("should resolve every top-level homeChildRoute to a component, a redirect, or children", () => {
       const { homeChildRoutes } = useRoutes();
       homeChildRoutes.forEach((route: any) => {
-        if (!route.redirect) {
-          expect(route.component).toBeDefined();
-        }
+        const resolves =
+          route.component !== undefined ||
+          route.redirect !== undefined ||
+          (Array.isArray(route.children) && route.children.length > 0);
+        expect(resolves, `route ${route.path} renders nothing`).toBe(true);
       });
+    });
+
+    /** ...and a componentless parent's children must themselves render. */
+    it("should have a component on every child of a componentless parent route", () => {
+      const { homeChildRoutes } = useRoutes();
+      homeChildRoutes
+        .filter((route: any) => !route.component && !route.redirect)
+        .forEach((parent: any) => {
+          expect(parent.children?.length).toBeGreaterThan(0);
+          parent.children.forEach((child: any) => {
+            expect(child.component, `${parent.path}/${child.path} renders nothing`).toBeDefined();
+          });
+        });
     });
 
     it("should have string path for every top-level homeChildRoute", () => {
