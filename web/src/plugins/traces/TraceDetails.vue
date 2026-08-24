@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <!-- Search Results Navigation -->
               <div
-                class="rounded-default border-input-border dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
+                class="rounded-default border-border-default dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
               >
                 <div
                   class="flex items-center gap-[0.0625rem] px-1 text-xs font-medium select-none"
@@ -797,15 +797,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Map View with Pattern/Span Toggle -->
             <div v-if="activeTab === 'map'" class="flex h-full min-h-0 w-full flex-1 flex-col">
               <!-- Chart Container -->
-              <div class="flex min-h-0 flex-1 items-center justify-center">
-                <div class="h-full w-full p-2.5 text-center">
-                  <ChartRenderer
-                    ref="chartRendererRef"
-                    data-test="trace-details-service-map-chart"
-                    :data="traceServiceMapChartOptions"
-                    class="trace-chart-height h-50! min-h-50! w-full!"
-                  />
-                </div>
+              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
+                <ChartRenderer
+                  ref="chartRendererRef"
+                  data-test="trace-details-service-map-chart"
+                  :data="traceServiceMapChartOptions"
+                  class="h-full"
+                />
               </div>
             </div>
           </div>

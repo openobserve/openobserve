@@ -1021,9 +1021,11 @@ export default defineComponent({
                 }),
               });
 
-              await configService.get_config().then((res: any) => {
-                store.dispatch("setConfig", res.data);
-              });
+              await configService
+                .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
+                .then((res: any) => {
+                  store.dispatch("setConfig", res.data);
+                });
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1080,9 +1082,11 @@ export default defineComponent({
               }),
             });
 
-            await configService.get_config().then((res: any) => {
-              store.dispatch("setConfig", res.data);
-            });
+            await configService
+              .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
+              .then((res: any) => {
+                store.dispatch("setConfig", res.data);
+              });
           } else {
             toast({
               variant: "error",

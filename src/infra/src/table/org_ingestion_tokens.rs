@@ -296,6 +296,7 @@ pub async fn get_by_name(
 
 /// Rotate (regenerate) a token's value. Returns the new token.
 pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Error> {
+    let _lock = get_lock().await;
     let new_token = generate_token();
     let now = chrono::Utc::now().timestamp_micros();
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

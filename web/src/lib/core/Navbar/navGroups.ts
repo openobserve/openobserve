@@ -99,41 +99,67 @@ export const NAV_GROUPS: NavGroupDef[] = [
     parentLink: "/alerts",
     absorbs: ["alertList", "sloList", "incidentList"],
     children: [
+      // ── Alerts ──────────────────────────────────────────────────────────
+      // These four are the alerting cluster, and they carry a peer tab strip
+      // (AlertSectionTabs) on every one of their pages. Same ORDER in both, and
+      // one header here — a rail that disagreed with the tabs would make the
+      // two feel like different places. Labels differ on purpose: the rail
+      // names a destination out of context ("Notification Destinations"), the
+      // strip names it inside one ("Destinations"), which is why both keys
+      // exist.
+      //
+      // Destinations and Templates moved out of Settings: they are alerting
+      // configuration, not deployment configuration. None of the three have a
+      // rail entry of their own, so they ride on Alerts being present —
+      // hiding `alertList` via custom_hide_menus takes its plumbing with it.
+      // "All Alerts", not "Alerts": it sits directly under an "Alerts" header,
+      // and a row repeating its own header names nothing. The peer tab uses the
+      // same string for the same reason — the page title above it says "Alerts".
       {
-        titleKey: "menu.alerts",
+        titleKey: "alerts.allAlerts",
         icon: "shield-alert-outline",
         name: "alertList",
         requires: "alertList",
+        categoryKey: "menu.alerts",
       },
-      // An SLO is what an SLO alert burns against, and an incident is what an
-      // alert escalates into — one reliability workflow, one tile. Every child
-      // carries `requires` so that hiding any of them (`custom_hide_menus`, or
-      // Incidents being enterprise-gated) shrinks the group, and dropping to a
-      // single survivor collapses it back to a plain link rather than leaving a
-      // one-item flyout.
-      { titleKey: "menu.slos", icon: "target", name: "sloList", requires: "sloList" },
-      {
-        titleKey: "menu.incidents",
-        icon: "notifications-active",
-        name: "incidentList",
-        requires: "incidentList",
-      },
-      // Where an alert is delivered, and the message it delivers. These moved
-      // out of Settings: they are alerting configuration, not deployment
-      // configuration. They have no rail entry of their own, so they ride on
-      // Alerts being present — hiding `alertList` via custom_hide_menus takes
-      // its plumbing with it.
       {
         titleKey: "alert_destinations.header",
         icon: "location-on",
         name: "alertDestinations",
         requires: "alertList",
+        categoryKey: "menu.alerts",
       },
       {
         titleKey: "alert_templates.header",
         icon: "description",
         name: "alertTemplates",
         requires: "alertList",
+        categoryKey: "menu.alerts",
+      },
+      // The curated catalog you install alerts FROM — gated the same way, so
+      // hiding Alerts hides the place to get more. Last, like its tab: you go
+      // looking for it once, then work in the other three.
+      {
+        titleKey: "alert_library.header",
+        icon: "menu-book",
+        name: "alertLibrary",
+        requires: "alertList",
+        categoryKey: "menu.alerts",
+      },
+      // ── Reliability's other concerns ────────────────────────────────────
+      // Deliberately OUTSIDE the Alerts header: an SLO is what an SLO alert
+      // burns against and an incident is what an alert escalates into — the
+      // same workflow, but not alerting configuration, so filing them under
+      // "Alerts" would misfile them. Every child carries `requires` so hiding
+      // any of them (`custom_hide_menus`, or Incidents being enterprise-gated)
+      // shrinks the group, and dropping to a single survivor collapses it back
+      // to a plain link rather than leaving a one-item flyout.
+      { titleKey: "menu.slos", icon: "target", name: "sloList", requires: "sloList" },
+      {
+        titleKey: "menu.incidents",
+        icon: "notifications-active",
+        name: "incidentList",
+        requires: "incidentList",
       },
       // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
       // Gated on incidentList, not alertList: this only makes sense where

@@ -51,7 +51,10 @@ const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
 pub async fn get_nats_client() -> &'static Client {
-    NATS_CLIENT.get_or_init(connect).await
+    NATS_CLIENT
+        .get_or_try_init(connect)
+        .await
+        .unwrap_or_else(|e| panic!("{e}"))
 }
 
 async fn get_bucket_by_key<'a>(
@@ -107,8 +110,9 @@ async fn get_bucket_by_key<'a>(
     Ok((kv, key.trim_start_matches(bucket_name)))
 }
 
-pub async fn init() {
-    _ = get_nats_client().await;
+pub async fn init() -> Result<()> {
+    NATS_CLIENT.get_or_try_init(connect).await?;
+    Ok(())
 }
 
 pub struct NatsDb {
@@ -639,7 +643,7 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub async fn connect() -> async_nats::Client {
+async fn connect() -> Result<async_nats::Client> {
     let cfg = get_config();
     if cfg.common.print_key_config {
         log::info!("Nats init get_config(): {:?}", cfg.nats);
@@ -657,15 +661,16 @@ pub async fn connect() -> async_nats::Client {
         .nats
         .addr
         .split(',')
-        .map(|a| a.parse().unwrap())
-        .collect::<Vec<ServerAddr>>();
-    match async_nats::connect_with_options(addrs.clone(), opts).await {
-        Ok(client) => client,
-        Err(e) => {
-            log::error!("NATS connect failed for address(es): {addrs:?}, err: {e}");
-            panic!("NATS connect failed");
-        }
-    }
+        .map(|a| a.parse())
+        .collect::<std::result::Result<Vec<ServerAddr>, _>>()
+        .map_err(|e| Error::Message(format!("invalid NATS address {}: {e}", cfg.nats.addr)))?;
+    async_nats::connect_with_options(addrs.clone(), opts)
+        .await
+        .map_err(|e| {
+            Error::Message(format!(
+                "NATS connect failed for address(es): {addrs:?}, err: {e}"
+            ))
+        })
 }
 
 async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {

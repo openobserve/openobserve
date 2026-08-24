@@ -61,9 +61,11 @@ describe("Alert List", async () => {
     vi.clearAllMocks();
   });
 
-  it("Should render alerts title", () => {
-    // Title now lives in the standard OPageHeader (row 1).
-    expect(wrapper.find(".app-page-header h1").text()).toBe("Templates");
+  it("titles itself with the SECTION, so the peer tabs never move", () => {
+    // All four alerting pages carry this identical string: the title block
+    // sizes to its content, so a per-page title would shift the tab strip
+    // horizontally on every navigation. The active tab says which page it is.
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
   });
 
   it("Should reder table with templates", () => {
@@ -100,6 +102,8 @@ describe("Alert List", async () => {
   describe("When user clicks on delete alert", () => {
     const template_name = "Template2";
     const deleteAlert = vi.spyOn(templateService, "delete");
+    const listTemplates = vi.spyOn(templateService, "list");
+    let listCallsBeforeDelete = 0;
     beforeEach(async () => {
       global.server.use(
         http.delete(
@@ -109,23 +113,7 @@ describe("Alert List", async () => {
           },
         ),
       );
-      // Override the templates list to return only Template3 after deletion.
-      // The service returns res.data which axios maps to the raw response body,
-      // so the array must be returned directly (not wrapped in { list: [...] }).
-      global.server.use(
-        http.get(
-          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`,
-          () => {
-            return HttpResponse.json([
-              {
-                name: "Template3",
-                body: '\r\n[\r\n  {\r\n    "labels": {\r\n        "alertname": "{alert_name}",\r\n        "stream": "{stream_name}",\r\n        "organization": "{org_name}",\r\n        "alerttype": "{alert_type}",\r\n        "severity": "critical"\r\n    },\r\n    "annotations": {\r\n        "timestamp": "{timestamp}"\r\n    }\r\n  }\r\n]',
-                isDefault: true,
-              },
-            ]);
-          },
-        ),
-      );
+      listCallsBeforeDelete = listTemplates.mock.calls.length;
 
       // Click the delete button — only visible once skeleton is cleared (done in outer beforeEach).
       await wrapper
@@ -137,23 +125,22 @@ describe("Alert List", async () => {
       const mainWrapper = new DOMWrapper(document.body);
       await mainWrapper.find('[data-test="o-dialog-primary-btn"]').trigger("click");
       await flushPromises();
-
-      // Advance past the skeleton hold timer triggered by the refetch.
-      vi.advanceTimersByTime(SKELETON_HOLD_MS);
-      await flushPromises();
     });
 
     it("Should delete alert from the list", () => {
       expect(deleteAlert).toHaveBeenCalledTimes(1);
     });
 
-    it("Should refetch all alerts", () => {
-      const tableRows = wrapper
+    it("drops the deleted row in place, leaving the rest of the list alone", () => {
+      // No refetch: reloading the list would blank the table behind its skeleton
+      // and a loading toast for a row the server already confirmed gone.
+      expect(listTemplates.mock.calls.length).toBe(listCallsBeforeDelete);
+      const body = wrapper
         .find('[data-test="alert-templates-list-table"]')
-        .find("thead")
-        .findAll("tr");
-      expect(tableRows.length).toBe(1);
-      expect(tableRows[0].html()).not.toContain(template_name);
+        .find('[data-test="o2-table-body"]');
+      expect(body.findAll("tr").length).toBe(2);
+      expect(body.text()).not.toContain(template_name);
+      expect(body.text()).toContain("Template3");
     });
   });
 });

@@ -41,6 +41,7 @@ use infra::{
     storage,
 };
 use ingester::{PackSegment, PendingStreamStats};
+use metrics_index::MetricsFileLayout;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::merge::{self, MergeMode, MergeOutput};
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -388,7 +389,11 @@ async fn upload_chunk(
         bufs.push(data);
     }
 
-    let (buf, mut new_file_meta, file_format) = if chunk.len() == 1 {
+    // Segments are persisted in arrival order. A hash-sorted layout must be
+    // produced by the merge, so it never takes the as-is fast path.
+    let mode = MergeMode::for_ingester(stream_type, stream_name, &latest_schema);
+    let single_segment_as_is = chunk.len() == 1 && mode.file_layout() == MetricsFileLayout::Legacy;
+    let (buf, mut new_file_meta, file_format, layout) = if single_segment_as_is {
         // fast path: upload the parquet bytes as-is, no decode/re-encode
         let buf = Bytes::from(bufs.pop().unwrap());
         let file_meta = FileMeta {
@@ -399,7 +404,12 @@ async fn upload_chunk(
             compressed_size: buf.len() as i64,
             ..Default::default()
         };
-        (buf, file_meta, FileFormat::Parquet)
+        (
+            buf,
+            file_meta,
+            FileFormat::Parquet,
+            MetricsFileLayout::Legacy,
+        )
     } else {
         // merge multiple segments in memory
         let mut segment_schemas = Vec::with_capacity(bufs.len());
@@ -437,13 +447,18 @@ async fn upload_chunk(
             tables,
             &bloom_filter_fields,
             new_file_meta,
-            &MergeMode::for_ingester(stream_type, stream_name),
+            &mode,
             MergeOutput::for_ingester(stream_type),
         )
         .await?;
         // the ingester always merges into exactly one file
         let (merged, file_format) = merge_result.into_single()?;
-        (Bytes::from(merged.buf), merged.meta, file_format)
+        (
+            Bytes::from(merged.buf),
+            merged.meta,
+            file_format,
+            merged.layout,
+        )
     };
 
     if new_file_meta.compressed_size == 0 {
@@ -458,13 +473,13 @@ async fn upload_chunk(
         chunk[0].meta.partition_key,
         generate_filename_with_time_range(min_ts, max_ts, 0)
     );
-    let new_file_key = super::generate_ingester_storage_file_key(
+    let new_file_key = layout.mark_file_key(&super::generate_ingester_storage_file_key(
         org_id,
         stream_type,
         stream_name,
         &wal_like_name,
         file_format,
-    );
+    ));
 
     log::info!(
         "[INGESTER:PACK:JOB:{thread_id}] uploading {} segments into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",

@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="mb-3 flex">
         <b>{{ t("cipherKey.secret") }}</b>
       </label>
-      <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
+      <pre class="border-border-default mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
         localValue
       }}</pre>
       <OButton

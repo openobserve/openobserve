@@ -40,6 +40,7 @@ use cron::Schedule;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     scheduler::get_scheduler_max_retries,
+    table::get_lock,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
@@ -815,6 +816,8 @@ async fn handle_composite_alert_trigger(
     use sea_orm::{
         ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
     };
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     let transaction = db.begin().await?;
     let lease_deadline = now + config::get_config().limit.alert_schedule_timeout * 1_000_000;
     if !infra::scheduler::renew_claim_in_transaction(
@@ -840,6 +843,8 @@ async fn handle_composite_alert_trigger(
             || current.evaluation_generation != definition.definition.evaluation_generation
     }) {
         transaction.rollback().await?;
+        // released before complete_claim, which takes this lock itself on sqlite
+        drop(_lock);
         trigger.status = db::scheduler::TriggerStatus::Waiting;
         trigger.next_run_at = now + composite_debounce_secs() * 1_000_000;
         let _ = infra::scheduler::complete_claim(trigger).await?;
@@ -847,6 +852,8 @@ async fn handle_composite_alert_trigger(
     }
     infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
     transaction.commit().await?;
+    // released before delivery and complete_claim below, which take this lock themselves
+    drop(_lock);
 
     let mut delivery_retry_at = None;
     if evaluated.result {
@@ -1277,6 +1284,8 @@ async fn handle_anomaly_detection_triggers(
             let mut active = config.into_active_model();
             active.status = Set(AnomalyStatus::Active.to_i32());
             active.updated_at = Set(run_end_us);
+            // make sure only one client is writing to the database(only for sqlite)
+            let _lock = get_lock().await;
             if let Err(e) = active.update(db).await {
                 log::warn!(
                     "[anomaly_detection] failed to reset status to Active for {anomaly_id}: {e}"

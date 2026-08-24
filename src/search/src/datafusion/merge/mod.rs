@@ -28,6 +28,7 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+use metrics_index::MetricsFileLayout;
 use parquet::{
     arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
     file::metadata::KeyValue,
@@ -51,6 +52,7 @@ use crate::datafusion::{
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
+mod metrics;
 pub mod mode;
 
 pub use mode::{MergeMode, MergeOutput};
@@ -59,6 +61,10 @@ pub use mode::{MergeMode, MergeOutput};
 pub struct MergedFile {
     pub buf: Vec<u8>,
     pub meta: FileMeta,
+    /// Physical layout the file was written in; decides its file name.
+    pub layout: MetricsFileLayout,
+    /// `.midx` metrics index of a [`MetricsFileLayout::Indexed`] file.
+    pub metrics_index: Option<Vec<u8>>,
 }
 
 pub struct MergeParquetResult {
@@ -98,7 +104,7 @@ pub async fn merge_parquet_files(
     let sql = mode.sql(&schema);
     log::debug!("merge_parquet_files [{mode}] sql: {sql}");
     let (schema, mut rx, read_task) =
-        run_merge_query(&sql, mode.input_sort_order(), schema, tables).await?;
+        run_merge_query(&sql, mode.output_sort_order(), schema, tables).await?;
 
     let files = match mode {
         #[cfg(feature = "enterprise")]
@@ -109,6 +115,17 @@ pub async fn merge_parquet_files(
                 &metadata,
                 output.file_format,
                 rx,
+                read_task,
+            )
+            .await?
+        }
+        MergeMode::MetricsIndexed => {
+            metrics::write_files(
+                &schema,
+                bloom_filter_fields,
+                &metadata,
+                get_config().compact.max_file_size,
+                &mut rx,
                 read_task,
             )
             .await?
@@ -132,6 +149,8 @@ pub async fn merge_parquet_files(
             vec![MergedFile {
                 buf,
                 meta: metadata,
+                layout: mode.file_layout(),
+                metrics_index: None,
             }]
         }
     };
@@ -149,9 +168,11 @@ pub async fn merge_parquet_files(
 
 /// Plan and start `sql` over the union of `tables`; the record batches arrive
 /// on the returned channel, the task reports the stream's completion / error.
+/// `sort_order` only enables `split_file_groups_by_statistics` for that
+/// order; the input tables declare what the files really carry.
 async fn run_merge_query(
     sql: &str,
-    input_sort_order: FileSortOrder,
+    sort_order: FileSortOrder,
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
 ) -> Result<(
@@ -162,7 +183,7 @@ async fn run_merge_query(
     let cfg = get_config();
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        .sort_order(input_sort_order)
+        .sort_order(sort_order)
         .build(cfg.limit.datafusion_min_partition_num)
         .await?;
     // register union table
@@ -378,7 +399,7 @@ mod tests {
         .unwrap();
         let table = Arc::new(MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap());
 
-        let mode = MergeMode::for_ingester(StreamType::Metadata, "trace_time_index_test");
+        let mode = MergeMode::for_ingester(StreamType::Metadata, "trace_time_index_test", &schema);
         assert!(matches!(mode, MergeMode::TraceTimeIndex));
         let merged = merge_parquet_files(
             schema,

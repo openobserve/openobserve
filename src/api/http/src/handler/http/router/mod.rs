@@ -678,13 +678,15 @@ pub fn basic_routes() -> Router {
     router
 }
 
-/// Create config routes
+/// Create config routes. `/` is served WITHOUT auth (the login page bootstraps
+/// from it), so it must expose only [`status::zo_config_bootstrap`]'s minimal
+/// payload — the full config lives at the authenticated `/api/{org_id}/config`.
 #[cfg(not(feature = "enterprise"))]
 pub fn config_routes() -> Router {
     Router::new()
         .route("/reload", get(status::config_reload))
         .route_layer(middleware::from_fn(auth_middleware))
-        .route("/", get(status::zo_config))
+        .route("/", get(status::zo_config_bootstrap))
         .route("/logout", get(status::logout))
 }
 
@@ -693,7 +695,7 @@ pub fn config_routes() -> Router {
     Router::new()
         .route("/reload", get(status::config_reload))
         .route_layer(middleware::from_fn(auth_middleware))
-        .route("/", get(status::zo_config))
+        .route("/", get(status::zo_config_bootstrap))
         .route("/logout", get(status::logout))
         .route("/redirect", get(status::redirect))
         .route("/dex_login", get(status::dex_login))
@@ -716,6 +718,9 @@ pub fn service_routes() -> Router {
     let server = cfg.common.instance_name_short.to_string();
 
     let mut router = Router::new();
+    // Full UI configuration — authenticated counterpart of the unauthenticated
+    // `/config` bootstrap in config_routes()
+    router = router.route("/{org_id}/config", get(status::zo_config));
     // Users
     router = router.route("/{org_id}/users", get(users::list).post(users::save))
         .route("/{org_id}/users/{email_id}", post(users::add_user_to_org).put(users::update).delete(users::delete))
@@ -1610,8 +1615,15 @@ mod tests {
         );
     }
 
+    // ── unauthenticated /config bootstrap ─────────────────────────────────
+    //
+    // GET /config is served WITHOUT auth so the login page can render. Its
+    // response is therefore a security surface: this exact-key-set assertion is
+    // the contract that keeps deployment details (version, license, billing
+    // orgs, storage region, …) from leaking to anonymous clients. Adding a key
+    // here needs the same scrutiny as removing auth from an endpoint.
     #[tokio::test]
-    async fn test_config_routes_include_sql_reserved_keywords() {
+    async fn config_bootstrap_exposes_only_login_page_fields() {
         let app = config_routes();
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
@@ -1624,12 +1636,112 @@ mod tests {
             .unwrap();
         let payload: Value = serde_json::from_slice(&body).unwrap();
 
+        let mut keys: Vec<&str> = payload
+            .as_object()
+            .expect("bootstrap config is a JSON object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            vec![
+                "build_type",
+                "commit_hash",
+                "custom_hide_self_logo",
+                "custom_logo_dark_img",
+                "custom_logo_img",
+                "custom_logo_text",
+                "native_login_enabled",
+                "rum",
+                "sso_enabled",
+                "telemetry_enabled",
+            ],
+            "unauthenticated /config must expose exactly the login-page bootstrap fields"
+        );
+
+        // build_type (enterprise/cloud/opensource) is not sensitive and the o2
+        // CLI + o2-operator read it from this unauthenticated endpoint to gate
+        // enterprise commands — it must stay a real build-type token.
+        assert_eq!(
+            payload.get("build_type").and_then(Value::as_str),
+            Some("opensource"),
+            "bootstrap build_type must carry the real build kind"
+        );
+
+        assert_eq!(
+            payload.get("commit_hash").and_then(Value::as_str),
+            Some(config::COMMIT_HASH),
+            "bootstrap commit_hash must carry the real commit for stale-build detection"
+        );
+    }
+
+    #[tokio::test]
+    async fn config_reload_still_requires_auth() {
+        let app = config_routes();
+
+        let req = Request::builder()
+            .uri("/reload")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "/config/reload must stay behind auth_middleware"
+        );
+    }
+
+    // Same testability constraint as query_functions above: service_routes()
+    // answers 401 for every path, so registration of /{org_id}/config is pinned
+    // via a minimal router carrying only this route.
+    #[tokio::test]
+    async fn config_full_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route("/{org_id}/config", get(status::zo_config));
+
+        let ok = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/myorg/config")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(ok.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: Value = serde_json::from_slice(&body).unwrap();
         assert!(
             payload
                 .get("sql_reserved_keywords")
                 .and_then(Value::as_array)
                 .is_some_and(|keywords| !keywords.is_empty())
         );
+        assert!(
+            payload.get("version").is_some(),
+            "authenticated config carries the version"
+        );
+        assert!(
+            payload.get("instance").is_none(),
+            "the instance id is a fingerprinting handle no UI consumer reads; it must not be served"
+        );
+
+        let wrong_method = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/myorg/config")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(wrong_method.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
     // NOTE ON WHAT IS TESTABLE HERE.

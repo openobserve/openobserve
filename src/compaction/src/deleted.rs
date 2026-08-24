@@ -18,10 +18,11 @@
 use std::borrow::Cow;
 
 use config::{
-    meta::stream::{FileKey, FileListDeleted, FileMeta},
+    meta::stream::{FileKey, FileListDeleted, FileMeta, StreamType},
     utils::inverted_index::to_tantivy_name,
 };
 use infra::{file_list as infra_file_list, storage};
+use metrics_index::MetricsFileLayout;
 
 // Batch size for deleting files from file_list_deleted table
 const BATCH_SIZE: i64 = 10000;
@@ -76,6 +77,11 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
             .flatten()
     })
     .await?;
+
+    // delete metrics index files
+    delete_from_storage("metrics index", &files, metrics_index_key).await?;
+
+    // delete flattened files
     delete_from_storage("flattened", &files, |file| {
         file.flattened
             .then(|| Cow::Owned(super::flatten::generate_flatten_file_key(&file.file)))
@@ -104,4 +110,40 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     }
 
     Ok(files_num)
+}
+
+fn metrics_index_key(file: &FileListDeleted) -> Option<Cow<'_, str>> {
+    if file.file.split('/').nth(2) != Some(StreamType::Metrics.as_str()) {
+        return None;
+    }
+    MetricsFileLayout::metrics_index_path(&file.file).map(Cow::Owned)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn deleted_file(file: &str) -> FileListDeleted {
+        FileListDeleted {
+            file: file.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn metrics_index_key_only_for_indexed_metrics_files() {
+        let file = deleted_file("files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.parquet");
+        assert_eq!(
+            metrics_index_key(&file).as_deref(),
+            Some("files/default/midx/cpu/2026/08/19/07/indexed-v1-456.midx")
+        );
+
+        for file in [
+            "files/default/logs/app/2026/08/19/07/indexed-v1-456.parquet",
+            "files/default/metrics/cpu/2026/08/19/07/hash-sorted-v1-456.parquet",
+            "files/default/metrics/cpu/2026/08/19/07/456.parquet",
+        ] {
+            assert!(metrics_index_key(&deleted_file(file)).is_none(), "{file}");
+        }
+    }
 }
