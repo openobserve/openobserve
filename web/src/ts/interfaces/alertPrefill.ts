@@ -139,9 +139,27 @@ export interface AlertPrefill {
   promqlCondition?: AlertPrefillThresholdCondition | null;
   thresholdShape?: AlertPrefillThresholdShape;
 
+  /**
+   * The trigger's OWN count gate — "fire when N rows/groups match" — as
+   * distinct from `promqlCondition` / `aggregation.having`, which are
+   * thresholds on a VALUE.
+   *
+   * Optional, and most surfaces leave it unset: a prefill derived from a logs
+   * search or a dashboard panel has no opinion about how many rows should
+   * count as an alert, so the form's own default is the honest answer. Set it
+   * only where the source carries a real, curated trigger — a library alert
+   * being the case it exists for. When set it WINS over the "threshold lives
+   * inside the query, so count ≥ 1" inference the form would otherwise make.
+   */
+  triggerThreshold?: number;
+  /** Comparison for `triggerThreshold`; only meaningful alongside it. */
+  triggerOperator?: string;
+
   /** Rolling evaluation window in minutes, already clamped. */
   periodMinutes?: number;
   frequencyMinutes?: number;
+  /** Repeat-notification suppression, minutes. `0` is a real value (no silence). */
+  silenceMinutes?: number;
   timezone?: string;
 
   /** Populated when the surface had more than one stream to choose from. */

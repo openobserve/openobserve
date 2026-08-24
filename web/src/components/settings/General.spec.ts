@@ -56,6 +56,7 @@ vi.mock("@/services/config", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), {
     default: {
       get_config: vi.fn(),
+      get_config_full: vi.fn(),
     },
   });
 });
@@ -280,6 +281,7 @@ describe("General", () => {
     mockSettingsService.deleteLogo.mockResolvedValue({ status: 200 });
     mockSettingsService.updateCustomText.mockResolvedValue({ status: 200 });
     mockConfigService.get_config.mockResolvedValue({ data: {} });
+    mockConfigService.get_config_full.mockResolvedValue({ data: {} });
     mockDOMPurify.sanitize.mockImplementation((text) => text);
   });
 

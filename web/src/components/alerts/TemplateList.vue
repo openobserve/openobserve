@@ -19,10 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       v-if="!showImportTemplate && !showTemplateEditor"
-      :title="t('alert_templates.header')"
-      icon="description"
-      :subtitle="t('settings.templatesDesc')"
+      :title="t('alerts.header')"
+      icon="shield-alert-outline"
     >
+      <!-- Section-level title, identical on all four alerting pages, so the
+           peer tabs anchor at the same x — see AlertList.vue for the rationale.
+           Subtitle-free for the same reason. -->
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
         <OToggleGroup
           :model-value="activeTab"
@@ -203,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('alert_templates.delete')
               "
               :disabled="row.isPrebuilt"
+              :loading="deletingTemplates.has(row.name)"
               @click="conformDeleteDestination(row)"
               data-row-action="delete"
             >
@@ -213,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <DependencyUsageCell
               :graph="depGraph"
               :focus="{ kind: 'template', name: row.name }"
-              @deleted="refreshTemplates"
+              @deleted="onDependencyDeleted"
             />
           </template>
           <template v-if="selectedTemplates.length > 0" #bottom>
@@ -269,7 +276,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { templateKeys } from "@/services/alert_templates.querykeys";
 import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -286,11 +293,15 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import DependencyUsageCell from "./DependencyUsageCell.vue";
 import useDependencyGraph, {
   invalidateDependencyGraphCache,
+  applyDependencyDeletion,
+  depNodeId,
 } from "@/composables/alerts/useDependencyGraph";
+import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -346,6 +357,7 @@ const confirmDelete: Ref<{
 const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
 const bulkDeleteLoading = ref(false);
+const deletingTemplates = ref(new Set<string>());
 const filterQuery = ref("");
 // Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
 // system templates (name starts with `prebuilt_`), "custom" shows the rest.
@@ -442,6 +454,35 @@ const getTemplates = (force = false) => {
       fetching.value = false;
     });
 };
+// A delete is one row leaving a list the server has already confirmed. Splice it
+// out and prune the shared dependency graph rather than refetching: a refetch
+// blanks the table behind its spinner and a "please wait" toast, which reads as a
+// page reload, and drops the user's scroll and page position with it.
+const dropTemplates = (names: string[]) => {
+  if (!names.length) return;
+  const gone = new Set(names);
+  templates.value = templates.value.filter((tpl: any) => !gone.has(tpl.name));
+  // Anything that failed to delete stays selected, so a bulk retry is one click.
+  selectedTemplates.value = selectedTemplates.value.filter((tpl: any) => !gone.has(tpl.name));
+  const org = store.state.selectedOrganization.identifier;
+  // The rows above are a render of the cached list, not the cache itself — splice
+  // the names out of every cached module list too, or the row returns on the next
+  // visit inside staleTime (and, since this query persists, on a browser reload
+  // that hydrates from its localStorage copy).
+  queryClient.setQueriesData({ queryKey: templateKeys.all(org) }, (list: any) =>
+    Array.isArray(list) ? list.filter((tpl: any) => !gone.has(tpl.name)) : list,
+  );
+  for (const name of gone)
+    depGraph.value = applyDependencyDeletion(org, depNodeId("template", name), depGraph.value);
+};
+
+// Deleting an alert or a destination in the impact dialog leaves this list's rows
+// untouched, so re-read the (already pruned) shared graph for the Used by counts
+// instead of reloading the page's data.
+const onDependencyDeleted = (kind: DepNodeKind) => {
+  if (kind === "template") getTemplates();
+  else loadDepGraph(store.state.selectedOrganization.identifier);
+};
 const updateRoute = () => {
   if (router.currentRoute.value.query.action === "add") editTemplate();
   if (router.currentRoute.value.query.action === "update")
@@ -519,38 +560,35 @@ const cloneTemplate = (template: any) => {
   });
 };
 const deleteTemplate = () => {
-  if (confirmDelete.value?.data?.name) {
-    templateService
-      .delete({
-        org_identifier: store.state.selectedOrganization.identifier,
-        template_name: confirmDelete.value.data.name,
-      })
-      .then(() => {
-        toast({
-          variant: "success",
-          message: t("toastMessages.alerts.templateDeletedSuccessfully", {
-            name: confirmDelete.value.data.name,
-          }),
-        });
-
-        // Drop the row from the cache first so it disappears now, not when the
-        // refetch lands. The forced reload matters as much: this query
-        // persists, so without it the deleted template would come back on a
-        // browser reload, hydrated from localStorage.
-        const deletedName = confirmDelete.value.data.name;
-        queryClient.setQueriesData({ queryKey: templateKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
-          Array.isArray(list) ? list.filter((tpl: any) => tpl.name !== deletedName) : list);
-        getTemplates(true);
-      })
-      .catch((err) => {
-        if (err.response.data.code === 409) {
-          toast({
-            variant: "error",
-            message: err.response.data.message,
-          });
-        }
+  const name = confirmDelete.value?.data?.name;
+  if (!name) return;
+  deletingTemplates.value.add(name);
+  templateService
+    .delete({
+      org_identifier: store.state.selectedOrganization.identifier,
+      template_name: name,
+    })
+    .then(() => {
+      toast({
+        variant: "success",
+        message: t("toastMessages.alerts.templateDeletedSuccessfully", { name }),
       });
-  }
+
+      dropTemplates([name]);
+    })
+    .catch((err: any) => {
+      // A network failure has no `err.response` at all, and a non-409 code used to
+      // fall through silently; the row stays either way, so it has to say why.
+      if (err?.response?.status === 403) return;
+      toast({
+        variant: "error",
+        message:
+          raw(err?.response?.data?.message) || t("alert_dependencies.deleteFailedToast", { name }),
+      });
+    })
+    .finally(() => {
+      deletingTemplates.value.delete(name);
+    });
 };
 const importTemplate = () => {
   showImportTemplate.value = true;
@@ -669,10 +707,8 @@ const bulkDeleteTemplates = () => {
         });
       }
 
-      selectedTemplates.value = [];
       confirmBulkDelete.value = false;
-      // Forced: a cached reload would bring the deleted templates back.
-      getTemplates(true);
+      dropTemplates(successful);
     })
     .catch((err: any) => {
       const errorMessage =

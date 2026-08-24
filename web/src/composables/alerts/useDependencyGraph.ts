@@ -259,9 +259,68 @@ export function focusSummary(graph: DepGraph, focus: DepFocus): FocusSummary {
   };
 }
 
-const tplId = (name: string) => `template:${name}`;
-const dstId = (name: string) => `destination:${name}`;
-const alrId = (id: string) => `alert:${id}`;
+/**
+ * The graph one delete later, without refetching it: drops the deleted row and
+ * the edges that row was the source of truth for, then re-derives every count and
+ * flag. A destination or template that alerts still name survives as a dangling
+ * `missing` node — exactly what a rebuild from the server would produce.
+ */
+export function removeNodeFromGraph(graph: DepGraph, nodeId: string): DepGraph {
+  const target = graph.nodes.find((n) => n.id === nodeId);
+  if (!target) return graph;
+
+  // An alert row owns every edge pointing at it; a destination row owns only its
+  // own template edge; a template row owns none (nothing is derived from one).
+  const ownedByDeletedRow = (e: DepEdge) =>
+    e.target === nodeId && (target.kind === "alert" || e.relation === "template");
+
+  const edges = graph.edges.filter((e) => !ownedByDeletedRow(e));
+
+  // usageCount is one per outgoing edge, so the surviving edges re-derive it.
+  const outgoing = new Map<string, number>();
+  const referenced = new Set<string>();
+  for (const e of edges) {
+    outgoing.set(e.source, (outgoing.get(e.source) ?? 0) + 1);
+    referenced.add(e.source);
+    referenced.add(e.target);
+  }
+
+  // A dangling node exists only because something pointed at it, so it leaves with
+  // the last reference — a rebuild would never invent it again.
+  const nodes = graph.nodes
+    .filter((n) =>
+      n.id === nodeId || (n.missing && n.kind !== "alert") ? referenced.has(n.id) : true,
+    )
+    .map((n) => {
+      const usageCount = outgoing.get(n.id) ?? 0;
+      const missing = n.id === nodeId ? true : n.missing;
+      const orphan = n.kind !== "alert" && !missing && usageCount === 0;
+      return n.id === nodeId
+        ? { ...n, usageCount, missing, orphan, transport: undefined }
+        : { ...n, usageCount, orphan };
+    });
+
+  const count = (fn: (n: DepNode) => boolean) => nodes.filter(fn).length;
+  return {
+    nodes,
+    edges,
+    stats: {
+      templates: count((n) => n.kind === "template" && !n.missing),
+      destinations: count((n) => n.kind === "destination" && !n.missing),
+      alerts: count((n) => n.kind === "alert"),
+      orphanDestinations: count((n) => n.kind === "destination" && n.orphan),
+      danglingReferences: count((n) => n.kind !== "alert" && n.missing),
+      orphanTemplates: count((n) => n.kind === "template" && n.orphan),
+    },
+  };
+}
+
+/** A node's graph id, so callers can prune one without knowing the id format. */
+export const depNodeId = (kind: DepNodeKind, key: string) => `${kind}:${key}`;
+
+const tplId = (name: string) => depNodeId("template", name);
+const dstId = (name: string) => depNodeId("destination", name);
+const alrId = (id: string) => depNodeId("alert", id);
 
 const emptyGraph = (): DepGraph => ({
   nodes: [],
@@ -279,16 +338,29 @@ const emptyGraph = (): DepGraph => ({
 // The graph is identical for every popover in an org and costs three list calls
 // (up to the org's full alert list), so build it once and reuse it across opens,
 // rows and list pages instead of re-downloading it on every popover open.
-// Correctness comes from explicit invalidation — the popover's delete AND every
-// list page's refresh (post add/edit/delete) call invalidateDependencyGraphCache()
-// — so this TTL only backstops changes made in another tab/session; kept long
-// because same-session mutations already drop the cache immediately.
+// Correctness comes from explicit maintenance — every list page's refresh (post
+// add/edit/delete) calls invalidateDependencyGraphCache(), and the impact dialog's
+// delete folds itself in via applyDependencyDeletion() — so this TTL only backstops
+// changes made in another tab/session; kept long because same-session mutations
+// already update the cache immediately.
 const GRAPH_TTL_MS = 300_000;
 let graphCache: { org: string; graph: DepGraph; at: number } | null = null;
 
 /** Drop the cached graph so the next open refetches (call after a mutation). */
 export function invalidateDependencyGraphCache() {
   graphCache = null;
+}
+
+/**
+ * Fold one delete into the graph every open view is already showing instead of
+ * throwing it away: prunes the shared cache (so the next loadGraph is a hit, not
+ * three list calls) and returns the pruned graph for the caller's own copy.
+ */
+export function applyDependencyDeletion(org: string, nodeId: string, current: DepGraph): DepGraph {
+  const cached = graphCache?.org === org ? graphCache : null;
+  const next = removeNodeFromGraph(cached ? cached.graph : current, nodeId);
+  if (cached) graphCache = { ...cached, graph: next };
+  return next;
 }
 
 export function useDependencyGraph() {

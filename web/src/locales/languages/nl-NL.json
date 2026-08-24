@@ -7293,12 +7293,17 @@
       "matchingGroups": "overeenkomende groepen",
       "dataPoint": "gegevenspunt",
       "dataPoints": "gegevenspunten",
+      "matchingSeries": "tijdreeks",
+      "matchingSeriesPlural": "tijdreeksen",
       "row": "rij",
       "rows": "rijen",
       "result": "resultaat",
       "results": "resultaten",
       "reasonMatch": "{count} {label} komen overeen ({comparison})",
-      "reasonNoMatch": "{count} {label} gevonden - voldoet niet aan {comparison}"
+      "reasonNoMatch": "{count} {label} gevonden - voldoet niet aan {comparison}",
+      "levelCritical": "Kritiek",
+      "levelWarning": "Waarschuwing",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "Alle kolommen selecteren is niet toegestaan",
     "customSql": "Aangepaste SQL",

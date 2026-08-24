@@ -65,9 +65,12 @@ reoInit();
 
 // app.use(SearchPlugin);
 
+// Unauthenticated bootstrap payload: only what the login page needs. The full
+// configuration is fetched authenticated (per org) once the user is signed in.
 interface ConfigResponse {
   data?: {
     telemetry_enabled?: boolean;
+    build_type?: string;
     commit_hash?: string;
     rum?: {
       enabled: boolean;
@@ -85,13 +88,19 @@ interface ConfigResponse {
 }
 
 const getConfig = async () => {
-  // Seeds the shared `/config` query — MainLayout, Login, General and UsageTab
-  // read the same cached entry instead of each issuing their own request.
+  // Seeds the shared bootstrap `/config` query — Login and the version checker
+  // read the same cached entry instead of each issuing their own request. The
+  // authenticated full config is a separate entry (`configFullQuery`), fetched
+  // per org once the user is signed in.
   await queryClient.fetchQuery(configQuery()).then((data: ConfigResponse["data"]) => {
     const res: ConfigResponse = { data };
     if (!res.data) return;
 
-    store.dispatch("setConfig", res.data);
+    // Never clobber the authenticated full config with the bootstrap subset if
+    // the full fetch (MainLayout) happens to resolve first.
+    if (!store.state.zoConfig?.version) {
+      store.dispatch("setConfig", res.data);
+    }
     config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";
 
     // Store initial commit hash for version checking

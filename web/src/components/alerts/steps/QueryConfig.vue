@@ -893,10 +893,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.queryConfig.viewAlertQuery") }}
                         <OTooltip :delay="200" side="bottom">
                           <template #content>
-                            <pre
-                              class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-                              v-html="highlightedSqlQuery"
-                            />
+                            <AlertQueryPreview :query="generatedSqlQuery" />
                           </template>
                         </OTooltip>
                       </span>
@@ -988,10 +985,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("alerts.queryConfig.viewAlertQuery") }}
                     <OTooltip :delay="200" side="bottom">
                       <template #content>
-                        <pre
-                          class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-                          v-html="highlightedSqlQuery"
-                        />
+                        <AlertQueryPreview :query="generatedSqlQuery" />
                       </template>
                     </OTooltip>
                   </span>
@@ -1623,11 +1617,6 @@ import {
   getImageURL,
   resolveBrowserTimezone,
 } from "@/utils/zincutils";
-import hljs from "highlight.js/lib/core";
-import sql from "highlight.js/lib/languages/sql";
-
-hljs.registerLanguage("sql", sql);
-
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
@@ -1635,6 +1624,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
+import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
@@ -1661,6 +1651,7 @@ export default defineComponent({
   components: {
     OTag,
     AlertMultiToggle,
+    AlertQueryPreview,
     FilterGroup,
     QueryEditorDialog,
     CustomConfirmDialog,
@@ -1733,6 +1724,18 @@ export default defineComponent({
       default: false,
     },
     beingUpdated: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * True while a prefill is seeding the WHOLE form at once (library alert,
+     * dashboard panel, logs search). Distinguishes "these fields changed
+     * because someone handed us a finished alert" from "the user just changed
+     * this field", which is the only signal that tells the mode-default
+     * watchers to keep their hands off. `beingUpdated` cannot serve: a prefill
+     * is a NEW alert.
+     */
+    isSeeding: {
       type: Boolean,
       default: false,
     },
@@ -2207,6 +2210,22 @@ export default defineComponent({
           // Edit mode: alert was saved with total_events (aggregation: null)
           selectedFunction.value = "total_events";
           localIsAggregationEnabled.value = false;
+        } else if (props.isSeeding || fv("query_condition.type") === "promql") {
+          // NOT a user switching stream type — a prefill is seeding the whole
+          // form and the stream type only "changed" as part of that. The
+          // alert already knows what it is, so defaulting `avg` + `having`
+          // over it invents a measure alert nobody asked for; on a PromQL
+          // alert (which is what most metric prefills are) it invents a SECOND
+          // threshold beside the real `promql_condition` one.
+          //
+          // Both halves of the guard earn their place: `isSeeding` covers the
+          // window where stream_type has landed but the query type has not
+          // yet, and the form read covers a PromQL alert on its own terms.
+          // `localTab` is NOT usable here — this watcher runs ahead of the one
+          // that syncs it on a whole-form seed.
+          selectedFunction.value = "total_events";
+          localIsAggregationEnabled.value = false;
+          emit("update:isAggregationEnabled", false);
         } else {
           // New alert switching to metrics — default to avg + init aggregation
           selectedFunction.value = "avg";
@@ -3466,16 +3485,10 @@ export default defineComponent({
     // (empty SQL / SQL error / empty PromQL / aggregate-column toast) are
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
-    const highlightedSqlQuery = computed(() => {
-      if (!props.generatedSqlQuery) return "";
-      return hljs.highlight(props.generatedSqlQuery, { language: "sql" }).value;
-    });
-
     return {
       raw,
       t,
       store,
-      highlightedSqlQuery,
       localTab,
       tabOptions,
       shouldShowTabs,

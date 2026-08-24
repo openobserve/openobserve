@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { globalKey } from "@/composables/query/keys";
+import { globalKey, orgKey } from "@/composables/query/keys";
 
 /**
  * Keys only, dependency-free apart from `orgKey`, so a write in another domain
@@ -25,4 +25,10 @@ import { globalKey } from "@/composables/query/keys";
 export const configKeys = {
   all: () => globalKey("config"),
   get: () => globalKey("config", "get"),
+  /**
+   * The authenticated full config, org-scoped: `/api/{org}/config` answers
+   * per-org, so it cannot share the bootstrap entry above — and an org switch
+   * has to purge it, which only an org-rooted key does.
+   */
+  full: (org: string) => orgKey(org, "config", "full"),
 };

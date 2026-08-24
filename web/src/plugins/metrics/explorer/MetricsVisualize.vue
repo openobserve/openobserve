@@ -65,6 +65,7 @@ import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
 import { restoreMetricsStream } from "@/utils/streamPersist";
+import { normaliseMetricsBlobData } from "@/composables/metrics/metricsUrlState";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
@@ -142,12 +143,7 @@ export default defineComponent({
     const applySeed = (seed: Record<string, any>) => {
       resetDashboardPanelData();
       dashboardPanelData.layout.showQueryBar = true;
-      if (Array.isArray(seed.queries)) {
-        for (const q of seed.queries) {
-          if (q && q.fields) q.fields.stream_type = "metrics";
-        }
-      }
-      Object.assign(dashboardPanelData.data, seed);
+      Object.assign(dashboardPanelData.data, normaliseMetricsBlobData({ ...seed }));
       dashboardPanelData.layout.currentQueryIndex = 0;
     };
 

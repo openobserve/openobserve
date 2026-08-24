@@ -552,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
-import { configQuery } from "@/services/config.queries";
+import { configFullQuery } from "@/services/config.queries";
 import { orgSummaryQuery } from "@/services/organizations.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
@@ -960,7 +960,13 @@ onMounted(() => {
 
 const refreshConfig = async () => {
   try {
-    store.dispatch("setConfig", await queryClient.fetchQuery({ ...configQuery(), staleTime: 0 }));
+    if (!orgId.value) return;
+    // Forced: the whole point of this call is a fresher last_usage_report_ts
+    // than the one the banner is already rendering.
+    store.dispatch(
+      "setConfig",
+      await queryClient.fetchQuery({ ...configFullQuery(orgId.value), staleTime: 0 }),
+    );
   } catch (error) {
     console.log(error);
   }

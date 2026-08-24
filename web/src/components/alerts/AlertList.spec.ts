@@ -448,6 +448,15 @@ describe("AlertList - basic rendering", () => {
     expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
   });
 
+  it("titles itself with the SECTION, so the peer tabs never move", async () => {
+    // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
+    // is NOT "Alerts": a per-page title sizes the title block and shifts the
+    // tab strip horizontally on every navigation.
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
+  });
+
   it("renders search input and toggle", async () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
@@ -682,12 +691,22 @@ describe("AlertList - row actions", () => {
     await wrapper.vm.showDeleteDialogFn({ row });
     expect(wrapper.vm.confirmDelete).toBe(true);
 
+    (alertsSvc.listByFolderId as any).mockClear();
     await wrapper.vm.deleteAlertByAlertId();
     await flushPromises();
 
     expect(
       wrapper.vm.filteredResults.find((r: any) => r.alert_id === row.alert_id),
     ).toBeUndefined();
+    // No refetch: reloading the folder would blank the table behind its skeleton
+    // and a loading toast for a row the server already confirmed gone.
+    expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+    // The store cache backs a folder revisit, so the row must leave it too or it
+    // reappears the moment the user navigates away and back.
+    const cached = store.state.organizationData.allAlertsListByFolderId[wrapper.vm.activeFolderId];
+    if (Array.isArray(cached)) {
+      expect(cached.find((r: any) => r.alert_id === row.alert_id)).toBeUndefined();
+    }
   });
 
   it("edit action navigates to update route (sets query action=update)", async () => {

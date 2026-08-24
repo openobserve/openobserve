@@ -85,9 +85,14 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
-        await queryClient.fetchQuery(configQuery())
-          .then(async (data) => {
-            store.commit("setConfig", data);
+        await queryClient
+          .fetchQuery(configQuery())
+          .then(async (data: any) => {
+            // Never replace an already-loaded full config with the bootstrap
+            // subset (e.g. a logged-in user navigating to /login).
+            if (!store.state.zoConfig?.version) {
+              store.commit("setConfig", data);
+            }
           })
           .catch((err) => {
             console.error("Error while fetching config:", err);
@@ -302,9 +307,15 @@ export default defineComponent({
      */
 
     if (this.$route.hash) {
-      queryClient.fetchQuery(configQuery())
-        .then(async (data) => {
-          this.store.commit("setZoConfig", data);
+      queryClient
+        .fetchQuery(configQuery())
+        .then(async (data: any) => {
+          // "setZoConfig" never existed as a mutation, so this fetch stored
+          // nothing; commit through the real mutation, with the same
+          // don't-clobber-the-full-config guard as everywhere else.
+          if (!this.store.state.zoConfig?.version) {
+            this.store.commit("setConfig", data);
+          }
           const token = getUserInfo(this.$route.hash);
 
           if (token !== null && token.email != null) {
