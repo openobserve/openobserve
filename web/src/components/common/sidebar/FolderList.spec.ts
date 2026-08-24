@@ -159,6 +159,38 @@ describe("FolderList.vue", () => {
     wrapper?.unmount();
   });
 
+  // The rail reserves a fixed slot for the icon so every folder name starts at
+  // the same x-position. A folder with no icon still fills it, rather than
+  // leaving a hole that makes the list look ragged.
+  describe("Folder icon slot", () => {
+    it("should render an icon slot for every folder, icon set or not", () => {
+      const slots = wrapper.findAll('[data-test^="dashboard-folder-icon-"]');
+      const rows = wrapper.findAll('[data-test^="dashboard-folder-name-"]');
+      expect(rows.length).toBeGreaterThan(0);
+      expect(slots).toHaveLength(rows.length);
+    });
+
+    it("should fall back to the folder glyph when a folder has no icon", () => {
+      // No icons are stored in this suite, so every slot shows the fallback.
+      const slot = wrapper.find('[data-test^="dashboard-folder-icon-"]');
+      expect(slot.exists()).toBe(true);
+      expect(slot.find("svg").exists()).toBe(true);
+      expect(slot.find('[data-test="glyph-emoji"]').exists()).toBe(false);
+    });
+
+    it("should give the icon slot a fixed size so names stay aligned", () => {
+      const classes = wrapper.find('[data-test^="dashboard-folder-icon-"]').classes();
+      expect(classes).toContain("size-4");
+      expect(classes).toContain("shrink-0");
+    });
+
+    it("should let the folder name take the remaining row width", () => {
+      const name = wrapper.find('[data-test^="dashboard-folder-name-"]');
+      expect(name.classes()).toContain("flex-1");
+      expect(name.classes()).toContain("truncate");
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should render the component correctly", () => {
       expect(wrapper.exists()).toBe(true);

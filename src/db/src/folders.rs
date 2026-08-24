@@ -474,6 +474,7 @@ mod tests {
             folder_id: "test_folder".to_string(),
             name: "Test Folder".to_string(),
             description: "Test description".to_string(),
+            icon: None,
         };
 
         assert_eq!(folder.folder_id, "test_folder");
