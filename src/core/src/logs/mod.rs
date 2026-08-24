@@ -622,7 +622,9 @@ fn handle_timestamp_for_map(
         return Err(get_future_discard_error());
     }
     if timestamp == 0 || !has_valid_timestamp {
-        timestamp = if def_ts > 0 {
+        timestamp = if timestamp > 0 {
+            timestamp
+        } else if def_ts > 0 {
             def_ts
         } else {
             Utc::now().timestamp_micros()
