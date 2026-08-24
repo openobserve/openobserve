@@ -92,6 +92,7 @@ pub async fn merge_parquet_files(
                 &schema,
                 bloom_filter_fields,
                 &metadata,
+                output.file_format,
                 get_config().compact.max_file_size,
                 &mut rx,
                 read_task,
@@ -337,6 +338,10 @@ mod tests {
         assert_eq!(
             metrics.file_name("1", FileFormat::Parquet),
             "hash-sorted-v1-1.parquet"
+        );
+        assert_eq!(
+            metrics.file_name("1", FileFormat::Vortex),
+            "hash-sorted-v1-1.vortex"
         );
         assert_eq!(
             metrics.mark_file_key("files/o/metrics/s/1.parquet"),

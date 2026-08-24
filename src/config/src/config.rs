@@ -671,14 +671,6 @@ impl std::str::FromStr for FileFormat {
 }
 
 impl FileFormat {
-    pub fn for_ingester_stream(stream_type: StreamType, configured: Self) -> Self {
-        if stream_type == StreamType::Metrics {
-            Self::Parquet
-        } else {
-            configured
-        }
-    }
-
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Parquet => FILE_EXT_PARQUET,
@@ -2630,7 +2622,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor merges a closed hour into size-split `indexed-v1-` Parquet files with a `.midx` metrics index. Only affects newly written Parquet metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Experimental metrics index layout. The ingester writes metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor merges a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written Parquet or Vortex metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
     )]
     pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
@@ -4917,22 +4909,6 @@ mod tests {
     fn test_file_format_extension() {
         assert_eq!(FileFormat::Parquet.extension(), ".parquet");
         assert_eq!(FileFormat::Vortex.extension(), ".vortex");
-    }
-
-    #[test]
-    fn test_file_format_for_ingester_stream() {
-        assert_eq!(
-            FileFormat::for_ingester_stream(StreamType::Metrics, FileFormat::Vortex),
-            FileFormat::Parquet
-        );
-        assert_eq!(
-            FileFormat::for_ingester_stream(StreamType::Logs, FileFormat::Vortex),
-            FileFormat::Vortex
-        );
-        assert_eq!(
-            FileFormat::for_ingester_stream(StreamType::Traces, FileFormat::Parquet),
-            FileFormat::Parquet
-        );
     }
 
     #[test]
