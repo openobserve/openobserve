@@ -28,11 +28,10 @@ export const makeGeneralSettingsSchema = (t: (_key: string) => string) =>
     scrape_interval: z
       .any()
       .refine((v) => !isEmpty(v), {
-        message: t("settings.scrapeIntervalRequired") || "Scrape interval is required",
+        message: t("settings.scrapeIntervalRequired"),
       })
       .refine((v) => isEmpty(v) || (!Number.isNaN(Number(v)) && Number(v) >= 0), {
-        message:
-          t("settings.scrapeIntervalPositive") || "Scrape interval must be a positive number",
+        message: t("settings.scrapeIntervalPositive"),
       }),
     // Optional — only range-checked (1000..1000000) when a value is present.
     max_series_per_query: z
@@ -41,9 +40,7 @@ export const makeGeneralSettingsSchema = (t: (_key: string) => string) =>
         (v) =>
           isEmpty(v) || (!Number.isNaN(Number(v)) && Number(v) >= 1000 && Number(v) <= 1000000),
         {
-          message:
-            t("settings.maxSeriesPerQueryValidation") ||
-            "Max series per query must be between 1000 and 1000000",
+          message: t("settings.maxSeriesPerQueryValidation"),
         },
       ),
   });

@@ -272,6 +272,23 @@ describe("VariableSettings", () => {
       expect(vm.getVariableTypeLabel("custom")).toBe("Custom");
       expect(vm.getVariableTypeLabel("unknown_type")).toBe("unknown_type");
     });
+
+    it("reports which variables a variable depends on", async () => {
+      const vm = wrapper.vm as any;
+      // `pod` references `$namespace` in a filter → depends on namespace.
+      vm.dashboardVariablesList = [
+        { name: "namespace", type: "query_values", query_data: { stream: "logs", filter: [] } },
+        {
+          name: "pod",
+          type: "query_values",
+          query_data: { stream: "logs", filter: [{ value: "$namespace" }] },
+        },
+      ];
+      await nextTick();
+
+      expect(vm.getDependencies({ name: "pod" })).toEqual(["namespace"]);
+      expect(vm.getDependencies({ name: "namespace" })).toEqual([]);
+    });
   });
 
   describe("Add Variable Functionality", () => {

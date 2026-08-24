@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 30] = [
-    ("config", 0),               // /config
+const QUERIER_ROUTES: [(&str, usize); 35] = [
+    ("config", 0),               // /config (unauthenticated bootstrap)
+    ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
     ("organizations", 1),        // /api/organizations
     ("settings", 2),             // /api/{org_id}/settings/...
@@ -26,6 +27,8 @@ const QUERIER_ROUTES: [(&str, usize); 30] = [
     ("traces/session", 3),       // /api/{org_id}/{stream_name}/traces/session
     ("traces/user", 3),          // /api/{org_id}/{stream_name}/traces/user
     ("dag", 5),                  // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
+    ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
+    ("traces/time_range", 3),    // /api/{org_id}/{stream_name}/traces/time_range
     ("clusters", 1),             // /api/clusters
     ("query_manager", 2),        // /api/{org_id}/query_manager/...
     ("_search", 2),              // /api/{org_id}/_search
@@ -46,8 +49,10 @@ const QUERIER_ROUTES: [(&str, usize); 30] = [
     ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
-    ("service_streams", 2), // /api/{org_id}/service_streams/...
-    ("node/list", 2),       // /api/_meta/node/list
+    ("discovery", 2),         // /api/{org_id}/discovery
+    ("annotation_queues", 2), // /api/{org_id}/annotation_queues/...
+    ("service_streams", 2),   // /api/{org_id}/service_streams/...
+    ("node/list", 2),         // /api/_meta/node/list
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
@@ -138,9 +143,10 @@ mod tests {
 
     #[test]
     fn test_is_querier_route() {
-        // Test config route
+        // Test config routes: the unauthenticated bootstrap and the
+        // authenticated per-org config are both served by queriers.
         assert!(is_querier_route("/config"));
-        assert!(!is_querier_route("/api/org1/config"));
+        assert!(is_querier_route("/api/org1/config"));
 
         // Test summary route
         assert!(is_querier_route("/api/org1/summary"));
@@ -158,6 +164,26 @@ mod tests {
         assert!(is_querier_route("/api/org1/service_streams/_analytics"));
         assert!(is_querier_route("/api/org1/service_streams/_correlate"));
         assert!(is_querier_route("/api/org1/service_streams/_grouped"));
+
+        // AI evaluation reads execute searches and must never fall through to
+        // the default ingester route.
+        assert!(is_querier_route("/api/org1/discovery"));
+        assert!(is_querier_route(
+            "/api/org1/annotation_queues/queue-1/items/item-1"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/annotation_queues/queue-1/items/item-1/reviews"
+        ));
+        // Test trace detail routes
+        assert!(is_querier_route(
+            "/api/org1/default/traces/trace-id/details"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/default/traces/time_range?trace_id=trace-id"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/default/traces/time_range?session_id=session-id"
+        ));
     }
 
     #[test]

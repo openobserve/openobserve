@@ -279,6 +279,7 @@ members = [
     "src/node",
     "src/transform",
     "src/super_cluster_queue",
+    "src/synthetics",
     "src/search",
     "src/cipher",
     "src/db",
@@ -286,6 +287,7 @@ members = [
     "src/usage_reporting",
     "src/audit",
     "src/promql",
+    "src/metrics_index",
     "src/promql_service",
     "src/jobs",
     "src/mcp",
@@ -333,6 +335,8 @@ openobserve-node = { path = "src/node" }
 common = { path = "src/common" }
 transform = { path = "src/transform" }
 super_cluster_queue = { path = "src/super_cluster_queue" }
+# Deliberately NOT a dependency of super_cluster_queue — see src/synthetics/src/lib.rs.
+openobserve-synthetics = { path = "src/synthetics" }
 search = { path = "src/search" }
 openobserve-cipher = { path = "src/cipher" }
 db = { path = "src/db" }
@@ -340,6 +344,7 @@ search_service = { path = "src/search_service" }
 usage_reporting = { path = "src/usage_reporting" }
 audit = { path = "src/audit" }
 promql = { path = "src/promql" }
+metrics_index = { path = "src/metrics_index" }
 promql-service = { path = "src/promql_service" }
 openobserve-api-common = { path = "src/api/common" }
 openobserve-api-grpc = { path = "src/api/grpc" }
@@ -402,6 +407,7 @@ tower-http = { version = "0.6", features = [
     "decompression-gzip",
     "decompression-br",
     "decompression-deflate",
+    "decompression-zstd",
     "trace",
     "timeout",
     "request-id",
@@ -426,6 +432,11 @@ async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.8"
 aws-credential-types = "1.2.14"
+aws-sdk-lambda = { version = "1", default-features = false, features = [
+    "behavior-version-latest",
+    "default-https-client",
+    "rt-tokio",
+] }
 aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "behavior-version-latest",
     "default-https-client",
@@ -587,6 +598,7 @@ tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = [
     "gzip",
+    "zstd",
     "tls-webpki-roots",
     "tls-native-roots",
 ] }

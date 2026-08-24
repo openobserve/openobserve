@@ -24,7 +24,7 @@ use config::meta::{
         dispatch::DeliveryEpisode,
         grouping::GroupPlan,
         level::AlertLevel,
-        state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
+        state::{AlertState, EvalLedgerWrite, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
     },
     self_reporting::usage::RunOutcome,
 };
@@ -33,7 +33,10 @@ use sea_orm::{
     TransactionTrait,
 };
 
-use super::entity::{alert_state_transitions, alert_states, alerts};
+use super::{
+    entity::{alert_state_transitions, alert_states, alerts},
+    get_lock,
+};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
@@ -131,30 +134,45 @@ pub async fn list_groups_with<C: sea_orm::ConnectionTrait>(
 }
 
 /// Persist a [`StateUpdate`] produced by
-/// `config::meta::alerts::state::apply_outcome`.
+/// `config::meta::alerts::state::apply_outcome`, plus this evaluation's
+/// contribution to the availability ledger (S-16) when it has one.
 ///
-/// The state upsert and its transition insert go in one transaction: a
-/// transition that is not reflected in current state (or vice versa) would make
-/// recovery pairing unreliable, which is the whole reason this is not on the
-/// lossy stream path.
-pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
-    if update.state.is_none() {
+/// The state upsert, its transition insert and the ledger extension go in one
+/// transaction: a transition that is not reflected in current state (or vice
+/// versa) would make recovery pairing unreliable, which is the whole reason
+/// this is not on the lossy stream path — and a ledger that disagreed with the
+/// state row about whether an evaluation happened would put fabricated coverage
+/// and lost coverage one crash apart. A failure loses both together, and the
+/// ledger consequence of that is a gap, which is the safe direction (D34).
+pub async fn persist(
+    update: &StateUpdate,
+    ledger: Option<&EvalLedgerWrite>,
+) -> Result<(), errors::Error> {
+    if update.state.is_none() && ledger.is_none() {
         return Ok(());
     }
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    persist_with(client, update).await
+    persist_with(client, update, ledger).await
 }
 
 /// [`persist`] against a caller-supplied connection.
 pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     conn: &C,
     update: &StateUpdate,
+    ledger: Option<&EvalLedgerWrite>,
 ) -> Result<(), errors::Error> {
-    if update.state.is_none() {
+    if update.state.is_none() && ledger.is_none() {
         return Ok(());
     }
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
     write_update(&txn, update).await?;
+    if let Some(write) = ledger {
+        crate::table::alert_eval_intervals::record_evaluation_with(&txn, write).await?;
+    }
     txn.commit().await?;
     Ok(())
 }
@@ -167,7 +185,13 @@ pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
 /// state that never existed. The evictions go in the same transaction for the
 /// same reason — a cap overflow that upserted the winners but failed to delete
 /// the displaced rows would leave stored rows above the cap.
-pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<(), errors::Error> {
+///
+/// Returns `false` when the plan was dropped by the opt-out gate below rather
+/// than written. The caller needs to be able to tell the two apart: the
+/// super-cluster wrapper must not broadcast a plan this region refused, or a
+/// region that has not yet seen the opt-out would materialise exactly the rows
+/// the toggle promised to remove.
+pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     persist_group_plan_with(client, plan, alert_id).await
 }
@@ -177,7 +201,10 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     conn: &C,
     plan: &GroupPlan,
     alert_id: &str,
-) -> Result<(), errors::Error> {
+) -> Result<bool, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
 
     // §5.3 opt-out race: this evaluation may have read the alert BEFORE a save
@@ -192,7 +219,7 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
             "alert {alert_id}: per-group alerting was turned off mid-evaluation; dropping this \
              evaluation's group writes"
         );
-        return Ok(());
+        return Ok(false);
     }
 
     for update in &plan.updates {
@@ -211,7 +238,7 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     }
 
     txn.commit().await?;
-    Ok(())
+    Ok(true)
 }
 
 /// Record a per-group delivery outcome (§5.5 MN-6/MN-7), conditionally.
@@ -243,6 +270,9 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
     episode: DeliveryEpisode,
     outcome: DeliveryOutcome,
 ) -> Result<bool, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
 
     let Some(current) =
@@ -371,7 +401,10 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
 }
 
 /// Which delivery outcome [`advance_delivery_state`] should record.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// Serializable because the advance replicates across a super cluster by
+/// re-running the same guarded write in every other region.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DeliveryOutcome {
     Delivered {
         /// The alert's configured silence, in minutes. The window itself is
@@ -425,6 +458,10 @@ pub async fn delete_groups_with<C: sea_orm::ConnectionTrait>(
     if group_keys.is_empty() {
         return Ok(());
     }
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .filter(alert_states::Column::GroupKey.is_in(group_keys.to_vec()))
@@ -492,6 +529,9 @@ pub async fn delete_all_groups_with<C: sea_orm::ConnectionTrait>(
     conn: &C,
     alert_id: &str,
 ) -> Result<u64, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let res = alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .filter(alert_states::Column::GroupKey.ne(ROLLUP_GROUP_KEY))
@@ -573,15 +613,50 @@ where
     Ok(())
 }
 
+/// Writes one state/transition update inside a caller-owned metadata
+/// transaction. Composite evaluation uses this after renewing and fencing its
+/// scheduler claim in the same transaction.
+pub async fn persist_update_in_transaction<C>(
+    txn: &C,
+    update: &StateUpdate,
+) -> Result<(), errors::Error>
+where
+    C: sea_orm::ConnectionTrait,
+{
+    write_update(txn, update).await
+}
+
 /// Append one transition row, inside a caller-owned transaction.
 ///
 /// Split out so the delivery callbacks can write a transition alongside their
 /// own guarded state update without going through the state upsert, whose
 /// conflict clause deliberately excludes the delivery columns.
+///
+/// **Identified by `(alert_id, group_key, at)`**, and skipped if that identity
+/// is already stored. The log is append-only with a surrogate key, so nothing
+/// else stops a redelivered super-cluster message from writing the same change
+/// twice — and a duplicated transition is not a cosmetic problem: M-8 history
+/// would show the same recovery repeatedly, once per redelivery. One evaluation
+/// emits at most one transition per group, so the triple cannot collide with a
+/// genuinely different change. The check runs inside the caller's transaction
+/// rather than as a database constraint: there is no unique index on those
+/// columns, and adding one to a live table that may already hold duplicates is
+/// a migration this change deliberately does not make.
 async fn write_transition<C>(txn: &C, t: &StateTransition) -> Result<(), errors::Error>
 where
     C: sea_orm::ConnectionTrait,
 {
+    if alert_state_transitions::Entity::find()
+        .filter(alert_state_transitions::Column::AlertId.eq(t.alert_id.as_str()))
+        .filter(alert_state_transitions::Column::GroupKey.eq(t.group_key.as_str()))
+        .filter(alert_state_transitions::Column::At.eq(t.at))
+        .one(txn)
+        .await?
+        .is_some()
+    {
+        return Ok(());
+    }
+
     alert_state_transitions::ActiveModel {
         alert_id: Set(t.alert_id.clone()),
         group_key: Set(t.group_key.clone()),
@@ -646,11 +721,115 @@ pub async fn list_transitions_filtered(
         .collect())
 }
 
+/// Transitions for one alert inside a time window, oldest first — the shape a
+/// status-lane renderer needs (each row's `to_level` is in effect from `at` to
+/// the next row). Unlike [`list_transitions_filtered`] this is bounded by `at`
+/// and ordered ascending so the caller can paint forward in time.
+pub async fn list_transitions_between(
+    alert_id: &str,
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    limit: u64,
+) -> Result<Vec<StateTransition>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut query = alert_state_transitions::Entity::find()
+        .filter(alert_state_transitions::Column::AlertId.eq(alert_id))
+        .filter(alert_state_transitions::Column::At.gte(from))
+        .filter(alert_state_transitions::Column::At.lte(to));
+    if let Some(key) = group_key {
+        query = query.filter(alert_state_transitions::Column::GroupKey.eq(key));
+    }
+    Ok(query
+        .order_by_asc(alert_state_transitions::Column::At)
+        .limit(limit)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(|m| {
+            Some(StateTransition {
+                alert_id: m.alert_id,
+                group_key: m.group_key,
+                from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
+                to_outcome: RunOutcome::from_i32(m.to_outcome)?,
+                from_level: m.from_level.and_then(AlertLevel::from_i32),
+                to_level: m.to_level.and_then(AlertLevel::from_i32),
+                at: m.at,
+                value: m.value,
+                group_labels: m.group_labels,
+            })
+        })
+        .collect())
+}
+
+/// Batched counterpart to [`list_transitions_between`]: transitions for many
+/// alerts inside one window, grouped by alert id, oldest first per alert. Each
+/// lane is truncated to `per_alert_limit` in memory — the window itself bounds
+/// the fetch, so no per-alert SQL limit (and no N per-child queries) is needed.
+pub async fn list_transitions_between_many(
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    let mut grouped: std::collections::HashMap<String, Vec<StateTransition>> =
+        std::collections::HashMap::new();
+    if alert_ids.is_empty() {
+        return Ok(grouped);
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut query = alert_state_transitions::Entity::find()
+        .filter(alert_state_transitions::Column::AlertId.is_in(alert_ids.iter().cloned()))
+        .filter(alert_state_transitions::Column::At.gte(from))
+        .filter(alert_state_transitions::Column::At.lte(to));
+    if let Some(key) = group_key {
+        query = query.filter(alert_state_transitions::Column::GroupKey.eq(key));
+    }
+    let rows = query
+        .order_by_asc(alert_state_transitions::Column::At)
+        .limit(per_alert_limit.saturating_mul(alert_ids.len() as u64))
+        .all(client)
+        .await?;
+    for m in rows {
+        let Some(to_outcome) = RunOutcome::from_i32(m.to_outcome) else {
+            continue;
+        };
+        let transition = StateTransition {
+            alert_id: m.alert_id,
+            group_key: m.group_key,
+            from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
+            to_outcome,
+            from_level: m.from_level.and_then(AlertLevel::from_i32),
+            to_level: m.to_level.and_then(AlertLevel::from_i32),
+            at: m.at,
+            value: m.value,
+            group_labels: m.group_labels,
+        };
+        let lane = grouped.entry(transition.alert_id.clone()).or_default();
+        if lane.len() < per_alert_limit as usize {
+            lane.push(transition);
+        }
+    }
+    Ok(grouped)
+}
+
 /// Remove all state for an alert. Called when the alert itself is deleted —
 /// unlike `scheduled_jobs`, these rows are owned by the alert's lifecycle.
 pub async fn delete_by_alert(alert_id: &str) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let txn = client.begin().await?;
+    delete_by_alert_with(client, alert_id).await
+}
+
+/// [`delete_by_alert`] against a caller-supplied connection.
+pub async fn delete_by_alert_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    alert_id: &str,
+) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let txn = conn.begin().await?;
     alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .exec(&txn)
@@ -666,6 +845,9 @@ pub async fn delete_by_alert(alert_id: &str) -> Result<(), errors::Error> {
 /// Retention for the append-only transition log. Governed by audit needs, set
 /// independently of the `triggers` stream retention.
 pub async fn delete_transitions_before(cutoff: i64) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     alert_state_transitions::Entity::delete_many()
         .filter(alert_state_transitions::Column::At.lt(cutoff))
@@ -676,6 +858,8 @@ pub async fn delete_transitions_before(cutoff: i64) -> Result<(), errors::Error>
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::PaginatorTrait;
+
     use super::*;
 
     fn model(last_outcome: Option<i32>) -> alert_states::Model {
@@ -824,6 +1008,507 @@ mod tests {
         );
     }
 
+    // ── Replicated apply (PR 0) ─────────────────────────────────────────────
+    // These tables now replicate across a super cluster. Publishing lives one
+    // layer up in `db` — this module cannot reach the enterprise crate — so the
+    // queue processor applies through the functions below and nothing it writes
+    // is broadcast again. A queue redelivers, so every apply runs at least once
+    // and may run again: the state upsert is last-write-wins by primary key,
+    // and the transition insert is made replay-idempotent by the
+    // `(alert_id, group_key, at)` identity.
+
+    /// The three tables the write path touches, built straight from their
+    /// entities so a column the code writes but the fixture lacks fails loudly
+    /// here rather than passing against a hand-rolled subset.
+    ///
+    /// Columns and primary keys only — `create_table_from_entity` emits no
+    /// secondary indexes, and neither state entity declares one. That is
+    /// faithful for the transition log, whose only key IS its autoincrement id:
+    /// there is no unique constraint on `(alert_id, group_key, at)` in the real
+    /// schema either, so replay identity cannot be delegated to the database.
+    async fn db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(alert_states::Entity),
+            schema.create_table_from_entity(alert_state_transitions::Entity),
+            // The group-plan write re-reads the alert's `multi_alert` opt-in
+            // inside its own transaction (§5.3), so the plan tests need the
+            // alert row — and `folders` before it, because the alert entity's
+            // FK is emitted and sqlx turns `PRAGMA foreign_keys` on.
+            schema.create_table_from_entity(crate::table::entity::folders::Entity),
+            schema.create_table_from_entity(alerts::Entity),
+            // The availability ledger shares this write's transaction (S-16).
+            schema.create_table_from_entity(crate::table::entity::alert_eval_intervals::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        db
+    }
+
+    /// The same fixture without the ledger table, so a ledger write is
+    /// guaranteed to fail. The only way to prove the two writes really share
+    /// one transaction is to break one of them.
+    async fn db_without_the_ledger_table() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(alert_states::Entity),
+            schema.create_table_from_entity(alert_state_transitions::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        db
+    }
+
+    fn ledger_write_at(at: i64) -> EvalLedgerWrite {
+        EvalLedgerWrite {
+            org: "myorg".to_string(),
+            alert_id: "alert-1".to_string(),
+            level: AlertLevel::Critical,
+            frequency_secs: 60,
+            tolerance_secs: 0,
+            at,
+        }
+    }
+
+    async fn count_intervals<C: sea_orm::ConnectionTrait>(conn: &C) -> u64 {
+        crate::table::entity::alert_eval_intervals::Entity::find()
+            .count(conn)
+            .await
+            .unwrap()
+    }
+
+    /// Insert the alert row the group-plan gate reads. Only the columns the
+    /// schema requires plus the opt-in itself — everything else is nullable and
+    /// irrelevant to `multi_alert_still_enabled`.
+    async fn insert_alert<C: sea_orm::ConnectionTrait>(conn: &C, alert_id: &str, multi: bool) {
+        use crate::table::entity::folders;
+
+        folders::ActiveModel {
+            id: Set("folder-1".to_string()),
+            org: Set("myorg".to_string()),
+            folder_id: Set("default".to_string()),
+            name: Set("default".to_string()),
+            description: Set(None),
+            r#type: Set(0),
+            icon: Set(None),
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+
+        alerts::ActiveModel {
+            id: Set(alert_id.to_string()),
+            org: Set("myorg".to_string()),
+            folder_id: Set("folder-1".to_string()),
+            name: Set("Test Alert".to_string()),
+            stream_type: Set("logs".to_string()),
+            stream_name: Set("default".to_string()),
+            is_real_time: Set(false),
+            destinations: Set(serde_json::json!([])),
+            row_template_type: Set(0),
+            enabled: Set(true),
+            tz_offset: Set(0),
+            query_type: Set(0),
+            query_promql_multi_alert: Set(Some(multi)),
+            trigger_threshold_operator: Set(">".to_string()),
+            trigger_period_seconds: Set(900),
+            trigger_threshold_count: Set(1),
+            trigger_frequency_type: Set(0),
+            trigger_frequency_seconds: Set(60),
+            trigger_silence_seconds: Set(0),
+            align_time: Set(false),
+            dedup_enabled: Set(false),
+            creates_incident: Set(false),
+            workflows: Set(serde_json::json!([])),
+            ..Default::default()
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+    }
+
+    async fn count_states<C: sea_orm::ConnectionTrait>(conn: &C) -> u64 {
+        alert_states::Entity::find().count(conn).await.unwrap()
+    }
+
+    async fn count_transitions<C: sea_orm::ConnectionTrait>(conn: &C) -> u64 {
+        alert_state_transitions::Entity::find()
+            .count(conn)
+            .await
+            .unwrap()
+    }
+
+    fn state_row(alert_id: &str, group_key: &str, at: i64) -> AlertState {
+        let mut s = AlertState::empty(alert_id, group_key);
+        s.last_outcome = Some(RunOutcome::Firing);
+        s.last_outcome_at = Some(at);
+        s.since = Some(at);
+        s.level = Some(AlertLevel::Critical);
+        s.level_since = Some(at);
+        s.level_at = Some(at);
+        s.last_seen = Some(at);
+        s
+    }
+
+    fn update_at(group_key: &str, at: i64) -> StateUpdate {
+        update_for("alert-1", group_key, at)
+    }
+
+    fn update_for(alert_id: &str, group_key: &str, at: i64) -> StateUpdate {
+        StateUpdate {
+            state: Some(state_row(alert_id, group_key, at)),
+            transition: Some(StateTransition {
+                alert_id: alert_id.to_string(),
+                group_key: group_key.to_string(),
+                from_outcome: None,
+                to_outcome: RunOutcome::Firing,
+                from_level: None,
+                to_level: Some(AlertLevel::Critical),
+                at,
+                value: Some(9.5),
+                group_labels: None,
+            }),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_replayed_state_update_writes_exactly_one_transition() {
+        let db = db().await;
+        let update = update_at("host=web-1", 1_000);
+
+        persist_with(&db, &update, None).await.unwrap();
+        persist_with(&db, &update, None).await.unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(
+            count_transitions(&db).await,
+            1,
+            "a redelivered message must not append the same transition twice"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_is_last_write_wins_by_primary_key() {
+        let db = db().await;
+
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 2_000), None)
+            .await
+            .unwrap();
+        // The older message redelivered after the newer one has landed.
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        let stored = get_with(&db, "alert-1", "host=web-1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            stored.last_outcome_at,
+            Some(1_000),
+            "apply is last-write-wins by primary key, not merge-by-timestamp"
+        );
+    }
+
+    /// The dedup must key on the instant, not on the alert: real history is two
+    /// changes at two times, and swallowing the second would erase it.
+    #[tokio::test]
+    async fn transitions_at_different_instants_both_land() {
+        let db = db().await;
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 2_000), None)
+            .await
+            .unwrap();
+        assert_eq!(count_transitions(&db).await, 2);
+    }
+
+    /// ...and on the group. One evaluation writes every group's transition at
+    /// the same `at`; collapsing them by `(alert_id, at)` would keep one group's
+    /// history and drop the rest.
+    #[tokio::test]
+    async fn transitions_for_different_groups_at_one_instant_all_land() {
+        let db = db().await;
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-2", 1_000), None)
+            .await
+            .unwrap();
+        assert_eq!(count_transitions(&db).await, 2);
+    }
+
+    /// ...and on the alert. Every alert's rollup transition carries the SAME
+    /// group key — the empty string — so an identity that dropped `alert_id`
+    /// would let the first alert to transition in a given microsecond swallow
+    /// every other alert's rollup history.
+    #[tokio::test]
+    async fn transitions_for_different_alerts_at_one_instant_all_land() {
+        let db = db().await;
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_for("alert-2", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        assert_eq!(count_transitions(&db).await, 2);
+    }
+
+    #[tokio::test]
+    async fn a_replayed_delivery_advance_does_not_move_the_silence_window() {
+        let db = db().await;
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+
+        let episode = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+        let outcome = DeliveryOutcome::Delivered {
+            silence_minutes: 10,
+            at: 2_000,
+        };
+
+        assert!(
+            advance_delivery_state_with(&db, "alert-1", "host=web-1", episode, outcome)
+                .await
+                .unwrap()
+        );
+        let after_first = get_with(&db, "alert-1", "host=web-1")
+            .await
+            .unwrap()
+            .unwrap();
+
+        // The replay must still be *applied*, not rejected as stale: a guard
+        // that its own success invalidates would mean the advance lands on
+        // exactly one cluster and every other one silently keeps paging.
+        assert!(
+            advance_delivery_state_with(&db, "alert-1", "host=web-1", episode, outcome)
+                .await
+                .unwrap(),
+            "the delivery guard must stay satisfiable after the write it guards"
+        );
+        let after_replay = get_with(&db, "alert-1", "host=web-1")
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            after_first.silenced_until,
+            Some(2_000 + 10 * 60 * 1_000_000)
+        );
+        assert_eq!(after_replay.silenced_until, after_first.silenced_until);
+        assert_eq!(after_replay.last_notified_level, Some(AlertLevel::Critical));
+    }
+
+    #[tokio::test]
+    async fn a_replayed_failed_delivery_appends_exactly_one_transition() {
+        let db = db().await;
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        assert_eq!(count_transitions(&db).await, 1);
+
+        let episode = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_000,
+            notified_at_enqueue: (None, None),
+        };
+        let outcome = DeliveryOutcome::Failed { at: 3_000 };
+
+        advance_delivery_state_with(&db, "alert-1", "host=web-1", episode, outcome)
+            .await
+            .unwrap();
+        advance_delivery_state_with(&db, "alert-1", "host=web-1", episode, outcome)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            count_transitions(&db).await,
+            2,
+            "the failure adds one transition; the replay adds none — the outcome \
+             has already moved, so no second transition is even proposed"
+        );
+        let stored = get_with(&db, "alert-1", "host=web-1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.last_outcome, Some(RunOutcome::NotifyFailed));
+    }
+
+    #[tokio::test]
+    async fn a_replayed_group_delete_is_a_no_op_and_spares_the_rollup() {
+        let db = db().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+
+        let keys = vec!["host=web-1".to_string()];
+        delete_groups_with(&db, "alert-1", &keys).await.unwrap();
+        delete_groups_with(&db, "alert-1", &keys).await.unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert!(
+            get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_some(),
+            "reaping groups must never take the rollup row with it"
+        );
+        assert_eq!(
+            count_transitions(&db).await,
+            2,
+            "deleting group rows retains their history (M-8)"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_replayed_opt_out_cleanup_is_a_no_op_and_spares_the_rollup() {
+        let db = db().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-2", 1_000), None)
+            .await
+            .unwrap();
+
+        assert_eq!(delete_all_groups_with(&db, "alert-1").await.unwrap(), 2);
+        assert_eq!(
+            delete_all_groups_with(&db, "alert-1").await.unwrap(),
+            0,
+            "the replay finds nothing left to delete"
+        );
+        assert_eq!(count_states(&db).await, 1);
+        assert!(
+            get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_replayed_group_plan_lands_once_with_its_evictions() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        // The row the plan evicts, written by an earlier evaluation.
+        persist_with(&db, &update_at("host=web-9", 500), None)
+            .await
+            .unwrap();
+
+        let plan = GroupPlan {
+            updates: vec![update_at("host=web-1", 1_000)],
+            evicted: vec!["host=web-9".to_string()],
+        };
+        persist_group_plan_with(&db, &plan, "alert-1")
+            .await
+            .unwrap();
+        persist_group_plan_with(&db, &plan, "alert-1")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            list_groups_with(&db, "alert-1").await.unwrap().len(),
+            1,
+            "the plan's row lands, the evicted one stays gone on replay"
+        );
+        assert!(
+            get_with(&db, "alert-1", "host=web-9")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            count_transitions(&db).await,
+            2,
+            "the evicted row's earlier transition, plus the plan's — the replay adds none"
+        );
+    }
+
+    /// The forward-only consequence, recorded deliberately: the gate re-reads
+    /// the alert on the *receiving* cluster, so a plan that outruns its alert
+    /// row is dropped rather than stranding group rows under an alert that
+    /// cluster has never heard of. It converges on the next evaluation.
+    #[tokio::test]
+    async fn a_group_plan_for_an_unknown_alert_writes_nothing() {
+        let db = db().await;
+        let plan = GroupPlan {
+            updates: vec![update_at("host=web-1", 1_000)],
+            evicted: vec![],
+        };
+        assert!(
+            !persist_group_plan_with(&db, &plan, "alert-1")
+                .await
+                .unwrap(),
+            "the drop must be reported, not silently reported as a write — the \
+             super-cluster wrapper decides whether to broadcast on this"
+        );
+        assert_eq!(count_states(&db).await, 0);
+        assert_eq!(count_transitions(&db).await, 0);
+    }
+
+    /// Alert deletion runs on whichever cluster served the API, so this is the
+    /// one replicated write the job cluster does not originate. It must be
+    /// safe to apply on a cluster that has already deleted the rows itself.
+    #[tokio::test]
+    async fn a_replayed_alert_delete_is_a_no_op() {
+        let db = db().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
+            .await
+            .unwrap();
+
+        delete_by_alert_with(&db, "alert-1").await.unwrap();
+        delete_by_alert_with(&db, "alert-1").await.unwrap();
+
+        assert_eq!(count_states(&db).await, 0);
+        assert_eq!(
+            count_transitions(&db).await,
+            0,
+            "an alert's deletion takes its history with it, unlike a group reap"
+        );
+    }
+
+    #[test]
+    fn a_delivery_outcome_survives_the_super_cluster_round_trip() {
+        // The advance replicates by re-running the same guarded write, so the
+        // outcome it carries decides which columns move on every cluster.
+        for outcome in [
+            DeliveryOutcome::Delivered {
+                silence_minutes: 10,
+                at: 2_000,
+            },
+            DeliveryOutcome::Failed { at: 3_000 },
+        ] {
+            let bytes = config::utils::json::to_vec(&outcome).unwrap();
+            let back: DeliveryOutcome = config::utils::json::from_slice(&bytes).unwrap();
+            assert_eq!(back, outcome);
+        }
+    }
+
     #[test]
     fn test_legacy_rows_read_back_as_unknown_not_as_false() {
         // NULL on these columns means "written before the column existed". It
@@ -837,5 +1522,84 @@ mod tests {
         assert_eq!(s.groups_observed_is_lower_bound, None);
         assert_eq!(s.groups_firing_is_lower_bound, None);
         assert_eq!(s.group_labels, None);
+    }
+
+    // ── The availability ledger rides this transaction (S-16, PR 1) ─────────
+
+    #[tokio::test]
+    async fn a_ledger_write_lands_alongside_the_state_row() {
+        let db = db().await;
+
+        persist_with(
+            &db,
+            &update_at(ROLLUP_GROUP_KEY, 1_000),
+            Some(&ledger_write_at(1_000)),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 1);
+    }
+
+    /// Most evaluations carry no ledger write at all — every grouped alert, and
+    /// every unmeasured run. Those must leave the ledger untouched rather than
+    /// writing a zero-width interval.
+    #[tokio::test]
+    async fn a_state_write_without_a_ledger_write_leaves_the_ledger_empty() {
+        let db = db().await;
+
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 0);
+    }
+
+    /// One transaction, not two calls in a row: a ledger failure must take the
+    /// state write down with it. The alternative — state committed, ledger lost
+    /// — is an evaluation the SLI can never see, and the reverse is coverage
+    /// with no state behind it.
+    #[tokio::test]
+    async fn a_failing_ledger_write_rolls_the_state_write_back() {
+        let db = db_without_the_ledger_table().await;
+
+        let err = persist_with(
+            &db,
+            &update_at(ROLLUP_GROUP_KEY, 1_000),
+            Some(&ledger_write_at(1_000)),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .to_lowercase()
+                .contains("alert_eval_intervals"),
+            "expected the ledger write to be what failed, got: {err}"
+        );
+
+        assert_eq!(
+            count_states(&db).await,
+            0,
+            "the state row must not survive a failed ledger write"
+        );
+        assert_eq!(count_transitions(&db).await, 0);
+    }
+
+    /// The queue redelivers, so the bundled apply runs at least once and may run
+    /// again. Neither half may double up.
+    #[tokio::test]
+    async fn a_redelivered_persist_writes_neither_a_second_transition_nor_a_second_interval() {
+        let db = db().await;
+        let update = update_at(ROLLUP_GROUP_KEY, 1_000);
+        let ledger = ledger_write_at(1_000);
+
+        persist_with(&db, &update, Some(&ledger)).await.unwrap();
+        persist_with(&db, &update, Some(&ledger)).await.unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_transitions(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 1);
     }
 }

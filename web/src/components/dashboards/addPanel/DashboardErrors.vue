@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
     </div>
-    <div class="flex overflow-hidden" :style="!showErrors ? 'height: 0px;' : 'height: auto;'">
+    <div class="flex overflow-hidden" :style="!showErrors ? 'height: 0;' : 'height: auto;'">
       <div class="flex flex-col">
         <div data-test="dashboard-error">
           <ul data-test="dashboard-errors-list" class="list-inside list-disc px-3">

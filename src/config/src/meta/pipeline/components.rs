@@ -153,6 +153,8 @@ pub struct Node {
     io_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     style: Option<NodeStyle>,
+    #[serde(default)]
+    pub is_disabled: bool,
 }
 
 impl MemorySize for Node {
@@ -164,6 +166,7 @@ impl MemorySize for Node {
             + self.meta.mem_size()
             + self.io_type.mem_size()
             + self.style.mem_size()
+            + self.is_disabled.mem_size()
     }
 }
 
@@ -174,6 +177,7 @@ impl PartialEq for Node {
             && self.position == other.position
             && self.meta == other.meta
             && self.io_type == other.io_type
+            && self.is_disabled == other.is_disabled
     }
 }
 
@@ -186,6 +190,7 @@ impl Node {
             position: Position { x: pos_x, y: pos_y },
             io_type,
             style: None,
+            is_disabled: false,
         }
     }
 

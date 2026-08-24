@@ -15,7 +15,7 @@
 
 use async_trait::async_trait;
 use chrono::Duration;
-use config::utils::{json, time::now_micros};
+use config::utils::time::now_micros;
 use sqlx::Row;
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
@@ -26,6 +26,37 @@ use crate::{
     },
     errors::{DbError, Error, Result},
 };
+
+const PULL_QUERY: &str = r#"UPDATE scheduled_jobs
+SET status = $1, start_time = $2, claim_epoch = claim_epoch + 1,
+    end_time = CASE WHEN module = $3 THEN $4 ELSE $5 END
+WHERE id IN (
+    SELECT id FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7
+      AND NOT (is_realtime = $8 AND is_silenced = $9)
+    ORDER BY next_run_at, id LIMIT $10
+)
+RETURNING *;"#;
+
+const PULL_QUERY_BY_MODULE: &str = r#"UPDATE scheduled_jobs
+SET status = $1, start_time = $2, claim_epoch = claim_epoch + 1,
+    end_time = CASE WHEN module = $3 THEN $4 ELSE $5 END
+WHERE id IN (
+    SELECT id FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7
+      AND NOT (is_realtime = $8 AND is_silenced = $9) AND module = $10
+    ORDER BY next_run_at, id LIMIT $11
+)
+RETURNING *;"#;
+
+const KEEP_ALIVE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END
+WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
+
+const COMPLETE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET status = $1, retries = $2, next_run_at = $3,
+    is_realtime = $4, is_silenced = $5, data = $6
+WHERE id = $7 AND claim_epoch = $8 AND status = $9;"#;
 
 pub struct SqliteScheduler {}
 
@@ -62,7 +93,8 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    data         TEXT not null
+    data         TEXT not null,
+    claim_epoch  BIGINT default 0 not null
 );
             "#,
         )
@@ -75,6 +107,13 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
             "scheduled_jobs",
             "data",
             "TEXT NOT NULL DEFAULT ''",
+        )
+        .await?;
+        add_column(
+            &client,
+            "scheduled_jobs",
+            "claim_epoch",
+            "BIGINT NOT NULL DEFAULT 0",
         )
         .await?;
 
@@ -174,22 +213,11 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // release lock
         drop(client);
 
-        // For now, only send realtime alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, trigger.org, trigger.module_key
-            );
-
-            // TODO: For sqlite cluster coordinator, the alert triggers are put
-            // into the sqlite meta database to send watch events. Hence, there is a
-            // redundancy of alert triggers stored both in scheduled_jobs and meta
-            // tables. How to remove this redundancy?
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
-                .await?;
-        }
+        // TODO: For sqlite cluster coordinator, the alert triggers are put
+        // into the sqlite meta database to send watch events. Hence, there is a
+        // redundancy of alert triggers stored both in scheduled_jobs and meta
+        // tables. How to remove this redundancy?
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
@@ -307,17 +335,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // release lock
         drop(client);
 
-        // For now, only send alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, trigger.org, trigger.module_key
-            );
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
-                .await?;
-        }
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
@@ -374,6 +392,55 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
+    async fn keep_alive_claim(
+        &self,
+        claim: &Trigger,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<bool> {
+        let now = now_micros();
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
+                .ok_or_else(|| Error::Message("invalid report timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("report timeout overflow".into()))?;
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
+                .ok_or_else(|| Error::Message("invalid alert timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("alert timeout overflow".into()))?;
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let result = sqlx::query(KEEP_ALIVE_CLAIM_QUERY)
+            .bind(TriggerModule::Report)
+            .bind(report_max_time)
+            .bind(alert_max_time)
+            .bind(claim.id)
+            .bind(claim.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&*client)
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let result = sqlx::query(COMPLETE_CLAIM_QUERY)
+            .bind(&trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(trigger.id)
+            .bind(trigger.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&*client)
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
     /// - Lock the Sqlite client for read-write
@@ -408,36 +475,9 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // `module` filter still scopes which rows a per-module puller claims; see postgres.rs for
         // the C3 lock rationale. Legacy `None` string is byte-identical (LIMIT $10).
         let query = if module.is_some() {
-            r#"UPDATE scheduled_jobs
-SET status = $1, start_time = $2,
-    end_time = CASE
-        WHEN module = $3 THEN $4
-        ELSE $5
-    END
-WHERE id IN (
-    SELECT id
-    FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
-      AND module = $10
-    ORDER BY next_run_at
-    LIMIT $11
-)
-RETURNING *;"#
+            PULL_QUERY_BY_MODULE
         } else {
-            r#"UPDATE scheduled_jobs
-SET status = $1, start_time = $2,
-    end_time = CASE
-        WHEN module = $3 THEN $4
-        ELSE $5
-    END
-WHERE id IN (
-    SELECT id
-    FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
-    ORDER BY next_run_at
-    LIMIT $10
-)
-RETURNING *;"#
+            PULL_QUERY
         };
 
         let mut q = sqlx::query_as::<_, Trigger>(query)
@@ -605,7 +645,7 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, SqliteScheduler};
 
     #[test]
     fn test_sqlite_scheduler_new() {
@@ -615,5 +655,33 @@ mod tests {
     #[test]
     fn test_sqlite_scheduler_default() {
         let _scheduler = SqliteScheduler::default();
+    }
+
+    #[test]
+    fn sqlite_claim_epoch_is_created_incremented_and_returned_by_claim() {
+        assert!(PULL_QUERY.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY.contains("RETURNING"));
+    }
+
+    #[test]
+    fn sqlite_composite_keepalive_and_completion_are_epoch_fenced() {
+        for (operation, query) in [
+            ("keep alive", KEEP_ALIVE_CLAIM_QUERY),
+            ("completion", COMPLETE_CLAIM_QUERY),
+        ] {
+            let compact = query.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(
+                compact.contains("id = $"),
+                "{operation} must match the job ID"
+            );
+            assert!(
+                compact.contains("claim_epoch = $"),
+                "{operation} must match the captured epoch"
+            );
+            assert!(
+                compact.contains("status = $"),
+                "{operation} must require Processing status"
+            );
+        }
     }
 }

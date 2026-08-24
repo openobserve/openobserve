@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, nextTick } from "vue";
-import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
+import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import {
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
@@ -98,6 +98,29 @@ const clearFieldLabels = (data: any) => {
   data.queries[0].fields.y.forEach((f: any) => {
     f.label = "";
   });
+};
+
+/**
+ * Draw the threshold lines AND make room for them.
+ *
+ * A chart auto-scales to its DATA, so a threshold outside that range lands
+ * outside the plot area and is simply never seen — and the commonest preview of
+ * all is an alert that is NOT currently firing, where every value sits below the
+ * threshold and the one line the user came to check is the one thing missing.
+ * `thresholdAxisBounds` only ever WIDENS the axis (both chart pipelines take
+ * max(config, dataMax) / min(config, dataMin)), so data that already crosses the
+ * threshold still scales normally.
+ *
+ * The bounds are ASSIGNED, never merged: a refresh that drops the threshold must
+ * drop the headroom it asked for, or the chart keeps scaling to a line it is no
+ * longer drawing.
+ */
+const applyThresholds = (critical: unknown, warning: unknown): void => {
+  const markLines = buildThresholdMarkLines(critical, warning);
+  const bounds = thresholdAxisBounds(markLines);
+  dashboardPanelData.data.config.mark_line = markLines;
+  dashboardPanelData.data.config.y_axis_min = bounds.y_axis_min;
+  dashboardPanelData.data.config.y_axis_max = bounds.y_axis_max;
 };
 
 // Helper function to get decoded VRL function
@@ -347,7 +370,7 @@ const fetchQuerySchema = async () => {
           alias: "zo_sql_key",
           column: "zo_sql_key",
           color: null,
-          label: "Time",
+          label: t("alerts.timeLabel"),
         },
       ];
       const aggFunction = props.formData.query_condition?.aggregation?.function || "";
@@ -368,10 +391,7 @@ const fetchQuerySchema = async () => {
       ];
       dashboardPanelData.data.queries[0].fields.z = [];
       dashboardPanelData.data.queries[0].fields.breakdown = breakdown;
-      dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
-        thresholdValue,
-        warningValue,
-      );
+      applyThresholds(thresholdValue, warningValue);
 
       if (
         !dashboardPanelData.data.queries[0].fields.filter ||
@@ -439,7 +459,7 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.queryType = "sql";
     // Critical + optional Warning marklines (alerts_2.md Feature 1). Both are
     // drawn so the two bands are visible on the preview, matching the mock.
-    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+    applyThresholds(
       props.formData.trigger_condition?.threshold,
       props.formData.trigger_condition?.warning_threshold,
     );
@@ -515,6 +535,15 @@ const handleChartDataUpdate = (resultMetaData: any) => {
     console.warn("[PreviewAlert] No trigger_condition found, skipping evaluation");
     return;
   }
+
+  // PromQL is evaluated in handleSeriesDataUpdate — the only handler that sees
+  // sample VALUES. PromQL `resultMetaData` carries query metadata only
+  // ({ step, trace_id } — usePanelPromQLExecutor.ts:222), so evaluating here
+  // counted nothing and stamped a bogus "0 >= 1" over the real verdict on every
+  // refresh. Keyed on the tab, not on query_condition.type: the form keeps a
+  // stale promql_condition around after the user switches modes.
+  // (This makes the `selectedTab === "promql"` arm of the chain below dead code.)
+  if (props.selectedTab === "promql") return;
 
   // resultMetaData structure from usePanelDataLoader:
   // resultMetaData[queryIndex] is an array of metadata objects from streaming partitions
@@ -641,13 +670,58 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             );
           }
         }
-        // SQL mode: trigger = "SQL returned >= N rows", so count total rows returned
+        // SQL mode: trigger = "SQL returned >= N rows", so count total rows returned.
+        //
+        // Frame arithmetic differs by mode, and getting it wrong silently changes
+        // the verdict:
+        //   - PLAIN partitions are DISJOINT time slices (the request is narrowed
+        //     per partition, search_service/src/streaming/execution.rs:194-197), so
+        //     each frame's `total` is its own slice's row count -> SUM them.
+        //   - STREAMING-AGGREGATE frames each carry the CUMULATIVE merged result
+        //     over everything scanned so far (streaming/collect.rs:152-175 replaces
+        //     hits and recomputes `total`; execution.rs:289-292 "Only accumulate the
+        //     results of the last partition") -> ONE frame already is the whole
+        //     answer, and summing multiplies it by the frame count. Same rule the
+        //     hit handler applies at usePanelSearchHandlers.ts:69.
+        // The backend meanwhile evaluates the alert with a single non-streaming
+        // search (`streaming_output: false`, src/core/src/alerts/mod.rs:584) and
+        // counts `records.len()` once (:831).
         else if (props.selectedTab === "sql") {
-          if (firstQueryMetadata.some((p: any) => p?.total !== undefined)) {
-            resultCount = firstQueryMetadata.reduce(
-              (sum: number, p: any) => sum + (p?.total || 0),
-              0,
-            );
+          // `total: 0` is a SETTLED ANSWER, not a missing field: a shrinking HAVING
+          // (`< N`, `!= N`) legitimately ends at zero rows. Testing truthiness here
+          // instead of `!== undefined` silently resurrects the previous frame's count.
+          const framesWithTotal = firstQueryMetadata.filter((p: any) => p?.total !== undefined);
+          // Neither index 0 nor the last entry alone is a safe place to read the
+          // flag (usePanelSQLExecutor.ts:553 and usePanelSearchHandlers.ts:238-241
+          // make opposite mistakes); the flag is uniform per run, so `some` cannot
+          // false-positive. Derived per call — never latched — so the next preview
+          // of an edited query decides afresh.
+          const isStreamingAggs = firstQueryMetadata.some((p: any) => p?.streaming_aggs === true);
+
+          if (framesWithTotal.length > 0) {
+            if (!isStreamingAggs) {
+              resultCount = framesWithTotal.reduce(
+                (sum: number, p: any) => sum + (Number(p?.total) || 0),
+                0,
+              );
+            } else {
+              // Last-wins, matching the server's own collector (collect.rs:165).
+              // Skip range-capped frames: send_partial_search_resp emits a
+              // default-constructed Response (total = 0, execution.rs:1053) still
+              // tagged streaming_aggs, and taking it literally would report 0 rows.
+              // Scanned without mutating: `firstQueryMetadata` is the composable's
+              // LIVE reactive array, passed by reference from the deep watcher
+              // (usePanelDrilldown.ts:105), and reordering it in place would break
+              // handleStreamingHistogramHits' index arithmetic (:238).
+              let settled: any = undefined;
+              let maxTotal = 0;
+              for (const frame of framesWithTotal) {
+                const total = Number(frame?.total) || 0;
+                if (total > maxTotal) maxTotal = total;
+                if (frame?.is_partial !== true) settled = frame;
+              }
+              resultCount = settled !== undefined ? Number(settled.total) || 0 : maxTotal;
+            }
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
           }
@@ -701,129 +775,422 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             );
           }
         }
-      }
 
-      evaluateAndSetStatus(resultCount);
+        // Only write a verdict when a count could actually be DERIVED from this
+        // payload. Both producers initialise `state.resultMetaData[qi] = []`
+        // immediately before pushing the first frame
+        // (usePanelSearchHandlers.ts:131-133, usePanelSQLExecutor.ts:497-499) and
+        // the deep watcher emits on that assignment
+        // (usePanelDrilldown.ts:104-110), so `[[]]` — and likewise
+        // `[null]` and the legacy object writer's `[{ total, hits }]` — arrives at
+        // the start of EVERY refresh. Evaluating those falls through every branch
+        // with `resultCount` still 0 and flashes "0 rows - WOULD NOT TRIGGER" over
+        // a correct verdict.
+        //
+        // Deliberately NOT the PromQL policy, and the difference is the point: an
+        // unusable THRESHOLD means the alert is not configured, so no verdict is
+        // meaningful and we withdraw (evaluationStatus = null). An empty PAYLOAD
+        // means the data has not arrived yet, so the last known verdict is the
+        // best answer available and we leave it standing. Withdrawing here would
+        // flash a blank badge instead of a wrong one.
+        //
+        // A derived count of ZERO is still a verdict and is still written — the
+        // guard is on the payload being usable, never on the count being nonzero.
+        evaluateAndSetStatus(resultCount);
+      }
     }
   } catch (error) {
     console.error("[PreviewAlert] Error processing chart data:", error);
   }
 };
 
-// Handle series data update event (PromQL only — aggregation evaluation uses handleChartDataUpdate)
-const handleSeriesDataUpdate = (seriesData: any) => {
-  if (!props.formData.trigger_condition) return;
+/** The severity a preview verdict fired at, when the alert has two bands. */
+type PreviewLevel = "critical" | "warning";
 
-  // Aggregation mode is evaluated from partition hits in handleChartDataUpdate
-  if (props.selectedTab === "custom" && props.isAggregationEnabled) return;
+/**
+ * A threshold as a finite number, or null when it is not usable.
+ *
+ * `0` is a real threshold — `up == 0` and "available replicas <= 0" are the
+ * canonical PromQL alerts — so falsiness must not stand in for "unset".
+ *
+ * Everything else that is not a number must come back null, in every spelling,
+ * or the caller silently evaluates against a fabricated threshold: `Number(" ")`
+ * is 0, `Number(true)` is 1 and `Number([5])` is 5. Only `number` and `string`
+ * can carry one; a trimmed-empty string is a cleared input, not a zero.
+ */
+const finiteThreshold = (value: unknown): number | null => {
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  const candidate = typeof value === "string" ? value.trim() : value;
+  if (candidate === "") return null;
+  const parsed = Number(candidate);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
-  // --- PromQL mode ---
-  if (props.selectedTab !== "promql") return;
+/**
+ * The value the backend would classify this series by, or null if it has none.
+ *
+ * The backend takes `samples.last()` unconditionally (src/core/src/alerts/mod.rs:265)
+ * and then drops the series entirely if that value is not a JSON number
+ * (`filter_map(as_f64)`, :274 — `serde_json::Value::from(f64::NAN)` is `Null`).
+ * So there are two distinct rules here, and conflating them diverges:
+ *
+ *  - Walk back over `null` / `undefined` / `""` — those are GAPS, a UI artifact
+ *    the backend never sees: the streaming overlay pushes a `[Date, null]`
+ *    anchor onto every series (overlayNewDataOnOldOptions.ts:80) and the
+ *    aligned-x-axis path fills missing steps with `[time, null]`
+ *    (convertPromQLData.ts:714). The check MUST come before `Number()`:
+ *    `Number(null)` is `0` and `0` is finite, so without it every series reads
+ *    as a hard zero.
+ *  - The first genuinely present value IS the sample. If it is not finite the
+ *    series does not count — do NOT walk back to an older reading. Values
+ *    arrive as STRINGS (`[ts, value.to_string()]`, promql/value.rs:176), so a
+ *    tail of "NaN" or "inf" is exactly the case the backend discards.
+ */
+const classifiableSample = (data: unknown): number | null => {
+  if (!Array.isArray(data)) return null;
+  for (let i = data.length - 1; i >= 0; i--) {
+    const point = data[i];
+    const rawValue = Array.isArray(point) ? point[1] : point;
+    if (rawValue === null || rawValue === undefined || rawValue === "") continue;
+    const value = Number(rawValue);
+    return Number.isFinite(value) ? value : null;
+  }
+  return null;
+};
 
-  try {
-    let resultCount = 0;
-    if (Array.isArray(seriesData)) {
-      resultCount = seriesData.length;
-    } else if (seriesData && typeof seriesData === "object") {
-      if (Array.isArray(seriesData.series)) {
-        resultCount = seriesData.series.length;
-      } else if (Array.isArray(seriesData.data)) {
-        resultCount = seriesData.data.length;
-      } else if (seriesData.options && Array.isArray(seriesData.options.series)) {
-        const dataSeries = seriesData.options.series.filter((s: any) => {
-          const hasData = s.data && Array.isArray(s.data);
-          const hasMultiplePoints = hasData && s.data.length > 1;
-          const hasName = s.name !== undefined && s.name !== null;
-          return (hasName || hasMultiplePoints) && hasData;
-        });
-        resultCount = dataSeries.length;
-      } else if (seriesData.options?.dataset?.source) {
-        const source = seriesData.options.dataset.source;
-        if (Array.isArray(source) && source.length > 1) {
-          resultCount = source.length - 1;
-        }
-      }
-    }
-
-    if (resultCount > 0) evaluateAndSetStatus(resultCount);
-  } catch (error) {
-    console.error("[PreviewAlert] Error processing series data:", error);
+/** One sample against one threshold — mirrors `compare` (config/meta/alerts/level.rs:209). */
+const promqlSampleMatches = (
+  value: number,
+  operator: string | undefined,
+  threshold: number,
+): boolean => {
+  switch (operator) {
+    case ">":
+      return value > threshold;
+    case "<=":
+      return value <= threshold;
+    case "<":
+      return value < threshold;
+    // The backend maps EqualTo to "==" when it builds the PromQL query.
+    case "=":
+    case "==":
+      return value === threshold;
+    case "!=":
+      return value !== threshold;
+    case ">=":
+      return value >= threshold;
+    default:
+      // Mirrors `compare`'s `_ => false` (level.rs:217): an operator with no
+      // numeric meaning classifies NO series. Reachable without an API bug —
+      // nothing rejects a non-comparison PromQL operator at save time. The
+      // direction check runs only when a warning value is set
+      // (alert.rs:720-727) and the rest of PromQL validation is presence-only
+      // (alert.rs:770-776), so an alert carrying e.g. `Contains` saves cleanly.
+      //
+      // What follows is NOT "it never fires" — that reading is wrong twice:
+      //  * In single-alert mode the backend bakes the operator into the query,
+      //    `format!("({v}) {op} {filter}")` (mod.rs:198-210), producing
+      //    `(expr) contains 500` — invalid PromQL. The search returns Err and
+      //    mod.rs:242-249 propagates it deliberately, so the alert ERRORS on
+      //    every evaluation rather than quietly not firing.
+      //  * Zero classified series still reaches the COUNT gate, which reads
+      //    `trigger_condition.operator` — a different field from this one. With
+      //    no series at all it evaluates `compare(0, tc.operator, tc.threshold)`
+      //    (aggregation_level.rs:167), so `<= 0`, `< 1` or `!= N` (N != 0)
+      //    returns Some(Critical) on an empty set. The preview reproduces that
+      //    faithfully because this function only classifies; the gate is
+      //    `evaluateCountGate` and it is not consulted about this operator.
+      // Defaulting to `>=` here would invent a classification the backend never
+      // makes, and would break the second bullet's zero-series case.
+      return false;
   }
 };
 
-// Separate function to evaluate and set status based on result count
-const evaluateAndSetStatus = (resultCount: number) => {
-  const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
-
-  // Use the configured trigger condition threshold values
-  const threshold = props.formData.trigger_condition?.threshold || 0;
+/**
+ * The `trigger_condition` COUNT gate — the coverage gate ("having series >= N"),
+ * not the value threshold. Returns the badge text alongside the verdict so a
+ * two-band evaluation can report the comparison it actually made last.
+ *
+ * COUNTER-INTUITIVE, AND DELIBERATE: a count of 0 is a real input, not a
+ * short-circuit. The backend runs `compare(0.0, tc.operator, tc.threshold)`
+ * unconditionally when nothing classified (aggregation_level.rs:167), so a gate
+ * of `<= 0`, `< 1` or `!= N` (N != 0) fires with no matching item at all. Do not
+ * "fix" that by returning `{ passes: false }` early on `count === 0`, and do not
+ * add such a guard in `evaluatePromqlSeries` either — it would make the preview
+ * disagree with the engine. Pinned by the `<= 0` tests in PreviewAlert.spec.ts.
+ */
+const evaluateCountGate = (count: number): { passes: boolean; comparison: string } => {
+  // Coerced, and NOT only for PromQL: `evaluateCountGate` is shared with the
+  // SQL, builder and aggregation callers, and the form hands every one of them
+  // the raw input value. Uncoerced, `===`/`!==` against a string threshold
+  // reports a self-contradicting "1 == 1 -> no match" — a latent bug on all four
+  // paths, so the coercion belongs at the gate rather than at the one caller
+  // that surfaced it.
+  const threshold = Number(props.formData.trigger_condition?.threshold || 0);
   const operator = props.formData.trigger_condition?.operator || ">=";
 
-  let wouldTrigger = false;
-  let comparisonText = "";
-
-  // For real-time alerts, show neutral message (preview shows historical data, not real-time)
-  if (isRealTime) {
-    // Always show as "would trigger" with informational message for real-time alerts
-    evaluationStatus.value = {
-      wouldTrigger: true,
-      reason: "When conditions match",
-    };
-    return;
-  }
-
-  // For scheduled alerts, evaluate based on operator and threshold
   switch (operator) {
     case ">=":
-      wouldTrigger = resultCount >= threshold;
-      comparisonText = `${resultCount} >= ${threshold}`;
-      break;
+      return { passes: count >= threshold, comparison: `${count} >= ${threshold}` };
     case ">":
-      wouldTrigger = resultCount > threshold;
-      comparisonText = `${resultCount} > ${threshold}`;
-      break;
+      return { passes: count > threshold, comparison: `${count} > ${threshold}` };
     case "<=":
-      wouldTrigger = resultCount <= threshold;
-      comparisonText = `${resultCount} <= ${threshold}`;
-      break;
+      return { passes: count <= threshold, comparison: `${count} <= ${threshold}` };
     case "<":
-      wouldTrigger = resultCount < threshold;
-      comparisonText = `${resultCount} < ${threshold}`;
-      break;
+      return { passes: count < threshold, comparison: `${count} < ${threshold}` };
     case "==":
     case "=":
-      wouldTrigger = resultCount === threshold;
-      comparisonText = `${resultCount} == ${threshold}`;
-      break;
+      return { passes: count === threshold, comparison: `${count} == ${threshold}` };
     case "!=":
-      wouldTrigger = resultCount !== threshold;
-      comparisonText = `${resultCount} != ${threshold}`;
-      break;
+      return { passes: count !== threshold, comparison: `${count} != ${threshold}` };
+    default:
+      return { passes: false, comparison: "" };
+  }
+};
+
+/** The noun the badge counts in: series for PromQL, groups/rows/points otherwise. */
+const resultLabelFor = (resultCount: number): I18nText => {
+  const plural = resultCount !== 1;
+
+  // PromQL counts SERIES. It must key off the MODE, not off the chart type (the
+  // preview hardcodes "line" for PromQL, which is what made a series count come
+  // out labelled "data points") and not off the presence of a promql_condition
+  // (the form keeps one around after the user switches tabs).
+  if (props.selectedTab === "promql") {
+    return plural
+      ? t("alerts.previewEvaluation.matchingSeriesPlural")
+      : t("alerts.previewEvaluation.matchingSeries");
   }
 
-  // Determine appropriate label based on chart data
   const chartType = dashboardPanelData.data.type;
   const hasGroupBy =
     dashboardPanelData.data.queries[0]?.fields?.breakdown?.length > 0 ||
     dashboardPanelData.data.queries[0]?.fields?.x?.length > 0;
 
-  let resultLabel = "result";
   if (props.isAggregationEnabled && hasGroupBy) {
-    resultLabel = resultCount !== 1 ? "matching groups" : "matching group";
-  } else if (chartType === "line") {
-    resultLabel = resultCount !== 1 ? "data points" : "data point";
-  } else if (chartType === "table") {
-    resultLabel = resultCount !== 1 ? "rows" : "row";
-  } else {
-    resultLabel = resultCount !== 1 ? "results" : "result";
+    return plural
+      ? t("alerts.previewEvaluation.matchingGroups")
+      : t("alerts.previewEvaluation.matchingGroup");
   }
+  if (chartType === "line") {
+    return plural
+      ? t("alerts.previewEvaluation.dataPoints")
+      : t("alerts.previewEvaluation.dataPoint");
+  }
+  if (chartType === "table") {
+    return plural ? t("alerts.previewEvaluation.rows") : t("alerts.previewEvaluation.row");
+  }
+  return plural ? t("alerts.previewEvaluation.results") : t("alerts.previewEvaluation.result");
+};
+
+/**
+ * Real-time alerts get a neutral message: the preview shows historical data, so
+ * there is no verdict to compute. Checked by every entry point BEFORE it counts
+ * anything, so nothing is evaluated only to be thrown away.
+ */
+const writeRealTimeStatus = (): boolean => {
+  const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
+  if (!isRealTime) return false;
+  evaluationStatus.value = {
+    wouldTrigger: true,
+    reason: t("alerts.previewEvaluation.realTimeReason"),
+  };
+  return true;
+};
+
+/**
+ * Write the badge. `level` names the severity that fired, and is set only when
+ * the alert has two bands — with a single band there is nothing to disambiguate
+ * and the sentence must carry no severity word at all.
+ */
+const setEvaluationStatus = (verdict: {
+  count: number;
+  wouldTrigger: boolean;
+  comparison: string;
+  level?: PreviewLevel | null;
+}) => {
+  const args = {
+    count: verdict.count,
+    label: resultLabelFor(verdict.count),
+    comparison: verdict.comparison,
+  };
+  const sentence = verdict.wouldTrigger
+    ? t("alerts.previewEvaluation.reasonMatch", args)
+    : t("alerts.previewEvaluation.reasonNoMatch", args);
 
   evaluationStatus.value = {
-    wouldTrigger,
-    reason: wouldTrigger
-      ? `${resultCount} ${resultLabel} match (${comparisonText})`
-      : `${resultCount} ${resultLabel} found - does not meet ${comparisonText}`,
+    wouldTrigger: verdict.wouldTrigger,
+    reason: verdict.level
+      ? t("alerts.previewEvaluation.reasonLevel", {
+          reason: sentence,
+          level:
+            verdict.level === "critical"
+              ? t("alerts.previewEvaluation.levelCritical")
+              : t("alerts.previewEvaluation.levelWarning"),
+        })
+      : sentence,
   };
+};
+
+// Evaluate and set status based on a result count already gated on value
+// (rows, groups, data points). PromQL goes through evaluatePromqlSeries instead.
+const evaluateAndSetStatus = (resultCount: number) => {
+  if (writeRealTimeStatus()) return;
+
+  const gate = evaluateCountGate(resultCount);
+  setEvaluationStatus({
+    count: resultCount,
+    wouldTrigger: gate.passes,
+    comparison: gate.comparison,
+  });
+};
+
+/**
+ * The PromQL verdict, mirroring `evaluate_level_over_items`
+ * (config/meta/alerts/aggregation_level.rs:146):
+ *
+ *  1. classify each series by its last sample — critical first, most severe wins
+ *  2. gate `criticalCount`; a pass fires CRITICAL and the warning count is never
+ *     consulted
+ *  3. otherwise gate `firingCount` (warning-or-worse, so a critical series counts
+ *     in both); a pass fires WARNING
+ *
+ * There is exactly ONE count gate: `trigger_condition.warning_threshold` is
+ * rejected at save time for PromQL (src/core/src/alerts/alert.rs:680-696), so the
+ * backend's `warning_threshold.unwrap_or(threshold)` collapses to `threshold`.
+ * `widened_threshold` only ever widens the backend's QUERY, never the counts.
+ *
+ * Last sample, not "ever crossed": that matches multi-alert mode exactly. In
+ * single-alert mode the backend pre-filters the query, so a series that crossed
+ * and came back down still counts there while the preview says it does not —
+ * the safe direction for a preview, which never claims an alert would fire on a
+ * series that is currently healthy.
+ */
+const evaluatePromqlSeries = (dataSeries: any[]) => {
+  if (writeRealTimeStatus()) return;
+
+  const promqlCondition = props.formData.query_condition?.promql_condition;
+  const critical = finiteThreshold(promqlCondition?.value);
+  const warning = finiteThreshold(props.formData.query_condition?.promql_warning_value);
+  // No `?? ">="` fallback: a missing operator is as meaningless as an
+  // unrecognised one (Rust's `operator: Operator` has no serde default, so the
+  // backend can never receive a condition without one), and both must reach the
+  // same answer rather than having the preview invent a comparison.
+  const operator: string | undefined = promqlCondition?.operator;
+
+  // No usable threshold — no condition at all, or a value that is not a finite
+  // number — means there is nothing to classify against, so there is no verdict
+  // to show. Counting every series instead would reinstate the exact tautology
+  // this fixes, and dressed as a condition match ("2 series match (2 >= 1)") it
+  // reads as MORE authoritative than the old bug. It is an ordinary gesture, not
+  // a corner case: a number input emits "" the moment the user clears the field.
+  if (critical === null) {
+    evaluationStatus.value = null;
+    return;
+  }
+
+  // The COUNT gate needs a usable number for the same reason. Clearing the
+  // "having series" box gives "", and `Number("" || 0)` is 0, so the badge would
+  // announce "0 series match (0 >= 0)" — WOULD TRIGGER over an empty result set,
+  // the same tautology on the other threshold. An explicit 0 is still a real
+  // gate and is evaluated (`compare(0, >=, 0)` is true on the backend too); only
+  // an unusable value withdraws.
+  //
+  // The WITHDRAWAL is scoped to PromQL on purpose: the SQL, builder and
+  // aggregation callers still evaluate an unusable count threshold as 0, which
+  // predates this fix and is out of its scope. The inconsistency is known, not
+  // an oversight — the same treatment for those paths is a follow-up.
+  //
+  // The `Number()` COERCION inside `evaluateCountGate` is deliberately NOT so
+  // scoped, and the two must not be read as one decision: that coercion removes
+  // a self-contradicting "1 == 1 -> no match" which the shared callers hit just
+  // as PromQL does, so it is applied at the gate and changes their behaviour on
+  // purpose. Same reasoning for the `Number(p?.total)` in the plain SQL sum,
+  // which stops `+` concatenating string totals into "0102".
+  if (finiteThreshold(props.formData.trigger_condition?.threshold) === null) {
+    evaluationStatus.value = null;
+    return;
+  }
+
+  let criticalCount = 0;
+  let firingCount = 0; // warning-or-worse
+
+  for (const series of dataSeries) {
+    const value = classifiableSample(series?.data);
+    if (value === null) continue;
+    if (promqlSampleMatches(value, operator, critical)) {
+      criticalCount++;
+      firingCount++;
+    } else if (warning !== null && promqlSampleMatches(value, operator, warning)) {
+      firingCount++;
+    }
+  }
+
+  const hasWarningBand = warning !== null;
+
+  const criticalGate = evaluateCountGate(criticalCount);
+  if (criticalGate.passes) {
+    setEvaluationStatus({
+      count: criticalCount,
+      wouldTrigger: true,
+      comparison: criticalGate.comparison,
+      level: hasWarningBand ? "critical" : null,
+    });
+    return;
+  }
+
+  // The badge reports the widest count actually gated, so a near-miss explains
+  // itself. With no warning band firingCount === criticalCount, and the backend
+  // never consults the second gate at all — hence `hasWarningBand &&`.
+  const firingGate = evaluateCountGate(firingCount);
+  const firesWarning = hasWarningBand && firingGate.passes;
+  setEvaluationStatus({
+    count: firingCount,
+    wouldTrigger: firesWarning,
+    comparison: firingGate.comparison,
+    level: firesWarning ? "warning" : null,
+  });
+};
+
+// Handle series data update event (PromQL only — every other mode is evaluated
+// from partition metadata in handleChartDataUpdate)
+const handleSeriesDataUpdate = (seriesData: any) => {
+  if (!props.formData.trigger_condition) return;
+  if (props.selectedTab !== "promql") return;
+
+  try {
+    // PanelSchemaRenderer only ever emits panelData, i.e. the converted ECharts
+    // option (PanelSchemaRenderer.vue:1338). A payload with no series is
+    // evaluated as zero rather than skipped, so a refresh that stops matching
+    // replaces its own stale verdict. (That is not a guarantee the renderer
+    // makes: on a zero-result completion with a chart already on screen it
+    // returns without reassigning panelData (:1204), so the deep watch never
+    // fires and this handler is not called at all.)
+    const emittedSeries: any[] = Array.isArray(seriesData?.options?.series)
+      ? seriesData.options.series
+      : [];
+
+    // Drop entries that carry no data. DEFENCE IN DEPTH, not load-bearing:
+    // besides the markLine attached to each data series
+    // (convertPromQLData.ts:724), every time-series chart also gets a DEDICATED
+    // nameless markLine/markArea series (:1083) whose data is a single
+    // `[ts, null]` point. The predicate excludes it (no name, one point) — but
+    // `classifiableSample` rejects it independently, reading that lone `null` as
+    // a gap and returning null, so dropping this filter would not move a single
+    // verdict against either producer today. It is kept as the cheaper barrier,
+    // and because it does not depend on that point staying null: a nameless
+    // one-point series carrying a real NUMBER would be classified without it.
+    const dataSeries = emittedSeries.filter((s: any) => {
+      const hasData = Array.isArray(s?.data);
+      const hasMultiplePoints = hasData && s.data.length > 1;
+      const hasName = s?.name !== undefined && s?.name !== null;
+      return (hasName || hasMultiplePoints) && hasData;
+    });
+
+    evaluatePromqlSeries(dataSeries);
+  } catch (error) {
+    console.error("[PreviewAlert] Error processing series data:", error);
+  }
 };
 
 const refreshData = () => {
@@ -869,7 +1236,7 @@ const refreshData = () => {
       alias: "zo_sql_key",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
-      label: "Timestamp",
+      label: t("alerts.timestamp"),
     },
   ];
 
@@ -904,11 +1271,17 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queries[0].config.promql_mode = true;
+    // A binary operator or an aggregation strips every label, leaving a series
+    // the legend renders as "{}". Name it after what the alert measures — the
+    // same fallback AlertGroupChart uses. Consulted only when a series has no
+    // name of its own to give: labels that identify it always win.
+    dashboardPanelData.data.queries[0].config.promql_legend_fallback =
+      props.formData.stream_name || t("alerts.preview");
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
     // Add threshold mark line from promql_condition
-    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+    applyThresholds(
       props.formData.query_condition?.promql_condition?.value,
       props.formData.query_condition?.promql_warning_value,
     );
@@ -930,7 +1303,7 @@ const refreshData = () => {
     // Configure x-axis for zo_sql_key (timestamp buckets)
     xAxis = [
       {
-        label: "Time",
+        label: t("alerts.timeLabel"),
         alias: "zo_sql_key",
         column: "zo_sql_key",
         color: null,
@@ -959,7 +1332,7 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "line"; // Line chart for histogram
-    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+    applyThresholds(
       props.formData.trigger_condition?.threshold,
       props.formData.trigger_condition?.warning_threshold,
     );

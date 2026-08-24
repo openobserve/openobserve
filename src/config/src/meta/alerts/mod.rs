@@ -44,6 +44,11 @@ pub mod state;
 pub mod state_level;
 pub mod tags;
 
+/// Minimum silence applied to a realtime alert after each notification, even
+/// when the alert's own silence is 0 — without a floor, every matching
+/// ingestion request sends a notification and its db writes.
+const REALTIME_MIN_SILENCE_SECS: i64 = 30;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
 pub struct TriggerCondition {
@@ -341,6 +346,15 @@ impl TriggerCondition {
             )
         }
     }
+
+    /// Effective realtime-alert silence in microseconds: the alert's own
+    /// silence (minutes) floored by [`REALTIME_MIN_SILENCE_SECS`].
+    pub fn effective_silence_micros(&self) -> i64 {
+        self.silence
+            .saturating_mul(60)
+            .max(REALTIME_MIN_SILENCE_SECS)
+            .saturating_mul(1_000_000)
+    }
 }
 
 impl TriggerCondition {
@@ -426,6 +440,15 @@ pub struct TriggerEvalResults {
     /// count.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_classification: Option<grouping::GroupClassification>,
+    /// The evaluation completed but **observed nothing** — an SLO alert whose
+    /// every window was frozen (stale watermark, coverage under the floor,
+    /// superseded generation; `alerts_2.md` §7.6). Categorically different
+    /// from "evaluated and nothing matched": a frozen run must not be recorded
+    /// as `Ok`, or a measurement outage reads as a recovery for every
+    /// burn-rate alert in the org (D34). Only `Slo` evaluations set this, and
+    /// only with `data: None` and `level: None`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub frozen: bool,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]

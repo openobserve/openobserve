@@ -14,12 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
 import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -43,6 +45,7 @@ export function usePanelDrilldown({
   selectedAnnotationData,
   isCursorOverPanel,
   showErrorNotification,
+  t,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -66,6 +69,7 @@ export function usePanelDrilldown({
   selectedAnnotationData: any;
   isCursorOverPanel: any;
   showErrorNotification: any;
+  t: TranslateFn;
 }) {
   // Cross-linking: store cross-links from result_schema response
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
@@ -932,10 +936,17 @@ export function usePanelDrilldown({
       // if drilldown by url
       if (drilldownData.type == "byUrl") {
         try {
+          // Guard the RESOLVED url. The form schema rejects a hostile one at
+          // save time, but that is client-side only: a direct dashboard PUT
+          // stores anything, and dashboards saved before the schema existed
+          // are still in the DB. A variable VALUE can also carry a scheme.
+          const resolved = replacePlaceholders(drilldownData.data.url, drilldownVariables);
+          if (!isSafeNavigableUrl(resolved)) return;
           // open url
           return window.open(
-            replacePlaceholders(drilldownData.data.url, drilldownVariables),
+            resolved,
             drilldownData.targetBlank ? "_blank" : "_self",
+            "noopener,noreferrer",
           );
         } catch {
           /* ignore: best-effort window.open */
@@ -944,7 +955,7 @@ export function usePanelDrilldown({
         try {
           navigateToLogs();
         } catch (error) {
-          showErrorNotification("Failed to navigate to logs");
+          showErrorNotification(t("dashboard.failedToNavigateToLogs"));
         }
       } else if (drilldownData.type == "byDashboard") {
         // we have folder, dashboard and tabs name

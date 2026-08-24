@@ -3,7 +3,8 @@
 /**
  * Alerts 4.0 (multi-alerts) — UI surfaces  [P0]
  *
- * Complements alerts-multialert-api.spec.js (which owns the API contract) by
+ * Complements the API contract suite (now pytest:
+ * tests/api-testing/tests/alerts/test_multialert_api.py) by
  * asserting the rendering the API cannot: the create form saves end-to-end, the
  * Simple/Multi toggle reflects a stored multi-alert, and the new Alert Detail
  * page shows the multi layout. Multi cases are created via the API and then

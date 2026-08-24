@@ -47,11 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
+          @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :enable-column-format="enableColumnFormat"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -174,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-sm dark:shadow-sm"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -413,6 +415,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Table preview's per-column format icon; explicit opt-in, not derived from `viewOnly` (which tracks print mode) — only PanelEditor sets this.
+    enableColumnFormat: {
+      type: Boolean,
+      default: false,
+    },
     shouldRefreshWithoutCache: {
       type: Boolean,
       required: false,
@@ -453,10 +460,12 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "sparkline-warning-update",
     "is-partial-data-update",
     "series-data-update",
     "contextmenu",
     "show-legends",
+    "format-column",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -597,6 +606,7 @@ export default defineComponent({
         top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
         backgroundColor: (void isDark.value, chartColor("--color-surface-base")),
+        // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
         boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
@@ -643,6 +653,8 @@ export default defineComponent({
       errorDetail,
       metadata,
       resultMetaData,
+      sparklineData,
+      sparklineWarning,
       annotations,
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
@@ -709,6 +721,14 @@ export default defineComponent({
       );
 
       return filtered;
+    });
+
+    // Keep metric sparkline hits index-aligned with filteredData (same filter).
+    const filteredSparklineData = computed(() => {
+      const sd = sparklineData?.value;
+      if (!Array.isArray(sd)) return sd;
+      if (!hiddenQueries.value || hiddenQueries.value.length === 0) return sd;
+      return sd.filter((_: any, index: number) => !hiddenQueries.value.includes(index));
     });
 
     // Also filter panelSchema.queries in sync with filteredData
@@ -811,19 +831,19 @@ export default defineComponent({
 
       const currentXLabel =
         panelSchema?.value?.type == "table"
-          ? "First Column"
+          ? t("panel.firstColumn")
           : panelSchema?.value?.type == "h-bar"
-            ? "Y-Axis"
-            : "X-Axis";
+            ? t("panel.yAxisShort")
+            : t("panel.xAxisShort");
 
       const currentYLabel =
         panelSchema?.value?.type == "table"
-          ? "Other Columns"
+          ? t("panel.otherColumn")
           : panelSchema?.value?.type == "h-bar"
-            ? "X-Axis"
-            : "Y-Axis";
+            ? t("panel.xAxisShort")
+            : t("panel.yAxisShort");
 
-      validateSQLPanelFields(panelSchema.value, 0, currentXLabel, currentYLabel, errors, true);
+      validateSQLPanelFields(t, panelSchema.value, 0, currentXLabel, currentYLabel, errors, true);
 
       return errors;
     });
@@ -921,6 +941,7 @@ export default defineComponent({
             chartPanelStyle.value,
             annotations,
             loading.value,
+            filteredSparklineData.value,
           );
 
           // Apply overlay BEFORE assigning to panelData.value.
@@ -1104,7 +1125,7 @@ export default defineComponent({
     );
 
     watch(
-      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations],
+      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations, sparklineData],
       async () => {
         // emit vrl function field list per query index
         if (data.value?.length) {
@@ -1452,6 +1473,8 @@ export default defineComponent({
 
     const { showErrorNotification, showPositiveNotification } = useNotifications();
 
+    const onFormatColumn = (field: string) => emit("format-column", field);
+
     const { drilldownArray, onChartClick, openDrilldown, hidePopupsAndOverlays } =
       usePanelDrilldown({
         panelSchema,
@@ -1476,6 +1499,7 @@ export default defineComponent({
         selectedAnnotationData,
         isCursorOverPanel,
         showErrorNotification,
+        t,
       });
 
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
@@ -1485,6 +1509,7 @@ export default defineComponent({
       tableRendererRef,
       showErrorNotification,
       showPositiveNotification,
+      t,
     });
 
     // Trellis only applies when EVERY query has a breakdown field (each
@@ -1522,6 +1547,11 @@ export default defineComponent({
     // Watch isPartialData changes and emit them
     watch(isPartialData, (newValue) => {
       emit("is-partial-data-update", newValue);
+    });
+
+    // Surface the sparkline-unavailable warning (e.g. JOIN queries) on the header.
+    watch(sparklineWarning, (newValue) => {
+      emit("sparkline-warning-update", newValue);
     });
 
     const tableRendererData = computed(() => {
@@ -1562,6 +1592,7 @@ export default defineComponent({
       tableRendererRef,
       tableRendererData,
       onChartClick,
+      onFormatColumn,
       onDataZoom,
       drilldownArray,
       selectedAnnotationData,

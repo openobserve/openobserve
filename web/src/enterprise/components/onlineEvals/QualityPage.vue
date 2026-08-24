@@ -34,6 +34,7 @@
     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
     <KpiCardRow
       v-else
+      gap="gap-2"
       class="quality-page__kpis px-page-edge"
       :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
     >
@@ -50,10 +51,7 @@
     <!-- Tier 2: the configs table is the persistent view; selecting a
          row opens the detail in a right-side ODrawer (70% width). The user
          keeps full context of the list behind the drawer. -->
-    <div
-      class="quality-page__tier2 grid min-h-0 flex-1 gap-3"
-      style="grid-template-columns: minmax(0, 1fr)"
-    >
+    <div class="quality-page__tier2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3">
       <QualityScoreConfigsTable
         :rows="configRows"
         :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
@@ -212,7 +210,7 @@ const {
   rows: configRows,
   isLoading: isConfigsLoading,
   refresh: refreshConfigs,
-} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, agentFilterRef);
+} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, t, agentFilterRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
 const detailScope = ref<QualityScope>("all");
@@ -241,7 +239,7 @@ const {
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef, detailScope);
+} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef, detailScope, t);
 
 const {
   isLoading: isChartsLoading,

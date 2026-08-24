@@ -14,12 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { gt } from "@/types/i18n";
 import { wrapCsvValue, usePanelAlertCreation, usePanelDownload } from "./usePanelActions";
 import { downloadFile } from "@/utils/dom";
+import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 
 vi.mock("@/utils/dom", () => ({
   downloadFile: vi.fn(),
 }));
+
+const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
 describe("usePanelActions", () => {
   beforeEach(() => {
@@ -51,6 +56,8 @@ describe("usePanelActions", () => {
             {
               query: 'select count(*) as "errors" from logs',
               fields: {
+                stream: "logs",
+                stream_type: "logs",
                 y: [{ column: "errors", alias: "errors" }],
               },
             },
@@ -107,26 +114,46 @@ describe("usePanelActions", () => {
       expect(api.contextMenuVisible.value).toBe(false);
     });
 
-    it("navigates to alert creation with encoded panel payload", () => {
+    it("navigates to alert creation, carrying the payload out of the URL", () => {
       const args = makeBase();
       const api = usePanelAlertCreation(args as any);
       args.contextMenuData.value = { seriesName: "errors" };
 
-      api.handleCreateAlert({ condition: ">", threshold: 10 });
+      api.handleCreateAlert({ condition: "above", threshold: 10 });
 
       expect(args.router.push).toHaveBeenCalledTimes(1);
       const pushArg = args.router.push.mock.calls[0][0];
       expect(pushArg.name).toBe("addAlert");
       expect(pushArg.query.org_identifier).toBe("org-1");
-      expect(pushArg.query.fromPanel).toBe("true");
+      expect(pushArg.query.prefill).toBe("panel");
+      // The old scheme rode the URL and risked truncation; it must not come back.
+      expect(pushArg.query.panelData).toBeUndefined();
 
-      const decoded = JSON.parse(decodeURIComponent(pushArg.query.panelData));
-      expect(decoded.panelTitle).toBe("Errors");
-      expect(decoded.queryType).toBe("sql");
-      expect(decoded.threshold).toBe(10);
-      expect(decoded.condition).toBe(">");
-      expect(decoded.yAxisColumn).toBe("errors");
-      expect(decoded.executedQuery).toContain("where level");
+      const stored = readAlertPrefill();
+      expect(stored?.sourceLabel).toBe("Errors");
+      expect(stored?.queryType).toBe("sql");
+      expect(stored?.streamName).toBe("logs");
+      expect(stored?.sql).toContain("where level");
+      // The y-axis extraction is this surface's own knowledge — it survives as
+      // the HAVING the consumer injects with the SQL parser.
+      expect(stored?.meta?.sqlHaving).toEqual({
+        column: "errors",
+        operator: ">=",
+        value: 10,
+      });
+    });
+
+    it("explains itself instead of no-oping when the panel has no stream", () => {
+      const args = makeBase();
+      args.panelSchema.value.queries[0].fields = {
+        y: [{ column: "errors", alias: "errors" }],
+      };
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 10 });
+
+      expect(args.router.push).not.toHaveBeenCalled();
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("does nothing when query is missing", () => {
@@ -160,6 +187,7 @@ describe("usePanelActions", () => {
       },
       showErrorNotification: vi.fn(),
       showPositiveNotification: vi.fn(),
+      t: gt,
     });
 
     it("delegates table downloads to table renderer", () => {

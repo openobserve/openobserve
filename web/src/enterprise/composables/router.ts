@@ -29,6 +29,14 @@ const AISessionsPage = () => import("@/enterprise/views/AIObservability/Sessions
 const AIAgentGraphPage = () => import("@/enterprise/views/AIObservability/AgentGraphPage.vue");
 const AIAgentBehaviorPage = () =>
   import("@/enterprise/views/AIObservability/AgentBehaviorPage.vue");
+const AIDatasetsPage = () => import("@/enterprise/views/AIObservability/DatasetsPage.vue");
+const AIDatasetDetailPage = () =>
+  import("@/enterprise/views/AIObservability/DatasetDetailPage.vue");
+const AIDiscoveryPage = () => import("@/enterprise/views/AIObservability/DiscoveryPage.vue");
+const AIQueuesPage = () => import("@/enterprise/views/AIObservability/QueuesPage.vue");
+const AIQueueDetailPage = () => import("@/enterprise/views/AIObservability/QueueDetailPage.vue");
+const AIQueueWorkbenchPage = () =>
+  import("@/enterprise/views/AIObservability/QueueWorkbenchPage.vue");
 // Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
 // AI menu item active) instead of the Traces session-details route.
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
@@ -43,7 +51,7 @@ const useEnvRoutes = () => {
       name: "awsMarketplaceSetup",
       component: AwsMarketplaceSetup,
       meta: {
-        title: "AWS Marketplace Setup",
+        titleKey: "routeTitles.awsMarketplaceSetup",
         requiresAuth: true,
       },
     },
@@ -71,7 +79,7 @@ const useEnvRoutes = () => {
         routeGuard(to, from, next);
       },
       meta: {
-        title: "AI Monitoring",
+        titleKey: "routeTitles.aiMonitoring",
         keepAlive: false,
       },
       children: [
@@ -84,32 +92,70 @@ const useEnvRoutes = () => {
           path: "llm-insights",
           name: "aiLLMInsights",
           component: AILLMInsightsPage,
-          meta: { title: "Insights", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.llmInsights", keepAlive: false },
         },
         {
           path: "sessions",
           name: "aiSessions",
           component: AISessionsPage,
-          meta: { title: "Sessions", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.sessions", keepAlive: false },
         },
         {
           path: "agent-graph",
           name: "aiAgentGraph",
           component: AIAgentGraphPage,
-          meta: { title: "Agent Graph", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.agentGraph", keepAlive: false },
         },
         {
           path: "agent-behavior",
           name: "aiAgentBehavior",
           component: AIAgentBehaviorPage,
-          meta: { title: "Agent Behavior", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.agentBehavior", keepAlive: false },
+        },
+        {
+          path: "discovery",
+          name: "aiDiscovery",
+          component: AIDiscoveryPage,
+          meta: { titleKey: "aiObservability.nav.discovery", keepAlive: false },
+        },
+        {
+          path: "queues",
+          name: "aiQueues",
+          component: AIQueuesPage,
+          meta: { titleKey: "aiObservability.nav.queues", keepAlive: false },
+        },
+        {
+          path: "queues/:id",
+          name: "aiQueueDetail",
+          component: AIQueueDetailPage,
+          meta: { titleKey: "routeTitles.aiQueueDetail", keepAlive: false },
+        },
+        // The Workbench is a MODE of a queue, not a sibling page — it sits under
+        // the queue it reviews so "back" lands on the queue, not the list.
+        {
+          path: "queues/:id/review",
+          name: "aiQueueWorkbench",
+          component: AIQueueWorkbenchPage,
+          meta: { titleKey: "routeTitles.aiQueueReview", keepAlive: false },
+        },
+        {
+          path: "datasets",
+          name: "aiDatasets",
+          component: AIDatasetsPage,
+          meta: { titleKey: "aiObservability.nav.datasets", keepAlive: false },
+        },
+        {
+          path: "datasets/:id",
+          name: "aiDatasetDetail",
+          component: AIDatasetDetailPage,
+          meta: { titleKey: "routeTitles.aiDatasetDetail", keepAlive: false },
         },
         {
           path: "evaluations",
           name: "aiEvaluations",
           component: OnlineEvals,
           props: { hideTabBar: true },
-          meta: { title: "Evaluations", keepAlive: false },
+          meta: { titleKey: "onlineEvals.title", keepAlive: false },
         },
       ],
     },
@@ -119,7 +165,7 @@ const useEnvRoutes = () => {
       path: "ai/session-details",
       name: "aiSessionDetails",
       component: SessionDetails,
-      meta: { title: "Session Details", keepAlive: false },
+      meta: { titleKey: "routeTitles.sessionDetails", keepAlive: false },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },

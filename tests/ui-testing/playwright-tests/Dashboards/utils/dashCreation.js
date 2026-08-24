@@ -63,28 +63,55 @@ export const applyQueryButton = async function (page) {
 export async function deleteDashboard(page, dashboardName) {
   testLogger.info('Deleting dashboard', { dashboardName });
 
-  // Wait for page to be fully loaded
-// ✅ Wait for either the Dashboard API or Folder API (whichever comes first)
-  await Promise.race([
-    page.waitForResponse(
-      (response) => {
-        const url = response.url();
-        return (
-          ( /\/api\/.*\/dashboards/.test(url) ||
-            /\/api\/.*\/folders/.test(url) ) &&
-          response.status() === 200
-        );
-      },
-      { timeout: 20000 }
-    ),
-    page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
-  ]);
+  await page.locator('[data-test="dashboard-table"]').waitFor({
+    state: 'visible',
+    timeout: 20000,
+  });
 
-  const deleteButton = page
+  const nameCell = page
     .locator(`[data-test="dashboard-name-cell-${dashboardName}"]`)
-    .first()
+    .first();
+
+  // The dashboard list is paginated and is not sorted newest-first. Narrow it
+  // to the generated dashboard when its row is not on the current page.
+  //
+  // Filling the search ONCE and then waiting 15s is not enough: this runs right
+  // after returning from the panel editor, so the list is often still loading
+  // and re-rendering. A fill landing mid-render is discarded (the input remounts
+  // empty), leaving the search unapplied and the row on some other page — the
+  // wait then expires against a row that was never going to appear. Re-assert
+  // the filter until the row shows up.
+  const searchInput = page.locator('[data-test="dashboard-search-field"]').first();
+  const findAttempts = 3;
+  for (let attempt = 1; attempt <= findAttempts; attempt++) {
+    if (await nameCell.isVisible().catch(() => false)) break;
+
+    if (await searchInput.count()) {
+      // Re-fill only when the filter did not stick, so a slow-but-applied
+      // search is left alone rather than being retyped underneath itself.
+      if ((await searchInput.inputValue().catch(() => "")) !== dashboardName) {
+        await searchInput.fill(dashboardName).catch(() => {});
+      }
+    }
+
+    // waitFor() blocks; isVisible({timeout}) does NOT — that option is
+    // documented as ignored and the call returns immediately. Polling with
+    // isVisible here made all three attempts complete in microseconds, so the
+    // loop never actually gave the filtered list time to render and was a
+    // no-op versus the single waitFor below.
+    const found = await nameCell
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (found) break;
+  }
+
+  await nameCell.waitFor({ state: 'visible', timeout: 15000 });
+
+  const deleteButton = nameCell
     .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
     .locator('[data-test="dashboard-delete"]');
+  await deleteButton.waitFor({ state: 'visible', timeout: 10000 });
   await deleteButton.click();
 
   // Wait for the confirmation dialog to ensure it is fully rendered
@@ -226,6 +253,96 @@ export async function reopenDashboardFromList(page, dashboardName) {
 }
 
 /**
+ * A one-line snapshot of what the dashboard view actually rendered, for failure
+ * messages. A bare `locator.waitFor` timeout says only "the button never showed",
+ * which is the one thing already known — this says what was on screen instead.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<string>}
+ */
+async function describeDashboardView(page) {
+  const state = await page
+    .evaluate(() => ({
+      url: location.href,
+      backBtn: !!document.querySelector('[data-test="dashboard-back-btn"]'),
+      // RenderDashboardCharts' own container — absent means the view body never mounted
+      chartsContainer: !!document.querySelector(".render-dashboard-charts-container"),
+      panelContainers: document.querySelectorAll('[data-test="dashboard-panel-container"]').length,
+      tabList: !!document.querySelector('[data-test="dashboard-tab-list"]'),
+      // The empty-state illustration renders alongside the add-panel card, but the
+      // card itself is gated on `!viewOnly` — art present + button absent narrows
+      // the cause to a view-only render rather than a load that never finished.
+      emptyStateArt: !!document.querySelector('[data-test="empty-panel-art"]'),
+      toast:
+        document.querySelector("[data-test-variant]")?.getAttribute("data-test-message") ?? null,
+    }))
+    .catch((e) => ({ evaluateFailed: e.message }));
+  return JSON.stringify(state);
+}
+
+/**
+ * Wait for a freshly created (empty) dashboard to be ready for `addPanel()`.
+ *
+ * createDashboard() returns as soon as /dashboards/view is reachable and the
+ * header's back button has mounted, but the empty-state add-panel button lives in
+ * RenderDashboardCharts (v-if="!panels.length"), which only renders once the
+ * dashboard GET and variables init have finished. Under parallel load that lands
+ * well after the header.
+ *
+ * Occasionally that initial load wedges outright and no amount of extra waiting
+ * helps — the previous single 30s wait then died with an opaque timeout. Recovery
+ * is a re-navigation to the view URL, which re-runs the dashboard GET and variables
+ * init; the dashboard already exists by this point, so it is safe and idempotent.
+ *
+ * The re-navigation deliberately uses the URL captured on entry rather than
+ * page.reload(): when that first load fails outright the app bounces back to the
+ * dashboards list, and reloading would just reload the list forever. If it still
+ * isn't ready, fail with what was actually on screen rather than a bare timeout.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} dashboardName - only used for logging
+ */
+export async function waitForEmptyDashboardReady(page, dashboardName) {
+  const addPanelBtn = page.locator(SELECTORS.ADD_PANEL_BTN);
+  // createDashboard() has just landed on /dashboards/view, so this is the URL to
+  // return to. Capture it now — by the time the wait below expires the app may
+  // have navigated away.
+  const viewUrl = page.url();
+
+  try {
+    await addPanelBtn.waitFor({ state: "visible", timeout: 20000 });
+    return;
+  } catch {
+    testLogger.warn("Empty-state add-panel button did not render, re-opening dashboard view", {
+      dashboardName,
+      viewUrl,
+      state: await describeDashboardView(page),
+    });
+  }
+
+  if (!/\/dashboards\/view/.test(viewUrl)) {
+    throw new Error(
+      `setupTestDashboard("${dashboardName}"): expected to be on the dashboard view after ` +
+        `createDashboard(), but the URL was ${viewUrl}. Dashboard view state: ${await describeDashboardView(page)}`
+    );
+  }
+
+  await page.goto(viewUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
+
+  try {
+    await addPanelBtn.waitFor({ state: "visible", timeout: 30000 });
+    testLogger.info("Empty-state add-panel button rendered after re-opening the view", {
+      dashboardName,
+    });
+  } catch {
+    throw new Error(
+      `setupTestDashboard("${dashboardName}"): the empty-state add-panel button never rendered, ` +
+        `even after re-opening ${viewUrl}. Dashboard view state: ${await describeDashboardView(page)}`
+    );
+  }
+}
+
+/**
  * Set up a test dashboard for variable tests
  * Consolidates the common pattern of navigating to dashboards,
  * creating a dashboard, and waiting for it to be ready
@@ -247,7 +364,7 @@ export async function setupTestDashboard(page, pm, dashboardName, options = {}) 
   await pm.dashboardCreate.createDashboard(dashboardName);
 
   if (waitForAddPanelBtn) {
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await waitForEmptyDashboardReady(page, dashboardName);
   }
 
   testLogger.info('Test dashboard setup complete', { dashboardName });

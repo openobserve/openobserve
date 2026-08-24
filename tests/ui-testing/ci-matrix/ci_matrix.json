@@ -1,113 +1,5 @@
 [
   {
-    "testfolder": "GeneralTests",
-    "actual_folder": "GeneralTests",
-    "browser": "chrome",
-    "run_files": [
-      "sanity.spec.js",
-      "changeOrg.spec.js",
-      "enrichment.spec.js",
-      "schema.spec.js",
-      "schemaload.spec.js",
-      "serviceAccount.spec.js",
-      "usersOrg.spec.js",
-      "org.spec.js",
-      "theme-management.spec.js",
-      "ingestion-config.spec.js",
-      "ingestionTokens.spec.js",
-      "landingPage.spec.js",
-      "languageTranslation.spec.js",
-      "edition-features.spec.js",
-      "logsqueries.sql-comments.spec.js",
-      "iam-form-validation.spec.js",
-      "regex-patterns-form-validation.spec.js",
-      "cipher-keys-form-validation.spec.js",
-      "settings-form-validation.spec.js",
-      "ai-toolsets-form-validation.spec.js",
-      "shared-components-form-validation.spec.js",
-      "onboarding-form-validation.spec.js",
-      "rum-form-validation.spec.js",
-      "login-form-validation.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Logs-Builder-Basic",
-    "actual_folder": "Logs",
-    "browser": "chrome",
-    "run_files": [
-      "logsQueryBuilder-chart.spec.js",
-      "logsQueryBuilder-filters-basic.spec.js",
-      "pagination.spec.js",
-      "unflattened.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Logs-Builder-Advanced",
-    "actual_folder": "Logs",
-    "browser": "chrome",
-    "run_files": [
-      "logsQueryBuilder-editor.spec.js",
-      "logsQueryBuilder-filters-advanced.spec.js",
-      "logsquickmode.spec.js",
-      "logshistogram.spec.js",
-      "logsQuickPick.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Logs-Core",
-    "actual_folder": "Logs",
-    "browser": "chrome",
-    "run_files": [
-      "logspage.spec.js",
-      "logstable.spec.js",
-      "logsqueries.spec.js",
-      "join.spec.js",
-      "shareLink.spec.js",
-      "logsAnalyzeDimensions.spec.js",
-      "monaco-query-prefill.spec.js",
-      "logsqueries.matchall.spec.js",
-      "ftsDefaultColumn.spec.js",
-      "logsVisualizePersistence.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "_comment": "Own shard because isSelectStarForTable() only exists when the server runs with ZO_QUICK_MODE_ENABLED=true. That flag is read once at process start, so it cannot vary between tests sharing a backend — each shard gets its own OpenObserve process. Every other shard omits quick_mode_enabled and keeps the default (false).",
-    "testfolder": "Logs-SelectStar",
-    "actual_folder": "Logs",
-    "browser": "chrome",
-    "quick_mode_enabled": "true",
-    "run_files": [
-      "logsVisualizeSelectStar.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Logs-Features",
-    "actual_folder": "Logs",
-    "browser": "chrome",
-    "run_files": [
-      "logs-autocomplete-suggestions.spec.js",
-      "logs-sql-autocomplete.spec.js",
-      "logsqueries.cte.spec.js",
-      "logsDownloads.spec.js",
-      "secondsPrecisionAdded.spec.js",
-      "searchpartition.spec.js",
-      "indexquery.spec.js",
-      "region.spec.js",
-      "timezoneDisplay.spec.js"
-    ],
-    "disabled": [
-      {
-        "file": "searchJobInspector.spec.js",
-        "reason": "TODO: update for new correlation feature"
-      }
-    ]
-  },
-  {
     "testfolder": "Alerts",
     "actual_folder": "Alerts",
     "browser": "chrome",
@@ -116,17 +8,14 @@
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
       "alerts-destinations-prebuilt.spec.js",
+      "dl-email-destinations.spec.js",
       "alerts-vrl-encoding.spec.js",
       "alerts-history.spec.js",
       "alerts-template-prebuilt-guard.spec.js",
       "alerts-form-validation.spec.js",
       "anomaly-detection-form-validation.spec.js",
       "alerts-priority-tags.spec.js",
-      "alerts-multialert-api.spec.js",
-      "alerts-multialert-ui.spec.js",
-      "alerts-multialert-regression.spec.js",
-      "alerts-multialert-firing.spec.js",
-      "alerts-multialert-transitions.spec.js"
+      "alerts-multialert-ui.spec.js"
     ],
     "disabled": [
       {
@@ -142,6 +31,45 @@
         "reason": ""
       }
     ]
+  },
+  {
+    "testfolder": "Dashboard-Config-Settings",
+    "actual_folder": "Dashboards",
+    "browser": "chrome",
+    "run_files": [
+      "dashboard-series-color-multiwindow.spec.js",
+      "dashboard-config-advanced.spec.js",
+      "dashboard-config-axis.spec.js",
+      "dashboard-config-gauge-maps.spec.js",
+      "dashboard-config-general.spec.js",
+      "dashboard-config-legends.spec.js",
+      "dashboard-config-line-style.spec.js",
+      "dashboard-config-panel-time.spec.js",
+      "dashboard-config-table.spec.js",
+      "dashboard-config-trellis.spec.js",
+      "dashboard-config-drilldown.spec.js",
+      "dashboard-config-promql.spec.js",
+      "dashboard-config-markline.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Dashboards-Charts",
+    "_comment": "Dashboard panel tests are grouped by feature so each shard stays under the ephemeral-runner endurance window. A single combined 16-spec shard ran ~40 min and got reclaimed mid-run ('runner lost communication'). Add new specs to the shard of the feature they cover.",
+    "actual_folder": "Dashboards",
+    "browser": "chrome",
+    "run_files": [
+      "custom-charts.spec.js",
+      "dashboard-geoMap.spec.js",
+      "dashboard-maps.spec.js",
+      "dashboard-multi-y-axis.spec.js",
+      "dashboard-html-chart.spec.js",
+      "dashboard-sankey.spec.js",
+      "dashboard-pie-donut.spec.js",
+      "dashboard-metric-camelcase.spec.js",
+      "dashboard-create-alert.spec.js"
+    ],
+    "disabled": []
   },
   {
     "testfolder": "Dashboards-Core",
@@ -175,6 +103,19 @@
     "disabled": []
   },
   {
+    "testfolder": "Dashboards-Panel-Level-DateTime-Config",
+    "actual_folder": "Dashboards",
+    "browser": "chrome",
+    "run_files": [
+      "dashboard-panel-time-config-behavior.spec.js",
+      "dashboard-panel-time-url-priority.spec.js",
+      "dashboard-panel-time-advanced-edge-cases.spec.js",
+      "dashboard-panel-time-apply-behavior.spec.js",
+      "dashboard-panel-time-variables-behavior.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Dashboards-Settings",
     "actual_folder": "Dashboards",
     "browser": "chrome",
@@ -191,30 +132,11 @@
     "disabled": []
   },
   {
-    "testfolder": "Dashboards-Charts",
-    "_comment": "Dashboard panel tests are grouped by feature so each shard stays under the ephemeral-runner endurance window. A single combined 16-spec shard ran ~40 min and got reclaimed mid-run ('runner lost communication'). Add new specs to the shard of the feature they cover.",
+    "testfolder": "Dashboards-Streaming",
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
-      "custom-charts.spec.js",
-      "dashboard-geoMap.spec.js",
-      "dashboard-maps.spec.js",
-      "dashboard-multi-y-axis.spec.js",
-      "dashboard-html-chart.spec.js",
-      "dashboard-sankey.spec.js",
-      "dashboard-pie-donut.spec.js",
-      "dashboard-metric-camelcase.spec.js",
-      "dashboard-create-alert.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Dashboards-Visualize",
-    "actual_folder": "Dashboards",
-    "browser": "chrome",
-    "run_files": [
-      "visualize.spec.js",
-      "visualize-vrl.spec.js"
+      "dashboard-streaming.spec.js"
     ],
     "disabled": []
   },
@@ -235,11 +157,176 @@
     "disabled": []
   },
   {
-    "testfolder": "Dashboards-Streaming",
+    "testfolder": "Dashboards-Variables",
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
-      "dashboard-streaming.spec.js"
+      "dashboard-variables-setting.spec.js",
+      "dashboard-variables-global.spec.js",
+      "dashboard-variables-tab-level.spec.js",
+      "dashboard-variables-panel-level.spec.js",
+      "dashboard-variables-dependency.spec.js",
+      "dashboard-variables-refresh.spec.js",
+      "dashboard-variables-url-sync.spec.js",
+      "dashboard-variables-creation-scopes.spec.js",
+      "dashboard-variables-default-values-chain.spec.js",
+      "dashboard-variables-custom-parents.spec.js",
+      "dashboard-variables-stream-field.spec.js",
+      "dashboard-mustache-variables.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Dashboards-Visualize",
+    "actual_folder": "Dashboards",
+    "browser": "chrome",
+    "run_files": [
+      "visualize.spec.js",
+      "visualize-vrl.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Functions",
+    "actual_folder": "Functions",
+    "browser": "chrome",
+    "run_files": [
+      "js-transform-type.spec.js",
+      "row-expansion.spec.js",
+      "enrichment-table-url.spec.js",
+      "functions-form-validation.spec.js",
+      "action-scripts-form-validation.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "GeneralTests",
+    "actual_folder": "GeneralTests",
+    "browser": "chrome",
+    "run_files": [
+      "sanity.spec.js",
+      "changeOrg.spec.js",
+      "enrichment.spec.js",
+      "schema.spec.js",
+      "schemaload.spec.js",
+      "serviceAccount.spec.js",
+      "usersOrg.spec.js",
+      "org.spec.js",
+      "theme-management.spec.js",
+      "ingestion-config.spec.js",
+      "ingestionTokens.spec.js",
+      "landingPage.spec.js",
+      "languageTranslation.spec.js",
+      "edition-features.spec.js",
+      "logsqueries.sql-comments.spec.js",
+      "iam-form-validation.spec.js",
+      "regex-patterns-form-validation.spec.js",
+      "cipher-keys-form-validation.spec.js",
+      "settings-form-validation.spec.js",
+      "ai-toolsets-form-validation.spec.js",
+      "shared-components-form-validation.spec.js",
+      "onboarding-form-validation.spec.js",
+      "rum-form-validation.spec.js",
+      "login-form-validation.spec.js",
+      "datetime-picker-copy-paste.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Logs-Builder-Advanced",
+    "actual_folder": "Logs",
+    "browser": "chrome",
+    "run_files": [
+      "logsQueryBuilder-editor.spec.js",
+      "logsQueryBuilder-filters-advanced.spec.js",
+      "logsquickmode.spec.js",
+      "logshistogram.spec.js",
+      "logsQuickPick.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Logs-Builder-Basic",
+    "actual_folder": "Logs",
+    "browser": "chrome",
+    "run_files": [
+      "logsQueryBuilder-chart.spec.js",
+      "logsQueryBuilder-filters-basic.spec.js",
+      "pagination.spec.js",
+      "unflattened.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Logs-Core",
+    "actual_folder": "Logs",
+    "browser": "chrome",
+    "run_files": [
+      "logspage.spec.js",
+      "logstable.spec.js",
+      "logsqueries.spec.js",
+      "join.spec.js",
+      "shareLink.spec.js",
+      "logsAnalyzeDimensions.spec.js",
+      "monaco-query-prefill.spec.js",
+      "logsqueries.matchall.spec.js",
+      "ftsDefaultColumn.spec.js",
+      "logsVisualizePersistence.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Logs-Features",
+    "actual_folder": "Logs",
+    "browser": "chrome",
+    "run_files": [
+      "logs-autocomplete-suggestions.spec.js",
+      "logs-sql-autocomplete.spec.js",
+      "logsqueries.cte.spec.js",
+      "logsDownloads.spec.js",
+      "secondsPrecisionAdded.spec.js",
+      "searchpartition.spec.js",
+      "indexquery.spec.js",
+      "region.spec.js",
+      "timezoneDisplay.spec.js"
+    ],
+    "disabled": [
+      {
+        "file": "searchJobInspector.spec.js",
+        "reason": "TODO: update for new correlation feature"
+      }
+    ]
+  },
+  {
+    "_comment": "Own shard because isSelectStarForTable() only exists when the server runs with ZO_QUICK_MODE_ENABLED=true. That flag is read once at process start, so it cannot vary between tests sharing a backend \u2014 each shard gets its own OpenObserve process. Every other shard omits quick_mode_enabled and keeps the default (false).",
+    "testfolder": "Logs-SelectStar",
+    "actual_folder": "Logs",
+    "browser": "chrome",
+    "quick_mode_enabled": "true",
+    "run_files": [
+      "logsVisualizeSelectStar.spec.js",
+      "logsBuildStreamList.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Metrics",
+    "actual_folder": "Metrics",
+    "browser": "chrome",
+    "run_files": [
+      "metrics.spec.js",
+      "metrics-queries.spec.js",
+      "metrics-aggregations.spec.js",
+      "metrics-advanced.spec.js",
+      "metrics-config-tabs.spec.js",
+      "metrics-visualizations.spec.js",
+      "metrics-config.spec.js",
+      "metrics-promql-query-persistence.spec.js",
+      "metrics-table-column-order.spec.js",
+      "metrics-promql-builder.spec.js",
+      "promqlAutocomplete.spec.js",
+      "metrics-share-deep-link.spec.js",
+      "metrics-explorer-share-visualize.spec.js"
     ],
     "disabled": []
   },
@@ -268,19 +355,6 @@
     ]
   },
   {
-    "testfolder": "Functions",
-    "actual_folder": "Functions",
-    "browser": "chrome",
-    "run_files": [
-      "js-transform-type.spec.js",
-      "row-expansion.spec.js",
-      "enrichment-table-url.spec.js",
-      "functions-form-validation.spec.js",
-      "action-scripts-form-validation.spec.js"
-    ],
-    "disabled": []
-  },
-  {
     "testfolder": "Reports",
     "actual_folder": "Reports",
     "browser": "chrome",
@@ -290,7 +364,33 @@
       "reportFolders.spec.js",
       "reports-bulk-operations.spec.js",
       "reports-form-validation.spec.js",
-      "reportCsvMediaType.spec.js"
+      "reportCsvMediaType.spec.js",
+      "scheduledReportsDrawer.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "RUM",
+    "_comment": "The RUM ingest/token/sourcemaps routes are part of the standard (OSS) router (src/api/http/src/handler/http/router/mod.rs), so these specs run against the OSS binary. Ingestion-auth negative cases live in the API suite (tests/api-testing/tests/rum).",
+    "actual_folder": "RUM",
+    "browser": "chrome",
+    "run_files": [
+      "rum-cdn-dataflow.spec.js",
+      "rum-npm-dataflow.spec.js",
+      "rum-page-dataflow.spec.js",
+      "rum-onboarding-snippets.spec.js",
+      "sourcemap-ui.spec.js",
+      "sourcemap-upload-pretty.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "RUM-Token",
+    "_comment": "rum-token.spec.js RESETS the org RUM token; running it beside the dataflow specs (workers run files in parallel) would 401 their in-flight SDK beacons. Own shard = own isolated instance \u2014 do NOT merge back into RUM.",
+    "actual_folder": "RUM",
+    "browser": "chrome",
+    "run_files": [
+      "rum-token.spec.js"
     ],
     "disabled": []
   },
@@ -324,101 +424,30 @@
     "disabled": []
   },
   {
-    "testfolder": "RUM",
-    "_comment": "The RUM ingest/token/sourcemaps routes are part of the standard (OSS) router (src/api/http/src/handler/http/router/mod.rs), so these specs run against the OSS binary. Ingestion-auth negative cases live in the API suite (tests/api-testing/tests/rum).",
-    "actual_folder": "RUM",
+    "testfolder": "SLO",
+    "_comment": "SLO lifecycle, form validation and the alert SLI type. No backfill dependency, so these run in parallel \u2014 but pinned to 3 workers: at 5 the concurrent SLO/alert/destination writes trip SQLite's 'database is locked' on the single-node meta store. The REST contract is covered by pytest in tests/api-testing/tests/slos/.",
+    "actual_folder": "SLO",
     "browser": "chrome",
+    "ingest_allowed_upto": "240",
+    "workers": 3,
     "run_files": [
-      "rum-cdn-dataflow.spec.js",
-      "rum-npm-dataflow.spec.js",
-      "rum-page-dataflow.spec.js",
-      "rum-onboarding-snippets.spec.js",
-      "sourcemap-ui.spec.js",
-      "sourcemap-upload-pretty.spec.js"
+      "slo-crud.spec.js",
+      "slo-form-validation.spec.js",
+      "slo-alert-sli.spec.js"
     ],
     "disabled": []
   },
   {
-    "testfolder": "RUM-Token",
-    "_comment": "rum-token.spec.js RESETS the org RUM token; running it beside the dataflow specs (workers run files in parallel) would 401 their in-flight SDK beacons. Own shard = own isolated instance \u2014 do NOT merge back into RUM.",
-    "actual_folder": "RUM",
+    "testfolder": "SLO-Measurement",
+    "_comment": "SEPARATE SHARD ON PURPOSE. These two specs seed 8 days of history and wait for the backfill job (ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1, so its 3 backfilled SLOs queue strictly one at a time). slo_backfill_chunk_secs is bumped from the 86400 (1-day) server default to the full 604800 (7-day) window each of those SLOs uses, so each finishes in 1 chunk instead of 7 -- no test here asserts on per-chunk timing or partial coverage, only on the final measured state. Any spec creating SLOs on the same instance queues behind them and starves the wait, so they must not share a runner with the SLO shard. Both specs are mode:serial and pay the backfill once in beforeAll.",
+    "actual_folder": "SLO",
     "browser": "chrome",
+    "ingest_allowed_upto": "240",
+    "slo_backfill_chunk_secs": "604800",
+    "workers": 1,
     "run_files": [
-      "rum-token.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Metrics",
-    "actual_folder": "Metrics",
-    "browser": "chrome",
-    "run_files": [
-      "metrics.spec.js",
-      "metrics-queries.spec.js",
-      "metrics-aggregations.spec.js",
-      "metrics-advanced.spec.js",
-      "metrics-config-tabs.spec.js",
-      "metrics-visualizations.spec.js",
-      "metrics-config.spec.js",
-      "metrics-promql-query-persistence.spec.js",
-      "metrics-table-column-order.spec.js",
-      "metrics-promql-builder.spec.js",
-      "promqlAutocomplete.spec.js",
-      "metrics-share-deep-link.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Dashboards-Variables",
-    "actual_folder": "Dashboards",
-    "browser": "chrome",
-    "run_files": [
-      "dashboard-variables-setting.spec.js",
-      "dashboard-variables-global.spec.js",
-      "dashboard-variables-tab-level.spec.js",
-      "dashboard-variables-panel-level.spec.js",
-      "dashboard-variables-dependency.spec.js",
-      "dashboard-variables-refresh.spec.js",
-      "dashboard-variables-url-sync.spec.js",
-      "dashboard-variables-creation-scopes.spec.js",
-      "dashboard-variables-default-values-chain.spec.js",
-      "dashboard-variables-custom-parents.spec.js",
-      "dashboard-variables-stream-field.spec.js",
-      "dashboard-mustache-variables.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Dashboards-Panel-Level-DateTime-Config",
-    "actual_folder": "Dashboards",
-    "browser": "chrome",
-    "run_files": [
-      "dashboard-panel-time-config-behavior.spec.js",
-      "dashboard-panel-time-url-priority.spec.js",
-      "dashboard-panel-time-advanced-edge-cases.spec.js",
-      "dashboard-panel-time-apply-behavior.spec.js",
-      "dashboard-panel-time-variables-behavior.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Dashboard-Config-Settings",
-    "actual_folder": "Dashboards",
-    "browser": "chrome",
-    "run_files": [
-      "dashboard-series-color-multiwindow.spec.js",
-      "dashboard-config-advanced.spec.js",
-      "dashboard-config-axis.spec.js",
-      "dashboard-config-gauge-maps.spec.js",
-      "dashboard-config-general.spec.js",
-      "dashboard-config-legends.spec.js",
-      "dashboard-config-line-style.spec.js",
-      "dashboard-config-panel-time.spec.js",
-      "dashboard-config-table.spec.js",
-      "dashboard-config-trellis.spec.js",
-      "dashboard-config-drilldown.spec.js",
-      "dashboard-config-promql.spec.js",
-      "dashboard-config-markline.spec.js"
+      "slo-timeslice.spec.js",
+      "slo-alerts.spec.js"
     ],
     "disabled": []
   }

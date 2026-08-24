@@ -29,7 +29,7 @@ use axum::{
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    DISTINCT_FIELDS, O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
+    O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         gen_ai::GenAiAgentMappingConfig,
@@ -38,7 +38,7 @@ use config::{
         stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
+    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
 use ingestion_common::IngestUser;
@@ -58,6 +58,7 @@ pub mod inferred;
 pub mod otel;
 pub mod service_graph;
 pub mod session;
+pub mod time_index;
 
 #[cfg(feature = "cloud")]
 use ::stream::get_stream;
@@ -75,9 +76,6 @@ use crate::{
         write_file,
     },
     logs::O2IngestJsonData,
-    metadata::{
-        MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem, write,
-    },
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 
@@ -86,7 +84,7 @@ const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const RESERVED_SPAN_FIELDS: [&str; 16] = [
+const RESERVED_SPAN_FIELDS: [&str; 27] = [
     "trace_id",
     "span_id",
     "flags",
@@ -100,6 +98,20 @@ const RESERVED_SPAN_FIELDS: [&str; 16] = [
     inferred::INFER_SERVICE_NAME,
     inferred::INFER_SERVICE_TYPE,
     inferred::INFER_SERVICE_SYSTEM,
+    // DBM identity columns written by crate::db_monitoring::enrich (design D1
+    // condition 1): a user span attribute named e.g. `o2.db.fingerprint` gets
+    // the attr_ prefix instead of spoofing aggregates.
+    crate::db_monitoring::O2_DB_FINGERPRINT,
+    crate::db_monitoring::O2_DB_QUERY_NORM,
+    crate::db_monitoring::O2_DB_SYSTEM,
+    crate::db_monitoring::O2_DB_NAMESPACE,
+    crate::db_monitoring::O2_DB_INSTANCE,
+    crate::db_monitoring::O2_DB_OPERATION,
+    crate::db_monitoring::O2_DB_STATUS_CODE,
+    crate::db_monitoring::O2_DB_USER,
+    crate::db_monitoring::O2_DB_ENV,
+    crate::db_monitoring::O2_DB_STMT_CLASS,
+    crate::db_monitoring::O2_DB_BATCH_MULTIPLIER,
     "events",
     "links",
     TIMESTAMP_COL_NAME,
@@ -267,6 +279,49 @@ async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObserv
     .await;
 }
 
+/// Strip client-supplied derived-identity keys (`o2_db_*`, `infer_service_*`)
+/// from a JSON-path record BEFORE re-derivation (design D1 condition 1):
+/// `RESERVED_SPAN_FIELDS` protects the OTLP path only — the JSON ingest path
+/// flattens the caller's record keys directly, so a spoofed `o2_db_fingerprint`
+/// (or `infer_service_name`, fixed in the same PR per the design) would land as
+/// a trusted aggregation key. Legitimate values written by a first-pass OTLP
+/// enrichment re-derive identically from the raw `db_*` / peer attributes that
+/// are still on the record (the derivations are deterministic).
+fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value>) {
+    for field in crate::db_monitoring::ALL_DB_FIELDS {
+        record_val.remove(field);
+    }
+    record_val.remove(inferred::INFER_SERVICE_NAME);
+    record_val.remove(inferred::INFER_SERVICE_TYPE);
+    record_val.remove(inferred::INFER_SERVICE_SYSTEM);
+}
+
+/// Save DBM identity columns that the stream's UDS field list does NOT include,
+/// so they can be re-inserted after `refactor_map` strips unlisted fields —
+/// they are aggregation keys, not user attributes (design D1 condition 2; same
+/// guarantee [`restore_canonical_agent_fields`] provides for gen_ai identity).
+/// Columns the UDS list DOES include are left to `refactor_map` itself.
+fn save_db_fields_for_uds(
+    record_val: &Map<String, json::Value>,
+    fields: &HashSet<String>,
+) -> Vec<(&'static str, json::Value)> {
+    crate::db_monitoring::ALL_DB_FIELDS
+        .iter()
+        .filter(|f| !fields.contains(**f))
+        .filter_map(|f| record_val.get(*f).map(|v| (*f, v.clone())))
+        .collect()
+}
+
+/// Re-insert the fields captured by [`save_db_fields_for_uds`].
+fn restore_db_fields(
+    record_val: &mut Map<String, json::Value>,
+    saved: Vec<(&'static str, json::Value)>,
+) {
+    for (field, value) in saved {
+        record_val.insert(field.to_string(), value);
+    }
+}
+
 fn normalized_trace_key(key: &str) -> String {
     let mut key = key.to_string();
     flatten::format_key(&mut key);
@@ -432,6 +487,12 @@ pub async fn handle_otlp_request(
             );
         }
     }
+
+    // Database Monitoring enrichment options (design §8): the fixed defaults —
+    // the old per-option config knobs were removed when DBM collapsed to a
+    // single `enabled` switch.
+    let mut has_db_spans = false;
+    let db_enrich_opts = crate::db_monitoring::EnrichOptions::default();
 
     // Start retrieving associated pipeline and construct pipeline params
     let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
@@ -666,6 +727,28 @@ pub async fn handle_otlp_request(
                     }
                 }
 
+                // Database Monitoring: canonical dual-semconv identity + stable
+                // query fingerprint for db CLIENT/PRODUCER spans (o2_db_*,
+                // design §3.1). enrich itself gates on span kind and db-attr
+                // presence (negative stamping). Resource attrs are overlaid so
+                // resource-level dimensions resolve (o2_db_env lives on
+                // `deployment.environment[.name]`, a resource attribute).
+                if cfg.db_monitoring.enabled
+                    && let Some(db_fields) = crate::db_monitoring::enrich_with_opts(
+                        &crate::db_monitoring::SpanWithResource {
+                            span: &span_att_map,
+                            resource: &service_att_map,
+                        },
+                        span.kind,
+                        &db_enrich_opts,
+                    )
+                {
+                    for (field, value) in db_fields {
+                        span_att_map.insert(field, value);
+                    }
+                    has_db_spans = true;
+                }
+
                 let local_val = Span {
                     trace_id: trace_id.clone(),
                     span_id: span_id.clone(),
@@ -829,7 +912,11 @@ pub async fn handle_otlp_request(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&stream_params.stream_name.to_string())
                             {
+                                // Save DBM identity columns across the UDS
+                                // refactor (design D1 condition 2).
+                                let saved_db_fields = save_db_fields_for_uds(&record_val, fields);
                                 record_val = crate::ingestion::refactor_map(record_val, fields);
+                                restore_db_fields(&mut record_val, saved_db_fields);
                             }
                             restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
                             set_o2_ingest_ts(&mut record_val);
@@ -891,6 +978,20 @@ pub async fn handle_otlp_request(
     // if no data, fast return
     if json_data_by_stream.is_empty() {
         return format_response(partial_success, req_type);
+    }
+
+    // Ensure the o2_db_* columns exist on streams that carried db spans
+    // (design §4 — idempotent, mirrors ensure_gen_ai_fields_in_schema; only
+    // when a DB span was enriched, so non-DB workloads pay nothing).
+    if has_db_spans
+        && let Err(e) = super::db::schema::ensure_db_fields_in_schema(
+            org_id,
+            &traces_stream_name,
+            StreamType::Traces,
+        )
+        .await
+    {
+        log::error!("[TRACES:OTLP] failed to ensure db monitoring fields in schema: {e}");
     }
 
     // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
@@ -1025,7 +1126,12 @@ fn finalize_and_buffer_trace_span(
         agent_observations,
     );
     if let Some(Some(fields)) = user_defined_schema_map.get(traces_stream_name) {
+        // Save DBM identity columns across the UDS refactor — they are
+        // aggregation keys, not user attributes (design D1 condition 2; same
+        // guarantee restore_canonical_agent_fields provides below).
+        let saved_db_fields = save_db_fields_for_uds(&record_val, fields);
         record_val = crate::ingestion::refactor_map(record_val, fields);
+        restore_db_fields(&mut record_val, saved_db_fields);
     }
     restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
     set_o2_ingest_ts(&mut record_val);
@@ -1094,6 +1200,12 @@ pub async fn ingest_json(
     let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
         .timestamp_micros();
 
+    // Database Monitoring enrichment options (design §8): the fixed defaults —
+    // the old per-option config knobs were removed when DBM collapsed to a
+    // single `enabled` switch.
+    let mut has_db_spans = false;
+    let db_enrich_opts = crate::db_monitoring::EnrichOptions::default();
+
     let json_values: Vec<json::Value> = json::from_slice(&body)?;
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
@@ -1155,32 +1267,50 @@ pub async fn ingest_json(
         };
         normalize_llm_field_types(&mut record_val);
 
-        // Derive inferred service fields when absent (data from sources that
-        // did not run the OTLP-side derivation, e.g. older versions).
-        if !record_val.contains_key(inferred::INFER_SERVICE_NAME) {
-            let span_kind = match record_val.get("span_kind") {
-                Some(json::Value::String(s)) => inferred::span_kind_to_i32(s),
-                Some(v) => v.as_i64().unwrap_or(0) as i32,
-                None => 0,
-            };
-            if let Some(inferred_svc) = inferred::derive_inferred_service(span_kind, |key| {
-                record_val
-                    .get(key)
-                    .and_then(|v| v.as_str())
-                    .map(String::from)
-            }) {
-                record_val.insert(
-                    inferred::INFER_SERVICE_NAME.to_string(),
-                    inferred_svc.name.into(),
-                );
-                record_val.insert(
-                    inferred::INFER_SERVICE_TYPE.to_string(),
-                    inferred_svc.service_type.into(),
-                );
-                if let Some(system) = inferred_svc.system {
-                    record_val.insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
-                }
+        // The JSON path flattens the caller's record keys directly —
+        // RESERVED_SPAN_FIELDS protects OTLP only. Drop any client-supplied
+        // o2_db_* / infer_service_* keys and re-derive both identities from
+        // the raw attributes still on the record (design D1 condition 1).
+        strip_client_supplied_derived_fields(&mut record_val);
+
+        let span_kind = match record_val.get("span_kind") {
+            Some(json::Value::String(s)) => inferred::span_kind_to_i32(s),
+            Some(v) => v.as_i64().unwrap_or(0) as i32,
+            None => 0,
+        };
+
+        // Derive inferred service fields (data from sources that did not run
+        // the OTLP-side derivation, e.g. older versions or pipeline re-ingest —
+        // any incoming values were stripped above, so this always re-derives).
+        if let Some(inferred_svc) = inferred::derive_inferred_service(span_kind, |key| {
+            record_val
+                .get(key)
+                .and_then(|v| v.as_str())
+                .map(String::from)
+        }) {
+            record_val.insert(
+                inferred::INFER_SERVICE_NAME.to_string(),
+                inferred_svc.name.into(),
+            );
+            record_val.insert(
+                inferred::INFER_SERVICE_TYPE.to_string(),
+                inferred_svc.service_type.into(),
+            );
+            if let Some(system) = inferred_svc.system {
+                record_val.insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
             }
+        }
+
+        // Database Monitoring identity (design §3.1) — same re-derivation
+        // reasoning as above; enrich gates on span kind + db-attr presence.
+        if cfg.db_monitoring.enabled
+            && let Some(db_fields) =
+                crate::db_monitoring::enrich_with_opts(&record_val, span_kind, &db_enrich_opts)
+        {
+            for (field, value) in db_fields {
+                record_val.insert(field, value);
+            }
+            has_db_spans = true;
         }
 
         // check if we have any LLM related attributes
@@ -1213,6 +1343,20 @@ pub async fn ingest_json(
     // if no data, fast return
     if json_data_by_stream.is_empty() {
         return format_response(partial_success, req_type);
+    }
+
+    // Ensure the o2_db_* columns exist on streams that carried db spans
+    // (design §4 — idempotent, mirrors ensure_gen_ai_fields_in_schema; only
+    // when a DB span was enriched, so non-DB workloads pay nothing).
+    if has_db_spans
+        && let Err(e) = super::db::schema::ensure_db_fields_in_schema(
+            org_id,
+            traces_stream_name,
+            StreamType::Traces,
+        )
+        .await
+    {
+        log::error!("[TRACES:JSON] failed to ensure db monitoring fields in schema: {e}");
     }
 
     // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
@@ -1420,10 +1564,6 @@ async fn write_traces(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
-        .await
-        .unwrap_or_default();
-
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let partition_time_level = get_partition_time_level(StreamType::Traces);
     if stream_schema.has_partition_keys {
@@ -1477,53 +1617,17 @@ async fn write_traces(
     let record_schema = Arc::new(record_schema);
     let schema_key = record_schema.hash_key();
 
+    if let Err(e) = time_index::write(org_id, stream_name, &json_data).await {
+        metrics::TRACE_TIME_INDEX_OPERATIONS
+            .with_label_values(&[org_id, "write", "error"])
+            .inc();
+        log::error!("[TRACE_TIME_INDEX] failed to write index for {org_id}/{stream_name}: {e}");
+    }
+
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-    let mut distinct_values = Vec::with_capacity(16);
-    let mut trace_index_values = Vec::with_capacity(json_data.len());
 
     // Start write data
     for (timestamp, record_val) in json_data {
-        // get service_name
-        let service_name = record_val
-            .get("service_name")
-            .map(json::get_string_value)
-            .unwrap_or_default();
-        // get distinct_value item
-        if stream_settings.enable_distinct_fields {
-            let mut map = Map::new();
-            for field in DISTINCT_FIELDS.iter().chain(
-                stream_settings
-                    .distinct_value_fields
-                    .iter()
-                    .map(|f| &f.name),
-            ) {
-                if let Some(val) = record_val.get(field) {
-                    map.insert(field.clone(), val.clone());
-                }
-            }
-            if !map.is_empty() {
-                distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Traces,
-                    stream_name: stream_name.to_string(),
-                    value: map,
-                }));
-            }
-        }
-
-        // build trace metadata
-        let trace_id = record_val
-            .get("trace_id")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        trace_index_values.push(MetadataItem::TraceListIndexer(TraceListItem {
-            _timestamp: timestamp,
-            stream_name: stream_name.to_string(),
-            service_name: service_name.to_string(),
-            trace_id,
-        }));
-
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
             && triggers.len() < alerts.len()
@@ -1596,25 +1700,10 @@ async fn write_traces(
         std::io::Error::other(e.to_string())
     })?;
 
-    // send distinct_values
-    if !distinct_values.is_empty()
-        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-        && stream_settings.enable_distinct_fields
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
-    {
-        log::error!("Error while writing distinct values: {e}");
+    // only one trigger per request; notification/db work must not block ingestion
+    if !triggers.is_empty() {
+        tokio::spawn(evaluate_trigger(triggers));
     }
-
-    // send trace metadata
-    if cfg.common.traces_list_index_enabled
-        && !trace_index_values.is_empty()
-        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
-    {
-        log::error!("Error while writing trace_index values: {e}");
-    }
-
-    // only one trigger per request
-    evaluate_trigger(triggers).await;
 
     Ok(req_stats)
 }
@@ -2018,7 +2107,14 @@ mod tests {
     #[test]
     fn test_reserved_span_fields() {
         let reserved_span_fields = &super::RESERVED_SPAN_FIELDS;
-        assert_eq!(reserved_span_fields.len(), 16);
+        assert_eq!(reserved_span_fields.len(), 27);
+        // All eleven DBM identity columns are reserved (design D1 condition 1).
+        for field in crate::db_monitoring::ALL_DB_FIELDS {
+            assert!(
+                reserved_span_fields.contains(&field),
+                "missing DBM reserved field {field}"
+            );
+        }
         assert!(reserved_span_fields.contains(&"_timestamp"));
         assert!(reserved_span_fields.contains(&"duration"));
         assert!(reserved_span_fields.contains(&"start_time"));
@@ -2443,6 +2539,180 @@ mod tests {
         let key = super::span_attribute_key("http.method".to_string(), &service_att_map);
 
         assert_eq!(key, "http.method");
+    }
+
+    #[test]
+    fn test_span_attribute_key_blocks_o2_db_field_spoofing() {
+        // A user span attribute must not be able to write the canonical
+        // o2_db_* columns — they are DBM aggregation keys (design D1 cond. 1).
+        let service_att_map = std::collections::HashMap::new();
+        for field in crate::db_monitoring::ALL_DB_FIELDS {
+            let dotted = field.replace('_', ".");
+            assert_eq!(
+                super::span_attribute_key(dotted.clone(), &service_att_map),
+                format!("attr_{dotted}"),
+                "dotted form of {field} must be attr_-prefixed"
+            );
+            assert_eq!(
+                super::span_attribute_key(field.to_string(), &service_att_map),
+                format!("attr_{field}"),
+                "literal {field} must be attr_-prefixed"
+            );
+        }
+    }
+
+    #[test]
+    fn test_strip_client_supplied_derived_fields_on_json_path() {
+        // The JSON ingest path flattens client keys directly — RESERVED_SPAN_FIELDS
+        // protects OTLP only. Incoming o2_db_* AND infer_service_* keys must be
+        // stripped before (re-)derivation (design D1 cond. 1, same-PR infer fix).
+        use config::utils::json;
+
+        let mut record_val: json::Map<String, json::Value> = json::Map::new();
+        record_val.insert("span_kind".to_string(), json::json!("3"));
+        record_val.insert("db_system".to_string(), json::json!("postgresql"));
+        record_val.insert(
+            "db_statement".to_string(),
+            json::json!("SELECT id FROM users WHERE id = 42"),
+        );
+        // Spoofed / stale derived identity keys:
+        record_val.insert(
+            "o2_db_fingerprint".to_string(),
+            json::json!("deadbeef00000000"),
+        );
+        record_val.insert("o2_db_system".to_string(), json::json!("mysql"));
+        record_val.insert(
+            "o2_db_query_norm".to_string(),
+            json::json!("DROP TABLE spoof"),
+        );
+        record_val.insert("o2_db_batch_multiplier".to_string(), json::json!(999));
+        record_val.insert("infer_service_name".to_string(), json::json!("evil-svc"));
+        record_val.insert("infer_service_type".to_string(), json::json!("database"));
+        record_val.insert("infer_service_system".to_string(), json::json!("spoofql"));
+
+        super::strip_client_supplied_derived_fields(&mut record_val);
+
+        for field in crate::db_monitoring::ALL_DB_FIELDS {
+            assert!(
+                !record_val.contains_key(field),
+                "client-supplied {field} must not survive the JSON path"
+            );
+        }
+        assert!(!record_val.contains_key(super::inferred::INFER_SERVICE_NAME));
+        assert!(!record_val.contains_key(super::inferred::INFER_SERVICE_TYPE));
+        assert!(!record_val.contains_key(super::inferred::INFER_SERVICE_SYSTEM));
+        // Ordinary keys are untouched — re-derivation has its raw inputs.
+        assert_eq!(
+            record_val.get("db_system").and_then(|v| v.as_str()),
+            Some("postgresql")
+        );
+        assert!(record_val.contains_key("db_statement"));
+        assert!(record_val.contains_key("span_kind"));
+    }
+
+    #[test]
+    fn test_finalize_keeps_o2_db_fields_under_uds() {
+        // A user-defined schema that doesn't list the o2_db_* columns must not
+        // strip them — they are DBM aggregation keys (same guarantee
+        // restore_canonical_agent_fields provides for gen_ai identity).
+        use std::collections::{HashMap, HashSet};
+
+        use config::{meta::gen_ai::GenAiAgentMappingConfig, utils::json};
+
+        let value = json::json!({
+            "trace_id": "5b8efff798038103d269b633813fc60c",
+            "span_id": "eee19b7ec3c1b174",
+            "service_name": "svc",
+            "duration": 5,
+            "_timestamp": 1722172800000000i64,
+            "o2_db_fingerprint": "813e1ea2c1fbf511",
+            "o2_db_system": "postgresql",
+            "o2_db_query_norm": "SELECT * FROM t WHERE id = ?",
+            "o2_db_batch_multiplier": 4,
+            "junk_attr": "should be stripped by UDS"
+        });
+        let mut uds: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+        uds.insert(
+            "default".to_string(),
+            Some(HashSet::from([
+                "trace_id".to_string(),
+                "span_id".to_string(),
+                "service_name".to_string(),
+                "duration".to_string(),
+                config::TIMESTAMP_COL_NAME.to_string(),
+            ])),
+        );
+        let mut partial = super::ExportTracePartialSuccess::default();
+        let mut out: HashMap<String, super::O2IngestJsonData> = HashMap::new();
+        let mut observations: super::AgentObservationBuffer = Default::default();
+
+        let ok = super::finalize_and_buffer_trace_span(
+            value,
+            "org1",
+            &uds,
+            "default",
+            &GenAiAgentMappingConfig::default(),
+            &mut partial,
+            &mut out,
+            &mut observations,
+        );
+        assert!(ok);
+        let (ts_data, _) = out.get("default").unwrap();
+        let record = &ts_data[0].1;
+        // UDS did its job on ordinary attributes…
+        assert!(!record.contains_key("junk_attr"));
+        // …but the DBM identity survives, Int64 included.
+        assert_eq!(
+            record.get("o2_db_fingerprint").and_then(|v| v.as_str()),
+            Some("813e1ea2c1fbf511")
+        );
+        assert_eq!(
+            record.get("o2_db_system").and_then(|v| v.as_str()),
+            Some("postgresql")
+        );
+        assert_eq!(
+            record.get("o2_db_query_norm").and_then(|v| v.as_str()),
+            Some("SELECT * FROM t WHERE id = ?")
+        );
+        assert_eq!(
+            record
+                .get("o2_db_batch_multiplier")
+                .and_then(|v| v.as_i64()),
+            Some(4)
+        );
+    }
+
+    #[test]
+    fn test_uds_save_restore_helpers_only_cover_unlisted_fields() {
+        // When the UDS field list DOES include an o2_db_* column, refactor_map
+        // keeps it — the save/restore pair must not duplicate or override it.
+        use std::collections::HashSet;
+
+        use config::utils::json;
+
+        let mut record_val: json::Map<String, json::Value> = json::Map::new();
+        record_val.insert(
+            "o2_db_fingerprint".to_string(),
+            json::json!("aaaa000000000000"),
+        );
+        record_val.insert("o2_db_system".to_string(), json::json!("postgresql"));
+        let fields: HashSet<String> = HashSet::from(["o2_db_fingerprint".to_string()]);
+
+        let saved = super::save_db_fields_for_uds(&record_val, &fields);
+        // Listed field is not saved (refactor_map will keep it); unlisted is.
+        assert!(saved.iter().all(|(name, _)| *name != "o2_db_fingerprint"));
+        assert!(saved.iter().any(|(name, _)| *name == "o2_db_system"));
+
+        record_val.remove("o2_db_system"); // simulate refactor_map stripping it
+        super::restore_db_fields(&mut record_val, saved);
+        assert_eq!(
+            record_val.get("o2_db_system").and_then(|v| v.as_str()),
+            Some("postgresql")
+        );
+        assert_eq!(
+            record_val.get("o2_db_fingerprint").and_then(|v| v.as_str()),
+            Some("aaaa000000000000")
+        );
     }
 
     #[test]

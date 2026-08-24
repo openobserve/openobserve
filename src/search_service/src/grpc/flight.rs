@@ -19,7 +19,7 @@ use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
-use arrow_schema::Schema;
+use arrow_schema::{DataType, Schema};
 use config::{
     cluster::LOCAL_NODE,
     datafusion::request::FlightSearchRequest,
@@ -117,7 +117,7 @@ pub async fn search(
     let empty_exec = visitor.plan();
 
     // here need reset the option because when init ctx we don't know this information
-    if empty_exec.sorted_by_time() {
+    if empty_exec.sort_order().is_sorted() {
         ctx.state_ref().write().config_mut().options_mut().set(
             "datafusion.execution.split_file_groups_by_statistics",
             "true",
@@ -155,7 +155,15 @@ pub async fn search(
     let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
-        .filter(|v| latest_schema_map.contains_key(v))
+        .filter(|v| {
+            latest_schema_map
+                .get(v)
+                .map(|f| {
+                    [DataType::Utf8, DataType::Utf8View, DataType::LargeUtf8]
+                        .contains(f.data_type())
+                })
+                .unwrap_or_default()
+        })
         .collect_vec();
     let index_fields = get_stream_setting_index_fields(&stream_settings)
         .into_iter()
@@ -190,6 +198,7 @@ pub async fn search(
         physical_plan,
         &ctx,
         &latest_schema,
+        stream_type,
         (req.search_info.start_time, req.search_info.end_time),
         fst_fields.clone(),
         index_fields,
@@ -207,10 +216,13 @@ pub async fn search(
             .as_ref()
             .map(|rule| rule.referenced_fields())
             .unwrap_or_default();
+        let distinct_fields_updated_at =
+            infra::db::tantivy_index::get_ttv_distinct_fields_updated_at().await;
         get_stream_setting_index_updated_at_for_fields(
             &stream_settings,
             stream_created_at,
             &index_used_fields,
+            distinct_fields_updated_at,
         )
     };
 
@@ -324,7 +336,7 @@ pub async fn search(
             query_params.clone(),
             latest_schema.clone(),
             &file_list,
-            empty_exec.sorted_by_time(),
+            empty_exec.sort_order(),
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
@@ -372,7 +384,7 @@ pub async fn search(
             query_params.clone(),
             latest_schema.clone(),
             &search_partition_keys,
-            empty_exec.sorted_by_time(),
+            empty_exec.sort_order(),
             index_condition.clone(),
             fst_fields.clone(),
         )
@@ -397,7 +409,7 @@ pub async fn search(
             query_params.clone(),
             latest_schema.clone(),
             &search_partition_keys,
-            empty_exec.sorted_by_time(),
+            empty_exec.sort_order(),
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
@@ -617,6 +629,7 @@ fn optimizer_physical_plan(
     plan: Arc<dyn ExecutionPlan>,
     ctx: &SessionContext,
     schema: &Schema,
+    stream_type: StreamType,
     time_range: (i64, i64),
     fst_fields: Vec<String>,
     index_fields: Vec<String>,
@@ -647,6 +660,12 @@ fn optimizer_physical_plan(
         let _ = index_optimizer_rule.optimize(original_plan, ctx.state().config_options())?;
     }
 
+    {
+        let mut index_optimizer_rule = index_optimizer_rule_ref.lock();
+        *index_optimizer_rule =
+            index_optimize_mode_for_stream(stream_type, index_optimizer_rule.take());
+    }
+
     let rewrite_match_rule = RewriteMatchPhysical::new(
         fst_fields
             .clone()
@@ -671,6 +690,20 @@ fn optimizer_physical_plan(
     }
 
     Ok(plan)
+}
+
+fn index_optimize_mode_for_stream(
+    stream_type: StreamType,
+    mode: Option<IndexOptimizeMode>,
+) -> Option<IndexOptimizeMode> {
+    // Metrics files may be hash-ordered, so Tantivy doc IDs do not guarantee timestamp order.
+    if stream_type == StreamType::Metrics
+        && matches!(mode, Some(IndexOptimizeMode::SimpleSelect(..)))
+    {
+        None
+    } else {
+        mode
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -952,6 +985,7 @@ mod tests {
             physical_plan,
             &ctx,
             &schema,
+            StreamType::Logs,
             (start_time, end_time),
             vec![],
             vec!["kubernetes_namespace_name".to_string()],
@@ -973,5 +1007,81 @@ mod tests {
             index_optimizer_rule_ref.lock().clone(),
             Some(IndexOptimizeMode::SimpleHistogram(..))
         ));
+    }
+
+    #[test]
+    fn test_index_optimize_mode_for_stream_disables_metrics_simple_select() {
+        let simple_select = Some(IndexOptimizeMode::SimpleSelect(10, false));
+
+        assert_eq!(
+            index_optimize_mode_for_stream(StreamType::Metrics, simple_select.clone()),
+            None
+        );
+        assert_eq!(
+            index_optimize_mode_for_stream(StreamType::Logs, simple_select.clone()),
+            simple_select
+        );
+        assert_eq!(
+            index_optimize_mode_for_stream(
+                StreamType::Metrics,
+                Some(IndexOptimizeMode::SimpleCount),
+            ),
+            Some(IndexOptimizeMode::SimpleCount)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_optimizer_physical_plan_disables_detected_metrics_simple_select() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("default", schema.clone()).with_partitions(12);
+        ctx.register_table("default", Arc::new(provider)).unwrap();
+
+        let logical_plan = ctx
+            .state()
+            .create_logical_plan("SELECT * FROM default ORDER BY _timestamp DESC LIMIT 10")
+            .await
+            .unwrap();
+        let physical_plan = ctx
+            .state()
+            .create_physical_plan(&logical_plan)
+            .await
+            .unwrap();
+
+        for (stream_type, expected_mode) in [
+            (
+                StreamType::Logs,
+                Some(IndexOptimizeMode::SimpleSelect(10, false)),
+            ),
+            (StreamType::Metrics, None),
+        ] {
+            let index_condition_ref = Arc::new(Mutex::new(None));
+            let index_optimizer_rule_ref = Arc::new(Mutex::new(None));
+            let is_metrics = stream_type == StreamType::Metrics;
+
+            optimizer_physical_plan(
+                physical_plan.clone(),
+                &ctx,
+                &schema,
+                stream_type,
+                (0, 100),
+                vec![],
+                vec![],
+                index_condition_ref.clone(),
+                index_optimizer_rule_ref.clone(),
+            )
+            .unwrap();
+
+            assert_eq!(index_optimizer_rule_ref.lock().clone(), expected_mode);
+            assert_eq!(index_condition_ref.lock().is_none(), is_metrics);
+        }
     }
 }

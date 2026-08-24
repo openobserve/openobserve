@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const testLogger = require('./utils/test-logger.js');
+const PageManager = require('../pages/page-manager.js');
 
 /**
  * Auth-warm spec — mints a shared-auth artifact WITHOUT running the heavy
@@ -29,7 +30,8 @@ test.describe('Alpha1 auth warm-up', () => {
     expect(url, `expected an authenticated app URL, got ${url}`).not.toMatch(/\/web\/login$/);
 
     // Home menu item is only present once the SPA has an authenticated session.
-    await expect(page.locator('[data-test="menu-link-\\/-item"]')).toBeVisible({ timeout: 30000 });
+    const pm = new PageManager(page);
+    await pm.loginPage.expectHomeMenuVisible(30000);
     testLogger.info(`[alpha1] auth-warm: session for user index ${userIndex} is valid`);
   });
 });

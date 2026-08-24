@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Stepper -->
     <div class="bg-card-glass-bg h-[calc(100vh-7rem)] overflow-auto px-3 py-2">
-      <div style="max-width: 720px">
+      <div style="max-width: 45rem">
         <OForm
           ref="storageForm"
           :schema="orgStorageEditorSchema"
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
                     <div class="text-compact text-text-body leading-[1.55]">
                       <template v-if="isCloud">
-                        {{ t("storage_settings.awsStsCloudInfo") }}
+                        {{ t("storage_settings.awsStsCloudInfo", { product: raw("OpenObserve") }) }}
                       </template>
                       <template v-else>
                         {{ t("storage_settings.awsStsSelfHostedInfo") }}
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 
 defineOptions({ name: "OrgStorageEditor" });
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
@@ -434,8 +434,8 @@ function blankFormValues(provider: string): OrgStorageEditorForm {
 
 // Dynamic defaults (region from cloud/store, provider projected from the card
 // grid) → a typed computed.
-const orgStorageEditorDefaults = computed(
-  (): OrgStorageEditorForm => blankFormValues(selectedProvider.value),
+const orgStorageEditorDefaults = computed((): OrgStorageEditorForm =>
+  blankFormValues(selectedProvider.value),
 );
 
 const cloudProviders = computed(() => {

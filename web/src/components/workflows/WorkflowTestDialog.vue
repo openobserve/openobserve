@@ -41,7 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText as="label" class="text-xs font-medium">
           {{ t("workflow.test.runFrom") }}
         </OText>
-        <OSelect v-model="runFrom" :options="runFromOptions" data-test="workflow-test-run-from" />
+        <OSelect
+          v-model="runFrom"
+          :options="runFromOptions"
+          icon-key="icon"
+          data-test="workflow-test-run-from"
+        />
         <OText v-if="workflowObj.testRun.fromNode" variant="meta" as="p">
           {{ t("workflow.test.runFromNote") }}
         </OText>
@@ -100,6 +105,7 @@ import {
   executeTestRun,
   flowOrderedNodeIds,
   nodeConfigDetail,
+  nodeCustomName,
   currentTriggerKind,
   buildTriggerSampleText,
 } from "@/plugins/workflows/useWorkflowCanvas";
@@ -164,12 +170,33 @@ const runFromOptions = computed(() => {
   const opts = steps.map((n) => {
     const type = n.data?.node_type;
     seen[type] = (seen[type] || 0) + 1;
+    // Per-type glyph so a step's KIND is recognisable in the dropdown even when a
+    // custom name (rename) hides the type from the label text.
+    const icon = nodeMeta(type)?.icon || "help";
     const base = t(nodeMeta(type)?.titleKey || type);
+    // Always keep the TYPE prefix so the kind reads clearly — a custom name (rename)
+    // takes the detail slot ("Condition · My Name"); otherwise the config detail does.
+    const custom = nodeCustomName(n);
+    if (custom) return { label: raw(`${base} · ${custom}`), value: n.id, icon };
     const numbered = totals[type] > 1 ? raw(`${base} ${seen[type]}`) : base;
     const detail = nodeDetail(n);
-    return { label: detail ? raw(`${numbered} · ${detail}`) : numbered, value: n.id };
+    return { label: detail ? raw(`${numbered} · ${detail}`) : numbered, value: n.id, icon };
   });
-  return [{ label: t("workflow.test.runFromBeginning"), value: RUN_FROM_BEGINNING }, ...opts];
+  // "From Beginning" starts at the trigger, so surface the trigger's custom name
+  // (rename) when set — e.g. "From Beginning · My Alert" — instead of a static label.
+  const trigger = nodes.value.find((n) => n.data?.node_type === "workflow_trigger");
+  const triggerName = trigger ? nodeCustomName(trigger) : "";
+  const beginningLabel = triggerName
+    ? raw(`${t("workflow.test.runFromBeginning")} · ${triggerName}`)
+    : t("workflow.test.runFromBeginning");
+  return [
+    {
+      label: beginningLabel,
+      value: RUN_FROM_BEGINNING,
+      icon: nodeMeta("workflow_trigger")?.icon || "notifications-active",
+    },
+    ...opts,
+  ];
 });
 
 const parsedInputs = computed<unknown[] | null>(() => {

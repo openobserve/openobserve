@@ -61,7 +61,7 @@ pub async fn signing_key() -> Option<&'static [u8]> {
             }
             // Fallback IKM: the root user's stored password hash — secret,
             // per-instance, and identical on every node because it lives in
-            // the shared meta DB (so routers verify what alert-managers sign).
+            // the shared meta DB (so routers verify what schedulers sign).
             match infra::table::users::get_root_user().await {
                 Ok(root) if !root.password.is_empty() => {
                     Ok(payload::derive_signing_key(&root.password, salt))

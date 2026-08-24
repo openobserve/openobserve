@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.self="handleCloseAddVariable"
     >
       <div
-        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2 shadow-[-2px_0_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2 shadow-sm"
       >
         <AddSettingVariable
           @save="handleSaveVariable"
@@ -288,7 +288,7 @@ export default defineComponent({
 
     // Initialize or inject variables manager
     const injectedManager = inject("variablesManager", null);
-    const variablesManager = injectedManager || useVariablesManager();
+    const variablesManager = injectedManager || useVariablesManager(t);
 
     // Provide to child components
     if (!injectedManager) {
@@ -756,9 +756,9 @@ export default defineComponent({
       }
 
       // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }

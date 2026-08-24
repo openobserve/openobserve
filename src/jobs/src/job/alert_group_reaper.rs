@@ -49,8 +49,8 @@ use config::{
 /// is a whole-table scan of group state, and running it on every node would
 /// multiply the writes and race resolutions against each other.
 pub fn run() {
-    if !LOCAL_NODE.is_alert_manager() {
-        log::debug!("[ALERT_GROUP_REAPER] not an alert_manager node, skipping");
+    if !LOCAL_NODE.is_scheduler() {
+        log::debug!("[ALERT_GROUP_REAPER] not a scheduler node, skipping");
         return;
     }
 
@@ -64,12 +64,12 @@ pub fn run() {
         "alert_group_reaper",
         cfg.limit.alert_group_sweep_interval,
         {
-            // Elect among alert-manager nodes, the role this job runs on: a
-            // dedicated alert-manager deployment does not overlap the
+            // Elect among scheduler nodes, the role this job runs on: a
+            // dedicated scheduler deployment does not overlap the
             // querier/ingester set, so electing from that set leaves the
             // sweep with no leader at all.
             let is_leader = match infra::cluster::get_cached_nodes(|node| {
-                node.status == config::meta::cluster::NodeStatus::Online && node.is_alert_manager()
+                node.status == config::meta::cluster::NodeStatus::Online && node.is_scheduler()
             })
             .await
             {
@@ -87,11 +87,89 @@ pub fn run() {
                 continue;
             }
 
+            // Within-cluster election is not enough once state rows replicate
+            // across a super cluster: every region's leader would then sweep
+            // the same rows. Only the elected job cluster may — its evaluator
+            // is the one writing the fresh `last_seen` this sweep's decisions
+            // rest on, and a reap-delete from anywhere else fans back out and
+            // destroys the job cluster's live rows.
+            #[cfg(feature = "enterprise")]
+            if !is_job_cluster().await {
+                continue;
+            }
+
             if let Err(e) = sweep().await {
                 log::error!("[ALERT_GROUP_REAPER] sweep failed: {e}");
             }
         }
     );
+}
+
+/// Whether this cluster holds the super-cluster scheduler claim, checked once
+/// per pass. A KV read that fails skips the pass: a missed sweep costs one
+/// interval, where sweeping without the gate costs live rows in another region.
+#[cfg(feature = "enterprise")]
+async fn is_job_cluster() -> bool {
+    use o2_enterprise::enterprise::{
+        common::config::get_config as get_o2_config, super_cluster::kv,
+    };
+
+    if !get_o2_config().super_cluster.enabled {
+        return true;
+    }
+
+    let job_cluster = match kv::scheduler::get_job_cluster().await {
+        Ok(name) => name,
+        Err(e) => {
+            log::error!("[ALERT_GROUP_REAPER] could not read the job cluster, skipping pass: {e}");
+            return false;
+        }
+    };
+    let local = config::get_cluster_name();
+    if job_cluster.is_empty() || job_cluster == local {
+        return true;
+    }
+
+    // Same shape as the scheduling loop's check: defer only to a claimant that
+    // is still there.
+    let live = match kv::cluster::list_by_role_group(None).await {
+        Ok(clusters) => clusters.into_iter().map(|c| c.name).collect::<Vec<_>>(),
+        Err(e) => {
+            log::error!("[ALERT_GROUP_REAPER] could not list clusters, skipping pass: {e}");
+            return false;
+        }
+    };
+    let run = may_sweep(&job_cluster, &local, &live);
+    if !run {
+        log::debug!("[ALERT_GROUP_REAPER] job cluster is {job_cluster}, skipping this pass");
+    }
+    run
+}
+
+/// The gate's decision, split out from the I/O that feeds it.
+///
+/// This follows the scheduler's election; it does not hold one of its own — the
+/// reaper must never claim the job cluster, only obey it. So the two degenerate
+/// states, an unclaimed key and a claim whose holder has departed, open the gate
+/// for everyone rather than picking a winner. That is the deliberate direction:
+/// refusing instead would freeze group lifecycle in every region until some
+/// scheduler node restarts and re-registers, and in both of those states no
+/// cluster is running the scheduling loop either, so there is no evaluator whose
+/// writes a concurrent sweep could race. Resolutions written concurrently do
+/// carry per-cluster `at` stamps and so replicate as separate transitions, but
+/// `resolve_group_update` is a no-op against an already-resolved row — the
+/// window closes after one replication lag.
+#[cfg(feature = "enterprise")]
+fn may_sweep(job_cluster: &str, local_cluster: &str, live_clusters: &[String]) -> bool {
+    // The "is someone else holding this" half is shared with the synthetics
+    // start gate, which asks the same question of the same key; only what each
+    // does with an *unclaimed* key differs, and that difference is the reason
+    // this stays a named function rather than an inlined call.
+    !o2_enterprise::enterprise::super_cluster::kv::scheduler::claim_is_held_elsewhere(
+        job_cluster,
+        local_cluster,
+        live_clusters,
+    )
 }
 
 /// One pass over every alert that currently has per-group state rows.
@@ -163,7 +241,7 @@ async fn sweep_alert(
             .collect();
         let stale = opt_out_evictions(&tracked);
         let n = stale.len();
-        infra::table::alert_states::delete_groups(alert_id, &stale).await?;
+        db::alerts::alert_states::delete_groups(alert_id, &stale).await?;
         return Ok((0, 0, n));
     }
     let alert = alert.expect("still_multi implies the alert is cached");
@@ -206,7 +284,12 @@ async fn sweep_alert(
                 // row; writing anyway would push the reap clock out by one
                 // interval every pass and the row would never be deleted.
                 if !update.is_noop() {
-                    infra::table::alert_states::persist(&update).await?;
+                    // No ledger write: a resolution is the sweep noticing a
+                    // group stopped being returned, not the alert evaluating.
+                    // Recording it as coverage would credit measured time to a
+                    // pass that measured nothing — and a grouped alert has no
+                    // ledger history at all (D65).
+                    db::alerts::alert_states::persist(&update, None).await?;
                     resolved += 1;
                 }
             }
@@ -216,7 +299,7 @@ async fn sweep_alert(
 
     let reaped = to_reap.len();
     if reaped > 0 {
-        infra::table::alert_states::delete_groups(alert_id, &to_reap).await?;
+        db::alerts::alert_states::delete_groups(alert_id, &to_reap).await?;
     }
     Ok((resolved, reaped, 0))
 }
@@ -265,5 +348,52 @@ mod tests {
     fn a_simple_or_missing_alert_is_not_multi() {
         assert!(!still_multi(None));
         assert!(!still_multi(Some(&Alert::default())));
+    }
+
+    // ── The job-cluster gate (PR 0) ─────────────────────────────────────────
+    // Once state rows replicate across a super cluster, every cluster's reaper
+    // leader sees them. Only the elected job cluster may act: its evaluator is
+    // the one writing `last_seen`, and a reap-delete from anywhere else fans
+    // back out and destroys the job cluster's live rows.
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unclaimed_job_cluster_lets_the_sweep_run() {
+        // Nothing has registered yet — refusing here would mean the sweep never
+        // runs on a single-cluster deployment that has not elected.
+        assert!(may_sweep("", "us-west", &["us-west".to_string()]));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_elected_job_cluster_sweeps() {
+        assert!(may_sweep(
+            "us-west",
+            "us-west",
+            &["us-west".to_string(), "eu-central".to_string()]
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_cluster_that_lost_the_election_does_not_sweep() {
+        assert!(!may_sweep(
+            "us-west",
+            "eu-central",
+            &["us-west".to_string(), "eu-central".to_string()]
+        ));
+    }
+
+    /// The claim outlives the cluster that made it — it is a KV key kept alive
+    /// by a live scheduler. Deferring to a name that is no longer in the
+    /// cluster list would freeze group lifecycle everywhere, permanently.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_stale_claim_by_a_departed_cluster_does_not_block_the_sweep() {
+        assert!(may_sweep(
+            "us-west",
+            "eu-central",
+            &["eu-central".to_string()]
+        ));
     }
 }

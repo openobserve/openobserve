@@ -24,7 +24,7 @@ use ::stream::get_stream;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    DISTINCT_FIELDS, META_ORG_ID, SIZE_IN_MB, get_config,
+    META_ORG_ID, SIZE_IN_MB, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -35,7 +35,6 @@ use config::{
         json::{Map, Value, estimate_json_bytes, get_string_value},
         schema_ext::SchemaExt,
         time::now_micros,
-        util::DISTINCT_STREAM_PREFIX,
     },
 };
 use db;
@@ -50,7 +49,6 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-    metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
 };
 
 pub mod bulk;
@@ -333,6 +331,37 @@ async fn write_logs(
         partition_keys = stream_settings.partition_keys;
     }
 
+    // DBM read-path pruning: a stream receiving server-vantage DBM records gets
+    // `o2_dbm_kind` seeded as a SECONDARY INDEX (`index_fields`, a raw-tokenized
+    // tantivy column — explicitly not full-text search), so a DBM read filtering
+    // on one kind prunes rows via the index instead of scanning the stream. The
+    // reasoning, the selectivity risk, the migration case and the
+    // `time_index.rs` precedent this follows are all documented on
+    // `ensure_server_stream_index_field`.
+    //
+    // Placed here rather than in the rollup job because the settings must exist
+    // on the node about to write parquet (the index is built per-file at the
+    // WAL→parquet move), and because only the ingest path knows which stream the
+    // recipes actually export to (every DBM read endpoint takes a `stream`
+    // override; the seed is data-driven, not name-driven).
+    //
+    // Gated on the batch actually carrying a canonicalized DBM record, so the
+    // overwhelming majority of log ingests — which carry none — pay one
+    // short-circuiting scan and nothing else. `apply_to_record` has already run
+    // by this point (it is called per record on the way in), so the kind stamp
+    // is present to be seen.
+    //
+    // No settings re-read follows, unlike the partition-key implementation this
+    // replaces: partition keys had to be read back because THIS function
+    // computes the write path from them, whereas the secondary index is
+    // consumed later, by the parquet writer reading stream settings for itself.
+    if config::get_config().db_monitoring.enabled
+        && crate::db_monitoring::server_vantage::batch_has_dbm_records(&json_data)
+    {
+        crate::db_monitoring::server_vantage::ensure_server_stream_index_field(org_id, stream_name)
+            .await;
+    }
+
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     crate::ingestion::get_stream_alerts(
@@ -380,8 +409,6 @@ async fn write_logs(
         Some(schema) => Arc::new(schema.cloned_from(&latest_schema)),
         None => Arc::new(latest_schema),
     };
-
-    let mut distinct_values = Vec::with_capacity(16);
 
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
@@ -490,30 +517,6 @@ async fn write_logs(
         }
         // end check for alert triggers
 
-        // get distinct_value items
-        if stream_settings.enable_distinct_fields {
-            let mut map = Map::new();
-            for field in DISTINCT_FIELDS.iter().chain(
-                stream_settings
-                    .distinct_value_fields
-                    .iter()
-                    .map(|f| &f.name),
-            ) {
-                if let Some(val) = record_val.get(field) {
-                    map.insert(field.clone(), val.clone());
-                }
-            }
-
-            if !map.is_empty() {
-                // add distinct values
-                distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    value: map,
-                }));
-            }
-        }
-
         // get hour key
         let hour_key = get_write_partition_key(
             timestamp,
@@ -565,18 +568,9 @@ async fn write_logs(
     )
     .await?;
 
-    // send distinct_values
-    if !distinct_values.is_empty()
-        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-        && stream_settings.enable_distinct_fields
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
-    {
-        log::error!("Error while writing distinct values: {e}");
-    }
-
     // only one trigger per request
     if !triggers.is_empty() {
-        tokio::spawn(async move { evaluate_trigger(triggers).await });
+        tokio::spawn(evaluate_trigger(triggers));
     }
 
     Ok(req_stats)

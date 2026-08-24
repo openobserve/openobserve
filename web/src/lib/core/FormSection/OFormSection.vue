@@ -55,8 +55,10 @@
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
+
 defineProps<{
-  title: string;
+  title: I18nText;
   /** Appends the required marker to the heading. */
   required?: boolean;
   dataTest?: string;

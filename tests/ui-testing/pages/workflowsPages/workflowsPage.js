@@ -50,6 +50,7 @@ class WorkflowsPage {
     this.nodeFunctionNameTrigger = '[data-test="add-function-name-input-trigger"]';
     this.nodeFunctionNameInput = '[data-test="add-function-name-input-input"]';
     this.saveBtn = '[data-test="workflow-editor-save"]';
+    this.publishBtn = '[data-test="workflow-editor-publish"]';
     this.testBtn = '[data-test="workflow-editor-test"]';
     this.cancelBtn = '[data-test="workflow-editor-cancel"]';
     this.backBtn = '[data-test="workflow-editor-back"]';
@@ -196,6 +197,14 @@ class WorkflowsPage {
       if (!b) throw new Error('save button not found: ' + sel);
       b.click();
     }, this.saveBtn);
+  }
+
+  async clickPublish() {
+    await this.page.evaluate((sel) => {
+      const b = document.querySelector(sel);
+      if (!b) throw new Error('publish button not found: ' + sel);
+      b.click();
+    }, this.publishBtn);
   }
 
   /**
@@ -355,7 +364,7 @@ class WorkflowsPage {
     await this.addNodeFromPalette('destination');
     await this.createDestinationInline({ name: destName, url });
     await this.saveNodeDrawer();
-    await this.clickSave();
+    await this.clickPublish();
     await this.skipLinkAlerts();
   }
 
@@ -365,7 +374,7 @@ class WorkflowsPage {
    * (e.g. trigger-only save -> "Add At Least One Step After The Trigger").
    */
   async saveAndCaptureResult() {
-    await this.clickSave();
+    await this.clickPublish();
     const toast = this.page.locator('[role="alert"], .q-notification__message').first();
     await toast.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
     return (await toast.textContent().catch(() => '') || '').trim();

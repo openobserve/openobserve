@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
 import { convertTableData, convertMultiQueryTableData } from "@/utils/dashboard/convertTableData";
@@ -39,6 +40,8 @@ export const convertPanelData = async (
   chartPanelStyle: any,
   annotations: any,
   loading: any = false,
+  // Metric sparkline: per-query histogram hits (SQL metric only).
+  sparklineData?: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -68,7 +71,7 @@ export const convertPanelData = async (
         !query?.fields?.x?.length &&
         !query?.fields?.y?.length
       ) {
-        throw new Error("Please select required fields to render the chart");
+        throw new Error(gt("dashboard.utils.selectRequiredFields"));
       }
 
       if (
@@ -107,6 +110,7 @@ export const convertPanelData = async (
               chartPanelStyle,
               annotations,
               loading,
+              sparklineData,
             )),
           };
         } catch (error) {
@@ -221,7 +225,7 @@ export const convertPanelData = async (
     case "custom_chart": {
       const validationError = validateUserCode(panelSchema.customChartContent ?? "");
       if (validationError) {
-        throw new Error(`Unsafe code detected: ${validationError}`);
+        throw new Error(gt("dashboard.utils.unsafeCodeDetected", { error: validationError }));
       }
 
       const hasData =
@@ -237,7 +241,8 @@ export const convertPanelData = async (
           ...safeResult,
         };
       } else {
-        if (panelSchema?.queries?.[0]?.query?.trim() == "") throw new Error("No data found");
+        if (panelSchema?.queries?.[0]?.query?.trim() == "")
+          throw new Error(gt("dashboard.utils.noDataFound"));
       }
     }
     // falls through — custom chart without data resolves to the default empty result

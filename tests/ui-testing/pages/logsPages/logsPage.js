@@ -14,6 +14,16 @@ const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment, authedRequest } = 
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 export class LogsPage {
+    /**
+     * Escape a value for embedding inside a double-quoted CSS attribute selector.
+     * Backslashes must be escaped first, otherwise a literal `\` in the text would
+     * be emitted unescaped and swallow the character that follows it (and a
+     * trailing `\` would escape the closing quote and break the whole selector).
+     */
+    static escapeCssAttrValue(text) {
+        return String(text).replace(/["\\]/g, '\\$&');
+    }
+
     constructor(page) {
         this.page = page;
         
@@ -137,6 +147,8 @@ export class LogsPage {
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-state"]';
+        // Generic error indicator (class/role based) used when no data-test error hook exists.
+        this.genericErrorSelector = '[class*="error"], [class*="negative"], [role="alert"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
@@ -219,6 +231,7 @@ export class LogsPage {
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
+        this.explainQueryMenuBtn = '[data-test="logs-search-bar-explain-query-menu-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
         this.downloadSubmenuTrigger = '[data-test="search-download-submenu-trigger"]';
         this.downloadSubmenu = '[data-test="search-download-submenu"]';
@@ -268,7 +281,23 @@ export class LogsPage {
         this.xAxisItemsAny = `${this.xAxisLayout} [data-test^="dashboard-x-item-"]`;
         this.yAxisItemsAny = `${this.yAxisLayout} [data-test^="dashboard-y-item-"]`;
 
-        // Field list for builder
+        // Field list for builder.
+        // Scoped under [data-test="logs-build-query-page"]: the Visualize tab mounts a
+        // SECOND PanelEditor (pageType="logs") that Index.vue keeps in the DOM with
+        // v-show, so both tabs render an `index-dropdown-stream` and an unscoped
+        // locator is a strict-mode violation.
+        this.buildStreamTypeDropdown = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream_type"]';
+        this.buildStreamTypeTrigger = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream_type-trigger"]';
+        this.buildStreamDropdown = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream"]';
+        this.buildStreamTrigger = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream-trigger"]';
+        // OSelect popovers teleport to <body>, so popover/option/search locators are
+        // NOT scoped to the build page — only one popover is ever open at a time.
+        this.buildStreamPopover = '[data-test="index-dropdown-stream-popover"]';
+        this.buildStreamSearch = '[data-test="index-dropdown-stream-search"]';
+        this.buildStreamOptions = '[data-test="index-dropdown-stream-popover"] [data-test="index-dropdown-stream-option"]';
+        this.buildStreamOption = (name) => `[data-test="index-dropdown-stream-option"][data-test-value="${name}"]`;
+        this.buildStreamTypePopover = '[data-test="index-dropdown-stream_type-popover"]';
+        this.buildStreamTypeOption = (type) => `[data-test="index-dropdown-stream_type-popover"] [data-test="index-dropdown-stream_type-option"][data-test-value="${type}"]`;
         this.streamTypeDropdown = '[data-test="index-dropdown-stream_type"]';
         this.streamDropdown = '[data-test="index-dropdown-stream"]';
         this.addToXAxis = '[data-test="dashboard-add-x-data"]';
@@ -328,6 +357,8 @@ export class LogsPage {
         // known variants on the root only — also dodges Monaco's `role="alert"` accessibility
         // hosts and the inner `o-toast-message` description node that share the `o-toast-` prefix.
         this.successNotification = '[data-test-variant="success"], [data-test-variant="error"], [data-test-variant="info"], [data-test-variant="warning"], [data-test-variant="loading"], [data-test-variant="default"]';
+        // Success-only toast variant (e.g. saved view created)
+        this.successToast = '[data-test-variant="success"]';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
 
@@ -427,15 +458,23 @@ export class LogsPage {
         // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
         // Toggle button to switch to patterns view
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
-        // Statistics summary
-        this.patternStatistics = '[data-test="pattern-statistics"]';
-        // Pattern cards (dynamic selectors with index)
-        this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
+        // Patterns-loaded signal. The old "pattern-statistics" summary element was
+        // dropped in the patterns UI redesign; the severity filter row is the
+        // stable stand-in because PatternList renders it under exactly the same
+        // condition (!loading && patterns.length > 0), and unlike a pattern card
+        // it is not subject to OVirtualScroll mounting only the visible window.
+        this.patternStatistics = '[data-test="pattern-list-severity-filter"]';
+        // Pattern cards (dynamic selectors with index).
+        // NOTE: These `pattern-card-${index}` selectors address cards by their
+        // ABSOLUTE OVirtualScroll item index, which is only mounted when inside the
+        // visible window. Card-root and details clicks must go through
+        // patternCardAt(index) (rendered position) instead — see that helper and
+        // getPatternCardCount(). The template/frequency/percentage getters use
+        // patternCardPart() for the same reason.
         this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
         this.patternCardAnomalyBadge = (index) => `[data-test="pattern-card-${index}-anomaly-badge"]`;
         this.patternCardFrequency = (index) => `[data-test="pattern-card-${index}-frequency"]`;
         this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
-        this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
         // Include/exclude/create-alert moved off the card and into the details
         // dialog in the patterns UI redesign, so they are no longer per-index.
         this.patternDetailIncludeBtn = '[data-test="pattern-detail-include-btn"]';
@@ -450,9 +489,13 @@ export class LogsPage {
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
         this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
         // Pattern list states
-        this.patternLoadingSpinner = '[data-test="pattern-list-loading-indicator"]';
+        // The loader became a skeleton block and the empty state moved into
+        // OEmptyState during the patterns UI redesign. Both are matched by their
+        // data-test hooks rather than by visible copy, so wording/i18n changes
+        // cannot silently turn these waits into timeouts again.
+        this.patternLoadingSpinner = '[data-test="pattern-list-loading-skeleton"]';
         this.patternLoadingText = 'text=Extracting patterns from logs...';
-        this.patternEmptyState = 'text=No patterns found';
+        this.patternEmptyState = '[data-test="log-patterns-empty-state"]';
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
@@ -1646,24 +1689,7 @@ export class LogsPage {
         return isOn;
     }
 
-    // Histogram methods
-    async toggleHistogram() {
-        // Histogram is a standalone toolbar button (data-test="logs-search-bar-histogram-btn")
-        // in normal-width viewports. It falls back into the utilities ("More") dropdown only
-        // when the viewport is very narrow (shouldMoveButtonsToMenu breakpoint < 328px).
-        await this.page.keyboard.press('Escape').catch(() => {});
-        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
-        const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
-        if (isInline) {
-            await inlineBtn.click();
-            return;
-        }
-        // Narrow-viewport fallback: open the utilities menu and click the menu item.
-        await this.page.locator(this.utilitiesMenuButton).click();
-        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
-        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        await histogramMenuItem.click();
-    }
+
 
     async toggleHistogramAndExecute() {
         await this.toggleHistogram();
@@ -2397,6 +2423,30 @@ export class LogsPage {
         return await this.logsQueryPage.clickRefresh();
     }
 
+    // --- Sentinel POM helpers (relocated from spec files) ---
+
+
+
+    // Text of the quick-pick "+N more" footer.
+    async getQuickPickMoreFooterText() {
+        return await this.page.locator(this.quickPickMoreFooter).innerText();
+    }
+
+
+
+    getShareLinkButtonLocator() {
+        return this.page.locator(this.shareLinkButton);
+    }
+
+    // Readiness gates (deterministic waits keyed on the search-bar controls).
+    async waitForStreamSelectReady(timeout = 15000) {
+        await this.page.locator(this.indexDropDown).waitFor({ state: 'visible', timeout });
+    }
+
+    async waitForRefreshButtonReady(timeout = 15000) {
+        await this.page.locator(this.searchBarRefreshButton).waitFor({ state: 'visible', timeout });
+    }
+
     async clickErrorMessage() {
         return await this.logsQueryPage.clickErrorMessage();
     }
@@ -2503,10 +2553,7 @@ export class LogsPage {
         return await this.managementPage.navigateToManagement();
     }
 
-    // Additional methods needed for tests
-    async clickDateTimeButton() {
-        return await this.page.locator(this.dateTimeButton).click({ force: true });
-    }
+
 
     async clickRelative15MinButton() {
         return await this.page.locator(this.relative15MinButton).click({ force: true });
@@ -3051,6 +3098,10 @@ export class LogsPage {
         return await this.clickSaveViewButton();
     }
 
+    getSuccessToastLocator() {
+        return this.page.locator(this.successToast);
+    }
+
     async clickSavedViewsExpand() {
         // CRITICAL: This method is often called after applying a saved view
         //
@@ -3450,25 +3501,24 @@ export class LogsPage {
     }
 
     /**
-     * Verifies that the Table tab is selected by default.
-     * As of #13368 ("logs sidebar table will be default view") the log-detail sidebar
-     * opens on the Table tab, superseding the earlier Bug #9724 JSON-default behavior.
-     * Checks that the Table tab is visible AND is the active tab AND table content shows.
+     * Verifies that the JSON tab is selected by default.
+     * The log-detail sidebar opens on the JSON tab — the first tab in the bar.
+     * Checks that the JSON tab is visible AND is the active tab AND JSON content shows.
      * @returns {Promise<void>}
      */
-    async verifyTableTabSelectedByDefault() {
-        const tableTab = this.page.locator(this.logDetailTableTab);
-        await expect(tableTab).toBeVisible();
+    async verifyJsonTabSelectedByDefault() {
+        const jsonTab = this.page.locator(this.logDetailJsonTab);
+        await expect(jsonTab).toBeVisible();
 
         // The Reka OTab (TabsTrigger) carries data-state="active" when selected. The
         // DetailTable drawer is an async component, so on open the trigger can render a
         // tick before Reka's reactive data-state settles. Poll with toHaveAttribute,
         // which auto-retries until the attribute settles (avoids CI-load flakes).
-        await expect(tableTab, 'Table tab should be selected by default (#13368)')
+        await expect(jsonTab, 'JSON tab should be selected by default')
             .toHaveAttribute('data-state', 'active', { timeout: 10000 });
 
-        await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
-        testLogger.info('✓ Table tab is selected by default (#13368 verified)');
+        await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
+        testLogger.info('✓ JSON tab is selected by default');
     }
 
     /**
@@ -3766,7 +3816,7 @@ export class LogsPage {
     }
 
     async expectNotificationMessage(text) {
-        const escaped = String(text).replace(/"/g, '\\"');
+        const escaped = LogsPage.escapeCssAttrValue(text);
         const selector = [
             `[data-test-variant="success"][data-test-message*="${escaped}"]`,
             `[data-test-variant="error"][data-test-message*="${escaped}"]`,
@@ -3794,7 +3844,7 @@ export class LogsPage {
         // Some validations in the UX-revamp moved from $q.notify toasts to inline
         // OInput error messages (rendered as `[data-test="<name>-error"]`).
         // Cover both surfaces so the wait succeeds for either feedback channel.
-        const escaped = String(text).replace(/"/g, '\\"');
+        const escaped = LogsPage.escapeCssAttrValue(text);
         const selector = [
             `[data-test-variant="success"][data-test-message*="${escaped}"]`,
             `[data-test-variant="error"][data-test-message*="${escaped}"]`,
@@ -3934,12 +3984,7 @@ export class LogsPage {
         await expect(this.page.getByText(text, { exact: true })).toBeVisible();
     }
 
-    async expectLogsTableVisible() {
-        const table = this.page.locator(this.logsTable);
-        // Wait for the table to be visible with a timeout
-        await table.waitFor({ state: 'visible', timeout: 30000 });
-        return await expect(table).toBeVisible();
-    }
+
 
     async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
@@ -3956,9 +4001,7 @@ export class LogsPage {
         return await expect(this.page.getByText(/Field is required/).first()).toBeVisible();
     }
 
-    async expectErrorWhileFetchingNotVisible() {
-        return await expect(this.page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
-    }
+
 
     async clickBarChartCanvas() {
         // Wait for network idle to ensure chart data has loaded
@@ -4508,9 +4551,7 @@ export class LogsPage {
         return await expect(this.page.locator(this.searchBarRefreshButton)).toBeVisible();
     }
 
-    async expectQuickModeToggleVisible() {
-        return await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-    }
+
 
     async clickInterestingFieldButton(field) {
         const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
@@ -4765,12 +4806,7 @@ export class LogsPage {
         return await this.page.locator(this.savedFunctionNameInput).click();
     }
 
-    async fillSavedFunctionNameInput(text) {
-        // OInput wrapper data-test is "saved-function-name-input"; inner native input is "-field" (AGENT_RULES §4).
-        // Wait on the wrapper (visibility) but fill the -field variant.
-        await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 10000 });
-        return await this.page.locator(this.savedFunctionNameInputField).fill(text);
-    }
+
 
     async expectFunctionNameNotValid() {
         // OInput convention §4: the error span is `<parent>-error`. SearchBar.vue sets
@@ -5136,7 +5172,48 @@ export class LogsPage {
     }
 
     async clickExplainQuery() {
-        return await this.page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]').click();
+        return await this.page.locator(this.explainQueryMenuBtn).click();
+    }
+
+    /**
+     * Get the query error-state message locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getErrorMessageLocator() {
+        return this.page.locator(this.errorMessage);
+    }
+
+    /**
+     * Get the more-options (hamburger) button locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getMoreOptionsButtonLocator() {
+        return this.page.locator(this.moreOptionsBtn);
+    }
+
+    /**
+     * Get the Explain Query menu item locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getExplainQueryMenuBtnLocator() {
+        return this.page.locator(this.explainQueryMenuBtn);
+    }
+
+    /**
+     * Get a generic error indicator locator (class/role based)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getGenericErrorLocator() {
+        return this.page.locator(this.genericErrorSelector);
+    }
+
+    /**
+     * Get a menu item by (partial, case-insensitive) visible text
+     * @param {string} text - The menu text to match
+     * @returns {import('@playwright/test').Locator}
+     */
+    getMenuItemByText(text) {
+        return this.page.getByText(text, { exact: false }).first();
     }
 
     async hoverDownloadResults() {
@@ -6157,9 +6234,7 @@ export class LogsPage {
         return await this.page.locator(this.logSearchIndexListFieldSearchInput).fill(fieldName);
     }
 
-    async navigateToStreams() {
-        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
-    }
+
 
     async navigateToStreamsAlternate() {
         return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
@@ -7381,6 +7456,32 @@ export class LogsPage {
         if (sharedUrl.startsWith('http://') && !sharedUrl.includes('localhost')) {
             sharedUrl = sharedUrl.replace('http://', 'https://');
             testLogger.info('Converted HTTP to HTTPS', { url: sharedUrl });
+        }
+
+        // Re-point the short URL at the host the tests authenticated against (ZO_BASE_URL).
+        // On deployed/cloud envs the app builds the share link from its PUBLIC base URL
+        // (e.g. *.external.zinclabs.dev) which differs from the ingress the tests use
+        // (e.g. *.internal.zinclabs.dev). Navigating cross-origin drops the auth cookies
+        // and bounces to Dex, so the redirected page reads back an empty/logged-out state.
+        // The /short/<id> id resolves identically on the backend regardless of ingress
+        // host, so swapping only the origin keeps the session valid and the test intent
+        // (verify state preservation through the short-URL redirect) unchanged. Same-origin
+        // envs (localhost, matching deployed host) fall through untouched.
+        const baseUrl = process.env.ZO_BASE_URL;
+        if (baseUrl && !sharedUrl.includes('localhost')) {
+            try {
+                const shared = new URL(sharedUrl);
+                const base = new URL(baseUrl);
+                if (shared.origin !== base.origin) {
+                    shared.protocol = base.protocol;
+                    shared.host = base.host;
+                    const rewritten = shared.toString();
+                    testLogger.info('Re-pointed share URL to ZO_BASE_URL origin', { from: sharedUrl, to: rewritten });
+                    sharedUrl = rewritten;
+                }
+            } catch (e) {
+                testLogger.warn('Could not re-point share URL origin', { error: e.message });
+            }
         }
 
         testLogger.info('Share link URL captured', { url: sharedUrl });
@@ -8942,7 +9043,12 @@ export class LogsPage {
                 testLogger.info('Patterns loading result: statistics');
                 return 'statistics';
             }
-            if (await this.page.locator(this.patternCard(0)).isVisible().catch(() => false)) {
+            // Address the first *rendered* card, not absolute index 0 — OVirtualScroll
+            // stamps the absolute item index onto each card and mounts only the visible
+            // window, so `pattern-card-0` can be absent even while cards are on screen
+            // (see patternCardPart/patternCardAt). Anchoring on rendered position keeps
+            // this check consistent with getPatternCardCount() and the click helpers.
+            if (await this.patternCardAt(0).isVisible().catch(() => false)) {
                 testLogger.info('Patterns loading result: patterns');
                 return 'patterns';
             }
@@ -8984,7 +9090,8 @@ export class LogsPage {
      * Assert that at least one pattern card is visible
      */
     async expectPatternCardsVisible() {
-        await expect(this.page.locator(this.patternCard(0))).toBeVisible();
+        // First *rendered* card, not absolute index 0 — see patternCardPart().
+        await expect(this.patternCardAt(0)).toBeVisible();
         testLogger.info('At least one pattern card is visible');
     }
 
@@ -9010,11 +9117,51 @@ export class LogsPage {
     }
 
     /**
+     * Locate a sub-element of the Nth *rendered* pattern card.
+     *
+     * PatternList renders cards inside OVirtualScroll, which stamps the absolute
+     * item index onto each card (`pattern-card-<absoluteIndex>`) and mounts only
+     * the rows in the current window. Addressing `pattern-card-0-*` therefore
+     * fails outright once the list has scrolled past item 0, even though cards
+     * are on screen — getPatternCardCount() counts by suffix and stays > 0, so
+     * the two disagreed and the getters hung until timeout.
+     *
+     * Selecting by suffix and taking .nth() keeps these helpers consistent with
+     * how the count is measured: both address cards by rendered position.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @param {string} part - Card sub-element suffix (template|frequency|percentage)
+     * @returns {import('@playwright/test').Locator}
+     */
+    patternCardPart(index, part) {
+        return this.page
+            .locator(`[data-test^="pattern-card-"][data-test$="-${part}"]`)
+            .nth(index);
+    }
+
+    /**
+     * Locate the Nth *rendered* pattern card root, for the same virtualization
+     * reason as patternCardPart(). The card root's data-test has no suffix, so
+     * anchor on the template child (exactly one per card) and walk up to the
+     * card element — that keeps "Nth rendered card" identical to what
+     * getPatternCardCount() counts.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @returns {import('@playwright/test').Locator}
+     */
+    patternCardAt(index) {
+        return this.page
+            .locator('[data-test^="pattern-card-"]')
+            .filter({ has: this.page.locator('[data-test$="-template"]') })
+            .nth(index);
+    }
+
+    /**
      * Click on a pattern card to open details
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternCard(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         testLogger.info(`Clicked pattern card at index ${index}`);
     }
 
@@ -9024,7 +9171,7 @@ export class LogsPage {
      * @returns {Promise<string>} The template text
      */
     async getPatternCardTemplateText(index = 0) {
-        const text = await this.page.locator(this.patternCardTemplate(index)).textContent();
+        const text = await this.patternCardPart(index, 'template').textContent();
         testLogger.info(`Pattern ${index} template: ${text}`);
         return text;
     }
@@ -9035,7 +9182,7 @@ export class LogsPage {
      * @returns {Promise<string>} The frequency text
      */
     async getPatternCardFrequency(index = 0) {
-        const text = await this.page.locator(this.patternCardFrequency(index)).textContent();
+        const text = await this.patternCardPart(index, 'frequency').textContent();
         testLogger.info(`Pattern ${index} frequency: ${text}`);
         return text;
     }
@@ -9046,7 +9193,7 @@ export class LogsPage {
      * @returns {Promise<string>} The percentage text
      */
     async getPatternCardPercentage(index = 0) {
-        const text = await this.page.locator(this.patternCardPercentage(index)).textContent();
+        const text = await this.patternCardPart(index, 'percentage').textContent();
         testLogger.info(`Pattern ${index} percentage: ${text}`);
         return text;
     }
@@ -9057,7 +9204,7 @@ export class LogsPage {
      * @returns {Promise<number>} Number of wildcard chip elements
      */
     async getPatternCardWildcardChipCount(index = 0) {
-        const count = await this.page.locator(this.patternCardWildcardChips(index)).count().catch(() => 0);
+        const count = await this.patternCardAt(index).locator(this.wildcardChip).count().catch(() => 0);
         testLogger.info(`Pattern ${index} wildcard chips: ${count}`);
         return count;
     }
@@ -9106,7 +9253,10 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if anomaly badge is visible
      */
     async isPatternAnomaly(index = 0) {
-        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible({ timeout: 500 }).catch(() => false);
+        const isAnomaly = await this.patternCardAt(index)
+            .locator('[data-test$="-anomaly-badge"]')
+            .isVisible({ timeout: 500 })
+            .catch(() => false);
         testLogger.info(`Pattern ${index} is anomaly: ${isAnomaly}`);
         return isAnomaly;
     }
@@ -9117,7 +9267,10 @@ export class LogsPage {
      * @returns {Promise<string>} Badge text, or empty string if not visible
      */
     async getPatternAnomalyBadgeText(index = 0) {
-        const text = await this.page.locator(this.patternCardAnomalyBadge(index)).textContent().catch(() => '');
+        const text = await this.patternCardAt(index)
+            .locator('[data-test$="-anomaly-badge"]')
+            .textContent()
+            .catch(() => '');
         return text.trim();
     }
 
@@ -9127,7 +9280,7 @@ export class LogsPage {
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternIncludeBtn(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         await this.page.locator(this.patternDetailIncludeBtn).click();
         testLogger.info(`Clicked include button on pattern ${index}`);
     }
@@ -9138,18 +9291,28 @@ export class LogsPage {
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternExcludeBtn(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         await this.page.locator(this.patternDetailExcludeBtn).click();
         testLogger.info(`Clicked exclude button on pattern ${index}`);
     }
 
     /**
-     * Click the details icon on a pattern card
-     * @param {number} index - The pattern card index (0-based)
+     * Click the Nth rendered pattern card and return its absolute list index.
+     * @param {number} index - Position among rendered cards (0-based)
+     * @returns {Promise<number>} Absolute pattern index (0-based)
      */
     async clickPatternDetailsIcon(index = 0) {
-        await this.page.locator(this.patternCardDetailsIcon(index)).click();
-        testLogger.info(`Clicked details icon on pattern ${index}`);
+        const card = this.patternCardAt(index);
+        const dataTest = await card.getAttribute('data-test');
+        const absoluteIndex = Number.parseInt(dataTest?.match(/^pattern-card-(\d+)$/)?.[1] ?? '', 10);
+
+        if (!Number.isInteger(absoluteIndex)) {
+            throw new Error(`Unable to determine absolute pattern index from ${dataTest}`);
+        }
+
+        await card.click();
+        testLogger.info(`Clicked rendered pattern ${index} (absolute index ${absoluteIndex})`);
+        return absoluteIndex;
     }
 
     /**
@@ -9329,6 +9492,131 @@ export class LogsPage {
     async clickBuildToggle() {
         await this.page.locator(this.buildToggle).click();
         testLogger.info('Clicked Build tab toggle');
+    }
+
+    // ── Build tab: panel field list stream selectors ────────────────────────
+    // PanelFieldList (pageKey "build") owns these. Unlike the Visualize tab's
+    // copy (pageKey "logs", read-only), both selects here are the user's own.
+    // All locator work and every assertion lives here — specs call the semantic
+    // methods only, matching the other Logs specs.
+
+    /**
+     * Assert the LOGS page has no stream selected.
+     *
+     * Asserts the count too, and deliberately fails CLOSED: this selector also
+     * exists in JsonPreview.vue (rendered when a log row is expanded), so a bare
+     * .first() could silently read the wrong control and report '' for a page
+     * that does have a stream. A second match is a broken precondition, not a
+     * detail to skip past.
+     */
+    async expectNoLogsStreamSelected() {
+        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        await expect(
+            trigger,
+            'expected exactly one logs stream select — a second match means the locator is ambiguous'
+        ).toHaveCount(1, { timeout: 20000 });
+        await expect(
+            trigger,
+            'logs page must start with no stream selected — the Build tab inherits that blank stream'
+        ).toHaveAttribute('data-test-selected-value', '', { timeout: 20000 });
+        testLogger.info('Verified logs page has no stream selected');
+    }
+
+    /** Assert the Build tab's stream type. Retries — the model settles a tick late. */
+    async expectBuildStreamType(type) {
+        await expect(this.page.locator(this.buildStreamTypeTrigger))
+            .toHaveAttribute('data-test-selected-value', type, { timeout: 20000 });
+        testLogger.info(`Verified Build tab stream type: ${type}`);
+    }
+
+    /** Assert which stream the Build tab's field list has selected. */
+    async expectBuildStreamSelected(name) {
+        await expect(this.page.locator(this.buildStreamTrigger))
+            .toHaveAttribute('data-test-selected-value', name, { timeout: 20000 });
+        testLogger.info(`Verified Build tab selected stream: ${name}`);
+    }
+
+    /** The stream select must be the user's own control, not read-only. */
+    async expectBuildStreamDropdownEditable() {
+        await expect(
+            this.page.locator(this.buildStreamTrigger),
+            'Build tab stream select must be user-editable'
+        ).toBeEnabled({ timeout: 20000 });
+    }
+
+    /** The open dropdown offers real streams instead of OSelect's empty state. */
+    async expectBuildStreamListPopulated() {
+        await expect(
+            this.page.locator(this.buildStreamPopover).getByText('No options found', { exact: true }),
+            'stream list never loaded — dropdown fell through to its empty state'
+        ).toHaveCount(0, { timeout: 15000 });
+        await expect(this.page.locator(this.buildStreamOptions).first())
+            .toBeVisible({ timeout: 15000 });
+    }
+
+    /** Assert a stream IS offered. Filters first — the option list is virtualised. */
+    async expectBuildStreamOptionVisible(name) {
+        await this.filterBuildStreamOptions(name);
+        await expect(this.page.locator(this.buildStreamOption(name)).first())
+            .toBeVisible({ timeout: 15000 });
+    }
+
+    /** Assert a stream is NOT offered (e.g. a logs stream under stream type traces). */
+    async expectBuildStreamOptionAbsent(name) {
+        await this.filterBuildStreamOptions(name);
+        await expect(this.page.locator(this.buildStreamOption(name)))
+            .toHaveCount(0, { timeout: 15000 });
+    }
+
+    /** Field rows render for the selected stream. Any row — this shard runs with
+     *  ZO_QUICK_MODE_ENABLED, which narrows which fields are listed. */
+    async expectBuildFieldListPopulated() {
+        await expect(
+            this.page.locator('[data-test="logs-build-query-page"] [data-test^="o-field-list-row-"]').first()
+        ).toBeVisible({ timeout: 20000 });
+    }
+
+    async openBuildStreamDropdown() {
+        const dropdown = this.page.locator(this.buildStreamDropdown);
+        await dropdown.waitFor({ state: 'visible', timeout: 20000 });
+        await dropdown.click();
+        await this.page.locator(this.buildStreamPopover).waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Opened Build tab stream dropdown');
+    }
+
+    async closeBuildStreamDropdown() {
+        await this.page.keyboard.press('Escape');
+        await this.page.locator(this.buildStreamPopover)
+            .waitFor({ state: 'hidden', timeout: 10000 })
+            .catch(() => {});
+    }
+
+    /**
+     * Filter the open stream dropdown. The option list is virtualised, so
+     * filtering — not scrolling — is the only reliable way to assert that a
+     * specific stream is present or absent.
+     */
+    async filterBuildStreamOptions(text) {
+        const search = this.page.locator(this.buildStreamSearch);
+        await search.waitFor({ state: 'visible', timeout: 10000 });
+        await search.fill(text);
+    }
+
+    /** Click an offered stream and wait for the dropdown to commit the pick. */
+    async clickBuildStreamOption(name) {
+        await this.page.locator(this.buildStreamOption(name)).first().click();
+        await expect(this.page.locator(this.buildStreamPopover)).toBeHidden({ timeout: 10000 });
+        testLogger.info(`Picked Build tab stream: ${name}`);
+    }
+
+    /** Change the Build tab's Stream Type. Clears the stream by design. */
+    async selectBuildStreamType(type) {
+        await this.page.locator(this.buildStreamTypeDropdown).click();
+        const popover = this.page.locator(this.buildStreamTypePopover);
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+        await popover.locator(`[data-test="index-dropdown-stream_type-option"][data-test-value="${type}"]`).first().click();
+        await popover.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        testLogger.info(`Selected Build tab stream type: ${type}`);
     }
 
     /**
@@ -9624,7 +9912,11 @@ export class LogsPage {
     async isQuickModeEnabledOnInstance() {
         return await this.page
             .evaluate(async () => {
-                const res = await fetch('/config');
+                // quick_mode_enabled lives on the AUTHENTICATED per-org config;
+                // the unauthenticated /config bootstrap no longer carries flags.
+                const org =
+                    new URLSearchParams(location.search).get('org_identifier') || 'default';
+                const res = await fetch(`/api/${org}/config`, { credentials: 'include' });
                 if (!res.ok) return false;
                 const cfg = await res.json();
                 return cfg.quick_mode_enabled === true;
@@ -10393,13 +10685,7 @@ export class LogsPage {
     // VRL fields, Query Inspector, Sorting, and Highlight tests
     // ============================================================================
 
-    /**
-     * Get the logs table element
-     * @returns {Locator} - The logs table locator
-     */
-    getLogsTable() {
-        return this.page.locator(this.logsSearchResultLogsTable);
-    }
+
 
     /**
      * Wait for logs table to be visible
@@ -10517,13 +10803,7 @@ export class LogsPage {
         return this.page.locator(this.logsSearchResultTableRows).last();
     }
 
-    /**
-     * Get the first row expand menu
-     * @returns {Locator} - The first expand menu locator
-     */
-    getFirstRowExpandMenu() {
-        return this.page.locator(this.tableRowExpandMenu).first();
-    }
+
 
     /**
      * Check if log detail panel is visible
@@ -11091,6 +11371,15 @@ export class LogsPage {
      */
     getSourceColumnHeader() {
         return this.page.locator('[data-test="o2-table-th-source"]');
+    }
+
+    /**
+     * Get a logs result table column header by field name.
+     * @param {string} fieldName - The field/column name.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getTableHeaderByField(fieldName) {
+        return this.page.locator(`[data-test="o2-table-th-${fieldName}"]`);
     }
 
     /**

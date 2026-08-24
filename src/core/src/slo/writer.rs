@@ -21,8 +21,9 @@
 //! which it is false. A write built any other way would be rejected by the
 //! guard protecting the stream from users.
 
-use config::{meta::stream::StreamType, utils::json};
+use config::{cluster::LOCAL_NODE, meta::stream::StreamType, utils::json};
 use ingestion_common::{self as ingestion, IngestUser, SystemJobType};
+use proto::cluster_rpc;
 
 /// Publish rows to a reserved internal stream.
 pub async fn publish(org: &str, stream: &str, rows: Vec<json::Value>) -> Result<(), anyhow::Error> {
@@ -31,20 +32,49 @@ pub async fn publish(org: &str, stream: &str, rows: Vec<json::Value>) -> Result<
     }
     ensure_schema(org, stream).await;
 
-    let bytes = bytes::Bytes::from(json::to_string(&rows)?);
-    let req = ingestion::IngestionRequest::Usage(bytes);
-    crate::logs::ingest::ingest(
-        0,
-        org,
-        stream,
-        req,
-        IngestUser::SystemJob(SystemJobType::SelfReporting),
-        None,
-        false,
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("failed to write {stream} for {org}: {e}"))?;
-    Ok(())
+    if LOCAL_NODE.is_ingester() {
+        let bytes = bytes::Bytes::from(json::to_string(&rows)?);
+        let req = ingestion::IngestionRequest::Usage(bytes);
+        crate::logs::ingest::ingest(
+            0,
+            org,
+            stream,
+            req,
+            IngestUser::SystemJob(SystemJobType::SelfReporting),
+            None,
+            false,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to write {stream} for {org}: {e}"))?;
+        Ok(())
+    } else {
+        // call gRPC ingestion service
+
+        let req = cluster_rpc::IngestionRequest {
+            org_id: org.to_string(),
+            stream_name: stream.to_string(),
+            stream_type: StreamType::Logs.to_string(),
+            data: Some(cluster_rpc::IngestionData::from(rows)),
+            ingestion_type: Some(cluster_rpc::IngestionType::Usage.into()),
+            metadata: None,
+        };
+
+        match crate::ingestion::ingestion_service::ingest(req).await {
+            Ok(resp) if resp.status_code == 200 => {
+                log::debug!(
+                    "[SLO-REPORTING] slo data successfully ingested to stream {org}/{stream}"
+                );
+                Ok(())
+            }
+            error => {
+                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                log::error!(
+                    "[SLO-REPORTING] slo data reporting errored while ingesting to stream {org}/{stream}. Error: {err}"
+                );
+                Err(anyhow::anyhow!("{err}"))
+            }
+        }
+    }
 }
 
 /// Create the stream's schema by reflection before the first write, so every
@@ -78,7 +108,17 @@ async fn ensure_schema(org: &str, stream: &str) {
             return;
         }
     };
-    if let Err(e) = crate::db::schema::merge(org, stream, StreamType::Logs, &expected, None).await {
+    // `Some(now)`, never `None`: a `None` min_ts is stored as `start_dt = 0`,
+    // and `infra::db::build_key` renders a zero `start_dt` as a THREE-segment
+    // key (`/schema/org/logs/slo_slices`) instead of four. The startup schema
+    // cache asserts four and panics, so a `None` here means the server can
+    // never restart once any SLO has written a slice. Every other ingestion
+    // path passes the record timestamp; this one has no record yet, so it
+    // passes the moment the reserved stream was created.
+    let min_ts = config::utils::time::now_micros();
+    if let Err(e) =
+        crate::db::schema::merge(org, stream, StreamType::Logs, &expected, Some(min_ts)).await
+    {
         log::warn!("[SLO] could not initialize {stream} schema for {org}: {e}");
     }
 }

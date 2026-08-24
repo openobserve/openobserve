@@ -1,5 +1,5 @@
 <template>
-  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 480px; max-width: 800px">
+  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 30rem; max-width: 50rem">
     <!-- Header -->
     <div class="px-2 py-3">
       <OCardSection role="header" class="w-full">
@@ -111,23 +111,26 @@ export default defineComponent({
           ? getUnitValue(query?.compressed_size, "megabytes", "", 2)
           : { value: "", unit: "" };
       const rows: any[] = [
-        ["Trace ID", query?.trace_id],
-        ["Status", query?.status],
-        ["User ID", query?.user_id],
-        ["Org ID", query?.org_id],
-        ["Stream Type", query?.stream_type],
-        ["Search Type", query?.search_type],
-        ["Query Source", query?.query_source],
+        [t("queries.traceId"), query?.trace_id],
+        [t("queries.status"), query?.status],
+        [t("queries.userId"), query?.user_id],
+        [t("queries.orgId"), query?.org_id],
+        [t("queries.streamType"), query?.stream_type],
+        [t("queries.searchType"), query?.search_type],
+        [t("queries.querySource"), query?.query_source],
         ["SQL", query?.sql],
-        ["Start Time", startTimeEntry],
-        ["End Time", endTimeEntry],
-        ["Exec. Duration", getDuration(query?.created_at)],
-        ["Query Range", queryRange(query?.start_time, query?.end_time)],
-        ["Scan Records", query?.records],
-        ["Files", query?.files],
-        ["Original Size", originalSize.value ? `${originalSize.value} ${originalSize.unit}` : ""],
+        [t("queries.startTime"), startTimeEntry],
+        [t("queries.endTime"), endTimeEntry],
+        [t("queries.duration"), getDuration(query?.created_at)],
+        [t("queries.queryRange"), queryRange(query?.start_time, query?.end_time)],
+        [t("queries.scanRecords"), query?.records],
+        [t("queries.files"), query?.files],
         [
-          "Compressed Size",
+          t("queries.originalSize"),
+          originalSize.value ? `${originalSize.value} ${originalSize.unit}` : "",
+        ],
+        [
+          t("queries.compressedSize"),
           compressedSize.value ? `${compressedSize.value} ${compressedSize.unit}` : "",
         ],
       ];

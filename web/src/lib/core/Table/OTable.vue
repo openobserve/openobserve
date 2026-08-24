@@ -76,7 +76,8 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   rowKey: "id",
   rowHeight: undefined,
   showGlobalFilter: true,
-  globalFilterPlaceholder: "Search...",
+  // no default here: a literal would ship untranslated. Resolved at render below.
+  globalFilterPlaceholder: undefined,
   filterMode: "client",
   defaultColumns: true,
   footerTitle: raw(""),
@@ -481,16 +482,16 @@ const displayRows = computed(() => {
 // ── Pivot: row-field cell merge (fake rowspan) ──────────────────
 // Consecutive rows sharing the same leading row-field values collapse into one
 // visual cell: the first row shows the value, the rest hide their content and
-// the group's inner borders. Keyed by each row-field column's `name`.
-const PIVOT_ROW_KEY_SEP = "\u0000";
+// the group's inner borders. Keyed by row object identity — a value-based key
+// collides across every row of a run when only one row field is configured
+// (all rows in the run share the same values), which made the last row's
+// hideContent overwrite the first row's and blank the whole run.
 const pivotMergeMap = computed(() => {
-  const map = new Map<string, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
+  const map = new Map<any, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
   const rowCols = (props.pivotRowColumns ?? []) as any[];
   if (!rowCols.length) return map;
   const rows = displayRows.value.map((r) => r.original as any).filter((r: any) => !r.__isTotalRow);
   if (!rows.length) return map;
-  const rowKey = (row: any) =>
-    rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
   for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
     const col = rowCols[colIdx];
     let groupStart = 0;
@@ -507,9 +508,9 @@ const pivotMergeMap = computed(() => {
       if (!sameGroup) {
         if (i - groupStart > 1) {
           for (let r = groupStart; r < i; r++) {
-            const key = rowKey(rows[r]);
-            if (!map.has(key)) map.set(key, {});
-            map.get(key)![col.name] = {
+            const rowObj = rows[r];
+            if (!map.has(rowObj)) map.set(rowObj, {});
+            map.get(rowObj)![col.name] = {
               hideContent: r !== groupStart,
               hideBorder: r < i - 1,
             };
@@ -525,10 +526,8 @@ function getPivotMerge(
   row: any,
   columnId: string,
 ): { hideContent: boolean; hideBorder: boolean } | null {
-  const rowCols = (props.pivotRowColumns ?? []) as any[];
-  if (!rowCols.length) return null;
-  const key = rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
-  return pivotMergeMap.value.get(key)?.[columnId] ?? null;
+  if (!(props.pivotRowColumns ?? []).length) return null;
+  return pivotMergeMap.value.get(row)?.[columnId] ?? null;
 }
 
 function pivotTotalCell(col: OTableColumnDef<TData>): any {
@@ -562,7 +561,7 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 }
 
@@ -589,6 +588,10 @@ const {
   rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
+  // A delegated scroller can contain a histogram or other content before this
+  // table. Keep its raw offset stable when wrapped rows are remeasured so a
+  // query refresh cannot move the owning page's scrollbar.
+  preserveScrollOffsetOnRowResize: () => !!props.scrollEl && useDynamicRowHeight.value,
 });
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
@@ -1088,7 +1091,7 @@ defineExpose({
           <input
             :value="globalFilterLocal"
             type="text"
-            :placeholder="props.globalFilterPlaceholder"
+            :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
             class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 pr-2 pl-7 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
@@ -1219,6 +1222,7 @@ defineExpose({
             :pinned-first-column="props.pinnedFirstColumn"
             :enable-column-resize="props.enableColumnResize"
             :enable-column-filter="props.enableColumnFilter"
+            :enable-column-format="props.enableColumnFormat"
             :is-resizing="columnMgmt.isResizing.value"
             :sorting-enabled="sorting.isEnabled.value"
             :sort-by="sorting.activeSortBy.value ?? undefined"
@@ -1244,6 +1248,7 @@ defineExpose({
             @drag-end="columnMgmt.onDragEnd"
             @resize-start="freezeFlexColumns"
             @close-column="(col: any) => emit('close-column', col)"
+            @format-column="(colId: string) => emit('format-column', colId)"
           />
 
           <!-- ── Skeleton Body (loading with no existing data) ───── -->
@@ -1391,7 +1396,7 @@ defineExpose({
                         position: 'sticky',
                         right: `${header.column.getAfter?.('right') ?? 0}px`,
                         zIndex: 20,
-                        boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                        boxShadow: 'var(--shadow-sticky-right)',
                       }
                     : {}),
                 }"
@@ -1588,6 +1593,7 @@ defineExpose({
 }
 
 .o2-table :deep(tr td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel row divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-card-glass-border) !important;
 }
 

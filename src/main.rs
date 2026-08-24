@@ -35,7 +35,7 @@ use openobserve::{
     telemetry::{enable_tracing, setup_logs},
 };
 use openobserve_api_http::handler::http::router::*;
-use openobserve_core::{bootstrap, metadata};
+use openobserve_core::bootstrap;
 use openobserve_jobs::job;
 use tokio::sync::oneshot;
 #[cfg(feature = "enterprise")]
@@ -232,8 +232,6 @@ async fn main() -> Result<(), anyhow::Error> {
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
 
-            // flush distinct values
-            _ = metadata::close().await;
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
             // flush compact offset cache to disk disk
@@ -525,6 +523,13 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         log::info!("init super cluster");
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         super_cluster_queue::init().await?;
+        // Composite alerts are unsupported in super-cluster mode (§18): fail
+        // closed at startup if any definitions or jobs remain, before serving.
+        if let Err(e) = openobserve_core::alerts::composite::startup_preflight().await {
+            return Err(anyhow::anyhow!(
+                "composite alerts super-cluster startup preflight failed: {e:#}"
+            ));
+        }
     }
 
     // Initialize enterprise AI components (agent and evaluation clients).
@@ -539,32 +544,6 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
     let o2cfg = o2_enterprise::enterprise::common::config::get_config();
     if let Err(e) = check_ratelimit_config(&cfg, &o2cfg) {
         panic!("ratelimit config error: {e}");
-    }
-
-    // Push the synthetics limits from enterprise config into the OSS validator.
-    // Synthetics is enterprise-only, so the values live in SyntheticsConfig, but
-    // the check validation they bound lives in `config` — which cannot depend on
-    // o2_enterprise. This is the seam.
-    //
-    // Deliberately NOT fatal, unlike ratelimit above: synthetics is one feature,
-    // and refusing to start the whole application — ingest, search, dashboards —
-    // because a probe ceiling is misconfigured would be the worse outage. On
-    // rejection nothing is installed and validation keeps using the conservative
-    // built-in defaults, so the failure mode is "stricter than intended", not
-    // "accepts checks that get killed mid-run".
-    if let Err(e) =
-        config::meta::synthetics::init_limits(config::meta::synthetics::SyntheticsLimits {
-            job_lease_secs: o2cfg.synthetics.job_lease_secs,
-            max_check_budget_secs: o2cfg.synthetics.max_check_budget_secs,
-            max_net_timeout_ms: o2cfg.synthetics.max_net_timeout_ms,
-        })
-    {
-        log::error!(
-            "synthetics limits config rejected, falling back to defaults \
-             (budget={}s lease={}s): {e}",
-            config::meta::synthetics::DEFAULT_MAX_CHECK_BUDGET_SECS,
-            config::meta::synthetics::DEFAULT_JOB_LEASE_SECS,
-        );
     }
 
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;

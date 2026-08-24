@@ -8,10 +8,14 @@ import { createI18n } from "vue-i18n";
 import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock external dependencies
-vi.mock("@/utils/commons", () => ({
-  getAllDashboards: vi.fn(),
-  getFoldersList: vi.fn(),
-}));
+vi.mock("@/utils/commons", async () => {
+  const actual: any = await vi.importActual("@/utils/commons");
+  return {
+    getAllDashboards: vi.fn(),
+    getFoldersList: vi.fn(),
+    dedupeDashboardIds: actual.dedupeDashboardIds,
+  };
+});
 
 vi.mock("@/services/dashboards", () => ({
   default: {
@@ -899,6 +903,40 @@ describe("ImportDashboard.vue", () => {
       expect(importBtn.exists()).toBe(true);
       expect(importBtn.attributes("form")).toBe("import-dashboard-form");
       expect(wrapper.find("#import-dashboard-form").exists()).toBe(true);
+    });
+  });
+
+  describe("import id uniqueness", () => {
+    it("dedupes duplicate panel ids and layout ids on import (before create)", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockResolvedValue({ data: { dashboardId: "d1" } });
+
+      wrapper = mountComponent();
+      await nextTick();
+
+      wrapper.vm.jsonStr = JSON.stringify({
+        title: "Dup Dashboard",
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [
+              { id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+              { id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+            ],
+          },
+        ],
+      });
+
+      await wrapper.vm.importFromJsonStr();
+      await flushPromises();
+
+      // migrateSchema dedupes after schema migration and before validation,
+      // so the dashboard reaching create has unique panel ids and layout ids.
+      expect(dashboardService.create).toHaveBeenCalledTimes(1);
+      const sentDashboard = (dashboardService.create as any).mock.calls[0][1];
+      const panels = sentDashboard.tabs[0].panels;
+      expect(new Set(panels.map((p: any) => p.id)).size).toBe(panels.length);
+      expect(new Set(panels.map((p: any) => p.layout.i)).size).toBe(panels.length);
     });
   });
 });

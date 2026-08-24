@@ -212,22 +212,6 @@ const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",
 );
 
-const badgeVariantMap: Record<string, "warning" | "success" | "error"> = {
-  healthy: "success",
-  degraded: "warning",
-  critical: "error",
-};
-const statusBadge = computed(() => {
-  const s = monitorStatus.value;
-  const labels: Record<string, string> = {
-    healthy: t("synthetics.status.healthy"),
-    degraded: t("synthetics.status.degraded"),
-    critical: t("synthetics.status.critical"),
-  };
-  if (!labels[s]) return null;
-  return { variant: badgeVariantMap[s], label: labels[s] };
-});
-
 // ── Date state + URL sync (same pattern as LLMInsightsPage) ────────────
 type DateValueType = "relative" | "absolute";
 const timeState = ref<{

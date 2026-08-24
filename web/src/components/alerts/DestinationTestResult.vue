@@ -18,7 +18,7 @@ limitations under the License. -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
-      class="rounded-default border-status-positive flex gap-3 border-l-[3px] border-solid bg-[rgba(76,175,80,0.08)] px-4 py-3 dark:bg-[rgba(76,175,80,0.12)]"
+      class="rounded-default border-status-positive flex gap-3 border-l-3 border-solid bg-[rgba(76,175,80,0.08)] px-4 py-3 dark:bg-[rgba(76,175,80,0.12)]"
     >
       <div class="text-status-positive shrink-0 pt-0.5">
         <OIcon name="check-circle" size="md" />
@@ -50,7 +50,7 @@ limitations under the License. -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
-      class="rounded-default border-status-negative flex gap-3 border-l-[3px] border-solid bg-[rgba(244,67,54,0.08)] px-4 py-3 dark:bg-[rgba(244,67,54,0.12)]"
+      class="rounded-default border-status-negative flex gap-3 border-l-3 border-solid bg-[rgba(244,67,54,0.08)] px-4 py-3 dark:bg-[rgba(244,67,54,0.12)]"
     >
       <div class="text-status-negative shrink-0 pt-0.5">
         <OIcon name="error" size="md" />
@@ -103,7 +103,7 @@ limitations under the License. -->
           <div data-test="test-failure-details" class="pt-2">
             <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
               <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
               >
                 {{ t("alerts.error") }}
               </div>
@@ -114,7 +114,7 @@ limitations under the License. -->
 
             <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
               <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
               >
                 {{ t("alerts.httpStatus") }}
               </div>
@@ -125,14 +125,13 @@ limitations under the License. -->
 
             <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
               <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
               >
                 {{ t("alerts.responseBody") }}
               </div>
               <pre
                 class="rounded-default text-3xs text-text-body m-0 max-h-37.5 overflow-y-auto border border-[rgba(0,0,0,0.1)] bg-[rgba(0,0,0,0.05)] p-2 font-mono leading-[1.5] whitespace-pre dark:border-[rgba(255,255,255,0.1)] dark:bg-[rgba(255,255,255,0.05)]"
-                >{{ formatResponseBody(result.responseBody) }}</pre
-              >
+                >{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </OCollapsible>
@@ -158,7 +157,7 @@ limitations under the License. -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"
-      class="rounded-default border-theme-accent flex gap-3 border-l-[3px] border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
+      class="rounded-default border-theme-accent flex gap-3 border-l-3 border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
     >
       <div class="text-theme-accent shrink-0 pt-0.5">
         <OSpinner size="xs" />
@@ -188,7 +187,7 @@ limitations under the License. -->
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { formatDate } from "@/utils/date";
 import type { TestResult } from "@/utils/prebuilt-templates/types";
@@ -241,17 +240,17 @@ function getFailureMessage(result: TestResult): string {
       if (errorMessage) {
         // If it's a string, return it directly
         if (typeof errorMessage === "string") {
-          return `Test failed: ${errorMessage}`;
+          return t("alerts.testFailedWithReason", { reason: errorMessage });
         }
         // If it's an array, join the messages
         if (Array.isArray(errorMessage)) {
-          return `Test failed: ${errorMessage.join(", ")}`;
+          return t("alerts.testFailedWithReason", { reason: errorMessage.join(", ") });
         }
       }
     } catch {
       // If parsing fails, try to use responseBody as-is if it's short enough
       if (result.responseBody.length < 100) {
-        return `Test failed: ${result.responseBody}`;
+        return t("alerts.testFailedWithReason", { reason: result.responseBody });
       }
     }
   }
@@ -273,7 +272,7 @@ function getFailureMessage(result: TestResult): string {
     }
 
     // For other errors, show the actual error message
-    return `Test failed: ${result.error}`;
+    return t("alerts.testFailedWithReason", { reason: result.error });
   }
 
   // Fall back to generic messages based on status code
@@ -290,23 +289,25 @@ function getFailureMessage(result: TestResult): string {
 }
 
 function getStatusText(statusCode: number): string {
+  // HTTP reason phrases, rendered right after the numeric status code. They are
+  // protocol vocabulary (RFC 9110), quoted as-is in every locale — never translated.
   const statusMessages: Record<number, string> = {
-    200: "OK",
-    201: "Created",
-    204: "No Content",
-    400: "Bad Request",
-    401: "Unauthorized",
-    403: "Forbidden",
-    404: "Not Found",
-    422: "Unprocessable Entity",
-    429: "Too Many Requests",
-    500: "Internal Server Error",
-    502: "Bad Gateway",
-    503: "Service Unavailable",
-    504: "Gateway Timeout",
+    200: raw("OK"),
+    201: raw("Created"),
+    204: raw("No Content"),
+    400: raw("Bad Request"),
+    401: raw("Unauthorized"),
+    403: raw("Forbidden"),
+    404: raw("Not Found"),
+    422: raw("Unprocessable Entity"),
+    429: raw("Too Many Requests"),
+    500: raw("Internal Server Error"),
+    502: raw("Bad Gateway"),
+    503: raw("Service Unavailable"),
+    504: raw("Gateway Timeout"),
   };
 
-  return statusMessages[statusCode] || "Unknown";
+  return statusMessages[statusCode] || t("alerts.unknownHttpStatus");
 }
 
 function formatResponseBody(body: string): string {

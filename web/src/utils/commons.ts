@@ -20,6 +20,7 @@ import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
+import type { TranslateFn } from "@/types/i18n";
 
 let moment: any;
 let momentInitialized = false;
@@ -308,6 +309,7 @@ export const addPanel = async (
 };
 
 export const addVariable = async (
+  t: TranslateFn,
   store: any,
   dashboardId: any,
   variableData: any,
@@ -325,7 +327,7 @@ export const addVariable = async (
   );
 
   if (variableExists.length) {
-    throw new Error("Variable with same name already exists");
+    throw new Error(t("dashboard.variableNameAlreadyExists"));
   }
 
   currentDashboard.variables.list.push(variableData);
@@ -402,6 +404,7 @@ export const deletePanel = async (
 };
 
 export const updateVariable = async (
+  t: TranslateFn,
   store: any,
   dashboardId: any,
   variableName: any,
@@ -423,7 +426,7 @@ export const updateVariable = async (
   );
 
   if (variableName != variableData.name && variableExists.length) {
-    throw new Error("Variable with same name already exists");
+    throw new Error(t("dashboard.variableNameAlreadyExists"));
   }
 
   // Update the variable data in the list
@@ -556,8 +559,8 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   // Ensure variables structure always exists (fix for dashboards with no variables)
   ensureVariablesStructure(dashboardJson);
 
-  // Fix duplicate panel IDs and check if any were found
-  const hasDuplicates = fixDuplicatePanelIds(dashboardJson);
+  // Fix duplicate panel IDs and layout IDs (layout.i) and check if any were found
+  const hasDuplicateIds = dedupeDashboardIds(dashboardJson);
 
   // The reserved timestamp column is not allowed as a SQL output alias —
   // normalize it to `ts`. Returns true when anything was rewritten, so we
@@ -565,8 +568,8 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   const timestampColumn = store.state.zoConfig?.timestamp_column ?? "_timestamp";
   const hasReservedAlias = normalizeReservedTimestampAlias(dashboardJson, timestampColumn);
 
-  // If either fix changed the dashboard, save it and retrieve the updated version
-  if (hasDuplicates || hasReservedAlias) {
+  // If any fix changed the dashboard, save it and retrieve the updated version
+  if (hasDuplicateIds || hasReservedAlias) {
     // Save the dashboard with the applied fixes
     await updateDashboard(
       store,
@@ -625,6 +628,46 @@ const generateUniquePanelId = (existingIds: Set<string>): string => {
     id = `${PANEL_ID_PREFIX}${Math.floor(1000000 + Math.random() * 9000000)}`;
   } while (existingIds.has(id));
   return id;
+};
+
+// Fix duplicate panel layout ids (layout.i). layout.i is a numeric grid-slot
+// id scoped to a tab, so dedupe per-tab and continue from the tab's max i.
+const fixDuplicateLayoutIds = (dashboardJson: any): boolean => {
+  let hasDuplicates = false;
+
+  for (const tab of dashboardJson?.tabs || []) {
+    if (!Array.isArray(tab?.panels)) continue;
+
+    const usedIds = new Set<number>();
+    let maxI = 0;
+    for (const panel of tab.panels) {
+      if (typeof panel?.layout?.i === "number") {
+        maxI = Math.max(maxI, panel.layout.i);
+      }
+    }
+
+    for (const panel of tab.panels) {
+      if (!panel?.layout) continue;
+
+      const currentId = panel.layout.i;
+      if (typeof currentId !== "number" || usedIds.has(currentId)) {
+        panel.layout.i = ++maxI;
+        hasDuplicates = true;
+      }
+
+      usedIds.add(panel.layout.i);
+    }
+  }
+
+  return hasDuplicates;
+};
+
+// Dedupe both panel ids and layout ids in place. Used on dashboard load and at
+// import time (post schema migration). Returns true if anything was changed.
+export const dedupeDashboardIds = (dashboardJson: any): boolean => {
+  const fixedPanelIds = fixDuplicatePanelIds(dashboardJson);
+  const fixedLayoutIds = fixDuplicateLayoutIds(dashboardJson);
+  return fixedPanelIds || fixedLayoutIds;
 };
 
 export const deleteDashboardById = async (store: any, dashboardId: any, folderId: any) => {

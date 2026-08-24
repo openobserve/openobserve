@@ -47,37 +47,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="vertical-segment"
               :data-left="parseInt((spans as any[])[virtualRow.index].style.left)"
               :data-depth="depth"
+              class="border-card-glass-border pointer-events-none absolute top-0 z-1 border-l"
               :style="{
-                position: 'absolute',
                 left:
                   parseInt((spans as any[])[virtualRow.index].style.left) -
                   (spanDimensions?.gap ?? 15) * (depth - 1) +
                   'px',
-                top: '0',
                 height: nextSiblingMap[virtualRow.index as number]
                   ? spanDimensions.height + 'px'
                   : depth === 1
                     ? spanDimensions.height / 2 + 'px'
                     : spanDimensions.height + 'px',
-                borderLeft: '1.5px solid var(--color-card-glass-border)',
-                pointerEvents: 'none',
-                zIndex: 1,
               }"
             />
           </template>
           <!-- Horizontal stub from parent column to this badge -->
           <div
             data-test="horizontal-segment"
+            class="border-card-glass-border pointer-events-none absolute top-1/2 z-1 border-t"
             :style="{
-              position: 'absolute',
               left: parseInt((spans as any[])[virtualRow.index].style.left) + 'px',
-              top: '50%',
               width: (spans as any[])[virtualRow.index].hasChildSpans
                 ? (spanDimensions?.gap ?? 15) / 2 + 'px'
                 : (spanDimensions?.gap ?? 15) + 5 + 'px',
-              borderTop: '1.5px solid var(--color-card-glass-border)',
-              pointerEvents: 'none',
-              zIndex: 1,
             }"
           />
         </template>
@@ -152,15 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="collapseMapping[(spans as any[])[virtualRow.index].spanId]"
                     data-test="vertical-segment"
-                    :style="{
-                      position: 'absolute',
-                      left: '0.5rem',
-                      bottom: '-6px',
-                      height: '5px',
-                      borderLeft: '1.5px solid var(--color-card-glass-border)',
-                      pointerEvents: 'none',
-                      zIndex: 1,
-                    }"
+                    class="border-card-glass-border pointer-events-none absolute -bottom-1.5 left-2 z-1 h-1.25 border-l"
                   />
                 </div>
 
@@ -278,13 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         whiteSpace: 'nowrap',
                       }"
                       :title="
-                        getEventCount((spans as any[])[virtualRow.index]) > 1
-                          ? t('traces.traceTree.spanEvents', {
-                              count: getEventCount((spans as any[])[virtualRow.index]),
-                            })
-                          : t('traces.traceTree.spanEvent', {
-                              count: getEventCount((spans as any[])[virtualRow.index]),
-                            })
+                        t('traces.traceTree.spanEvent', {
+                          count: getEventCount((spans as any[])[virtualRow.index]),
+                        })
                       "
                       :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
@@ -348,6 +328,7 @@ import useTheme from "@/composables/useTheme";
 import SpanBlock from "./SpanBlock.vue";
 import SpanKindBadge from "./components/SpanKindBadge.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/convertTraceData";
@@ -433,7 +414,7 @@ export default defineComponent({
     "view-correlated-logs",
   ],
   setup(props, { emit }) {
-    const { buildQueryDetails, navigateToLogs } = useTraces();
+    const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();
     const store = useStore();
     const { isDark } = useTheme();
 
@@ -544,7 +525,33 @@ export default defineComponent({
         emit("view-correlated-logs", span);
         return;
       }
-      const queryDetails = buildQueryDetails(span);
+      // OSS resolves the target stream from the header's picker. Without a
+      // selection we would navigate to `/logs?stream=`, which drops the filter
+      // and dumps an unfiltered result set on the user. The header's own View
+      // Logs button is disabled in this state; this row-level one is not, so
+      // say why instead of leaving it a silent dead end (same handling as #13722).
+      if (!searchObj.data.traceDetails.selectedLogStreams.length) {
+        toast({
+          variant: "warning",
+          message: t("search.selectLogsStreamFirst"),
+        });
+        return;
+      }
+      // `spans` are formatted nodes (camelCase, microseconds); `buildQueryDetails`
+      // reads the raw API shape (`start_time`/`end_time`, nanoseconds). Resolve the
+      // raw span the same way the rest of this component does rather than making the
+      // shared helper tolerate two shapes — passing a formatted node produced
+      // `from=NaN&to=NaN`. A span missing `span_id` gets a synthetic `spanId` that is
+      // absent from `spanMap`, so the lookup can miss.
+      const rawSpan = props.spanMap[span.spanId];
+      if (!rawSpan) {
+        toast({
+          variant: "warning",
+          message: t("traces.viewLogsUnavailable"),
+        });
+        return;
+      }
+      const queryDetails = buildQueryDetails(rawSpan);
       navigateToLogs(queryDetails);
     };
 

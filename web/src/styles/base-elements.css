@@ -41,6 +41,7 @@
   ::-webkit-scrollbar-thumb {
     background: var(--color-scrollbar-thumb);
     border-radius: 0.375rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- transparent border + background-clip: content-box insets the thumb inside the fixed-width native scrollbar track — a paint gutter, not text-driven layout */
     border: 2px solid transparent;
     background-clip: content-box;
   }
@@ -70,6 +71,7 @@
 @layer base {
   @media print {
     .h-full,
+    /* eslint-disable-next-line local/no-hardcoded-px -- selector text, not a rendered length: it must spell the escaped Tailwind class name h-[calc(100vh-105px)] literally */
     .h-\[calc\(100vh-105px\)\],
     .overflow-y-auto,
     .overflow-auto,
@@ -218,7 +220,7 @@ body {
     font-size: var(--text-compact);
     color: var(--color-text-code);
     font-feature-settings: "tnum";
-    letter-spacing: -0.2px;
+    letter-spacing: -0.0125rem;
   }
 
   pre,
@@ -334,4 +336,15 @@ html.dark [role="button"]:has([data-destructive-icon="true"]):hover,
 html.dark [data-destructive-icon="true"]:hover,
 .dark [data-destructive-icon="true"]:hover {
   background-color: rgba(220, 38, 38, 0.18) !important;
+}
+
+/* Monaco's `editor.colorize` emits .mtk* token classes carrying the colours of
+   whichever Monaco theme is loaded, which is not ours. .mtk1 is its default
+   foreground — the unhighlighted bulk of the text — so pointing it back at the
+   inherited colour lets the surrounding O2 token drive it in both themes while
+   the keyword/string/number classes keep their syntax colours. Global because
+   three pages now render colorized SQL and the alternative is a scoped copy in
+   each. */
+.o2-colorized-query .mtk1 {
+  color: inherit;
 }

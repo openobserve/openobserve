@@ -24,6 +24,7 @@ import { createI18n } from "vue-i18n";
 import { ref } from "vue";
 import KubernetesConfig from "./KubernetesConfig.vue";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 // `isCloud` gates the in-cluster variants, so it must be mutable per-test.
 const mockConfig = { isCloud: "false" };
@@ -72,7 +73,7 @@ const SUBS = {
 
 // Imported lazily inside tests so the mocked aws-exports value is picked up.
 const buildCard = async () =>
-  (await import("@/components/ingestion/setupCard/content/kubernetes")).default(SUBS);
+  (await import("@/components/ingestion/setupCard/content/kubernetes")).default(SUBS, gt);
 
 describe("kubernetesCard builder", () => {
   beforeEach(() => {
@@ -233,7 +234,7 @@ describe("KubernetesConfig.vue", () => {
   });
 
   it("renders the shared setup card for the kubernetes slug", () => {
-    expect(getDataSourceCard("kubernetes", SUBS)?.provider.name).toBe("Kubernetes");
+    expect(getDataSourceCard("kubernetes", SUBS, gt)?.provider.name).toBe("Kubernetes");
     wrapper = mount(KubernetesConfig, {
       global: { plugins: [mockStore, mockI18n] },
     });

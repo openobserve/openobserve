@@ -17,6 +17,7 @@ export default class DashboardactionPage {
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
@@ -28,11 +29,38 @@ export default class DashboardactionPage {
     this.panelNameError = page.locator('[data-test="dashboard-panel-name-error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
     this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test^="o2-table-row-"]');
+    // Rendered table header cells (thead th) and the prefixed per-column header
+    // cells (data-test="o2-table-th-<colId>") used for sort / pivot-total checks.
+    this.tableHeaderCells = page.locator('[data-test="dashboard-panel-table"] thead tr th');
+    this.tableThCells = page.locator('[data-test^="o2-table-th-"]');
+
+    // Rendered chart bar + the per-panel edit dropdown/menu, used to reopen a
+    // saved panel in edit mode from the dashboard view.
+    this.panelBar = page.locator('[data-test="dashboard-panel-bar"]');
+    this.editPanelDropdownAny = page.locator('[data-test*="dashboard-edit-panel"][data-test$="-dropdown"]');
+    this.editPanelMenuItem = page.locator('[data-test="dashboard-edit-panel"]');
+  }
+
+  /**
+   * Reopen the first rendered panel in edit mode: hover its bar to reveal the
+   * hover-actions dropdown, open it, and click Edit. Encapsulates the
+   * hover → dropdown → edit chain the config specs use to verify persistence.
+   */
+  async openFirstPanelEditor() {
+    await this.panelBar.first().hover();
+    await this.editPanelDropdownAny.first().click();
+    await this.editPanelMenuItem.click();
   }
 
   // Returns the error toast locator for assertions
   getErrorToast() {
     return this.errorToast;
+  }
+
+  // Generic visible-text locator for query-output / error-message assertions
+  // (accepts a string or RegExp). Chain .first() as needed.
+  getVisibleText(text) {
+    return this.page.getByText(text);
   }
 
   // Returns the inline panel-name validation error locator for assertions
@@ -83,6 +111,11 @@ export default class DashboardactionPage {
     return this.chartRendererCanvas;
   }
 
+  // Get the inner <canvas> element inside the chart-renderer
+  getChartRendererCanvasElement() {
+    return this.chartRendererCanvasEl;
+  }
+
   // Get dashboard-error locator
   // DashboardErrors.vue has two nested elements with the same data-test attribute;
   // use .first() to avoid Playwright strict-mode throws on multi-element locators.
@@ -98,10 +131,52 @@ export default class DashboardactionPage {
 
   // Add panel name
   async addPanelName(panelName) {
-    // Open the inline editor, then fill the revealed input.
-    await this.panelNameTrigger.click();
-    await this.panelNameInput.waitFor({ state: "visible" });
-    await this.panelNameInput.fill(panelName);
+    // The panel name input is NOT a plain text box — when left untouched it
+    // mirrors an auto-generated name derived from the chart config ("Count of
+    // Kubernetes Namespace Name, Count of ... by ..."). Every config change
+    // recomputes that name and re-renders the input, replacing the DOM node.
+    //
+    // A fill() issued while such a re-render is in flight hits a node that is
+    // detached mid-action; Playwright retries internally but keeps resolving
+    // into nodes that are themselves replaced, so it burns the full timeout
+    // ("element was detached from the DOM, retrying"). A re-render landing
+    // just AFTER a successful fill is equally bad: it silently restores the
+    // auto-generated name and the panel saves under the wrong title.
+    //
+    // Re-open and re-fill until the value actually sticks, so a re-render
+    // costs one attempt rather than the whole call, and verify the result
+    // instead of assuming the fill held.
+    const maxAttempts = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // The trigger is only present while the editor is closed — clicking it
+        // when the input is already open would toggle the editor shut.
+        if (!(await this.panelNameInput.isVisible().catch(() => false))) {
+          await this.panelNameTrigger.click({ timeout: 10000 });
+        }
+        await this.panelNameInput.waitFor({ state: "visible", timeout: 10000 });
+        await this.panelNameInput.fill(panelName, { timeout: 10000 });
+
+        // Confirm the value survived any re-render that raced the fill.
+        if ((await this.panelNameInput.inputValue()) === panelName) return;
+        lastError = new Error(
+          `panel name reverted after fill (auto-generated name won the race)`
+        );
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw new Error(
+      `addPanelName: could not set panel name to "${panelName}" after ${maxAttempts} attempts. Last error: ${lastError?.message}`
+    );
+  }
+
+  // Save panel button locator (for callers that only need a raw click)
+  getPanelSaveBtn() {
+    return this.panelSaveBtn;
   }
 
   // Save panel button
@@ -122,6 +197,33 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  /**
+   * Discard the current panel and return to the dashboard view page.
+   * Use this for teardown when the panel intentionally holds an
+   * incomplete/invalid config (which cannot pass save validation) or when the
+   * test does not need to persist the panel. Discarding an edited panel fires
+   * a native window.confirm — Playwright auto-dismisses dialogs by default,
+   * which would cancel the navigation and leave the page on add_panel — so
+   * accept it for the duration of the discard.
+   * (Same handling as dashboard-multi-sql.js discardPanel; this is the
+   * generic home for it since discard is not a multi-SQL-specific action.)
+   */
+  async discardPanel() {
+    const discardBtn = this.page.locator('[data-test="dashboard-panel-discard"]');
+    const dialogHandler = (dialog) => dialog.accept();
+    this.page.on("dialog", dialogHandler);
+    try {
+      await discardBtn.waitFor({ state: "visible", timeout: 15000 });
+      await discardBtn.click();
+      // Discard navigates to the dashboard view page (/dashboards/view).
+      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
+        timeout: 30000,
+      });
+    } finally {
+      this.page.off("dialog", dialogHandler);
+    }
   }
 
   //Apply dashboard button
@@ -176,6 +278,13 @@ export default class DashboardactionPage {
   }
 
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
+
+  // Returns the per-panel edit dropdown locator (data-test keyed by panel name)
+  getEditPanelDropdown(panelName) {
+    return this.page.locator(
+      `[data-test="dashboard-edit-panel-${panelName}-dropdown"]`
+    );
+  }
 
   async selectPanelAction(panelName, action) {
     const actionDataTestIds = {

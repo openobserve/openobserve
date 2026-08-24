@@ -169,7 +169,6 @@ export const useHistogram = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
-      let hasAggregationFlag = false;
       const parsedSQL: any = fnParsedSQL();
       if (searchObj.meta.sqlMode && Object.prototype.hasOwnProperty.call(parsedSQL, "columns")) {
         hasAggregation(parsedSQL.columns);
@@ -348,7 +347,7 @@ export const useHistogram = () => {
       }
     } catch (e: any) {
       console.error("Error while generating histogram data", e);
-      notificationMsg.value = "Error while generating histogram data.";
+      notificationMsg.value = t("search.errorWhileGeneratingHistogramData");
     }
   };
 

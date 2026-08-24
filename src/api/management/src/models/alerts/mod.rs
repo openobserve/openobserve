@@ -190,6 +190,12 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[schema(example = json!(["prod", "service:checkout"]))]
     pub tags: Vec<String>,
+
+    /// Whether a scheduler job exists for this alert (runtime status, not a
+    /// stored field). Populated on the composite detail path; omitted otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(read_only)]
+    pub scheduler_job_present: Option<bool>,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -208,7 +214,9 @@ pub struct Alert {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
     /// Time window in minutes to evaluate. The query looks back this many minutes.
-    #[serde(rename = "period")]
+    /// Defaulted to `0` so composite alerts — which send only `silence` — can
+    /// omit it; the composite path rejects any non-default period explicitly.
+    #[serde(rename = "period", default)]
     #[schema(example = 15)]
     pub period_minutes: i64,
 
@@ -251,8 +259,11 @@ pub struct TriggerCondition {
     pub cron: String,
 
     /// Schedule type: "minutes" for interval-based or "cron" for cron expressions.
-    #[serde(default)]
-    pub frequency_type: FrequencyType,
+    /// `None` means the field was omitted. Kept optional (rather than defaulting
+    /// to "minutes") so composite alerts can reject an explicit `frequency_type`
+    /// even when its value equals the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frequency_type: Option<FrequencyType>,
 
     /// Silence period in minutes after an alert fires before it can fire again.
     #[serde(rename = "silence")]
@@ -566,6 +577,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             workflows: alert.workflows,
             priority: alert.priority,
             tags: alert.tags,
+            scheduler_job_present: None,
         }
     }
 }
@@ -580,7 +592,7 @@ impl From<meta_alerts::TriggerCondition> for TriggerCondition {
             notify_on_warning: value.notify_on_warning,
             frequency_minutes: value.frequency / 60,
             cron: value.cron,
-            frequency_type: value.frequency_type.into(),
+            frequency_type: Some(value.frequency_type.into()),
             silence_minutes: value.silence,
             timezone: value.timezone,
             tolerance_seconds: value.tolerance_in_secs,
@@ -774,7 +786,7 @@ impl From<TriggerCondition> for meta_alerts::TriggerCondition {
             notify_on_warning: value.notify_on_warning,
             frequency: value.frequency_minutes * 60,
             cron: value.cron,
-            frequency_type: value.frequency_type.into(),
+            frequency_type: value.frequency_type.unwrap_or_default().into(),
             silence: value.silence_minutes,
             timezone: value.timezone,
             tolerance_in_secs: value.tolerance_seconds,
@@ -1355,7 +1367,7 @@ mod tests {
             threshold_count: 3,
             frequency_minutes: 5,
             cron: "".to_string(),
-            frequency_type: FrequencyType::Minutes,
+            frequency_type: Some(FrequencyType::Minutes),
             silence_minutes: 30,
             timezone: None,
             tolerance_seconds: None,

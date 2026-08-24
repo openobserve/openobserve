@@ -23,6 +23,23 @@
 //! guarantees a parseable document. Entity-encoding them would corrupt the
 //! data for the machine consumer.
 //!
+//! # Contract: `links[].url` is passed through UNFILTERED — deliberate
+//!
+//! Every human-facing renderer either substitutes a hostile URL scheme
+//! ([`safe_url`], for email/SNS) or drops the link outright
+//! ([`dispatchable_url`], for Slack/Teams/Discord/PagerDuty). This envelope
+//! does NEITHER, for the same reason it does not entity-encode: rewriting a
+//! URL to `#` would hand the consumer corrupted data where it expects the
+//! authored value, and this is a versioned contract other systems parse.
+//!
+//! **The consumer owns presentation and MUST treat `links[].url` as
+//! untrusted.** Save-time validation (`ContentSpec::validate`) rejects a
+//! hostile scheme written literally into a template, but a URL assembled by
+//! variable substitution at send time can still carry one here.
+//!
+//! [`safe_url`]: super::safe_url
+//! [`dispatchable_url`]: super::dispatchable_url
+//!
 //! # Contract: an empty `links[].label` means "no label authored"
 //!
 //! `resolve` appends the alert URL as a link with an EMPTY label. That empty

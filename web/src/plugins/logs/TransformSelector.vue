@@ -138,7 +138,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -160,7 +159,6 @@ const { searchObj } = searchState();
 
 const { isActionsEnabled } = logsUtils();
 
-const store = useStore();
 const { isDark } = useTheme();
 
 const functionModel = ref(false);
@@ -198,24 +196,6 @@ const filteredTransformOptions = computed(() => {
   if (searchObj.data.transformType === "function") return filteredFunctionOptions.value;
 
   return [];
-});
-
-const functionToggleIcon = computed(() => {
-  return (
-    "img:" +
-    getImageURL(
-      searchObj.meta.toggleFunction
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
-  );
-});
-
-const iconRight = computed(() => {
-  return (
-    "img:" +
-    getImageURL(isDark.value ? "images/common/function_dark.svg" : "images/common/function.svg")
-  );
 });
 
 const transformsLabel = computed(() => {
@@ -316,7 +296,7 @@ const getTransformLabelTooltip = computed(() => {
 
   return searchObj.meta.showTransformEditor
     ? t("search.hide")
-    : `${t("search.show")} ${editorType} ${t("search.editor")}`;
+    : t("search.showEditor", { type: editorType });
 });
 </script>
 

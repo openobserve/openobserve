@@ -42,11 +42,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('workflow.deleteNode')
         : undefined
     "
+    neutral-button-variant="outline-destructive"
     @click:primary="onSave"
     @click:secondary="onCancel"
     @click:neutral="onDelete"
     data-test="workflow-node-drawer"
   >
+    <!-- The drawer TITLE is the editable step name (T2) — rename right at the top,
+         with the node type as the subtitle so the kind stays clear. Replaces the
+         static type title; no separate "Name This Step" field below. -->
+    <template #header>
+      <div class="min-w-0">
+        <OInlineEdit
+          :model-value="nodeName"
+          data-test="workflows-node-rename-input"
+          :placeholder="t('workflow.node.namePlaceholder')"
+          :aria-label="t('workflow.node.namePlaceholder')"
+          @update:model-value="onNameLive"
+          @commit="onNameCommit"
+        />
+        <div class="text-text-secondary mt-0.5 truncate text-xs">{{ typeBreadcrumb }}</div>
+      </div>
+    </template>
+
     <div :class="workflowObj.dialog.expand ? 'h-full min-h-0' : 'p-4'">
       <!-- Per-node-type body. Each exposes submit() returning the data payload
            (or null to block Save). Types without a form yet fall back to the
@@ -61,6 +79,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("workflow.node.configComingSoon", { node: title }) }}
         </div>
       </div>
+
+      <!-- Comment (T3) — an optional free-text note, kept at the BOTTOM so the
+           node's own config leads. Hidden in the full-width inline editor. -->
+      <div v-if="!workflowObj.dialog.expand" class="mt-4 flex flex-col gap-1">
+        <label class="text-text-secondary text-xs font-medium">
+          {{ t("workflow.node.commentLabel") }}
+        </label>
+        <OTextarea
+          :model-value="nodeComment"
+          data-test="workflows-node-comment-input"
+          :placeholder="t('workflow.node.commentPlaceholder')"
+          :rows="2"
+          size="sm"
+          @update:model-value="onCommentLive"
+          @blur="onCommentBlur"
+        />
+      </div>
     </div>
   </ODrawer>
 </template>
@@ -70,6 +105,8 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";
 import WorkflowCondition from "@/plugins/workflows/nodes/WorkflowCondition.vue";
 import WorkflowFunction from "@/plugins/workflows/nodes/WorkflowFunction.vue";
@@ -78,12 +115,36 @@ import useWorkflowCanvas, {
   workflowObj,
   nodeMeta,
   triggerDef,
+  nodeCustomName,
+  nodeComment as readNodeComment,
+  setNodeName,
+  setNodeComment,
+  markWorkflowDirty,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18nTyped();
 const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas(t);
 
 const meta = computed(() => nodeMeta(workflowObj.dialog.name));
+
+// Rename (T2) + comment (T3) bind to the staged/edited node (currentSelectedNodeData
+// is the node ref in both add and edit). Live writes keep the canvas card in sync
+// as the user types; commit/blur trims and drops empties (via the meta helpers).
+const nodeName = computed(() => nodeCustomName(workflowObj.currentSelectedNodeData));
+const nodeComment = computed(() => readNodeComment(workflowObj.currentSelectedNodeData));
+const typeBreadcrumb = computed(() =>
+  meta.value ? `${t(meta.value.kindKey)} · ${t(meta.value.titleKey)}` : "",
+);
+const writeMetaLive = (key: string, value: string) => {
+  const n = workflowObj.currentSelectedNodeData;
+  if (!n) return;
+  n.meta = { ...(n.meta || {}), [key]: value };
+  markWorkflowDirty();
+};
+const onNameLive = (val: string) => writeMetaLive("label", val);
+const onNameCommit = (val: string) => setNodeName(workflowObj.currentSelectedNodeData, val);
+const onCommentLive = (val: string) => writeMetaLive("comment", val);
+const onCommentBlur = () => setNodeComment(workflowObj.currentSelectedNodeData, nodeComment.value);
 const title = computed(() => {
   // Trigger drawers title by KIND (registry), matching the canvas card; other
   // nodes use their node-type title.

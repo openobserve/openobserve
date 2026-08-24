@@ -17,7 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
-import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
 
@@ -131,6 +130,8 @@ const mockTranslations = {
   "correlation.noMetricStreamsFor": "No metric streams found for this {kind}",
   "correlation.filters": "Filters",
   "correlation.all": "All",
+  "correlation.currentValueOption": "{value} (current)",
+  "correlation.timeRangeWithDuration": "{start} - {end} ({minutes} min)",
   "correlation.loadingLogs": "Loading logs...",
   "correlation.loadingMetrics": "Loading metrics...",
   "correlation.loadingTraces": "Loading traces...",

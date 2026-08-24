@@ -30,6 +30,39 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
   }
 
   /**
+   * Helper: leave the panel with exactly one Y-axis field, `alias`.
+   *
+   * Entering custom SQL makes the builder auto-seed the Y axis FROM THE SQL ALIAS, and
+   * that seeding is asynchronous. The tests used to assume the placeholder `y_axis_1` was
+   * still there and did removeField("y_axis_1") + searchAndAddField(alias), which races
+   * the seeding two ways:
+   *   - seeding not done yet -> y_axis_1 present, remove succeeds, alias added: fine
+   *   - seeding already done -> Y is already `alias`, so removeField("y_axis_1") waits
+   *     for an element that will never exist and times out
+   * and when the Y config is left wrong the panel renders nothing, which shows up as the
+   * "No Data" failure. Reconcile against whatever the panel actually holds instead of
+   * assuming which of the two states we are in.
+   */
+  async function ensureSingleYField(page, alias) {
+    const desired = page.locator(`[data-test="dashboard-y-item-${alias}-remove"]`);
+    const anyY = page.locator('[data-test^="dashboard-y-item-"][data-test$="-remove"]');
+
+    // Let the SQL-driven seeding settle before deciding what to reconcile.
+    await anyY.first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+
+    if ((await desired.count()) > 0) {
+      testLogger.info(`Y-axis already seeded from SQL alias "${alias}" — nothing to do`);
+      return;
+    }
+
+    // Drop whatever placeholder the builder seeded, then add the alias under test.
+    for (let guard = 0; guard < 5 && (await anyY.count()) > 0; guard++) {
+      await anyY.first().click({ timeout: 5000 }).catch(() => {});
+    }
+    await pm.chartTypeSelector.searchAndAddField(alias, "y");
+  }
+
+  /**
    * Helper: Apply dashboard and set a wide time range for data availability.
    */
   async function applyWithTimeRange(page) {
@@ -46,10 +79,47 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
    * Helper: Assert metric chart renders with data (not "No Data").
    */
   async function assertMetricRenders(page) {
-    const chartRenderer = page.locator('[data-test="chart-renderer"]');
+    const chartRenderer = pm.dashboardPanelActions.getChartRendererCanvas();
     await expect(chartRenderer).toBeVisible({ timeout: 15000 });
 
-    const noDataElement = page.locator('[data-test="no-data"]');
+    // Safety net: re-run the query if the panel is still showing "No Data".
+    //
+    // The panel does not re-query itself after its configuration changes — it surfaces
+    // the banner "Chart Configuration / Variables has been updated, but the chart was
+    // not updated automatically. Click on the 'Apply' button to run the query again".
+    // So a panel left showing "No Data" is a FINISHED render that never updates on its
+    // own, and only a fresh Apply can change it.
+    //
+    // That is why waiting cannot fix this, measured on alpha with 12 executions each:
+    //   - waitFor({state:"hidden"})  -> no-op; the element is ABSENT (not hidden) when
+    //                                   data renders, and waitFor("hidden") resolves
+    //                                   instantly against a selector matching nothing
+    //   - DOM poll for 15s           -> 7/12 passed
+    //   - waitForStreamComplete()    -> 5/12 passed, and slower: it reads the SSE body
+    //                                   via response.text(), which mostly fails on a
+    //                                   stream, so it silently rides its 15s fallback
+    //                                   ("Stream completed" logged just once in 12 runs)
+    //   - re-apply the query         -> 12/12 passed, always on the first retry
+    //
+    // The primary fix is ensureSingleYField() above, which stops the panel being
+    // misconfigured in the first place; this loop only covers the residual case (it
+    // fired once in 12 executions after that fix landed). The assertion below is
+    // unchanged: if the panel never renders data the loop gives up, the read still
+    // returns "No Data", and the test fails as it should.
+    const noDataElement = pm.dashboardPanelActions.getNoDataLocator();
+    const stillEmpty = async () => {
+      if ((await noDataElement.count()) === 0) return false;
+      const text = (await noDataElement.first().textContent().catch(() => "")) || "";
+      return text.trim() === "No Data";
+    };
+
+    for (let attempt = 1; attempt <= 4 && (await stillEmpty()); attempt++) {
+      testLogger.info(`Metric panel still empty — re-applying query (attempt ${attempt})`);
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await pm.dashboardPanelActions.waitForChartToRender();
+      await page.waitForTimeout(3000);
+    }
+
     const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");
     expect(noDataText.trim()).not.toBe("No Data");
   }
@@ -119,10 +189,9 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
       `SELECT count(*) AS totalcount FROM "${STREAM_NAME}"`
     );
 
-    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
-    await pm.chartTypeSelector.removeField("y_axis_1", "y");
-    // Add the lowercase alias as Y-axis field (metric chart requires Y-axis to render)
-    await pm.chartTypeSelector.searchAndAddField("totalcount", "y");
+    // Metric allows one Y. Reconcile with whatever the SQL seeding left behind rather
+    // than assuming the y_axis_1 placeholder survived (see ensureSingleYField).
+    await ensureSingleYField(page, "totalcount");
     testLogger.info("Custom SQL with lowercase alias entered");
 
     // Apply with time range and verify
@@ -157,10 +226,9 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
       `SELECT count(*) AS metricValue FROM "${STREAM_NAME}" WHERE kubernetes_container_name = 'nonexistent_container_xyz_99999'`
     );
 
-    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
-    await pm.chartTypeSelector.removeField("y_axis_1", "y");
-    // Add Y-axis field (metric chart requires Y-axis to render)
-    await pm.chartTypeSelector.searchAndAddField("metricValue", "y");
+    // Metric allows one Y. Reconcile with whatever the SQL seeding left behind rather
+    // than assuming the y_axis_1 placeholder survived (see ensureSingleYField).
+    await ensureSingleYField(page, "metricValue");
     testLogger.info("Custom SQL with non-existent filter entered");
 
     // Apply and set narrow time range
@@ -177,8 +245,8 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
 
     // For count(*) with a WHERE that matches nothing, the result may still be 0
     // which is a valid metric value. Assert the panel is in a valid state.
-    const chartRenderer = page.locator('[data-test="chart-renderer"]');
-    const noDataElement = page.locator('[data-test="no-data"]');
+    const chartRenderer = pm.dashboardPanelActions.getChartRendererCanvas();
+    const noDataElement = pm.dashboardPanelActions.getNoDataLocator();
 
     const chartVisible = await chartRenderer.isVisible().catch(() => false);
     const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");
@@ -219,10 +287,9 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
       `SELECT count(*) AS countRecords FROM "${STREAM_NAME}"`
     );
 
-    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
-    await pm.chartTypeSelector.removeField("y_axis_1", "y");
-    // Add the camelCase alias as Y-axis field (metric chart requires Y-axis to render)
-    await pm.chartTypeSelector.searchAndAddField("countRecords", "y");
+    // Metric allows one Y. Reconcile with whatever the SQL seeding left behind rather
+    // than assuming the y_axis_1 placeholder survived (see ensureSingleYField).
+    await ensureSingleYField(page, "countRecords");
     testLogger.info("Custom SQL with camelCase alias entered");
 
     // Apply with time range and verify

@@ -63,16 +63,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <li
               v-for="(category, index) in chartCategories"
               :key="index"
-              @click="scrollToCategory(category.chartLabel)"
+              @click="scrollToCategory(category.chartLabelKey)"
               class="rounded-default mb-1 flex cursor-pointer items-center px-3 py-2 transition-all duration-200"
               :class="
-                selectedCategory === category.chartLabel
+                selectedCategory === category.chartLabelKey
                   ? 'bg-theme-accent text-text-inverse font-semibold'
                   : 'hover:bg-button-ghost-hover-bg'
               "
               data-test="chart-category-item"
             >
-              <span class="text-sm">{{ category.chartLabel }}</span>
+              <span class="text-sm">{{ t(category.chartLabelKey) }}</span>
             </li>
           </ul>
         </OCard>
@@ -104,11 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(category, categoryIndex) in filteredCategories"
             :key="categoryIndex"
             class="chart-category-section mb-6 scroll-mt-5"
-            :data-category="category.chartLabel"
+            :data-category="category.chartLabelKey"
             data-test="chart-category-section"
           >
             <div class="mb-3 text-xl font-medium font-semibold">
-              {{ category.chartLabel }}
+              {{ t(category.chartLabelKey) }}
             </div>
             <div class="flex gap-3">
               <div
@@ -117,9 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
                 <OCard
-                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                   :class="{
-                    'border-theme-accent border-2 shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]':
+                    'border-theme-accent shadow-theme-accent/30 border-2 shadow-md':
                       selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
@@ -194,7 +194,7 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
-    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabel || "");
+    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabelKey || "");
     const selectedChart = ref<ChartType | null>(null);
     const contentArea = ref<HTMLElement | null>(null);
     const confirmChartSelectionDialog = ref<boolean>(false);
@@ -303,7 +303,7 @@ export default defineComponent({
       nextTick(() => {
         // Set first category as selected by default
         if (chartCategories.value.length > 0) {
-          selectedCategory.value = chartCategories.value[0].chartLabel;
+          selectedCategory.value = chartCategories.value[0].chartLabelKey;
         }
       });
     });

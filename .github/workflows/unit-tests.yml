@@ -83,7 +83,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        run: cargo --config net.git-fetch-with-cli=true clippy --workspace --all-targets -- -D warnings
+        run: cargo --config net.git-fetch-with-cli=true clippy --workspace --all-targets -- -W clippy::too_many_lines -W clippy::cognitive_complexity -W clippy::excessive_nesting -D warnings
 
   backend_unit_tests_postgres:
     needs: [check_changes]
@@ -119,7 +119,7 @@ jobs:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@v2.85.10
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -179,7 +179,7 @@ jobs:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@v2.85.10
         with:
           tool: nextest,cargo-llvm-cov
 

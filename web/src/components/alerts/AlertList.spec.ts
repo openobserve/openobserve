@@ -35,6 +35,9 @@ vi.mock("@/services/alerts", () => ({
     getHistory: vi.fn(),
     export_by_id: vi.fn(),
     retrain_by_id: vi.fn(),
+    bulkDelete: vi.fn(),
+    bulkToggleState: vi.fn(),
+    getCompositeReferences: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_templates", () => ({
@@ -129,6 +132,9 @@ type AlertV2 = {
   stream_type: string;
   enabled: boolean;
   condition: any;
+  child_count?: number;
+  referenced_by_composite_count?: number;
+  expression_summary?: string;
   description?: string;
   owner?: string;
   trigger_condition?: {
@@ -200,6 +206,7 @@ async function mountAlertList() {
           template: '<div class="confirm-dialog-stub" :data-open="modelValue"></div>',
         },
         AppTabs: {
+          name: "AppTabs",
           props: ["tabs", "activeTab"],
           emits: ["update:active-tab"],
           template:
@@ -228,6 +235,16 @@ const destinationsSvc = vi.mocked(DestinationService);
 
 beforeEach(() => {
   vi.clearAllMocks();
+
+  // Reset the shared router singleton before mounting. The component's
+  // immediate watcher on query.action (and the activeTab init read of
+  // query.tab) run during mount(), before mountAlertList can blank the query —
+  // so a leftover action/tab from an earlier test (e.g. "when action=add"
+  // pushes {action:"add"}) would asynchronously re-open the add/import dialog
+  // and hide the list (and its AppTabs), breaking every later assertion.
+  router.currentRoute.value.query = {};
+  router.currentRoute.value.params = {};
+  router.currentRoute.value.name = "alertList";
 
   // align store shape expected by component watchers
   // ensure foldersByType has 'alerts' key and alerts map exists
@@ -304,6 +321,14 @@ beforeEach(() => {
 
   (alertsSvc.retrain_by_id as any) = vi.fn().mockImplementation(async () => {
     return Promise.resolve({ data: { code: 200 } } as any);
+  });
+
+  (alertsSvc.bulkDelete as any) = vi.fn().mockResolvedValue({
+    data: { successful: [], unsuccessful: [] },
+  });
+  (alertsSvc.bulkToggleState as any) = vi.fn().mockResolvedValue({ data: {} });
+  (alertsSvc.getCompositeReferences as any) = vi.fn().mockResolvedValue({
+    data: { references: [], hidden_reference_count: 0 },
   });
 
   (alertsSvc.create_by_alert_id as any) = vi
@@ -412,6 +437,15 @@ describe("AlertList - basic rendering", () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
+  });
+
+  it("titles itself with the SECTION, so the peer tabs never move", async () => {
+    // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
+    // is NOT "Alerts": a per-page title sizes the title block and shifts the
+    // tab strip horizontally on every navigation.
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
   });
 
   it("renders search input and toggle", async () => {
@@ -648,12 +682,22 @@ describe("AlertList - row actions", () => {
     await wrapper.vm.showDeleteDialogFn({ row });
     expect(wrapper.vm.confirmDelete).toBe(true);
 
+    (alertsSvc.listByFolderId as any).mockClear();
     await wrapper.vm.deleteAlertByAlertId();
     await flushPromises();
 
     expect(
       wrapper.vm.filteredResults.find((r: any) => r.alert_id === row.alert_id),
     ).toBeUndefined();
+    // No refetch: reloading the folder would blank the table behind its skeleton
+    // and a loading toast for a row the server already confirmed gone.
+    expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+    // The store cache backs a folder revisit, so the row must leave it too or it
+    // reappears the moment the user navigates away and back.
+    const cached = store.state.organizationData.allAlertsListByFolderId[wrapper.vm.activeFolderId];
+    if (Array.isArray(cached)) {
+      expect(cached.find((r: any) => r.alert_id === row.alert_id)).toBeUndefined();
+    }
   });
 
   it("edit action navigates to update route (sets query action=update)", async () => {
@@ -671,28 +715,47 @@ describe("AlertList - row actions", () => {
     expect(call).toBeTruthy();
   });
 
-  it("exports a single alert to JSON (creates object URL)", async () => {
+  // Export fetches the definition and opens the format dialog; the file is
+  // written from there, once the user has picked JSON or Terraform.
+  it("opens the export dialog with the fetched alert definition", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     const row = wrapper.vm.filteredResults[0];
 
-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
     // Trigger export through method to avoid menu interaction
     await wrapper.vm.exportAlert(row);
-    expect(createURLSpy).toHaveBeenCalled();
+    await flushPromises();
+
+    expect(wrapper.vm.showExportDialog).toBe(true);
+    expect(wrapper.vm.alertsToExport).toHaveLength(1);
+    expect(wrapper.vm.alertsToExport[0].name).toBe(row.name);
+    // The exported id belongs to the source alert, not to what this creates.
+    expect(wrapper.vm.alertsToExport[0]).not.toHaveProperty("id");
   });
 
-  it("exports multiple selected alerts to JSON", async () => {
+  it("opens the export dialog with every selected alert", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // Select two alerts
-    wrapper.vm.selectedAlerts = [wrapper.vm.filteredResults[0], wrapper.vm.filteredResults[1]];
+    // Select two alerts. selectedAlerts is a computed over selectedAlertIds whose
+    // setter only handles clearing, so selection has to go through the ids.
+    wrapper.vm.selectedAlertIds = [
+      wrapper.vm.filteredResults[0].alert_id,
+      wrapper.vm.filteredResults[1].alert_id,
+    ];
+    await flushPromises();
+    expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+
+    await wrapper.vm.multipleExportAlert();
     await flushPromises();
 
-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
-    await wrapper.vm.multipleExportAlert();
-    expect(createURLSpy).toHaveBeenCalled();
+    expect(wrapper.vm.showExportDialog).toBe(true);
+    expect(wrapper.vm.alertsToExport).toHaveLength(2);
+
+    // The selection clears once the download actually happens.
+    expect(wrapper.vm.selectedAlerts.length).toBe(2);
+    wrapper.vm.onExportDownloaded({ format: "terraform", count: 2 });
+    await flushPromises();
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
 });
@@ -1276,4 +1339,102 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(wrapper.vm.formatGroupCount(3, true)).toBe("\u22653");
     expect(wrapper.vm.formatGroupCount(0, undefined)).toBe("0");
   });
+
+  describe("composite alert list integration", () => {
+    it("maps a composite without query fields to its badge, expression, and counts", async () => {
+      alertsDB = [
+        {
+          ...makeAlert(1),
+          alert_id: "composite-1",
+          alert_type: "composite",
+          name: "Checkout degraded",
+          is_real_time: false,
+          stream_name: undefined,
+          stream_type: "",
+          condition: null,
+          child_count: 3,
+          referenced_by_composite_count: 2,
+          expression_summary: "High error rate AND High latency",
+        },
+      ];
+      const wrapper: any = await mountAlertList();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      await flushPromises();
+
+      const row = wrapper.vm.filteredResults[0];
+      expect(row.alert_type).toBe("Composite");
+      expect(row.conditions).toBe("High error rate AND High latency");
+      expect(row.child_count).toBe(3);
+      expect(row.referenced_by_composite_count).toBe(2);
+      expect(wrapper.find('[data-test="alert-list-composite-badge-composite-1"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="alert-list-child-count-composite-1"]').text()).toContain(
+        "3",
+      );
+      expect(wrapper.find('[data-test="alert-list-reference-count-composite-1"]').text()).toContain(
+        "2",
+      );
+    });
+
+    it("exposes Composite as a distinct list filter", async () => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+
+      expect(wrapper.vm.tabs).toEqual(
+        expect.arrayContaining([expect.objectContaining({ value: "composite" })]),
+      );
+      const tabs = wrapper.findComponent({ name: "AppTabs" });
+      await tabs.vm.$emit("update:active-tab", "composite");
+      await flushPromises();
+
+      expect(AlertService.listByFolderId).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        "composite",
+      );
+    });
+
+    it("keeps mixed bulk-delete successes while opening reference conflicts", async () => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      wrapper.vm.filteredResults[0].selected = true;
+      wrapper.vm.filteredResults[1].selected = true;
+      await wrapper.vm.$nextTick();
+      const selectedIds = wrapper.vm.selectedAlerts.map((alert: AlertV2) => alert.alert_id);
+      alertsSvc.bulkDelete.mockResolvedValueOnce({
+        data: {
+          successful: [{ alert_id: wrapper.vm.filteredResults[0].alert_id }],
+          unsuccessful: [
+            {
+              alert_id: wrapper.vm.filteredResults[1].alert_id,
+              code: "child_referenced",
+              references: [{ alert_id: "parent-1", name: "Checkout degraded" }],
+              hidden_reference_count: 1,
+            },
+          ],
+        },
+      });
+
+      await wrapper.vm.bulkDeleteAlerts();
+      await flushPromises();
+
+      expect(alertsSvc.bulkDelete).toHaveBeenCalledWith(
+        expect.any(String),
+        { ids: selectedIds },
+        "default",
+      );
+      expect(wrapper.find('[data-test="alerts-composite-reference-conflict"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').exists(),
+      ).toBe(true);
+    });
+  }, 15000);
 });

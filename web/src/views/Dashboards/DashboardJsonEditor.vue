@@ -13,10 +13,12 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="saveChanges()"
   >
+    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
       data-test="dashboard-json-editor-container"
       class="bg-surface-base flex h-[calc(100vh-116px)] w-[70vw] flex-col"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
       <div class="min-h-0 flex-1">
         <QueryEditor
@@ -95,7 +97,7 @@ export default defineComponent({
         isValidJson.value = true;
 
         // Validate the dashboard JSON structure
-        validationErrors.value = validateDashboardJson(parsedJson);
+        validationErrors.value = validateDashboardJson(t, parsedJson);
 
         // Check if dashboardId has been changed
         if (parsedJson.dashboardId && parsedJson.dashboardId !== props.dashboardData.dashboardId) {
@@ -125,7 +127,7 @@ export default defineComponent({
       try {
         const updatedJson = JSON.parse(jsonContent.value);
         // Validate one more time before saving
-        const errors = validateDashboardJson(updatedJson);
+        const errors = validateDashboardJson(t, updatedJson);
 
         if (errors.length > 0) {
           // Show validation errors

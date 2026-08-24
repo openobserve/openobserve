@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         round
         variant="ghost"
         size="icon-circle-sm"
-        class="scroll-to-bottom-btn border-theme-accent! text-theme-accent! pointer-events-auto border-2! bg-[rgba(255,255,255,0.95)]! shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-all duration-300 ease-[ease] hover:scale-110 hover:bg-white! hover:opacity-80 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:scale-100 dark:bg-[rgba(30,30,30,0.9)]! dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80"
+        class="scroll-to-bottom-btn border-theme-accent! text-theme-accent! pointer-events-auto border-2! bg-[rgba(255,255,255,0.95)]! shadow-sm backdrop-blur-sm transition-all duration-300 ease-[ease] hover:scale-110 hover:bg-white! hover:opacity-80 hover:shadow-md active:scale-100 dark:bg-[rgba(30,30,30,0.9)]! dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80"
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />
@@ -181,7 +181,8 @@ onMounted(async () => {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline;
   position: relative;
-  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+  box-shadow: var(--shadow-ring-hairline-geom)
+    color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
   line-height: 1.6;
   vertical-align: baseline;
   white-space: nowrap;
@@ -194,16 +195,20 @@ onMounted(async () => {
     color-mix(in srgb, var(--color-theme-accent) 20%, transparent)
   );
   transform: translateY(-0.0625rem);
+  /* Ring stays a TINT (25%), not the solid accent — a full-strength hairline
+     reads ~4x stronger than the resting 15% and turns hover into a hard outline. */
   box-shadow:
-    0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 25%, transparent),
-    0 0.125rem 0.5rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+    var(--shadow-ring-hairline-geom) color-mix(in srgb, var(--color-theme-accent) 25%, transparent),
+    var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
 }
 
 .summary-text :deep(.summary-clickable:active) {
   transform: translateY(0) scale(0.98);
   background: color-mix(in srgb, var(--color-theme-accent) 18%, transparent);
+  /* Pressed = a 1px INSET press hairline. NOT --shadow-scroll-top, which is an
+     8px inset scroll affordance and reads as a shaded band on click. */
   box-shadow:
-    0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 30%, transparent),
+    var(--shadow-ring-hairline-geom) color-mix(in srgb, var(--color-theme-accent) 30%, transparent),
     inset 0 0.0625rem 0.125rem color-mix(in srgb, var(--color-black) 10%, transparent);
 }
 

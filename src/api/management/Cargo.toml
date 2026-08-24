@@ -19,6 +19,7 @@ enterprise = [
     "enrichment-data/enterprise",
     "openobserve-api-common/enterprise",
     "openobserve-core/enterprise",
+    "openobserve-synthetics/enterprise",
     "openobserve-org-storage/enterprise",
     "openobserve-sourcemaps/enterprise",
     "promql-service/enterprise",
@@ -51,6 +52,7 @@ ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
 anyhow.workspace = true
+arrow-schema.workspace = true
 async-stream.workspace = true
 audit.workspace = true
 axum.workspace = true
@@ -60,6 +62,7 @@ bytes.workspace = true
 chrono.workspace = true
 common.workspace = true
 config.workspace = true
+csv.workspace = true
 db.workspace = true
 enrichment-data.workspace = true
 futures.workspace = true
@@ -77,6 +80,7 @@ o2_openfga = { workspace = true, optional = true }
 openobserve-builtins.workspace = true
 openobserve-cipher = { workspace = true, optional = true }
 openobserve-core.workspace = true
+openobserve-synthetics.workspace = true
 openobserve-api-common.workspace = true
 openobserve-node.workspace = true
 openobserve-org-storage.workspace = true
@@ -102,8 +106,8 @@ transform.workspace = true
 url.workspace = true
 usage_reporting.workspace = true
 utoipa.workspace = true
+uuid.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
-arrow-schema.workspace = true
 cron.workspace = true

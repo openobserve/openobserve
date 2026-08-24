@@ -4,6 +4,7 @@
       error ||
       maxQueryRangeWarning ||
       limitNumberOfSeriesWarningMessage ||
+      sparklineWarning ||
       xAliasInconsistencyWarning ||
       isCachedDataDifferWithCurrentTimeRange ||
       (isPartialData && !isPanelLoading) ||
@@ -19,7 +20,7 @@
       icon-left="warning"
       data-test="panel-error-data"
     >
-      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap">{{ error }}</div></template
         >
@@ -32,7 +33,7 @@
       icon-left="warning"
       data-test="panel-max-duration-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap" data-test="panel-max-duration-warning-content">
             {{ maxQueryRangeWarning }}
@@ -54,13 +55,28 @@
       </OTooltip>
     </OButton>
     <OButton
+      v-if="sparklineWarning"
+      variant="ghost-warning"
+      size="icon"
+      data-test="panel-sparkline-warning"
+    >
+      <template #icon-left><OIcon name="show-chart" size="sm" /></template>
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+        <template #content
+          ><div class="whitespace-pre-wrap" data-test="panel-sparkline-warning-content">
+            {{ sparklineWarning }}
+          </div></template
+        >
+      </OTooltip>
+    </OButton>
+    <OButton
       v-if="xAliasInconsistencyWarning"
       variant="ghost-warning"
       size="icon"
       icon-left="warning"
       data-test="panel-x-alias-inconsistency-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
         <template #content>
           <div class="whitespace-pre-wrap">{{ t("dashboard.xAliasInconsistencyWarning") }}</div>
         </template>
@@ -138,6 +154,10 @@ export default defineComponent({
       default: "",
     },
     limitNumberOfSeriesWarningMessage: {
+      type: String,
+      default: "",
+    },
+    sparklineWarning: {
       type: String,
       default: "",
     },

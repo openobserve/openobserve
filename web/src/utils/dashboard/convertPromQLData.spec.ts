@@ -512,6 +512,50 @@ describe("Convert PromQL Data Utils", () => {
       });
     });
 
+    it("keeps the metric value AND the sparkline series when sparkline is enabled", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: {
+          background: { value: { color: "#FFFFFF" } },
+          sparkline: { enabled: true },
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { job: "test-job" },
+              values: [
+                [1640435200, "42"],
+                [1640435260, "45"],
+                [1640435320, "40"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Both the value-text series and the sparkline trend series must survive:
+      // the "one metric value" reduction must not drop the value text (the bug
+      // was slicing after flatten, which kept only the trailing sparkline).
+      expect(result.options.series.length).toBe(2);
+      const textSeries = result.options.series.find((s: any) => s._metricText !== undefined);
+      expect(textSeries).toBeDefined();
+      expect(textSeries._metricText).toBeDefined();
+    });
+
     it("should handle bar chart type", async () => {
       const panelSchema = {
         id: "panel1",
@@ -1397,9 +1441,9 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const expectedName =
-        '{"__name__":"memory_usage","job":"prometheus","instance":"localhost:9090"}';
-      const dataSeries = result.options.series.find((s: any) => s.name === expectedName);
+      // A lone series has no siblings to differ from, but `instance` still says
+      // which target it is — better than the label set wrapped in braces.
+      const dataSeries = result.options.series.find((s: any) => s.name === "localhost:9090");
       expect(dataSeries).toBeDefined();
     });
 
@@ -4510,6 +4554,75 @@ describe("Convert PromQL Data Utils", () => {
         expect(result.options.xAxis.min).toBeUndefined();
         expect(result.options.xAxis.max).toBeUndefined();
       });
+    });
+  });
+
+  describe("series naming without a legend template", () => {
+    const twoPods = [
+      {
+        resultType: "matrix",
+        result: [
+          {
+            metric: { __name__: "http_requests", container: "api", pod: "api-1" },
+            values: [
+              [1640435200, "10"],
+              [1640438800, "15"],
+            ],
+          },
+          {
+            metric: { __name__: "http_requests", container: "api", pod: "api-2" },
+            values: [
+              [1640435200, "20"],
+              [1640438800, "25"],
+            ],
+          },
+        ],
+      },
+    ];
+
+    it("names each series by the label that tells it apart", async () => {
+      const panelSchema = {
+        id: "naming-panel",
+        type: "line",
+        queries: [{ query: "http_requests", config: {}, fields: {} }],
+        config: {},
+      };
+
+      const result = await convertPromQLData(
+        panelSchema,
+        twoPods,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // The shared labels (__name__, container) name nothing; only pod does.
+      // An unnamed annotation series rides along, so compare the named ones.
+      expect(result.options.series.map((s: any) => s.name).filter(Boolean)).toEqual([
+        "api-1",
+        "api-2",
+      ]);
+    });
+
+    it("leaves an explicit legend template in charge", async () => {
+      const panelSchema = {
+        id: "naming-panel",
+        type: "line",
+        queries: [{ query: "http_requests", config: { promql_legend: "{container}" }, fields: {} }],
+        config: {},
+      };
+
+      const result = await convertPromQLData(
+        panelSchema,
+        twoPods,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.series.map((s: any) => s.name).filter(Boolean)).toEqual(["api", "api"]);
     });
   });
 });

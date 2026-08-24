@@ -345,6 +345,7 @@ const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   computed(() => ({})),
   _sqlMode,
   _noStream,
+  t,
 );
 const { errorTrackingState } = useErrorTracking();
 const {
@@ -695,13 +696,6 @@ const handleErrorTypeClick = async (payload: any) => {
 
 const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
-};
-
-// Severity spine flush against the row's left edge — same mechanism and
-// colors as the sessions table, for cross-page consistency.
-const getIssueStatusColor = (row: any) => {
-  if (row.error_handling === "handled") return "var(--color-severity-warning-color)";
-  return "var(--color-severity-error-color)";
 };
 
 function restoreUrlQueryParams() {

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tabItem.name"
             :data-test="tabItem.dataTest"
             :name="tabItem.name"
-            :label="raw(tabItem.label)"
+            :label="tabItem.label"
           />
         </OTabs>
       </div>
@@ -36,6 +36,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
         />
+        <!-- Lives in the header rather than inside the JSON tab so the action
+             stays reachable from every tab. JsonPreview is told to hide its own
+             copy via `hide-view-trace`. -->
+        <div
+          v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
+          class="flex shrink-0 items-center gap-2"
+        >
+          <OSelect
+            data-test="log-detail-view-trace-stream-select"
+            v-model="searchObj.meta.selectedTraceStream"
+            :options="tracesStreams"
+            class="w-40! shrink-0"
+            :loading="isTracesStreamsLoading"
+            :disabled="isTracesStreamsLoading"
+            size="sm"
+          />
+          <OButton
+            data-test="log-detail-view-trace-btn"
+            size="xs"
+            variant="outline"
+            icon-left="account-tree"
+            @click="viewTrace"
+            >{{ t("search.viewTrace") }}</OButton
+          >
+        </div>
         <OSwitch
           v-show="tab === 'table'"
           data-test="log-detail-wrap-values-toggle-btn"
@@ -69,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-copy-button
               mode="sidebar"
               hide-view-related
+              hide-view-trace
               :highlight-query="highlightQuery"
               :should-wrap-values="shouldWrapValues"
               @copy="copyContentToClipboard"
@@ -111,10 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #cell-field="{ value }">
-                <div
-                  :data-test="`log-detail-${value}-key`"
-                  class="text-status-error-text text-left"
-                >
+                <!-- `log-key` (assets/styles/log-highlighting.css) is the same class the
+                     JSON tab puts on its keys, so both tabs stay one color in both themes. -->
+                <div :data-test="`log-detail-${value}-key`" class="log-key text-left">
                   {{ value }}
                 </div>
               </template>
@@ -457,6 +482,7 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -472,6 +498,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -600,6 +627,25 @@ export default defineComponent({
     ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
+
+    // The View Trace action is rendered in this component's header row (not
+    // inside JsonPreview) so it stays reachable from every tab. Gate on
+    // `modelValue`, which is a prop and therefore available during setup —
+    // `rowData` is only filled by the async created() hook below.
+    const {
+      tracesStreams,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
+      setViewTraceBtn: setViewTraceBtnFor,
+    } = useViewTraceAction(t, searchObj);
+
+    watch(
+      () => props.modelValue,
+      (record) => {
+        setViewTraceBtnFor(record);
+      },
+      { immediate: true },
+    );
     const { fnParsedSQL, hasAggregation } = logsUtils();
 
     // Watch for initialTab prop changes to update tab
@@ -741,7 +787,7 @@ export default defineComponent({
       return tabs;
     });
 
-    type DetailTab = { name: string; label: string; dataTest: string };
+    type DetailTab = { name: string; label: I18nText; dataTest: string };
 
     const loadTabOrder = (): DetailTab[] => {
       try {
@@ -923,7 +969,9 @@ export default defineComponent({
     };
 
     const openCrossLink = (url: string) => {
-      window.open(url, "_blank");
+      // Guard the RESOLVED url — see JsonPreview.vue's twin for the reasoning.
+      if (!isSafeNavigableUrl(url)) return;
+      window.open(url, "_blank", "noopener,noreferrer");
     };
 
     const viewTrace = () => {
@@ -963,7 +1011,10 @@ export default defineComponent({
 
     const createRegexPatternFromLogs = (key: string, value: any) => {
       emit("closeTable");
-      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      // Prompt text handed to the assistant — model input, deliberately English.
+      const promptToBeAdded = raw(
+        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
       router.push({
         path: "/settings/regex_patterns",
         query: {
@@ -1016,7 +1067,6 @@ export default defineComponent({
     };
 
     return {
-      raw,
       t,
       store,
       router,
@@ -1036,6 +1086,9 @@ export default defineComponent({
       searchObj,
       multiStreamFields,
       viewTrace,
+      tracesStreams,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
       hasAggregationQuery,
       sendToAiChat,
       addSearchTerm,
@@ -1104,7 +1157,9 @@ export default defineComponent({
 
 .o2-schema-table :deep(thead th),
 .o2-schema-table :deep(tbody td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-right: 1px solid var(--color-card-glass-border);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-card-glass-border);
 }
 

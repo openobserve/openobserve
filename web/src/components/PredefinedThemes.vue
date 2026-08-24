@@ -61,17 +61,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Theme list for the active mode. Selecting a row applies it immediately;
          the applied row is highlighted rather than carrying an Apply button. -->
+    <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <OCardSection class="max-h-[calc(100vh-100px)] overflow-y-auto px-2 py-2">
       <ul class="m-0 flex list-none flex-col gap-2 p-0">
         <li v-for="theme in predefinedThemes" :key="theme.id">
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
-            class="rounded-default flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
+            class="rounded-default focus-visible:ring-accent/40 flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
             :class="
               isThemeApplied(theme, mode)
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
-                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isThemeApplied(theme, mode)"
             :aria-label="t('common.applyTheme', { name: themeDisplayName(theme.name) })"
@@ -103,11 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
-            class="rounded-default flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
+            class="rounded-default focus-visible:ring-accent/40 flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
             :class="
               isCustomThemeApplied(mode)
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
-                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isCustomThemeApplied(mode)"
             :aria-label="t('components.predefinedThemes.customThemeColorAriaLabel')"
@@ -285,6 +286,7 @@ watch(dialogOpen, (val) => {
 // Watch activeTab changes and update store.state.theme accordingly
 watch(activeTab, (newTab) => {
   const newTheme = newTab === "dark" ? "dark" : "light";
+  // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
   if (store.state.theme !== newTheme) {
     localStorage.setItem("theme", newTheme);
     // Update store and toggle .dark on <html> (Tailwind dark variant) inside

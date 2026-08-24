@@ -95,7 +95,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 const props = withDefaults(
   defineProps<{
@@ -113,17 +112,7 @@ const { t } = useI18nTyped();
 
 const { searchObj } = searchState();
 
-const store = useStore();
 const { isDark } = useTheme();
-
-const functionToggleIcon = computed(() => {
-  return (
-    "img:" +
-    (isDark.value
-      ? getImageURL("images/common/function_dark.svg")
-      : getImageURL("images/common/function.svg"))
-  );
-});
 
 const iconRight = computed(() => {
   return (
@@ -151,7 +140,9 @@ const filteredFunctionOptions = computed(() => {
 
 const selectedFunctionTooltip = computed(() => {
   if (searchObj.data.selectedFunction?.name) {
-    return `${t("search.functionLabel")}: ${searchObj.data.selectedFunction.name}`;
+    return t("search.selectedFunctionTooltip", {
+      name: searchObj.data.selectedFunction.name,
+    });
   }
   return t("search.functionPlaceholder");
 });

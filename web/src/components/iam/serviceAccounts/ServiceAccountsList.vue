@@ -283,20 +283,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel name="curl">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenCurlSnippet }}</pre
-              >
+                >{{ tokenCurlSnippet }}</pre>
             </OTabPanel>
             <OTabPanel name="header">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenHeaderSnippet }}</pre
-              >
+                >{{ tokenHeaderSnippet }}</pre>
             </OTabPanel>
             <OTabPanel name="env">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenEnvSnippet }}</pre
-              >
+                >{{ tokenEnvSnippet }}</pre>
             </OTabPanel>
           </OTabPanels>
 
@@ -730,7 +727,7 @@ export default defineComponent({
       },
     ];
     const userEmail: any = ref("");
-    const options = ref([{ label: "Admin", value: "admin" }]);
+    const options = ref([{ label: t("iam.roleAdmin"), value: "admin" }]);
     const selectedRole = ref(options.value[0].value);
     const currentUserRole = ref("");
     let deleteUserEmail = "";

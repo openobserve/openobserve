@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('iam.editRole.selectResource')"
                 clearable
                 searchable
-                style="width: 200px"
+                style="width: 12.5rem"
                 @update:model-value="onResourceChange"
               />
             </div>
@@ -114,7 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div></div>
           <div class="flex items-center gap-2">
             <span data-test="edit-role-permissions-count" class="text-sm font-bold">
-              {{ t("iam.editRole.permissionsCount", { count: selectedPermissionsHash.size }) }}
+              {{
+                t("iam.editRole.permissionCountSingular", { count: selectedPermissionsHash.size })
+              }}
             </span>
             <OToggleGroup
               data-test="edit-role-permissions-ui-type-toggle"
@@ -171,7 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex flex-nowrap">
-              <div :style="isHelpOpen ? { width: 'calc(100% - 350px)' } : { width: '100%' }">
+              <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <QueryEditor
                   data-test="logs-vrl-function-editor"
                   editor-id="add-function-editor"
@@ -181,8 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:query="permissionsJsonValue"
                   style="height: calc(100vh - var(--navbar-height) - 295px)"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
-              <div v-if="isHelpOpen" style="width: 350px" class="p-2">
+              <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
                 <div class="flex items-center justify-between px-2">
                   <div style="font-size: var(--text-base)">
                     {{ t("iam.editRole.quickReference") }}
@@ -285,10 +289,11 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+import llmQueuesService from "@/services/llm-queues.service";
+import llmDatasetsService from "@/services/llm-datasets.service";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -1420,6 +1425,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     score_config: getScoreConfigs,
     scorer: getScorers,
     eval_job: getEvalJobs,
+    annotation_queue: getAnnotationQueues,
+    dataset: getDatasets,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
     logs_cache: getLogsCacheStreams,
@@ -1775,10 +1782,10 @@ const getActionScripts = async () => {
 
 const getStreamsTypes = async () => {
   const streams = [
-    { stream_type: "logs", name: "Logs" },
-    { stream_type: "traces", name: "Traces" },
-    { stream_type: "metrics", name: "Metrics" },
-    { stream_type: "index", name: "Indices" },
+    { stream_type: "logs", name: t("common.logs") },
+    { stream_type: "traces", name: t("common.traces") },
+    { stream_type: "metrics", name: t("common.metrics") },
+    { stream_type: "index", name: t("iam.indices") },
   ];
 
   streams.forEach((stream) => {
@@ -1916,6 +1923,26 @@ const getEvalJobs = async () => {
   const evalJobs = await onlineEvalsService.jobs.list(store.state.selectedOrganization.identifier);
 
   updateResourceEntities("eval_job", ["id"], evalJobs, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getAnnotationQueues = async () => {
+  const queues = await llmQueuesService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("annotation_queue", ["id"], queues, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getDatasets = async () => {
+  const datasets = await llmDatasetsService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("dataset", ["id"], datasets, false, "name");
 
   return new Promise((resolve) => {
     resolve(true);
@@ -2224,14 +2251,12 @@ const saveRole = () => {
     ) as string[],
   };
 
-  if (
-    !(
-      payload.add.length ||
-      payload.remove.length ||
-      payload.add_users.length ||
-      payload.remove_users.length
-    )
-  ) {
+  if (!(
+    payload.add.length ||
+    payload.remove.length ||
+    payload.add_users.length ||
+    payload.remove_users.length
+  )) {
     toast({
       variant: "info",
       message: t("iam.editRole.noUpdatesDetected"),

@@ -275,7 +275,7 @@ pub async fn remote_write(
         // get labels
         let mut replica_label = String::new();
 
-        let labels: FxIndexMap<String, String> = event
+        let mut labels: FxIndexMap<String, String> = event
             .labels
             .drain(..)
             .filter(|label| {
@@ -294,8 +294,15 @@ pub async fn remote_write(
             .map(|label| (format_label_name(&label.name), label.value))
             .collect();
 
-        let metric_name = match labels.get(NAME_LABEL) {
-            Some(v) => format_stream_name(v.to_string()),
+        let metric_name = match labels.get_mut(NAME_LABEL) {
+            Some(v) => {
+                // store the formatted name back so the `__name__` column always
+                // equals the stream name; otherwise `{__name__="..."}` selectors
+                // can never match the rows (same policy as the OTLP writer)
+                let name = format_stream_name(std::mem::take(v));
+                v.clone_from(&name);
+                name
+            }
             None => continue,
         };
 
@@ -559,6 +566,16 @@ pub async fn remote_write(
             .unwrap_or_default();
         let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
+        let cur_stream_alerts = stream_alerts_map.get(&format!(
+            "{}/{}/{}",
+            org_id,
+            StreamType::Metrics,
+            stream_name
+        ));
+        let mut triggers: TriggerAlertData =
+            Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
+        let mut evaluated_alerts = HashSet::new();
+
         for (mut val_map, timestamp) in json_data {
             let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
@@ -631,27 +648,43 @@ pub async fn remote_write(
                 .push(Arc::new(json::Value::Object(val_map.to_owned())));
             hour_buf.records_size += value_str.len();
 
-            // real time alert
-            let need_trigger = !stream_trigger_map.contains_key(&stream_name);
-            if need_trigger && !stream_alerts_map.is_empty() {
-                // Start check for alert trigger
-                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, stream_name);
-                if let Some(alerts) = stream_alerts_map.get(&key) {
-                    let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = now_micros();
-                    for alert in alerts {
-                        if let Ok(Some(data)) = alert
-                            .evaluate(Some(&val_map), (None, alert_end_time), None)
-                            .await
-                            .map(|res| res.data)
-                        {
-                            trigger_alerts.push((alert.clone(), data));
+            // start check for alert trigger
+            if let Some(alerts) = cur_stream_alerts
+                && triggers.len() < alerts.len()
+            {
+                let end_time = now_micros();
+                for alert in alerts {
+                    let key = format!(
+                        "{}/{}/{}/{}",
+                        org_id,
+                        StreamType::Metrics,
+                        alert.stream_name,
+                        alert.get_unique_key()
+                    );
+                    // For one alert, only one trigger per request
+                    // Trigger for this alert is already added.
+                    if evaluated_alerts.contains(&key) {
+                        continue;
+                    }
+                    match alert.evaluate(Some(&val_map), (None, end_time), None).await {
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        Ok(_) => {
+                            // the data doesn't satisfy the alert condition
+                        }
+                        Err(e) => {
+                            log::error!("[METRICS] Error while evaluating realtime alert: {e}");
                         }
                     }
-                    stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
                 }
             }
-            // End check for alert trigger
+            // end check for alert triggers
+        }
+
+        if !triggers.is_empty() {
+            stream_trigger_map.insert(stream_name.clone(), Some(triggers));
         }
     }
     let elapsed_ms = step_start.elapsed().as_millis();
@@ -774,10 +807,10 @@ pub async fn remote_write(
         ])
         .inc();
 
-    // only one trigger per request
+    // only one trigger per request; notification/db work must not block ingestion
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
-            evaluate_trigger(entry).await;
+            tokio::spawn(evaluate_trigger(entry));
         }
     }
 
@@ -923,8 +956,11 @@ pub async fn get_series(
     let mut sql_where = Vec::new();
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
+            // `__name__` already picked the stream; the stored column may hold the
+            // pre-`format_stream_name` metric name, so filtering on it drops all rows.
             if mat.name == TIMESTAMP_COL_NAME
                 || mat.name == VALUE_LABEL
+                || mat.name == NAME_LABEL
                 || schema.field_with_name(&mat.name).is_err()
             {
                 continue;

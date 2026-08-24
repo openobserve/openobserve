@@ -174,19 +174,19 @@ const sizeClasses = computed(() => {
   if (props.width) return "max-w-none";
   switch (props.size) {
     case "sm":
-      return "w-[min(360px,100vw)]";
+      return "w-[min(22.5rem,100vw)]";
     case "md":
-      return "w-[min(480px,100vw)]";
+      return "w-[min(30rem,100vw)]";
     case "lg":
-      return "w-[min(640px,100vw)]";
+      return "w-[min(40rem,100vw)]";
     case "xl":
-      return "w-[min(800px,100vw)]";
+      return "w-[min(50rem,100vw)]";
     case "xxl":
-      return "w-[min(1000px,100vw)]";
+      return "w-[min(62.5rem,100vw)]";
     case "full":
       return "w-screen";
     default:
-      return "w-[min(480px,100vw)]";
+      return "w-[min(30rem,100vw)]";
   }
 });
 
@@ -308,7 +308,12 @@ watch(internalOpen, (open) => {
       <slot name="trigger" />
     </DialogTrigger>
 
-    <DialogPortal :to="props.portalTarget ?? 'body'">
+    <DialogPortal
+      v-if="!inline || internalOpen"
+      :to="props.portalTarget ?? 'body'"
+      :disabled="inline"
+      :force-mount="inline ? true : undefined"
+    >
       <!-- Overlay / scrim — same z-index as ODialog -->
       <DialogOverlay
         data-test="o-drawer-overlay"
@@ -324,6 +329,7 @@ watch(internalOpen, (open) => {
 
       <!-- Drawer panel -->
       <DialogContent
+        :force-mount="inline ? true : undefined"
         data-o2-drawer
         :data-test="parentDataTest || 'o-drawer-panel'"
         :style="contentStyle"
@@ -468,11 +474,9 @@ watch(internalOpen, (open) => {
             'min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
             'text-dialog-content-text',
             bodyPaddingClass,
-            canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollUp &&
-              canScrollDown &&
-              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            canScrollUp && 'shadow-scroll-top',
+            canScrollDown && 'shadow-scroll-bottom',
+            canScrollUp && canScrollDown && 'shadow-scroll-both',
           ]"
         >
           <template v-if="!props.lazy || internalOpen">

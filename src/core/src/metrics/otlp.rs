@@ -550,6 +550,16 @@ pub async fn handle_otlp_request(
         )
         .await?;
 
+        let cur_stream_alerts = stream_alerts_map.get(&format!(
+            "{}/{}/{}",
+            org_id,
+            StreamType::Metrics,
+            local_metric_name
+        ));
+        let mut triggers: TriggerAlertData =
+            Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
+        let mut evaluated_alerts = HashSet::new();
+
         for val_map in json_data {
             let timestamp = val_map
                 .get(TIMESTAMP_COL_NAME)
@@ -588,27 +598,43 @@ pub async fn handle_otlp_request(
                 .push(Arc::new(json::Value::Object(val_map.to_owned())));
             hour_buf.records_size += value_str.len();
 
-            // real time alert
-            let need_trigger = !stream_trigger_map.contains_key(&local_metric_name);
-            if need_trigger && !stream_alerts_map.is_empty() {
-                // Start check for alert trigger
-                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, local_metric_name);
-                if let Some(alerts) = stream_alerts_map.get(&key) {
-                    let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = now_micros();
-                    for alert in alerts {
-                        if let Ok(Some(data)) = alert
-                            .evaluate(Some(&val_map), (None, alert_end_time), None)
-                            .await
-                            .map(|res| res.data)
-                        {
-                            trigger_alerts.push((alert.clone(), data))
+            // start check for alert trigger
+            if let Some(alerts) = cur_stream_alerts
+                && triggers.len() < alerts.len()
+            {
+                let end_time = now_micros();
+                for alert in alerts {
+                    let key = format!(
+                        "{}/{}/{}/{}",
+                        org_id,
+                        StreamType::Metrics,
+                        alert.stream_name,
+                        alert.get_unique_key()
+                    );
+                    // For one alert, only one trigger per request
+                    // Trigger for this alert is already added.
+                    if evaluated_alerts.contains(&key) {
+                        continue;
+                    }
+                    match alert.evaluate(Some(&val_map), (None, end_time), None).await {
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        Ok(_) => {
+                            // the data doesn't satisfy the alert condition
+                        }
+                        Err(e) => {
+                            log::error!("[METRICS] Error while evaluating realtime alert: {e}");
                         }
                     }
-                    stream_trigger_map.insert(local_metric_name.clone(), Some(trigger_alerts));
                 }
             }
-            // End check for alert trigger
+            // end check for alert triggers
+        }
+
+        if !triggers.is_empty() {
+            stream_trigger_map.insert(local_metric_name.clone(), Some(triggers));
         }
     }
 
@@ -680,10 +706,10 @@ pub async fn handle_otlp_request(
         .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .inc();
 
-    // only one trigger per request
+    // only one trigger per request; notification/db work must not block ingestion
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
-            evaluate_trigger(entry).await;
+            tokio::spawn(evaluate_trigger(entry));
         }
     }
 
@@ -748,7 +774,7 @@ fn process_gauge(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, get_exclude_labels());
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
@@ -777,7 +803,7 @@ fn process_sum(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, get_exclude_labels());
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
@@ -803,7 +829,7 @@ fn process_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -829,7 +855,7 @@ fn process_exponential_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -855,7 +881,7 @@ fn process_summary(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }

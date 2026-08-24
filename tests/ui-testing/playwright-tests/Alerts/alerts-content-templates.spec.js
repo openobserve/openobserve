@@ -104,25 +104,25 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     await page.goto(`${baseUrl}/web/alert-templates?org_identifier=${org}`, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
-    await page.locator('[data-test="template-list-add-btn"]').click();
+    await pm.alertsPage.getTemplateListAddBtn().click();
     await page.waitForTimeout(1000);
 
     // Content is the default editor mode for a new template — assert the mode
     // tabs are visible (kind selector), then explicitly select "content" to be
     // safe against default-mode drift.
-    const modeTabs = page.locator('[data-test="add-template-mode-tabs"]');
+    const modeTabs = pm.alertsPage.getAddTemplateModeTabs();
     await expect(modeTabs).toBeVisible({ timeout: 10000 });
 
-    await page.locator('[data-test="add-template-name-input-field"]').click();
-    await page.locator('[data-test="add-template-name-input-field"]').fill(templateName);
-    await expect(page.locator('[data-test="add-template-name-input-field"]')).toHaveValue(templateName);
+    await pm.alertsPage.getAddTemplateNameInputField().click();
+    await pm.alertsPage.getAddTemplateNameInputField().fill(templateName);
+    await expect(pm.alertsPage.getAddTemplateNameInputField()).toHaveValue(templateName);
 
     // Title field of the ContentSpec (bridged, not part of OForm schema).
-    await page.locator('[data-test="content-template-form-title-input-field"]').click();
-    await page.locator('[data-test="content-template-form-title-input-field"]').fill(`E2E ${alertNameForTemplate}`);
+    await pm.alertsPage.getContentTemplateTitleInputField().click();
+    await pm.alertsPage.getContentTemplateTitleInputField().fill(`E2E ${alertNameForTemplate}`);
 
     // Body with a bold variable via the markdown editor.
-    const bodyEditorLines = page.locator('[data-test="content-template-form-body-editor"] .view-lines, .monaco-editor .view-lines').first();
+    const bodyEditorLines = pm.alertsPage.getContentTemplateBodyEditorLines();
     await bodyEditorLines.waitFor({ state: 'visible', timeout: 15000 });
     await bodyEditorLines.click({ force: true });
     const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
@@ -137,18 +137,18 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     // override ("add-template-preview-panel") which wins over the child's
     // own root data-test via Vue's attribute fallthrough — select the value
     // that's actually on the rendered DOM.
-    const previewPanel = page.locator('[data-test="add-template-preview-panel"]');
+    const previewPanel = pm.alertsPage.getAddTemplatePreviewPanel();
     await expect(previewPanel).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('[data-test="template-preview-panel-visual-tab"]')).toBeVisible();
-    await expect(page.locator('[data-test="template-preview-panel-raw-tab"]')).toBeVisible();
+    await expect(pm.alertsPage.getTemplatePreviewVisualTab()).toBeVisible();
+    await expect(pm.alertsPage.getTemplatePreviewRawTab()).toBeVisible();
 
     // Default channel is slack — assert the visual card actually rendered
     // (proves the live preview call round-tripped through the backend).
-    await expect(page.locator('[data-test="template-preview-panel-visual-card"]')).toBeVisible({ timeout: 15000 });
+    await expect(pm.alertsPage.getTemplatePreviewVisualCard()).toBeVisible({ timeout: 15000 });
 
     // Switch to raw tab and assert JSON payload text is present.
-    await page.locator('[data-test="template-preview-panel-raw-tab"]').click();
-    const rawJson = page.locator('[data-test="template-preview-panel-raw-json"]');
+    await pm.alertsPage.getTemplatePreviewRawTab().click();
+    const rawJson = pm.alertsPage.getTemplatePreviewRawJson();
     await expect(rawJson).toBeVisible();
     await expect(rawJson).not.toHaveText('', { timeout: 10000 });
 
@@ -162,28 +162,28 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     // which starts CLOSED by design for a fresh template (Task 17 redesign —
     // see ContentTemplateForm.spec.ts) so it must be opened before its
     // contents are reachable.
-    const optionalDisclosure = page.locator('[data-test="content-template-form-optional-collapsible"]');
+    const optionalDisclosure = pm.alertsPage.getContentTemplateOptionalCollapsible();
     if ((await optionalDisclosure.getAttribute('data-state')) !== 'open') {
       await optionalDisclosure.click();
       await page.waitForTimeout(300);
     }
-    await page.locator('[data-test="content-template-form-fields-add-btn"]').click();
+    await pm.alertsPage.getContentTemplateFieldsAddBtn().click();
     await page.waitForTimeout(300);
 
-    const fieldLabelInput = page.locator('[data-test="content-template-form-fields-row-0-label-input-field"]');
-    const fieldValueInput = page.locator('[data-test="content-template-form-fields-row-0-value-input-field"]');
+    const fieldLabelInput = pm.alertsPage.getContentTemplateFieldRow0LabelInput();
+    const fieldValueInput = pm.alertsPage.getContentTemplateFieldRow0ValueInput();
     await fieldLabelInput.waitFor({ state: 'visible', timeout: 10000 });
     await fieldLabelInput.fill('CriticalOnlyField');
     await fieldValueInput.fill('only-shown-for-critical');
 
     // Per-row severity filter checkbox/select for "critical" — the
     // ContentFieldsEditor exposes a levels selector per row.
-    const severityFilterTrigger = page.locator('[data-test="content-template-form-fields-row-0-severity-select-trigger"], [data-test="content-template-form-fields-row-0-show-when-trigger"]').first();
+    const severityFilterTrigger = pm.alertsPage.getContentTemplateFieldRow0SeverityTrigger();
     const severityFilterExists = await severityFilterTrigger.isVisible({ timeout: 3000 }).catch(() => false);
     if (severityFilterExists) {
       await severityFilterTrigger.click();
       await page.waitForTimeout(300);
-      const criticalOption = page.getByText(/critical/i).first();
+      const criticalOption = pm.alertsPage.getElementByText(/critical/i).first();
       await criticalOption.click().catch(() => {});
       await page.keyboard.press('Escape').catch(() => {});
     } else {
@@ -192,22 +192,22 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
 
     // Preview severity select: default is single_level — field with a
     // show_when:critical filter must NOT appear.
-    await page.locator('[data-test="template-preview-panel-visual-tab"]').click();
+    await pm.alertsPage.getTemplatePreviewVisualTab().click();
     await page.waitForTimeout(500);
 
     if (severityFilterExists) {
-      const fieldsBlock = page.locator('[data-test="template-preview-panel-fields"]');
+      const fieldsBlock = pm.alertsPage.getTemplatePreviewFields();
       // At single_level, a critical-only field should be absent.
       const hasFieldAtSingleLevel = await fieldsBlock.getByText('CriticalOnlyField').isVisible({ timeout: 5000 }).catch(() => false);
       expect(hasFieldAtSingleLevel).toBe(false);
       testLogger.info('Confirmed critical-only field hidden at single_level severity');
 
       // Switch preview severity to critical — the field must now appear.
-      const severitySelect = page.locator('[data-test="template-preview-panel-severity-select"]');
+      const severitySelect = pm.alertsPage.getTemplatePreviewSeveritySelect();
       await severitySelect.click();
       await page.waitForTimeout(300);
-      await page.getByText(/^Critical$/i).first().click().catch(async () => {
-        await page.locator('[data-test-value="critical"]').click();
+      await pm.alertsPage.getElementByText(/^Critical$/i).first().click().catch(async () => {
+        await pm.alertsPage.getTemplatePreviewSeverityCriticalValue().click();
       });
       await page.waitForTimeout(800);
 
@@ -218,16 +218,16 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
       // Reset back to single_level so it doesn't leak into subsequent steps.
       await severitySelect.click();
       await page.waitForTimeout(300);
-      await page.getByText(/single/i).first().click().catch(() => {});
+      await pm.alertsPage.getElementByText(/single/i).first().click().catch(() => {});
       await page.waitForTimeout(500);
     } else {
       testLogger.warn('SKIPPED severity show_when assertions — per-field severity control selector not found; see report for follow-up');
     }
 
     // Save the template.
-    await page.locator('[data-test="add-template-submit-btn"]').click();
+    await pm.alertsPage.getAddTemplateSubmitBtn().click();
     await page.waitForTimeout(2000);
-    await expect(page.getByText('Template Saved Successfully.')).toBeVisible({ timeout: 15000 }).catch(() => {
+    await expect(pm.alertsPage.getElementByText('Template Saved Successfully.')).toBeVisible({ timeout: 15000 }).catch(() => {
       testLogger.warn('Save success toast not observed via getByText — verifying via API instead');
     });
 
@@ -396,4 +396,49 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
 
     testLogger.info('===== Content Template E2E test COMPLETE =====');
   });
+
+  // ══ REGRESSION TESTS FOR OPEN DEFECTS (#2471) ══════════════════════════════
+  // Both assert the CORRECT behaviour and therefore fail on today's build.
+  // Skipped rather than left red, since neither defect is P0/blocking.
+  // Un-skip as each issue closes — do not soften the assertion.
+
+  test.skip('B8 · a content template can be selected for an email destination [#2471 B8]', {
+    tag: ['@contentTemplates', '@email', '@regression', '@P1', '@all'],
+  }, async ({ page }) => {
+    // BLOCKED BY #2471 (B8): the Webhook/Email type tabs in AddTemplate.vue sit
+    // inside the v-else branch, so they render only in the legacy Custom editor.
+    // Content mode — the default for new templates — always saves type: http, and
+    // an email destination filters its dropdown to type === "email". Net effect:
+    // the better email renderer is unreachable from the UI, which is what makes
+    // the plain-text defect (B3) unavoidable.
+    await page.goto(`${process.env['ZO_BASE_URL']}/web/alert-destinations?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
+    await pm.alertDestinationsPage.expectDestinationsListTitleVisible();
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('email');
+
+    const options = await pm.alertDestinationsPage.getTemplateOptionsForEmail();
+    testLogger.info('templates offered to an email destination', { options });
+    expect(options.length, 'an email destination must be able to use content templates')
+      .toBeGreaterThan(1);
+  });
+
+  // BLOCKED BY #2471 (B1): resolve.rs builds the rows collection from
+  // spec.rows.max / columns / format but never reads spec.rows.enabled, so the
+  // "Show matching rows" switch is inert and matched log rows are always
+  // embedded. The frontend is not at fault — the editor stores the flag
+  // correctly; only the renderer ignores it.
+  //
+  // Verification shape (see the issue for the full manual reproduction):
+  //   1. author a content template with rows.enabled = false
+  //   2. confirm the STORED spec really has rows.enabled: false
+  //   3. bind it to a destination + alert, fire, capture the payload
+  //   4. assert the payload carries no rows
+  //
+  // Not yet implemented as a runnable test — a hardcoded failing assertion
+  // here would still fail once #2471 is fixed, which reads as "still broken"
+  // when it means the opposite.
+  test.fixme('B1 · rows disabled in a content template are not embedded [#2471 B1]', {
+    tag: ['@contentTemplates', '@delivery', '@regression', '@P1', '@all'],
+  }, async () => {});
 });

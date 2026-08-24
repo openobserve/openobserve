@@ -25,7 +25,10 @@ use config::{
     utils::time::now_micros,
 };
 use db::authz::{remove_ownership, set_ownership};
-use infra::{db::ORM_CLIENT, table::anomaly_detection::config as anomaly_config_table};
+use infra::{
+    db::ORM_CLIENT,
+    table::{anomaly_detection::config as anomaly_config_table, get_lock},
+};
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use search_service as search;
 use serde::{Deserialize, Serialize};
@@ -153,6 +156,7 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
             folder_id: DEFAULT_FOLDER.to_owned(),
             name: "default".to_owned(),
             description: "default".to_owned(),
+            icon: None,
         };
         if crate::folders::save_folder(org_id, folder, FolderType::Alerts, true)
             .await
@@ -692,7 +696,11 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     let updated = active_model.update(db).await?;
+    // released before the retrain/scheduler follow-ups below, which take this lock themselves
+    drop(_lock);
 
     // Evict any cached model for this config — training params may have changed,
     // so the next detection run should load a fresh model from S3.
@@ -705,7 +713,7 @@ pub async fn update_config(
     // runs AFTER invalidate_config so the fresh re-cache inside recompute wins. If the model is
     // legacy (no sidecar) or recompute fails, fall back to forcing a one-time retrain so the
     // change is never silently dropped. Training/detection (and thus the model + sidecar) live
-    // only on the alert_manager node, so this recompute happens where the model is; other
+    // only on the scheduler node, so this recompute happens where the model is; other
     // super-cluster regions hold no model and only sync the config row for API reads.
     // Skip while a (re)train is in flight (status == Training): the running trainer already
     // reads `config.threshold` live and will bake the new percentile into the model it is about
@@ -1078,7 +1086,10 @@ async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<(
     active.status = Set(0i32);
     active.is_trained = Set(false);
     active.updated_at = Set(Utc::now().timestamp_micros());
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     active.update(db).await?;
+    drop(_lock);
 
     // Nudge the training scheduler so the retrain fires promptly rather than on its next
     // periodic sweep.
@@ -1111,6 +1122,8 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     active.training_started_at = Set(None);
     active.last_error = Set(Some("Training cancelled by user.".to_string()));
     active.updated_at = Set(Utc::now().timestamp_micros());
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     active.update(db).await?;
 
     log::info!("[anomaly_detection {anomaly_id}] training cancelled by user");
@@ -1737,7 +1750,7 @@ fn extract_value_from_hit(hit: &serde_json::Value) -> Result<f64> {
 /// Write anomaly events to the _anomalies stream.
 ///
 /// Uses HTTP POST to an ingester node so this works from any node role
-/// (including alert_manager which is not an ingester and cannot call
+/// (including scheduler nodes, which are not ingesters and cannot call
 /// service::logs::ingest::ingest() directly).
 #[cfg(feature = "enterprise")]
 pub async fn write_anomalies_to_stream(

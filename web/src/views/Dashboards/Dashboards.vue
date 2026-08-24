@@ -496,9 +496,7 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
-  onActivated,
   onBeforeUnmount,
-  onDeactivated,
   onMounted,
   onUnmounted,
   ref,
@@ -527,12 +525,11 @@ import {
   getAllDashboardsByFolderId,
   getDashboard,
   getFoldersList,
-  moveModuleToAnotherFolder,
 } from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
-import { debounce, filter, forIn } from "lodash-es";
+import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -647,7 +644,7 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -765,7 +762,7 @@ export default defineComponent({
       // navigates to the pinned dashboard's CURRENT folder even if it was moved
       // on another system since this tab last loaded.
       const org = store.state.selectedOrganization?.identifier;
-      if (org) useHomeDashboard().load(org);
+      if (org) useHomeDashboard(t).load(org);
       // Favorites are loaded by the landing-view onMounted below, before the
       // favorites-first landing decision needs them.
     });
@@ -1224,7 +1221,7 @@ export default defineComponent({
           (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
         );
         const allLists = store.state.organizationData?.allDashboardList ?? {};
-        return favorites.value.map((fav: any, index: number) => {
+        return favorites.value.map((fav: any, _index: number) => {
           const cached = (allLists[fav.folderId] ?? []).find(
             (board: any) => board.dashboardId === fav.dashboardId,
           );
@@ -1303,7 +1300,7 @@ export default defineComponent({
           // of lingering until the next navigation.
           if (deletedWasHome) {
             const org = store.state.selectedOrganization?.identifier;
-            if (org) useHomeDashboard().load(org);
+            if (org) useHomeDashboard(t).load(org);
           }
         } catch (err) {
           showErrorNotification(
@@ -1320,7 +1317,7 @@ export default defineComponent({
     };
 
     //after adding Folder need to update the Folder list
-    const updateFolderList = async (it: any) => {
+    const updateFolderList = async (_it: any) => {
       showAddFolderDialog.value = false;
       isFolderEditMode.value = false;
     };
@@ -1636,7 +1633,7 @@ export default defineComponent({
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {
           const org = store.state.selectedOrganization?.identifier;
-          if (org) await useHomeDashboard().load(org);
+          if (org) await useHomeDashboard(t).load(org);
         }
       } catch (error) {
         dismiss();

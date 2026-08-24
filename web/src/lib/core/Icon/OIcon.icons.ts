@@ -134,6 +134,7 @@ import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-out
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
+import BookmarkAdd from "~icons/material-symbols/bookmark-add-outline";
 import Build from "~icons/material-symbols/build-outline";
 import Business from "~icons/material-symbols/business-center-outline";
 import Chat from "~icons/material-symbols/chat-outline";
@@ -236,6 +237,7 @@ import HelpIcon from "~icons/material-symbols/help-outline";
 import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
 import HomeIcon from "~icons/mdi/home-outline";
 import OrganizationIcon from "~icons/octicon/organization-16";
+import Graph1Icon from "~icons/material-symbols/graph-1";
 import Graph2Icon from "~icons/material-symbols/graph-2";
 import HubIcon from "~icons/material-symbols/hub-outline";
 import ImageIcon from "~icons/material-symbols/image-outline";
@@ -266,6 +268,7 @@ import RunningWithErrorsIcon from "~icons/material-symbols/error-outline";
 import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
+import SensorsOff from "~icons/material-symbols/sensors-off-outline";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
 import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
@@ -474,6 +477,7 @@ export const iconRegistry = {
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,
   bookmark: Bookmark,
+  "bookmark-add": BookmarkAdd,
   build: Build,
   business: Business,
   chat: Chat,
@@ -485,6 +489,7 @@ export const iconRegistry = {
   dns: Dns,
   "fork-right": ForkRight,
   "git-branch": ForkRight,
+  "graph-1": Graph1Icon,
   "graph-2": Graph2Icon,
   flame: Whatshot,
   whatshot: Whatshot,
@@ -692,6 +697,10 @@ export const iconRegistry = {
   checklist: Checklist,
   "photo-camera": PhotoCamera,
   "smart-display": SmartDisplay,
+
+  // Batch 4: Alert Library (2026-08-20)
+  // "no signal arriving" — the alert library's not-ingesting-this-stream state.
+  "sensors-off": SensorsOff,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

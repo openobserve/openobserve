@@ -2,7 +2,7 @@
 // Batched latest-score aggregates across span, trace, and session targets,
 // keyed by each Score Config's stable entity_id.
 
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 import { computed, ref, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
@@ -216,6 +216,7 @@ export function configHealthStatus(
 export function useQualityScoreConfigs(
   scoreConfigs: Ref<ScoreConfig[]>,
   dateWindow: Ref<DateWindow>,
+  t: TranslateFn,
   agentFilter?: Ref<AgentFilterSelection | null | undefined>,
 ) {
   const { executeQuery, executeQueryOnce } = useLLMStreamQuery();
@@ -335,6 +336,7 @@ export function useQualityScoreConfigs(
           category: String(row.value_categorical),
           count: toNumber(row.c) ?? 0,
         })),
+        t,
       );
 
       return {

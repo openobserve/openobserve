@@ -42,8 +42,8 @@ use infra::{
 };
 use ingester::{PackSegment, PendingStreamStats};
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::merge::{self, MergeParquetResult};
-use tantivy_utils::index_builder::create_tantivy_index;
+use search::datafusion::merge::{self, MergeMode, MergeOutput, MergedFile};
+use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
 use tokio::sync::{Mutex, RwLock};
 
 static PROCESSING_STREAMS: std::sync::LazyLock<RwLock<HashSet<String>>> =
@@ -388,18 +388,28 @@ async fn upload_chunk(
         bufs.push(data);
     }
 
-    let (buf, mut new_file_meta, file_format) = if chunk.len() == 1 {
+    // Segments are persisted in arrival order. A hash-sorted layout must be
+    // produced by the merge, so it never takes the as-is fast path.
+    let mode = MergeMode::for_ingester(stream_type, stream_name, &latest_schema);
+    let single_segment_as_is = chunk.len() == 1 && mode.metrics_file_layout().is_none();
+    let (merged_file, file_format) = if single_segment_as_is {
         // fast path: upload the parquet bytes as-is, no decode/re-encode
-        let buf = Bytes::from(bufs.pop().unwrap());
+        let data = bufs.pop().unwrap();
         let file_meta = FileMeta {
             min_ts,
             max_ts,
             records: total_records,
             original_size: total_original_size,
-            compressed_size: buf.len() as i64,
+            compressed_size: data.len() as i64,
             ..Default::default()
         };
-        (buf, file_meta, FileFormat::Parquet)
+        (
+            MergedFile::Standard {
+                data,
+                meta: file_meta,
+            },
+            FileFormat::Parquet,
+        )
     } else {
         // merge multiple segments in memory
         let mut segment_schemas = Vec::with_capacity(bufs.len());
@@ -433,48 +443,37 @@ async fn upload_chunk(
             ..Default::default()
         };
         let merge_result = merge::merge_parquet_files(
-            stream_type,
-            stream_name,
             union_schema,
             tables,
             &bloom_filter_fields,
             new_file_meta,
-            true,
+            &mode,
+            MergeOutput::for_ingester(stream_type),
         )
         .await?;
-        match merge_result {
-            MergeParquetResult::Single {
-                buf,
-                file_meta,
-                file_format,
-            } => (Bytes::from(buf), file_meta, file_format),
-            MergeParquetResult::Multiple { .. } => {
-                return Err(anyhow::anyhow!(
-                    "merge_parquet_files error: unexpected multiple files on ingester"
-                ));
-            }
-        }
+        // the ingester always merges into exactly one file
+        merge_result.into_single()?
     };
+
+    let new_file_key = merged_file.mark_file_key(&super::generate_ingester_storage_file_key(
+        org_id,
+        stream_type,
+        stream_name,
+        &format!(
+            "0/{}/{}",
+            chunk[0].meta.partition_key,
+            generate_filename_with_time_range(min_ts, max_ts, 0)
+        ),
+        file_format,
+    ));
+    let (data, mut new_file_meta) = merged_file.into_buffered()?;
+    let buf = Bytes::from(data);
 
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "upload_chunk error: compressed_size is 0 for stream [{org_id}/{stream_type}/{stream_name}]"
         ));
     }
-
-    // the synthetic wal-like name keeps the segments' partition path
-    let wal_like_name = format!(
-        "0/{}/{}",
-        chunk[0].meta.partition_key,
-        generate_filename_with_time_range(min_ts, max_ts, 0)
-    );
-    let new_file_key = super::generate_ingester_storage_file_key(
-        org_id,
-        stream_type,
-        stream_name,
-        &wal_like_name,
-        file_format,
-    );
 
     log::info!(
         "[INGESTER:PACK:JOB:{thread_id}] uploading {} segments into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
@@ -519,9 +518,12 @@ async fn upload_chunk(
             .any(|f| index_schema_fields.contains(f));
         if need_index {
             let index_size = create_tantivy_index(
-                "INGESTER:PACK",
-                org_id,
-                &new_file_key,
+                TantivyIndexOptions {
+                    caller: "INGESTER:PACK",
+                    org_id,
+                    data_file_name: &new_file_key,
+                    storage_tier: storage::StorageTier::Default,
+                },
                 &full_text_search_fields,
                 &index_fields,
                 index_schema.clone(),

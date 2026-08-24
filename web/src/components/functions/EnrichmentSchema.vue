@@ -32,7 +32,7 @@
       </div>
       <div v-else class="indexDetailsContainer h-screen w-full p-5">
         <div
-          class="titleContainer items-flex-start bg-surface-subtle border-input-border rounded-default flex flex-col gap-5 border p-4"
+          class="titleContainer items-flex-start bg-surface-subtle border-border-default rounded-default flex flex-col gap-5 border p-4"
         >
           <div
             data-test="stream-details-container"
@@ -81,7 +81,7 @@
           />
         </div>
         <div>
-          <div style="margin-bottom: 30px" class="mt-4">
+          <div style="margin-bottom: 1.875rem" class="mt-4">
             <OTable
               data-test="schema-log-stream-field-mapping-table"
               :data="schemaData.schema"

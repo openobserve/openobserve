@@ -15,7 +15,7 @@
               <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
               <div class="mt-2 text-sm">
                 {{ t("about.installation_id") }}:
-                <strong>{{ licenseData.installation_id || t("common.notAvailable") }}</strong>
+                <strong>{{ licenseData.installation_id || raw("N/A") }}</strong>
               </div>
               <div
                 class="mt-3 text-sm"
@@ -50,7 +50,7 @@
                   name="licenseKey"
                   :rows="8"
                   :placeholder="t('about.paste_license_placeholder')"
-                  style="min-height: 200px"
+                  style="min-height: 12.5rem"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -239,7 +239,7 @@
                   name="licenseKey"
                   :rows="6"
                   :placeholder="t('about.paste_new_license_placeholder')"
-                  style="min-height: 150px"
+                  style="min-height: 9.375rem"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -295,9 +295,11 @@
 
             <div class="mt-3 flex flex-col gap-2">
               <!-- Summary Message -->
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur radius with text makes the frosting bloom -->
               <div
                 class="ingestion-summary-compact rounded-default relative overflow-hidden border border-solid border-[rgba(99,102,241,0.2)] px-3.5 py-3 [backdrop-filter:blur(10px)] dark:border-[rgba(99,102,241,0.3)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)]"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <div class="summary-text-compact text-compact text-sm leading-[1.6] text-inherit">
                   <!-- Line 1: License Info -->
                   <div class="mb-2 flex items-center gap-2">
@@ -355,14 +357,17 @@
                         <span
                           v-html="
                             DOMPurify.sanitize(
-                              t('about.limit_exceeded_days', {
-                                colorClass:
-                                  licenseData?.ingestion_exceeded > 30
-                                    ? 'text-status-error-text'
-                                    : 'text-status-warning-text',
-                                days: licenseData?.ingestion_exceeded,
-                                plural: licenseData?.ingestion_exceeded > 1 ? 's' : '',
-                              }),
+                              t(
+                                'about.limit_exceeded_days',
+                                {
+                                  colorClass:
+                                    licenseData?.ingestion_exceeded > 30
+                                      ? 'text-status-error-text'
+                                      : 'text-status-warning-text',
+                                  days: licenseData?.ingestion_exceeded,
+                                },
+                                licenseData?.ingestion_exceeded,
+                              ),
                             )
                           "
                         ></span
@@ -371,27 +376,28 @@
                           class="inline-flex items-center font-semibold text-inherit"
                           v-html="
                             DOMPurify.sanitize(
-                              t('about.limit_exceeded_warning', {
-                                max: limitBreachAllowedCount,
-                                maxPlural: limitBreachAllowedCount > 1 ? 's' : '',
-                              }),
+                              t(
+                                'about.limit_exceeded_warning',
+                                { max: limitBreachAllowedCount },
+                                limitBreachAllowedCount,
+                              ),
                             )
                           "
                         ></span
                         ><span
                           v-else
-                          class="text-xs italic opacity-80"
+                          class="ml-1 text-xs italic opacity-80"
                           v-html="
                             DOMPurify.sanitize(
-                              t('about.limit_exceeded_info', {
-                                remaining:
-                                  limitBreachAllowedCount - licenseData?.ingestion_exceeded,
-                                plural:
-                                  limitBreachAllowedCount - licenseData?.ingestion_exceeded > 1
-                                    ? 's'
-                                    : '',
-                                max: limitBreachAllowedCount,
-                              }),
+                              t(
+                                'about.limit_exceeded_info',
+                                {
+                                  remaining:
+                                    limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                                  max: limitBreachAllowedCount,
+                                },
+                                limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                              ),
                             )
                           "
                         ></span
@@ -597,8 +603,12 @@ export default defineComponent({
     const showUpdateFormAndFocus = () => {
       showUpdateForm.value = true;
       setTimeout(() => {
+        // Match the stable data-test hook, not the placeholder: the placeholder
+        // is translated, so a text selector silently found nothing (and never
+        // focused) in every non-English locale. OTextarea renders the native
+        // element with `${data-test}-field`.
         const textarea = document.querySelector(
-          'textarea[placeholder="Paste new license key here..."]',
+          'textarea[data-test="update-license-key-input-field"]',
         ) as HTMLTextAreaElement;
         if (textarea) {
           textarea.focus();
@@ -787,7 +797,7 @@ export default defineComponent({
         // Add critical threshold at 100% of limit
         thresholds.push({
           type: "yAxis",
-          name: "Limit Exceeded",
+          name: t("settings.limitExceeded"),
           value: ingestionLimit,
           color: "#FF0000", // Red
           lineStyle: "solid",
@@ -975,6 +985,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       loading,
       licenseData,

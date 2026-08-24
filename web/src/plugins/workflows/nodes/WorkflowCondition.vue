@@ -27,7 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="workflow-condition-body" class="w-full">
-    <ConditionBuilder ref="builder" :fields="fields" :initial-conditions="savedConditions">
+    <ConditionBuilder
+      ref="builder"
+      :fields="fields"
+      :initial-conditions="savedConditions"
+      normalize-column-names
+    >
       <!-- The examples below are CODE SAMPLES held in en-US.json: only the
            illustrative column name ("severity") is meant to vary per locale —
            the operators and literals (`!=`, `""`, `null`) are expression syntax
@@ -89,7 +94,9 @@ const savedConditions = workflowObj.currentSelectedNodeData?.data?.conditions ??
 
 const builder = ref<any>(null);
 // The builder validates through its zod schema (async) and renders the error
-// inline, returning null when the rule is empty/incomplete.
+// inline, returning null when the rule is empty/incomplete. Custom columns are
+// normalized to the flattened form (dots → underscores) at creation time by
+// ConditionBuilder — see the `normalize-column-names` prop above.
 const submit = async () => (await builder.value?.submit()) ?? null;
 
 defineExpose({ submit });

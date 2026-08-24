@@ -27,19 +27,22 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
+mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
-mod alert_manager;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
 pub mod config_watcher;
+mod db_monitoring;
 mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
+#[cfg(feature = "enterprise")]
+mod llm_review_reconciliation;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
@@ -49,6 +52,7 @@ pub(crate) mod pipeline;
 mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
+mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
@@ -201,7 +205,7 @@ async fn enforce_usage_stream_retention() {
 
 #[cfg(feature = "cloud")]
 async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
-    if !LOCAL_NODE.is_alert_manager() {
+    if !LOCAL_NODE.is_scheduler() {
         return Ok(None);
     }
     use infra::{cluster::get_node_by_uuid, dist_lock};
@@ -350,7 +354,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     if !cfg.common.mmdb_disable_download
-        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager())
+        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler())
     {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(mmdb_downloader::run());
@@ -398,14 +402,24 @@ pub async fn init() -> Result<(), anyhow::Error> {
     _ = infra::db::tantivy_index::get_ttv_timestamp_updated_at().await;
     // check tantivy secondary index update time
     _ = infra::db::tantivy_index::get_ttv_secondary_index_updated_at().await;
+    if let Err(e) = infra::db::trace_time_index::initialize(
+        config::get_config().common.trace_time_index_enabled,
+    )
+    .await
+    {
+        log::warn!("failed to initialize trace time index coverage marker: {e}");
+    }
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
     if audit::run_publish_job().is_none() {
-        log::error!("Failed to run audit publish");
+        log::info!("Audit is disabled, skipping audit publish job");
     };
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
+    {
+        tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
+        tokio::task::spawn(o2_enterprise::enterprise::cloud::org_invites::watch());
+    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -518,7 +532,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // pipeline not used on compactors
-    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler() {
         tokio::task::spawn(openobserve_core::pipeline::db::watch());
     } else {
         // On nodes that do not run the heavy pipeline watch (e.g. routers), still maintain
@@ -534,7 +548,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
         tokio::task::spawn(db::session::watch());
     }
-    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler() {
         tokio::task::spawn(enrichment_data::enrichment_table::runtime::watch());
     }
 
@@ -625,7 +639,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler() {
         db::session::cache()
             .await
             .expect("user session cache failed");
@@ -657,10 +671,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
+    // No cfg, unlike service_graph above: parts of DBM's read API are
+    // enterprise-only, but this rollup works on ordinary database spans and is
+    // identical in both builds (design §5/§7).
+    tokio::task::spawn(db_monitoring::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
     // Register enterprise callbacks before durable consumers and scheduler startup.
-    // HTTP/background work can land on querier, ingester, or alert_manager nodes,
+    // HTTP/background work can land on querier, ingester, or scheduler nodes,
     // so callbacks must be available everywhere before consumers start.
     #[cfg(feature = "enterprise")]
     {
@@ -741,10 +759,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         ..Default::default()
                     };
                     let stream_type = config::meta::stream::StreamType::from(stream_type.as_str());
-                    let count_response =
-                        search_service::search("", &org_id, stream_type, None, &count_req)
-                            .await
-                            .map_err(|e| anyhow::anyhow!(e))?;
+                    let count_response = search_service::search(
+                        &config::ider::generate_trace_id(),
+                        &org_id,
+                        stream_type,
+                        None,
+                        &count_req,
+                    )
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))?;
                     if count_response.is_partial || !count_response.function_error.is_empty() {
                         return Ok(o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
                             total: count_response.total,
@@ -784,18 +807,24 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         use_cache: false,
                         ..Default::default()
                     };
-                    search_service::search("", &org_id, stream_type, None, &data_req)
-                        .await
-                        .map(|response| {
-                            o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
-                                hits: response.hits,
-                                total,
-                                is_partial: response.is_partial,
-                                function_error: response.function_error,
-                                over_limit,
-                            }
-                        })
-                        .map_err(|e| anyhow::anyhow!(e))
+                    search_service::search(
+                        &config::ider::generate_trace_id(),
+                        &org_id,
+                        stream_type,
+                        None,
+                        &data_req,
+                    )
+                    .await
+                    .map(|response| {
+                        o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                            hits: response.hits,
+                            total,
+                            is_partial: response.is_partial,
+                            function_error: response.function_error,
+                            over_limit,
+                        }
+                    })
+                    .map_err(|e| anyhow::anyhow!(e))
                 })
             },
         );
@@ -819,7 +848,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         ..Default::default()
                     };
                     search_service::search(
-                        "",
+                        &config::ider::generate_trace_id(),
                         &request.org_id,
                         stream_type,
                         None,
@@ -950,10 +979,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
     }
 
-    // The scheduler and startup recovery only run on alert_manager nodes.
+    // The scheduler and startup recovery only run on scheduler nodes.
     // Skip entirely when anomaly detection is disabled — no training and no detection.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager()
+    if LOCAL_NODE.is_scheduler()
         && !o2_enterprise::enterprise::common::config::get_config()
             .anomaly_detection
             .disabled
@@ -968,16 +997,36 @@ pub async fn init() -> Result<(), anyhow::Error> {
             log::error!("Failed to start anomaly detection scheduler: {e}");
         }
     }
-    #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager() {
-        o2_enterprise::enterprise::synthetics::init().await;
-        if get_o2_config().synthetics.enabled {
+    if LOCAL_NODE.is_scheduler() {
+        // Ungated: synthetics is OSS, and without this an OSS build accepts a
+        // check, stores it, and never runs it — the routes would be registered
+        // and the workers would not exist.
+        //
+        // `init` carries its own super-cluster arbitration: in a super cluster
+        // it starts the scheduler/dispatcher/reaper only in the cluster holding
+        // the job-cluster claim, the same key `scheduler::run` below elects on.
+        openobserve_synthetics::init().await;
+        // The staleness watcher stays enterprise — it reports on private
+        // locations, whose agents are the enterprise half.
+        #[cfg(feature = "enterprise")]
+        if config::get_config().synthetics.enabled {
+            // Deliberately NOT behind that gate. It reports on
+            // `synthetics_agents`, which never replicates (spec §3) because an
+            // agent long-polls exactly one region — so a location's agent rows
+            // exist in one region and only that region can tell they went
+            // stale. Gating this would leave agents registered outside the job
+            // cluster with no liveness reporting at all, including the §9
+            // misconfiguration where they are pointed at the wrong region and
+            // that is the only signal available. The duplicate-notification
+            // hazard the gate would remove does not arise: the agent sets are
+            // disjoint per region, so a region without rows short-circuits on
+            // `agents.is_empty()` before it can claim or notify.
             tokio::task::spawn(crate::service::synthetics::location_staleness_watcher());
         }
     }
     tokio::task::spawn(metrics::run());
     let _ = promql::run();
-    tokio::task::spawn(alert_manager::run());
+    tokio::task::spawn(scheduler::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(infra::cache::file_downloader::run());
@@ -1078,11 +1127,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // can never retire on its own, because a vanished group produces no
     // observation to act on.
     alert_group_reaper::run();
+    // Retention for the alert availability ledger (S-16). Not job-cluster
+    // gated: retention deletes do not replicate, so every region reaps its own
+    // copy or it grows without bound.
+    alert_eval_ledger_reaper::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget
     // residuals (S-14c).
     slo_maintenance::run();
+    // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow
+    // failure window where ingestion succeeded but QueueItem status did not.
+    #[cfg(feature = "enterprise")]
+    llm_review_reconciliation::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
@@ -1112,7 +1169,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(openobserve_org_storage::watch::watch());
         tokio::task::spawn(openobserve_core::workflows::runtime::clean());
         tokio::task::spawn(db::workflows::watch());
-        if LOCAL_NODE.is_alert_manager() {
+        if LOCAL_NODE.is_scheduler() {
             tokio::task::spawn(openobserve_core::workflows::runtime::watch_workflow_triggers());
         }
     }
@@ -1153,8 +1210,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("AWS Marketplace integration init failed");
 
-        // run these cloud jobs only in alert manager
-        if LOCAL_NODE.is_alert_manager() {
+        // run these cloud jobs only on scheduler nodes
+        if LOCAL_NODE.is_scheduler() {
             cloud::start();
         }
     }
@@ -1180,7 +1237,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::license::watch());
     }
 
-    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {
         return Ok(());
     }
 

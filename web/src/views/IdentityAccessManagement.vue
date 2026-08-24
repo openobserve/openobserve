@@ -32,7 +32,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { useRouter, useRoute, RouterView } from "vue-router";
@@ -71,9 +71,6 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   const meta = isMetaOrg.value;
   const rbac = !!store.state.zoConfig.rbac_enabled;
   const svc = store.state.zoConfig.service_account_enabled ?? true;
-  // MCP is an AI feature (its endpoint requires O2_AI_ENABLED). Available on
-  // both enterprise and cloud builds, gated on the ai_enabled runtime flag.
-  const aiEnabled = isEnt && !!store.state.zoConfig.ai_enabled;
 
   const groups: SectionHubGroup[] = [
     {
@@ -110,16 +107,18 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.syntheticsTokensDesc"),
           icon: "key",
           to: { name: "syntheticsTokens", query: orgQuery.value },
-          visible: isEnt && store.state.zoConfig?.synthetics_enabled !== false,
+          visible: store.state.zoConfig?.synthetics_enabled !== false,
           dataTest: "iam-synthetics-tokens-tab",
         },
         {
           key: "mcpServer",
           label: t("iam.mcpServerLabel"),
-          description: t("iam.mcpServerDesc"),
+          description: t("iam.mcpServerDesc", { product: raw("Model Context Protocol") }),
           icon: "mcp",
           to: { name: "mcpServer", query: orgQuery.value },
-          visible: aiEnabled,
+          // No `visible` gate: the MCP endpoint is served by every edition, so
+          // the card shows on OSS too. See the route comment in
+          // useEnterpriseRoutes.ts.
           dataTest: "iam-mcp-server-tab",
         },
         {

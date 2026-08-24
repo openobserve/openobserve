@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { gt, raw } from "@/types/i18n";
 import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
@@ -81,11 +82,45 @@ export const pagerdutyConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.pagerdutySeverity",
       type: "select",
       required: true,
+      // Getters, not resolved strings: this config object is module scope, so a
+      // plain call would freeze the copy at the boot locale.
       options: [
-        { label: "Critical", value: "critical", description: "Highest priority incidents" },
-        { label: "Error", value: "error", description: "Standard error incidents" },
-        { label: "Warning", value: "warning", description: "Warning level incidents" },
-        { label: "Info", value: "info", description: "Informational incidents" },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.severityCritical");
+          },
+          value: "critical",
+          get description() {
+            return gt("alert_destinations.severityCriticalDescription");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.severityError");
+          },
+          value: "error",
+          get description() {
+            return gt("alert_destinations.severityErrorDescription");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.severityWarning");
+          },
+          value: "warning",
+          get description() {
+            return gt("alert_destinations.severityWarningDescription");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.severityInfo");
+          },
+          value: "info",
+          get description() {
+            return gt("alert_destinations.severityInfoDescription");
+          },
+        },
       ],
     },
   ],
@@ -95,7 +130,7 @@ import pagerdutyLogo from "@/assets/images/alerts/destinations/pagerduty.png";
 
 export const pagerdutyDestinationType: PrebuiltType = {
   id: "pagerduty",
-  name: "PagerDuty",
+  name: raw("PagerDuty"),
   descriptionKey: "alert_destinations.prebuilt.pagerdutyDescription",
   icon: "pagerduty",
   image: pagerdutyLogo,

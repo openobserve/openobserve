@@ -30,7 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("settings.claimParserFunction") }}
         </div>
         <div class="text-text-secondary mb-3 text-sm">
-          {{ t("settings.claimParserFunctionDescription") }}
+          {{
+            t("settings.claimParserFunctionDescription", {
+              product1: raw("VRL"),
+              product2: raw("JavaScript"),
+            })
+          }}
         </div>
 
         <div class="flex items-end gap-3">
@@ -95,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Recent Errors Section -->
             <div
               v-if="claimParserFunction"
-              class="rounded-default bg-surface-subtle border-l-status-negative border-l-[3px] p-4"
+              class="rounded-default bg-surface-subtle border-l-status-negative border-l-3 p-4"
             >
               <div class="mb-2 flex items-center">
                 <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
@@ -187,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="domain-management-new-domain-input"
               name="newDomain"
               class="domain-input"
-              :placeholder="t('settings.domainPlaceholder')"
+              :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
             />
           </div>
           <OButton
@@ -477,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";

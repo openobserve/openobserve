@@ -10,6 +10,27 @@ import { type Span, type EnrichedSpan, type SpanStatus } from "./span.types";
  */
 export type TraceSearchMode = "traces" | "spans" | "service-graph" | "services-catalog";
 
+export const TRACE_SEARCH_MODES: readonly TraceSearchMode[] = [
+  "traces",
+  "spans",
+  "service-graph",
+  "services-catalog",
+];
+
+export const DEFAULT_TRACE_SEARCH_MODE: TraceSearchMode = "spans";
+
+export const isTraceSearchMode = (value: unknown): value is TraceSearchMode =>
+  typeof value === "string" && TRACE_SEARCH_MODES.some((mode) => mode === value);
+
+export const resolveTraceSearchMode = (
+  value: unknown,
+  serviceGraphEnabled: boolean,
+): TraceSearchMode => {
+  if (!isTraceSearchMode(value)) return DEFAULT_TRACE_SEARCH_MODE;
+  if (value === "service-graph" && !serviceGraphEnabled) return DEFAULT_TRACE_SEARCH_MODE;
+  return value;
+};
+
 /**
  * Trace - Collection of spans representing a single request
  */

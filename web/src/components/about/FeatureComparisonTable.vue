@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mb-2 flex items-start gap-3">
       <div
         data-test="feature-comparison-table-icon-wrapper"
-        class="rounded-default text-accent flex h-12 w-12 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))]"
+        class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
       >
         <OIcon name="compare-arrows" size="md" />
       </div>
@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
     <div class="grid grid-cols-3 gap-5 pt-4">
+      <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
       <div
         v-for="ed in editionList"
         :key="ed.id"
@@ -57,11 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg rounded-default border-card-glass-border relative flex flex-col border p-6 max-[1024px]:p-4"
         :class="{ 'border-accent border-2 pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <!-- Your Plan badge (floats above the card top border) -->
         <div
           v-if="buildType === ed.id"
           data-test="feature-comparison-table-your-plan-badge"
-          class="text-3xs bg-accent text-button-primary-foreground absolute top-[-14px] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
+          class="text-3xs bg-accent text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
         >
           <OIcon name="arrow-upward" size="sm" class="mr-1" />
           {{ t("about.yourPlan") }}
@@ -78,9 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
-        <div
-          class="rounded-default mb-4 border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] p-3"
-        >
+        <div class="rounded-default border-accent/15 bg-card-glass-tint-subtle mb-4 border p-3">
           <div class="text-3xs text-text-label m-0 mb-2 font-bold tracking-[0.12em] uppercase">
             {{ t("about.allFivePillars") }}
           </div>
@@ -89,13 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="pillarId in PILLAR_IDS"
               :key="pillarId"
               data-test="feature-comparison-table-pillar-chip"
-              class="rounded-default text-2xs text-accent mr-1.5 mb-1.5 inline-flex items-center border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-2 py-[0.1875rem] font-medium"
+              class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint mr-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
             >
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
           <span
-            class="rounded-default text-2xs text-accent mr-1.5 mb-1.5 inline-flex items-center border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-2 py-[0.1875rem] font-medium"
+            class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint mr-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
             >{{ t("about.feature_dashboards") }}</span
           >
         </div>
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             target="_blank"
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="action"
-            class="rounded-default text-accent hover:border-accent block w-full cursor-pointer border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))]"
+            class="rounded-default text-accent hover:border-accent border-accent/30 bg-card-glass-tint hover:bg-card-glass-tint-strong block w-full cursor-pointer border border-solid px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
           >
             {{ ed.ctaLabel }}
           </a>
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="current"
-            class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border-[1.5px] border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
+            class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
             disabled
           >
             {{ ed.ctaLabel }}
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { FEATURE_REGISTRY, getFeatureNameKey, type FeatureDefinition } from "@/constants/features";
 
 const store = useStore();
@@ -212,48 +212,48 @@ const listFeatures = computed(() => FEATURE_REGISTRY.filter((f) => !EXCLUDED_FRO
 
 interface EditionMeta {
   id: string;
-  shortName: string;
-  hosting: string;
-  price: string;
-  priceSub: string;
-  license: string;
-  support: string;
-  ctaLabel: string;
+  shortName: I18nText;
+  hosting: I18nText;
+  price: I18nText;
+  priceSub: I18nText;
+  license: I18nText;
+  support: I18nText;
+  ctaLabel: I18nText;
   ctaUrl: string | null;
 }
 
 const editionList = computed((): EditionMeta[] => [
   {
     id: "opensource",
-    shortName: "Open Source",
-    hosting: "Self-hosted",
+    shortName: raw("Open Source"),
+    hosting: t("about.selfHosted"),
     price: t("about.value_cost_free"),
-    priceSub: "Forever, no limits",
-    license: t("about.value_license_agpl"),
+    priceSub: t("about.foreverNoLimits"),
+    license: raw("AGPL"),
     support: t("about.value_support_community"),
-    ctaLabel: buildType === "opensource" ? "Current plan" : "Learn more",
+    ctaLabel: buildType === "opensource" ? t("about.currentPlan") : t("about.learnMore"),
     ctaUrl: buildType === "opensource" ? null : "https://openobserve.ai",
   },
   {
     id: "enterprise",
-    shortName: "Enterprise",
-    hosting: "Self-hosted",
+    shortName: raw("Enterprise"),
+    hosting: t("about.selfHosted"),
     price: t("about.value_cost_free"),
-    priceSub: "Up to 50 GB/day · paid beyond",
+    priceSub: t("about.upToFiftyGbPaidBeyond"),
     license: t("about.value_license_enterprise"),
     support: t("about.value_support_enterprise"),
-    ctaLabel: buildType === "enterprise" ? "Current plan" : "Download",
+    ctaLabel: buildType === "enterprise" ? t("about.currentPlan") : t("about.download"),
     ctaUrl: buildType === "enterprise" ? null : "https://openobserve.ai/download",
   },
   {
     id: "cloud",
-    shortName: "Cloud",
-    hosting: "Fully managed",
-    price: "14-day trial",
-    priceSub: "Usage-based thereafter",
+    shortName: raw("Cloud"),
+    hosting: t("about.fullyManaged"),
+    price: t("about.trialFourteenDay"),
+    priceSub: t("about.usageBasedThereafter"),
     license: t("about.value_license_cloud"),
     support: t("about.value_support_cloud"),
-    ctaLabel: buildType === "cloud" ? "Current plan" : "Start free trial",
+    ctaLabel: buildType === "cloud" ? t("about.currentPlan") : t("about.startFreeTrial"),
     ctaUrl: buildType === "cloud" ? null : "https://cloud.openobserve.ai",
   },
 ]);

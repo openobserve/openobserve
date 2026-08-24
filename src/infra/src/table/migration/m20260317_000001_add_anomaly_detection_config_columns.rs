@@ -44,7 +44,8 @@ async fn column_exists(manager: &SchemaManager<'_>, column: &str) -> Result<bool
         ),
         sea_orm::DbBackend::Postgres => format!(
             "SELECT COUNT(*) AS cnt FROM information_schema.columns \
-             WHERE table_name = 'anomaly_detection_config' AND column_name = '{column}'"
+             WHERE table_name = 'anomaly_detection_config' AND column_name = '{column}' \
+             AND table_schema = current_schema()"
         ),
         sea_orm::DbBackend::MySql => format!(
             "SELECT COUNT(*) AS cnt FROM information_schema.columns \

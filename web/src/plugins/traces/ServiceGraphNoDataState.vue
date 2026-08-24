@@ -45,7 +45,7 @@ import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue
 import useJumpToLatestData from "@/composables/useJumpToLatestData";
 
 const { t } = useI18nTyped();
-const { jumpTarget, jumpTargetSublabel } = useJumpToLatestData();
+const { jumpTarget, jumpTargetSublabel } = useJumpToLatestData(t);
 
 const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];

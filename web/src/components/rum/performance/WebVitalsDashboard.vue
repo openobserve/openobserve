@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="rounded-default bg-badge-indigo-soft-bg mt-2 ml-3 flex w-fit items-center px-2 py-1 text-sm font-bold"
         >
           <OIcon name="info" size="sm" class="mr-1" />
-          {{ t("rum.learnWebVitalsLabel") }}
+          {{ t("rum.learnWebVitalsLabel", { product: raw("Web Vitals") }) }}
           <a
             :title="raw('https://web.dev/articles/vitals')"
             href="https://web.dev/articles/vitals"

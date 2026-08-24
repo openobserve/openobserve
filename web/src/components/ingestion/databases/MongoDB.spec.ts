@@ -21,6 +21,7 @@ import { ref } from "vue";
 import MongoDB from "./MongoDB.vue";
 import mongodbCard from "@/components/ingestion/setupCard/content/mongodb";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -53,7 +54,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("mongodbCard builder", () => {
   it("builds metadata + step flow", () => {
-    const card = mongodbCard(SUBS);
+    const card = mongodbCard(SUBS, gt);
     expect(card.provider.name).toBe("MongoDB");
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -70,7 +71,7 @@ describe("mongodbCard builder", () => {
   });
 
   it("offers mongosh / docker / Compass tabs to create the user", () => {
-    const prepare = mongodbCard(SUBS).steps.find((s) => s.id === "prepare")!;
+    const prepare = mongodbCard(SUBS, gt).steps.find((s) => s.id === "prepare")!;
     expect(prepare.variants?.map((v) => v.id)).toEqual(["mongosh", "docker", "shell"]);
     const mongosh = prepare.variants!.find((v) => v.id === "mongosh")!.code;
     expect(mongosh.raw).toContain("mongosh");
@@ -80,7 +81,7 @@ describe("mongodbCard builder", () => {
   });
 
   it("writes a mongodb receiver config with the org's exporter", () => {
-    const configure = mongodbCard(SUBS).steps.find((s) => s.id === "configure")!;
+    const configure = mongodbCard(SUBS, gt).steps.find((s) => s.id === "configure")!;
     expect(configure.inputs?.map((i) => i.id)).toEqual(["host", "port"]);
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
     expect(config).toContain("mongodb:");
@@ -95,7 +96,7 @@ describe("MongoDB.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card for the mongoDB slug", () => {
-    expect(getDataSourceCard("mongoDB", SUBS)?.provider.name).toBe("MongoDB");
+    expect(getDataSourceCard("mongoDB", SUBS, gt)?.provider.name).toBe("MongoDB");
     wrapper = mount(MongoDB, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

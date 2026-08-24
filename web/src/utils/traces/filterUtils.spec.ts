@@ -260,57 +260,29 @@ describe("applyFilterTerm", () => {
     });
   });
 
-  describe("piped base value (SQL before | and filter after |)", () => {
-    // The implementation splits on "|" giving parts[0] (SQL) and parts[1] (filter text).
-    // It then rejoins with "| " (pipe + space). Because parts[1] retains any leading/trailing
-    // whitespace from the original split, the rejoined string preserves that whitespace.
+  describe("base value containing a pipe inside a quoted term", () => {
+    // The whole base value is the where clause. A pipe inside a quoted search term
+    // (e.g. match_all('text | error')) must survive untouched — it is part of the
+    // term the user is matching on, not a clause separator.
 
-    it("should set the filter after the pipe when the right side is empty", () => {
-      // parts[1] is "" (empty after "|"), trim() === "" → else branch sets parts[1] = filter
-      // join produces "select * from spans " + "| " + "status='active'"
-      const result = applyFilterTerm("status='active'", "select * from spans |");
-      expect(result).toBe("select * from spans | status='active'");
+    it("should append the filter after a match_all term containing a pipe", () => {
+      const result = applyFilterTerm("code=200", "match_all('text | error')");
+      expect(result).toBe("match_all('text | error') and code=200");
     });
 
-    it("should replace an existing condition in the right side of the pipe and preserve leading space", () => {
-      // baseValue split on "|": parts[1] = " status='active'" (note leading space from original)
-      // replaceExistingFieldCondition replaces within " status='active'" → " status='error'"
-      // join: "select * from spans " + "| " + " status='error'" = "select * from spans |  status='error'"
-      const result = applyFilterTerm("status='error'", "select * from spans | status='active'");
-      expect(result).toBe("select * from spans |  status='error'");
+    it("should leave a match_all term with several pipes byte-for-byte intact", () => {
+      const result = applyFilterTerm("code=200", "match_all('a | b | c')");
+      expect(result).toBe("match_all('a | b | c') and code=200");
     });
 
-    it("should not set parts[1] to null when field not found — null is coerced to empty string by join", () => {
-      // parts[1] = " env='prod'"; replaceExistingFieldCondition for "status" returns null.
-      // Line 86: replaced (null) !== parts[1] (" env='prod'") → true → parts[1] = null
-      // join("| "): ["select * from spans ", null].join("| ") = "select * from spans | "
-      const result = applyFilterTerm("status='error'", "select * from spans | env='prod'");
-      expect(result).toBe("select * from spans |  env='prod' and status='error'");
+    it("should replace an existing condition without disturbing the piped term", () => {
+      const result = applyFilterTerm("status='error'", "match_all('a | b') and status='active'");
+      expect(result).toBe("match_all('a | b') and status='error'");
     });
 
-    it("should not set parts[1] to null in a piped null-normalised query when field not found", () => {
-      // Same null-coercion behaviour as above; filter becomes "error_code is null"
-      // but "env" field condition does not match "error_code" → replaced is null → parts[1] = null
-      const result = applyFilterTerm("error_code='null'", "select * from spans | env='prod'");
-      expect(result).toBe("select * from spans |  env='prod' and error_code is null");
-    });
-
-    it("should replace existing multi-value group on the right side and preserve leading space", () => {
-      // parts[1] = " (status='active' OR status='pending')" (leading space)
-      // multiRegex matches → replaces the group → " " + "status='ok'" left by replace
-      // join produces "select * from spans |  status='ok'"
-      const result = applyFilterTerm(
-        "status='ok'",
-        "select * from spans | (status='active' OR status='pending')",
-      );
-      expect(result).toBe("select * from spans |  status='ok'");
-    });
-
-    it("should handle a pipe with whitespace-only right side by setting filter directly", () => {
-      // parts[1] = "   ", trim() === "" → else branch: parts[1] = filter
-      // join: "select * from spans " + "| " + "status='active'"
-      const result = applyFilterTerm("status='active'", "select * from spans |   ");
-      expect(result).toBe("select * from spans | status='active'");
+    it("should normalise a null filter appended after a piped term", () => {
+      const result = applyFilterTerm("error_code='null'", "match_all('a | b')");
+      expect(result).toBe("match_all('a | b') and error_code is null");
     });
   });
 });
@@ -436,11 +408,21 @@ describe("removeFieldCondition", () => {
     });
   });
 
-  describe("pipe-separated queries", () => {
-    it("should remove an IS NULL condition only from the WHERE part", () => {
-      expect(removeFieldCondition("SELECT * FROM rum | brand IS NULL", "brand")).toBe(
-        "SELECT * FROM rum | ",
+  describe("queries containing a pipe inside a quoted term", () => {
+    it("should remove a condition that sits after a piped match_all term", () => {
+      expect(removeFieldCondition("match_all('text | error') AND code=200", "code")).toBe(
+        "match_all('text | error')",
       );
+    });
+
+    it("should remove a condition that sits before a piped match_all term", () => {
+      expect(removeFieldCondition("code=200 AND match_all('a | b')", "code")).toBe(
+        "match_all('a | b')",
+      );
+    });
+
+    it("should leave the piped term intact when the target field is absent", () => {
+      expect(removeFieldCondition("match_all('a | b')", "code")).toBe("match_all('a | b')");
     });
   });
 });

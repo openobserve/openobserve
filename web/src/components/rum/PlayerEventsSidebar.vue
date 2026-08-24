@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- 1-device-pixel trim off a 100% width to dodge sub-pixel overflow; a rem inset would open a visible gap -->
   <div class="relative-position flex h-full w-[calc(100%-1px)] flex-col overflow-hidden">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="mx-2! mt-2! px-2 py-1" />
     <template v-if="activeTab === 'tags'">
@@ -120,7 +121,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
 
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";

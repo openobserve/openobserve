@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
 import { formatDate } from "./dateTimeUtils";
@@ -29,10 +31,15 @@ import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { chartColor, chartNumber } from "@/utils/chartTheme";
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
-import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
-import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
+import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
+import { resolveMetricValueStyle } from "./tableConfigUtils";
+import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legendBuilder";
+import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
+
+/** Rows a tooltip will list before it collapses the rest into a "+N more". */
+const TOOLTIP_MAX_SERIES = 10;
 
 let moment: any;
 let momentInitialized = false;
@@ -185,13 +192,11 @@ export const convertPromQLData = async (
     // Only show warning if we actually hit the limit (metricsStored >= maxSeries)
     // AND we had to drop some metrics (totalMetricsReceived > metricsStored)
     if (totalMetricsReceived > metricsStored && metricsStored >= maxSeries) {
-      extras.limitNumberOfSeriesWarningMessage =
-        "Limiting the displayed series to ensure optimal performance";
+      extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
     }
   } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
     // Fallback: Series limiting happens here (for non-streaming queries)
-    extras.limitNumberOfSeriesWarningMessage =
-      "Limiting the displayed series to ensure optimal performance";
+    extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
   }
 
   // flag to check if the data is time seriesc
@@ -384,6 +389,7 @@ export const convertPromQLData = async (
       borderWidth: 1,
       padding: [8, 12],
       extraCssText:
+        // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
         "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;",
       formatter: function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
@@ -453,7 +459,15 @@ export const convertPromQLData = async (
           }
         });
 
-        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+        // A query fanning out to dozens of series makes an unreadable wall of
+        // rows; the list is already sorted by value with the hovered series
+        // hoisted first, so the cap keeps what the reader came for.
+        const shown = hoverText.slice(0, TOOLTIP_MAX_SERIES);
+        if (hoverText.length > shown.length) {
+          shown.push(`+${hoverText.length - shown.length} more`);
+        }
+
+        return `${formatDate(date)} <br/> ${shown.join("<br/>")}`;
       },
       axisPointer: {
         show: true,
@@ -639,6 +653,25 @@ export const convertPromQLData = async (
     [chartMin, chartMax] = getMetricMinMaxValue(limitedSearchQueryData);
   }
 
+  // Series names come from the label vocabulary itself, so a chart neither waits
+  // on nor fires a request. The org's semantic groups only REFINE the result and
+  // only if some other view has already loaded them — the endpoint they come
+  // from is enterprise-only, and a chart must render the same on OSS.
+  //
+  // Consequence worth knowing: on enterprise the refinement is therefore
+  // order-dependent. A dashboard opened before anything has fetched the groups
+  // names purely from the static vocabulary; opened after, a group can veto or
+  // promote a label and shift the names. Both are readable; they are not always
+  // identical within one session.
+  const seriesNames = buildPromqlSeriesNames(
+    (limitedSearchQueryData ?? []).map((it: any, index: number) => ({
+      metrics: (it?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
+      template: panelSchema.queries?.[index]?.config?.promql_legend,
+      fallback: panelSchema.queries?.[index]?.config?.promql_legend_fallback,
+    })),
+    getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
+  );
+
   options.series = limitedSearchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -660,10 +693,7 @@ export const convertPromQLData = async (
                 seriesDataObj[value[0]] = value[1];
               });
 
-              const seriesName = getPromqlLegendName(
-                metric.metric,
-                panelSchema.queries[index].config.promql_legend,
-              );
+              const seriesName = seriesNames.get(metric.metric) ?? "";
 
               const resolvedSeriesColor = (() => {
                 try {
@@ -727,10 +757,7 @@ export const convertPromQLData = async (
                     color: "#8B5A2B",
                     type: [8, 4],
                     width: 2,
-                    shadowColor:
-                      store.state.theme === "light"
-                        ? "rgba(255, 255, 255, 0.7)"
-                        : "rgba(0, 0, 0, 0.7)",
+                    shadowColor: chartColor("--color-chart-markline-shadow"),
                     shadowBlur: 2,
                   },
                 },
@@ -744,10 +771,7 @@ export const convertPromQLData = async (
             const seriesObj = it?.result?.map((metric: any) => {
               const values = [metric.value];
 
-              const seriesName = getPromqlLegendName(
-                metric.metric,
-                panelSchema.queries[index].config.promql_legend,
-              );
+              const seriesName = seriesNames.get(metric.metric) ?? "";
 
               const resolvedVectorColor = (() => {
                 try {
@@ -807,10 +831,7 @@ export const convertPromQLData = async (
                     color: "#8B5A2B",
                     type: [8, 4],
                     width: 2,
-                    shadowColor:
-                      store.state.theme === "light"
-                        ? "rgba(255, 255, 255, 0.7)"
-                        : "rgba(0, 0, 0, 0.7)",
+                    shadowColor: chartColor("--color-chart-markline-shadow"),
                     shadowBlur: 2,
                   },
                 },
@@ -826,13 +847,10 @@ export const convertPromQLData = async (
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
         const series = it?.result?.map((metric: any) => {
-          const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+          const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
 
-          const seriesName = getPromqlLegendName(
-            metric.metric,
-            panelSchema.queries[index].config.promql_legend,
-          );
+          const seriesName = seriesNames.get(metric.metric) ?? "";
 
           return {
             ...getPropsByChartTypeForSeries(panelSchema.type),
@@ -865,7 +883,7 @@ export const convertPromQLData = async (
               {
                 name: seriesName,
                 // taking first value for gauge
-                value: values[0][1],
+                value: values?.[0]?.[1] ?? 0,
                 detail: {
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(
@@ -928,6 +946,7 @@ export const convertPromQLData = async (
           borderWidth: 1,
           padding: [8, 12],
           extraCssText:
+            // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
             "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;",
         };
 
@@ -948,66 +967,80 @@ export const convertPromQLData = async (
 
         switch (it?.resultType) {
           case "matrix": {
-            // take first result
             const metric = it?.result?.[0];
 
-            const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+            const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
             const latestValue = values[values.length - 1]?.[1] ?? 0;
 
-            const unitValue = getUnitValue(
-              latestValue,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
+            const metricStyle = resolveMetricValueStyle(latestValue, {
+              mappings: panelSchema.config?.mappings,
+              unit: panelSchema.config?.unit,
+              customUnit: panelSchema.config?.unit_custom,
+              decimals: panelSchema.config?.decimals,
+              panelBackground: panelSchema.config?.background?.value?.color ?? "",
+            });
+            options.backgroundColor = metricStyle.bgColor;
+            const metricText = metricStyle.text;
+            // metric value color: explicit mapping text color wins; otherwise auto-contrast.
+            const metricFillColor =
+              metricStyle.textColor ??
+              getContrastColor(
+                metricStyle.bgColor,
+                chartColor("--color-chart-metric-text"),
+                chartNumber("--chart-metric-contrast-threshold", 0.5),
+              );
+            // Optional sparkline: the trend of the full matrix series.
+            const sparkValues = values.map((v: any) => Number(v?.[1]));
+            const sparkline = buildMetricSparkline(
+              sparkValues,
+              panelSchema.config?.sparkline,
+              chartColor("--color-accent"),
             );
-            options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
-            const metricText = formatUnitValue(unitValue);
-            const series: any[] = [
-              {
-                type: "custom",
-                silent: true,
-                coordinateSystem: "polar",
-                _metricText: metricText,
-                renderItem: function (params: any) {
-                  const backgroundColor = panelSchema?.config?.background?.value?.color;
-                  return {
-                    type: "text",
-                    style: {
-                      text: metricText,
-                      fontSize: calculateMetricFontSize(
-                        metricText,
-                        params?.coordSys?.cx * 2,
-                        params?.coordSys?.cy * 2,
-                      ), //coordSys is relative. so that we can use it to calculate the dynamic size
-                      fontWeight: 500,
-                      align: "center",
-                      verticalAlign: "middle",
-                      x: params?.coordSys?.cx,
-                      y: params?.coordSys?.cy,
-                      fill: getContrastColor(
-                        backgroundColor,
-                        chartColor("--color-chart-metric-text"),
-                        chartNumber("--chart-metric-contrast-threshold", 0.5),
-                      ),
-                    },
-                  };
-                },
+
+            const textSeries: any = {
+              type: "custom",
+              silent: true,
+              coordinateSystem: "polar",
+              _metricText: metricText,
+              z: 2,
+              renderItem: function (params: any) {
+                return {
+                  type: "text",
+                  style: {
+                    text: metricText,
+                    fontSize: calculateMetricFontSize(
+                      metricText,
+                      params?.coordSys?.cx * 2,
+                      params?.coordSys?.cy * 2,
+                    ), //coordSys is relative. so that we can use it to calculate the dynamic size
+                    fontWeight: 500,
+                    align: "center",
+                    verticalAlign: "middle",
+                    x: params?.coordSys?.cx,
+                    y: params?.coordSys?.cy,
+                    fill: metricFillColor,
+                  },
+                };
               },
-            ];
+            };
+            // Text series first; sparkline layered behind via z.
+            const series: any[] = sparkline ? [textSeries, sparkline.series] : [textSeries];
 
             // Rect for the per-value copy icon overlay (single metric fills the area).
             const panelEl = chartPanelRef?.value;
             if (panelEl) {
               const w = panelEl?.offsetWidth;
               const h = panelEl?.offsetHeight;
-              series[0]._metricLayout = {
+              const valueH = sparkline ? h * sparkline.valueBandFactor : h;
+              const cy = sparkline ? h * sparkline.valueCenterFactor : h / 2;
+              textSeries._metricLayout = {
                 left: 0,
                 top: 0,
                 width: w,
-                height: h,
+                height: valueH,
                 cx: w / 2,
-                cy: h / 2,
-                fontSize: calculateMetricFontSize(metricText, w, h),
+                cy,
+                fontSize: calculateMetricFontSize(metricText, w, valueH),
               };
             }
 
@@ -1021,9 +1054,16 @@ export const convertPromQLData = async (
             options.radiusAxis = {
               show: false,
             };
-            options.polar = {};
-            options.xAxis = [];
-            options.yAxis = [];
+            if (sparkline) {
+              options.polar = { center: ["50%", sparkline.polarCenterY], radius: 0 };
+              options.grid = sparkline.grid;
+              options.xAxis = sparkline.xAxis;
+              options.yAxis = sparkline.yAxis;
+            } else {
+              options.polar = {};
+              options.xAxis = [];
+              options.yAxis = [];
+            }
 
             return series;
           }
@@ -1076,12 +1116,16 @@ export const convertPromQLData = async (
     });
   }
 
-  options.series = options.series.flat();
-
-  // For metric chart type, only show one metric value (from last query with data)
+  // For metric chart type, only show one metric value (from the last query with
+  // data). Slice BEFORE flattening: each metric query contributes an array
+  // [textSeries] (+ sparklineSeries when enabled), so keeping the last query's
+  // array preserves both the value and its sparkline. Slicing after flatten would
+  // keep only the trailing element — the sparkline — and drop the value text.
   if (panelSchema.type === "metric" && options.series.length > 1) {
     options.series = options.series.slice(-1);
   }
+
+  options.series = options.series.flat();
 
   // Apply series color mappings via reusable helper
   applySeriesColorMappings(

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :key="store.state.selectedOrganization.identifier"
     data-test="rum-performance-page"
     :title="t('rum.performanceSummaryLabel')"
-    :subtitle="t('rum.performanceSummarySubtitle')"
+    :subtitle="t('rum.performanceSummarySubtitle', { product: raw('Core Web Vitals') })"
     title-data-test="rum-performance-title"
     icon="speed"
     bleed
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, ref, watch, onMounted, nextTick, computed, onActivated } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
@@ -191,9 +191,9 @@ export default defineComponent({
       currentDashboardData.data = overviewDashboard;
 
       // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
@@ -385,6 +385,7 @@ export default defineComponent({
     return {
       currentDashboardData,
       t,
+      raw,
       getDashboard,
       store,
       // date variables

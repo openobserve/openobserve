@@ -21,6 +21,7 @@
 
 use sea_orm::{ConnectionTrait, Statement, Value};
 
+use super::get_lock;
 use crate::errors;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -67,6 +68,10 @@ pub async fn insert_run<C: ConnectionTrait>(
              run_result, created_at, completed_at)
         VALUES ($1, $2, $3, $4, $5, $6, 0, NULL, $7, NULL)
     "#;
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     conn.execute(Statement::from_sql_and_values(
         conn.get_database_backend(),
         sql,
@@ -244,7 +249,7 @@ pub async fn get_run<C: ConnectionTrait>(
 ///
 /// Everything the caller does on completion then happened twice: the run
 /// rollup, the check status write, and the alert dispatch — a duplicate
-/// customer-facing notification. This needed no multiple alert managers to
+/// customer-facing notification. This did not require multiple scheduler nodes to
 /// reach: acks are served on ingesters (2 replicas in every environment) and the
 /// probes of one run finish independently.
 ///
@@ -263,6 +268,10 @@ pub async fn increment_jobs_done<C: ConnectionTrait>(
     job_result: i32,
     now_us: i64,
 ) -> Result<Option<(i32, i32)>, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite).
+    // One lock across all three steps — the guard drops at fn end.
+    let _lock = get_lock().await;
+
     // Step 1: count this job and fold its severity in.
     //
     // `jobs_done < job_count` stops a duplicate or replayed ack from pushing the

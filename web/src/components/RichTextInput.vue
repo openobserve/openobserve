@@ -1,10 +1,18 @@
 <template>
   <div
-    class="rich-text-input-wrapper rounded-default bg-surface-base border-border-default min-h-15 cursor-text border px-2 py-1 pb-2 transition-all duration-200 ease-in-out focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
+    class="rich-text-input-wrapper rounded-default bg-surface-base border-border-default focus-within:ring-accent min-h-15 cursor-text border px-2 py-1 pb-2 transition-all duration-200 ease-in-out focus-within:border-transparent focus-within:ring-2"
     :class="[
       disabled ? ['is-disabled', 'opacity-60', 'cursor-not-allowed'] : [],
       borderless
-        ? ['borderless', 'p-0', 'border-0!', 'bg-transparent!', 'shadow-none!', 'rounded-none']
+        ? [
+            'borderless',
+            'p-0',
+            'border-0!',
+            'bg-transparent!',
+            'shadow-none!',
+            'ring-0!',
+            'rounded-none',
+          ]
         : [],
     ]"
     @click="focusInput"
@@ -649,10 +657,10 @@ export default defineComponent({
    they can only be reached with :deep() and cannot be expressed as utilities.
    keep(scrollbar) — ::-webkit-scrollbar pseudo-elements have no utility form.
    keep(complex-state) — .is-empty is toggled imperatively by the input handlers,
-   so the placeholder :before has no Tailwind variant. */
+   so the placeholder ::before has no Tailwind variant. */
 
 /* Placeholder for the empty contenteditable */
-.rich-text-input.is-empty:before {
+.rich-text-input.is-empty::before {
   content: attr(data-placeholder);
   color: var(--color-text-placeholder);
   pointer-events: none;

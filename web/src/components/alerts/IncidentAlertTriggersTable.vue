@@ -128,8 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <pre
           data-test="trigger-payload-json"
           class="bg-surface-secondary rounded-surface max-h-[60vh] overflow-auto p-3 text-xs"
-          >{{ formattedPayload }}</pre
-        >
+          >{{ formattedPayload }}</pre>
       </template>
     </ODialog>
   </div>
@@ -248,7 +247,7 @@ export default defineComponent({
     ]);
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp) return "N/A";
+      if (!timestamp) return raw("N/A");
       return formatToReadable(timestamp);
     };
 

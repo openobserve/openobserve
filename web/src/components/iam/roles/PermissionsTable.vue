@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length && !loading"
         class="text-text-secondary mt-4 w-full text-center font-bold"
-        style="margin-top: 64px; font-size: var(--text-lg)"
+        style="margin-top: 4rem; font-size: var(--text-lg)"
       >
         <span> {{ t("iam.permissionsTable.noPermissionsSelected") }} </span>
       </div>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :id="`permissions-table-${parent.resourceName}`"
         :class="level > 0 ? 'overflow-x-hidden overflow-y-auto' : ''"
         :style="{
-          maxHeight: level > 0 ? '400px' : undefined,
+          maxHeight: level > 0 ? '25rem' : undefined,
         }"
       >
         <OTable
@@ -89,6 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span :style="{ paddingLeft: level > 0 ? `${level * 20}px` : undefined }">{{
               row.display_name
             }}</span>
+          </template>
+          <!-- `row.type` is a sentinel compared in EditRole.vue and below, so the value
+               stays English and only the rendered label is translated. -->
+          <template #cell-type="{ row }">
+            <span>{{ objectTypeLabel(row.type) }}</span>
           </template>
           <template v-for="col in permissionColumnIds" :key="col" #[`cell-${col}`]="{ row }">
             <OCheckbox
@@ -136,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, h } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -203,6 +208,17 @@ function handleOTableExpansionChange(ids: string[]) {
     if (row) emits("expand:row", row);
   });
 }
+
+/**
+ * Display label for the Object column. The underlying `row.type` is a machine value
+ * ("Resource" / "Type") compared in EditRole.vue and in `typeRows` below, so it must not
+ * be translated in place; an unrecognised value falls through to its raw form.
+ */
+const objectTypeLabel = (type: string): I18nText => {
+  if (type === "Resource") return t("iam.permissionsTable.objectResource");
+  if (type === "Type") return t("iam.permissionsTable.objectType");
+  return raw(type ?? "");
+};
 
 const columns = computed<OTableColumnDef[]>(() => [
   {

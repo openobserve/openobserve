@@ -22,7 +22,7 @@
         <section class="mb-6">
           <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
-              class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
+              class="text-text-secondary text-2xs bg-text-secondary/12 inline-flex h-5.5 w-5.5 items-center justify-center rounded-full font-mono font-bold"
               >{{ t("onlineEvals.provider.sectionStep1") }}</span
             >
             <div class="text-text-heading m-0 text-sm font-semibold">
@@ -44,7 +44,7 @@
               </div>
               <OFormInput
                 name="name"
-                :placeholder="t('onlineEvals.provider.namePlaceholder')"
+                :placeholder="raw('Production OpenAI')"
                 size="sm"
                 :disabled="mode === 'edit'"
                 data-test="provider-form-name-input"
@@ -95,7 +95,7 @@
               </div>
               <OFormInput
                 name="defaultModel"
-                :placeholder="t('onlineEvals.provider.defaultModelPlaceholder')"
+                :placeholder="raw('gpt-4o-mini')"
                 size="sm"
                 data-test="provider-form-default-model-input"
               />
@@ -107,7 +107,7 @@
               </div>
               <OFormInput
                 name="availableModels"
-                :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
+                :placeholder="raw('gpt-4o-mini, gpt-4.1')"
                 size="sm"
                 data-test="provider-form-available-models-input"
               />
@@ -121,7 +121,7 @@
         <section class="mb-6">
           <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
-              class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
+              class="text-text-secondary text-2xs bg-text-secondary/12 inline-flex h-5.5 w-5.5 items-center justify-center rounded-full font-mono font-bold"
               >{{ t("onlineEvals.provider.sectionStep2") }}</span
             >
             <div class="text-text-heading m-0 text-sm font-semibold">
@@ -131,7 +131,7 @@
 
           <div
             v-if="mode === 'edit'"
-            class="provider-callout rounded-default text-2xs text-text-secondary mb-3 flex items-start gap-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] px-3 py-2 leading-[1.4]"
+            class="provider-callout rounded-default text-2xs text-text-secondary border-status-info-text/30 bg-status-info-text/12 mb-3 flex items-start gap-2 border px-3 py-2 leading-[1.4]"
           >
             <OIcon name="lock" size="xs" class="text-status-info-text mt-px shrink-0" />
             <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
@@ -140,7 +140,9 @@
           <div class="mb-3">
             <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
               {{ t("onlineEvals.provider.apiKeyLabel") }}
-              <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
+              <span v-if="mode === 'create' && apiKeyRequired" class="text-status-error-text ml-0.5"
+                >*</span
+              >
             </div>
             <OFormInput
               name="apiKey"
@@ -226,6 +228,9 @@ const form = useOForm<ProviderForm>({
   onSubmit: save,
 });
 const formValues = form.useStore((s: any) => s.values as ProviderForm);
+const apiKeyRequired = computed(() =>
+  ["openai", "deepseek", "anthropic"].includes(formValues.value.providerType),
+);
 
 const providerTypeOptions = computed(() => [
   { label: raw("OpenAI"), value: "openai" },

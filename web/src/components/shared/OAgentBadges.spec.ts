@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import OAgentBadges from "./OAgentBadges.vue";
 

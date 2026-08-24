@@ -79,15 +79,15 @@ test.describe('Alerts — Additional Settings Help Drawer', {
 
         // The "Learn more" help trigger lives next to the Template Override field.
         // (data-test kept as advanced-template-info-btn for selector stability.)
-        const learnMore = page.locator('[data-test="advanced-template-info-btn"]');
+        const learnMore = pm.alertsPage.getHelpDrawerTemplateInfoBtn();
         await learnMore.waitFor({ state: 'visible', timeout: 10000 });
         await learnMore.click();
 
         // Drawer must be visible and the current-section content area must render
-        const drawer = page.locator('[data-test="alert-settings-help-drawer"]');
+        const drawer = pm.alertsPage.getAlertSettingsHelpDrawer();
         await expect(drawer).toBeVisible({ timeout: 5000 });
 
-        const currentSection = page.locator('[data-test="help-current-section"]');
+        const currentSection = pm.alertsPage.getHelpCurrentSection();
         await expect(currentSection).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Help drawer opened and current-section is visible');
@@ -102,23 +102,23 @@ test.describe('Alerts — Additional Settings Help Drawer', {
         await navigateToAdvancedTab(page, pm);
 
         // Open drawer via the Template Override "Learn more" trigger
-        const learnMore = page.locator('[data-test="advanced-template-info-btn"]');
+        const learnMore = pm.alertsPage.getHelpDrawerTemplateInfoBtn();
         await learnMore.waitFor({ state: 'visible', timeout: 10000 });
         await learnMore.click();
-        await page.locator('[data-test="alert-settings-help-drawer"]').waitFor({ state: 'visible', timeout: 5000 });
+        await pm.alertsPage.getAlertSettingsHelpDrawer().waitFor({ state: 'visible', timeout: 5000 });
 
         // Capture form's Template Override select value BEFORE panel interaction
-        const formSelect = page.locator('[data-test="advanced-template-override-select"]');
+        const formSelect = pm.alertsPage.getAdvancedTemplateOverrideSelect();
         const beforeText = await formSelect.textContent();
         testLogger.info('Template Override value before panel interaction', { beforeText });
 
         // Open the panel preview template select and pick first available option
-        const previewSelect = page.locator('[data-test="help-preview-template-select"]');
+        const previewSelect = pm.alertsPage.getHelpPreviewTemplateSelect();
         await previewSelect.waitFor({ state: 'visible', timeout: 5000 });
         await openOSelectDropdown(page, previewSelect);
 
         // If there are options, pick the first; if not, just close the dropdown
-        const previewOption = page.locator('[data-test="help-preview-template-select-popover"] [data-test$="-option"]').first();
+        const previewOption = pm.alertsPage.getHelpPreviewTemplateFirstOption();
         const hasOption = await previewOption.isVisible({ timeout: 3000 }).catch(() => false);
         if (hasOption) {
             await previewOption.click();
@@ -145,14 +145,14 @@ test.describe('Alerts — Additional Settings Help Drawer', {
         await navigateToAdvancedTab(page, pm);
 
         // Open drawer via the Template Override "Learn more" trigger
-        const learnMore = page.locator('[data-test="advanced-template-info-btn"]');
+        const learnMore = pm.alertsPage.getHelpDrawerTemplateInfoBtn();
         await learnMore.waitFor({ state: 'visible', timeout: 10000 });
         await learnMore.click();
-        const drawer = page.locator('[data-test="alert-settings-help-drawer"]');
+        const drawer = pm.alertsPage.getAlertSettingsHelpDrawer();
         await expect(drawer).toBeVisible({ timeout: 5000 });
 
         // Click the overlay to dismiss
-        const overlay = page.locator('[data-test="o-drawer-overlay"]');
+        const overlay = pm.alertsPage.getHelpDrawerOverlay();
         await overlay.waitFor({ state: 'visible', timeout: 5000 });
         await overlay.click({ force: true });
 
@@ -171,19 +171,19 @@ test.describe('Alerts — Additional Settings Help Drawer', {
         await navigateToAdvancedTab(page, pm);
 
         // Open the Additional Variables "Learn more" trigger
-        const learnMore = page.locator('[data-test="advanced-variables-info-btn"]');
+        const learnMore = pm.alertsPage.getHelpDrawerVariablesInfoBtn();
         await learnMore.waitFor({ state: 'visible', timeout: 10000 });
         await learnMore.click();
-        await expect(page.locator('[data-test="alert-settings-help-drawer"]')).toBeVisible({ timeout: 5000 });
+        await expect(pm.alertsPage.getAlertSettingsHelpDrawer()).toBeVisible({ timeout: 5000 });
 
         // Built-in variable chips are hidden until the disclosure is expanded
-        await expect(page.locator('[data-test="help-builtin-var"]').first()).toBeHidden();
-        const toggle = page.locator('[data-test="help-builtin-toggle"]');
+        await expect(pm.alertsPage.getFirstHelpBuiltinVar()).toBeHidden();
+        const toggle = pm.alertsPage.getHelpBuiltinToggle();
         await expect(toggle).toBeVisible({ timeout: 5000 });
 
         // Expanding reveals the chips
         await toggle.click();
-        await expect(page.locator('[data-test="help-builtin-var"]').first()).toBeVisible({ timeout: 5000 });
+        await expect(pm.alertsPage.getFirstHelpBuiltinVar()).toBeVisible({ timeout: 5000 });
         testLogger.info('Built-in variables list expands on demand');
     });
 });

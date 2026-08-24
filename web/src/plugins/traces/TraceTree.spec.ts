@@ -51,13 +51,31 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
   getSpanTechIconDataUrl: vi.fn().mockReturnValue(null),
 }));
 
+// Shared, stable spies for the useTraces helpers so `viewSpanLogs` can be
+// asserted on. `searchObj` is a plain mutable object: tests flip
+// `data.traceDetails.selectedLogStreams` to drive the OSS stream guard.
+const { mockBuildQueryDetails, mockNavigateToLogs, mockToast, mockSearchObj } = vi.hoisted(() => ({
+  mockBuildQueryDetails: vi.fn(),
+  mockNavigateToLogs: vi.fn(),
+  mockToast: vi.fn(),
+  mockSearchObj: {
+    meta: { serviceColors: {} },
+    data: { traceDetails: { selectedLogStreams: [] as string[] } },
+  },
+}));
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
-    searchObj: { meta: { serviceColors: {} } },
-    buildQueryDetails: vi.fn(),
-    navigateToLogs: vi.fn(),
+    searchObj: mockSearchObj,
+    buildQueryDetails: mockBuildQueryDetails,
+    navigateToLogs: mockNavigateToLogs,
   }),
 }));
+
+vi.mock("@/lib/feedback/Toast/useToast", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>("@/lib/feedback/Toast/useToast");
+  return { ...actual, toast: mockToast };
+});
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -66,6 +84,7 @@ import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
 import TraceTree from "@/plugins/traces/TraceTree.vue";
+import config from "@/aws-exports";
 
 const mockStore = createStore({
   state: {
@@ -84,8 +103,8 @@ const mockSpans = [
   {
     spanId: "d9603ec7f76eb499",
     operationName: "service:alerts:evaluate_scheduled",
-    serviceName: "alertmanager",
-    resolvedIdentity: "alertmanager",
+    serviceName: "scheduler",
+    resolvedIdentity: "scheduler",
     spanStatus: "UNSET",
     spanKind: "Client",
     parentId: "6702b0494b2b6e57",
@@ -102,8 +121,8 @@ const mockSpans = [
   {
     spanId: "6702b0494b2b6e57",
     operationName: "service:alerts:process",
-    serviceName: "alertmanager",
-    resolvedIdentity: "alertmanager",
+    serviceName: "scheduler",
+    resolvedIdentity: "scheduler",
     spanStatus: "ERROR",
     spanKind: "Server",
     parentId: null,
@@ -127,7 +146,7 @@ const mockSpanMap = {
     duration: 321372,
     span_id: "d9603ec7f76eb499",
     operation_name: "service:alerts:evaluate_scheduled",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     span_status: "UNSET",
     span_kind: 2,
     parent_id: "6702b0494b2b6e57",
@@ -139,7 +158,7 @@ const mockSpanMap = {
     duration: 321372,
     span_id: "6702b0494b2b6e57",
     operation_name: "service:alerts:process",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     span_status: "ERROR",
     span_kind: 1,
     parent_id: null,
@@ -196,7 +215,7 @@ const mockSpanDimensions = {
 const mockSpanList = [
   {
     span_id: "d9603ec7f76eb499",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     operation_name: "service:alerts:evaluate_scheduled",
     duration: 321372,
     span_status: "UNSET",
@@ -217,7 +236,7 @@ const mockSpanList = [
   },
   {
     span_id: "6702b0494b2b6e57",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     operation_name: "service:alerts:process",
     duration: 321372,
     span_status: "ERROR",
@@ -400,7 +419,7 @@ describe("TraceTree", () => {
   describe("Search functionality", () => {
     it("should highlight spans that match search query", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -413,7 +432,7 @@ describe("TraceTree", () => {
 
     it("should highlight current match", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -439,7 +458,7 @@ describe("TraceTree", () => {
 
     it("should find matches in service name", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -472,7 +491,7 @@ describe("TraceTree", () => {
 
     it("should handle case-insensitive search", async () => {
       await wrapper.setProps({
-        searchQuery: "ALERTMANAGER",
+        searchQuery: "SCHEDULER",
       });
 
       await flushPromises();
@@ -483,7 +502,7 @@ describe("TraceTree", () => {
 
     it("should emit search-result with correct count", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -494,7 +513,7 @@ describe("TraceTree", () => {
 
     it("should emit update-current-index when current index changes", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -506,23 +525,23 @@ describe("TraceTree", () => {
     describe("isHighlighted function", () => {
       beforeEach(async () => {
         await wrapper.setProps({
-          searchQuery: "alertmanager",
+          searchQuery: "scheduler",
         });
         await flushPromises();
       });
 
       it("should return true for array path that matches search results", () => {
         wrapper.vm.searchResults = [
-          ["service_name", "alertmanager"],
+          ["service_name", "scheduler"],
           ["operation_name", "evaluate_scheduled"],
         ];
 
-        const result = wrapper.vm.isHighlighted(["service_name", "alertmanager"]);
+        const result = wrapper.vm.isHighlighted(["service_name", "scheduler"]);
         expect(result).toBe(true);
       });
 
       it("should return false for array path that doesn't match search results", () => {
-        wrapper.vm.searchResults = [["service_name", "alertmanager"]];
+        wrapper.vm.searchResults = [["service_name", "scheduler"]];
 
         const result = wrapper.vm.isHighlighted(["operation_name", "process"]);
         expect(result).toBe(false);
@@ -553,7 +572,7 @@ describe("TraceTree", () => {
     describe("scrollToMatch function", () => {
       beforeEach(async () => {
         await wrapper.setProps({
-          searchQuery: "alertmanager",
+          searchQuery: "scheduler",
         });
         await flushPromises();
       });
@@ -643,7 +662,7 @@ describe("TraceTree", () => {
   describe("Navigation methods", () => {
     beforeEach(async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
       await flushPromises();
     });
@@ -848,13 +867,13 @@ describe("TraceTree", () => {
       const spanList = [
         {
           span_id: "span1",
-          service_name: "alertmanager",
+          service_name: "scheduler",
           operation_name: "process",
         },
         { span_id: "span2", service_name: "other", operation_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
@@ -883,22 +902,22 @@ describe("TraceTree", () => {
 
     it("should handle case-insensitive search", () => {
       const spanList = [
-        { span_id: "span1", service_name: "AlertManager" },
+        { span_id: "span1", service_name: "Scheduler" },
         { span_id: "span2", service_name: "Other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
 
     it("should handle trimmed search query", () => {
       const spanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "  alertmanager  ");
+      const results = wrapper.vm.findMatches(spanList, "  scheduler  ");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
@@ -907,20 +926,20 @@ describe("TraceTree", () => {
       const spanList = [
         {
           span_id: "span1",
-          service_name: "alertmanager",
+          service_name: "scheduler",
           metadata: { key: "value" },
         },
         { span_id: "span2", service_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
 
     it("should return empty array when no matches found", () => {
       const spanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
@@ -929,7 +948,7 @@ describe("TraceTree", () => {
     });
 
     it("should handle empty search query", () => {
-      const spanList = [{ span_id: "span1", service_name: "alertmanager" }];
+      const spanList = [{ span_id: "span1", service_name: "scheduler" }];
 
       const results = wrapper.vm.findMatches(spanList, "");
       expect(results).toEqual([]);
@@ -947,13 +966,13 @@ describe("TraceTree", () => {
 
     it("should update search results when search query exists", async () => {
       const localSpanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
       await wrapper.setProps({
         spanList: localSpanList,
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -964,7 +983,7 @@ describe("TraceTree", () => {
 
     it("should clear search results when search query is empty", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -1364,6 +1383,224 @@ describe("TraceTree", () => {
       );
       expect(badge.exists()).toBe(true);
       expect(badge.attributes("title")).toContain("collapse");
+    });
+  });
+
+  describe("viewSpanLogs", () => {
+    // A formatted tree node — what the `spans` prop holds: camelCase keys and
+    // microsecond timestamps. This is NOT the shape buildQueryDetails accepts.
+    const formattedSpan = {
+      spanId: "d9603ec7f76eb499",
+      operationName: "service:alerts:evaluate_scheduled",
+      serviceName: "scheduler",
+      resolvedIdentity: "scheduler",
+      spanStatus: "UNSET",
+      spanKind: "Client",
+      parentId: null,
+      hasChildSpans: false,
+      startTimeUs: 1752490492843047,
+      endTimeUs: 1752490493164419,
+      style: {
+        color: "#1ab8be",
+        backgroundColor: "#1ab8be33",
+        top: "0px",
+        left: "0px",
+      },
+      depth: 0,
+      index: 0,
+    };
+
+    // The raw API span behind it — what `spanMap` holds: snake_case keys and
+    // nanosecond timestamps. buildQueryDetails must receive THIS object.
+    const rawSpan = {
+      _timestamp: 1752490492843047,
+      start_time: 1752490492843047200,
+      end_time: 1752490493164419300,
+      duration: 321372,
+      span_id: "d9603ec7f76eb499",
+      operation_name: "service:alerts:evaluate_scheduled",
+      service_name: "scheduler",
+      span_status: "UNSET",
+      span_kind: 2,
+      parent_id: null,
+    };
+
+    // Real case: a span with no `span_id` is given a synthetic `spanId` by the
+    // formatter, so `spanMap` has no entry for it.
+    const orphanSpan = {
+      ...formattedSpan,
+      spanId: "synthetic-span-id-0",
+    };
+
+    const queryDetailsStub = {
+      stream_name: "default",
+      from: 1752490492843,
+      to: 1752490493164,
+    };
+
+    const viewLogsBtnFor = (w: any, spanId: string) =>
+      w.find(`[data-test="trace-tree-span-view-logs-btn-${spanId}"]`);
+
+    const originalIsEnterprise = config.isEnterprise;
+
+    /** Mounts the tree with a single span and a spanMap containing only rawSpan. */
+    function mountWithSpan(span: Record<string, unknown>) {
+      return mountTraceTree({
+        spans: [span],
+        spanMap: { [rawSpan.span_id]: rawSpan },
+        spanList: [rawSpan],
+      });
+    }
+
+    beforeEach(() => {
+      mockSearchObj.data.traceDetails.selectedLogStreams = [];
+      mockBuildQueryDetails.mockReturnValue(queryDetailsStub);
+    });
+
+    afterEach(() => {
+      config.isEnterprise = originalIsEnterprise;
+      mockSearchObj.data.traceDetails.selectedLogStreams = [];
+    });
+
+    describe("OSS mode (config.isEnterprise !== 'true')", () => {
+      let ossWrapper: any;
+
+      beforeEach(() => {
+        config.isEnterprise = "false";
+      });
+
+      afterEach(() => {
+        ossWrapper?.unmount();
+        ossWrapper = null;
+      });
+
+      it("should warn and skip both helpers when no logs stream is selected", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = [];
+        ossWrapper = mountWithSpan(formattedSpan);
+
+        await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
+
+        expect(mockToast).toHaveBeenCalledTimes(1);
+        expect(mockToast).toHaveBeenCalledWith({
+          variant: "warning",
+          message: "Select Logs stream first",
+        });
+        expect(mockBuildQueryDetails).not.toHaveBeenCalled();
+        expect(mockNavigateToLogs).not.toHaveBeenCalled();
+      });
+
+      it("should not emit view-correlated-logs when no logs stream is selected", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = [];
+        ossWrapper = mountWithSpan(formattedSpan);
+
+        await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
+
+        expect(ossWrapper.emitted("view-correlated-logs")).toBeFalsy();
+      });
+
+      it("should warn and skip both helpers when the span is missing from spanMap", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
+        ossWrapper = mountWithSpan(orphanSpan);
+
+        await viewLogsBtnFor(ossWrapper, orphanSpan.spanId).trigger("click");
+
+        expect(mockToast).toHaveBeenCalledTimes(1);
+        expect(mockToast).toHaveBeenCalledWith({
+          variant: "warning",
+          message: "Could not open logs for this span.",
+        });
+        expect(mockBuildQueryDetails).not.toHaveBeenCalled();
+        expect(mockNavigateToLogs).not.toHaveBeenCalled();
+      });
+
+      it("should pass the RAW span from spanMap to buildQueryDetails, not the formatted node", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
+        ossWrapper = mountWithSpan(formattedSpan);
+
+        await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
+
+        expect(mockBuildQueryDetails).toHaveBeenCalledTimes(1);
+
+        const passedSpan = mockBuildQueryDetails.mock.calls[0][0];
+        // Raw shape: snake_case keys, nanosecond timestamps.
+        expect(passedSpan).toEqual(rawSpan);
+        expect(passedSpan.span_id).toBe(rawSpan.span_id);
+        expect(passedSpan.start_time).toBe(rawSpan.start_time);
+        expect(passedSpan.end_time).toBe(rawSpan.end_time);
+        // Formatted shape must be absent — passing it produced `from=NaN&to=NaN`.
+        expect(passedSpan.spanId).toBeUndefined();
+        expect(passedSpan.startTimeUs).toBeUndefined();
+        expect(passedSpan.endTimeUs).toBeUndefined();
+        expect(mockBuildQueryDetails).not.toHaveBeenCalledWith(
+          expect.objectContaining({ spanId: formattedSpan.spanId }),
+        );
+      });
+
+      it("should navigate with the query details returned by buildQueryDetails", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
+        ossWrapper = mountWithSpan(formattedSpan);
+
+        await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
+
+        expect(mockNavigateToLogs).toHaveBeenCalledTimes(1);
+        expect(mockNavigateToLogs).toHaveBeenCalledWith(queryDetailsStub);
+        expect(mockNavigateToLogs.mock.calls[0][0]).toBe(queryDetailsStub);
+        expect(mockToast).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("Enterprise mode (config.isEnterprise === 'true')", () => {
+      let entWrapper: any;
+
+      beforeEach(() => {
+        config.isEnterprise = "true";
+      });
+
+      afterEach(() => {
+        entWrapper?.unmount();
+        entWrapper = null;
+      });
+
+      it("should emit view-correlated-logs with the original formatted span", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
+        entWrapper = mountWithSpan(formattedSpan);
+
+        await viewLogsBtnFor(entWrapper, formattedSpan.spanId).trigger("click");
+
+        expect(entWrapper.emitted("view-correlated-logs")).toBeTruthy();
+        expect(entWrapper.emitted("view-correlated-logs")).toHaveLength(1);
+        expect(entWrapper.emitted("view-correlated-logs")[0][0]).toEqual(formattedSpan);
+      });
+
+      it("should never call buildQueryDetails or navigateToLogs", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
+        entWrapper = mountWithSpan(formattedSpan);
+
+        await viewLogsBtnFor(entWrapper, formattedSpan.spanId).trigger("click");
+
+        expect(mockBuildQueryDetails).not.toHaveBeenCalled();
+        expect(mockNavigateToLogs).not.toHaveBeenCalled();
+      });
+
+      it("should bypass the stream guard when no logs stream is selected", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = [];
+        entWrapper = mountWithSpan(formattedSpan);
+
+        await viewLogsBtnFor(entWrapper, formattedSpan.spanId).trigger("click");
+
+        expect(mockToast).not.toHaveBeenCalled();
+        expect(entWrapper.emitted("view-correlated-logs")).toHaveLength(1);
+      });
+
+      it("should bypass the spanMap guard for a span missing from spanMap", async () => {
+        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
+        entWrapper = mountWithSpan(orphanSpan);
+
+        await viewLogsBtnFor(entWrapper, orphanSpan.spanId).trigger("click");
+
+        expect(mockToast).not.toHaveBeenCalled();
+        expect(entWrapper.emitted("view-correlated-logs")[0][0]).toEqual(orphanSpan);
+      });
     });
   });
 });

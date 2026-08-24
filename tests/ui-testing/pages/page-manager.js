@@ -24,9 +24,15 @@ import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
+import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
+import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
+import { SloListPage } from "./sloPages/sloListPage.js";
+import { SloFormPage } from "./sloPages/sloFormPage.js";
+import { SloDetailPage } from "./sloPages/sloDetailPage.js";
+import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -46,9 +52,11 @@ import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
 import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
 import { MetricsBuilderPage } from "./metricsPages/metricsBuilderPage.js";
+import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
+import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
 import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
@@ -73,8 +81,10 @@ import { SanityPage } from "./generalPages/sanityPage.js";
 import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 import { ThemePage } from "./generalPages/themePage.js";
+import { DateTimePickerPage } from "./generalPages/dateTimePickerPage.js";
 import { LanguagePage } from "./generalPages/languagePage.js";
 import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.js";
+import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
@@ -142,11 +152,19 @@ class PageManager {
     this.dashboardPanelTime = new DashboardPanelTime(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
+    this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
+    this.compositeAlertsPage = new CompositeAlertsPage(page);
+
+    // ===== SLO PAGE OBJECTS =====
+    this.sloListPage = new SloListPage(page);
+    this.sloFormPage = new SloFormPage(page);
+    this.sloDetailPage = new SloDetailPage(page);
+    this.sloAlertsPage = new SloAlertsPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
@@ -170,9 +188,11 @@ class PageManager {
     this.metricsPage = new MetricsPage(page);
     this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
     this.metricsBuilderPage = new MetricsBuilderPage(page);
+    this.metricsExplorerPage = new MetricsExplorerPage(page);
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
+    this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);
@@ -193,8 +213,10 @@ class PageManager {
     this.changeOrgPage = new ChangeOrgPage(page);
     this.enrichmentPage = new EnrichmentPage(page);
     this.themePage = new ThemePage(page);
+    this.dateTimePickerPage = new DateTimePickerPage(page);
     this.languagePage = new LanguagePage(page);
     this.correlationSettingsPage = new CorrelationSettingsPage(page);
+    this.correlationDrawerPage = new CorrelationDrawerPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
     this.modelPricingPage = new ModelPricingPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);

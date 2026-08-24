@@ -29,16 +29,17 @@
  */
 
 import { type I18nKey } from "@/types/i18n";
+import {
+  LLM_LATENCY_SERIES_COLORS,
+  LLM_ERRORS_COLOR,
+  LLM_SPANS_COLOR,
+  LLM_TOKENS_COLOR,
+} from "@/utils/dashboard/colorPalette";
 
 export type LLMPanelType = "stacked-area" | "stacked-bar" | "horizontal-bar" | "table";
 
 export type LLMTableColumnFormat =
-  | "time"
-  | "service-chip"
-  | "error"
-  | "cost"
-  | "view-link"
-  | "text";
+  "time" | "service-chip" | "error" | "cost" | "view-link" | "text";
 
 export interface LLMTableColumn {
   /** Hit field used as the value source. May be omitted for "view-link". */
@@ -63,8 +64,12 @@ export interface LLMPanelQuery {
   seriesField?: string;
   /** Hit field used for the y-value (or bar length). */
   valueField?: string;
-  /** Legend label used when seriesField is not set. */
-  seriesLabel?: string;
+  /**
+   * i18n KEY for the legend label used when seriesField is not set. Resolved by
+   * `buildLLMPanelSchema` — see {@link LLMTableColumn.labelKey} for why this
+   * module stores a key rather than a translated string.
+   */
+  seriesLabelKey?: I18nKey;
   /**
    * Hint to the renderer for axis / tooltip formatting.
    * - "cost": prefix with `$` and use 2-decimal precision in tooltips.
@@ -223,10 +228,10 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     },
     // Severity escalation: slate (typical) → red (slow tail).
     series: [
-      { field: "p50_ms", label: "p50", color: "#64748b" },
-      { field: "p90_ms", label: "p90", color: "#f59e0b" },
-      { field: "p95_ms", label: "p95", color: "#f97316" },
-      { field: "p99_ms", label: "p99", color: "#ef4444" },
+      { field: "p50_ms", label: "p50", color: LLM_LATENCY_SERIES_COLORS.p50 },
+      { field: "p90_ms", label: "p90", color: LLM_LATENCY_SERIES_COLORS.p90 },
+      { field: "p95_ms", label: "p95", color: LLM_LATENCY_SERIES_COLORS.p95 },
+      { field: "p99_ms", label: "p99", color: LLM_LATENCY_SERIES_COLORS.p99 },
     ],
   },
   {
@@ -257,7 +262,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     subtitleKey: "aiObservability.panels.errorsOverTime.subtitle",
     type: "stacked-bar",
     layout: { colSpan: 1 },
-    color: "#ef4444",
+    color: LLM_ERRORS_COLOR,
     query: {
       // No baseFilter: OTel SDKs typically propagate the failure to a deep
       // child span (e.g. tool.<name>) which doesn't carry
@@ -274,7 +279,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       `,
       timeField: "ts",
       valueField: "count",
-      seriesLabel: "errors",
+      seriesLabelKey: "traces.lLMInsightsDashboard.errorsSeries",
     },
   },
   {
@@ -283,7 +288,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     subtitleKey: "aiObservability.panels.spansByModel.subtitle",
     type: "horizontal-bar",
     layout: { colSpan: 1 },
-    color: "#3b82f6",
+    color: LLM_SPANS_COLOR,
     limit: 10,
     query: {
       sql: `
@@ -305,7 +310,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     subtitleKey: "aiObservability.panels.tokensByModel.subtitle",
     type: "horizontal-bar",
     layout: { colSpan: 1 },
-    color: "#a855f7",
+    color: LLM_TOKENS_COLOR,
     limit: 10,
     query: {
       sql: `

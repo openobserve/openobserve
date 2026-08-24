@@ -19,11 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
-      :title="t('alert_destinations.header')"
+      :title="t('alerts.header')"
       title-data-test="alert-destinations-list-title"
-      icon="location-on"
-      :subtitle="t('alert_destinations.subtitle')"
+      icon="shield-alert-outline"
     >
+      <!-- Section-level title, identical on all four alerting pages, so the
+           peer tabs anchor at the same x — see AlertList.vue for the rationale.
+           Subtitle-free for the same reason. -->
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
         <OToggleGroup
           :model-value="activeTab"
@@ -232,11 +238,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.delete')"
+                :loading="deletingDestinations.has(row.name)"
                 @click="conformDeleteDestination(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
             </div>
+          </template>
+
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'destination', name: row.name }"
+              @deleted="onDependencyDeleted"
+            />
           </template>
         </OTable>
       </div>
@@ -292,6 +307,13 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+  applyDependencyDeletion,
+  depNodeId,
+} from "@/composables/alerts/useDependencyGraph";
+import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -303,6 +325,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -329,11 +352,14 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
+    AlertSectionTabs,
+    DependencyUsageCell,
   },
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18nTyped();
+    const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
     const { getAllActions } = useActions();
     const { track } = useReo();
 
@@ -391,11 +417,21 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "used_by",
+        header: t("alert_dependencies.usedByColumn"),
+        cell: " ",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 200,
+        meta: { align: "left" },
+      },
+      {
         id: "actions",
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 120,
+        size: 130,
         meta: { align: "center", actionCount: 3 },
       },
     ];
@@ -413,6 +449,7 @@ export default defineComponent({
     const router = useRouter();
     const filterQuery = ref("");
     const resultTotal = ref(0);
+    const deletingDestinations = ref(new Set<string>());
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -465,6 +502,33 @@ export default defineComponent({
       }
     };
 
+    // A delete is one row leaving a list the server has already confirmed. Splice
+    // it out and prune the shared dependency graph rather than refetching: a
+    // refetch blanks the table behind its spinner and a "please wait" toast, which
+    // reads as a page reload, and takes the user's scroll and page with it.
+    const dropDestinations = (names: string[]) => {
+      if (!names.length) return;
+      const gone = new Set(names);
+      destinations.value = destinations.value.filter((d: any) => !gone.has(d.name));
+      // Anything that failed to delete stays selected, so a bulk retry is one click.
+      selectedDestinations.value = selectedDestinations.value.filter((d: any) => !gone.has(d.name));
+      const org = store.state.selectedOrganization.identifier;
+      for (const name of gone)
+        depGraph.value = applyDependencyDeletion(
+          org,
+          depNodeId("destination", name),
+          depGraph.value,
+        );
+    };
+
+    // Deleting an alert in the impact dialog leaves this list's rows untouched, so
+    // re-read the (already pruned) shared graph for the Used by counts instead of
+    // reloading the page's data.
+    const onDependencyDeleted = (kind: DepNodeKind) => {
+      if (kind === "destination") getDestinations();
+      else loadDepGraph(store.state.selectedOrganization.identifier);
+    };
+
     const loading = ref(false);
     const getDestinations = () => {
       const dismiss = toast({
@@ -491,6 +555,11 @@ export default defineComponent({
           );
           resultTotal.value = res.data.length;
           destinations.value = res.data;
+          // Any destination add/edit/delete lands here on refresh — drop the
+          // shared dependency-graph cache and rebuild it so the "Used by" counts
+          // (and the impact dialog) are current.
+          invalidateDependencyGraphCache();
+          loadDepGraph(store.state.selectedOrganization.identifier);
           updateRoute();
         })
         .catch((err) => {
@@ -556,34 +625,34 @@ export default defineComponent({
       editingDestination.value = null;
     };
     const deleteDestination = () => {
-      if (confirmDelete.value?.data?.name) {
-        destinationService
-          .delete({
-            org_identifier: store.state.selectedOrganization.identifier,
-            destination_name: confirmDelete.value.data.name,
-          })
-          .then(() => {
-            toast({
-              variant: "success",
-              message: t("toastMessages.alerts.destinationDeletedSuccessfully", {
-                name: confirmDelete.value.data.name,
-              }),
-            });
-            getDestinations();
-          })
-          .catch((err) => {
-            if (err.response.data.code === 409) {
-              const message =
-                err.response.data?.message ||
-                err.response.data?.error ||
-                "Error while deleting destination";
-              toast({
-                variant: "error",
-                message,
-              });
-            }
+      const name = confirmDelete.value?.data?.name;
+      if (!name) return;
+      deletingDestinations.value.add(name);
+      destinationService
+        .delete({
+          org_identifier: store.state.selectedOrganization.identifier,
+          destination_name: name,
+        })
+        .then(() => {
+          toast({
+            variant: "success",
+            message: t("toastMessages.alerts.destinationDeletedSuccessfully", { name }),
           });
-      }
+          dropDestinations([name]);
+        })
+        .catch((err: any) => {
+          // A network failure has no `err.response` at all, and a non-409 code used
+          // to fall through silently; the row stays either way, so it has to say why.
+          if (err?.response?.status === 403) return;
+          const message =
+            err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            t("alerts.messages.deleteDestinationFailed");
+          toast({ variant: "error", message });
+        })
+        .finally(() => {
+          deletingDestinations.value.delete(name);
+        });
     };
     const conformDeleteDestination = (destination: any) => {
       confirmDelete.value.visible = true;
@@ -763,14 +832,20 @@ export default defineComponent({
           });
         }
 
-        selectedDestinations.value = [];
-        getDestinations();
+        // An unrecognised shape is NOT taken as "all of them" — splicing rows the
+        // server may have kept would show a delete that never happened.
+        if (Array.isArray(response.data?.successful)) {
+          dropDestinations(response.data.successful.map((entry: any) => entry?.name ?? entry));
+        } else {
+          selectedDestinations.value = [];
+          getDestinations();
+        }
       } catch (error: any) {
         dismiss();
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting destinations. Please try again.";
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -815,6 +890,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      depGraph,
       showDestinationEditor,
       destinations,
       columns,
@@ -828,6 +904,8 @@ export default defineComponent({
       templates,
       toggleDestinationEditor,
       getDestinations,
+      onDependencyDeleted,
+      deletingDestinations,
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,

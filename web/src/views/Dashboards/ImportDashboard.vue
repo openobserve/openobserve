@@ -248,19 +248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  computed,
-  onMounted,
-  onActivated,
-  onDeactivated,
-  onUnmounted,
-  reactive,
-  watch,
-} from "vue";
+import { defineComponent, ref, onMounted, reactive, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { getAllDashboards, getFoldersList } from "../../utils/commons.js";
+import { getAllDashboards, getFoldersList, dedupeDashboardIds } from "../../utils/commons.js";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import dashboardService from "../../services/dashboards.js";
@@ -284,7 +274,6 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
@@ -453,6 +442,16 @@ export default defineComponent({
     });
 
     //import dashboard from the json
+    const migrateSchema = (dashboard: any) => {
+      const converted = convertDashboardSchemaVersion(dashboard);
+      try {
+        dedupeDashboardIds(converted);
+      } catch (e) {
+        console.error("Failed to dedupe dashboard ids on import", e);
+      }
+      return converted;
+    };
+
     const importDashboardFromJSON = async (jsonObj: any, selectedFolder: any) => {
       const data =
         typeof jsonObj == "string"
@@ -518,10 +517,10 @@ export default defineComponent({
                 //it will convert the dashboard schema version to the latest version
 
                 try {
-                  const convertedSchema = convertDashboardSchemaVersion(dashboard);
+                  const convertedSchema = migrateSchema(dashboard);
 
                   // Validate the converted schema before importing
-                  const validationErrors = validateDashboardJson(convertedSchema);
+                  const validationErrors = validateDashboardJson(t, convertedSchema);
                   if (validationErrors.length > 0) {
                     const errorMessage = validationErrors.join("; ");
                     results.push({
@@ -634,10 +633,10 @@ export default defineComponent({
 
         const importPromises = dashboards.map((dashboard, index) => {
           try {
-            const converted = convertDashboardSchemaVersion(dashboard);
+            const converted = migrateSchema(dashboard);
 
             // Validate the converted schema before importing
-            const validationErrors = validateDashboardJson(converted);
+            const validationErrors = validateDashboardJson(t, converted);
             if (validationErrors.length > 0) {
               const errorMessage = validationErrors.join("; ");
               return Promise.reject({ index, error: new Error(errorMessage) });
@@ -685,10 +684,10 @@ export default defineComponent({
         // get the dashboard
 
         const oldImportedSchema = JSON.parse(jsonStr.value);
-        const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
+        const convertedSchema = migrateSchema(oldImportedSchema);
 
         // Validate the converted schema before importing
-        const validationErrors = validateDashboardJson(convertedSchema);
+        const validationErrors = validateDashboardJson(t, convertedSchema);
         if (validationErrors.length > 0) {
           const errorMessage = validationErrors.join("; ");
           showErrorNotification(
@@ -697,7 +696,7 @@ export default defineComponent({
           return;
         }
 
-        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((res) => {
+        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((_res) => {
           resetAndRefresh(ImportType.JSON_STRING, selectedFolder.value);
           filesImportResults.value = [];
           jsonStr.value = "";
@@ -740,12 +739,12 @@ export default defineComponent({
         if (Array.isArray(jsonObj)) {
           jsonObj.forEach((input, index) => {
             // migrate to new schema
-            const convertedSchema = convertDashboardSchemaVersion(input);
+            const convertedSchema = migrateSchema(input);
             validateBasicInputs(convertedSchema, index);
           });
         } else {
           // migrate to new schema
-          const convertedSchema = convertDashboardSchemaVersion(jsonObj);
+          const convertedSchema = migrateSchema(jsonObj);
           validateBasicInputs(convertedSchema);
         }
         if (dashboardErrorsToDisplay.value.length > 0) {
@@ -777,7 +776,7 @@ export default defineComponent({
       }
 
       // Comprehensive dashboard validation using validateDashboardJson
-      const validationErrors = validateDashboardJson(input);
+      const validationErrors = validateDashboardJson(t, input);
       if (validationErrors.length > 0) {
         validationErrors.forEach((error) => {
           dashboardErrorsToDisplay.value.push({

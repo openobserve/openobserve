@@ -36,6 +36,7 @@ const {
   mockServiceGetLocations,
   mockServiceGetAgentSetup,
   mockRouterPush,
+  mockRouteQuery,
 } = vi.hoisted(() => ({
   mockServiceList: vi.fn().mockResolvedValue({ data: { monitors: [] } }),
   mockServiceEnable: vi.fn().mockResolvedValue({}),
@@ -50,6 +51,8 @@ const {
     .mockResolvedValue({ data: { install: "curl ...", token: "abc123" } }),
   // router.push returns a Promise in vue-router; callers here chain .catch() on it.
   mockRouterPush: vi.fn().mockResolvedValue(undefined),
+  // Mutable so a test can drive `?section=private` without remounting the mock.
+  mockRouteQuery: {} as Record<string, string>,
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────
@@ -60,7 +63,7 @@ vi.mock("vue-i18n", () => ({
 vi.mock("vue-router", () => ({
   useRoute: () => ({
     params: {},
-    query: {},
+    query: mockRouteQuery,
   }),
   useRouter: () => ({
     push: mockRouterPush,
@@ -235,12 +238,22 @@ function mountPage() {
   });
 }
 
+/** Renders the page as an OSS build sees it: no private locations. */
+function mountPageWithoutPrivateLocations() {
+  store.state.zoConfig.synthetics_private_locations_enabled = false;
+  return mountPage();
+}
+
 describe("SyntheticMonitoring", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockServiceList.mockResolvedValue({ data: { monitors: [] } });
+    // Both are process-global and mutated by individual tests, so they are
+    // restored here rather than left for the next test to inherit.
+    for (const k of Object.keys(mockRouteQuery)) delete mockRouteQuery[k];
+    store.state.zoConfig.synthetics_private_locations_enabled = true;
   });
 
   afterEach(() => {
@@ -355,6 +368,23 @@ describe("SyntheticMonitoring", () => {
 
       const tabElements = wrapper.findAll('[data-test="synthetic-monitoring-header-tab"]');
       expect(tabElements).toHaveLength(2);
+    });
+
+    it("hides the Private Locations tab when private locations are unavailable", () => {
+      // Private locations are served by agents deployed inside the customer's
+      // network, which is the one enterprise part of synthetics. An OSS build
+      // must not offer a tab whose contents it cannot serve.
+      wrapper = mountPageWithoutPrivateLocations();
+      const tabElements = wrapper.findAll('[data-test="synthetic-monitoring-header-tab"]');
+      expect(tabElements).toHaveLength(1);
+    });
+
+    it("falls back to Checks when ?section=private but private locations are unavailable", () => {
+      // Otherwise a deep link from an enterprise deployment lands on a tab that
+      // is not rendered, and the page looks empty rather than unavailable.
+      mockRouteQuery.section = "private";
+      wrapper = mountPageWithoutPrivateLocations();
+      expect((wrapper.vm as any).activeSection).toBe("checks");
     });
 
     it("defaults activeSection to 'checks'", () => {

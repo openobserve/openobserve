@@ -35,11 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 w-full flex-1 flex-col">
       <div class="min-h-0 w-full flex-1 px-2.5 pt-1 pb-2.5">
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <div
           class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
-          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 1024px">
+          <!-- eslint-enable local/no-hardcoded-px -->
+          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 64rem">
             <div class="create-report-form">
               <div data-test="add-action-script-name-input-wrapper" class="report-name-input pt-3">
                 <OFormInput
@@ -49,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   required
                   class="showLabelOnTop"
                   tabindex="0"
-                  style="width: 400px"
+                  style="width: 25rem"
                   :help-text="t('actions.nameInvalidChars')"
                 />
               </div>
@@ -59,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('reports.description')"
                   class="showLabelOnTop"
                   tabindex="0"
-                  style="width: 800px"
+                  style="width: 50rem"
                 />
               </div>
 
@@ -180,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="add-action-script-cron-input"
                           class="mr-2 pt-2"
-                          style="width: 320px"
+                          style="width: 20rem"
                         >
                           <div
                             class="text-text-secondary mb-1 font-bold"
@@ -227,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :loading="isFetchingServiceAccounts"
                             class="showLabelOnTop no-case mb-[2.4rem]"
                             disabled
-                            style="min-width: 250px !important; width: 250px !important"
+                            style="min-width: 15.625rem !important; width: 15.625rem !important"
                           />
                         </div>
                       </div>
@@ -285,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="no-case py-2"
                         labelKey="label"
                         valueKey="value"
-                        style="min-width: 250px !important; width: 250px !important"
+                        style="min-width: 15.625rem !important; width: 15.625rem !important"
                       />
                     </div>
                   </div>
@@ -495,8 +497,10 @@ const actionTypes = [
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is just the empty placeholder; both fields are set from t() before the
+  // dialog is shown, so they carry the I18nText brand for ConfirmDialog's props.
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
 
@@ -543,14 +547,14 @@ const frequency = ref({
  */
 const getCronError = (cron: string): string => {
   const value = String(cron ?? "").trim();
-  if (!value) return "Invalid cron expression!";
+  if (!value) return t("actionScripts.invalidCronExpression");
   try {
     // cron-parser v5 dropped the `utc` option; parse validity is tz-independent here.
     CronExpressionParser.parse(value, {
       currentDate: new Date(),
     });
   } catch {
-    return "Invalid cron expression!";
+    return t("actionScripts.invalidCronExpression");
   }
   try {
     const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
@@ -559,10 +563,10 @@ const getCronError = (cron: string): string => {
       !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
     ) {
       const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-      return `Frequency should be greater than ${minInterval - 1} seconds.`;
+      return t("pipeline.frequencyGreaterThanSeconds", { seconds: minInterval - 1 });
     }
   } catch {
-    return "Invalid cron expression!";
+    return t("actionScripts.invalidCronExpression");
   }
   return "";
 };
@@ -588,18 +592,16 @@ const editScriptSchema = makeEditScriptSchema({
 // Dynamic (edit-prefill) defaults: projects the form-owned fields out of the
 // component's `formData` / `frequency`. Seeds useOForm at create; re-applied
 // via form.reset() when an edited record arrives async (see below).
-const editScriptDefaults = computed(
-  (): EditScriptForm => ({
-    name: formData.value.name ?? "",
-    description: formData.value.description ?? "",
-    type: formData.value.type ?? "scheduled",
-    service_account: formData.value.service_account ?? "",
-    timezone: formData.value.timezone ?? "UTC",
-    codeZip: (formData.value.codeZip as File | null) ?? null,
-    cron: frequency.value.cron ?? "",
-    frequencyType: frequency.value.type ?? "once",
-  }),
-);
+const editScriptDefaults = computed((): EditScriptForm => ({
+  name: formData.value.name ?? "",
+  description: formData.value.description ?? "",
+  type: formData.value.type ?? "scheduled",
+  service_account: formData.value.service_account ?? "",
+  timezone: formData.value.timezone ?? "UTC",
+  codeZip: (formData.value.codeZip as File | null) ?? null,
+  cron: frequency.value.cron ?? "",
+  frequencyType: frequency.value.type ?? "once",
+}));
 
 // Headless form (Rule ③ owner). defaultValues seed the blank create form; the
 // async edit record re-seeds via form.reset() below. onSubmit is deferred to
@@ -749,7 +751,7 @@ let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+const browserTime = raw("Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")");
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
@@ -849,7 +851,11 @@ const saveActionScript = async (value: EditScriptForm) => {
           variant: "error",
           message:
             error?.response?.data?.message ||
-            `Error while ${isEditingActionScript.value ? "updating" : "saving"} Action.`,
+            t(
+              isEditingActionScript.value
+                ? "toastMessages.actionScripts.errorWhileUpdating"
+                : "toastMessages.actionScripts.errorWhileSaving",
+            ),
         });
       }
     })
@@ -913,8 +919,8 @@ const openCancelDialog = () => {
     return;
   }
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel Action changes?";
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("actionScripts.cancelActionChangesConfirm");
   dialog.value.okCallback = goToActionScripts;
 };
 const editFileToUpload = () => {
@@ -968,7 +974,7 @@ const handleActionScript = async () => {
         if (err.response.status != 403) {
           toast({
             variant: "error",
-            message: err?.data?.message || "Error while fetching Action!",
+            message: err?.data?.message || t("actionScripts.fetchActionError"),
           });
         }
       })
@@ -995,7 +1001,7 @@ const getServiceAccounts = async () => {
     if (err.response?.status != 403) {
       toast({
         variant: "error",
-        message: err.response?.data?.message || "Error while fetching service accounts.",
+        message: err.response?.data?.message || t("actionScripts.fetchServiceAccountsError"),
       });
     }
   } finally {

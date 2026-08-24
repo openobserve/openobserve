@@ -18,7 +18,7 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="flex h-full w-full flex-col" style="min-width: 380px">
+      <div class="flex h-full w-full min-w-[23.75rem] flex-col">
         <div
           v-if="errors.length"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -50,7 +50,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-name-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1 w-80">
                     <OInput
                       :data-test="`scorer-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-name-conflict-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1 w-80">
                     <OInput
                       :data-test="`scorer-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -82,7 +82,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-type-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1 w-80">
                     <OSelect
                       :data-test="`scorer-import-type-select-${err.itemIndex}`"
                       v-model="typeFixers[err.itemIndex]"
@@ -99,7 +99,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-score-config-ref-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1 w-80">
                     <OSelect
                       :data-test="`scorer-import-score-config-select-${err.itemIndex}`"
                       v-model="scoreConfigFixers[err.itemIndex]"
@@ -116,7 +116,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-provider-ref-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1" style="width: 320px">
+                  <div class="mt-1 w-80">
                     <OSelect
                       :data-test="`scorer-import-provider-select-${err.itemIndex}`"
                       v-model="providerFixers[err.itemIndex]"
@@ -235,9 +235,13 @@ const providerOptions = computed(() =>
 );
 
 const editorHeights = computed(() => ({
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
   urlEditor: "calc(100vh - 266px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
   fileEditor: "calc(100vh - 296px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
   outputContainer: "calc(100vh - 130px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
   errorReport: "calc(100vh - 192px)",
 }));
 
@@ -248,7 +252,7 @@ function goBack() {
 }
 
 function resetBaseImportFlag() {
-  if (baseImportRef.value) baseImportRef.value.isImporting = false;
+  if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
 }
 
 function syncEditor(items: any[]) {
@@ -323,11 +327,11 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     rawItems = jsonArray;
   } else {
     try {
-      if (!jsonStr || !jsonStr.trim()) throw new Error("JSON is empty");
+      if (!jsonStr || !jsonStr.trim()) throw new Error(t("onlineEvals.jsonIsEmpty"));
       const parsed = JSON.parse(jsonStr);
       rawItems = Array.isArray(parsed) ? parsed : [parsed];
     } catch (e: any) {
-      toast({ message: e.message || "Invalid JSON format", variant: "error" });
+      toast({ message: e.message || t("onlineEvals.invalidJsonFormat"), variant: "error" });
       resetBaseImportFlag();
       return;
     }
@@ -384,7 +388,7 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
           if (err?.response?.status === 409) {
             return { status: "exists" as const, name: payload.name };
           }
-          const msg = err?.response?.data?.message || err?.message || "Unknown error";
+          const msg = err?.response?.data?.message || err?.message || t("onlineEvals.unknownError");
           return { status: "error" as const, name: payload.name, message: msg };
         },
       ),
@@ -400,19 +404,19 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
       creators.value.push({
         name: v.name,
         status: "success",
-        message: `"${v.name}" created successfully`,
+        message: t("onlineEvals.import.createdSuccessfully", { name: v.name }),
       });
     } else if (v.status === "exists") {
       creators.value.push({
         name: v.name,
         status: "exists",
-        message: `"${v.name}" already exists — skipped`,
+        message: t("onlineEvals.import.alreadyExistsSkipped", { name: v.name }),
       });
     } else {
       creators.value.push({
         name: v.name,
         status: "error",
-        message: `"${v.name}" failed: ${v.message}`,
+        message: t("onlineEvals.import.failedWithReason", { name: v.name, reason: v.message }),
       });
     }
   }

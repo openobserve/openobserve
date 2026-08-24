@@ -28,6 +28,7 @@ pub mod nats;
 pub mod postgres;
 pub mod sqlite;
 pub mod tantivy_index;
+pub mod trace_time_index;
 
 pub static NEED_WATCH: bool = true;
 pub static NO_NEED_WATCH: bool = false;
@@ -49,8 +50,10 @@ pub async fn connect_to_orm() -> DatabaseConnection {
             SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
         }
         _ => {
-            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+            // clone the pool handle directly, NOT through the CLIENT_RW mutex:
+            // callers may lazily initialize ORM_CLIENT while already holding
+            // `table::get_lock()`, and locking here again would self-deadlock
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW_POOL.clone())
         }
     }
 }
@@ -63,8 +66,7 @@ pub async fn connect_to_orm_ddl() -> DatabaseConnection {
         }
         _ => {
             // for sqlite, there is no separate ddl client, use the common one
-            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW_POOL.clone())
         }
     }
 }
@@ -180,6 +182,18 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
+
+    /// Like `get`, but returns `None` when `key` is missing. Prefer it for
+    /// exact-key lookups expected to miss: `get` falls back to a prefix scan,
+    /// which on NATS costs a full bucket listing per miss.
+    async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
+        match self.get(key).await {
+            Ok(v) => Ok(Some(v)),
+            Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     async fn put(
         &self,
         key: &str,
@@ -438,5 +452,17 @@ mod tests {
         db.put("/foo/del/bar3", hello, false, None).await.unwrap();
         assert_eq!(db.list_keys("/foo/del/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/del/").await.unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn connect_to_orm_never_takes_the_sqlite_write_mutex() {
+        // Regression: a task may lazily initialize ORM_CLIENT while already
+        // holding table::get_lock() (the CLIENT_RW mutex). connect_to_orm must
+        // clone the pool handle without locking CLIENT_RW itself, or the first
+        // cold-start write from any entry point self-deadlocks forever.
+        let _guard = sqlite::CLIENT_RW.lock().await;
+        tokio::time::timeout(std::time::Duration::from_secs(5), connect_to_orm())
+            .await
+            .expect("connect_to_orm deadlocked on the held CLIENT_RW mutex");
     }
 }

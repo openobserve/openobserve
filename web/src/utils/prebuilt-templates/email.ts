@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { gt } from "@/types/i18n";
 import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
@@ -20,6 +21,7 @@ import { PrebuiltConfig, PrebuiltType } from "./types";
  */
 export const emailTemplate = {
   name: "prebuilt_email",
+  /* eslint-disable local/no-hardcoded-px -- standalone HTML email document: rem resolves against the recipient's mail client, and every px sits on an interior line of this template literal, which cannot host a comment */
   body: `<!DOCTYPE html>
 <html>
 <head>
@@ -93,6 +95,7 @@ export const emailTemplate = {
     </div>
 </body>
 </html>`,
+  /* eslint-enable local/no-hardcoded-px */
   type: "email" as const,
   title: "OpenObserve Alert Notification",
   isDefault: false,
@@ -147,7 +150,11 @@ import emailLogo from "@/assets/images/alerts/destinations/email.png";
 
 export const emailDestinationType: PrebuiltType = {
   id: "email",
-  name: "Email",
+  // Lazy: this object is module scope, so a resolved string would freeze at the
+  // boot locale. The getter runs when the destination picker renders.
+  get name() {
+    return gt("alerts.email");
+  },
   descriptionKey: "alert_destinations.prebuilt.emailDescription",
   icon: "email",
   image: emailLogo,

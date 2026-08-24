@@ -16,8 +16,8 @@
 use std::{collections::HashMap, sync::LazyLock as Lazy};
 
 use prometheus::{
-    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts,
-    Registry, TextEncoder,
+    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts, Registry, TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -199,6 +199,79 @@ pub static SYNTHETICS_OLDEST_PENDING_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &["location", "pool"],
+    )
+    .expect("Metric created")
+});
+
+/// Enabled checks no scheduler has claimed within several of their own
+/// intervals, per org.
+///
+/// The queue gauges above only see work that was *created*; an orphaned check
+/// never reaches the queue, so it is invisible from that side by construction.
+pub static SYNTHETICS_ORPHANED_CHECKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "synthetics_orphaned_checks",
+            "Number of enabled synthetics checks no scheduler has claimed.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// Completed orphan-detection passes. A dead-man's switch, not a workload count.
+///
+/// The detector runs only on scheduler nodes and reads only its own region's
+/// database, so it shares fate with the thing it watches: a region whose
+/// scheduler never started has no detector either, and every check in it is
+/// orphaned with nothing left to say so. No stream record can report that —
+/// the absence of records is indistinguishable from "nothing was wrong".
+///
+/// A counter that stops advancing is the one signal that survives, because it
+/// is scraped from outside the region. Alert on
+/// `rate(zo_synthetics_orphan_scans_total[15m]) == 0`. That is why this is
+/// incremented on EVERY completed pass, including passes that find zero
+/// orphans: a detector that reports nothing and a detector that is gone must
+/// not look the same.
+pub static SYNTHETICS_ORPHAN_SCANS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_orphan_scans_total",
+            "Completed synthetics orphan-detection passes.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+/// Check rows this node read and could not parse, and therefore skipped.
+///
+/// Skipping is the right call — one unreadable row must not stop the scheduler
+/// or the list API for everything else — but it has to be visible, or a check
+/// silently stops running. Every skip also logs with the row's id; this counter
+/// is the part an alert can watch.
+///
+/// Deliberately unlabelled. The one question worth alerting on is "is this node
+/// dropping rows at all", the log line answers "which", and a per-org label
+/// would put an attacker- or migration-controlled string into the cardinality
+/// of a metric that should normally sit at zero.
+///
+/// Orphan detection covers only part of this: it runs on scheduler nodes only,
+/// so a row skipped on the list path in a non-scheduler region has nothing else
+/// to report it.
+pub static SYNTHETICS_UNREADABLE_CHECKS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_unreadable_checks_total",
+            "Synthetics check rows skipped because they could not be parsed.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
     )
     .expect("Metric created")
 });
@@ -1143,6 +1216,46 @@ pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static TRACE_TIME_INDEX_OPERATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "trace_time_index_operations_total",
+            "Trace time index operations by outcome",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "operation", "status"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_QUERY_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "trace_time_index_query_duration_seconds",
+            "Trace time index query duration in seconds by lookup-key kind",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "kind", "status"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_QUERY_ROUNDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "trace_time_index_query_rounds",
+            "Trace time index query rounds by lookup-key kind and phase",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0, 34.0]),
+        &["organization", "kind", "phase"],
+    )
+    .expect("Metric created")
+});
+
 // This corresponds to pgsql queries, not sqlite as that is local and can be ignored
 pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -1269,6 +1382,32 @@ pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["type"],
+    )
+    .expect("Metric created")
+});
+
+// promql series label cache metrics
+pub static QUERY_METRICS_LABEL_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_metrics_label_cache_hit_count",
+            "promql series label cache hit count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_METRICS_LABEL_CACHE_MISS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_metrics_label_cache_miss_count",
+            "promql series label cache miss count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
     )
     .expect("Metric created")
 });
@@ -2115,6 +2254,15 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(SYNTHETICS_ORPHANED_CHECKS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_ORPHAN_SCANS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(INGEST_PACK_FILES.clone()))
         .expect("Metric registered");
     registry
@@ -2224,7 +2372,15 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(QUERY_CANCELED_NUMS.clone()))
         .expect("Metric registered");
-
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_OPERATIONS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_QUERY_DURATION.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_QUERY_ROUNDS.clone()))
+        .expect("Metric registered");
     // compactor stats
     registry
         .register(Box::new(COMPACT_USED_TIME.clone()))
@@ -2400,6 +2556,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_CONSISTENT_HASH.clone()))
+        .expect("Metric registered");
+
+    // promql series label cache metrics
+    registry
+        .register(Box::new(QUERY_METRICS_LABEL_CACHE_HIT_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_METRICS_LABEL_CACHE_MISS_COUNT.clone()))
         .expect("Metric registered");
 
     // query disk cache metrics
@@ -2721,6 +2885,9 @@ mod tests {
         let _ = INGEST_PARQUET_FILES.clone();
         let _ = SYNTHETICS_PENDING_JOBS.clone();
         let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
+        let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
+        let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
+        let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
         let _ = INGEST_PACK_FILES.clone();
         let _ = INGEST_PACK_SEGMENTS.clone();
         let _ = INGEST_WAL_WRITE_BYTES.clone();

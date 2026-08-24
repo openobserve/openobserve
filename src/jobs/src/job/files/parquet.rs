@@ -49,9 +49,10 @@ use ingester::WAL_PARQUET_METADATA;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
-    merge::{self, MergeParquetResult},
+    merge::{self, MergeMode, MergeOutput},
+    sort_order::FileSortOrder,
 };
-use tantivy_utils::index_builder::create_tantivy_index;
+use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
 use tokio::{
     fs::remove_file,
     sync::{Mutex, RwLock},
@@ -778,19 +779,19 @@ async fn merge_files(
         target_partitions: 0,
     };
     let tables = TableBuilder::new()
-        .sorted_by_time(true)
+        .sort_order(FileSortOrder::TimestampDesc)
         .build(session, new_file_list, schema.clone())
         .await?;
 
     let start = std::time::Instant::now();
+    let mode = MergeMode::for_ingester(stream_type, &stream_name, &schema);
     let merge_result = merge::merge_parquet_files(
-        stream_type,
-        &stream_name,
         schema,
         tables,
         &bloom_filter_fields,
         new_file_meta,
-        true,
+        &mode,
+        MergeOutput::for_ingester(stream_type),
     )
     .await;
 
@@ -807,30 +808,23 @@ async fn merge_files(
         }
     };
 
-    let (buf, mut new_file_meta, file_format) = match buf {
-        MergeParquetResult::Single {
-            buf,
-            file_meta,
-            file_format,
-        } => (buf, file_meta, file_format),
-        MergeParquetResult::Multiple { .. } => {
-            // ingester should not support multiple files, it will be handled in compactor mode
-            panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
-        }
-    };
+    // the ingester always merges into exactly one file
+    let (merged_file, file_format) = buf.into_single()?;
+
+    let new_file_key = merged_file.mark_file_key(&super::generate_ingester_storage_file_key(
+        &org_id,
+        stream_type,
+        &stream_name,
+        &file_name,
+        file_format,
+    ));
+    let (data, mut new_file_meta) = merged_file.into_buffered()?;
 
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-    let new_file_key = super::generate_ingester_storage_file_key(
-        &org_id,
-        stream_type,
-        &stream_name,
-        &file_name,
-        file_format,
-    );
     log::info!(
         "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
@@ -840,7 +834,7 @@ async fn merge_files(
     );
 
     // upload file
-    let buf = Bytes::from(buf);
+    let buf = Bytes::from(data);
     if cfg.cache_latest_files.enabled
         && cfg.cache_latest_files.cache_parquet
         && cfg.cache_latest_files.download_from_node
@@ -886,9 +880,12 @@ async fn merge_files(
     }
 
     let index_size = create_tantivy_index(
-        "INGESTER",
-        &org_id,
-        &new_file_key,
+        TantivyIndexOptions {
+            caller: "INGESTER",
+            org_id: &org_id,
+            data_file_name: &new_file_key,
+            storage_tier: storage::StorageTier::Default,
+        },
         &full_text_search_fields,
         &index_fields,
         latest_schema.clone(), // Use stream schema to include all configured fields

@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          button lives inside <OForm> as type="submit", so Enter + click both
          submit natively (no form-id). -->
     <OForm id="add-ai-toolset-form" :form="form" v-slot="{ isSubmitting }">
+      <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div style="height: calc(100vh - 120px)" class="overflow-auto">
         <div class="mx-4 mt-4 max-w-2xl">
           <!-- Name -->
@@ -240,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   :name="`cli.credFiles[${idx}].key`"
                   :label="t('aiToolset.credEnvVar')"
-                  :helpText="raw('e.g. KUBECONFIG')"
+                  :helpText="t('aiToolset.credEnvVarHint', { example: 'KUBECONFIG' })"
                   class="o2-input w-48"
                 />
                 <OButton
@@ -462,7 +463,9 @@ export default defineComponent({
       } catch (err: any) {
         const msg =
           err?.response?.data?.message ||
-          (isEditing.value ? t("aiToolset.updateFailed") : t("aiToolset.createFailed"));
+          (isEditing.value
+            ? t("aiToolset.updateFailed", { product: raw("AI Toolset") })
+            : t("aiToolset.createFailed", { product: raw("AI Toolset") }));
         toast({ variant: "error", message: msg });
       }
     };

@@ -1,5 +1,5 @@
 /** Semantic color state derived from the data value */
-export type ProgressBarVariant = "default" | "warning" | "danger";
+export type ProgressBarVariant = "default" | "success" | "warning" | "danger";
 
 /** Height of the progress track */
 export type ProgressBarSize = "xs" | "sm" | "md" | "lg";

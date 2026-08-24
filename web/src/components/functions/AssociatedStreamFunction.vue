@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #expansion>
-        <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 60px">
+        <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 3.75rem">
           <OInnerLoading
             :showing="loadingFunctions"
             :label="t('logStream.fetchingFunctions')"
@@ -442,7 +442,9 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message: raw(JSON.stringify(err.response.data["error"]) || "Function fetching failed"),
+            message:
+              raw(JSON.stringify(err.response.data["error"])) ||
+              t("functions.functionFetchingFailed"),
           });
         });
     };
@@ -491,7 +493,9 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message: raw(JSON.stringify(err.response.data["error"]) || "Function creation failed"),
+            message:
+              raw(JSON.stringify(err.response.data["error"])) ||
+              t("functions.functionCreationFailed"),
           });
         })
         .finally(() => {

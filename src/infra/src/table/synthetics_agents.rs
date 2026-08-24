@@ -159,6 +159,7 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
 /// lease, which is exactly the rate of the reads the cache serves. Callers that
 /// need a current `last_seen_at` use [`get`], not [`get_cached`].
 pub async fn touch(agent_id: &str, now_us: i64) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::update_many()
         .col_expr(Column::LastSeenAt, Expr::value(now_us))

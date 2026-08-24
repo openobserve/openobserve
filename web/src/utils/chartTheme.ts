@@ -59,6 +59,8 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-series-10": "#4ade80",
   "--color-chart-series-11": "#e879f9",
   "--color-chart-series-12": "#facc15",
+  // Mark-line drop shadow (light value) — dark override lives in dark.css.
+  "--color-chart-markline-shadow": "rgba(255, 255, 255, 0.7)",
   // Dashboard table row-highlight palette (light values) + grid line.
   "--color-chart-table-1": "#FFCDEE",
   "--color-chart-table-2": "#FFD2D3",
@@ -123,9 +125,13 @@ const FALLBACKS: Record<string, string> = {
   "--color-trace-span-35": "#3B82F6",
   // Metric-panel text default (contrast fallback when a panel has no background).
   "--color-chart-metric-text": "#000000",
+  // Brand accent (--color-primary-600), light value — metric sparkline default color.
+  "--color-accent": "#3f7994",
   // Alert threshold marklines (light values from semantic.css / base.css).
   "--color-status-error-text": "#cc3645",
   "--color-status-warning-text": "#e56d17",
+  // Error series in canvas charts (light value from base.css).
+  "--color-severity-error-color": "#ef5350",
 };
 
 /**

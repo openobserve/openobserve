@@ -16,12 +16,7 @@ import { computed, ref } from "vue";
 
 // Canonical keys for every pinnable item in the logs More menu.
 export type ToolbarPinKey =
-  | "histogram"
-  | "sqlMode"
-  | "quickMode"
-  | "functionEditor"
-  | "savedViews"
-  | "syntaxGuide";
+  "histogram" | "sqlMode" | "quickMode" | "functionEditor" | "savedViews" | "syntaxGuide";
 
 // Fixed left-to-right render order for pinned controls. Pinning never changes an
 // item's position — it only toggles whether the item is shown outside the menu.

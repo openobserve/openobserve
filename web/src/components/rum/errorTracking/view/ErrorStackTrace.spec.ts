@@ -216,14 +216,12 @@ describe("ErrorStackTrace Component", () => {
 
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
-    const firstStyle = stackLines[0].attributes("style");
-    expect(firstStyle).toContain("border-top: 1px solid var(--color-border-default)");
+    // The top border is a `border-t` utility (the colour comes from the
+    // element's own `border-border-default`); only the first line carries it.
+    expect(stackLines[0].classes()).toContain("border-t");
 
     for (let i = 1; i < stackLines.length; i++) {
-      const style = stackLines[i].attributes("style");
-      if (style) {
-        expect(style).not.toContain("border-top: 1px solid var(--color-border-default)");
-      }
+      expect(stackLines[i].classes()).not.toContain("border-t");
     }
   });
 
@@ -233,7 +231,7 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const style = stackLines[0].attributes("style");
-    expect(style).toContain("border-radius: 4px 4px 0 0");
+    expect(style).toContain("border-radius: 0.25rem 0.25rem 0 0");
   });
 
   it("applies bottom-rounded border radius to the last stack line", () => {
@@ -242,7 +240,7 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const lastStyle = stackLines[stackLines.length - 1].attributes("style");
-    expect(lastStyle).toContain("border-radius: 0 0 4px 4px");
+    expect(lastStyle).toContain("border-radius: 0 0 0.25rem 0.25rem");
   });
 
   it("applies both border-radius values when there is only one stack line", async () => {
@@ -254,9 +252,9 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(stackLines).toHaveLength(1);
+    expect(stackLines[0].classes()).toContain("border-t");
     const style = stackLines[0].attributes("style");
-    expect(style).toContain("border-top: 1px solid var(--color-border-default)");
-    expect(style).toContain("border-radius: 0 0 4px 4px");
+    expect(style).toContain("border-radius: 0 0 0.25rem 0.25rem");
   });
 
   it("does not apply rounded border radius to middle stack lines", () => {
@@ -268,8 +266,8 @@ describe("ErrorStackTrace Component", () => {
       for (let i = 1; i < stackLines.length - 1; i++) {
         const style = stackLines[i].attributes("style");
         if (style) {
-          expect(style).not.toContain("border-radius: 4px 4px 0 0");
-          expect(style).not.toContain("border-radius: 0 0 4px 4px");
+          expect(style).not.toContain("border-radius: 0.25rem 0.25rem 0 0");
+          expect(style).not.toContain("border-radius: 0 0 0.25rem 0.25rem");
         }
       }
     }

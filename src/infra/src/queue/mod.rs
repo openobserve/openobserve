@@ -105,7 +105,11 @@ pub async fn get_super_cluster() -> &'static Box<dyn Queue> {
 }
 
 pub async fn init() -> Result<()> {
-    nats::init().await
+    match QueueStore::try_from(config::get_config().common.queue_store.as_str()) {
+        Ok(QueueStore::Nats) => nats::init().await,
+        Ok(QueueStore::Memory) => memory::init().await,
+        Err(e) => Err(Error::Message(e)),
+    }
 }
 
 async fn default() -> Box<dyn Queue> {

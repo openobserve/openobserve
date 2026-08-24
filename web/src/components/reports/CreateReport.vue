@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="create-report-page flex min-h-0 w-full flex-1 flex-col"
     >
       <div class="bg-card-glass-bg flex min-h-0 flex-1 overflow-auto">
-        <div ref="addAlertFormRef" class="my-3 px-4" style="width: 1024px">
+        <div ref="addAlertFormRef" class="my-3 px-4" style="width: 64rem">
           <OForm :id="formId" :form="form" class="create-report-form">
             <div class="flex items-start gap-4 px-2 pt-3">
               <div data-test="add-report-name-input" class="o2-input">
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="input-border"
                 class="showLabelOnTop"
                 tabindex="0"
-                style="width: 600px"
+                style="width: 37.5rem"
               />
             </div>
 
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingFolders"
                           @update:model-value="(v: any) => onFolderSelection(v, index)"
-                          style="min-width: 250px !important; width: 100% !important"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                       <div
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
                           @update:model-value="(v: any) => onDashboardSelection(v, index)"
-                          style="min-width: 250px !important; width: 100% !important"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                       <div
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('reports.dashboardTab')"
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
-                          style="min-width: 250px !important; width: 100% !important"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                     </div>
@@ -187,14 +187,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OFormSelect
                             :name="`dashboards[${index}].report_type`"
                             :options="[
-                              { label: raw('PDF (default)'), value: 'pdf' },
-                              { label: raw('PNG (Image)'), value: 'png' },
-                              { label: raw('CSV (Data)'), value: 'csv' },
+                              {
+                                label: t('reports.reportTypePdf', { format: raw('PDF') }),
+                                value: 'pdf',
+                              },
+                              {
+                                label: t('reports.reportTypePng', { format: raw('PNG') }),
+                                value: 'png',
+                              },
+                              {
+                                label: t('reports.reportTypeCsv', { format: raw('CSV') }),
+                                value: 'csv',
+                              },
                             ]"
                             :label="t('reports.reportType')"
                             color="input-border"
                             class="showLabelOnTop"
-                            style="min-width: 180px"
+                            style="min-width: 11.25rem"
                           />
                         </div>
 
@@ -209,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="attachmentTypeOptions(dashboard.report_type)"
                             :label="t('reports.attachmentType')"
                             class="showLabelOnTop"
-                            style="min-width: 200px"
+                            style="min-width: 12.5rem"
                           />
                         </div>
                       </div>
@@ -256,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :label="t('reports.dimensionWidth')"
                               color="input-border"
                               class="showLabelOnTop"
-                              style="min-width: 120px"
+                              style="min-width: 7.5rem"
                               :placeholder="t('reports.widthPlaceholder')"
                               data-test="add-report-dimension-width"
                             />
@@ -269,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :label="t('reports.dimensionHeight')"
                               color="input-border"
                               class="showLabelOnTop"
-                              style="min-width: 120px"
+                              style="min-width: 7.5rem"
                               :placeholder="t('reports.heightPlaceholder')"
                               data-test="add-report-dimension-height"
                             />
@@ -340,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input mr-2 pt-0"
-                        style="width: 320px"
+                        style="width: 20rem"
                       >
                         <div class="text-text-secondary mb-1 font-bold">
                           {{ t("reports.cronExpression") + " *" }}
@@ -367,11 +376,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           data-test="add-report-schedule-start-timezone-select"
                           name="timezone"
-                          :options="timezoneOptions"
+                          :options="timezoneSelectOptions"
                           :label="t('logStream.timezone')"
                           required
                           class="timezone-select showLabelOnTop"
-                          style="width: 300px"
+                          style="width: 18.75rem"
                         />
                       </div>
                     </div>
@@ -406,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input mr-2 pt-0"
-                        style="width: 160px"
+                        style="width: 10rem"
                       >
                         <OFormInput
                           name="customInterval"
@@ -421,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="add-report-schedule-custom-frequency-select"
                         class="o2-input pt-0"
-                        style="width: 160px"
+                        style="width: 10rem"
                       >
                         <OFormSelect
                           name="customPeriod"
@@ -462,11 +471,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           data-test="add-report-schedule-start-timezone-select"
                           name="timezone"
-                          :options="timezoneOptions"
+                          :options="timezoneSelectOptions"
                           :label="t('logStream.timezone')"
                           required
                           class="timezone-select showLabelOnTop"
-                          style="width: 300px"
+                          style="width: 18.75rem"
                         />
                       </div>
                     </div>
@@ -514,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('reports.title')"
                       required
                       tabindex="0"
-                      style="width: 400px"
+                      style="width: 25rem"
                     />
                   </div>
 
@@ -555,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-report-image-preview-toggle"
                     />
                     <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
-                      <OTooltip max-width="320px">
+                      <OTooltip max-width="20rem">
                         <template #content>{{ t("reports.imagePreviewHint") }}</template>
                       </OTooltip>
                     </OIcon>
@@ -652,7 +661,7 @@ import {
   type CreateReportForm,
 } from "./CreateReport.schema";
 
-const props = defineProps({
+defineProps({
   report: {
     type: Object,
     default: null,
@@ -745,8 +754,9 @@ const { track } = useReo();
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
 
@@ -780,8 +790,6 @@ const dashboardRows = form.useStore((s: any): any[] => s.values?.dashboards ?? [
 
 // `variables` are now form-owned (VariablesInput renders in form mode,
 // name-prefix="variables"); read from the form value at save.
-
-const filteredTimezone: any = ref([]);
 
 const folderOptions: Ref<{ label: I18nText; value: string }[]> = ref([]);
 
@@ -864,7 +872,7 @@ onBeforeMount(async () => {
         if (err?.response?.status != 403) {
           toast({
             variant: "error",
-            message: err?.response?.data?.message || "Error while fetching report!",
+            message: err?.response?.data?.message || t("reports.fetchReportError"),
           });
         }
       })
@@ -1072,7 +1080,7 @@ const setDashboardOptions = (id: string) => {
 
         resolve(true);
       })
-      .catch((err) => reject(true))
+      .catch((_err) => reject(true))
       .finally(() => (isFetchingDashboard.value = false));
   });
 };
@@ -1124,35 +1132,30 @@ const customFrequencyOptions = computed(() => [
 const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
 
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter((column: any) => column.toLowerCase().indexOf(value) > -1);
-  });
-  return filteredOptions;
-};
-
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+// Not translated on purpose: utils/timezone.ts resolveBrowserTimezone() parses
+// this exact "Browser Time (<zone>)" shape back to an IANA zone before saving, and
+// existing records hold it verbatim. The LABEL is translated in timezoneSelectOptions.
+const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const browserTime = raw("Browser Time (" + browserTz + ")");
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
+
+// The browser-time entry keeps its English VALUE (resolveBrowserTimezone parses that
+// exact shape and stored reports hold it) but renders translated copy.
+const timezoneSelectOptions = computed(() =>
+  timezoneOptions.map((tz: string) =>
+    tz === browserTime
+      ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+      : { label: raw(tz), value: tz },
+  ),
+);
 
 const getDashboaordFolders = () => {
   return new Promise((resolve, reject) => {
@@ -1169,7 +1172,7 @@ const getDashboaordFolders = () => {
         });
         resolve(true);
       })
-      .catch((err) => reject(true))
+      .catch((_err) => reject(true))
       .finally(() => {
         isFetchingFolders.value = false;
       });
@@ -1337,7 +1340,11 @@ const saveReport = async (value: CreateReportForm) => {
           variant: "error",
           message:
             error?.response?.data?.message ||
-            `Error while ${isEditingReport.value ? "updating" : "saving"} report.`,
+            t(
+              isEditingReport.value
+                ? "toastMessages.reports.errorWhileUpdating"
+                : "toastMessages.reports.errorWhileSaving",
+            ),
         });
       }
     })
@@ -1354,37 +1361,6 @@ const goToReports = () => {
       folder: selectedReportFolderId.value || "default",
     },
   });
-};
-
-const onFilterOptions = (type: string, val: String, update: Function) => {
-  if (type === "folders") {
-    folderOptions.value = filterOptions(options.value[type] || [], val, update);
-  }
-
-  if (type === "dashboards") {
-    dashboardOptions.value = filterOptions(options.value[type] || [], val, update);
-  }
-
-  if (type === "tabs") {
-    dashboardTabOptions.value = filterOptions(dashboardTabOptions.value, val, update);
-  }
-};
-
-const filterOptions = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter((option: any) => {
-      return option.label.toLowerCase().indexOf(value) > -1;
-    });
-  });
-
-  return filteredOptions;
 };
 
 const setupEditingReport = async (report: any) => {
@@ -1529,8 +1505,8 @@ const openCancelDialog = () => {
     return;
   }
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel report changes?";
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("reports.cancelReportChangesConfirm");
   dialog.value.okCallback = goToReports;
 };
 </script>

@@ -29,7 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
-        :separatorStyle="{ height: '10px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
+        :separatorStyle="{
+          height: '0.625rem',
+          marginTop: '-0.3125rem',
+          marginBottom: '-0.3125rem',
+          zIndex: '10',
+        }"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
@@ -71,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="logs-splitter-smooth h-full max-h-full w-full overflow-hidden"
               separatorClass="field-list-separator"
               :separatorStyle="{
-                width: '10px',
-                marginLeft: '-5px',
-                marginRight: '-5px',
+                width: '0.625rem',
+                marginLeft: '-0.3125rem',
+                marginRight: '-0.3125rem',
                 zIndex: '10',
               }"
               @update:model-value="onSplitterUpdate"
@@ -308,7 +313,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -547,7 +552,7 @@ export default defineComponent({
       useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
-    const { extractPatterns, patternsState } = usePatterns();
+    const { extractPatterns, patternsState } = usePatterns(t);
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1412,15 +1417,21 @@ export default defineComponent({
             return text ? ` Error: ${text}.` : "";
           })()
         : "";
+      // The prompt is model input, not screen copy — it stays English so the
+      // assistant reads the same wording regardless of the user's locale.
       const modeContext = sqlMode
-        ? `I am using SQL mode. Full query: ${queryContext || "(none)"}.`
-        : `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`;
+        ? raw(`I am using SQL mode. Full query: ${queryContext || "(none)"}.`)
+        : raw(
+            `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`,
+          );
       const outcome = errorContext
-        ? `The query produced an error.${errorContext}`
-        : `The query ran successfully but returned no results.`;
+        ? raw(`The query produced an error.${errorContext}`)
+        : raw(`The query ran successfully but returned no results.`);
       emit(
         "sendToAiChat",
-        `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+        raw(
+          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+        ),
         false,
       );
     };

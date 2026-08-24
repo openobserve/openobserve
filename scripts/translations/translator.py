@@ -38,7 +38,10 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from openai import OpenAI
+# `openai` is imported inside _get_client(), not here: the change-detection half of
+# this module (collect_pending_leaves, load_state, …) is pure file comparison, and
+# `main.py --check` runs it with no dependencies installed and no API key — which is
+# what lets the merge-queue gate be free.
 
 STATE_FILENAME = ".translation_state.json"
 
@@ -69,9 +72,23 @@ LANGUAGE_NAMES = {
     # Add them here together with RTL layout support and their web wiring.
 }
 
-# vue-i18n / printf style interpolation tokens that MUST survive translation
-# unchanged: {count}, {name}, {0}, %s, %d, @:linked.key
-_PLACEHOLDER = re.compile(r"{[^{}]*}|%[sd]|@:[\w.]+")
+# printf / linked-message tokens that MUST survive translation unchanged.
+# Brace tokens are handled by _scan_tokens, which a regex cannot do: `{'}'}` is a
+# single literal-escape token whose body contains the very character a regex like
+# `{[^{}]*}` stops at.
+_PRINTF = re.compile(r"%[sd]")
+# `@` always starts a linked message in vue-i18n — `@:key` or `@.modifier:key`.
+# A bare `@` (even inside a word, e.g. an email address) is a compile error; the
+# locale files spell it `{'@'}` for that reason.
+_LINKED = re.compile(r"@(?:\.[A-Za-z_$][A-Za-z0-9_$]*)?:[\w.]+")
+
+# A vue-i18n named placeholder is a JS-style identifier; a list placeholder is an
+# index. Anything else — most importantly a name the model helpfully translated,
+# `{标识符}` for `{identifier}` — is INVALID_TOKEN_IN_PLACEHOLDER, and vue-i18n
+# compiles messages just-in-time, so it *throws* at render time and blanks the
+# page that used the string.
+_NAMED = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*\Z")
+_LIST = re.compile(r"\d+\Z")
 
 _client = None
 # Batches are translated concurrently (see translate_pending), so the lazy client
@@ -121,6 +138,31 @@ def load_json(path, default=None):
     return {} if default is None else default
 
 
+def find_duplicate_keys(path):
+    """Return the key names duplicated within a single object in `path`.
+
+    json.load keeps the LAST of a duplicated pair, so a locale file carrying two
+    "announcements" blocks parses, validates and compares as up-to-date while the
+    earlier block is silently dead. Nothing this module writes can produce one —
+    it dumps Python dicts — but git can: line-merging two locale files that each
+    added the same block at a different offset keeps both and reports no conflict.
+    Only a pairs hook sees them, which is why this is checked rather than assumed.
+    """
+    found = []
+
+    def hook(pairs):
+        seen = set()
+        for key, _ in pairs:
+            if key in seen:
+                found.append(key)
+            seen.add(key)
+        return dict(pairs)
+
+    with open(path, "r", encoding="utf-8") as f:
+        json.load(f, object_pairs_hook=hook)
+    return sorted(set(found))
+
+
 def load_source():
     """Load the English source (en-US.json)."""
     return load_json(get_language_file_path(SOURCE_LOCALE), {})
@@ -154,22 +196,99 @@ def new_counters():
     return {"pending": 0, "kept": 0, "translated": 0, "failed": 0, "failed_paths": set()}
 
 
+def _scan_tokens(text):
+    """
+    Return (tokens, compilable) for one message.
+
+    `tokens` is the multiset of interpolation tokens vue-i18n would see —
+    placeholders (`{count}`, `{0}`), literal escapes (`{'{'}`, `{'@'}`), printf
+    tokens and linked-message references — normalised so that incidental
+    whitespace inside braces does not count as a difference.
+
+    `compilable` is False when the message is something vue-i18n's compiler would
+    reject outright: a placeholder whose name is not an identifier, an unclosed
+    or unbalanced brace, or an unterminated literal escape. Those are what turn a
+    translation into a thrown SyntaxError at render time instead of a wrong-looking
+    label, so they must never be written to a locale file.
+    """
+    tokens = []
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+
+        if ch == "%":
+            m = _PRINTF.match(text, i)
+            if m:
+                tokens.append(m.group(0))
+                i = m.end()
+                continue
+
+        if ch == "@":
+            m = _LINKED.match(text, i)
+            if not m:
+                return tokens, False  # bare @ — must be written {'@'}
+            tokens.append(m.group(0))
+            i = m.end()
+            continue
+
+        if ch == "}":
+            return tokens, False  # closing brace with nothing open
+
+        if ch != "{":
+            i += 1
+            continue
+
+        j = i + 1
+        while j < n and text[j].isspace():
+            j += 1
+
+        if j < n and text[j] == "'":
+            # Literal escape: {'{'}, {'}'}, {'@'}, {'|'}. The body is quoted, so
+            # scan to the closing quote rather than to the next brace.
+            end = text.find("'", j + 1)
+            if end == -1:
+                return tokens, False
+            k = end + 1
+            while k < n and text[k].isspace():
+                k += 1
+            if k >= n or text[k] != "}":
+                return tokens, False
+            tokens.append("{'" + text[j + 1 : end] + "'}")
+            i = k + 1
+            continue
+
+        end = text.find("}", j)
+        if end == -1:
+            return tokens, False
+        name = text[j:end].strip()
+        if not (_NAMED.match(name) or _LIST.match(name)):
+            return tokens, False
+        tokens.append("{" + name + "}")
+        i = end + 1
+
+    return tokens, True
+
+
 def _placeholders(text):
     """Multiset of interpolation tokens in a string (order-independent)."""
-    return sorted(_PLACEHOLDER.findall(text))
+    return sorted(_scan_tokens(text)[0])
 
 
 def _get_client():
     """Lazily construct the DeepSeek (OpenAI-compatible) client.
 
     Constructed on first use so that dry passes / imports don't require the API
-    key to be present (e.g. when only counting pending work). The client itself is
-    thread-safe and shared by every worker; only its construction is locked.
+    key — or the `openai` package — to be present (e.g. when only counting pending
+    work). The client itself is thread-safe and shared by every worker; only its
+    construction is locked.
     """
     global _client
     if _client is None:
         with _client_lock:
             if _client is None:
+                from openai import OpenAI
+
                 api_key = os.environ.get("DEEPSEEK_API_KEY")
                 if not api_key:
                     raise TranslationError(
@@ -436,13 +555,20 @@ def _validate(src, out):
     Return `out` if it safely preserves `src`'s structure, else None.
 
     Rejects a translation that is empty/whitespace-only (which would blank the
-    label), changes the interpolation-placeholder multiset ({count}, %s, @:key),
-    or changes the vue-i18n pluralization pipe count (`|`) — each silently breaks
-    runtime rendering.
+    label), that vue-i18n could not compile at all, that changes the
+    interpolation-token multiset ({count}, {'{'}, %s, @:key), or that changes the
+    vue-i18n pluralization pipe count (`|`).
+
+    The compilability check is the one that matters most: a translated placeholder
+    name or a mangled literal escape makes vue-i18n throw while rendering, which
+    blanks every component on the page rather than just spoiling one label.
     """
     if not isinstance(out, str) or not out.strip():
         return None
-    if _placeholders(src) != _placeholders(out):
+    out_tokens, compilable = _scan_tokens(out)
+    if not compilable:
+        return None
+    if _placeholders(src) != sorted(out_tokens):
         return None
     if src.count("|") != out.count("|"):
         return None

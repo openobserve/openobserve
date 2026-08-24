@@ -284,8 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <pre
                   class="m-0 font-[inherit] [overflow-wrap:break-word] [word-break:break-word] [white-space:pre-wrap] [word-wrap:break-word]"
-                  >{{ val.message }}</pre
-                >
+                  >{{ val.message }}</pre>
               </div>
             </div>
           </div>
@@ -509,7 +508,7 @@ export default defineComponent({
       );
     };
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       // Validate correction fields that are currently displayed
       let hasCorrectionErrors = false;
       destinationErrorsToDisplay.value.forEach((errorGroup, idx) => {
@@ -533,7 +532,7 @@ export default defineComponent({
         }
       });
       if (hasCorrectionErrors) {
-        if (baseImportRef.value) baseImportRef.value.isImporting = false;
+        if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
         return;
       }
 
@@ -554,7 +553,7 @@ export default defineComponent({
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
-          baseImportRef.value.isImporting = false;
+          baseImportRef.value.isImportingLocal = false;
         }
         return;
       }
@@ -589,7 +588,7 @@ export default defineComponent({
       isDestinationImporting.value = false;
 
       if (baseImportRef.value) {
-        baseImportRef.value.isImporting = false;
+        baseImportRef.value.isImportingLocal = false;
       }
     };
 

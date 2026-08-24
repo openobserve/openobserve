@@ -282,19 +282,4 @@ const getLabelValueOptions = (labelKey: string) => {
 
   return options;
 };
-
-const getOperatorHint = (op: string): string => {
-  switch (op) {
-    case "=":
-      return t("metrics.labelFilterEditor.exactMatch");
-    case "!=":
-      return t("metrics.labelFilterEditor.notEqualTo");
-    case "=~":
-      return t("metrics.labelFilterEditor.regexPattern");
-    case "!~":
-      return t("metrics.labelFilterEditor.regexNotMatching");
-    default:
-      return "";
-  }
-};
 </script>

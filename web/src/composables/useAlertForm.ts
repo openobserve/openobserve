@@ -42,7 +42,6 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import {
   getUUID,
   getTimezoneOffset,
-  b64DecodeUnicode,
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
@@ -86,6 +85,9 @@ import {
   type TransformContext,
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
+import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import type { AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -105,6 +107,12 @@ export const defaultAlertValue: any = () => {
     stream_type: "logs",
     stream_name: "",
     is_real_time: "false",
+    composite_condition: {
+      expression: "",
+      warning_counts_as_firing: true,
+      stale_child_policy: "use_last_state",
+    },
+    children: [],
     query_condition: {
       conditions: {
         filterType: "group",
@@ -129,6 +137,10 @@ export const defaultAlertValue: any = () => {
       // aggregation.multi_alert — a PromQL alert has no aggregation, so the
       // flag cannot live there.
       promql_multi_alert: false,
+      // Feature 5 (§6b.6). `null` until the SLO query mode is chosen: the
+      // backend enforces `query_type == slo` IFF this is present, so an empty
+      // object here would make every ordinary alert fail validation.
+      slo_condition: null,
       vrl_function: null,
       multi_time_range: [],
     },
@@ -207,6 +219,7 @@ export interface AlertFormProps {
   isUpdated: boolean;
   destinations: any[];
   templates?: any[];
+  folderId?: string;
 }
 
 export interface AlertFormEmit {
@@ -474,7 +487,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const anomalySummarySectionStyle = computed(() => {
     if (!showAnomalySummary.value) return { flex: "0 0 auto" };
-    return { flex: "1", minHeight: "150px" };
+    return { flex: "1", minHeight: "9.375rem" };
   });
 
   // ── Expand / UI State ───────────────────────────────────────────────────
@@ -520,11 +533,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const showTimezoneWarning = ref(false);
   const showJsonEditorDialog = ref(false);
   const validationErrors = ref([]);
-  const isLoadingPanelData = ref(false);
+  const isLoadingPrefill = ref(false);
+  /** Lossy transforms the source adapter performed, surfaced in the form. */
+  const prefillWarnings = ref<AlertPrefillWarning[]>([]);
 
   const folderQuery = router.currentRoute.value.query.folder;
+  // Prefer the folder the caller (AlertList) hands us over the URL query: the
+  // folder tab's v-model is the authoritative current folder, while the URL
+  // query can be stale when the "New alert" dialog is opened from a tab.
   const activeFolderId = ref<string>(
-    (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
+    props.folderId || (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
   );
   const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
@@ -666,6 +684,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const sqlUtilsContext: SqlUtilsContext = {
       parser,
       sqlQueryErrorMsg,
+      t,
     };
     return getParserUtil(sqlQuery, sqlUtilsContext);
   };
@@ -970,7 +989,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const debouncedPreviewAlert = debounce(previewAlert, 500);
 
-  const onInputUpdate = async (name: string, value: any) => {
+  const onInputUpdate = async (_name: string, _value: any) => {
     if (formData.value.query_condition.type === "custom") {
       debouncedGenerateSql();
     } else if (showPreview.value) {
@@ -989,7 +1008,37 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     };
     // Read the synchronous source of truth (the form store), not the reactive
     // read-view, so a value written by setF immediately before save is included.
-    return getAlertPayloadUtil(form.state.values, payloadContext);
+    if (form.state.values.is_real_time === "composite") {
+      const source = cloneDeep(form.state.values) as any;
+      const contextAttributes = Object.fromEntries(
+        (Array.isArray(source.context_attributes) ? source.context_attributes : [])
+          .filter((attribute: any) => attribute.key?.trim() && attribute.value?.trim())
+          .map((attribute: any) => [attribute.key, attribute.value]),
+      );
+      return {
+        ...(source.id ? { id: source.id } : {}),
+        alert_type: "composite",
+        name: source.name,
+        description: raw(String(source.description ?? "").trim()),
+        enabled: source.enabled,
+        destinations: source.destinations ?? [],
+        template: source.template,
+        context_attributes: contextAttributes,
+        trigger_condition: {
+          silence: Number(source.trigger_condition?.silence ?? 0),
+        },
+        owner: source.owner || undefined,
+        creates_incident: source.creates_incident ?? false,
+        workflows: source.workflows ?? [],
+        priority: source.priority ?? null,
+        tags: source.tags ?? [],
+        composite_condition: source.composite_condition,
+      };
+    }
+    const payload = getAlertPayloadUtil(form.state.values, payloadContext);
+    delete payload.composite_condition;
+    delete payload.children;
+    return payload;
   };
 
   const validateInputs = (input: any, notify: boolean = true) => {
@@ -1020,6 +1069,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   const validateConditionsAgainstUDS = () => {
+    if (formData.value.is_real_time === "composite") {
+      return { isValid: true, invalidFields: [] };
+    }
     if (
       !formData.value.stream_name ||
       !formData.value.stream_type ||
@@ -1220,9 +1272,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
-  // Regex matching backend RE_OFGA_UNSUPPORTED_NAME in src/common/utils/auth.rs
-  const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
-
   // Schema-driven validity predicate (validation ONLY — never triggers the save;
   // the real save path is handleSave → form.handleSubmit). The ONE composed
   // schema owns name/stream + the step field rules, so this just runs the
@@ -1400,6 +1449,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const updateVrlFunction = (value: any) => setF("query_condition.vrl_function", value);
   const updateAggregation = (value: any) => setF("query_condition.aggregation", value);
   const updatePromqlCondition = (value: any) => setF("query_condition.promql_condition", value);
+  const updateSloCondition = (value: any) => setF("query_condition.slo_condition", value);
   const updateTriggerCondition = (value: any) => setF("trigger_condition", value);
   const updateTemplate = (value: any) => setF("template", value);
   const updateContextAttributes = (value: any) => setF("context_attributes", value);
@@ -1429,17 +1479,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (previewAlertRef.value && typeof previewAlertRef.value.refreshData === "function") {
       previewAlertRef.value.refreshData();
     }
-  };
-
-  const routeToCreateDestination = () => {
-    const url = router.resolve({
-      name: "alertDestinations",
-      query: {
-        action: "add",
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    }).href;
-    window.open(url, "_blank");
   };
 
   const openEditorDialog = () => {
@@ -1516,237 +1555,141 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     );
   };
 
-  // ── Panel Data Import ───────────────────────────────────────────────────
+  // ── Prefill Import (any source surface) ─────────────────────────────────
 
-  const loadPanelDataIfPresent = async () => {
+  /**
+   * Apply a prefill handed over by ANY surface — a dashboard panel, a logs
+   * search, a pattern set, or something added later. The shaping work already
+   * happened in the source's pure adapter (utils/alerts/prefill/*), so this
+   * only has to seed the form.
+   *
+   * Replaces the old `loadPanelDataIfPresent`, which read a JSON blob out of the
+   * URL and understood the panel shape only.
+   */
+  const applyAlertPrefill = async () => {
     const route = router.currentRoute.value;
+    if (!route.query.prefill) return;
 
-    if (route.query.fromPanel === "true" && route.query.panelData) {
-      isLoadingPanelData.value = true;
-      try {
-        const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
+    const prefill = readAlertPrefill();
+    if (!prefill) return;
 
-        if (panelData.queries && panelData.queries.length > 0) {
-          const query = panelData.queries[0];
+    isLoadingPrefill.value = true;
+    try {
+      // Mutate a LOCAL working copy, then seed the ONE form with a single
+      // resetForm (Rule ③ — `formData` is a readonly read-view).
+      const data: any = cloneDeep(formData.value);
 
-          const sanitizePanelTitle = (title: string | undefined): string => {
-            if (!title || title.trim() === "") {
-              return "panel";
-            }
-            let sanitized = title.replace(/[:#?&%'"\s]+/g, "_");
-            sanitized = sanitized.replace(/_+/g, "_");
-            sanitized = sanitized.replace(/^_+|_+$/g, "");
-            if (sanitized === "") {
-              return "panel";
-            }
-            const maxLength = 200;
-            if (sanitized.length > maxLength) {
-              sanitized = sanitized.substring(0, maxLength);
-              sanitized = sanitized.replace(/_+$/, "");
-            }
-            return sanitized;
-          };
+      if (prefill.name) data.name = prefill.name;
 
-          // Panel import mutates a LOCAL working copy of the current form
-          // values, then seeds the ONE form with a single resetForm() at the
-          // end (Rule ③ — no read-view mutation).
-          const data: any = cloneDeep(formData.value);
-          data.name = `Alert_from_${sanitizePanelTitle(panelData.panelTitle)}`;
+      data.stream_type = prefill.streamType || data.stream_type;
+      data.stream_name = prefill.streamName;
 
-          toast({
-            variant: "success",
-            message: t("alerts.importedFromPanel", {
-              panelTitle: panelData.panelTitle,
-            }),
-          });
-
-          if (query.fields?.stream_type) {
-            data.stream_type = query.fields.stream_type;
-          }
-
-          if (query.fields?.stream) {
-            data.stream_name = query.fields.stream;
-            // Seed the form's stream fields so updateStreams fetches the right
-            // schema (it reads them off the form). resetForm() below re-seeds.
-            setF("stream_type", data.stream_type);
-            setF("stream_name", data.stream_name);
-            await updateStreams(false);
-          }
-
-          if (panelData.queryType === "sql") {
-            data.query_condition.type = "sql";
-            const sourceQuery = panelData.executedQuery || query.query;
-            if (sourceQuery) {
-              let sqlQuery = sourceQuery;
-
-              if (
-                panelData.threshold !== undefined &&
-                panelData.condition &&
-                panelData.yAxisColumn
-              ) {
-                const threshold = panelData.threshold;
-                const operator = panelData.condition === "above" ? ">=" : "<=";
-                const yAxisColumn = panelData.yAxisColumn;
-
-                if (!parser) {
-                  await importSqlParser();
-                }
-                sqlQuery = addHavingClauseToQuery(
-                  sqlQuery,
-                  yAxisColumn,
-                  operator,
-                  threshold,
-                  parser,
-                );
-              }
-
-              data.query_condition.sql = sqlQuery;
-            }
-          } else if (panelData.queryType === "promql") {
-            data.query_condition.type = "promql";
-            const sourceQuery = panelData.executedQuery || query.query;
-            if (sourceQuery) {
-              data.query_condition.promql = sourceQuery;
-            }
-          } else {
-            data.query_condition.type = "sql";
-          }
-
-          if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
-            isAggregationEnabled.value = true;
-
-            if (query.fields.x && query.fields.x.length > 0) {
-              if (!data.query_condition.aggregation) {
-                data.query_condition.aggregation = {
-                  group_by: [],
-                  function: "count",
-                  having: {
-                    column: "",
-                    operator: ">=",
-                    value: 1,
-                  },
-                };
-              }
-              data.query_condition.aggregation.group_by = query.fields.x.map(
-                (x: any) => x.alias || x.column,
-              );
-            }
-
-            if (query.fields.y && query.fields.y.length > 0) {
-              const yField = query.fields.y[0];
-              if (yField.aggregationFunction) {
-                if (!data.query_condition.aggregation) {
-                  data.query_condition.aggregation = {
-                    group_by: [""],
-                    function: "count",
-                    having: {
-                      column: "",
-                      operator: ">=",
-                      value: 1,
-                    },
-                  };
-                }
-                data.query_condition.aggregation.function =
-                  yField.aggregationFunction.toLowerCase();
-                data.query_condition.aggregation.having.column = yField.alias || yField.column;
-              }
-            }
-
-            if (query.fields.filter && query.fields.filter.length > 0) {
-              const conditions: any[] = [];
-              query.fields.filter.forEach((filter: any) => {
-                if (filter.type === "list" && filter.values && filter.values.length > 0) {
-                  conditions.push({
-                    filterType: "condition",
-                    column: filter.column,
-                    operator: "=",
-                    value: filter.values[0],
-                    values: [],
-                    logicalOperator: "AND",
-                    id: getUUID(),
-                  });
-                }
-              });
-
-              if (conditions.length > 0) {
-                data.query_condition.conditions = {
-                  filterType: "group",
-                  logicalOperator: "AND",
-                  groupId: getUUID(),
-                  conditions: conditions,
-                };
-              }
-            }
-          }
-
-          if (query.vrlFunctionQuery) {
-            showVrlFunction.value = true;
-            data.query_condition.vrl_function = query.vrlFunctionQuery;
-          }
-
-          if (panelData.timeRange?.value_type === "relative") {
-            const relativeValue = panelData.timeRange.relative_value || 15;
-            const relativePeriodVal = panelData.timeRange.relative_period || "Minutes";
-
-            let periodInMinutes = relativeValue;
-            if (relativePeriodVal === "Hours") {
-              periodInMinutes = relativeValue * 60;
-            } else if (relativePeriodVal === "Days") {
-              periodInMinutes = relativeValue * 60 * 24;
-            } else if (relativePeriodVal === "Weeks") {
-              periodInMinutes = relativeValue * 60 * 24 * 7;
-            }
-
-            data.trigger_condition.period = periodInMinutes;
-          }
-
-          if (panelData.threshold !== undefined && panelData.condition) {
-            if (panelData.queryType === "promql") {
-              if (!data.query_condition.promql_condition) {
-                data.query_condition.promql_condition = {
-                  column: "value",
-                  operator: ">=",
-                  value: 1,
-                };
-              }
-              data.query_condition.promql_condition.value = panelData.threshold;
-              data.query_condition.promql_condition.operator =
-                panelData.condition === "above" ? ">=" : "<=";
-            } else {
-              if (isAggregationEnabled.value && data.query_condition.aggregation) {
-                if (!data.query_condition.aggregation.having) {
-                  data.query_condition.aggregation.having = {
-                    column: "",
-                    operator: ">=",
-                    value: 1,
-                  };
-                }
-                data.query_condition.aggregation.having.value = panelData.threshold;
-                data.query_condition.aggregation.having.operator =
-                  panelData.condition === "above" ? ">=" : "<=";
-              }
-            }
-
-            data.trigger_condition.threshold = 1;
-            data.trigger_condition.operator = ">=";
-          }
-
-          resetForm(data);
-        }
-
-        await nextTick();
-        if (previewAlertRef.value?.refreshData) {
-          previewAlertRef.value.refreshData();
-        }
-      } catch (error) {
-        console.error("Error loading panel data:", error);
-        toast({
-          variant: "error",
-          message: t("alerts.messages.failedToLoadPanelData"),
-        });
-      } finally {
-        isLoadingPanelData.value = false;
+      if (prefill.streamName) {
+        // Seed the form's stream fields first so updateStreams fetches the right
+        // schema (it reads them off the form); resetForm below re-seeds anyway.
+        setF("stream_type", data.stream_type);
+        setF("stream_name", data.stream_name);
+        await updateStreams(false);
       }
+
+      if (prefill.queryType === "promql") {
+        data.query_condition.type = "promql";
+        data.query_condition.promql = prefill.promql ?? "";
+        if (prefill.promqlCondition) {
+          data.query_condition.promql_condition = { ...prefill.promqlCondition };
+        }
+      } else if (prefill.queryType === "custom" && prefill.conditions) {
+        data.query_condition.type = "custom";
+        data.query_condition.conditions = cloneDeep(prefill.conditions);
+      } else {
+        data.query_condition.type = "sql";
+        let sql = prefill.sql ?? "";
+
+        // A raw-SQL threshold arrives as meta.sqlHaving because injecting it
+        // needs the SQL parser, which is async and lives here rather than in the
+        // (pure, synchronous) adapters.
+        const sqlHaving = prefill.meta?.sqlHaving as
+          { column: string; operator: string; value: number } | undefined;
+        if (sql && sqlHaving?.column) {
+          if (!parser) await importSqlParser();
+          sql = addHavingClauseToQuery(
+            sql,
+            sqlHaving.column,
+            sqlHaving.operator,
+            sqlHaving.value,
+            parser,
+          );
+        }
+
+        data.query_condition.sql = sql;
+      }
+
+      if (prefill.aggregation) {
+        isAggregationEnabled.value = true;
+        data.query_condition.aggregation = cloneDeep(prefill.aggregation);
+      }
+
+      if (prefill.vrlFunction) {
+        showVrlFunction.value = true;
+        data.query_condition.vrl_function = prefill.vrlFunction;
+      }
+
+      if (prefill.periodMinutes) {
+        data.trigger_condition.period = prefill.periodMinutes;
+      }
+      if (prefill.frequencyMinutes) {
+        // The source's own schedule wins. The only floor is the org's minimum
+        // evaluation frequency, which is the rule the schema enforces on save;
+        // clamping to the form's DEFAULT instead (as this used to) silently
+        // overrode a curated alert that runs every minute with "every ten".
+        const floorMinutes = Math.max(1, Math.ceil(minAutoRefreshInterval() / 60));
+        data.trigger_condition.frequency = Math.max(floorMinutes, prefill.frequencyMinutes);
+      }
+      if (prefill.silenceMinutes !== undefined) {
+        data.trigger_condition.silence = prefill.silenceMinutes;
+      }
+      if (prefill.timezone) {
+        data.trigger_condition.timezone = prefill.timezone;
+      }
+
+      // A source that carries a real trigger says so explicitly, and is believed.
+      // Otherwise: with a threshold expressed inside the query (HAVING / promql
+      // condition), the trigger itself only needs "at least one row came back".
+      const hasQueryThreshold =
+        !!prefill.promqlCondition || !!prefill.meta?.sqlHaving || !!prefill.aggregation;
+      if (prefill.triggerThreshold !== undefined) {
+        data.trigger_condition.threshold = prefill.triggerThreshold;
+        if (prefill.triggerOperator) {
+          data.trigger_condition.operator = prefill.triggerOperator;
+        }
+      } else if (hasQueryThreshold) {
+        data.trigger_condition.threshold = 1;
+        data.trigger_condition.operator = ">=";
+      }
+
+      resetForm(data);
+
+      prefillWarnings.value = prefill.warnings ?? [];
+
+      toast({
+        variant: "success",
+        message: t(getAlertSource(prefill.source).toastKey, {
+          sourceLabel: prefill.sourceLabel,
+        }),
+      });
+
+      await nextTick();
+      if (previewAlertRef.value?.refreshData) {
+        previewAlertRef.value.refreshData();
+      }
+    } catch (error) {
+      console.error("Error applying alert prefill:", error);
+      toast({
+        variant: "error",
+        message: t("alerts.messages.failedToLoadPanelData"),
+      });
+    } finally {
+      isLoadingPrefill.value = false;
     }
   };
 
@@ -1988,6 +1931,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // (threshold / frequency / conditions / promql-condition / group_by / period /
   // silence / destinations / name / stream) are covered by the composed schema.
   const runImperativeQueryChecks = (): boolean => {
+    if (formData.value.is_real_time === "composite") return true;
     // ── Cron gate (R4 RESTORE) ───────────────────────────────────────────────
     // Pre-migration AlertSettings.validate() ran validateFrequency() first and
     // returned {valid:false} on any cronJobError, which the orchestrator turned
@@ -2187,11 +2131,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
     }
 
-    // VERSION HANDLING - wrap conditions with version field for backend
-    payload.query_condition.conditions = {
-      version: 2,
-      conditions: form.state.values.query_condition.conditions,
-    };
+    if (formData.value.is_real_time !== "composite") {
+      // VERSION HANDLING - wrap conditions with version field for backend
+      payload.query_condition.conditions = {
+        version: 2,
+        conditions: form.state.values.query_condition.conditions,
+      };
+    }
 
     if (beingUpdated.value) {
       payload.folder_id = router.currentRoute.value.query.folder || "default";
@@ -2204,7 +2150,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // isSubmitting) spans the whole request — otherwise the Save button
       // re-enables in the same tick and repeat clicks fire duplicate saves.
       const request = callAlert
-        .then((res: { data: any }) => {
+        .then((_res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2241,7 +2187,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
-        .then((res: { data: any }) => {
+        .then((_res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2293,11 +2239,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const data: any = { ...defaultAlertValue(), ...cloneDeep(props.modelValue) };
 
     const route = router.currentRoute.value;
-    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+    const hasPrefill = !!route.query.prefill;
 
     if (!props.isUpdated) {
       data.is_real_time = alertType.value === "realTime" ? true : false;
     }
+    if (data.alert_type === "composite") data.is_real_time = "composite";
     data.is_real_time = data.is_real_time.toString();
 
     if (store.state?.zoConfig?.min_auto_refresh_interval)
@@ -2317,15 +2264,19 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // `formData.value = cloneDeep(modelValue)` full swap).
       Object.keys(data).forEach((k) => delete data[k]);
       Object.assign(data, cloneDeep(props.modelValue));
+      // The swap above replaces every key with the raw GET response, which for
+      // a composite carries `alert_type` but not `is_real_time`. Re-derive the
+      // composite flag so the composite form (not the scheduled form) renders.
+      if (data.alert_type === "composite") data.is_real_time = "composite";
       // Guard the enterprise workflows link: the edited alert is expected to
       // carry `workflows` (v2 GET returns it, serde-defaulted to []), but if a
       // partially-populated row is ever passed, default it so an edit-save can't
       // silently wipe existing links. Must run AFTER the swap above, which
       // replaces every key on `data`.
       if (!Array.isArray(data.workflows)) data.workflows = [];
-      isAggregationEnabled.value = !!data.query_condition.aggregation;
+      isAggregationEnabled.value = !!data.query_condition?.aggregation;
 
-      if (data.query_condition.promql_condition) {
+      if (data.query_condition?.promql_condition) {
         if (!data.query_condition.promql_condition.column) {
           data.query_condition.promql_condition.column = "value";
         }
@@ -2342,21 +2293,21 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       lastValidStep.value = 6;
 
-      if (!data.trigger_condition?.timezone) {
+      if (data.is_real_time !== "composite" && !data.trigger_condition?.timezone) {
         if (data.tz_offset === 0) {
           data.trigger_condition.timezone = "UTC";
         } else {
           // Resolved async AFTER the form.reset below → setF in the .then.
           pendingTimezoneOffset = data.tz_offset;
         }
-      } else {
+      } else if (data.is_real_time !== "composite") {
         // Heal legacy alerts (e.g. created on older releases) that persisted a
         // "Browser Time (<zone>)" label — resolve it to a plain IANA zone so the
         // picker shows a valid value and the save path computes a real offset.
         data.trigger_condition.timezone = resolveBrowserTimezone(data.trigger_condition.timezone);
       }
 
-      if (data.query_condition.vrl_function) {
+      if (data.query_condition?.vrl_function) {
         showVrlFunction.value = true;
         data.query_condition.vrl_function = smartDecodeVrlFunction(
           data.query_condition.vrl_function,
@@ -2382,7 +2333,22 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     // VERSION DETECTION AND CONVERSION
-    if (
+    if (data.is_real_time === "composite") {
+      data.query_condition ??= defaultAlertValue().query_condition;
+      data.stream_type ??= "";
+      data.stream_name ??= "";
+      // The composite GET response may carry `null` for optional fields; the
+      // form inputs expect strings/arrays, so normalize them here.
+      data.description ??= "";
+      data.template ??= "";
+      data.tags ??= [];
+      data.composite_condition ??= {
+        expression: "",
+        warning_counts_as_firing: true,
+        stale_child_policy: "use_last_state",
+      };
+      data.children ??= [];
+    } else if (
       data.query_condition.conditions?.version === "2" ||
       data.query_condition.conditions?.version === 2
     ) {
@@ -2439,15 +2405,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
     }
 
-    // Panel import writes into the now-seeded form via setFieldValue.
-    if (isFromPanel) {
+    // A prefill from any source surface writes into the now-seeded form.
+    if (hasPrefill) {
       setF("query_condition.type", "");
-      await loadPanelDataIfPresent();
+      await applyAlertPrefill();
     }
 
-    updateStreams(false)?.then(() => {
-      updateEditorContent(formData.value.stream_name);
-    });
+    if (data.is_real_time !== "composite") {
+      updateStreams(false)?.then(() => {
+        updateEditorContent(formData.value.stream_name);
+      });
+    }
   };
 
   // ── Watchers ────────────────────────────────────────────────────────────
@@ -2824,6 +2792,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         if (data.folder_id) activeFolderId.value = data.folder_id;
         anomalyEditMode.value = true;
         lastValidStep.value = 6;
+
+        // The stream is only known NOW. initializeFormData already ran its
+        // updateStreams, but at that point stream_type was empty, so it
+        // returned early — leaving the stream select with no options and the
+        // stream's columns unloaded. The form value was set, yet nothing was
+        // selectable and every field picker downstream was empty.
+        if (data.stream_type) await updateStreams(false);
       } catch {
         toast({
           variant: "error",
@@ -2946,7 +2921,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     showTimezoneWarning,
     showJsonEditorDialog,
     validationErrors,
-    isLoadingPanelData,
+    isLoadingPrefill,
+    prefillWarnings,
     activeFolderId,
     alertType,
 
@@ -3005,6 +2981,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     updateVrlFunction,
     updateAggregation,
     updatePromqlCondition,
+    updateSloCondition,
     updateTriggerCondition,
     updateTemplate,
     updateContextAttributes,
@@ -3038,12 +3015,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     clearMultiWindows,
     handleEditorStateChanged,
     handleEditorClosed,
-    routeToCreateDestination,
     openEditorDialog,
     openJsonEditor,
     jsonEditorData,
     saveAlertJson,
-    loadPanelDataIfPresent,
+    applyAlertPrefill,
     handleSave,
     onSubmit,
     saveAnomalyDetection,

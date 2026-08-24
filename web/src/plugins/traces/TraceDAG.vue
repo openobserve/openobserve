@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-trace-dag-empty-container"
       class="flex h-125 flex-col items-center justify-center p-6"
     >
-      <OIcon name="info" style="width: 48px; height: 48px" />
+      <OIcon name="info" style="width: 3rem; height: 3rem" />
       <div class="text-text-muted mt-3">{{ t("traces.traceDAG.noData") }}</div>
     </div>
 
@@ -65,10 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="data.hasIncoming"
             type="target"
             :position="Position.Top"
-            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-sm"
           />
           <div
-            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[6px_12px] text-center shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 hover:[transform:translateY(-2px)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[0.375rem_0.75rem] text-center shadow-sm transition-all duration-200 hover:[transform:translateY(-0.125rem)] hover:shadow-md"
             :class="[
               {
                 'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="data.hasOutgoing"
             type="source"
             :position="Position.Bottom"
-            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-sm"
           />
         </template>
       </VueFlow>
@@ -476,58 +476,39 @@ export default defineComponent({
     // bg = base@12% over the surface. The base flips light/dark (see dark.css),
     // so no dark: variant is needed. Full literal classes so Tailwind compiles them.
     const llmNodeStyles: Record<string, string> = {
-      generation:
-        "border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
-      embedding:
-        "border-[var(--color-dag-node-embedding)] bg-[color-mix(in_srgb,var(--color-dag-node-embedding)_12%,var(--color-surface-base))]",
-      agent:
-        "border-[var(--color-dag-node-agent)] bg-[color-mix(in_srgb,var(--color-dag-node-agent)_12%,var(--color-surface-base))]",
-      tool: "border-[var(--color-dag-node-tool)] bg-[color-mix(in_srgb,var(--color-dag-node-tool)_12%,var(--color-surface-base))]",
-      chain:
-        "border-[var(--color-dag-node-chain)] bg-[color-mix(in_srgb,var(--color-dag-node-chain)_12%,var(--color-surface-base))]",
-      retriever:
-        "border-[var(--color-dag-node-retriever)] bg-[color-mix(in_srgb,var(--color-dag-node-retriever)_12%,var(--color-surface-base))]",
-      task: "border-[var(--color-dag-node-task)] bg-[color-mix(in_srgb,var(--color-dag-node-task)_12%,var(--color-surface-base))]",
-      evaluator:
-        "border-[var(--color-dag-node-evaluator)] bg-[color-mix(in_srgb,var(--color-dag-node-evaluator)_12%,var(--color-surface-base))]",
-      workflow:
-        "border-[var(--color-dag-node-workflow)] bg-[color-mix(in_srgb,var(--color-dag-node-workflow)_12%,var(--color-surface-base))]",
-      rerank:
-        "border-[var(--color-dag-node-rerank)] bg-[color-mix(in_srgb,var(--color-dag-node-rerank)_12%,var(--color-surface-base))]",
-      guardrail:
-        "border-[var(--color-dag-node-guardrail)] bg-[color-mix(in_srgb,var(--color-dag-node-guardrail)_12%,var(--color-surface-base))]",
-      span: "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
-      event:
-        "border-[var(--color-dag-node-event)] bg-[color-mix(in_srgb,var(--color-dag-node-event)_12%,var(--color-surface-base))]",
-      default:
-        "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
+      generation: "border-dag-node-generation bg-dag-node-generation-bg",
+      embedding: "border-dag-node-embedding bg-dag-node-embedding-bg",
+      agent: "border-dag-node-agent bg-dag-node-agent-bg",
+      tool: "border-dag-node-tool bg-dag-node-tool-bg",
+      chain: "border-dag-node-chain bg-dag-node-chain-bg",
+      retriever: "border-dag-node-retriever bg-dag-node-retriever-bg",
+      task: "border-dag-node-task bg-dag-node-task-bg",
+      evaluator: "border-dag-node-evaluator bg-dag-node-evaluator-bg",
+      workflow: "border-dag-node-workflow bg-dag-node-workflow-bg",
+      rerank: "border-dag-node-rerank bg-dag-node-rerank-bg",
+      guardrail: "border-dag-node-guardrail bg-dag-node-guardrail-bg",
+      span: "border-dag-node-default bg-dag-node-default-bg",
+      event: "border-dag-node-event bg-dag-node-event-bg",
+      default: "border-dag-node-default bg-dag-node-default-bg",
     };
 
     // Text = base mixed 70/30 toward the primary text color, which flips light/dark,
     // so text darkens in light mode and lightens in dark mode from the one base.
     const llmTextStyles: Record<string, string> = {
-      generation:
-        "text-[color-mix(in_srgb,var(--color-dag-node-generation)_70%,var(--color-text-heading))]",
-      embedding:
-        "text-[color-mix(in_srgb,var(--color-dag-node-embedding)_70%,var(--color-text-heading))]",
-      agent: "text-[color-mix(in_srgb,var(--color-dag-node-agent)_70%,var(--color-text-heading))]",
-      tool: "text-[color-mix(in_srgb,var(--color-dag-node-tool)_70%,var(--color-text-heading))]",
-      chain: "text-[color-mix(in_srgb,var(--color-dag-node-chain)_70%,var(--color-text-heading))]",
-      retriever:
-        "text-[color-mix(in_srgb,var(--color-dag-node-retriever)_70%,var(--color-text-heading))]",
-      task: "text-[color-mix(in_srgb,var(--color-dag-node-task)_70%,var(--color-text-heading))]",
-      evaluator:
-        "text-[color-mix(in_srgb,var(--color-dag-node-evaluator)_70%,var(--color-text-heading))]",
-      workflow:
-        "text-[color-mix(in_srgb,var(--color-dag-node-workflow)_70%,var(--color-text-heading))]",
-      rerank:
-        "text-[color-mix(in_srgb,var(--color-dag-node-rerank)_70%,var(--color-text-heading))]",
-      guardrail:
-        "text-[color-mix(in_srgb,var(--color-dag-node-guardrail)_70%,var(--color-text-heading))]",
-      span: "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]",
-      event: "text-[color-mix(in_srgb,var(--color-dag-node-event)_70%,var(--color-text-heading))]",
-      default:
-        "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]",
+      generation: "text-dag-node-generation-text",
+      embedding: "text-dag-node-embedding-text",
+      agent: "text-dag-node-agent-text",
+      tool: "text-dag-node-tool-text",
+      chain: "text-dag-node-chain-text",
+      retriever: "text-dag-node-retriever-text",
+      task: "text-dag-node-task-text",
+      evaluator: "text-dag-node-evaluator-text",
+      workflow: "text-dag-node-workflow-text",
+      rerank: "text-dag-node-rerank-text",
+      guardrail: "text-dag-node-guardrail-text",
+      span: "text-dag-node-default-text",
+      event: "text-dag-node-event-text",
+      default: "text-dag-node-default-text",
     };
 
     const getObservationTypeClass = (type: string | null): string => {

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Edge deletion help notification -->
     <div
       v-if="showEdgeHelpNotification"
-      class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+      class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
     >
       <OIcon name="info" class="mr-1" size="sm" />
       {{ t("pipeline.edgeDeleteHint") }}
@@ -86,10 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            --color-file-drag-bg (theme-aware; the old raw blue had no dark step).
            Stays a binding because the fill is driven by isDragOver at runtime. -->
     <DropzoneBackground
-      :style="{
-        backgroundColor: isDragOver ? 'var(--color-file-drag-bg)' : 'transparent',
-        transition: 'background-color 0.2s ease',
-      }"
+      class="[transition:background-color_0.2s_ease]"
+      :class="isDragOver ? 'bg-file-drag-bg' : 'bg-transparent'"
     >
       <p v-if="isDragOver">{{ t("pipeline.dropHere") }}</p>
     </DropzoneBackground>

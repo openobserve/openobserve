@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { StreamInfo, FieldAlias } from "@/services/service_streams";
+import type { TranslateFn } from "@/types/i18n";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
   buildFieldToGroupIdMap,
@@ -44,7 +45,7 @@ export interface MetricsCorrelationConfig {
  *
  * Creates a time-series dashboard showing correlated metrics
  */
-export function useMetricsCorrelationDashboard() {
+export function useMetricsCorrelationDashboard(t: TranslateFn) {
   /**
    * Generate dashboard JSON for metrics correlation
    */
@@ -63,8 +64,10 @@ export function useMetricsCorrelationDashboard() {
     const dashboard = {
       version: 5,
       dashboardId: ``,
-      title: `Correlated Streams - ${config.serviceName}`,
-      description: `Streams correlated with service ${config.serviceName}`,
+      title: t("correlation.correlatedStreamsFor", { service: config.serviceName }),
+      description: t("correlation.metricsDashboardDescription", {
+        service: config.serviceName,
+      }),
       role: "",
       owner: "",
       created: new Date().toISOString(),
@@ -194,7 +197,14 @@ ORDER BY x_axis_1`;
       id: `panel_${stream.stream_name}_${index}`,
       type: "line",
       title: stream.stream_name,
-      description: `Time series for ${stream.stream_name}${metricType ? ` (${metricType})` : ""}`,
+      // Two complete messages rather than splicing an optional "(type)" fragment
+      // into one — the clause position differs across languages.
+      description: metricType
+        ? t("correlation.panelTimeSeriesForWithType", {
+            stream: stream.stream_name,
+            type: metricType,
+          })
+        : t("correlation.panelTimeSeriesFor", { stream: stream.stream_name }),
       config: {
         show_legends: false,
         legends_position: "bottom",
@@ -328,18 +338,12 @@ ORDER BY x_axis_1`;
       // When viewing from logs page, prefer source stream
       streamName = config.sourceStream;
 
-      // Try to find matching stream in API response
+      // F27: only use filters the backend resolved for THIS stream. Another
+      // stream's filters use that stream's own field aliases, and
+      // matchedDimensions are semantic-ID keyed — either guess yields
+      // "No field named X" or a silently-wrong predicate.
       const matchingStream = streams?.find((s) => s.stream_name === config.sourceStream);
-      if (matchingStream) {
-        // Use filters from API response (best case - backend computed correct field names)
-        filters = matchingStream.filters ?? {};
-      } else if (streams && streams.length > 0) {
-        // Source stream not in response, use first available stream's filters
-        filters = streams[0].filters ?? {};
-      } else {
-        // No streams from API, fallback to matched dimensions
-        filters = config.matchedDimensions || {};
-      }
+      filters = matchingStream?.filters ?? {};
     } else if (streams && streams.length > 0) {
       // Use first correlated log stream from API response
       const primaryStream = streams[0];
@@ -369,8 +373,8 @@ ORDER BY x_axis_1`;
     const panel = {
       id: "logs_table_panel",
       type: "table",
-      title: `Logs - ${streamName}`,
-      description: `Correlated logs for service ${config.serviceName}`,
+      title: t("correlation.logsPanelTitle", { stream: streamName }),
+      description: t("correlation.logsPanelDescription", { service: config.serviceName }),
       config: {
         wrap_table_cells: false,
         table_dynamic_columns: true,
@@ -437,8 +441,8 @@ ORDER BY x_axis_1`;
     const dashboard = {
       version: 5,
       dashboardId: ``,
-      title: `Correlated Streams - ${config.serviceName}`,
-      description: `Logs correlated with service ${config.serviceName}`,
+      title: t("correlation.correlatedStreamsFor", { service: config.serviceName }),
+      description: t("correlation.logsDashboardDescription", { service: config.serviceName }),
       role: "",
       owner: "",
       created: new Date().toISOString(),

@@ -29,6 +29,8 @@
  * run-rate and can catch a spike without waiting for the monthly total.
  */
 
+import type { TranslateFn } from "@/types/i18n";
+
 /** The org's own self-reporting usage stream (populated when usage reporting
  *  is enabled for the org). Matches the backend constant `USAGE_STREAM`
  *  (`src/config/src/meta/self_reporting/usage.rs`), which writes to a stream
@@ -85,8 +87,9 @@ export function buildUsageCombinedSql(opts: { orgId: string; dataType: "gb" | "m
 export function buildUsageCombinedLinePanelSchema(opts: {
   orgId: string;
   dataType: "gb" | "mb";
+  t: TranslateFn;
 }): any {
-  const { orgId, dataType } = opts;
+  const { orgId, dataType, t } = opts;
   const sql = buildUsageCombinedSql({ orgId, dataType });
   const unitLabel = dataType === "gb" ? "GB" : "MB";
 
@@ -135,7 +138,7 @@ export function buildUsageCombinedLinePanelSchema(opts: {
         fields: {
           stream: USAGE_STREAM_NAME,
           stream_type: "logs",
-          x: [{ alias: "x_axis_1", column: "x_axis_1", color: null, label: "Time" }],
+          x: [{ alias: "x_axis_1", column: "x_axis_1", color: null, label: t("billing.time") }],
           y: [
             {
               alias: "y_axis_1",
@@ -150,7 +153,7 @@ export function buildUsageCombinedLinePanelSchema(opts: {
               alias: "breakdown_1",
               column: "breakdown_1",
               color: null,
-              label: "Event",
+              label: t("billing.event"),
             },
           ],
           filter: {
