@@ -225,12 +225,11 @@ pub struct MergeOutput {
 }
 
 impl MergeOutput {
-    /// Ingester movers: use the configured per-stream format and optional
-    /// Parquet no-compression.
+    /// Ingester movers: metrics always stay Parquet, optional no-compression.
     pub fn for_ingester(stream_type: StreamType) -> Self {
         let cfg = get_config();
         Self {
-            file_format: output_file_format(stream_type, cfg.common.file_format),
+            file_format: output_file_format(stream_type, true, cfg.common.file_format),
             parquet_compression: cfg
                 .common
                 .feature_ingester_none_compression
@@ -241,14 +240,23 @@ impl MergeOutput {
     /// Compactor: the configured format for the stream.
     pub fn for_compactor(stream_type: StreamType) -> Self {
         Self {
-            file_format: output_file_format(stream_type, get_config().common.file_format),
+            file_format: output_file_format(stream_type, false, get_config().common.file_format),
             parquet_compression: None,
         }
     }
 }
 
-fn output_file_format(stream_type: StreamType, configured: FileFormatConfig) -> FileFormat {
-    configured.for_stream(stream_type)
+fn output_file_format(
+    stream_type: StreamType,
+    is_ingester: bool,
+    configured: FileFormatConfig,
+) -> FileFormat {
+    let configured = configured.for_stream(stream_type);
+    if is_ingester {
+        FileFormat::for_ingester_stream(stream_type, configured)
+    } else {
+        configured
+    }
 }
 
 #[cfg(test)]
@@ -332,26 +340,30 @@ mod tests {
     }
 
     #[test]
-    fn output_file_format_honors_ingester_metrics_format() {
+    fn output_file_format_uses_parquet_for_ingester_metrics() {
         let configured = "parquet,metrics=vortex"
             .parse::<FileFormatConfig>()
             .unwrap();
         assert_eq!(
-            output_file_format(StreamType::Metrics, configured),
-            FileFormat::Vortex
-        );
-        assert_eq!(
-            output_file_format(StreamType::Logs, configured),
+            output_file_format(StreamType::Metrics, true, configured),
             FileFormat::Parquet
         );
         assert_eq!(
-            output_file_format(StreamType::Traces, configured),
+            output_file_format(StreamType::Logs, true, configured),
+            FileFormat::Parquet
+        );
+        assert_eq!(
+            output_file_format(StreamType::Metrics, false, configured),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            output_file_format(StreamType::Traces, false, configured),
             FileFormat::Parquet
         );
 
         let configured = FileFormatConfig::new(FileFormat::Vortex);
         assert_eq!(
-            output_file_format(StreamType::Logs, configured),
+            output_file_format(StreamType::Logs, true, configured),
             FileFormat::Vortex
         );
     }
