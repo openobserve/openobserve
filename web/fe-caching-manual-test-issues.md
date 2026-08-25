@@ -195,6 +195,497 @@ history surfaces just don't use it.
 
 ---
 
+## Fourth round — 2026-08-25, local dev against a local backend
+
+Findings from a further pass. Only items **not already covered above** are listed; each was
+reproduced in the browser with a request recorder installed and IndexedDB / localStorage read
+directly. Credentials are omitted throughout — substitute your own login e-mail and org
+passcode where a placeholder appears.
+
+### 7. Favourites and the home-dashboard pin are permanently lost on reload
+
+```
+Module:            Dashboards -> favourites (§5.1) and the org-wide home-dashboard pin
+UI path:           Dashboards -> star a row · a dashboard's "Set as Home" -> press F5
+What to check:     whether the star / pin survives a reload
+What to expect:    both are persisted settings — they should survive indefinitely
+```
+
+**Both are lost, and stay lost.** The server saves them correctly; the client's persisted
+copy is never updated, and the app then never re-reads the setting — a Dashboards mount
+issues **zero** `settings/v2` requests while the persisted entries sit at `null`.
+
+Two faults combine:
+
+1. **The write never reaches disk.** Both composables call `queryClient.setQueryData(...)`
+   after the server call. `setQueryData` does not invoke the persister, which only writes at
+   the end of a query-function run — so `localStorage` keeps the pre-write value.
+2. **The stale copy is never revalidated.** The entries were 22 and 70 minutes old — far past
+   `CONFIG_STALE_TIME` (5 min) — yet no request was issued.
+
+Measured (org `default`, a non-admin UI user; e-mail redacted):
+
+```
+FAVOURITES
+  click the star on a dashboard
+  server   GET settings/v2/favorite_dashboards?user_id=<redacted>
+           -> setting_value: [{ label: "<dashboard>" }]              SAVED
+  localStorage o2q-[...,"favorite_dashboards","<user>"]  -> []       NOT UPDATED (2.5 s later)
+  after F5 -> still [], entry age 611 s, star not set
+
+HOME PIN
+  set a dashboard as Home
+  server   GET settings/v2/home_dashboard
+           -> setting_value: { label: "<dashboard>" }                SAVED
+  localStorage o2q-[...,"home_dashboard","__org__"] -> null, age 4118 s   NOT UPDATED
+  visit Home -> renders the Overview, not the pinned dashboard
+  localStorage -> still null, age 4169 s   (age climbing, value unchanged)
+
+NO REVALIDATION
+  fetch/XHR recorder installed before mount; requests matching settings/v2  ->  0
+```
+
+**Blast radius checked and NOT general.** The concern that persisted queries might never
+revalidate was tested directly and disproved: a function created server-side appeared
+immediately on Pipelines -> Functions, with the request fired and the persisted list rewritten
+(entry age 13 s). Stream name lists, folders, functions, destinations, templates and regex
+patterns are unaffected. The fault is confined to the two **settings** reads.
+
+**Where:** `src/composables/useFavoriteDashboards.ts` and `src/composables/useHomeDashboard.ts`
+(lines 75, 91) — both `setQueryData` a persisted setting.
+
+**Suggested fix:** `invalidateQueries` instead of `setQueryData`, or persist explicitly
+afterwards the way `usePanelCache` does with `persistQueryByKey`. General rule:
+**`setQueryData` on a persisted query leaves disk behind** — worth auditing every call site.
+
+**Severity:** High — two user actions that report success are silently discarded, and the
+home pin is org-wide, so it reverts for everyone. It does **not** self-heal.
+
+---
+
+### 8. `_o2_removeDashboardCache()` no longer clears the panel cache (regression)
+
+```
+Module:            Dashboards -> panel result cache (§5.2)
+UI path:           any dashboard -> Console -> await window._o2_removeDashboardCache()
+What to check:     IndexedDB o2Cache -> kv, counting keys containing "panels", before and after
+What to expect:    every panel entry gone
+```
+
+> Corrects the "What passed" entry above, which lists `_o2_removeDashboardCache()` as working.
+
+It deletes only entries that have a **live in-memory query**, leaves the rest on disk, and
+`_o2_getDashboardCache()` then reports `{}` — claiming success while most of the cache survives.
+
+```
+panel entries in IndexedDB before   10
+await window._o2_removeDashboardCache()
+panel entries in IndexedDB after     9      <- removed exactly ONE
+await window._o2_getDashboardCache() -> {}  <- reports the cache as empty
+
+survivors: 6 metrics-explorer cards, a 2nd digest for the same dashboard panel,
+           and another dashboard's panel entry
+```
+
+**Regression introduced by this branch.** `main` wiped the whole object store in one line
+(`performTransaction("readwrite", store => store.clear())`); the new implementation walks
+`queryClient.getQueryCache()` instead. `persisterGc()` only reclaims **expired or busted**
+entries, so it does not cover the gap. The source comment acknowledges the hole — *"Entries
+that were only ever on disk have no in-memory query to walk"* — but the fallback does not
+close it.
+
+**Where:** `src/composables/dashboard/usePanelCache.ts`
+
+**Suggested fix:** delete by key prefix (`o2q-heavy-["org","<org>","panels"`) as
+`dropPanelCache()` in the same file already does via `cacheRemoveByPrefix`.
+
+**Severity:** Low — a debug/support tool, not user-facing. But it fails silently and
+misreports success, so anyone told to "clear the cache and retry" gets a false result.
+
+---
+
+### 9. (pre-existing, not this branch) `forceLoad` forks the panel cache key
+
+```
+Module:            Dashboards -> panel result cache (§5.2)
+UI path:           open a dashboard, let a panel load, press the panel's Refresh -> inspect IndexedDB
+What to check:     how many entries exist for one panel id
+What to expect:    one entry per panel + variable combination
+```
+
+`getCacheKey()` includes `forceLoad`, so a forced load hashes to a different key than a
+normal one. Each panel can hold **two** copies of the same result, and a forced refresh's
+result is never reused by a subsequent normal load.
+
+Observed: one panel with two digests, both holding a 168-hour window — the same range cached
+twice.
+
+**Not caused by this branch** — `getCacheKey()` is character-for-character identical on
+`main`. Filed for visibility only; the fix would be to drop `forceLoad` from the key, since
+forcing is about *whether to fetch*, not *which result you get*.
+
+**Severity:** Low — wasted IndexedDB space and a missed cache hit after any refresh. No
+incorrect data shown.
+
+---
+
+### Also confirmed this round
+
+- **Time range does not fork the panel cache** — independently verified, matching finding #2
+  above. Switching a dashboard from 1 week to 24 hours produced **no** new IndexedDB entry
+  (2 entries before, 2 after, both still 168 h). `getCacheKey()` holds panelSchema +
+  variables + dashboard/folder id only.
+- **Metrics Explorer panel cache works** — cards restore on revisit and across a hard reload
+  with **zero** `query_range` requests; 6 entries written under
+  `["org","<org>","panels","__metrics_explorer",...]`; no `DataCloneError`.
+- **Streams pagination + prefetch works** — cold load 2 requests (page + next-page prefetch),
+  page 2 -> 1 (prefetching page 3), page 3 -> 0. Sorting fires 2 with **different** offsets,
+  not two identical ones.
+- **Alert History prefetch works** — but only on the standalone **Alerts -> Alert History**
+  page, which has **no UI path**: `goToAlertHistory()` is defined and returned in
+  `AlertList.vue` but bound to no template element, and the same is true of
+  `goToAlertInsights()`. The alert-detail History tab and the History drawer do not prefetch
+  at all, so every reachable alert-history surface issues one request per page.
+- **A dashboard panel can render blank while its cache is correct** — a panel whose cached
+  entry held valid data (`loading:false`, no error) drew no chart. Reproduced on `main` too,
+  so it is **not** a caching fault; an ECharts instance is created but produces no canvas.
+  Worth a separate ticket.
+
+---
+
+## Carried over from the parallel run — findings not already listed above
+
+These came from a separate test campaign against a local backend. Each was checked
+against the findings above and is **not** a duplicate of them. Numbering continues from
+the list above; the original numbers from that run are noted in each heading.
+
+Two of that run's findings are **already covered above** and are not repeated here:
+its time-range/`now` cache-key finding is the same as **#6**, and its AI → Evaluations
+force-refetch overlaps **#3** (different pages in the same module — Evaluations there,
+Datasets & Queues here; both worth checking).
+
+---
+
+### 10. Destination webhook credentials written to localStorage in plaintext
+
+| Field | Detail |
+| --- | --- |
+| **Module** | Alerts → Destinations (§6.3) |
+| **UI path** | Left sidebar → **Alerts** → **Destinations** tab |
+| **What to check** | DevTools → Application → Local Storage → key `o2q-["org","default","alerts","destinations","alert"]` |
+| **What to expect** | Credentials never written to disk. Cipher keys, ingestion tokens, org passcode, RUM and agent tokens are all explicitly memory-only; destinations should follow the same rule |
+| **The issue** | The whole destination payload — **including `headers`** — is persisted to `localStorage`. A destination carrying `Authorization: Bearer …` (PagerDuty routing key, Opsgenie / ServiceNow credential, any custom webhook token) has that secret written to disk in cleartext |
+
+**Severity:** High — a credential at rest on a possibly shared machine.
+
+**Reproduced:**
+
+1. Created destination `cachetest_dest2` with header `Authorization: Bearer <redacted-token>
+2. Navigated to Alerts → Destinations.
+3. Scanned all of `localStorage` for the literal token:
+
+```
+plantedTokenFoundInStorage: true
+key:    o2q-["org","default","alerts","destinations","alert"]
+sample: ,"skip_tls_verify":false,"headers":{"Authorization":"Bearer <redacted-token>
+```
+
+4. Hard-reloaded (Ctrl+Shift+R) and re-scanned → `tokenSurvivedHardReload: true`.
+
+**Blast radius (also measured):** the token **is** removed by an org switch and by logout —
+both verified below. So the exposure is "on disk for the duration of the session, and
+across browser restarts until one of those runs", not "forever".
+
+**Where:** [`services/alert_destination.queries.ts`](../src/services/alert_destination.queries.ts)
+sets `persister: localStoragePersister` on `destinationsQuery`.
+
+**Suggested fix:** drop the persister (memory-only, as `cipherKeysQuery` already does), or
+strip `headers` before it reaches the persister. Same question at lower stakes for
+`actionsQuery` and `aiToolsetsQuery`.
+
+---
+
+*(originally #1 in the parallel run)*
+
+---
+
+### 11. A forced fetch permanently rewrites a query's stored `staleTime` to 0
+
+| Field | Detail |
+| --- | --- |
+| **Module** | Query layer — `fetchInto` / `queryClient.fetchQuery` (affects every page whose Refresh button forces) |
+| **UI path** | Any cached list with a Refresh button, e.g. Settings → **Cipher Keys** |
+| **What to check** | Read `queryClient.getQueryCache()` and inspect the entry's `options.staleTime` before and after clicking Refresh once |
+| **What to expect** | A one-off forced read should not change the query's standing freshness policy |
+| **The issue** | `fetchQuery({ ...options, staleTime: 0 })` **writes `staleTime: 0` onto the cached query object**, and a later `fetchQuery(options)` passing the correct value does not restore it |
+
+**Severity:** Low–Medium. **No longer latent — a real trigger path was found and reproduced
+live** (see "Confirmed on `/config`" below).
+
+**Controlled experiment** (synthetic key, so nothing else interferes):
+
+```
+staleTime after normal fetch  (passed 300000):  300000
+staleTime after forced fetch  (passed 0):       0          ← overwritten
+staleTime after next normal fetch (passed 300000): 0        ← NOT restored
+did that next normal fetch hit the network?     false
+```
+
+**Why it is not currently user-visible:** the *passed* `staleTime` still wins for each
+`fetchQuery` call, so imperative callers (`fetchInto`) keep behaving correctly — verified
+on Cipher Keys, where a Refresh click left the warm revisit at **0 requests** and the
+declared `staleTime: 300000` still in effect for the read decision.
+
+**Why it still matters:** the stored `0` is what `useQuery` observers, `isStale()`,
+`refetchOnMount` and `refetchOnWindowFocus` consult. Any component that later mounts a
+`useQuery` on a key that some other page force-fetched will treat it as permanently stale.
+Several keys are shared across pages exactly like this (destinations, templates, functions,
+streams), so this is a trap waiting for the next `useQuery` migration.
+
+**Confirmed on `/config` — the most-cached query in the app.**
+[`utils/buildVersionChecker.ts`](../src/utils/buildVersionChecker.ts) re-reads config with
+an explicit force:
+
+```ts
+this.cachedConfig = await queryClient.fetchQuery({ ...configQuery(), staleTime: 0 });
+```
+
+That force is **correct** for its purpose — the stale-build prompt must not be suppressed by
+the `staleTime: Infinity` config cache, and it isn't. But it permanently rewrites the stored
+policy. Measured live by invoking the real checker:
+
+```
+/config entry ["org","__global__","config","get"]
+  before checkForNewVersion():  staleTime: Infinity
+  after  checkForNewVersion():  staleTime: 0        ← permanently rewritten
+```
+
+The checker runs on any chunk-load error, so this is reachable in normal operation, not a
+synthetic case. Current user-visible impact is limited (`configQuery` is read via
+`fetchQuery` with its own `staleTime` passed, and it does not set `refetchOnWindowFocus`),
+but the standing policy on the app's session-immutable config query is now `0` — so the
+moment anything mounts a `useQuery` on it, or the client default for focus-refetch changes,
+`/config` starts refetching continuously.
+
+**Suggested fix:** force via `queryClient.invalidateQueries({ queryKey, refetchType: 'none' })`
+followed by a normal `fetchQuery`, or use `refetchQueries`, rather than passing
+`staleTime: 0` into `fetchQuery`.
+
+---
+
+*(originally #3 in the parallel run)*
+
+---
+
+### 12. Enrichment table status is re-requested on every visit
+
+| Field | Detail |
+| --- | --- |
+| **Module** | Pipelines → Enrichment Tables (§10.2) |
+| **UI path** | Left sidebar → **Pipelines** → **Enrichment Tables** |
+| **What to check** | Network tab: navigate away and straight back within 30 s |
+| **What to expect** | A warm revisit issues no request |
+| **The issue** | `GET /api/default/enrichment_tables/status` fires on **every** visit. The paired stream list *is* cached correctly |
+
+**Severity:** Low — listed as *not migrated* in `api-cache-inventory.md` §3a item 7, so a
+known gap rather than a regression. Recorded because the plan's §10.2 otherwise implies the
+page is fully cached.
+
+```
+cold visit: GET /api/default/enrichment_tables/status
+            GET /api/default/streams?type=enrichment_tables
+warm visit: GET /api/default/enrichment_tables/status      ← stream list correctly absent
+```
+
+---
+
+*(originally #4 in the parallel run)*
+
+---
+
+### 13. Alerts → History re-reads the whole alert list on every visit
+
+| Field | Detail |
+| --- | --- |
+| **Module** | Alerts → History (§6.5) |
+| **UI path** | Left sidebar → **Alerts** → **History** |
+| **What to check** | Network tab across repeated visits |
+| **What to expect** | The alert list backing the name filter is already cached by the Alerts page; it should not be re-read |
+| **The issue** | `GET /api/v2/{org}/alerts?sort_by=name&desc=false&name=` fires on **every** visit, and no `["org",…,"alerts","list",…]` entry is ever created — the call bypasses `alertsListQuery` entirely |
+
+**Severity:** Low. Confirmed by dumping every alert-related cache key after three visits:
+entries exist for `destinations`, `templates` and 11 × `history`, but **none** for the
+alert list.
+
+---
+
+*(originally #6 in the parallel run)*
+
+---
+
+### 14. (out of scope) An unused alert template cannot be deleted
+
+Found while testing C7; **not a caching defect**, recorded because it blocks that test.
+
+| Field | Detail |
+| --- | --- |
+| **Module** | Alerts → Templates (§6.4) |
+| **UI path** | Left sidebar → **Alerts** → **Templates** → row → **Delete** |
+| **What to check** | Delete a template that nothing uses |
+| **What to expect** | A confirm dialog, then the template is deleted |
+| **The issue** | The delete button opens the **dependency-impact** dialog, which for a template with 0 dependencies reads "Used by 0 destinations · 0 alerts" and offers **only a Close button**. There is no way to proceed, so an unused template cannot be deleted from the UI. Reproduced twice |
+
+
+---
+
+*(originally #7 in the parallel run)*
+
+---
+
+### 15. The alert form's workflow dropdown bypasses the cache
+
+| Field | Detail |
+| --- | --- |
+| **Module** | Alerts → create / edit alert (§6.2) |
+| **UI path** | Left sidebar → **Alerts** → **New alert** |
+| **What to check** | Network tab across repeated opens of the alert form |
+| **What to expect** | The workflow list is a declared cached read (`workflowsQuery`), already cached by the Workflows page — the dropdown should reuse it |
+| **The issue** | `GET /api/{org}/workflows` fires on **every** form open, and **no `workflows` cache entry is ever created** |
+
+**Severity:** Low — one extra request per form open.
+
+**Measured:** three consecutive opens of the alert form, each preceded by warming
+destinations, templates and streams:
+
+```
+open 1: GET /folders/alerts · GET /workflows · GET /functions
+open 2: GET /workflows          ← destinations/templates/streams correctly cached
+open 3: GET /workflows
+```
+
+Cache dump for the workflows domain after all three: **[] (empty)**.
+
+**Root cause:** [`components/alerts/AlertDestinationsField.vue`](../src/components/alerts/AlertDestinationsField.vue)
+calls the transport directly instead of the declared query:
+
+```ts
+import workflowService from "@/services/workflows";
+…
+const res = await workflowService.listWorkflows(store.state.selectedOrganization.identifier);
+```
+
+The Workflows *page* uses `workflowsQuery` and caches correctly (verified: cold 1, warm 0),
+so this is a single call site that opted out. Same class as Issue 6.
+
+**Suggested fix:** read through `workflowsQuery` (via `fetchInto` or `useQuery`) so the
+dropdown shares the entry the Workflows page already populates.
+
+---
+
+*(originally #8 in the parallel run)*
+
+---
+
+### 16. The trace DAG is persisted to IndexedDB but never served from it
+
+| Field | Detail |
+| --- | --- |
+| **Module** | Traces → trace detail → **DAG** tab (§16) |
+| **UI path** | Left sidebar → **Traces** → switch to **Traces** mode → click a trace → **DAG** tab |
+| **What to check** | Open the DAG, switch to Waterfall, switch back to DAG. Watch the Network tab |
+| **What to expect** | Per `api-cache-inventory.md`: "T5, `staleTime: Infinity` — **a trace is immutable, so each time window is cacheable forever**". The second open should issue **no** request |
+| **The issue** | The declaration ships `staleTime: 0`, so the entry is always stale. The DAG **is** written to IndexedDB, but every open re-fetches — the persistence is paid for and never used |
+
+**Severity:** Medium — the DAG is an expensive read, this is the one query the design
+singles out as permanently cacheable, and the persistence cost is being paid for no benefit.
+
+**Measured** (LLM trace `bb11cc22…`, DAG tab opened, switched away, reopened):
+
+```
+1st open: GET /api/default/default/traces/bb11cc22…/dag?start_time=…&end_time=…
+          → IndexedDB entry created:
+            o2q-heavy-["org","default","traces","dag","bb11cc22…","default",1787633545026000,1787637145026000]
+2nd open: GET /api/default/default/traces/bb11cc22…/dag?start_time=…&end_time=…   ← re-fetched
+```
+
+**Where:** [`services/search.queries.ts`](../src/services/search.queries.ts)
+
+```ts
+export const traceDagQuery = (…) =>
+  queryOptions({
+    queryKey: traceDagKeys.detail(org, streamName, traceId, startTime, endTime),
+    queryFn: …,
+    staleTime: 0,                    // ← inventory documents `Infinity`
+    gcTime: LONG_GC_TIME,
+    persister: indexedDbPersister,
+  });
+```
+
+**Suggested fix:** set `staleTime: SESSION_STALE_TIME` (Infinity), as the inventory
+describes. The key already includes the time window, so a different range still forks
+correctly.
+
+**Note on reaching this view:** the DAG tab only appears for traces containing **LLM spans**
+(`TraceDetails.vue`: `v-if="hasLLMSpans && activeTab === 'dag'"`, via `isLLMTrace()`).
+A plain HTTP/DB trace shows only Waterfall / Flame Graph / Trace Graph, and "Trace Graph" is
+a **client-side** render that issues no request — not the cached DAG. Testing §16 requires
+ingesting a trace with `gen_ai.*` attributes.
+
+---
+
+*(originally #9 in the parallel run)*
+
+---
+### 17. Raw `Date.now()` in cache keys — still unquantized on AI Insights/Sessions and Pipeline History
+
+```
+Module:            AI -> LLM Insights / Sessions (§22.3a) · Pipelines -> History (§9.3)
+UI path:           AI -> LLM Insights  (or Pipelines -> open a pipeline -> History)
+What to check:     Network tab: open the page, navigate away, come straight back — three times
+What to expect:    the second and third visits serve from cache
+```
+
+The cache key contains the raw `start_time` / `end_time`, recomputed from `Date.now()` on
+every mount. The key is therefore different every time: **the entry can never be reused**,
+and each visit adds a new permanent entry until `gcTime` reclaims it.
+
+**Partially fixed — two of the four original surfaces are now correct.** `quantizeRange()`
+buckets the range before it enters the key, and it is applied in exactly two places:
+
+```
+services/alerts.queries.ts:86          quantizeRange(start, end)            <- Alerts -> History   FIXED
+services/service_graph.querykeys.ts:35 quantizeRange(..., OVERVIEW_BUCKET)  <- Traces Service Graph FIXED
+
+plugins/traces/composables/useLLMInsights.ts   0 uses of quantizeRange, 10 raw-timestamp refs  STILL OPEN
+components/pipelines/PipelineHistory.vue       0 uses of quantizeRange, 15 raw-timestamp refs  STILL OPEN
+```
+
+So finding **#6** above (alert-history keys anchored to raw `now`) is resolved, but the same
+defect remains on the two call sites listed here — they were part of the same original
+finding and were not covered by that fix.
+
+**Suggested fix:** route both through `quantizeRange()` before building the key, as
+`alerts.queries.ts` does. The request still carries the caller's exact timestamps; only the
+key rounds.
+
+**Severity:** Medium — the cache is populated and never read on these pages, and entries
+accumulate one per visit.
+
+*(originally #5 in the parallel run, re-scoped after re-checking the source)*
+
+---
+
+### Verified fixed — not filed
+
+- **AI -> Evaluations force-refetching on every visit** (originally #2 in the parallel run)
+  is **fixed**. `OnlineEvals.vue` now mounts with `await loadAll(orgId.value)` — no force —
+  and the comment states the contract: *"Mount reads the cache; only the refresh button and
+  post-write reloads force."* The forced path (`loadAll(orgId, true)`) is reached only via
+  `@reload-configs`, which `QualityPage.vue` emits from `refreshAll()` — a refresh-button
+  handler, not a mount hook. Re-checked in source; no longer reproducible.
+
+---
+
 ## Security / review-note confirmations (§24)
 
 7. **Destinations persisted in plaintext — confirmed on disk** (§24 item 1). The localStorage key

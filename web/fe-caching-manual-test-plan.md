@@ -2,6 +2,8 @@
 
 Branch: `feat/fe-caching` · PR: [#13642](https://github.com/openobserve/openobserve/pull/13642)
 
+Companion doc: [fe-caching-manual-test-issues.md](./fe-caching-manual-test-issues.md) — findings from the test runs.
+
 Everything below is a **UI navigation path**, not a URL. Follow the clicks exactly as
 written. Each module lists: **where to go**, **what to check**, **what to expect**.
 
@@ -55,12 +57,24 @@ that is a bug — it opts out of the org-switch and logout purges.
 
 ## 1. The universal checklist — run this on EVERY cached list
 
-Sections 2 onward name the surfaces. For each one, run these eight checks. They are the
-same checks every time, so they are written out once here.
+### Which sections get C1–C8, and which do not
+
+**C1–C8 applies only to a cached LIST page** — a table of rows with a Refresh button and
+create / edit / delete. Everywhere else, run only that section's own rows.
+
+| Run **C1–C8 + the section's rows** | Run **the section's rows ONLY** |
+| --- | --- |
+| §3 Streams · §5.1 Dashboards · §6.1 Alerts · §6.3 Destinations · §6.4 Templates · §7 SLOs · §8 Reports · §9.1 Pipelines · §9.2 Pipeline destinations · §10.1 Functions · §11 Synthetics · §12 Workflows · §13 Actions · §14.1–14.5 IAM · §15.3 Cipher Keys · §15.4 Regex Patterns · §15.6 AI Toolsets | §2 App shell · **§4 Logs** · §4.1 Field values · §4A Metrics · §5.2–5.6 Panels/annotations · §6.5 Alert history · §6.8 Dependencies · §14.7 Organizations · §15.1 General · §15.2 Nodes · §15.5 Built-in patterns · §15.7 Model pricing · §15.8 License · §16 Traces · §19 Home · §20 Data sources · §21 RUM · §22 Enterprise · §23 Edge cases |
+
+A section that wants C1–C8 says **"Run C1–C8"** under its UI path. If it doesn't say that,
+it doesn't want them.
+
+Sections 2 onward name the surfaces. For each list page, run these eight checks. They are
+the same checks every time, so they are written out once here.
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
-| **C1** | Cold read | Hard-reload (Ctrl+Shift+R), navigate to the page | Skeleton appears, **exactly one** request in Network, rows render |
+| **C1** | Cold read | Hard-reload (Ctrl+Shift+R), navigate to the page | Skeleton appears, **one** request in Network, rows render. **Exception — server-paginated tables (Streams, §3): expect TWO** — the page you asked for, plus a background prefetch of the next page. That is by design, see §3 |
 | **C2** | Warm revisit — fresh | Navigate away to another module, come straight back (within the freshness window) | Rows appear **instantly, no skeleton**, and **zero requests** in Network |
 | **C3** | Warm revisit — stale | Navigate away, wait past the freshness window, come back | Rows appear **instantly, no skeleton**, then **one** background request; the table updates in place — it must never blank out |
 | **C4** | Refresh button | Click the Refresh icon in the page header | **One** request goes out every single time (even inside the freshness window). Rows stay on screen throughout. The **spinner is on the button**, not a full-table skeleton |
@@ -69,11 +83,120 @@ same checks every time, so they are written out once here.
 | **C7** | Delete + navigate back | Delete a row → confirm → then navigate to another module and come **straight back** | The row is gone immediately **and is still gone on return**. A deleted row reappearing is the single most likely regression in this branch |
 | **C8** | Filter/search survives refresh | Type a search term, then press Refresh (or `r`) | The search term and the filtered result set are **preserved**. The list must not reset to unfiltered |
 
+### 1.1 How many requests should a cold load fire? — read this before C1
+
+"One request" is the **default**, not a universal rule. Two legitimate reasons a page
+fires more, neither of which is a bug:
+
+**(a) The page prefetches the next page.** Only **two** surfaces do this — verified by
+grepping every `prefetchQuery` call site in the app:
+
+| Surface | Section | Cold load | Then each page change |
+| --- | --- | --- | --- |
+| **Streams** | §3 | **2** — page 1 + prefetch of page 2 | **1** (the page itself is cached; the request warms the page *ahead*) |
+| **Alert History** — standalone page, **URL-only, no UI path** (§6.5) | §6.5 | **2** — page 1 + prefetch of page 2 | **1**, same pattern |
+
+On the **last** page the prefetch is skipped, so expect **0**. The prefetch is also
+skipped whenever there is **no next page at all** — fewer than one page of rows means
+**1 request is correct**, on either surface. And within Alerts, only the standalone
+**Alert History** page prefetches: the alert-detail **History tab** and the **History
+drawer** never do, so expect 1 there always.
+`main` prefetches nowhere, so it shows 1-1-1-1 where this branch shows 2-1-0-0.
+
+**(b) The page genuinely needs several lists.** These fire one request *per list* on a
+cold load — count them against this table, not against "one".
+
+> **These are UPPER BOUNDS, not exact counts.** They come from static analysis of which
+> queries each page references. The real number is often lower because some queries are
+> conditional: gated by edition (`isEnterprise` / `isCloud`), by a feature flag, by which
+> tab is open, or fired only on a user action rather than on mount. Two known examples —
+> the Alerts list references `alertDetailQuery` but only fires it when you **open a row**,
+> so its cold load is 3, not 4; and Home → Overview fires fewer than 5 on a community
+> build. **Fewer requests than listed is fine. More is worth reporting.**
+
+| Page | Section | Cold requests | Which queries |
+| --- | --- | --- | --- |
+| Home → Overview | §19 | up to **5** | alert history · anomaly configs · anomaly history · incidents · service topology. **Enterprise/cloud only for the services + incidents sections** — a community build fires fewer |
+| AI → Evaluations | §22.1 | **4** | providers · score configs · scorers · eval jobs |
+| IAM → Users | §14.1 | **4** | org users · roles · assignable roles · all user roles |
+| Alerts list | §6.1 | **3** | alerts · destinations · templates. (`alertDetailQuery` is **not** one of them — it fires only when you open a row) |
+| Data sources | §20 | **3** | ingestion tokens · passcode · RUM tokens |
+| Alerts → dependency graph | §6.8 | **3** | alert dependencies · destinations · templates |
+| IAM → Roles → Edit role | §14.2 | **3** | resources · destinations · templates |
+| Alerts → Destinations | §6.3 | **2** | destinations · templates |
+| Pipelines → Destinations | §9.2 | **2** | destinations · templates |
+| IAM → Roles | §14.2 | **2** | roles · all user roles |
+| IAM → Add service account | §14.5 | **2** | roles · groups |
+| Streams | §3 | **2** + prefetch | stream page · org summary |
+| Dashboards | §5.1 | **2** | folders · dashboards-by-folder |
+| Settings → General | §15.1 | **2** | config · org summary |
+| Home → Usage | §19 | **2** | config · org summary |
+| Add / Edit alert | §6.2 | **2** | alert detail · destinations |
+| App shell (any page) | §2 | **2** | `/config` · org settings |
+
+**What C2 tests is unchanged and is the real signal:** whatever the cold count is, the
+**warm revisit within the freshness window must be ZERO**. A page that fires 4 on a cold
+load and 0 on return is working correctly. A page that fires 4 both times is not.
+
+---
+
+## 1.2 Cache policy — testing the mechanics themselves
+
+C1–C8 test each *screen*. This section tests the **cache engine**: freshness windows,
+eviction, focus refetch, polling and retry. Run it **once**, on any convenient list page —
+these are global behaviours, not per-module.
+
+**Use the TanStack Query Devtools** (§0.2) for this section. It shows every entry's state
+badge — `fresh` / `stale` / `fetching` / `inactive` — which is far easier than inferring
+freshness from the Network tab.
+
+### The four freshness tiers
+
+| Tier | Duration | Applies to | How to verify |
+| --- | --- | --- | --- |
+| **Default** | **30 s** | Most lists — alerts, SLOs, reports, pipelines, dashboards, IAM | Open a list, watch its Devtools badge flip `fresh` → `stale` after 30 s |
+| **Config** | **5 min** | Streams, folders, functions, destinations, templates, actions, regex patterns, org settings | Same, but the flip takes 5 minutes |
+| **Session** | **forever** | `/config` and built-in regex patterns only | Badge stays `fresh` for the whole session — it must **never** go stale |
+| **Persisted max age** | **24 h** | Anything in localStorage / IndexedDB | An entry older than 24 h is discarded on read rather than served |
+
+| # | Check | Steps | Expected |
+| --- | --- | --- | --- |
+| **P1** | Fresh window suppresses the request | Open Alerts, note the time. Navigate away and back **within 30 s** | **Zero** requests. Devtools badge reads `fresh` |
+| **P2** | Stale window triggers revalidation | Same, but wait **past 30 s** | Rows paint instantly, then **one** background request. Badge goes `stale` → `fetching` → `fresh` |
+| **P3** | Config tier is longer | Open Streams, come back **after 1 minute** | Still **zero** requests — the 5-minute tier has not expired. This is what distinguishes the tiers |
+| **P4** | Session tier never expires | Sit in the app for 10+ minutes, navigating around | `/config` is requested **once, ever**. Never re-requested |
+| **P5** | Built-in patterns never expire | Settings → Regex Patterns → Built-in tab, revisit repeatedly | One request per session, and it survives F5 (persisted) |
+
+### Eviction, focus, polling, retry
+
+| # | Check | Steps | Expected |
+| --- | --- | --- | --- |
+| **P6** | Unused entries are garbage-collected | Open a list, navigate away, **wait 5+ minutes** without returning, then come back | A **cold read with a skeleton** — the entry was evicted from memory. Config-tier entries are held 30 min instead, so use a default-tier list (Alerts, Reports) for this |
+| **P7** | Refetch on window focus | Open **Alerts**, switch to another application for over 30 s, switch back | **One** background request; rows stay on screen. Applies to the volatile lists — alerts, streams, reports, incidents, SLOs, synthetics, dashboards, pipelines, IAM, workflows |
+| **P8** | No focus refetch on config tier | Same, but on **Settings → Regex Patterns** | **Zero** requests — config-tier reads deliberately do not refetch on focus |
+| **P9** | Polling starts and stops | IAM → Organizations → open an org's **cleanup tasks** dialog | A request every **5 s** while open. **Close the dialog → polling stops entirely.** A poll that continues after close is a leak |
+| **P10** | Polling stops on completion | Leave the cleanup dialog open until the task reports complete | Polling stops by itself, without closing the dialog |
+| **P11** | 4xx does not retry | Trigger a 403 — sign in as a user without permission for some list | **One** request, one error. **No retry storm, no repeated toasts.** 400/401/403/404 are never retried |
+| **P12** | 5xx / network errors do retry | Stop the backend, then open a list | Up to **2 retries** before the error surfaces |
+| **P13** | Reconnect refetches | DevTools → Network → **Offline**, navigate, then back to **Online** | Queries refetch automatically on reconnect |
+
+### Persistence lifecycle
+
+| # | Check | Steps | Expected |
+| --- | --- | --- | --- |
+| **P14** | Persisted entries survive reload | Visit Streams and Dashboards, then press **F5** | Lists paint from localStorage before any request completes |
+| **P15** | Version buster discards old payloads | Console: `localStorage.setItem('o2q-["org","default","functions","list"]', '{"buster":"0"}')` then reload Functions | The tampered entry is **discarded, not rendered** — a mismatched buster is treated as invalid |
+| **P16** | Corrupt entry is discarded | Console: write `'not json'` into any `o2q-` key, reload that page | Entry removed, page loads normally from the server. **No crash** |
+
 ---
 
 ## 2. App shell, session and organization
 
+**Scope:** each sub-section below states its own — see them individually.
+
 ### 2.1 Login and app config
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Sign out → Login screen → sign in
 
@@ -84,6 +207,8 @@ same checks every time, so they are written out once here.
 | DevTools → Application → Local Storage | There is **no** `o2q-` key holding `/config`. It is memory-only **by design** (the payload carries the RUM client token) |
 
 ### 2.1a New-deploy detection (build version checker)
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 The stale-build detector reads `/config` through the same cache, so caching it too
 aggressively would stop the "a new version is available" prompt from ever firing.
@@ -99,6 +224,8 @@ aggressively would stop the "a new version is available" prompt from ever firing
 
 ### 2.2 Organization switch — the most important cross-cutting test
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 **UI path:** Top navbar → Organization dropdown → pick a different organization
 
 | Check | Expected |
@@ -109,7 +236,33 @@ aggressively would stop the "a new version is available" prompt from ever firing
 | Switch back to org A within a couple of minutes and open a list you had open | Rows paint instantly from memory (the in-memory cache is deliberately kept across an org switch — only the on-disk copy is purged) |
 | DevTools → Application → IndexedDB → `o2Cache` → `kv` | No entries left whose key contains org A's identifier |
 
+> **Expected quirk — do not file this as a bug.** After one round trip (A → B → A), you
+> will find **no `o2q-` keys for either org**. That is the design, not a purge failure:
+>
+> 1. Switching away deletes the leaving org's localStorage keys but **keeps its in-memory
+>    entries** — deliberately, so switching back costs no requests.
+> 2. The persister only writes **after the query function actually runs**
+>    (`persistQuery` sits after `await queryFn(ctx)` in the library).
+>
+> So on re-entry the memory copy is still fresh → no fetch → nothing re-written to disk.
+>
+> | Step | In-memory | localStorage |
+> | --- | --- | --- |
+> | Start in org A | fetches | ✅ A's keys |
+> | → org B | A kept | A's deleted · ✅ B's keys |
+> | → back to A | A still fresh, **no fetch** | B's deleted · ❌ A's **not** re-written |
+> | → B again | B still fresh, **no fetch** | ❌ nothing |
+>
+> **To prove it:** switch away, **wait > 5 minutes** (the config-tier window these
+> persisted queries use), switch back, open Dashboards. The entries go stale, refetch, and
+> the keys reappear. If they do **not** reappear after a stale refetch, *that* is a bug.
+>
+> Consequence worth knowing for §2.4: any org you bounce away from and back to inside
+> 5 minutes loses its reload-persistence until something refetches. See §24 item 12.
+
 ### 2.3 Logout — nothing may survive
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Top-right user avatar → **Sign Out**
 
@@ -118,9 +271,11 @@ aggressively would stop the "a new version is available" prompt from ever firing
 | Before logging out, confirm `o2q-*` keys exist in Local Storage and `o2Cache` / `o2FieldValues` have entries in IndexedDB | They do |
 | Sign out, then inspect the Application tab again | **All** `o2q-*` localStorage keys gone; `o2Cache` and `o2FieldValues` emptied |
 | Log in as a **different user** | No list anywhere shows the previous user's data, even for a flash |
-| **Field-value residue after logout** (fixed — see §24 item 6) | As user A, expand a field on a stream in Logs. Sign out **without reloading the browser**. Log in as user B, who is restricted from that stream, in the **same org**, within 60 seconds. Type that field name → `=` in the Logs editor | User B must **not** be offered A's cached values — the logout purge now clears the in-memory field-value read cache as well as IndexedDB |
+| **Field-value residue after logout** (known issue — see §24 item 6) | As user A, expand a field on a stream in Logs. Sign out **without reloading the browser**. Log in as user B, who is restricted from that stream, in the **same org**, within 60 seconds. Type that field name → `=` in the Logs editor  ·  ⚠️ User B may still be offered A's cached values. Logout is a route change, not a page reload, so the in-memory field-value cache survives its 60-second TTL. **A full browser reload clears it.** Confirm the blast radius and report what you see |
 
 ### 2.4 Reload persistence
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Streams (or Dashboards → any folder) → press F5
 
@@ -135,21 +290,82 @@ aggressively would stop the "a new version is available" prompt from ever firing
 
 **UI path:** Left sidebar → **Streams**
 
-Run **C1–C8**. Plus these:
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **3 (page + next-page prefetch + `/summary`)** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a stream, save | Back on the list, the stream is **already there** — no manual refresh |
+| C7 | Delete a stream → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
-| Pagination is warm | Go to page 1, then page 2, then back to page 1 | Page 1 returns with **no request**. Moving to page 2 the first time issues one request — and page 3 is quietly pre-fetched, so moving forward again is instant |
-| Sort does not double-request | Click a column header to sort | **Exactly one** request — not two |
+| **Pagination is warm** | Watch Network across: land → page 2 → page 3 → back to page 1 | See the request table below. The key property: **the page you land on is never fetched after the first time** — the one request you see is always warming the page *ahead* |
+| Sort does not double-request | Click a column header to sort | **2 requests, and they must have DIFFERENT offsets** — browser-verified: `offset=0&sort=name&asc=false` (re-sorted page 1) + `offset=20&…&asc=false` (prefetch of re-sorted page 2). Sorting resets to page 1, so it behaves like a fresh cold load. **The bug to watch for is two requests with the SAME `offset=0` and identical params** — that was the old double-fire, where the sort handler and the watcher both triggered a load |
+
+**Expected request count per action** (54 streams, page size 20 → 3 pages). This branch
+prefetches page N+1 after **every** page load, so the counts are not what you might guess:
+
+| Action | Requests | What they are |
+| --- | --- | --- |
+| Land on Streams (cold) | **2** | page 1 · **+ prefetch of page 2** |
+| → page 2 | **1** | page 2 served from cache · + prefetch of page 3 |
+| → page 3 | **1** | page 3 from cache · + prefetch of page 4 (none here, so may be 0 on the last page) |
+| → back to page 2 | **0** | cached, and page 3 still fresh so no prefetch |
+| → back to page 1 | **0** | cached, and page 2 still fresh |
+
+> **Two requests on first landing is CORRECT, not a bug.** `main` has no prefetching at
+> all (verified: zero `prefetch` occurrences in its `LogStream.vue`) and fires one. The
+> extra upfront request buys instant forward paging. Compare against main and you will see
+> 1-1-1-1 there versus 2-1-0-0 here — main re-fetches every page every time, including
+> pages you have already visited.
 | Stream type tabs | Switch Logs → Metrics → Traces → back to Logs | Returning to a tab you have already loaded issues no request |
 | **Delete a stream (the key one)** | Delete a stream → confirm → navigate to Dashboards → come back to Streams | The deleted stream is **gone and stays gone**, including on page 2 and under a search filter. It must not flash back |
 | Deleted stream leaves dropdowns | After deleting, open Logs → stream selector; open Alerts → New Alert → stream dropdown | The deleted stream is **not** offered |
 | Refresh stats button | Streams → **Refresh Stats** button | Issues a request; the table keeps its rows |
 
-**Storage note:** the stream *name list* (used by every stream dropdown in the app) is
-persisted to `localStorage`. On an org with a very large number of streams this can hit
-the browser's ~5 MB storage budget — the app swallows that silently and simply stops
-persisting. Not a crash, but if reload-persistence stops working on a huge org, this is why.
+**Storage note — measured.** The stream *name list* (used by every stream dropdown in the
+app) is persisted to `localStorage` under
+`o2q-["org","<org>","streams","nameList","logs"]`.
+
+Measured on a live instance: **781 bytes per stream** (53 streams → 41.4 KB). So this key
+alone would need roughly **6,700 streams in one org** to exhaust a 5 MB budget. Real, but
+not near-term for most deployments.
+
+It is **not the biggest** entry, though — the SQL-editor function catalogue
+(`…"functions","queryFunctions"`) measured **68.8 KB**, larger than the stream list. Total
+across all persisted keys on a normal org: **~110 KB**, comfortably inside budget.
+
+If the budget is ever exceeded the app swallows the error and silently stops persisting —
+no crash, but reload-persistence quietly stops working. To check your own totals:
+
+```js
+Object.keys(localStorage).filter(k => k.startsWith('o2q-'))
+  .map(k => ({ key: k, kb: +(localStorage[k].length/1024).toFixed(1) }))
+  .sort((a,b) => b.kb - a.kb)
+```
 
 ---
 
@@ -157,52 +373,106 @@ persisting. Not a crash, but if reload-persistence stops working on a huge org, 
 
 **UI path:** Left sidebar → **Logs**
 
-> The log **search itself is deliberately NOT cached** — see §17. What is cached here is
-> the surrounding furniture.
+> **Run the rows in this section only — NOT C1–C8.** Logs is a search page, not a cached
+> list: there is no row table to cache, nothing to delete, and no list Refresh button. The
+> universal checklist does not apply here. What is cached on Logs is the surrounding
+> furniture — saved views, functions, actions, field values — and each has its own row.
+>
+> The log **search itself is deliberately NOT cached** — see §17.
 
 | Surface | UI path | Check | Expected |
 | --- | --- | --- | --- |
 | Saved views | Logs → **Saved Views** dropdown in the search bar | Open, close, reopen | Second open issues no request |
-| Saved views write-through | Save a new view → reopen the dropdown | The new view is listed without a manual refresh |
+| Saved views write-through | — | — | The new view is listed without a manual refresh |
 | Functions in the search bar | Logs → **Functions** dropdown | Open it, then go to Pipelines → Functions and back | The list is shared — one cache entry, not two requests |
-| SQL editor function catalogue | Logs → switch to **SQL mode** → start typing in the editor | The query-function autocomplete catalogue is config-tier: requested once per **5-minute window**, not on every keystroke or editor open (a revalidate after the window is expected) |
-| Missing catalogue is remembered | On a backend that returns nothing for the catalogue | It is asked **once** and the empty answer is cached — not re-asked repeatedly |
-| Actions menu | Logs → **Actions** menu (enterprise) | Open on Logs, then again after navigating away and back | Second open issues no request |
-| Field value autocomplete | Logs → click into the query editor → type a field name → `=` → wait for value suggestions | Values are served from IndexedDB `o2FieldValues` on the second attempt for the same field |
-| Field values purge | Switch org, then check IndexedDB `o2FieldValues` | Previous org's entries are gone |
+| SQL editor function catalogue | — | — | **One** request to `/query_functions` the first time; **zero** on reopening the editor; **zero** after F5 (it is persisted to localStorage). Payload is large — 356 functions on a typical backend — so not re-fetching it per page load is the real win |
+| Missing catalogue is remembered | — | ⚠️ **Skip — not testable on a current backend** | Only applies where `/api/{org}/query_functions` is absent (404). Check with `curl -u <email>:<passcode> <url>/api/<org>/query_functions`; a **200 means this row does not apply** |
+| Action scripts (enterprise only) | Left sidebar → **Logs** — the list loads on **page init**, not on menu open | Land on Logs fresh, then navigate to Streams and back | **One** request to `/api/{org}/actions` on first load; **zero** on return. Switching the search-bar transform selector from **Function** to **Action** fetches nothing — it filters an already-loaded list. Requires Enterprise/Cloud (`isActionsEnabled`) |
+| Field values | — | **See §4.1** — it has its own section, because the cache spans nine surfaces beyond Logs and the reader/writer distinction matters | |
 
 ### 4.1 Field-value autocomplete cache — **not Logs-only**
 
-**UI path:** six entry points across five pages — each row of the first table below is one.
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
-This cache has **two writers** (expanding a field in the sidebar, and Run Query results)
-and is reachable from **six entry points across five pages**. Values are stored under
-`org | streamType | streamName | field`, so a value captured on one page is offered on
-every other page for the same stream. It is a **two-layer** cache: an in-memory read cache
-(1-minute TTL, 500-entry cap) in front of IndexedDB `o2FieldValues`.
+**UI path:** thirteen surfaces across Logs, Traces, Dashboards, Alerts, SLOs, RUM, Metrics
+and Pipelines — each is a row in the Writers / Readers tables below.
 
-Test each surface below at least once — a value captured on one should be offered on the others.
+Field *values* (not field names) are captured once and reused everywhere. Stored in
+IndexedDB `o2FieldValues` under `org | streamType | streamName | field`, behind a
+60-second in-memory read cache.
 
-| Surface | UI path | Expected |
+> ## Read this before testing: writers never show cache hits
+>
+> This cache has a **fill** side and a **spend** side. Only the spend side is a cache test.
+>
+> | Direction | What it does | What you observe |
+> | --- | --- | --- |
+> | **WRITE** (fill) | Fetches values from the server, then stores them | **A request every single time**, including repeats |
+> | **READ** (spend) | Looks values up in the store | **Zero requests** when captured earlier |
+>
+> **Writers do not consult the cache at all**, and that is deliberate: a sidebar shows
+> value **counts scoped to your current time range** (`info 14, warn 13`), while the store
+> keeps only the value names. Serving a sidebar from cache would show counts that are
+> missing or wrong. The autocomplete needs only the names, so the store is enough there.
+>
+> **Expanding a sidebar field ten times = ten requests. Correct. Not a cache miss.**
+
+### Writers — fill the cache (always fetch)
+
+| Surface | UI path |
+| --- | --- |
+| Logs sidebar | Logs → left field sidebar → click the `›` beside a field |
+| Logs Run Query | Logs → Run query — values harvested from result rows in the background |
+| Traces sidebar | Traces → left field sidebar → expand a field |
+| Pipelines (scheduled node) | Pipelines → open a pipeline → a scheduled node's query builder |
+
+**What to check on a writer:** the request fires and **the store grows**. Nothing else.
+Confirm in DevTools → Application → IndexedDB → `o2FieldValues`. Run Query specifically
+must have **no visible effect on rendering** — its writes are scheduled on browser idle.
+
+### Readers — spend the cache (should not fetch)
+
+**This is where the caching is actually tested.** Each of these offers value suggestions
+pulled from the shared store:
+
+| Surface | UI path |
+| --- | --- |
+| **Logs query editor** | Logs → query editor → type `<field>=` |
+| Traces query editor | Traces → query editor → type `<field>=` |
+| Dashboard panel builder | Dashboards → open a dashboard → Add Panel → add a filter → open its value dropdown |
+| Alert query builder | Alerts → New Alert → the query/condition builder |
+| Anomaly detection config | Alerts → anomaly alert → config step |
+| SLO builder | SLOs → Add SLO → the query builder |
+| Function tester | Pipelines → Functions → Test Function |
+| RUM error / session filters | RUM → Error Tracking or Sessions → a filter input |
+| PromQL labels | Metrics → PromQL editor → type a label value |
+
+**What to check on a reader:** values appear with **zero requests**.
+
+### The test that matters — fill on one surface, spend on another
+
+| # | Step | Expected |
 | --- | --- | --- |
-| **Logs sidebar** | Logs → left field sidebar → click a field to expand it | Values load; expanding the same field again is instant (in-memory hit, no request) |
-| **Logs Run Query** | Logs → run a query with results | Values are harvested from the result hits in the background — check `o2FieldValues` grows. This must have **no visible effect on rendering** (writes are scheduled on idle) |
-| **Traces sidebar** | Traces → left field sidebar → expand a field | Same behaviour as Logs. Values captured here are shared with the other surfaces |
-| **Pipelines** | Pipelines → open a pipeline → a node's field/condition value input | Suggestions offered from the shared cache |
-| **Dashboard panel builder** | Dashboards → open a dashboard → Add Panel → add a filter → open its value dropdown | Suggestions offered from the shared cache |
-| **PromQL suggestions** | Metrics → PromQL editor → start typing a label value | Suggestions offered from the shared cache |
+| 1 | Logs → set a time range that covers your data → expand `latency_ms` in the sidebar | One request (a writer — expected). Store now holds that field |
+| 2 | Clear the Network tab | — |
+| 3 | Click into the **query editor**, type `latency_ms=` | Values appear, **zero requests** ← **this is the caching test** |
+| 4 | Repeat step 3 for `level=`, `code=`, `user=` | Same — values, no requests |
+| 5 | Open a **dashboard panel filter** on the same stream/field | Same values, **zero requests** — one store serving two modules |
 
-| Cross-cutting check | Steps | Expected |
+### Other checks
+
+| Check | Steps | Expected |
 | --- | --- | --- |
-| Values are shared across surfaces | Expand field `X` on a stream in **Logs**, then open the **dashboard panel filter** for the same stream and field | Values are offered **with no request** — same cache entry |
-| Second read is instant | Expand a field, collapse it, expand it again within a minute | Served from the in-memory layer — no IndexedDB read, no request |
-| Cold stream has no values | Pick a stream nobody has searched or expanded yet | Empty suggestions is **correct** — that is a cold cache, not a bug |
-| Org switch purges them | Switch org → check IndexedDB `o2FieldValues` | Previous org's entries gone |
-| Private browsing | Repeat in a private window | Suggestions still work in-session; nothing persists; no console error |
+| Cold stream has no values | Type `<field>=` for a stream nobody has searched | **Empty is correct** — a cold cache, not a bug |
+| Time range matters | Expand a field with a range that excludes your data | "No values found" is correct — widen the range first |
+| Org switch purges | Switch org → check IndexedDB `o2FieldValues` | Previous org's entries gone; they do **not** come back on returning until something re-captures |
+| Private browsing | Repeat in a private window | Suggestions work in-session, nothing persists, no console error |
 
 ---
 
 ## 4A. Metrics Explorer
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Left sidebar → **Metrics**
 
@@ -223,11 +493,41 @@ Test each surface below at least once — a value captured on one should be offe
 
 ## 5. Dashboards
 
+**Scope:** each sub-section below states its own — see them individually.
+
 ### 5.1 Dashboard list and folders
 
 **UI path:** Left sidebar → **Dashboards**
 
-Run **C1–C8**. Plus:
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **4 (home_dashboard + folders + favourites + dashboards)** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a dashboard, save | Back on the list, the dashboard is **already there** — no manual refresh |
+| C7 | Delete a dashboard → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
@@ -238,10 +538,13 @@ Run **C1–C8**. Plus:
 | **Delete a dashboard** | Dashboards → folder → delete a dashboard → confirm → go to Streams → come back to Dashboards | Deleted dashboard is gone **and stays gone**. *This was a shipped bug: it used to come back on the next visit* |
 | Create a dashboard | Dashboards → **New Dashboard** → save | You land on the new dashboard; going back to the list shows it without a manual refresh |
 | Move a dashboard between folders | Move a dashboard to another folder, then open both folders | Source folder no longer lists it; destination folder does |
-| Favourites | Star a dashboard → reload the page | The star survives the reload (favourites are persisted per user) |
-| Home dashboard | Settings → set a home dashboard → go to Home | Applied; changing it updates Home without a reload |
+| Favourites | Star a dashboard → reload the page **within 5 minutes** | 🐛 **KNOWN BUG — the star disappears.** Reproduced and confirmed: the server saves it, but `setQueryData` does not write through to localStorage, so the reload hydrates a stale empty list that is still "fresh" and never refetches. Wait past 5 min and it self-heals. See §24 item 16 |
+| Home dashboard (org-wide pin) | **Dashboards** → a dashboard's row action (or open it → same action) → **Set as Home**. *Not in Settings — there is no such control there* | Click **Home**: that dashboard renders instead of the overview. Re-pin a different one → Home updates with no reload. Unpin → overview returns |
+| Home dashboard survives reload | Pin a dashboard → press **F5 within 5 minutes** | ⚠️ **Expected to FAIL** — `setHomeDashboard` uses the same `setQueryData` pattern as the confirmed favourites bug (§24 item 16) on the same persisted `settingQuery`. If the pin is lost, that confirms Issue 10 affects both call sites — and this one is **org-wide**, so it is worse |
 
 ### 5.2 Dashboard panels — the IndexedDB result cache
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Dashboards → open a folder → open a dashboard → (panels render)
 
@@ -250,13 +553,16 @@ Run **C1–C8**. Plus:
 | **Panel results survive a revisit** | Open a dashboard, let panels render → navigate to Streams → come back to the dashboard | Panels **restore their previous results immediately and fire NO queries**. This is by design — a restored panel does not revalidate |
 | Panel results survive reload | Open a dashboard, let panels render → press F5 | Panels restore from IndexedDB, no queries re-run |
 | **Panel cache is really written** | DevTools → Application → IndexedDB → `o2Cache` → `kv` | Entries whose key contains `panels` and your folder/dashboard/panel ids. **The store must not be empty** — before this branch every write threw `DataCloneError` and the cache stayed empty. Also check the Console: **no `DataCloneError`** |
-| Changing the time range refetches | Open a dashboard → change the time range → change it back | **Every** time-range change re-runs the panel queries, including the return — same as main. The cache keeps ONE entry per panel+variables (the last run); only a mount/reload restores it, tolerating a different span with the "cached data differs" badge |
-| Variables fork the cache entries | Change a dashboard variable, then change it back | Each variable combination has its own stored entry, but changing back still re-runs the queries (restore is mount-only, as above) |
+| Time range does **NOT** fork the cache | Open a dashboard → change the range → change it back | ⚠️ **Corrected expectation.** `getCacheKey()` holds only panelSchema + variables + dashboard/folder id — **the window is not in it**. There is **one entry per panel+variables**, so changing the range re-queries and changing back re-queries again. It is **not** instant |
+| Duration matters, bounds do not | Load at Past 1 Week, then pick a **different** 1-week absolute window | **No ⚠ warning** — same duration, so the cached result is still shown while the new one loads. Pick a *different length* (24 h) and the panel raises `isCachedDataDifferWithCurrentTimeRange` until fresh data lands. This is the design: a week-long result stays usable for another week-long window, with "Last Refreshed" reporting its true age |
+| Variables fork the cache | Change a dashboard variable, then change it back | Same — each variable combination has its own entry |
 | **Deleting a panel drops its cache** | Dashboards → open a dashboard → Edit → delete a panel → save → inspect IndexedDB `o2Cache` → `kv` | That panel's entries are **gone**, not left behind to age out |
 | Manual cache clear still works | Console: `await window._o2_removeDashboardCache()` then reload the dashboard | All panels re-run their queries |
 | Inspect the cache | Console: `await window._o2_getDashboardCache()` | Returns an object keyed by folder → dashboard → panel |
 
 ### 5.3 Add / edit panel
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Dashboards → open a dashboard → **Add Panel** (or Edit on an existing panel)
 
@@ -266,6 +572,8 @@ Run **C1–C8**. Plus:
 | Save a panel, return to the dashboard | The new panel renders; other panels keep their cached results |
 
 ### 5.4 Annotations
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Dashboards → open a dashboard → on a time-series panel, drag-select a range → **Add Annotation**
 
@@ -277,6 +585,8 @@ Run **C1–C8**. Plus:
 
 ### 5.5 Import dashboard
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 **UI path:** Dashboards → **Import**
 
 | Check | Expected |
@@ -284,6 +594,8 @@ Run **C1–C8**. Plus:
 | Import a dashboard JSON → go back to the list | The imported dashboard is listed without a manual refresh |
 
 ### 5.6 Dashboard picker dropdown (used outside the Dashboards module)
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI paths where the picker appears:** Reports → **New Report** → dashboard selector ·
 Alerts → dashboard-linked flows · anywhere a "select a dashboard" dropdown is offered
@@ -299,11 +611,41 @@ Alerts → dashboard-linked flows · anywhere a "select a dashboard" dropdown is
 
 ## 6. Alerts
 
+**Scope:** each sub-section below states its own — see them individually.
+
 ### 6.1 Alerts list
 
 **UI path:** Left sidebar → **Alerts**
 
-Run **C1–C8**. Plus:
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **3 (alerts + destinations + templates)** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a alert, save | Back on the list, the alert is **already there** — no manual refresh |
+| C7 | Delete a alert → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
@@ -315,6 +657,8 @@ Run **C1–C8**. Plus:
 | Enable / disable an alert | Toggle an alert | The row's state updates immediately, no manual refresh |
 
 ### 6.2 Alert create / edit
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Alerts → **New Alert** (or click an existing alert → Edit)
 
@@ -332,6 +676,35 @@ Run **C1–C8**. Plus:
 
 Run **C1–C8** (note C5 `r` — this was one of the broken shortcuts).
 
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **3 (destinations + templates + the dependency-graph alert read)** request(s) |
+| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a destination, save | Back on the list, the destination is **already there** — no manual refresh |
+| C7 | Delete a destination → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
+
 | Check | Expected |
 | --- | --- |
 | Create a destination → the list | New row present without manual refresh |
@@ -339,16 +712,45 @@ Run **C1–C8** (note C5 `r` — this was one of the broken shortcuts).
 | Open **Alerts → New Alert** afterwards | The deleted destination is not offered |
 | **Import a destination** — Alerts → Destinations → **Import** → paste/upload JSON → import | The imported destination is in the list **without a manual refresh**, and is offered in the alert form's dropdown |
 
-> ⚠️ **Security check:** open DevTools → Application → Local Storage — there must be **no**
-> `o2q-` entry for destinations. Destination payloads can carry webhook `Authorization`
-> headers, PagerDuty routing keys and Opsgenie/ServiceNow credentials, so the list is
-> cached in memory only (resolved — see §24 item 1).
+> ⚠️ **Security check worth doing:** open DevTools → Application → Local Storage and look at
+> the `o2q-` entry for destinations. Destination payloads can carry webhook
+> `Authorization` headers, PagerDuty routing keys and Opsgenie/ServiceNow credentials.
+> Confirm with the team whether writing those to disk is acceptable. See §24.
 
 ### 6.4 Alert templates
 
 **UI path:** Left sidebar → **Alerts** → **Templates** tab
 
 Run **C1–C8** (including the `r` shortcut).
+
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a template, save | Back on the list, the template is **already there** — no manual refresh |
+| C7 | Delete a template → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
@@ -358,6 +760,8 @@ Run **C1–C8** (including the `r` shortcut).
 | **Template preview panel** — Alerts → Templates → open a template → Preview | The destination list it needs comes from cache — no extra request if you were recently on the Destinations page |
 
 ### 6.5 Alert history / evaluation history
+
+**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) plus the rows below. C6–C8 are skipped — this page has no create/edit/delete or search filter.
 
 **UI paths:**
 - Alerts → click an alert → **History** tab
@@ -369,13 +773,75 @@ Run **C1–C8** (including the `r` shortcut).
 | Open the same history from all three surfaces | They **share one cache entry** — the second and third do not re-request |
 | Change the time range | Each range caches separately |
 | Refresh button on each | One request each; rows stay on screen |
-| Paginate | Paging forward is warm — the next page is pre-fetched |
+| Paginate — **standalone Alerts → Alert History page ONLY** | **Cold load fires 2** (page 1 + prefetch of page 2), then **1** per page change — the page you land on is cached, the request warms the page *ahead*. Same pattern as Streams, see §1.1. **Requires more than one page of data in the selected time range**; with ≤ 20 records in range there is no next page, so **1 request is correct** |
+| Paginate — **alert-detail History tab and the History drawer** | These two do **NOT** prefetch. Expect **1** request per page, always. Do not apply the prefetch expectation here |
+
+**Browser-verified** on a live instance (56 history records, 3 pages) — use these as the
+reference numbers. Note the two surfaces even use different page sizes:
+
+| Surface | Page size | Request seen | Count |
+| --- | --- | --- | --- |
+| **Alerts → Alert History** (standalone page) | **20** | `from=0&size=20` **+ `from=20&size=20`** | **2** |
+| **Alert detail → History tab** | **25** | `from=0&size=25` only | **1** |
+
+Paging on the standalone page, measured:
+
+| Action | New requests | What they are |
+| --- | --- | --- |
+| Cold load | **2** | page 1 (`from=0`) + prefetch of page 2 (`from=20`) |
+| → page 2 | **1** | page 2 served from cache; the request prefetches page 3 (`from=40`) |
+| → page 3 (last page) | **0** | already prefetched, and no page 4 exists to warm |
+
+> **⚠️ The standalone page has NO UI path — it is unreachable by clicking.** Verified
+> exhaustively: `AlertList.vue` defines `goToAlertHistory()` and returns it, but no
+> template element binds it; the only other entry is the **Alert Insights** page, whose
+> own entry point (`goToAlertInsights()`) is likewise defined, returned and bound to
+> nothing. There is no sidebar item, tab or link to either. Reach it only by URL:
+>
+> ```
+> http://localhost:8081/web/alerts/history?org_identifier=default
+> ```
+>
+> **So every alert-history surface a user can actually click to fires ONE request and
+> never prefetches.** If you are testing by clicking, one request is always correct here.
+> See §24 item 14 — two routed pages with no way in is worth raising on its own.
 
 ### 6.6 Incidents
+
+**Scope:** run **C1–C5** (cold read, warm revisit, refresh button, `r` shortcut) plus the rows below. C6–C8 are skipped — this page has no create/edit/delete or search filter to test.
 
 **UI path:** Left sidebar → **Alerts** → **Incidents**
 
 Run **C1–C5**. Plus:
+
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a incident, save | Back on the list, the incident is **already there** — no manual refresh |
+| C7 | Delete a incident → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
@@ -384,11 +850,48 @@ Run **C1–C5**. Plus:
 
 ### 6.7 External alert sources
 
+**Scope:** run **C1–C5** (cold read, warm revisit, refresh button, `r` shortcut) plus the rows below. C6–C8 are skipped — this page has no create/edit/delete or search filter to test.
+
 **UI path:** Left sidebar → **Alerts** → **Sources**
 
-Run **C1–C5** (this was one of the `r`-shortcut fixes).
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a source, save | Back on the list, the source is **already there** — no manual refresh |
+| C7 | Delete a source → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
+
+| Check | Steps | Expected |
+| --- | --- | --- |
+| **`r` shortcut reaches the server** | Click empty page area, press `r` | One request. *This was one of the ten `r`-shortcut fixes — it used to do nothing* |
+| Refresh button | Click Refresh | One request; rows stay on screen |
+| Warm revisit | Navigate away and back within 30 s | Zero requests |
 
 ### 6.8 Dependency graph
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Alerts → select an alert → **Dependencies** (also reachable from Destinations and Templates when deleting an item that is in use)
 
@@ -398,6 +901,8 @@ Run **C1–C5** (this was one of the `r`-shortcut fixes).
 | Delete something with dependencies | The impact dialog lists them; after deleting, the affected lists refresh |
 
 ### 6.9 Anomaly detection
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Left sidebar → **Alerts** → anomaly alert entries
 
@@ -412,7 +917,35 @@ Run **C1–C5** (this was one of the `r`-shortcut fixes).
 
 **UI path:** Left sidebar → **SLOs**
 
-Run **C1–C8**, **except C5** — this page registers no keyboard shortcuts, so `r` does nothing by design. The Refresh button (`slos-slolist-refresh`) still applies for C4.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | ⚠️ **Nothing happens — correct.** This page registers no keyboard shortcuts |
+| C6 | Create or edit a SLO, save | Back on the list, the SLO is **already there** — no manual refresh |
+| C7 | Delete a SLO → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
@@ -429,7 +962,35 @@ Run **C1–C8**, **except C5** — this page registers no keyboard shortcuts, so
 
 **UI path:** Left sidebar → **Reports**
 
-Run **C1–C8**.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2 (folders + reports)** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a report, save | Back on the list, the report is **already there** — no manual refresh |
+| C7 | Delete a report → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
@@ -437,19 +998,49 @@ Run **C1–C8**.
 | **Search survives refresh** | Type a report name in search → press `r` | Search term and filtered rows preserved. *The `r` shortcut used to drop the search* |
 | **Rows survive refresh** | Click Refresh while reading the table | Rows stay on screen; only the button spins. *It used to blank the table* |
 | Folder and tab filters | Switch folders and the report tabs | Each combination caches separately |
-| Create a report → back to list | Present without manual refresh |
-| Open a report for editing, go back, reopen | ⚠️ **A request on every open is EXPECTED — not a bug.** `reportDetailQuery` is declared but unread (§24 item 8). Only the *list* is cached |
-| Delete a report → navigate away → return | Gone and stays gone |
+| Create a report → back to list | — | Present without manual refresh |
+| Open a report for editing, go back, reopen | — | ⚠️ **A request on every open is EXPECTED — not a bug.** `reportDetailQuery` is declared but unread (§24 item 8). Only the *list* is cached |
+| Delete a report → navigate away → return | — | Gone and stays gone |
 
 ---
 
 ## 9. Pipelines
 
+**Scope:** each sub-section below states its own — see them individually.
+
 ### 9.1 Pipelines list
 
 **UI path:** Left sidebar → **Pipelines** → **Pipelines**
 
-Run **C1–C8**.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a pipeline, save | Back on the list, the pipeline is **already there** — no manual refresh |
+| C7 | Delete a pipeline → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
@@ -461,13 +1052,43 @@ Run **C1–C8**.
 
 **UI path:** Left sidebar → **Pipelines** → **Destinations** (also **Settings → Pipeline Destinations**)
 
-Run **C1–C8**, including the `r` shortcut.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2 (destinations + templates)** request(s) |
+| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a destination, save | Back on the list, the destination is **already there** — no manual refresh |
+| C7 | Delete a destination → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
 | Create a destination from inside the pipeline editor (a node's destination picker) | The new destination shows up in the picker immediately, and on the Destinations page |
 
 ### 9.3 Pipeline history
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Pipelines → open a pipeline → **History**
 
@@ -480,23 +1101,55 @@ Run **C1–C8**, including the `r` shortcut.
 
 ## 10. Functions and Enrichment Tables
 
+**Scope:** each sub-section below states its own — see them individually.
+
 ### 10.1 Functions
 
 **UI path:** Left sidebar → **Pipelines** → **Functions**
 
-Run **C1–C8**.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a function, save | Back on the list, the function is **already there** — no manual refresh |
+| C7 | Delete a function → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
 | **Second visit paints rows** | Open Functions → go to Streams → come back to Functions | Rows are there. *A shipped bug made the list render **empty** from the second visit onward with no request — this is the regression test for it* |
 | **`r` shortcut** | Press `r` on the Functions list | One request goes out. *Previously a no-op* |
-| Create a function → back to list | Present without manual refresh |
-| Delete a function → navigate away → return | Gone and stays gone |
-| Bulk-delete several functions | All selected rows gone; count updates; still gone after navigating away |
+| Create a function → back to list | — | Present without manual refresh |
+| Delete a function → navigate away → return | — | Gone and stays gone |
+| Bulk-delete several functions | — | All selected rows gone; count updates; still gone after navigating away |
 | Function appears in Logs | After creating one, open Logs → Functions dropdown | The new function is offered |
 | Deep link | Open Functions via the "add"/"update" deep link | The dialog opens **once**, not twice (a cached paint followed by a fresh one must not re-trigger it) |
 
 ### 10.2 Enrichment tables — ⚠️ **needs an org that actually has enrichment tables**
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Left sidebar → **Pipelines** → **Enrichment Tables**
 
@@ -508,7 +1161,7 @@ Run **C1–C8**.
 | Refresh keeps rows | With tables listed, click Refresh | Rows **stay on screen**; only the button spins. No skeleton, no page remount |
 | Refresh reaches the server | Watch Network while clicking Refresh | One request |
 | Page does not remount | Click Refresh and watch the page state | The page must **not** navigate to itself or reset its scroll and filters |
-| Upload a new enrichment table | It appears in the list without a manual refresh |
+| Upload a new enrichment table | — | It appears in the list without a manual refresh |
 
 ---
 
@@ -516,19 +1169,49 @@ Run **C1–C8**.
 
 **UI path:** Left sidebar → **Synthetics**
 
-Run **C1–C8**, **except C5** — this page registers no keyboard shortcuts, so `r` does nothing by design. The Refresh button (`synthetic-monitoring-refresh-btn`) still applies for C4.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | ⚠️ **Nothing happens — correct.** This page registers no keyboard shortcuts |
+| C6 | Create or edit a monitor, save | Back on the list, the monitor is **already there** — no manual refresh |
+| C7 | Delete a monitor → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
 | Create a **Browser Test** | Synthetics → **Add** → Browser | Destination dropdown populated from cache; on save, the monitor is in the list without a manual refresh |
 | Create a **Protocol Check** | Synthetics → **Add** → API/Protocol | Same |
-| Edit a monitor, save, return to the list | The edit is reflected immediately (the whole synthetics scope is invalidated on save) |
-| Open a monitor's detail, go back, reopen | ⚠️ **A request on every open is EXPECTED — not a bug.** `monitorDetailQuery` is declared but unread (§24 item 8). Only the *list* is cached |
+| Edit a monitor, save, return to the list | — | The edit is reflected immediately (the whole synthetics scope is invalidated on save) |
+| Open a monitor's detail, go back, reopen | — | ⚠️ **A request on every open is EXPECTED — not a bug.** `monitorDetailQuery` is declared but unread (§24 item 8). Only the *list* is cached |
 | Monitor results / runs | Synthetics → open a monitor → **Results** → paginate | Table keeps rows between pages; refresh forces one request |
-| Delete a monitor → navigate away → return | Gone and stays gone |
-| Folder filter | Each folder caches separately |
+| Delete a monitor → navigate away → return | — | Gone and stays gone |
+| Folder filter | — | Each folder caches separately |
 
 ### 11.1 Synthetics agent tokens
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Left sidebar → **IAM** → **Synthetics Tokens**
 
@@ -545,7 +1228,35 @@ Run **C1–C8**, **except C5** — this page registers no keyboard shortcuts, so
 
 **UI path:** Left sidebar → **Workflows**
 
-Run **C1–C8**, **except C5** — this page registers no keyboard shortcuts, so `r` does nothing by design. The Refresh button (`workflow-list-refresh`) still applies for C4.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | ⚠️ **Nothing happens — correct.** This page registers no keyboard shortcuts |
+| C6 | Create or edit a workflow, save | Back on the list, the workflow is **already there** — no manual refresh |
+| C7 | Delete a workflow → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
@@ -559,7 +1270,35 @@ Run **C1–C8**, **except C5** — this page registers no keyboard shortcuts, so
 
 **UI path:** Left sidebar → **Actions** (enterprise)
 
-Run **C1–C8**, including the `r` shortcut (this was one of the fixes).
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a action script, save | Back on the list, the action script is **already there** — no manual refresh |
+| C7 | Delete a action script → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
@@ -571,6 +1310,8 @@ Run **C1–C8**, including the `r` shortcut (this was one of the fixes).
 
 ## 14. IAM
 
+**Scope:** each sub-section below states its own — see them individually.
+
 **UI path:** Left sidebar → **IAM**
 
 ### 14.1 Users
@@ -578,6 +1319,35 @@ Run **C1–C8**, including the `r` shortcut (this was one of the fixes).
 **UI path:** IAM → **Users**
 
 Run **C1–C8** (`r` shortcut applies).
+
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **4 (users + 3 role lists)** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a user, save | Back on the list, the user is **already there** — no manual refresh |
+| C7 | Delete a user → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
@@ -589,7 +1359,35 @@ Run **C1–C8** (`r` shortcut applies).
 
 **UI path:** IAM → **Roles**
 
-Run **C1–C8**.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2 (roles + all-user-roles)** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a role, save | Back on the list, the role is **already there** — no manual refresh |
+| C7 | Delete a role → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
@@ -603,7 +1401,35 @@ Run **C1–C8**.
 
 **UI path:** IAM → **User Groups**
 
-Run **C1–C8**.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a group, save | Back on the list, the group is **already there** — no manual refresh |
+| C7 | Delete a group → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
@@ -613,18 +1439,48 @@ Run **C1–C8**.
 
 ### 14.4 Quota
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 **UI path:** IAM → **Quota**
 
 | Check | Expected |
 | --- | --- |
-| Open Quota, switch away, come back | The **module list is loaded once**, not on every visit. *It used to reload every time* |
+| Open Quota, switch away, come back | **One** `ratelimit/module_list` request per visit — *not two*. Commit `ec9313eda7` removed a double-load within a single mount; it did **not** put the list on the query layer, so a request per visit is correct |
 | Change a quota value and save | Reflected without a manual refresh |
 
 ### 14.5 Service accounts
 
 **UI path:** IAM → **Service Accounts**
 
-Run **C1–C8**, including the `r` shortcut.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a service account, save | Back on the list, the service account is **already there** — no manual refresh |
+| C7 | Delete a service account → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Steps | Expected |
 | --- | --- | --- |
@@ -634,6 +1490,8 @@ Run **C1–C8**, including the `r` shortcut.
 | Delete → navigate away → return | | Gone and stays gone |
 
 ### 14.6 Ingestion tokens
+
+**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
 
 **UI path:** IAM → **Ingestion Tokens**
 
@@ -646,6 +1504,8 @@ Run **C1–C8**, including the `r` shortcut.
 
 ### 14.7 Organizations
 
+**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
+
 **UI path:** IAM → **Organizations**
 
 | Check | Expected |
@@ -654,6 +1514,8 @@ Run **C1–C8**, including the `r` shortcut.
 | **Org cleanup tasks dialog** — IAM → Organizations → open an org's cleanup tasks | The dialog **polls every 5 seconds** while open, and **stops polling when closed** (confirm the requests stop in Network) |
 
 ### 14.8 MCP Server
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** IAM → **MCP Server**
 
@@ -666,9 +1528,13 @@ Run **C1–C8**, including the `r` shortcut.
 
 ## 15. Settings
 
+**Scope:** each sub-section below states its own — see them individually.
+
 **UI path:** Left sidebar → **Settings**
 
 ### 15.1 General / Organization settings
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Settings → **General** · Settings → **Organization**
 
@@ -679,6 +1545,8 @@ Run **C1–C8**, including the `r` shortcut.
 | Reload the page | Org settings paint from `localStorage` before the request lands |
 
 ### 15.2 Nodes
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Settings → **Nodes**
 
@@ -692,7 +1560,35 @@ Run **C1–C8**, including the `r` shortcut.
 
 **UI path:** Settings → **Cipher Keys**
 
-Run **C1–C8**.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a cipher key, save | Back on the list, the cipher key is **already there** — no manual refresh |
+| C7 | Delete a cipher key → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
@@ -710,6 +1606,35 @@ Run **C1–C8**.
 > (`regex_patterns_cache_<org>`, 1-hour TTL). The PR **deleted** it in favour of the
 > shared layer — see the sessionStorage check below.
 
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a pattern, save | Back on the list, the pattern is **already there** — no manual refresh |
+| C7 | Delete a pattern → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
+
 | Check | Steps | Expected |
 | --- | --- | --- |
 | **Revalidation actually happens** | Create a pattern in another tab or as another user, then return here, wait past 5 min and revisit | The list revalidates. *It used to read a local store copy and never consult the cache, so an invalidated entry was never refreshed* |
@@ -718,6 +1643,8 @@ Run **C1–C8**.
 | Stale sessionStorage residue is harmless | If an older build left a `regex_patterns_cache_*` key, reload with it present | The page ignores it entirely — nothing reads that key any more |
 
 ### 15.5 Built-in patterns
+
+**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
 
 **UI path:** Settings → **Regex Patterns** → **Built-in** tab
 
@@ -730,13 +1657,43 @@ Run **C1–C8**.
 
 **UI path:** Settings → **AI Toolsets**
 
-Run **C1–C8**, including `r`.
+**Scope:** the two check tables below, then this page's own rows.
+
+#### What to run on this page
+
+**Cache checks** — the point of this PR:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
+| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
+| C6 | Create or edit a toolset, save | Back on the list, the toolset is **already there** — no manual refresh |
+| C7 | Delete a toolset → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
+| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+
+**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+
+| # | Do this | Expect |
+| --- | --- | --- |
+| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
+| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
+| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
+| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
+| S5 | Clear the search | Full list returns |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+
+**This page's own checks** — specific to this module:
 
 | Check | Expected |
 | --- | --- |
 | Create / edit / delete a toolset | List updates without a manual refresh; deleted toolset stays gone |
 
 ### 15.7 Model Pricing
+
+**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
 
 **UI path:** Settings → **Model Pricing**
 
@@ -751,6 +1708,8 @@ Run **C1–C8**, including `r`.
 
 ### 15.8 License
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 **UI path:** Settings → **License**
 
 | Check | Expected |
@@ -759,9 +1718,11 @@ Run **C1–C8**, including `r`.
 | Update the license key, then reopen | The new entitlement shows immediately, not a stale one |
 | **Not persisted** | No `o2q-` localStorage entry for the license |
 | **Upgrade dialog reads the same license** — trigger the *Enterprise upgrade* dialog (click a PRO/enterprise-gated feature on a community build) | The dialog shows **current** entitlement/limits, never a stale copy. It reads through the same cached license entry |
-| Upgrade dialog after a license change | Update the license, then reopen the dialog | It reflects the new license |
+| Upgrade dialog after a license change | Update the license, then reopen the dialog  ·  It reflects the new license |
 
 ### 15.9 Query management / Running queries
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Settings → **Query Management**
 
@@ -772,6 +1733,8 @@ Run **C1–C8**, including `r`.
 ---
 
 ## 16. Traces
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Left sidebar → **Traces**
 
@@ -789,6 +1752,8 @@ Run **C1–C8**, including `r`.
 ---
 
 ## 17. What must NOT be cached — negative tests
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 These are as important as the positive tests. If any of these start serving stale data,
 that is a correctness bug.
@@ -810,6 +1775,8 @@ that is a correctness bug.
 
 ## 18. Credentials — must never touch disk
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 Open **DevTools → Application → Local Storage** and **IndexedDB**, then search every
 `o2q-*` value for these. **None of them may appear:**
 
@@ -829,6 +1796,8 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 ## 19. Home / Overview
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 **UI path:** Left sidebar → **Home**
 
 | Check | Steps | Expected |
@@ -843,6 +1812,8 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 ## 20. Data sources / Ingestion
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 **UI path:** Left sidebar → **Data sources**
 
 | Check | Expected |
@@ -856,6 +1827,8 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 ## 21. RUM
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 **UI path:** Left sidebar → **RUM**
 
 | Check | Expected |
@@ -868,7 +1841,11 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 ## 22. Enterprise modules
 
+**Scope:** each sub-section below states its own — see them individually.
+
 ### 22.1 Online Evals
+
+**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) plus the rows below. C6–C8 are skipped — this page has no create/edit/delete or search filter.
 
 **UI path:** Left sidebar → **AI** → **Evaluations**
 
@@ -886,6 +1863,8 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 ### 22.2 AI Observability — Datasets
 
+**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
+
 **UI path:** Left sidebar → **AI** → **Datasets**
 
 | Check | Steps | Expected |
@@ -896,11 +1875,19 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 ### 22.3 AI Observability — Queues
 
+**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
+
 **UI path:** Left sidebar → **AI** → **Queues**
 
-Same three checks as Datasets.
+| Check | Steps | Expected |
+| --- | --- | --- |
+| **Mount does not force** | Open Queues → navigate away → come back within 30 s | **Zero** requests. *It used to fetch on every visit* |
+| **Refresh forces** | Click the Refresh button | One request; rows stay on screen |
+| Table survives a revisit | Go away and back | Rows still there — the page no longer starts from empty |
 
 ### 22.3a AI Observability — LLM Insights dashboard (panel cache)
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 **UI path:** Left sidebar → **AI** → **LLM Insights**
 
@@ -918,6 +1905,8 @@ Same three checks as Datasets.
 
 ### 22.4 Billing
 
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
+
 **UI path:** Left sidebar → **Billing**
 
 | Check | Expected |
@@ -931,6 +1920,8 @@ Same three checks as Datasets.
 ---
 
 ## 23. Resilience / edge cases
+
+**Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
 | Scenario | How to reproduce | Expected |
 | --- | --- | --- |
@@ -950,11 +1941,12 @@ Same three checks as Datasets.
 These came out of the code review of this branch. They are not blockers for testing, but
 worth a decision.
 
-1. **Alert destinations are persisted to `localStorage`.** ~~Destination payloads can embed
+1. **Alert destinations are persisted to `localStorage`.** Destination payloads can embed
    webhook `Authorization` headers, PagerDuty routing keys and Opsgenie/ServiceNow
-   credentials.~~ **Resolved:** `destinationsQuery` no longer declares a persister — the
-   list is cached in memory only, matching cipher keys/tokens/passcodes. AI Toolsets and
-   Action Scripts stay persisted (their list payloads carry no credentials).
+   credentials. Cipher keys, ingestion tokens, passcodes, RUM and agent tokens are all
+   explicitly kept out of storage — destinations are not. They *are* purged on org switch
+   and logout, but until then they sit in plaintext on disk. Worth confirming this is
+   intentional. Same question, lower stakes, for AI Toolsets and Action Scripts.
 
 2. **`PERSIST_BUSTER` is `"1"`.** If a cached response shape changes without bumping it,
    a persisted payload from an older build will be rendered by a newer one. Add a
@@ -968,7 +1960,7 @@ worth a decision.
 4. **Enrichment tables were never verified live** (the test backend had no tables). §10.2
    is by inspection only — please prioritise it on an org that has enrichment tables.
 
-5. **`useServerTable` has no consumers.** [`composables/query/useServerTable.ts`](../src/composables/query/useServerTable.ts)
+5. **`useServerTable` has no consumers.** [`composables/query/useServerTable.ts`](./src/composables/query/useServerTable.ts)
    is built, exported and documented as "the fix for the blank-table flicker", but no page
    imports it — the server-paginated surfaces (Streams, alert history, pipeline history)
    were each done inline instead. Either adopt it on those pages or drop it; right now it
@@ -976,7 +1968,7 @@ worth a decision.
    pages re-implement by hand.
 
 6. **The field-value in-memory cache is never cleared on purge.**
-   [`composables/fieldValueStore.ts`](../src/composables/fieldValueStore.ts) keeps a
+   [`composables/fieldValueStore.ts`](./src/composables/fieldValueStore.ts) keeps a
    module-level `readCache` Map (60 s TTL, 500 entries) in front of IndexedDB. The purge
    path clears the *IndexedDB* layer only — `purgePersistedOrg` / `purgeAllPersisted` call
    `fieldValueDB.clearOrg` / `clearAll` and never touch this Map. `queryClient.clear()`
@@ -988,9 +1980,6 @@ worth a decision.
    readable for up to 60 s — which matters only where RBAC restricts user B from that
    stream. Narrow and suggestion-only, but the fix is one line: clear the Map from the
    purge path. Verify with the §2.3 test before deciding it is acceptable.
-
-   **Resolved:** `fieldValueStore.clearReadCache()` is now called from both purge paths
-   (`purgeOrgQueries` on org switch, `purgeAllQueries` on logout).
 
 8. **Eleven declared queries have zero consumers — the detail reads were never wired up.**
    These are declared in `*.queries.ts`, and `api-cache-inventory.md` lists most of them
@@ -1031,7 +2020,59 @@ worth a decision.
    cd web/src && grep -c useShortcuts views/slos/SloList.vue \n     views/SyntheticMonitoring.vue components/workflows/WorkflowsList.vue   # → 0 0 0
    ```
 
-11. **Docs drift.** `web/docs/api-cache-inventory.md` says "63 cached reads" and describes
+12. **Returning to an org never re-persists it.** The org-switch purge drops the leaving
+   org's localStorage entries but keeps its in-memory ones, and the persister only writes
+   after a real fetch. So re-entering an org inside its `staleTime` serves from memory,
+   writes nothing to disk, and leaves that org with **no persisted entries at all** until
+   something refetches.
+
+   Net effect: the reload-persistence win is silently lost for any org the user bounces
+   away from and back to within 5 minutes — on F5 that org re-fetches everything, which is
+   the exact cost persistence was added to avoid. Two candidate fixes: re-persist the
+   memory copy on org re-entry, or drop the leaving org's in-memory entries too so
+   re-entry is a normal cold read. The first keeps the "switching back is free" property
+   the design is built around; the second is simpler. Reproduced by hand — see the quirk
+   box in §2.2.
+
+14. **Two routed pages have no UI entry point** (pre-existing, not caused by this PR).
+   `alerts/history` (Alert History) and `alerts/insights` (Alert Insights) are both
+   registered routes with working pages, but nothing navigates to either.
+   `AlertList.vue` defines and returns `goToAlertHistory()` and `goToAlertInsights()`;
+   neither is bound to any template element. Alert Insights can reach Alert History, but
+   nothing can reach Alert Insights. Verified by grepping every reference to both route
+   names across the app.
+
+   Relevant to this PR only because the standalone Alert History page is the **only**
+   surface where the alert-history prefetch is exercised — so that code path ships but no
+   user can reach it. Either wire up the buttons or drop the routes.
+
+   ```bash
+   cd web/src && grep -rn "goToAlertHistory|goToAlertInsights" components/alerts/AlertList.vue
+   # → definition + return only; no @click binding
+   ```
+
+16. 🐛 **Dashboard favourites are lost on reload (caused by this PR).**
+   Starring a dashboard writes to the server correctly, but the client's write-through is
+   `queryClient.setQueryData(...)` — and `setQueryData` **does not invoke the persister**,
+   which only writes at the end of a query-function run. So localStorage keeps the previous
+   value. On reload the persisted (stale, often empty) list hydrates, carries its old
+   `dataUpdatedAt`, counts as fresh inside `CONFIG_STALE_TIME` (5 min), and never
+   refetches — **the star vanishes**. Past 5 minutes it self-heals, which makes it look
+   intermittent.
+
+   **Reproduced end to end**: starred a dashboard → server returned
+   `setting_value: [{label: "smoke_dash_xray_024"}]` → localStorage still `[]` → reload →
+   star gone, persisted entry age 611 s.
+
+   New in this PR: `settingQuery` is newly persisted to localStorage, and the
+   `setQueryData` write-through is new. Neither exists on `main`.
+
+   Affects [`useFavoriteDashboards.ts`](./src/composables/useFavoriteDashboards.ts) and,
+   by the same pattern, [`useHomeDashboard.ts`](./src/composables/useHomeDashboard.ts)
+   (home-dashboard pin). Fix: invalidate instead of `setQueryData`, or persist explicitly
+   after it the way `usePanelCache` does with `persistQueryByKey`.
+
+17. **Docs drift.** `web/docs/api-cache-inventory.md` says "63 cached reads" and describes
    a `persist: "none"` option; the shipped API is plain `queryOptions()` with the
    persister simply omitted, and there are now more query modules than the inventory
    lists (incidents, anomaly detection, service graph, LLM datasets/queues, API keys).
