@@ -311,10 +311,23 @@ describe("OnCallSchedulePresets", () => {
     expect(wrapper.find('[data-test="oncall-preset-field-timezone"]').exists()).toBe(true);
   });
 
+  /// Every row whose title is a required text field (the fixture's two
+  /// groups) needs a name typed in before Apply is a valid click — the same
+  /// thing a real operator has to do for follow-the-sun's regions.
+  async function nameGroups(wrapper: Awaited<ReturnType<typeof renderOpen>>) {
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-0-name"]')
+      .vm.$emit("update:modelValue", "APAC");
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-1-name"]')
+      .vm.$emit("update:modelValue", "EMEA");
+  }
+
   /// Absent beats empty: an un-overridden catch-all must not be sent as an
   /// empty group, which the server would read as "nobody covers the rest".
   it("applies without ceremony when the team has no schedule to lose", async () => {
     const wrapper = await renderOpen(0);
+    await nameGroups(wrapper);
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
 
@@ -322,6 +335,20 @@ describe("OnCallSchedulePresets", () => {
     expect(sent.data.preset).toBe("test_shape");
     expect(sent.data.catch_all).toBeUndefined();
     expect(wrapper.emitted("applied")).toBeTruthy();
+  });
+
+  /// The bug this guards: a group whose required name was never typed in must
+  /// never reach the network — the server refuses it too, but only after a
+  /// round trip, and with axum's raw extraction-failure text rather than a
+  /// sentence written for the person who left the field blank.
+  it("blocks apply and names the field when a required group name is blank", async () => {
+    const wrapper = await renderOpen(0);
+    await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
+    await flushPromises();
+
+    expect(service.applySchedulePreset).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="oncall-presets-error"]').text()).toContain("Group");
+    expect(wrapper.emitted("applied")).toBeFalsy();
   });
 
   /// A full replace of a working schedule gets a confirm; replacing nothing
@@ -344,6 +371,7 @@ describe("OnCallSchedulePresets", () => {
       response: { data: { message: "regions 2 and 3 overlap at minute 480" } },
     });
     const wrapper = await renderOpen(0);
+    await nameGroups(wrapper);
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
 
@@ -351,5 +379,26 @@ describe("OnCallSchedulePresets", () => {
       "regions 2 and 3 overlap at minute 480",
     );
     expect(wrapper.emitted("applied")).toBeFalsy();
+  });
+
+  /// The other half of the original bug: when the failure never reaches the
+  /// app's own error shape — axum's extraction rejection is plain text, not
+  /// `{message}` — the caught error's `data` IS that string. The screen must
+  /// still show it, not axios's generic "Request failed with status code 422".
+  it("shows a plain-text rejection body when the server never wrapped it in JSON", async () => {
+    service.applySchedulePreset.mockRejectedValue({
+      response: {
+        data: "Failed to deserialize the JSON body: missing field `name` at line 1 column 227",
+      },
+      message: "Request failed with status code 422",
+    });
+    const wrapper = await renderOpen(0);
+    await nameGroups(wrapper);
+    await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-presets-error"]').text()).toContain(
+      "missing field `name`",
+    );
   });
 });

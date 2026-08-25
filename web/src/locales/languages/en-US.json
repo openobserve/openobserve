@@ -12609,6 +12609,7 @@
     "presetsSubtitle": "Pick a shape, name the people, apply. Everything stays editable afterwards.",
     "presetsReplaceNote": "Applying replaces {count} existing rotation — it stays editable afterwards. | Applying replaces {count} existing rotations — they stay editable afterwards.",
     "presetsReplaceNone": "This team has no rotations yet — applying creates them.",
+    "presetsMissingName": "{label} needs a name before this can be applied.",
     "presetCoverageTitle": "Coverage this builds",
     "presetCoverageComplete": "every hour covered",
     "presetCoverageNobody": "nobody named yet",

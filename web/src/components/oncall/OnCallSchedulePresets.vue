@@ -786,10 +786,25 @@ const replaceNote = computed<I18nText>(() =>
 
 // ── Applying ──────────────────────────────────────────────────────────────────
 
+/// A row whose title is a REQUIRED text field (only follow-the-sun's regions,
+/// which the preset genuinely cannot guess) but is blank or was never typed
+/// into. Caught here, before the request leaves the browser, because the
+/// server refuses a blank name too but only after a round trip — and its
+/// rejection arrives as axum's own extraction failure, not this API's usual
+/// named-field error.
+function missingNameRow(): RowSpec | null {
+  return rows.value.find((row) => row.titleField && !titleOf(row).trim()) ?? null;
+}
+
 async function apply() {
   if (!chosen.value) return;
-  applying.value = true;
   applyError.value = "";
+  const missing = missingNameRow();
+  if (missing?.titleField) {
+    applyError.value = t("oncall.presetsMissingName", { label: missing.titleField.label });
+    return;
+  }
+  applying.value = true;
   try {
     // Absent beats empty: a field the user never touched is the server's to
     // default — `timezone` absent means the TEAM's zone, never UTC, and an
@@ -809,9 +824,17 @@ async function apply() {
     open.value = false;
     emit("applied");
   } catch (err) {
-    // Named-field validation, written for the person who typed the value.
-    const failure = err as { response?: { data?: { message?: string } }; message?: string };
-    applyError.value = String(failure?.response?.data?.message ?? failure?.message ?? "");
+    // Named-field validation, written for the person who typed the value —
+    // but a rejection that never reached that code (a body the server could
+    // not even parse) carries its reason as a plain string, not `{message}`.
+    // Either way, show the real reason rather than axios's generic status text.
+    const failure = err as {
+      response?: { data?: { message?: string } | string };
+      message?: string;
+    };
+    const data = failure?.response?.data;
+    const reason = typeof data === "string" ? data : data?.message;
+    applyError.value = String(reason || failure?.message || "");
   } finally {
     applying.value = false;
   }

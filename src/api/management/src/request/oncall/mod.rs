@@ -27,6 +27,7 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::oncall::{PriorityRung, Rotation};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
+use openobserve_api_common::extractors::ValidatedJson;
 use serde::{Deserialize, Deserializer};
 
 #[cfg(feature = "enterprise")]
@@ -1076,7 +1077,7 @@ pub async fn list_schedule_presets(
 pub async fn apply_schedule_preset(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<FromPresetRequest>,
+    ValidatedJson(body): ValidatedJson<FromPresetRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {

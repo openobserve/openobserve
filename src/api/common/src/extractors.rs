@@ -15,7 +15,7 @@
 
 use axum::{
     Json,
-    extract::FromRequestParts,
+    extract::{FromRequest, FromRequestParts, Request},
     http::{StatusCode, header::HeaderMap, request::Parts},
     response::{IntoResponse, Response},
 };
@@ -73,6 +73,54 @@ fn deserialize_headers<T: DeserializeOwned>(headers: &HeaderMap) -> Result<T, St
         log::warn!("Header deserialization error: {e}");
         "Invalid request".to_string()
     })
+}
+
+/// Wrapper around [`axum::Json`] whose rejection is JSON-shaped like the rest
+/// of the API, rather than axum's default plain-text rejection body.
+///
+/// A handler using plain `axum::Json<T>` looks identical until a caller sends
+/// a body that fails to deserialize: axum answers that with a `text/plain`
+/// rejection before the handler ever runs, so callers that assume every error
+/// response carries a `message` field (as every handler-level error in this
+/// API does) see nothing recognizable. This wrapper closes that gap by giving
+/// the extraction failure the same `{"code", "message"}` shape.
+pub struct ValidatedJson<T>(pub T);
+
+/// Rejection type for [`ValidatedJson`].
+pub struct ValidatedJsonRejection {
+    status: StatusCode,
+    message: String,
+}
+
+impl IntoResponse for ValidatedJsonRejection {
+    fn into_response(self) -> Response {
+        (
+            self.status,
+            Json(serde_json::json!({
+                "code": self.status.as_u16(),
+                "message": self.message
+            })),
+        )
+            .into_response()
+    }
+}
+
+impl<S, T> FromRequest<S> for ValidatedJson<T>
+where
+    T: DeserializeOwned,
+    S: Send + Sync,
+{
+    type Rejection = ValidatedJsonRejection;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        match Json::<T>::from_request(req, state).await {
+            Ok(Json(value)) => Ok(ValidatedJson(value)),
+            Err(rejection) => Err(ValidatedJsonRejection {
+                status: rejection.status(),
+                message: rejection.body_text(),
+            }),
+        }
+    }
 }
 
 #[cfg(test)]
