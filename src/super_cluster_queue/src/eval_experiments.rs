@@ -148,6 +148,8 @@ mod tests {
             retry_count: 0,
             scores_settled_at: None,
             idempotency_key: Some("key-1".to_string()),
+            is_baseline: false,
+            deleted_at: None,
             created_by: "owner@example.com".to_string(),
             created_at: 1,
         };
@@ -187,6 +189,8 @@ mod tests {
             retry_count: 0,
             scores_settled_at: None,
             idempotency_key: Some("key-1".to_string()),
+            is_baseline: false,
+            deleted_at: None,
             created_by: "owner@example.com".to_string(),
             created_at: 1,
         };
