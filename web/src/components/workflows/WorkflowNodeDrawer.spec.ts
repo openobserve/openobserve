@@ -490,15 +490,19 @@ describe("WorkflowNodeDrawer", () => {
       expect(next(wrapper).attributes("disabled")).toBeDefined();
     });
 
-    it("navigates to the neighbour WITHOUT running the current node's form", async () => {
+    it("commits the current node's config before navigating (no Save button)", async () => {
       seedGraph();
       openNode("cond");
+      conditionSubmit.mockReturnValue({ version: 2, conditions: [{ column: "a" }] });
       wrapper = mountDrawer();
       await next(wrapper).trigger("click");
       await flushPromises();
-      expect(workflowObj.currentSelectedNodeID).toBe("dest");
-      // pure navigation — the body's submit() is not called
-      expect(conditionSubmit).not.toHaveBeenCalled();
+      expect(workflowObj.currentSelectedNodeID).toBe("dest"); // navigated
+      // Navigating is a commit point: the body's submit() ran and its payload was
+      // merged into the (now left-behind) node, so the selection isn't dropped.
+      expect(conditionSubmit).toHaveBeenCalled();
+      const cond = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "cond");
+      expect(cond.data.conditions).toEqual([{ column: "a" }]);
     });
 
     // Layout must not change under the user when they land on a step with no data.

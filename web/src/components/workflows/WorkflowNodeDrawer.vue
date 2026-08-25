@@ -933,9 +933,10 @@ const containerWidth = computed(() => NDV_WIDTH);
 
 // prev/next navigation — the connected nodes, shown as floating edge buttons in the
 // NDV. Prev is the single upstream node (source of the incoming edge); next is one
-// button per outgoing branch (fan-out → multiple). Clicking simply OPENS that
-// neighbor's Input · Config · Output — no form submit / commit; the body remounts on
-// the id change (`:key`), loading the neighbor's config.
+// button per outgoing branch (fan-out → multiple). Clicking COMMITS the current node's
+// config first (there's no Save button — navigating is a commit point, same as closing)
+// then opens the neighbor's Input · Config · Output; the body remounts on the id change
+// (`:key`), loading the neighbor's config.
 const nodeDisplay = (node: any): { label: string; icon: string } => {
   const type = node?.data?.node_type;
   const m = nodeMeta(type);
@@ -1023,9 +1024,23 @@ const toggleStepsCollapsed = () => {
     /* non-fatal — state just won't persist */
   }
 };
-const navigateTo = (targetId: string) => {
+// Commit the mounted body's current config into the node WITHOUT closing the panel —
+// asks the body for its payload (async: the schema-validated pickers resolve on submit)
+// and merges it. mergeNodeConfig no-ops when nothing changed, so a plain look-around
+// navigation adds no history/dirty noise.
+const commitCurrentConfig = async () => {
+  if (bodyComponent.value && !readonlyBody.value && !canvasReadOnly.value) {
+    const payload = await bodyRef.value?.submit?.();
+    if (payload != null) mergeNodeConfig(payload);
+  }
+};
+const navigateTo = async (targetId: string) => {
   if (!targetId || targetId === nodeId.value) return;
+  // Dirty function node → prompt first; its Discard path proceeds without committing.
   if (guardFnExit(() => editNode(targetId))) return;
+  // Otherwise persist the current node's edits/selection before switching — Prev/Next
+  // is a commit point (no Save button), so leaving without this drops the selection.
+  await commitCurrentConfig();
   editNode(targetId);
 };
 
