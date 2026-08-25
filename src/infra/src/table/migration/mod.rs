@@ -164,12 +164,9 @@ mod m20260809_000001_create_alert_eval_intervals_table;
 mod m20260811_000001_create_llm_experiments;
 mod m20260812_000001_add_provider_rate_limits;
 mod m20260812_000001_create_composite_alerts;
-mod m20260813_000001_add_llm_experiment_lifecycle;
 mod m20260818_000001_create_llm_idempotency_records;
 mod m20260818_000002_create_llm_remote_tasks;
 mod m20260820_000001_add_icon_to_folders;
-mod m20260820_000001_add_llm_experiment_baseline;
-mod m20260820_000002_add_llm_experiment_deletion;
 mod m20260820_000003_create_llm_secrets;
 
 #[cfg(test)]
@@ -409,12 +406,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260811_000001_create_llm_experiments::Migration),
             Box::new(m20260812_000001_add_provider_rate_limits::Migration),
             Box::new(m20260812_000001_create_composite_alerts::Migration),
-            Box::new(m20260813_000001_add_llm_experiment_lifecycle::Migration),
             Box::new(m20260818_000001_create_llm_idempotency_records::Migration),
             Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
             Box::new(m20260820_000001_add_icon_to_folders::Migration),
-            Box::new(m20260820_000001_add_llm_experiment_baseline::Migration),
-            Box::new(m20260820_000002_add_llm_experiment_deletion::Migration),
             Box::new(m20260820_000003_create_llm_secrets::Migration),
         ]
     }

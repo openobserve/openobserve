@@ -13,7 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use sea_orm_migration::prelude::*;
+
+/// One Baseline per organization and Dataset (A2.1, A9).
+///
+/// Postgres and SQLite express that directly as a partial unique index, which
+/// makes a second Baseline impossible no matter which writer attempts it.
+/// MySQL has no partial index, so it gets a plain lookup index and relies on
+/// the single transaction that clears the old flag and sets the new one.
+const BASELINE_INDEX_NAME: &str = "llm_experiments_baseline_idx";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -42,7 +51,22 @@ impl MigrationTrait for Migration {
                     .col(LlmExperiments::CreatedAt)
                     .to_owned(),
             )
-            .await
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("llm_experiments_deleted_at_idx")
+                    .table(LlmExperiments::Table)
+                    .col(LlmExperiments::DeletedAt)
+                    .to_owned(),
+            )
+            .await?;
+        let db = manager.get_connection();
+        let backend = db.get_database_backend();
+        db.execute(Statement::from_string(backend, baseline_index_sql(backend)))
+            .await?;
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -128,6 +152,23 @@ fn create_statement() -> TableCreateStatement {
                 .big_integer()
                 .null(),
         )
+        // The organization's Baseline for this Dataset; at most one row per
+        // (org, dataset) may set it, enforced by `baseline_index_sql`.
+        .col(
+            ColumnDef::new(LlmExperiments::IsBaseline)
+                .boolean()
+                .not_null()
+                .default(false),
+        )
+        // Early deletion marker (A2.6). Deletion is not a single transaction
+        // across PostgreSQL and the streams, so the row has to be able to say
+        // "this Experiment is gone, cleanup is still running". Every read
+        // filters on this column.
+        .col(
+            ColumnDef::new(LlmExperiments::DeletedAt)
+                .big_integer()
+                .null(),
+        )
         .col(
             ColumnDef::new(LlmExperiments::IdempotencyKey)
                 .string_len(255)
@@ -144,6 +185,22 @@ fn create_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .to_owned()
+}
+
+fn baseline_index_sql(backend: DatabaseBackend) -> String {
+    match backend {
+        DatabaseBackend::Postgres => format!(
+            "CREATE UNIQUE INDEX IF NOT EXISTS {BASELINE_INDEX_NAME} ON llm_experiments (org_id, \
+             dataset_id) WHERE is_baseline"
+        ),
+        DatabaseBackend::Sqlite => format!(
+            "CREATE UNIQUE INDEX IF NOT EXISTS {BASELINE_INDEX_NAME} ON llm_experiments (org_id, \
+             dataset_id) WHERE is_baseline = 1"
+        ),
+        DatabaseBackend::MySql => format!(
+            "CREATE INDEX {BASELINE_INDEX_NAME} ON llm_experiments (org_id, dataset_id, is_baseline)"
+        ),
+    }
 }
 
 #[derive(DeriveIden)]
@@ -167,6 +224,8 @@ enum LlmExperiments {
     LifecycleVersion,
     RetryCount,
     ScoresSettledAt,
+    IsBaseline,
+    DeletedAt,
     IdempotencyKey,
     CreatedBy,
     CreatedAt,
@@ -189,7 +248,25 @@ mod tests {
         assert!(sql.contains("\"lifecycle_version\" bigint NOT NULL DEFAULT 0"));
         assert!(sql.contains("\"retry_count\" integer NOT NULL DEFAULT 0"));
         assert!(sql.contains("\"scores_settled_at\" bigint NULL"));
+        assert!(sql.contains("\"is_baseline\" bool NOT NULL DEFAULT FALSE"));
+        assert!(sql.contains("\"deleted_at\" bigint NULL"));
         assert!(!sql.contains("updated_at"));
         assert!(!sql.contains("updated_by"));
+    }
+
+    #[test]
+    fn only_one_baseline_row_can_exist_per_org_and_dataset() {
+        let postgres = baseline_index_sql(DatabaseBackend::Postgres);
+        assert!(postgres.contains("UNIQUE"));
+        assert!(postgres.ends_with("WHERE is_baseline"));
+
+        let sqlite = baseline_index_sql(DatabaseBackend::Sqlite);
+        assert!(sqlite.contains("UNIQUE"));
+        assert!(sqlite.ends_with("WHERE is_baseline = 1"));
+
+        // MySQL has no partial index; the transactional swap is the guarantee
+        // there, so the index exists only to make the lookup cheap.
+        let mysql = baseline_index_sql(DatabaseBackend::MySql);
+        assert!(!mysql.contains("UNIQUE"));
     }
 }
