@@ -571,7 +571,10 @@ describe("AlertList — SLO alert rows", () => {
           folder: "default",
           org_identifier: "default",
         };
-        await (w.vm as any).getAlertsFn(store, "default");
+        // The route object is not reactive in tests, so the `query.action`
+        // watcher cannot be fired by the assignment above — drive its named
+        // handler directly instead.
+        await (w.vm as any).handleActionQuery("update");
         await settle();
         return w;
       };

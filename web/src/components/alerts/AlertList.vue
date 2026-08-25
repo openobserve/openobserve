@@ -1932,25 +1932,10 @@ export default defineComponent({
           dismiss();
           return;
         }
-        if (router.currentRoute.value.query.action == "import") {
-          showImportAlertDialog.value = true;
-        }
-        if (router.currentRoute.value.query.action == "add") {
-          showAddUpdateFn({ row: undefined });
-        }
-        if (router.currentRoute.value.query.action == "update") {
-          const alertId = router.currentRoute.value.query.alert_id as string;
-          const alert = await getAlertById(alertId);
-
-          // Same diversion as the edit button. This path is reached by a hard
-          // reload, a bookmark or the back button, so guarding only the button
-          // would leave the generic editor reachable for an SLO alert.
-          if (!(await divertSloAlert(alert))) {
-            showAddUpdateFn({
-              row: alert,
-            });
-          }
-        }
+        // `?action=…` deep links are handled by the immediate watcher on
+        // `query.action` below. Handling them here too re-opened a blank form
+        // after every save: the post-save refresh reads the route before
+        // hideForm's cleanup push lands, so it still sees the stale `action`.
         dismiss();
       } catch (error) {
         console.error(error);
@@ -2197,42 +2182,45 @@ export default defineComponent({
         console.error("Navigation failed:", error);
       }
     };
+    // The one handler for `?action=…` deep links (hard reload, bookmark, Back).
+    // Named so tests can drive it without racing the router.
+    const handleActionQuery = async (action: unknown) => {
+      if (!action) {
+        showAddAlertDialog.value = false;
+        showImportAlertDialog.value = false;
+        return;
+      }
+
+      // Handle update action
+      if (action === "update" && router.currentRoute.value.query.alert_id) {
+        const alertId = router.currentRoute.value.query.alert_id as string;
+        try {
+          const alert = await getAlertById(alertId);
+          if (!(await divertSloAlert(alert))) {
+            showAddUpdateFn({ row: alert });
+          }
+        } catch (error) {
+          console.error("AlertList: Failed to load alert", error);
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
+          });
+        }
+      }
+
+      // Handle add action
+      if (action === "add") {
+        showAddUpdateFn({ row: undefined });
+      }
+
+      // Handle import action
+      if (action === "import") {
+        showImportAlertDialog.value = true;
+      }
+    };
     watch(
       () => router.currentRoute.value.query.action,
-      async (action) => {
-        if (!action) {
-          showAddAlertDialog.value = false;
-          showImportAlertDialog.value = false;
-          return;
-        }
-
-        // Handle update action
-        if (action === "update" && router.currentRoute.value.query.alert_id) {
-          const alertId = router.currentRoute.value.query.alert_id as string;
-          try {
-            const alert = await getAlertById(alertId);
-            if (!(await divertSloAlert(alert))) {
-              showAddUpdateFn({ row: alert });
-            }
-          } catch (error) {
-            console.error("AlertList: Failed to load alert", error);
-            toast({
-              variant: "error",
-              message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
-            });
-          }
-        }
-
-        // Handle add action
-        if (action === "add") {
-          showAddUpdateFn({ row: undefined });
-        }
-
-        // Handle import action
-        if (action === "import") {
-          showImportAlertDialog.value = true;
-        }
-      },
+      handleActionQuery,
       { immediate: true }, // Run immediately to handle direct navigation
     );
     const getDestinations = async () => {
@@ -3392,6 +3380,7 @@ export default defineComponent({
       addAlert,
       isUpdated,
       showAddUpdateFn,
+      handleActionQuery,
       showDeleteDialogFn,
       duplicateAlert,
       showAddAlertDialog,
