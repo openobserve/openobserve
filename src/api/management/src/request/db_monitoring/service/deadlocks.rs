@@ -781,7 +781,7 @@ pub(crate) async fn read_deadlocks_body(
     // to the assembled events of BOTH shapes — the canonicalizer populates the
     // same three fields on a raw-derived event, so one filter serves both. The
     // free-text `search` filter already worked this way.
-    let scope = ScopeNarrowing::new(&q);
+    let scope = ScopeNarrowing::new(q);
     let sql_preds = if raw_fallback.is_some() { "" } else { &preds };
     let sql = build_dbm_events_sql(
         stream,
