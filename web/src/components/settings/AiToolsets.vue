@@ -277,8 +277,10 @@ export default defineComponent({
       fetching.value = true;
       // TODO: fold into `useQuery` — this call site drives its own flags because
       // the surrounding refresh/toast flow is imperative.
-      const source = queryClient
-        .fetchQuery(force ? { ...options, staleTime: 0 } : options)
+      if (force) {
+        void queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      }
+      const source = queryClient.fetchQuery(options)
         .then((data) => {
           applyToolsets(data);
           return data;

@@ -216,8 +216,12 @@ const fetchHistory = async (force = false) => {
   try {
     const endTime = Date.now() * 1000;
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
-    const read = <T,>(options: any): Promise<T> =>
-      queryClient.fetchQuery(force ? { ...options, staleTime: 0 } : options);
+    const read = <T,>(options: any): Promise<T> => {
+      if (force) {
+        void queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      }
+      return queryClient.fetchQuery(options);
+    };
     const data = await read<any>(alertHistoryQuery(orgId, {
       alert_id: props.alertId,
       start_time: startTime,

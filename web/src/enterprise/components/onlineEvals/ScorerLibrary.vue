@@ -316,8 +316,10 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
     );
   } catch (err: any) {
     if (err?.response?.status === 409) {
-      const refreshed = await queryClient.fetchQuery({ ...scoreConfigsQuery(props.orgId), staleTime: 0 });
-      const found = refreshed.find((row) => row.name === name);
+      const options = scoreConfigsQuery(props.orgId);
+      await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      const refreshed = await queryClient.fetchQuery(options);
+      const found = refreshed.find((row: any) => row.name === name);
       if (found) return found;
     }
     throw err;

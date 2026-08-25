@@ -1186,12 +1186,10 @@ export default defineComponent({
       // re-download the config the menu is already filtered from. The retry
       // below forces a real fetch, since the failure it recovers from is the
       // reason there is nothing cached to serve.
-      await queryClient
-        .fetchQuery(
-          attempt > 0
-            ? { ...configFullQuery(orgIdentifier), staleTime: 0 }
-            : configFullQuery(orgIdentifier),
-        )
+      if (attempt > 0) {
+        await queryClient.invalidateQueries({ queryKey: configFullQuery(orgIdentifier).queryKey, exact: true, refetchType: "none" });
+      }
+      await queryClient.fetchQuery(configFullQuery(orgIdentifier))
         .then(async (data: any) => {
           const res = { data };
           if (config.isCloud == "false") {

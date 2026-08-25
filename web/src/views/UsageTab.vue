@@ -965,7 +965,7 @@ const refreshConfig = async () => {
     // than the one the banner is already rendering.
     store.dispatch(
       "setConfig",
-      await queryClient.fetchQuery({ ...configFullQuery(orgId.value), staleTime: 0 }),
+      await queryClient.invalidateQueries({ queryKey: configFullQuery(orgId.value).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(configFullQuery(orgId.value))),
     );
   } catch (error) {
     console.log(error);

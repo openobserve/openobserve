@@ -57,10 +57,17 @@ export async function fetchInto<T = any>(
   if (opts.fetching) opts.fetching.value = true;
 
   try {
-    const fresh = await queryClient.fetchQuery({
-      ...(options as any),
-      ...(opts.force && { staleTime: 0 }),
-    });
+    // Force by invalidating, not by spreading `staleTime: 0` into fetchQuery —
+    // query.fetch() stores the passed options, so the 0 would become the
+    // entry's standing freshness policy for every later observer.
+    if (opts.force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const fresh = await queryClient.fetchQuery(options as any);
     opts.apply(fresh as T);
     return fresh as T;
   } finally {

@@ -67,7 +67,9 @@ class BuildVersionChecker {
       return this.cachedConfig.commit_hash;
     }
 
-    this.cachedConfig = await queryClient.fetchQuery({ ...configQuery(), staleTime: 0 });
+    const options = configQuery();
+      await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      this.cachedConfig = await queryClient.fetchQuery(options);
     this.lastCheckTime = now;
 
     return this.cachedConfig.commit_hash;

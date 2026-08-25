@@ -708,8 +708,12 @@ const loadAnomalies = async (force = false) => {
     let rawHits: Array<{ cfg: any; hits: any[] }>;
 
     // `force` bypasses staleTime; the options object is the same either way.
-    const read = <T>(options: any): Promise<T> =>
-      queryClient.fetchQuery(force ? { ...options, staleTime: 0 } : options);
+    const read = <T>(options: any): Promise<T> => {
+      if (force) {
+        void queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      }
+      return queryClient.fetchQuery(options);
+    };
     const readConfigs = (org: string) => read<any[]>(anomalyConfigsQuery(org));
     const readHistory = (org: string, limit: number) => read<any>(anomalyHistoryQuery(org, limit));
 
@@ -805,9 +809,10 @@ const loadHistoryAndSplit = async (force = false) => {
       sort_by: "timestamp",
       sort_order: "desc",
     });
-    const res: any = await queryClient.fetchQuery(
-      force ? { ...historyOptions, staleTime: 0 } : historyOptions,
-    );
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: historyOptions.queryKey, exact: true, refetchType: "none" });
+    }
+    const res: any = await queryClient.fetchQuery(historyOptions);
     const hits: any[] = res?.hits ?? [];
 
     // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
@@ -865,9 +870,10 @@ const loadIncidents = async (force = false) => {
   if (!isIncidentsEnabled.value) return;
   try {
     const incidentOptions = incidentsQuery(orgId.value, "open", 4, 0);
-    const res: any = await queryClient.fetchQuery(
-      force ? { ...incidentOptions, staleTime: 0 } : incidentOptions,
-    );
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: incidentOptions.queryKey, exact: true, refetchType: "none" });
+    }
+    const res: any = await queryClient.fetchQuery(incidentOptions);
     incidents.value = res?.incidents ?? [];
     incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch {
@@ -885,9 +891,10 @@ const loadServiceGraph = async (force = false) => {
       startTime: timeRange.value.startTime,
       endTime: timeRange.value.endTime,
     });
-    const res: any = await queryClient.fetchQuery(
-      force ? { ...topologyOptions, staleTime: 0 } : topologyOptions,
-    );
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: topologyOptions.queryKey, exact: true, refetchType: "none" });
+    }
+    const res: any = await queryClient.fetchQuery(topologyOptions);
     const nodes: any[] = res?.nodes ?? [];
     const edges: any[] = res?.edges ?? [];
     graphData.value = { nodes, edges };

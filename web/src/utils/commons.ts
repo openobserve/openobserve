@@ -163,9 +163,11 @@ export const getAllDashboards = async (store: any, folderId: any, force = false)
   const org = store.state.selectedOrganization.identifier;
   // Reads the query cache; `force` is for post-mutation reloads, which must
   // reach the server.
-  const dashboards = force
-    ? await queryClient.fetchQuery({ ...dashboardsByFolderQuery(org, folderId), staleTime: 0 })
-    : await queryClient.fetchQuery(dashboardsByFolderQuery(org, folderId));
+  const options = dashboardsByFolderQuery(org, folderId);
+  if (force) {
+    await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+  }
+  const dashboards = await queryClient.fetchQuery(options);
 
   return applyDashboards(store, folderId, dashboards);
 };

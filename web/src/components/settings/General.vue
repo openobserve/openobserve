@@ -1025,12 +1025,18 @@ export default defineComponent({
 
               // Forced: the logo just changed, so the cached config is the one
               // thing that must not answer here.
+              await queryClient.invalidateQueries({
+                queryKey: configFullQuery(
+                  store.state.selectedOrganization?.identifier || orgIdentifier,
+                ).queryKey,
+                exact: true,
+                refetchType: "none",
+              });
               store.dispatch(
                 "setConfig",
-                await queryClient.fetchQuery({
-                  ...configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
-                  staleTime: 0,
-                }),
+                await queryClient.fetchQuery(
+                  configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
+                ),
               );
 
               // Clear the appropriate file ref
@@ -1092,10 +1098,19 @@ export default defineComponent({
             // thing that must not answer here.
             store.dispatch(
               "setConfig",
-              await queryClient.fetchQuery({
-                ...configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
-                staleTime: 0,
-              }),
+              await queryClient
+                .invalidateQueries({
+                  queryKey: configFullQuery(
+                    store.state.selectedOrganization?.identifier || orgIdentifier,
+                  ).queryKey,
+                  exact: true,
+                  refetchType: "none",
+                })
+                .then(() =>
+                  queryClient.fetchQuery(
+                    configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
+                  ),
+                ),
             );
           } else {
             toast({

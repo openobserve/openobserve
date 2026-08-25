@@ -845,7 +845,7 @@ export default defineComponent({
       loading.value = !warm;
       fetching.value = true;
       return new Promise((resolve, reject) => {
-        (force ? queryClient.fetchQuery({ ...orgUsersQuery(org), staleTime: 0 }) : queryClient.fetchQuery(orgUsersQuery(org)))
+        (force ? queryClient.invalidateQueries({ queryKey: orgUsersQuery(org).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(orgUsersQuery(org))) : queryClient.fetchQuery(orgUsersQuery(org)))
           .then(async (orgUsers: any[]) => {
             let users = [...orgUsers];
 

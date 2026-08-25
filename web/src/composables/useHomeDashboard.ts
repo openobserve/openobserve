@@ -47,7 +47,9 @@ export function useHomeDashboard(t: TranslateFn) {
     try {
       if (force) {
         isLoading.value = true;
-        apply(await queryClient.fetchQuery({ ...settingQuery(org, SETTING_KEY), staleTime: 0 }));
+        const options = settingQuery(org, SETTING_KEY);
+        await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+        apply(await queryClient.fetchQuery(options));
         return;
       }
       // Stale-while-revalidate: the pinned dashboard stays put while the

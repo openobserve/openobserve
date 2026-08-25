@@ -69,7 +69,9 @@ export function useOnlineEvalsData() {
   async function loadProviders(orgId: string) {
     if (!orgId) return;
     try {
-      providers.value = await queryClient.fetchQuery({ ...providersQuery(orgId), staleTime: 0 });
+      const options = providersQuery(orgId);
+      await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      providers.value = await queryClient.fetchQuery(options);
     } catch (err: any) {
       showError(err, t("onlineEvals.loadError"));
     }

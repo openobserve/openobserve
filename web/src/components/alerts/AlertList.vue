@@ -1914,7 +1914,7 @@ export default defineComponent({
       );
       const painted = cachedRows ? renderAlerts(cachedRows) : false;
       const pending = force
-        ? queryClient.fetchQuery({ ...alertsListQuery(org, folderId, query, alertType), staleTime: 0 })
+        ? queryClient.invalidateQueries({ queryKey: alertsListQuery(org, folderId, query, alertType).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(alertsListQuery(org, folderId, query, alertType)))
         : queryClient.fetchQuery(alertsListQuery(org, folderId, query, alertType));
 
       loading.value = !painted;

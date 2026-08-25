@@ -427,8 +427,10 @@ const getTemplates = (force = false) => {
   fetching.value = true;
 
   // TODO: fold into `useQuery` when this list drops its imperative refresh.
-  return queryClient
-    .fetchQuery(force ? { ...options, staleTime: 0 } : options)
+  if (force) {
+    void queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+  }
+  return queryClient.fetchQuery(options)
     .then((list: any[]) => {
       applyRows(list);
       // Kept out of `apply`, which runs again for the cached paint: rebuilding

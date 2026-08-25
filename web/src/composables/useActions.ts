@@ -36,7 +36,13 @@ const useActions = () => {
       // Cached: this runs on every Logs entry alongside the functions list.
       // `force` is for the Actions page's refresh and its post-write reloads.
       const org = store.state.selectedOrganization.identifier;
-      const data = force ? await queryClient.fetchQuery({ ...actionsQuery(org), staleTime: 0 }) : await queryClient.fetchQuery(actionsQuery(org));
+      const options = actionsQuery(org);
+      // Force by invalidating — spreading `staleTime: 0` into fetchQuery would
+      // be stored as the entry's standing policy.
+      if (force) {
+        await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      }
+      const data = await queryClient.fetchQuery(options);
       // Bridge for consumers still reading `organizationData.actions`.
       store.dispatch("setActions", data);
       return (data as any[]) ?? [];

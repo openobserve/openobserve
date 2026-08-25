@@ -562,9 +562,10 @@ export default defineComponent({
         this.fetching = true;
         // Options API, so this reads imperatively rather than through useQuery.
         // TODO: move to `useQuery` when this component moves to `setup()`.
-        this.integrations = await queryClient.fetchQuery(
-          force ? { ...options, staleTime: 0 } : options,
-        );
+        if (force) {
+          await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+        }
+        this.integrations = await queryClient.fetchQuery(options);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       } finally {

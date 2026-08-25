@@ -708,7 +708,7 @@ export default defineComponent({
         if (painted) applyStreams(cachedPage);
         isRefreshing.value = true;
         const streamResponse = _refresh
-          ? queryClient.fetchQuery({ ...streamPageQuery(org, type, params), staleTime: 0 })
+          ? queryClient.invalidateQueries({ queryKey: streamPageQuery(org, type, params).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(streamPageQuery(org, type, params)))
           : queryClient.fetchQuery(streamPageQuery(org, type, params));
 
         loadingState.value = !painted;
