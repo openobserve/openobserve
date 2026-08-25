@@ -82,6 +82,18 @@ const describedBy = computed(() =>
 
 const isTextarea = computed(() => props.type === "textarea");
 
+// ── Password reveal ────────────────────────────────────────────────────────
+// The toggle swaps the RENDERED type only; `type` itself is untouched, so a
+// revealed field still reports itself as a password to the form and to
+// autocomplete. Resets whenever the field stops being a revealable password, so
+// a type change can never leave a value exposed.
+const revealed = ref(false);
+const canReveal = computed(() => Boolean(props.revealable) && props.type === "password");
+const effectiveType = computed(() => (canReveal.value && revealed.value ? "text" : props.type));
+watch(canReveal, (allowed) => {
+  if (!allowed) revealed.value = false;
+});
+
 // ── Width ──────────────────────────────────────────────────────────────────
 const fieldWidthClass = computed(() => {
   switch (props.width) {
@@ -322,7 +334,9 @@ const wrapperClasses = computed(() => [
           'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'py-2',
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
-          $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
+          $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
+            ? 'pe-2'
+            : 'pe-3',
           'text-sm',
           autogrow ? 'resize-none' : 'resize-y',
         ]"
@@ -342,7 +356,7 @@ const wrapperClasses = computed(() => [
         ref="inputRef"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :value="String(modelValue ?? '')"
-        :type="type"
+        :type="effectiveType"
         :name="name"
         :placeholder="placeholder"
         :disabled="disabled"
@@ -364,7 +378,9 @@ const wrapperClasses = computed(() => [
             ? 'pt-3 pb-0.5 text-xs font-semibold'
             : textSizeClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
-          $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
+          $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
+            ? 'pe-2'
+            : 'pe-3',
         ]"
         @input="handleInput"
         @blur="handleBlur"
@@ -374,6 +390,21 @@ const wrapperClasses = computed(() => [
         @keypress="emit('keypress', $event)"
         @paste="emit('paste', $event)"
       />
+
+      <!-- Reveal toggle. `tabindex="-1"` matches the clear button: it is a
+           convenience, not a step in the form's tab order. -->
+      <button
+        v-if="canReveal"
+        type="button"
+        tabindex="-1"
+        :aria-pressed="revealed"
+        :aria-label="revealed ? t('components.input.hideValue') : t('components.input.showValue')"
+        :data-test="parentDataTest ? `${parentDataTest}-reveal` : undefined"
+        class="text-input-clear-btn hover:text-input-clear-btn-hover flex items-center pe-2 transition-colors"
+        @click="revealed = !revealed"
+      >
+        <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
+      </button>
 
       <!-- Clear button -->
       <button

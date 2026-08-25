@@ -38,8 +38,13 @@ export type ExperimentTask =
       model?: string | null;
       params?: Record<string, unknown> | null;
     }
-  | { type: "remote"; config: Record<string, unknown> }
-  | { type: "sdk"; config: Record<string, unknown> };
+  | {
+      type: "remote";
+      /** A published Remote Task pinned as `name` plus its version. Never latest. */
+      taskRef: string;
+      overrides?: { maxConcurrency?: number; timeoutMs?: number } | null;
+    }
+  | { type: "sdk"; taskFingerprint: string; config?: Record<string, unknown> };
 
 export interface ExperimentDatasetFilter {
   logicalIds?: string[];

@@ -474,6 +474,38 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Remote Task auth shape — plain. Says HOW the platform authenticates, never
+  // whether a secret is present; that is a separate column.
+  remoteTaskAuth: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      none: { variant: "default-soft", labelKey: "aiObservability.remoteTasks.auth.none" },
+      bearer: { variant: "blue-soft", labelKey: "aiObservability.remoteTasks.auth.bearer" },
+      basic: { variant: "purple-soft", labelKey: "aiObservability.remoteTasks.auth.basic" },
+      apikeyheader: {
+        variant: "orange-soft",
+        labelKey: "aiObservability.remoteTasks.auth.apiKeyHeader",
+      },
+    },
+  },
+
+  // Remote Task registry state — dot. This is NOT verification_status: it answers
+  // "can an Experiment pin this?", which is the question a reader actually has.
+  remoteTaskStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      published: {
+        variant: "success-soft",
+        labelKey: "aiObservability.remoteTasks.status.published",
+      },
+      draft: { variant: "default-soft", labelKey: "aiObservability.remoteTasks.status.draft" },
+      failed: { variant: "error-soft", labelKey: "aiObservability.remoteTasks.status.failed" },
+      retired: { variant: "default-soft", labelKey: "aiObservability.remoteTasks.status.retired" },
+    },
+  },
+
   // Schema field data types — plain.
   fieldType: {
     mode: "plain",
