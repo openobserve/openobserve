@@ -20,14 +20,15 @@ import { orgKey } from "@/composables/query/keys";
  * org-switch and logout purges reach them by prefix rather than by a namespace
  * only this cache knows about.
  *
- * `digest` is the FNV-1a hash of the normalized schema + variables from
- * `panelKey.ts` — a panel's identity is that pair, not its id, so two variable
- * combinations occupy two entries instead of evicting each other.
+ * One entry per panel id — the LAST run overwrites, exactly like main's
+ * bespoke store. The schema+variables the result was produced with travel
+ * inside the entry (`PanelCacheEntry.key`) and every reader compares them
+ * before using the data, so a mismatched restore is a miss, not wrong data.
  */
 export const panelKeys = {
   all: (org: string) => orgKey(org, "panels"),
   dashboard: (org: string, folderId: string, dashboardId: string) =>
     orgKey(org, "panels", folderId, dashboardId),
-  result: (org: string, folderId: string, dashboardId: string, panelId: string, digest: string) =>
-    orgKey(org, "panels", folderId, dashboardId, panelId, digest),
+  result: (org: string, folderId: string, dashboardId: string, panelId: string) =>
+    orgKey(org, "panels", folderId, dashboardId, panelId),
 };

@@ -42,9 +42,13 @@ import { toRaw } from "vue";
 import { hashKey } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { idbPersister, IDB_PREFIX } from "@/composables/query/persisters";
-import { cacheRemoveByPrefix, cacheRemoveWhere } from "@/composables/query/idbStorage";
+import {
+  cacheAllRecords,
+  cacheRemove,
+  cacheRemoveByPrefix,
+  cacheRemoveWhere,
+} from "@/composables/query/idbStorage";
 import { LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { panelKeyDigest } from "@/composables/query/panelKey";
 import { panelKeys } from "./panel.querykeys";
 
 /**
@@ -145,23 +149,32 @@ window._o2_removeDashboardCache = async (): Promise<void> => {
 window._o2_getDashboardCache = async (): Promise<any> => {
   try {
     const cache: any = {};
+    const put = (queryKey: readonly unknown[], entry: PanelCacheEntry | undefined) => {
+      if (!entry) return;
+      const [, , , folderId, dashboardId, panelId] = queryKey as any[];
+      if (!cache[folderId]) cache[folderId] = {};
+      if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
+      cache[folderId][dashboardId][panelId] = {
+        key: entry.key,
+        value: entry.value,
+        cacheTimeRange: entry.cacheTimeRange,
+        timestamp: entry.timestamp,
+      };
+    };
+
+    // Disk first, then memory on top — main read the whole store, and entries
+    // that were only ever persisted have no in-memory query to walk.
+    for (const record of await cacheAllRecords<any>()) {
+      const persisted = record.value;
+      if (!Array.isArray(persisted?.queryKey) || !isPanelKey(persisted.queryKey)) continue;
+      put(persisted.queryKey, persisted.state?.data as PanelCacheEntry | undefined);
+    }
     queryClient
       .getQueryCache()
       .getAll()
       .forEach((query) => {
         if (!isPanelKey(query.queryKey)) return;
-        const [, , , folderId, dashboardId, panelId] = query.queryKey as any[];
-        const entry = query.state.data as PanelCacheEntry | undefined;
-        if (!entry) return;
-
-        if (!cache[folderId]) cache[folderId] = {};
-        if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
-        cache[folderId][dashboardId][panelId] = {
-          key: entry.key,
-          value: entry.value,
-          cacheTimeRange: entry.cacheTimeRange,
-          timestamp: entry.timestamp,
-        };
+        put(query.queryKey, query.state.data as PanelCacheEntry | undefined);
       });
     return cache;
   } catch (error) {
@@ -195,12 +208,10 @@ export const usePanelCache = (
     };
   }
 
-  const keyFor = (cacheKey: any) =>
-    panelKeys.result(org, folderId, dashboardId, panelId, panelKeyDigest(cacheKey));
+  const queryKey = panelKeys.result(org, folderId, dashboardId, panelId);
 
   const savePanelCache = async (key: any, data: any, cacheTimeRange: any): Promise<void> => {
     try {
-      const queryKey = keyFor(key);
       const entry = toStorable<PanelCacheEntry>({
         key,
         value: data,
@@ -220,14 +231,13 @@ export const usePanelCache = (
   };
 
   /**
-   * `currentKey` is the key the panel would run with now — its digest selects
-   * the matching entry. Callers still verify the returned key themselves, so a
-   * digest collision cannot serve the wrong result.
+   * Returns the panel's single entry, whatever it was last saved with — the
+   * caller compares the entry's stored `key` against the key it would run with
+   * now and treats a mismatch as a miss, exactly as on main. The parameter is
+   * accepted for call-site compatibility and ignored.
    */
-  const getPanelCache = async (currentKey?: any): Promise<PanelCacheEntry | null> => {
+  const getPanelCache = async (_currentKey?: any): Promise<PanelCacheEntry | null> => {
     try {
-      const queryKey = keyFor(currentKey);
-
       // Memory first: a panel remounting inside one session never touches disk.
       let entry = queryClient.getQueryData<PanelCacheEntry>(queryKey);
 
@@ -266,11 +276,6 @@ export const usePanelCache = (
 };
 
 /**
- * Drop every cached result for one panel — all of its variable digests, in
- * memory and on disk. Called when the panel itself is deleted: otherwise its
- * payload sits in IndexedDB until the 24 h TTL or the record cap reclaims it.
- */
-/**
  * Drop every cached panel result under one dashboard, in memory and on disk.
  * Called when the dashboard itself is deleted — panel-level pruning never runs
  * for panels that go down with their dashboard, so without this their payloads
@@ -291,6 +296,11 @@ export const dropDashboardPanelCache = async (
   }
 };
 
+/**
+ * Drop one panel's cached result, in memory and on disk. Called when the panel
+ * itself is deleted: otherwise its payload sits in IndexedDB until the 24 h TTL
+ * or the record cap reclaims it.
+ */
 export const dropPanelCache = async (
   org: string,
   folderId: string,
@@ -298,14 +308,10 @@ export const dropPanelCache = async (
   panelId: string,
 ): Promise<void> => {
   try {
-    // One panel owns one entry per variable digest, and the digest is the key's
-    // last segment — so drop the segment and match everything under it.
-    const panelPrefix = panelKeys.result(org, folderId, dashboardId, panelId, "").slice(0, -1);
-    queryClient.removeQueries({ queryKey: panelPrefix });
-    // The persister keys by the query HASH, not the array, so the disk prefix is
-    // that hash with its closing bracket swapped for the separator.
-    const hashPrefix = hashKey(panelPrefix).replace(/\]$/, ",");
-    await cacheRemoveByPrefix(`${IDB_PREFIX}-${hashPrefix}`);
+    const queryKey = panelKeys.result(org, folderId, dashboardId, panelId);
+    queryClient.removeQueries({ queryKey, exact: true });
+    // The persister keys storage by the query HASH, not the key array.
+    await cacheRemove(`${IDB_PREFIX}-${hashKey(queryKey)}`);
   } catch (error) {
     console.error("Error dropping panel cache:", error);
   }
