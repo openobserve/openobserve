@@ -1,0 +1,792 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * The L2 tab bar states how much is happening in EVERY view, from whichever
+ * view you are standing in.
+ *
+ * The pages share one implementation — `DbmShell` issues a single `/badges`
+ * request and the pages render the snapshot — so the requirements are asserted
+ * by calling it rather than by scanning page source. The envelope's members are
+ * the six endpoints' own bodies (`null` for a failed slice), so the fold here
+ * exercises exactly what the server returns.
+ *
+ * The one source scan that remains covers the property no unit test can see:
+ * that a page does not fan out behind the shell's back.
+ */
+
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { badgeCount, claimedCount, countVantage } from "@/utils/dbm/format";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const read = (file: string) => readFileSync(join(here, file), "utf8");
+
+vi.mock("@/services/db_monitoring", () => ({
+  default: {
+    // The strip's one request.
+    getBadges: vi.fn(),
+    // The composable must never reach these itself: the per-endpoint reads and
+    // the zero-trace fallback pair are both server-side. Mocked so a stray call
+    // hits a spy (asserted never-called below) instead of the network.
+    getDatabases: vi.fn(),
+    getQueries: vi.fn(),
+    getActivity: vi.fn(),
+    getDeadlocks: vi.fn(),
+    getBlocking: vi.fn(),
+    getTableHealth: vi.fn(),
+    getServerQueries: vi.fn(),
+    getServerSamples: vi.fn(),
+  },
+}));
+
+const { default: dbMonitoringService } = await import("@/services/db_monitoring");
+const { fetchDbmTabCounts, tabCountProps, withOwnCount, emptyDbmTabCounts } =
+  await import("@/composables/dbm/useDbmTabCounts");
+
+const service = dbMonitoringService as unknown as Record<string, ReturnType<typeof vi.fn>>;
+
+/** A fulfilled response, in the shape axios hands back. */
+const ok = (data: unknown) => Promise.resolve({ data });
+
+/**
+ * A fully-answered `/badges` envelope: every member is its endpoint's body,
+ * no fallback member (the client vantage answered), so a test can override
+ * only what it cares about.
+ */
+const fullEnvelope = () => ({
+  // One row deliberately carries no `calls` — legal per the response contract
+  // (an idle instance's row omits it); the fold treats it as 0.
+  databases: { hits: [{ calls: 800 }, { calls: 400 }, {}] },
+  queries: { total: 42 },
+  activity: { by_state: [{ state: "active", sessions: 7 }], hits: [{ session_pid: 1 }] },
+  deadlocks: { total: 90, truncated: true },
+  blocking: { total: 100, truncated: true, hits: [{ pid: 5 }] },
+  table_health: { total: 12 },
+});
+
+const badgesAnswer = (envelope: unknown) => service.getBadges.mockReturnValue(ok(envelope));
+
+const WINDOW = { startTime: 1_000, endTime: 2_000 };
+
+describe("the one badges request answers every tab's badge at once", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    badgesAnswer(fullEnvelope());
+  });
+
+  /**
+   * The whole point of the server-side fan-in: the strip costs ONE request
+   * per window. The six-read fan-out (and its up-to-two fallback reads) is
+   * the server's concurrency now, not the browser's.
+   */
+  it("issues exactly one request", async () => {
+    await fetchDbmTabCounts("acme", WINDOW);
+    expect(service.getBadges).toHaveBeenCalledTimes(1);
+    for (const [name, fn] of Object.entries(service)) {
+      if (name === "getBadges") continue;
+      expect(fn, `${name} must not be read by the strip anymore`).not.toHaveBeenCalled();
+    }
+  });
+
+  /**
+   * One request, and every one of the seven badges comes out of it populated.
+   *
+   * The two badges fed by the TRACE rollup carry `vantage: "client"` — a call
+   * count is an overlap measure, so D2 makes the qualifier mandatory wherever
+   * it renders, and the strip can only qualify what the fold hands it.
+   */
+  it("fills all seven badges from that one request", async () => {
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(tabCountProps(counts)).toEqual({
+      databaseCount: 3,
+      queryCount: { count: 42, complete: true, vantage: "client" },
+      sampleCallsCount: { count: 1200, complete: true, vantage: "client" },
+      activityCount: 7,
+      deadlockCount: { count: 90, complete: false },
+      blockedCount: { count: 100, complete: false },
+      // A claim, not a bare number: the read caps at `limit` and now discloses
+      // it, so a full page renders `12+` rather than printing the cap as a total.
+      tableHealthCount: { count: 12, complete: true },
+    });
+  });
+
+  /**
+   * The badge means SESSIONS in the window, which is what the state breakdown
+   * counts. `hits`/`total` on the activity member is a row-limited sample, so
+   * sourcing the badge from it would render a constant cap as the population.
+   *
+   * `activitySampleTotal` expects the `by_state` array, not the whole activity
+   * response: an object has no `.length`, so passing one resolves the badge to
+   * `null` on every load without ever rendering a number.
+   */
+  it("sources the activity badge from the state breakdown, not from hits", async () => {
+    badgesAnswer({
+      ...fullEnvelope(),
+      activity: {
+        total: 100,
+        by_state: [
+          { state: "active", sessions: 5 },
+          { state: "idle", sessions: 6 },
+        ],
+        hits: [{}, {}],
+      },
+    });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(counts.activityCount).toBe(11);
+  });
+
+  /**
+   * **A capped read may not reach the badge as a bare total.**
+   *
+   * Measured against a live backend: /deadlocks returned total 90 with
+   * truncated true for a window holding at least 814 events, and /blocking 100
+   * for 426. Both are CEILINGS rendered as populations, and both stay still
+   * across windows in which the real number moves — the badge looks like a
+   * measurement that is not changing rather than one that is not being taken.
+   *
+   * So the claim carries the server's flag and the badge prints `90+`. The
+   * arithmetic is unit-tested in format.spec.ts; what is pinned here is that
+   * the flag survives the fold into the shared snapshot.
+   */
+  it("carries the server's cap into the capped badges", async () => {
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(badgeCount(counts.deadlockCount)).toBe("90+");
+    expect(badgeCount(counts.blockedCount)).toBe("100+");
+  });
+
+  it("drops the cap marker when the server says the read was complete", async () => {
+    badgesAnswer({ ...fullEnvelope(), deadlocks: { total: 7, truncated: false } });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(badgeCount(counts.deadlockCount)).toBe("7");
+  });
+});
+
+describe("the zero-trace fallback counts what the tabs actually show", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    badgesAnswer(fullEnvelope());
+  });
+
+  /**
+   * With no traced traffic, Top queries and Slowest calls render
+   * database-reported lists — so the strip must count those, as capped
+   * claims, on EVERY tab from the first paint. A shared `0` above rendered
+   * rows denies working data; a badge that only corrects after the page's own
+   * read lands flashes wrong and disagrees across tabs. The SERVER arms the
+   * fallback (exact zero, never a failed slice) and ships the members in the
+   * same envelope; the fold here turns them into the same capped claims the
+   * fallback pages put on their own badges.
+   */
+  it("fills the query and samples badges from the database-reported lists", async () => {
+    badgesAnswer({
+      ...fullEnvelope(),
+      queries: { total: 0 },
+      databases: { hits: [] },
+      server_queries: {
+        hits: [{ db_system: "postgresql", db_instance: "postgres" }],
+        truncated: true,
+      },
+      server_samples: {
+        hits: [
+          { db_system: "postgresql", db_instance: "postgres" },
+          { db_system: "mysql", db_instance: "mysql" },
+        ],
+        truncated: false,
+      },
+    });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(badgeCount(counts.queryCount)).toBe("1+");
+    expect(badgeCount(counts.sampleCallsCount)).toBe("2");
+    // Overview: distinct instances the server vantage NAMES — identity only,
+    // from rows already in hand.
+    expect(counts.databaseCount).toBe(2);
+  });
+
+  /**
+   * With client answers in hand the server sends no fallback members, and the
+   * strip must neither invent them nor fetch them itself — the fallback reads
+   * moved server-side, and a second client-side pass would be the request
+   * storm this endpoint exists to remove.
+   */
+  it("keeps the client answers when no fallback member is present", async () => {
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    // Value AND vantage: the client answer standing is only honest if the
+    // badge still says the trace vantage produced it.
+    expect(counts.queryCount).toEqual({ count: 42, complete: true, vantage: "client" });
+    expect(counts.sampleCallsCount).toEqual({ count: 1200, complete: true, vantage: "client" });
+    expect(service.getServerQueries).not.toHaveBeenCalled();
+    expect(service.getServerSamples).not.toHaveBeenCalled();
+  });
+
+  /**
+   * `null` is a FAILED read, and unknown is not zero — a fallback fired on a
+   * failure would dress an outage as a quiet org with server data. The server
+   * enforces this (a null slice ships no fallback member); the fold must obey
+   * the envelope rather than re-deciding.
+   */
+  it("does not fire the fallback for a failed client read", async () => {
+    badgesAnswer({ ...fullEnvelope(), queries: null });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(counts.queryCount).toBeNull();
+    expect(service.getServerQueries).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A fallback that FIRED and then FAILED arrives as a null member — present,
+   * unknown. The honest client zero stands; a null member must never be read
+   * as rows.
+   */
+  it("does not invent rows when a fired fallback member is null", async () => {
+    badgesAnswer({
+      ...fullEnvelope(),
+      queries: { total: 0 },
+      server_queries: null,
+    });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    // A null member is UNKNOWN, so nothing overwrites the client answer. That
+    // answer is an overlap zero, which D6/L2 withhold rather than qualify —
+    // the badge is blank, not `0 client-observed`.
+    expect(badgeCount(counts.queryCount)).toBeNull();
+    expect(claimedCount(counts.queryCount)).toBeNull();
+  });
+
+  /**
+   * An org with nothing anywhere prints zero everywhere — because everything
+   * ANSWERED. Both server members are present and empty, so the database's own
+   * lists were read and held nothing; that is a measurement, and the strip
+   * states it rather than going blank beside its populated siblings.
+   *
+   * The withheld-zero rule (D6/L2) still governs the arms above, where a
+   * server member is `null` (fired-and-failed) or absent (never fired) — there
+   * a vantage genuinely did not answer and must not claim a count.
+   */
+  it("prints a server zero on both overlap badges when the databases report nothing either", async () => {
+    badgesAnswer({
+      ...fullEnvelope(),
+      queries: { total: 0 },
+      databases: { hits: [] },
+      server_queries: { hits: [], truncated: false },
+      server_samples: { hits: [], truncated: false },
+    });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(badgeCount(counts.queryCount)).toBe("0");
+    expect(badgeCount(counts.sampleCallsCount)).toBe("0");
+    expect(countVantage(counts.queryCount)).toBe("server");
+    expect(counts.databaseCount).toBe(0);
+  });
+});
+
+describe("a failed slice blanks its own badge and nothing else", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    badgesAnswer(fullEnvelope());
+  });
+
+  /**
+   * `null` is bare; `0` is a measurement. A failed read has measured nothing,
+   * and printing `0` for it claims "there are none" — the one wrong answer that
+   * stops a reader opening the tab during an incident. The envelope carries
+   * the failure as a null member, and the fold must keep it null.
+   */
+  it.each([
+    ["databases", "databaseCount"],
+    // The samples badge folds the SAME databases member, so the same
+    // failure blanks it too — an honest blank, not a 0-call claim.
+    ["databases", "sampleCallsCount"],
+    ["queries", "queryCount"],
+    ["activity", "activityCount"],
+    ["deadlocks", "deadlockCount"],
+    ["blocking", "blockedCount"],
+    ["table_health", "tableHealthCount"],
+  ])("a null %s member leaves %s null, never 0", async (member, badge) => {
+    badgesAnswer({ ...fullEnvelope(), [member]: null });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(counts[badge as keyof typeof counts]).toBeNull();
+    expect(badgeCount(counts[badge as keyof typeof counts] as never)).toBeNull();
+  });
+
+  /** One dead slice must not abandon the others — per-member isolation. */
+  it("still answers the other badges", async () => {
+    badgesAnswer({ ...fullEnvelope(), activity: null });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(counts.activityCount).toBeNull();
+    expect(counts.databaseCount).toBe(3);
+    expect(badgeCount(counts.queryCount)).toBe("42");
+    expect(badgeCount(counts.tableHealthCount)).toBe("12");
+  });
+
+  /**
+   * Pins that the snapshot always carries every key, so `samples is not
+   * iterable` is unrepresentable.
+   *
+   * Divergent per-page payload shapes — only Table health carrying
+   * `blockingSamples` — let whichever page loaded first decide what the others
+   * got, so landing on Deadlocks then switching to Table health handed it a
+   * payload with no `blockingSamples` and `chainsFromSamples` threw out of a
+   * Vue computed. Asserted on the failure paths specifically — every member
+   * null, and the whole request rejected — because those are the paths that
+   * can drop a field.
+   */
+  it.each(["activityStates", "sessions", "blockingSamples"] as const)(
+    "%s is an array even when every member is null",
+    async (key) => {
+      badgesAnswer({
+        databases: null,
+        queries: null,
+        activity: null,
+        deadlocks: null,
+        blocking: null,
+        table_health: null,
+      });
+      const counts = await fetchDbmTabCounts("acme", WINDOW);
+      expect(Array.isArray(counts[key]), `${key} must never be undefined`).toBe(true);
+      expect(counts[key]).toEqual([]);
+    },
+  );
+
+  /**
+   * A total request failure REJECTS rather than folding to a row of `null`s.
+   *
+   * The two are different answers: a member `null` is "this slice could not be
+   * read", while a dead request is "nothing was learned at all". Folding the
+   * second into the first lets `load` write blanks over badges that already
+   * held real numbers, which is the badge vanishing on tab switch. The caller
+   * decides what a dead request means, because only it knows whether anything
+   * was known before — see `dbmTabCountsResilience.spec.ts`.
+   */
+  it("rejects when the request itself failed, rather than claiming zero", async () => {
+    service.getBadges.mockRejectedValue(new Error("boom"));
+    await expect(fetchDbmTabCounts("acme", WINDOW)).rejects.toThrow("boom");
+  });
+
+  /** The same guarantee before anything has been fetched at all. */
+  it.each(["activityStates", "sessions", "blockingSamples"] as const)(
+    "%s is an array on the pre-fetch snapshot",
+    (key) => {
+      expect(Array.isArray(emptyDbmTabCounts()[key])).toBe(true);
+    },
+  );
+
+  /**
+   * The array payloads are PROJECTIONS of the same members the counts came
+   * from — Table health's two rules read the activity and blocking samples — so
+   * they must be served from this snapshot rather than refetched. A second read
+   * over the same window could disagree with the badge sitting beside it.
+   */
+  it("serves the rule inputs from the same responses as the counts", async () => {
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(counts.sessions).toEqual([{ session_pid: 1 }]);
+    expect(counts.blockingSamples).toEqual([{ pid: 5 }]);
+    expect(service.getBadges).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the active tab still overrides its own badge", () => {
+  /**
+   * Each page counts its own tab from the rows it actually loaded, which is
+   * fresher than the shared fan-out's number and can differ from it
+   * legitimately — the page applies its own filters. That behaviour predates
+   * the hoist and must survive it: the shell supplies the sibling badges, the
+   * page supplies its own.
+   */
+  it("takes the page's own count in place of the shared one", () => {
+    const shared = { ...emptyDbmTabCounts(), activityCount: 500 };
+    expect(tabCountProps(withOwnCount(shared, "activityCount", 3)).activityCount).toBe(3);
+  });
+
+  /** The other badges are untouched by an override. */
+  it("leaves the badges it did not override alone", () => {
+    const shared = { ...emptyDbmTabCounts(), activityCount: 500, queryCount: 9 };
+    expect(tabCountProps(withOwnCount(shared, "activityCount", 3)).queryCount).toBe(9);
+  });
+
+  /**
+   * `undefined` means "I have no better number" and the shared one stands;
+   * `null` is a real "unknown" the page is asserting, so it wins and blanks the
+   * badge. Conflating them would let a page that has not loaded yet silently
+   * publish a zero-ish blank over a number the shell already has.
+   */
+  it("keeps the shared count when the page offers undefined", () => {
+    const shared = { ...emptyDbmTabCounts(), activityCount: 500 };
+    expect(tabCountProps(withOwnCount(shared, "activityCount", undefined)).activityCount).toBe(500);
+  });
+
+  it("lets a page assert null over a shared number", () => {
+    const shared = { ...emptyDbmTabCounts(), activityCount: 500 };
+    expect(tabCountProps(withOwnCount(shared, "activityCount", null)).activityCount).toBeNull();
+  });
+
+  /**
+   * DeadlocksPage and BlockedQueriesPage publish BARE NUMBERS where the shared
+   * snapshot holds a claim, and have always rendered them without the `+`.
+   * Quietly promoting them to claims would be a visible change nobody asked
+   * for, so the override accepts either.
+   */
+  it("accepts a bare number where the shared snapshot holds a claim", () => {
+    const shared = { ...emptyDbmTabCounts(), deadlockCount: { count: 90, complete: false } };
+    expect(badgeCount(withOwnCount(shared, "deadlockCount", 43).deadlockCount)).toBe("43");
+  });
+});
+
+/**
+ * The one property no unit test can see: that a page does not quietly fan out
+ * behind the shell's back.
+ *
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
+ */
+describe("no page re-fetches the badges the shell already owns", () => {
+  /** Which endpoint each page is legitimately allowed to read for ITS OWN table. */
+  const OWN_READ: Record<string, string[]> = {
+    "DatabasesPage.vue": ["getDatabases", "getQueries"],
+    "QueriesPage.vue": ["getQueries"],
+    // Its own table reads `getSamples`, which is not a badge fetch; its badge
+    // (the finished-call population) rides the shell's `/databases` read.
+    "SamplesPage.vue": [],
+    "ActivityPage.vue": ["getActivity"],
+    "DeadlocksPage.vue": ["getDeadlocks"],
+    "BlockedQueriesPage.vue": ["getBlocking"],
+    "TableHealthPage.vue": ["getTableHealth"],
+  };
+
+  const BADGE_FETCHES = [
+    // The strip's one request — only the shell may issue it. A page calling
+    // it directly reintroduces the duplicate fan-out server-side.
+    "getBadges",
+    "getDatabases",
+    "getQueries",
+    "getActivity",
+    "getDeadlocks",
+    "getBlocking",
+    "getTableHealth",
+  ];
+
+  it.each(Object.keys(OWN_READ))("%s reads only the endpoints its own table needs", (page) => {
+    const source = read(page);
+    const stray = BADGE_FETCHES.filter(
+      (fetcher) =>
+        !OWN_READ[page].includes(fetcher) && source.includes(`dbMonitoringService.${fetcher}(`),
+    );
+    expect(
+      stray,
+      `${page} still fans out to ${stray.join(", ")} — the shell already fetches ` +
+        `those for every tab, so this is the duplicate read the hoist removed`,
+    ).toEqual([]);
+  });
+
+  /**
+   * And every page must actually render the strip it is handed counts for. The
+   * strip's markup moved into `DbmPageChrome` — one header for all seven tabs —
+   * so what a PAGE must show is that it hands its counts to that header. The
+   * chrome's own spec pins that the strip is what receives them.
+   */
+  it.each(Object.keys(OWN_READ))("%s renders the shared tab strip", (page) => {
+    const source = read(page);
+    expect(source).toContain('import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue"');
+    expect(source).toMatch(/:tab-counts="tabCounts"/);
+  });
+
+  /**
+   * The refresh button must still reach the badges. The shell watches the URL,
+   * which does NOT change on a refresh, so a page that only reloaded its own
+   * table would leave the badges stating the pre-refresh numbers.
+   *
+   * The force lives ONCE now — in `useDbmListPage.onRefresh` — so what each
+   * page must show is that its refresh button is wired to THAT handler, and
+   * the composable must show the force itself.
+   *
+   * The button itself is now the shared `DbmRefreshButton`, which emits
+   * `refresh`; a page that still hand-rolls the OButton binds `@click`. Either
+   * spelling satisfies the requirement — that the handler is reached.
+   */
+  it.each(Object.keys(OWN_READ))("%s wires its refresh button to the shared handler", (page) => {
+    const source = read(page);
+    expect(source).toContain('from "@/composables/dbm/useDbmListPage"');
+    expect(
+      source,
+      `${page} never binds onRefresh, so its refresh button leaves the badges stale`,
+    ).toMatch(/@(?:click|refresh)="onRefresh"/);
+  });
+
+  it("the shared refresh handler forces the badge cache", () => {
+    const composable = readFileSync(join(here, "../../composables/dbm/useDbmListPage.ts"), "utf8");
+    expect(composable).toMatch(/tabCountsContext\.refresh\(\{ force: true \}\)/);
+  });
+
+  /**
+   * Filter changes must reach the URL. The route query is how the shell and
+   * the sibling tabs learn the scope, so a dimension filter that only calls
+   * `load()` narrows the table while the URL — and everything reading it —
+   * still describes the unfiltered question; a reload or a shared link then
+   * reopens a different table than the one on screen.
+   *
+   * The handler lives ONCE per page now — `createDbmFilterEntry` owns the
+   * `onChange` — so the pins are: the page's one apply callback syncs the URL
+   * BEFORE reloading, every entry goes through the factory, and no entry
+   * carries a hand-written `onChange` that could skip the URL half.
+   */
+  it.each(["QueriesPage.vue", "SamplesPage.vue", "DatabasesPage.vue"])(
+    "%s publishes every dimension-filter change to the URL",
+    (page) => {
+      const source = read(page);
+      expect(source, `${page}: the apply callback must sync the URL before reloading`).toMatch(
+        /createDbmFilterEntry\(\(\) => \{\s*\n\s*syncUrl\(\);\s*\n\s*load\(\);\s*\n\s*\}\)/,
+      );
+      const filters = source.split("const dimensionFilters")[1]?.split("\n]);")[0] ?? "";
+      expect(filters, "dimensionFilters must exist").not.toBe("");
+      const entries = filters.match(/filterEntry\(\{/g) ?? [];
+      expect(entries.length, "the filter set must carry entries").toBeGreaterThan(0);
+      expect(
+        filters,
+        `${page}: a hand-written onChange can skip the URL half — go through the factory`,
+      ).not.toMatch(/onChange:/);
+    },
+  );
+});
+
+/**
+ * The coverage caveat under each open database.
+ *
+ * `showsShortfall` is unit-tested in breakdownRows.spec.ts; what is pinned here
+ * is that the page ASKS it. The defect was never in the arithmetic — the
+ * per-row percentages were always distinct — it was that the page gated the
+ * caveat on `shortfall !== null` directly, which is true even when nothing was
+ * attributed and every row therefore reported the identical 100%.
+ */
+describe("DatabasesPage gates the coverage caveat on the shared rule", () => {
+  const source = read("DatabasesPage.vue");
+
+  it("asks showsShortfall rather than reading shortfall itself", () => {
+    expect(source).toContain('from "@/utils/dbm/breakdownRows"');
+    expect(source).toMatch(/const hasShortfall[\s\S]{0,400}showsShortfall\(/);
+  });
+
+  it("no longer gates the caveat on a bare non-null shortfall", () => {
+    expect(source).not.toMatch(/hasShortfall[\s\S]{0,200}breakdown\.shortfall !== null/);
+  });
+
+  /** The figure still rides along — a caveat without one is the disclaimer. */
+  it("still prints the row's own percentage in the caveat", () => {
+    expect(source).toMatch(/shortfallLine[\s\S]{0,300}dbm\.breakdown\.shortfall/);
+    expect(source).toMatch(/shortfallLine[\s\S]{0,300}percent:/);
+  });
+});
+
+/**
+ * **A vantage that measured nothing must not claim a zero.**
+ *
+ * Both live-reported symptoms on the zero-trace org `dbm_notraces` came from
+ * one defect, in two places on the same strip. The trace rollup is empty there
+ * BY CONSTRUCTION — no instrumented callers exist — so the client-vantage
+ * slices answer an exact `0` on every window. Stamped with the vantage that
+ * D2 makes mandatory, that rendered as `0 client-observed` on the Top-queries
+ * and Slowest-calls badges: a qualified zero, sitting directly above a tab
+ * that lists 50 statements the database itself reported.
+ *
+ * D6 forbids exactly this pairing — "never render an overlap value without a
+ * qualifier" and "never render absent as `0`" collide on a measured zero, and
+ * L2 resolves the collision by withholding the number. So the zero folds to
+ * `null` (blank), and the server fallback overwrites it with the real count
+ * when the database's own list is non-empty.
+ *
+ * The payloads below are the LIVE bodies, captured from
+ * `/api/dbm_nodb_monitoring/badges` at both windows.
+ */
+describe("an empty vantage withholds its overlap badge (D6/L2)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /** The 1h window: every vantage genuinely measured nothing. */
+  const emptyBothVantages = () => ({
+    databases: { hits: [], top_n_subset: false },
+    queries: { hits: [], other: [], total: 0, top_n_subset: false },
+    activity: { hits: [], by_wait_event: [], by_state: [], total: 0, truncated: false },
+    deadlocks: { total: 0, truncated: false },
+    blocking: { hits: [], total: 0, truncated: false },
+    table_health: { hits: [], total: 0 },
+    // The fallback FIRED (the client answer was an exact zero) and the server
+    // had nothing either — present-and-empty, not absent.
+    server_queries: { hits: [], total: 0, truncated: false },
+    server_samples: { hits: [], total: 0, truncated: false },
+  });
+
+  // A server member that is PRESENT AND EMPTY is a measurement: the database's
+  // own list was read and held nothing. Both vantages answered, so `0` is the
+  // honest count — and a blank badge beside populated siblings reads as "this
+  // tab is broken", which is what a reader reported. The withheld-zero rule
+  // still governs every arm where a vantage did NOT answer (see the two
+  // `toBeNull` cases above, where the server member is `null` or absent).
+  it.each([["queryCount"], ["sampleCallsCount"]])(
+    "%s prints a server 0 once the database's own list has answered and is empty",
+    async (badge) => {
+      badgesAnswer(emptyBothVantages());
+      const counts = await fetchDbmTabCounts("dbm_notraces", WINDOW);
+      const value = counts[badge as keyof typeof counts];
+      expect(badgeCount(value as never)).toBe("0");
+      // The zero carries the vantage that actually counted it, so the strip
+      // qualifies it rather than printing a bare, unattributed number.
+      expect(countVantage(value as never)).toBe("server");
+    },
+  );
+
+  /**
+   * The 7-day window on the same org: the trace vantage is still empty, but
+   * the database's own lists are not. The badge must show the SERVER number —
+   * this is the count that was being suppressed behind the fabricated zero.
+   */
+  it("renders the server list's count once the fallback has one", async () => {
+    badgesAnswer({
+      ...emptyBothVantages(),
+      server_queries: {
+        hits: Array.from({ length: 50 }, (_, i) => ({ fingerprint: `f${i}` })),
+        total: 50,
+        truncated: true,
+      },
+      server_samples: {
+        hits: Array.from({ length: 100 }, (_, i) => ({ fingerprint: `s${i}` })),
+        total: 100,
+        truncated: true,
+      },
+    });
+    const counts = await fetchDbmTabCounts("dbm_notraces", WINDOW);
+    // Capped reads, so the badge discloses the cap rather than printing it as
+    // a total — and carries the vantage that actually counted.
+    expect(badgeCount(counts.queryCount)).toBe("50+");
+    expect(badgeCount(counts.sampleCallsCount)).toBe("100+");
+    expect(countVantage(counts.queryCount)).toBe("server");
+    expect(countVantage(counts.sampleCallsCount)).toBe("server");
+  });
+
+  /**
+   * The activity badge is NOT an overlap measure — one feed, so its zero is
+   * the population and is allowed to print. What must never happen is the
+   * inverse defect: a populated breakdown folding to a blank badge.
+   */
+  it("still counts the activity population from the state breakdown", async () => {
+    badgesAnswer({
+      ...emptyBothVantages(),
+      activity: {
+        hits: [],
+        by_wait_event: [],
+        by_state: [
+          { state: "active", sessions: 3057 },
+          { state: "idle", sessions: 794 },
+          { state: "idle in transaction", sessions: 139 },
+          { state: "waiting", sessions: 20 },
+          { state: "running", sessions: 19 },
+          { state: "other", sessions: 3 },
+        ],
+        total: 100,
+        truncated: true,
+      },
+    });
+    const counts = await fetchDbmTabCounts("dbm_notraces", WINDOW);
+    expect(counts.activityCount).toBe(4032);
+    expect(badgeCount(counts.activityCount)).toBe("4032");
+  });
+
+  /**
+   * A real client-vantage number must still render, still qualified:
+   * withholding is for the zero only, and a rule that blanked every client
+   * count would break the `default` org.
+   */
+  it("leaves a real client-vantage count alone", async () => {
+    badgesAnswer(fullEnvelope());
+    const counts = await fetchDbmTabCounts("default", WINDOW);
+    expect(badgeCount(counts.queryCount)).toBe("42");
+    expect(countVantage(counts.queryCount)).toBe("client");
+    expect(claimedCount(counts.sampleCallsCount)).toBe(1200);
+    expect(countVantage(counts.sampleCallsCount)).toBe("client");
+  });
+});
+
+/**
+ * The Activity badge read 0 (blank) on a tab whose table was visibly full.
+ *
+ * ActivityPage overrides `activityCount` with its OWN `sampleTotal`, derived
+ * from the state breakdown it loaded. But `activitySampleTotal` returns `null`
+ * for an empty breakdown — which is true before the page's first load resolves,
+ * and true again on a window whose breakdown comes back `[]` while the row
+ * sample does not. Verified live: `oss_traces` answers `hits: 100` with
+ * `by_state: []`, and the shared `/badges` envelope carries the same shape.
+ *
+ * `null` is an assertion of unknown, so `withOwnCount` lets it WIN — stamping
+ * "we cannot count" over a shared snapshot that had counted perfectly well.
+ * The page must publish `undefined` ("I have no better number") instead, which
+ * is the same convention DatabasesPage uses via `loading ? undefined : …`.
+ */
+describe("the Activity badge does not blank a good shared count", () => {
+  const overrideAs = (own: number | null | undefined) =>
+    tabCountProps(
+      withOwnCount({ ...emptyDbmTabCounts(), activityCount: 389 }, "activityCount", own),
+    ).activityCount;
+
+  /** The unsampled-breakdown case, which is what the reader actually hit. */
+  it("keeps the shared count when the page's own breakdown is empty", () => {
+    // What `activitySampleTotal([])` yields, coalesced as the page now does.
+    const sampleTotal: number | null = null;
+    expect(overrideAs(sampleTotal ?? undefined)).toBe(389);
+  });
+
+  /** A real breakdown still wins — the override is not being disabled. */
+  it("still prefers the page's own count once it has one", () => {
+    expect(overrideAs(389)).toBe(389);
+    expect(overrideAs(12)).toBe(12);
+  });
+
+  /**
+   * A genuinely-measured zero must still be publishable: `0` is a number, not
+   * an absence, so `??` must not swallow it into the shared count.
+   */
+  it("lets a measured zero through", () => {
+    const sampleTotal: number | null = 0;
+    expect(overrideAs(sampleTotal ?? undefined)).toBe(0);
+  });
+
+  /**
+   * The page must not hand `null` to the override any more — and it must
+   * PUBLISH the count rather than substitute it into its own copy, so the
+   * badge reads the same from every tab. See dbmTabCountsResilience.spec.ts.
+   */
+  it("ActivityPage publishes its count, coalescing its null first", () => {
+    const source = readFileSync(join(here, "ActivityPage.vue"), "utf8");
+    // Asserted as SHAPE rather than an exact literal: the previous version of
+    // this test pinned the whole expression, so it failed on any edit —
+    // including the correct one that added the loading guard below.
+    const entry = source.match(/ownCounts:\s*\[[\s\S]*?\],/)?.[0] ?? "";
+    expect(entry).toContain('key: "activityCount"');
+    expect(entry, "a null sampleTotal must coalesce to undefined, never blank the badge").toContain(
+      "sampleTotal.value ?? undefined",
+    );
+  });
+
+  it("ActivityPage withholds its count while its own data is stale", () => {
+    const source = readFileSync(join(here, "ActivityPage.vue"), "utf8");
+    const entry = source.match(/ownCounts:\s*\[[\s\S]*?\],/)?.[0] ?? "";
+    // `stateBuckets` is a page ref and survives <keep-alive>, so between a
+    // scope change and this page's own reload `sampleTotal` still describes
+    // the PREVIOUS scope. Publishing then paints that number over the shared
+    // fan-out's fresh answer — the reported bug was an Activity badge reading
+    // 493 for `instance=mssql-prod-1` beside a table correctly showing no
+    // sessions. DatabasesPage withholds for exactly this reason.
+    expect(
+      entry,
+      "publishing an unloaded page's total repaints the previous scope's badge",
+    ).toContain("loading.value");
+  });
+});
