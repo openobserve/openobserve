@@ -547,6 +547,12 @@ pub struct DueCheck {
     pub next_run_at: i64,
     /// Populated only for browser checks (parsed from config.browser_devices).
     pub browser_devices: Vec<config::meta::synthetics::BrowserDevice>,
+    /// Steps the journey defines right now — 1 for protocol checks, which are
+    /// one step per attempt (spec §1.1). The scheduler freezes this onto every
+    /// job it enqueues, because the ack's clamp ceiling is computed from it and
+    /// a mid-flight edit must not move the ceiling of work already dispatched
+    /// (§4.4.1).
+    pub steps_configured: i32,
     pub tags: Vec<String>,
 }
 
@@ -574,11 +580,25 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
 
         let frequency: SyntheticFrequency = serde_json::from_value(m.frequency).unwrap_or_default();
 
-        let browser_devices = if check_type == SyntheticType::Browser {
+        // One parse, two answers. `m.config` is moved into `from_value`, so the
+        // fan-out devices and the frozen step count have to come out of the
+        // same call — parsing the same JSON twice per check per scheduler tick
+        // buys nothing.
+        let (browser_devices, steps_configured) = if check_type == SyntheticType::Browser {
             let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
-            cfg.browser_devices
+            // `unwrap_or_default()` turns an unreadable config into ZERO steps,
+            // and `validate_browser_config` rejects an empty journey on every
+            // create and update — so a 0 here means "could not read the row",
+            // never "the journey defines nothing". Both become a clamp ceiling
+            // of 0 at ack time, i.e. real work billed as nothing, which is the
+            // outcome §4.4.2 forbids. Floored to 1, the same floor protocol
+            // gets. The saturating conversion is belt-and-braces: a negative
+            // count would be a negative ceiling.
+            let steps = i32::try_from(cfg.steps.len().max(1)).unwrap_or(i32::MAX);
+            (cfg.browser_devices, steps)
         } else {
-            vec![]
+            // §1.1: a protocol check is one step per attempt, never zero.
+            (vec![], 1)
         };
 
         let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
@@ -593,6 +613,7 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
             tz_offset: m.tz_offset,
             next_run_at: m.next_run_at,
             browser_devices,
+            steps_configured,
             tags,
         })
     }
@@ -1088,11 +1109,15 @@ impl ApplyCheckFilters for sea_orm::Select<Entity> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::table::entity::synthetics_checks::Model;
 
-    fn make_model() -> Model {
+    /// `pub(crate)` for `table::synthetics_jobs`' T13 test, which has to enqueue
+    /// a job from a REAL check row and then edit that row: a hand-rolled second
+    /// fixture over there would drift from this one, and the day it did the
+    /// freezing test would stop testing freezing.
+    pub(crate) fn make_model() -> Model {
         Model {
             id: "mon-1".to_string(),
             org_id: "org1".to_string(),
@@ -1221,6 +1246,78 @@ mod tests {
                 "{dead}: the DueCheck error must name the check id, got: {err}"
             );
         }
+    }
+
+    /// Rewrites `config.steps` to `n` placeholder steps, leaving the rest of
+    /// the browser config alone. `pub(crate)` for the same reason `make_model`
+    /// is — the T13 freezing test in `table::synthetics_jobs` edits a journey.
+    pub(crate) fn with_steps(mut m: Model, n: usize) -> Model {
+        m.config["steps"] = serde_json::Value::Array(
+            (0..n)
+                .map(|i| serde_json::json!({"name": format!("step {i}")}))
+                .collect(),
+        );
+        m
+    }
+
+    /// The frozen count is the whole input to the ack's clamp ceiling
+    /// (spec §4.4.1), so it must be the number of steps the journey DEFINES,
+    /// read from the same `BrowserConfig` parse that already produces
+    /// `browser_devices` — a second parse of the same JSON per check per tick
+    /// buys nothing.
+    #[test]
+    fn a_browser_check_freezes_the_step_count_its_journey_defines() {
+        let due = DueCheck::try_from(with_steps(make_model(), 14)).unwrap();
+
+        assert_eq!(due.steps_configured, 14);
+        assert_eq!(
+            due.browser_devices.len(),
+            1,
+            "the one parse must still yield the devices"
+        );
+    }
+
+    /// §1.1: a protocol check is ONE step per attempt, and §4.4.2 makes its
+    /// zero-fallback 1. Freezing 0 would give the ack a ceiling of
+    /// `0 * (retries + 1) == 0` and bill nothing at all for work that ran —
+    /// the failure both sections exist to prevent.
+    #[test]
+    fn a_protocol_check_freezes_one_step_not_zero() {
+        for t in ["http", "tcp", "tls", "ssh"] {
+            let mut m = make_model();
+            m.synthetics_type = t.to_string();
+            let due = DueCheck::try_from(m).unwrap();
+
+            assert_eq!(due.steps_configured, 1, "{t} must freeze one step");
+            assert!(
+                due.browser_devices.is_empty(),
+                "{t} has no browser fan-out to freeze"
+            );
+        }
+    }
+
+    /// A browser row whose config does not parse degrades to
+    /// `BrowserConfig::default()`, whose `steps` is empty — so a 0 here means
+    /// "we could not read the journey", never "the journey defines nothing":
+    /// `validate_browser_config` rejects an empty `steps` on every create and
+    /// update. Billing an unreadable row as zero is the same wrong answer as
+    /// billing a protocol check as zero, so it takes the same floor of 1.
+    #[test]
+    fn a_browser_check_whose_steps_cannot_be_read_still_freezes_one() {
+        let empty = with_steps(make_model(), 0);
+        assert_eq!(
+            DueCheck::try_from(empty).unwrap().steps_configured,
+            1,
+            "an empty steps array must not become a ceiling of zero"
+        );
+
+        let mut unreadable = make_model();
+        unreadable.config = serde_json::json!("not a browser config at all");
+        assert_eq!(
+            DueCheck::try_from(unreadable).unwrap().steps_configured,
+            1,
+            "an unparseable config must not become a ceiling of zero"
+        );
     }
 
     #[test]

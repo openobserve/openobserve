@@ -557,6 +557,11 @@ pub async fn run() {
                     valid_until,
                     run_id: &run_id,
                     browser_devices: browser_devices_json.as_deref(),
+                    // Frozen here, not read at ack time: the ack's clamp
+                    // ceiling is `steps_configured x (retries + 1)`, and a
+                    // journey edited while these jobs are in flight must not
+                    // reprice work already dispatched (spec §4.4.1, E5).
+                    steps_configured: synthetic.steps_configured,
                     metadata: &metadata_json,
                 };
                 match synthetics_jobs::enqueue(db, p).await {

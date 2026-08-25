@@ -48,6 +48,14 @@ pub struct EnqueueParams<'a> {
     /// JSON array of `{execution_id, engine, device}` — browser checks only. `None` for
     /// protocol checks.
     pub browser_devices: Option<&'a str>,
+    /// How many steps the journey defined AT THIS MOMENT — 1 for protocol
+    /// checks, which are one step per attempt.
+    ///
+    /// Frozen onto the row for the same reason `browser_devices` is: the ack
+    /// clamps the probe's reported count at `steps_configured x (retries + 1)`,
+    /// and reading that ceiling from the live check instead would let an edit
+    /// made while the job is in flight reprice work already dispatched.
+    pub steps_configured: i32,
     /// Serialized `JobMetadata` — check-level context copied at enqueue time.
     pub metadata: &'a str,
 }
@@ -79,6 +87,10 @@ pub struct LeasedRow {
     pub dispatch_attempts: i32,
     pub run_id: String,
     pub browser_devices: Option<String>,
+    /// Steps the journey defined when this job was enqueued (1 for protocol
+    /// checks). The ack's clamp ceiling is computed from THIS, never from the
+    /// current check definition — see `EnqueueParams::steps_configured`.
+    pub steps_configured: i32,
     pub metadata: String,
 }
 
@@ -149,8 +161,9 @@ pub async fn enqueue<C: ConnectionTrait>(
     let sql = r#"
         INSERT INTO synthetics_jobs
             (id, synthetics_id, synthetics_name, org_id, location, pool,
-             scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11)
+             scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices,
+             steps_configured, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11, $12)
         ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
     "#;
 
@@ -173,6 +186,7 @@ pub async fn enqueue<C: ConnectionTrait>(
             p.browser_devices
                 .map(Value::from)
                 .unwrap_or(Value::from(None::<String>)),
+            Value::from(p.steps_configured),
             Value::from(p.metadata),
         ],
     ))
@@ -188,7 +202,8 @@ pub async fn get_by_id<C: ConnectionTrait>(
 ) -> Result<Option<LeasedRow>, errors::Error> {
     let sql = r#"
         SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
-               scheduled_ts, valid_until, dispatch_attempts, run_id, browser_devices, metadata
+               scheduled_ts, valid_until, dispatch_attempts, run_id, browser_devices,
+               steps_configured, metadata
         FROM synthetics_jobs
         WHERE id = $1
     "#;
@@ -215,6 +230,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
                 dispatch_attempts: row.try_get("", "dispatch_attempts")?,
                 run_id: row.try_get("", "run_id")?,
                 browser_devices: row.try_get("", "browser_devices")?,
+                steps_configured: row.try_get("", "steps_configured")?,
                 metadata: row.try_get("", "metadata").unwrap_or_default(),
             })
         })
@@ -369,6 +385,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
             dispatch_attempts: m.dispatch_attempts,
             run_id: m.run_id,
             browser_devices: m.browser_devices,
+            steps_configured: m.steps_configured,
             metadata: m.metadata,
         })
         .collect())
@@ -904,12 +921,14 @@ mod tests {
             browser_devices: Some(
                 r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#,
             ),
+            steps_configured: 14,
             metadata: r#"{"tags":["prod","checkout"]}"#,
         };
         assert_eq!(p.synthetics_id, "mon-1");
         assert_eq!(p.synthetics_name, "Login Flow");
         assert_eq!(p.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert!(p.browser_devices.is_some());
+        assert_eq!(p.steps_configured, 14);
     }
 
     #[test]
@@ -926,12 +945,170 @@ mod tests {
             dispatch_attempts: 1,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
             browser_devices: None,
+            steps_configured: 1,
             metadata: "{}".to_string(),
         };
         assert_eq!(row.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
         assert_eq!(row.synthetics_id, "mon-1");
         assert_eq!(row.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert_eq!(row.dispatch_attempts, 1);
+        assert_eq!(row.steps_configured, 1);
+    }
+
+    // ── The frozen step count (spec §4.4.1, T13/E5) ───────────────────────────
+
+    const SCHEDULED_TS: i64 = 1_750_000_000_000_000;
+
+    /// A real sqlite holding just this table, because the property under test
+    /// is what the DATABASE hands back: `get_by_id` names its columns in a raw
+    /// SELECT, so a column added to the struct and forgotten in that list is a
+    /// runtime "column not found" that no mock can reproduce.
+    ///
+    /// One connection, not a pool — separate connections to `sqlite::memory:`
+    /// get separate databases.
+    async fn jobs_db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectOptions, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+        // `enqueue` names this triple as its ON CONFLICT target and sqlite
+        // rejects a conflict target with no matching unique index. The FK to
+        // `synthetics_runs` is deliberately absent: sqlite does not enforce
+        // foreign keys unless `PRAGMA foreign_keys=ON`, and the table is not
+        // what these tests are about.
+        db.execute_unprepared(
+            "CREATE UNIQUE INDEX synthetics_jobs_dedup_uq \
+             ON synthetics_jobs (synthetics_id, location, scheduled_ts)",
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    fn browser_params(steps_configured: i32) -> EnqueueParams<'static> {
+        EnqueueParams {
+            synthetics_id: "mon-1",
+            synthetics_name: "Login Flow",
+            org_id: "org1",
+            location: "aws-us-east-1",
+            pool: "aws-browser",
+            scheduled_ts: SCHEDULED_TS,
+            valid_until: i64::MAX,
+            run_id: "3Fzn001XXXXXXXXXXXXXXXX",
+            browser_devices: Some(
+                r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#,
+            ),
+            steps_configured,
+            metadata: r#"{"tags":["prod"],"synthetic_type":"browser"}"#,
+        }
+    }
+
+    /// The missed-SELECT-column catcher. `enqueue` writes the frozen count and
+    /// `get_by_id` — the read the ack path uses — must hand it back. Adding the
+    /// field to `LeasedRow` without adding it to that raw SELECT compiles fine
+    /// and fails only in production.
+    #[tokio::test]
+    async fn enqueue_then_get_by_id_round_trips_the_frozen_step_count() {
+        let db = jobs_db().await;
+
+        let job_id = enqueue(&db, browser_params(14)).await.unwrap();
+        assert!(
+            !job_id.is_empty(),
+            "the insert must not have conflict-skipped"
+        );
+
+        let row = get_by_id(&db, &job_id)
+            .await
+            .unwrap()
+            .expect("the enqueued job must be readable");
+        assert_eq!(row.steps_configured, 14);
+        assert_eq!(row.synthetics_id, "mon-1");
+        assert!(
+            row.browser_devices.is_some(),
+            "the neighbouring column must still survive the widened INSERT"
+        );
+    }
+
+    /// `lease_batch` is the OTHER row that becomes a `LeasedRow`. It builds
+    /// from the sea-orm entity rather than a hand-written SELECT, so it cannot
+    /// miss a column — but only for as long as it keeps building from the
+    /// entity, which is what this pins.
+    #[tokio::test]
+    async fn lease_batch_carries_the_frozen_step_count() {
+        let db = jobs_db().await;
+        enqueue(&db, browser_params(14)).await.unwrap();
+
+        let leased = lease_batch(
+            &db,
+            "aws-browser",
+            "agent-1",
+            10,
+            SCHEDULED_TS,
+            300,
+            Some(true),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(leased.len(), 1);
+        assert_eq!(leased[0].steps_configured, 14);
+    }
+
+    /// **T13 / E5.** The ack clamps at `steps_configured × (retries + 1)`. Read
+    /// that count from the LIVE check at ack time and a customer who edits a
+    /// journey from 14 steps down to 8 reprices work that was already
+    /// dispatched — 14 real executed steps would clamp to 8 and the run bills
+    /// short. (The reverse edit is worse: 8 → 14 would raise the ceiling on a
+    /// run that never had those steps.) So the count is frozen onto the job row
+    /// at enqueue, next to `browser_devices`, and the edit cannot reach it.
+    ///
+    /// The check row is a real one, converted by the real `DueCheck::try_from`,
+    /// because "what the scheduler would have frozen" is half the claim.
+    #[tokio::test]
+    async fn a_journey_edited_mid_flight_does_not_move_the_frozen_ceiling() {
+        use crate::table::synthetics_checks::{
+            DueCheck,
+            tests::{make_model, with_steps},
+        };
+
+        let db = jobs_db().await;
+
+        // The journey defines 14 steps when the scheduler fans it out.
+        let at_enqueue = DueCheck::try_from(with_steps(make_model(), 14)).unwrap();
+        assert_eq!(at_enqueue.steps_configured, 14);
+        let job_id = enqueue(&db, browser_params(at_enqueue.steps_configured))
+            .await
+            .unwrap();
+
+        // The customer edits it down to 8 while the job is in flight. The live
+        // definition really does move …
+        let after_edit = DueCheck::try_from(with_steps(make_model(), 8)).unwrap();
+        assert_eq!(
+            after_edit.steps_configured, 8,
+            "the edit must actually have changed the live check"
+        );
+
+        // … and the dispatched job's frozen count does not.
+        let row = get_by_id(&db, &job_id).await.unwrap().unwrap();
+        assert_eq!(
+            row.steps_configured, 14,
+            "the in-flight job must keep the count it was enqueued with"
+        );
+
+        // Which is the number that matters, because it is the one the ack
+        // multiplies into the ceiling.
+        const RETRIES: i32 = 1;
+        assert_eq!(
+            row.steps_configured * (RETRIES + 1),
+            28,
+            "the ceiling must be 14 x (retries + 1), not the edited 8 x"
+        );
     }
 
     const MAX: i32 = 3;
