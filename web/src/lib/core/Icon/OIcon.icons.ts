@@ -107,6 +107,7 @@ import Replay from "~icons/material-symbols/replay";
 import Replay10 from "~icons/material-symbols/replay-10";
 import Forward10 from "~icons/material-symbols/forward-10";
 import Schedule from "~icons/material-symbols/schedule-outline";
+import Science from "~icons/material-symbols/science-outline";
 import Search from "~icons/material-symbols/search";
 import Send from "~icons/material-symbols/send-outline";
 import Share from "~icons/material-symbols/share-outline";
@@ -448,6 +449,7 @@ export const iconRegistry = {
   "replay-10": Replay10,
   "forward-10": Forward10,
   schedule: Schedule,
+  science: Science,
   search: Search,
   send: Send,
   share: Share,

@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="ready"
         variant="outline"
         size="sm-action"
-        icon-left="search"
+        icon-left="science"
         :active="testerOpen"
         data-test="oncall-routing-test-signal"
         @click="testerOpen = !testerOpen"
