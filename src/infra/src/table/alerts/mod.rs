@@ -213,6 +213,8 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok())
             .unwrap_or_default();
 
+        alert.pending_period_sec = value.pending_period_sec;
+
         Ok(alert)
     }
 }
@@ -1116,6 +1118,7 @@ pub(super) mod tests {
             dedup_config: None,
             creates_incident: false,
             workflows: serde_json::json!(["abc123"]),
+            pending_period_sec: 0
         }
     }
 
