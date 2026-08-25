@@ -16,7 +16,7 @@
 import { queryOptions } from "@tanstack/vue-query";
 import search from "./search";
 import { traceDagKeys } from "./search.querykeys";
-import { LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { LONG_GC_TIME, SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
 import { indexedDbPersister } from "@/composables/query/persisters";
 
 export const traceDagQuery = (
@@ -30,7 +30,9 @@ export const traceDagQuery = (
     queryKey: traceDagKeys.detail(org, streamName, traceId, startTime, endTime),
     queryFn: async () =>
       (await search.getTraceDAG(org, streamName, traceId, startTime, endTime)).data,
-    staleTime: 0,
+    // A trace is immutable and the key carries the time window, so each entry
+    // is cacheable for the whole session.
+    staleTime: SESSION_STALE_TIME,
     gcTime: LONG_GC_TIME,
     persister: indexedDbPersister,
   });
