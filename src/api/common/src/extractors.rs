@@ -253,4 +253,72 @@ mod tests {
         assert_eq!(multi_headers.content_type, "application/json");
         assert_eq!(multi_headers.accept, "*/*");
     }
+
+    /// The bug this extractor exists for: a body that fails to deserialize is
+    /// rejected by axum *before the handler runs*, so no handler-level error
+    /// mapping can reach it. It answered `text/plain`, and a client reading
+    /// `message` from every other error in this API saw nothing — which is
+    /// exactly what "Request failed with status code 422" was.
+    #[tokio::test]
+    async fn test_a_malformed_body_is_rejected_as_json_not_text() {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            #[allow(dead_code)]
+            name: String,
+        }
+
+        let req = Request::builder()
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(r#"{"nope":1}"#))
+            .unwrap();
+
+        let rejection = ValidatedJson::<Body>::from_request(req, &())
+            .await
+            .err()
+            .expect("a body missing a required field must be rejected");
+        let response = rejection.into_response();
+
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .map(|v| v.starts_with("application/json")),
+            Some(true),
+            "the rejection has to be JSON, or a client cannot read `message`"
+        );
+
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(body.get("code").is_some(), "no `code`: {body}");
+        // The reason, not just the status. "missing field `name`" is the whole
+        // point — the UI had a 422 and no way to learn which field.
+        let message = body["message"].as_str().unwrap_or_default();
+        assert!(message.contains("name"), "the message must name the field: {body}");
+    }
+
+    /// A well-formed body still arrives as the deserialized value — the wrapper
+    /// changes the failure path only.
+    #[tokio::test]
+    async fn test_a_valid_body_still_extracts() {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            name: String,
+        }
+
+        let req = Request::builder()
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(r#"{"name":"apac"}"#))
+            .unwrap();
+
+        let ValidatedJson(body) = ValidatedJson::<Body>::from_request(req, &())
+            .await
+            .ok()
+            .expect("a valid body must extract");
+        assert_eq!(body.name, "apac");
+    }
 }
