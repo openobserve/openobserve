@@ -15,7 +15,7 @@
 
 //! Loads and attaches labels for series returned by the sample scan.
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use config::{
     meta::promql::{
@@ -28,7 +28,6 @@ use datafusion::{
     arrow::{
         array::{Array, StringArray, StringViewArray, UInt64Array},
         datatypes::DataType,
-        record_batch::RecordBatch,
     },
     error::{DataFusionError, Result},
     physical_plan::{
@@ -39,7 +38,7 @@ use datafusion::{
 use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet};
 
-use super::{PartitionedMetrics, hash_range_owner, with_hash_label};
+use super::{PartitionedMetrics, with_hash_label};
 
 type TokioLabelsResult = tokio::task::JoinHandle<Result<HashMap<u64, RangeValue>>>;
 
@@ -138,217 +137,7 @@ impl LabelColumn<'_> {
     }
 }
 
-struct RoutedLabelBatch {
-    batch: Arc<RecordBatch>,
-    start: usize,
-    end: usize,
-}
-
-#[derive(Default)]
-struct LabelRouterStats {
-    rows: usize,
-    batches: usize,
-    messages: usize,
-    send_wait: Duration,
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn load_hash_range_labels(
-    trace_id: &str,
-    plan: Arc<dyn datafusion::physical_plan::ExecutionPlan>,
-    ctx: Arc<datafusion::execution::TaskContext>,
-    label_columns: Arc<Vec<(usize, String)>>,
-    include_hash_label: bool,
-    observer: Option<Arc<dyn LoadedLabelsObserver>>,
-    selected_hashes: Option<Vec<HashSet<u64>>>,
-    metrics: PartitionedMetrics,
-) -> Result<PartitionedMetrics> {
-    let streams = execute_stream_partitioned(Arc::clone(&plan), ctx)?;
-    let input_partitions = streams.len();
-    let target_partitions = metrics.len();
-    if target_partitions == 0 {
-        return Ok(metrics);
-    }
-
-    let selected_hashes = match selected_hashes {
-        Some(selected) if selected.len() == target_partitions => selected
-            .into_iter()
-            .map(Some)
-            .collect::<Vec<Option<HashSet<u64>>>>(),
-        Some(selected) => {
-            return Err(DataFusionError::Execution(format!(
-                "selected label partitions ({}) do not match metrics partitions ({target_partitions})",
-                selected.len()
-            )));
-        }
-        None => (0..target_partitions).map(|_| None).collect(),
-    };
-
-    let channel_capacity = input_partitions.max(2);
-    let mut senders = Vec::with_capacity(target_partitions);
-    let mut worker_tasks = Vec::with_capacity(target_partitions);
-    for (mut metrics, selected_hashes) in metrics.into_iter().zip(selected_hashes) {
-        let (sender, mut receiver) =
-            tokio::sync::mpsc::channel::<RoutedLabelBatch>(channel_capacity);
-        senders.push(sender);
-        let label_columns = Arc::clone(&label_columns);
-        let observer = observer.clone();
-        let task: TokioLabelsResult = tokio::task::spawn(async move {
-            let mut labeled_hashes = HashSet::with_capacity(
-                selected_hashes.as_ref().map_or(metrics.len(), HashSet::len),
-            );
-            let mut label_interners = label_columns
-                .iter()
-                .map(|(_, name)| LabelInterner::new(name.clone()))
-                .collect::<Vec<_>>();
-
-            while let Some(message) = receiver.recv().await {
-                let columns = message.batch.columns();
-                let cols = label_columns
-                    .iter()
-                    .map(|(index, name)| {
-                        let column = columns.get(*index).ok_or_else(|| {
-                            DataFusionError::Execution(format!("label column {name} is missing"))
-                        })?;
-                        match column.data_type() {
-                            DataType::Utf8 => column
-                                .as_any()
-                                .downcast_ref::<StringArray>()
-                                .map(LabelColumn::Utf8),
-                            DataType::Utf8View => column
-                                .as_any()
-                                .downcast_ref::<StringViewArray>()
-                                .map(LabelColumn::Utf8View),
-                            _ => None,
-                        }
-                        .ok_or_else(|| {
-                            DataFusionError::Execution(format!(
-                                "label column {name} is not Utf8 or Utf8View"
-                            ))
-                        })
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                let hash_values = message
-                    .batch
-                    .column_by_name(HASH_LABEL)
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<UInt64Array>()
-                    .unwrap();
-
-                for row in message.start..message.end {
-                    let hash = hash_values.value(row);
-                    if labeled_hashes.contains(&hash)
-                        || selected_hashes
-                            .as_ref()
-                            .is_some_and(|selected| !selected.contains(&hash))
-                    {
-                        continue;
-                    }
-                    let Some(range_val) = metrics.get_mut(&hash) else {
-                        continue;
-                    };
-                    let mut labels = Vec::with_capacity(label_columns.len());
-                    for (value, interner) in cols.iter().zip(&mut label_interners) {
-                        if !value.is_null(row) {
-                            labels.push(interner.intern(value.value(row)));
-                        }
-                    }
-                    if let Some(observer) = &observer {
-                        observer.observe(hash, &labels);
-                    }
-                    range_val.labels = with_hash_label(labels, hash, include_hash_label);
-                    labeled_hashes.insert(hash);
-                }
-            }
-            Ok(metrics)
-        });
-        worker_tasks.push(task);
-    }
-
-    let mut router_tasks = Vec::with_capacity(input_partitions);
-    for mut stream in streams {
-        let senders = senders.clone();
-        router_tasks.push(tokio::task::spawn(async move {
-            let mut stats = LabelRouterStats::default();
-            while let Some(batch) = stream.try_next().await? {
-                stats.rows += batch.num_rows();
-                stats.batches += 1;
-                if batch.num_rows() == 0 {
-                    continue;
-                }
-                let hash_values = batch
-                    .column_by_name(HASH_LABEL)
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<UInt64Array>()
-                    .unwrap();
-                let mut segments = Vec::new();
-                let mut segment_start = 0;
-                let mut segment_owner = hash_range_owner(hash_values.value(0), target_partitions);
-                for row in 1..batch.num_rows() {
-                    let owner = hash_range_owner(hash_values.value(row), target_partitions);
-                    if owner != segment_owner {
-                        segments.push((segment_owner, segment_start, row));
-                        segment_owner = owner;
-                        segment_start = row;
-                    }
-                }
-                segments.push((segment_owner, segment_start, batch.num_rows()));
-                let batch = Arc::new(batch);
-                for (owner, start, end) in segments {
-                    let send_start = std::time::Instant::now();
-                    senders[owner]
-                        .send(RoutedLabelBatch {
-                            batch: Arc::clone(&batch),
-                            start,
-                            end,
-                        })
-                        .await
-                        .map_err(|_| {
-                            DataFusionError::Execution(
-                                "hash-range label owner closed before routing completed"
-                                    .to_string(),
-                            )
-                        })?;
-                    stats.send_wait += send_start.elapsed();
-                    stats.messages += 1;
-                }
-            }
-            Ok::<_, DataFusionError>(stats)
-        }));
-    }
-    drop(senders);
-
-    let mut router_stats = LabelRouterStats::default();
-    for task in router_tasks {
-        let stats = task
-            .await
-            .map_err(|error| DataFusionError::Execution(error.to_string()))??;
-        router_stats.rows += stats.rows;
-        router_stats.batches += stats.batches;
-        router_stats.messages += stats.messages;
-        router_stats.send_wait += stats.send_wait;
-    }
-    let mut metrics = Vec::with_capacity(target_partitions);
-    for task in worker_tasks {
-        metrics.push(
-            task.await
-                .map_err(|error| DataFusionError::Execution(error.to_string()))??,
-        );
-    }
-
-    log::info!(
-        "[trace_id: {trace_id}] promql->load-labels: hash-range input partitions: {input_partitions}, output owners: {target_partitions}, input batches: {}, rows: {}, routed owner messages: {}, channel send wait: {:?}",
-        router_stats.batches,
-        router_stats.rows,
-        router_stats.messages,
-        router_stats.send_wait,
-    );
-    Ok(metrics)
-}
-
-/// Partition labels by series hash and process each partition in its own
+/// Repartition labels by series hash and process each partition in its own
 /// Tokio task. Each label partition mutates the corresponding metrics partition
 /// produced by the sample scan, so the global metrics map is built only once.
 ///
@@ -379,25 +168,6 @@ pub(super) async fn load_labels(
             .map(|(index, field)| (index, field.name().clone()))
             .collect::<Vec<_>>(),
     );
-    if hash_field_type == &DataType::UInt64 {
-        if metrics.len() != target_partitions {
-            return Err(DataFusionError::Execution(format!(
-                "label partitions ({target_partitions}) do not match metrics partitions ({})",
-                metrics.len()
-            )));
-        }
-        return load_hash_range_labels(
-            trace_id,
-            plan,
-            ctx,
-            label_columns,
-            include_hash_label,
-            observer,
-            selected_hashes,
-            metrics,
-        )
-        .await;
-    }
     let plan = Arc::new(RepartitionExec::try_new(
         plan,
         Partitioning::Hash(
@@ -644,7 +414,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_hash_range_sample_owners_match_label_partitions() {
+    async fn test_hash_run_sample_owners_match_datafusion_label_partitions() {
         let sample_schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new(HASH_LABEL, DataType::UInt64, false),
@@ -740,7 +510,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_load_labels_from_datafusion_range_routes_and_deduplicates() {
+    async fn test_load_labels_from_datafusion_repartitions_and_deduplicates() {
         let label_schema = Arc::new(Schema::new(vec![
             Field::new(HASH_LABEL, DataType::UInt64, false),
             Field::new("instance", DataType::Utf8, true),
