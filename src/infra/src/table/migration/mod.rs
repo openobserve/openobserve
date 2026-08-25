@@ -168,6 +168,7 @@ mod m20260818_000001_create_llm_idempotency_records;
 mod m20260818_000002_create_llm_remote_tasks;
 mod m20260820_000001_add_icon_to_folders;
 mod m20260820_000003_create_llm_secrets;
+mod m20260824_000001_create_llm_playground_snapshots;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -410,6 +411,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
             Box::new(m20260820_000001_add_icon_to_folders::Migration),
             Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
         ]
     }
 }

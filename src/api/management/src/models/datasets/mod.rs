@@ -238,6 +238,7 @@ pub enum DatasetItemSourceResponseBody {
     Trace,
     Annotation,
     Manual,
+    Playground,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -541,6 +542,7 @@ impl From<DatasetItemSource> for DatasetItemSourceResponseBody {
             DatasetItemSource::Trace => Self::Trace,
             DatasetItemSource::Annotation => Self::Annotation,
             DatasetItemSource::Manual => Self::Manual,
+            DatasetItemSource::Playground => Self::Playground,
         }
     }
 }

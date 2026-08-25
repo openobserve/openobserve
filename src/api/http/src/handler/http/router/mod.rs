@@ -55,8 +55,8 @@ use {
     },
     openobserve_api_management::request::{
         actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, providers, remote_tasks,
-        score_configs, scorers, service_streams, workflows,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, playground,
+        providers, remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1247,6 +1247,7 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
                 .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
                 .route("/{org_id}/providers/{provider_id}/test", post(providers::test_provider))
+                .route("/{org_id}/providers/{provider_id}/models", get(playground::list_provider_models))
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
@@ -1276,6 +1277,16 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/scorers/llm_judge/output_schema", post(scorers::preview_llm_judge_output_schema))
                 .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
                 .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
+
+                // Playground (Phase 3.1)
+                // NOTE: /snapshots and its children must precede nothing here,
+                // but /{snapshot_id}/diff must precede /{snapshot_id}
+                .route("/{org_id}/playground/run", post(playground::run_playground_cell))
+                .route("/{org_id}/playground/score", post(playground::score_playground_cell))
+                .route("/{org_id}/playground/seed_from_span", post(playground::seed_playground_from_span))
+                .route("/{org_id}/playground/snapshots", get(playground::list_playground_snapshots).post(playground::share_playground_snapshot))
+                .route("/{org_id}/playground/snapshots/{snapshot_id}/diff", get(playground::diff_playground_snapshot))
+                .route("/{org_id}/playground/snapshots/{snapshot_id}", get(playground::get_playground_snapshot).delete(playground::delete_playground_snapshot))
 
                 // Online Eval Jobs (Online Eval Phase 2)
                 // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
