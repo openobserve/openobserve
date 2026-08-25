@@ -71,7 +71,6 @@ async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) 
 // ── Request bodies ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct CreateTeamRequest {
     pub name: String,
     #[serde(default = "default_timezone")]
@@ -85,7 +84,6 @@ fn default_timezone() -> String {
 }
 
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct UpdateTeamRequest {
     #[serde(default)]
     pub name: Option<String>,
@@ -112,7 +110,6 @@ where
 /// people", and forcing the client to fan out one request per person is the
 /// most tedious part of the flow.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct AddMembersRequest {
     #[serde(default)]
     pub user_email: Option<String>,
@@ -135,8 +132,8 @@ impl AddMembersRequest {
     ///
     /// Both fields default, so `{}`, `{"user_emails":[]}` and a body whose only
     /// key was misspelled all deserialized to "add nobody" and answered 200 —
-    /// a team that reads as configured and pages no one. `deny_unknown_fields`
-    /// now catches the typo; this catches the honestly-empty body.
+    /// a team that reads as configured and pages no one. Whatever the caller
+    /// got wrong, no emails arrived, and that is the thing worth refusing.
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
     fn names_nobody(&self) -> bool {
         self.user_emails.iter().all(|e| e.trim().is_empty())
@@ -145,7 +142,6 @@ impl AddMembersRequest {
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SetScheduleRequest {
     /// Absent means "the team's own zone". It used to default to UTC, so a
     /// client that omitted it silently shifted every restriction window on an
@@ -163,7 +159,6 @@ pub struct SetScheduleRequest {
 /// the shape §C.3 published and the UI is built against. Which fields a given
 /// preset takes is the catalogue's job to say, not this struct's.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct FromPresetRequest {
     /// Absent means the team's own zone, exactly as `PUT /schedule` means it.
     /// Every window the preset generates is read in this one zone — there is no
@@ -184,7 +179,6 @@ pub struct FromPresetRequest {
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
     /// How many times the ladder runs before `final_action`. 1..=5.
@@ -215,7 +209,6 @@ pub struct SetPolicyRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ListResponsesQuery {
     pub team_id: Option<String>,
     /// Include closed records. Off by default: the home screen is what still
@@ -255,7 +248,6 @@ pub struct ListResponsesQuery {
 /// that does not render push tokens would erase one every time somebody saved a
 /// phone number.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SetContactRequest {
     #[serde(default, deserialize_with = "double_option")]
     pub phone: Option<Option<String>>,
@@ -266,7 +258,6 @@ pub struct SetContactRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct InboxQuery {
     /// Only what nobody has looked at — what a badge counts.
     #[serde(default)]
@@ -284,7 +275,6 @@ pub struct InboxQuery {
 /// `all` is the "clear my inbox" button and is bounded server-side; naming ids
 /// is what a list does as it scrolls.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct MarkReadRequest {
     #[serde(default)]
     pub event_ids: Vec<String>,
@@ -301,7 +291,6 @@ fn yes() -> bool {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MyTeamsQuery {
     /// Answer for this instant (micros) instead of now.
     pub at: Option<i64>,
@@ -313,7 +302,6 @@ pub struct MyTeamsQuery {
 /// an obvious answer for "lately", and forcing every caller to compute
 /// timestamps is how a dashboard tile ends up hardcoding the wrong month.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct CauseAnalyticsQuery {
     pub team_id: Option<String>,
     /// Micros, inclusive. Defaults to 30 days before `to`.
@@ -324,7 +312,6 @@ pub struct CauseAnalyticsQuery {
 
 /// Promotes a firing to a full incident.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct PromoteRequest {
     /// Absent takes the record's own title, which is nearly always right and
     /// is one less field to fill in mid-page.
@@ -337,7 +324,6 @@ pub struct PromoteRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct OnCallQuery {
     /// Resolve at this instant (micros) instead of now, so the UI can show a
     /// future week without a second endpoint.
@@ -345,7 +331,6 @@ pub struct OnCallQuery {
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct CreateOwnershipRuleRequest {
     pub team_id: String,
     /// `{alias_id: value}` — the same vocabulary the service-identity config
@@ -354,7 +339,6 @@ pub struct CreateOwnershipRuleRequest {
 }
 
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct ResolveRequest {
     /// Why it happened. Optional, but it is what makes the next firing of the
     /// same rule useful history rather than a list of dates.
@@ -366,13 +350,11 @@ pub struct ResolveRequest {
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct AddNoteRequest {
     pub body: String,
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SnoozeRequest {
     /// How long to stay quiet, in minutes.
     pub minutes: i64,
@@ -381,7 +363,6 @@ pub struct SnoozeRequest {
 /// Exactly one of `to` (a person on this team) or `to_team_id` (ownership
 /// moves to another team, and their on-call is paged under their rotation).
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct HandoffRequest {
     #[serde(default)]
     pub to: Option<String>,
@@ -394,7 +375,6 @@ pub struct HandoffRequest {
 /// An impacted team saying its own service is clear. The cause belongs to the
 /// owner team's record, not to this one, so there is nothing else to send.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct ConfirmRecoveryRequest {
     #[serde(default)]
     pub note: Option<String>,
@@ -402,7 +382,6 @@ pub struct ConfirmRecoveryRequest {
 
 /// "This needs more people, now." Optional context for the timeline.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct EscalateRequest {
     #[serde(default)]
     pub note: Option<String>,
@@ -411,7 +390,6 @@ pub struct EscalateRequest {
 /// Which ladder to prove. Priorities page differently, so "does paging work"
 /// has a different answer per priority and the caller has to say which one.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct TestPageRequest {
     /// 1–5. Defaults to P2, the highest priority whose ladder starts with one
     /// person: P1 pages the primary, the secondary and everyone on the schedule
@@ -433,13 +411,11 @@ impl Default for TestPageRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct HistoryQuery {
     pub limit: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct PreviewRoutingRequest {
     #[serde(default)]
     pub oncall_team: Option<String>,
@@ -459,21 +435,18 @@ pub struct PreviewRoutingRequest {
 /// one field, so "send the state you want" is unambiguous and clearing needs no
 /// second endpoint and no sentinel value.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SetRoutingConfigRequest {
     #[serde(default)]
     pub default_team_id: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct OwnershipQuery {
     pub team_id: Option<String>,
 }
 
 /// "Cover for me" — `architecture/02` §5, as one request.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct CreateOverrideRequest {
     /// Which rotation is being covered. Omitted means the team's primary, which
     /// is what "cover for me" means on a team that has never thought about
@@ -504,7 +477,6 @@ pub struct CreateOverrideRequest {
 /// Both bounds or neither. A half-specified window is a client bug, and
 /// answering it with the unfiltered list would look like it worked.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct OverrideWindowQuery {
     pub from: Option<i64>,
     pub to: Option<i64>,
@@ -513,7 +485,6 @@ pub struct OverrideWindowQuery {
 /// The window a resolved-schedule read covers. Both bounds are required: this
 /// endpoint has no useful default, and inventing one would hide the bound.
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ResolvedScheduleQuery {
     pub from: i64,
     pub to: i64,
@@ -527,7 +498,6 @@ pub struct ResolvedScheduleQuery {
 /// A person, a window, or both. Listing every absence an org has ever recorded
 /// is not a question anything asks, so it is not one this answers.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct UnavailabilityQuery {
     #[serde(default)]
     pub user_email: Option<String>,
@@ -539,7 +509,6 @@ pub struct UnavailabilityQuery {
 
 /// "I am away 20 Aug – 3 Sep."
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct CreateUnavailabilityRequest {
     /// Whose absence. Omitted means the caller's own, which is the common case
     /// and the one that must not need an administrator.
@@ -556,19 +525,16 @@ pub struct CreateUnavailabilityRequest {
 /// Carried as a query param on the confirmation GET and as a form field on
 /// the POST that actually acknowledges.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct AckQuery {
     pub token: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct RemoveMemberQuery {
     pub user_email: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct UnroutedQuery {
     /// A dismissed entry is kept rather than deleted — the evidence that the
     /// gap existed is the point — so asking for them back is opt-in. Left off,
@@ -598,7 +564,6 @@ impl UnroutedQuery {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct CoverageGapsQuery {
     /// Answer for this instant (micros) instead of now, so the same call can
     /// ask "will anybody be on call at 2am on Sunday?".
@@ -607,7 +572,6 @@ pub struct CoverageGapsQuery {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct DeliveriesQuery {
     pub limit: Option<u64>,
     pub offset: Option<u64>,
@@ -619,7 +583,6 @@ pub struct DeliveriesQuery {
 /// delivery ledger, which is the only on-call table that grows without an
 /// upper bound.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct LookbackQuery {
     /// Days. Clamped `1..=366`.
     pub days: Option<i64>,
@@ -630,7 +593,6 @@ pub struct LookbackQuery {
 /// answer per priority, and defaulting it would answer a question nobody
 /// asked.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct EscalationPreviewQuery {
     /// `P1`–`P5`, or `1`–`5`. Defaults to P1 — the ladder somebody opening
     /// this screen is checking.
@@ -641,7 +603,6 @@ pub struct EscalationPreviewQuery {
 
 /// The ownership list with its usage figures beside it.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct OwnershipStatsQuery {
     pub team_id: Option<String>,
     /// Days of history the counts cover. Clamped `1..=366`.
@@ -1503,7 +1464,6 @@ pub async fn set_policy(
 /// make the field impossible to turn off, because clearing it would silently
 /// resurrect whatever the policy still had in it.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SetTeamChannelRequest {
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
