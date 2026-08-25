@@ -30,14 +30,17 @@ import type { AsyncStorage } from "@tanstack/query-persist-client-core";
 import {
   CACHE_NAMESPACES,
   cacheRemoveByPrefix,
+  cacheRemoveWhere,
   cacheClear,
   isIdbAvailable,
   idbStorage,
 } from "./idbStorage";
 import {
   clearOrg as clearFieldValuesForOrg,
+  clearAllExceptOrg as clearFieldValuesExceptOrg,
   clearAll as clearAllFieldValues,
 } from "@/composables/fieldValueDB";
+import { GLOBAL_SCOPE } from "./keys";
 
 /**
  * Bump when a cached response shape changes so stale payloads are discarded
@@ -161,6 +164,44 @@ export const purgePersistedOrg = async (org: string): Promise<void> => {
   }
   // Field values live in their own database, keyed "org|type|stream|field".
   await clearFieldValuesForOrg(org);
+};
+
+/**
+ * Drop every persisted entry that belongs to neither `keepOrg` nor the global
+ * scope. `purgePersistedOrg` only cleans the org being LEFT, so entries from
+ * orgs visited in older sessions used to sit on disk until the 24 h max age —
+ * this is the org-switch sweep that removes them too.
+ */
+export const purgePersistedExceptOrg = async (keepOrg: string): Promise<void> => {
+  if (!keepOrg) return;
+  const keepLs = [orgStoragePrefix(LS_PREFIX, keepOrg), orgStoragePrefix(LS_PREFIX, GLOBAL_SCOPE)];
+  if (safeLocalStorage) {
+    try {
+      const doomed: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith(`${LS_PREFIX}-`) && !keepLs.some((p) => key.startsWith(p))) {
+          doomed.push(key);
+        }
+      }
+      doomed.forEach((k) => window.localStorage.removeItem(k));
+    } catch {
+      /* ignore */
+    }
+  }
+  const keepIdb = [
+    orgStoragePrefix(IDB_PREFIX, keepOrg),
+    orgStoragePrefix(IDB_PREFIX, GLOBAL_SCOPE),
+  ];
+  const keepNs = CACHE_NAMESPACES.map((ns) => `${ns}|${keepOrg}|`);
+  await cacheRemoveWhere((key) => {
+    if (key.startsWith(`${IDB_PREFIX}-`)) return !keepIdb.some((p) => key.startsWith(p));
+    if (CACHE_NAMESPACES.some((ns) => key.startsWith(`${ns}|`))) {
+      return !keepNs.some((p) => key.startsWith(p));
+    }
+    return false;
+  });
+  await clearFieldValuesExceptOrg(keepOrg);
 };
 
 /** Drop everything this app persisted. Called on logout. */

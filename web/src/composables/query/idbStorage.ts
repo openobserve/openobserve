@@ -259,6 +259,31 @@ export const cacheRemoveByPrefix = async (prefix: string): Promise<number> => {
   }
 };
 
+/** Full-store sweep for predicates a bounded range scan cannot express. */
+export const cacheRemoveWhere = async (shouldDelete: (key: string) => boolean): Promise<number> => {
+  try {
+    const db = await openCacheDB();
+    return await new Promise<number>((resolve) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      let deleted = 0;
+      const req = tx.objectStore(STORE_NAME).openCursor();
+      req.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          if (shouldDelete(String(cursor.key))) {
+            cursor.delete();
+            deleted++;
+          }
+          cursor.continue();
+        } else resolve(deleted);
+      };
+      req.onerror = () => resolve(deleted);
+    });
+  } catch {
+    return 0;
+  }
+};
+
 export const cacheClear = async (): Promise<void> => {
   try {
     await runRequest("readwrite", (store) => store.clear());

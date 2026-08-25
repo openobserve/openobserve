@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { MutationCache, QueryClient } from "@tanstack/vue-query";
-import { purgeAllPersisted, purgePersistedOrg } from "./persisters";
+import { purgeAllPersisted, purgePersistedExceptOrg, purgePersistedOrg } from "./persisters";
 import { DEFAULT_STALE_TIME } from "./cachePolicy";
 // Type-only: erased at build time. This module must not pull UI or i18n into its
 // runtime graph — the unit-test setup imports it eagerly, so a runtime edge here
@@ -136,15 +136,27 @@ export const queryClient = new QueryClient({
  * storage wrapper swallows it), and the previous tenant's stream, folder and
  * function names would sit on a possibly shared machine.
  */
-export const purgeOrgQueries = (org: string): void => {
+// Imported lazily: this module is loaded eagerly by the unit-test setup, and a
+// static edge to fieldValueStore would load its real dependency graph before
+// spec-level mocks can attach.
+const clearFieldValueReadCache = (): void => {
+  void import("@/composables/fieldValueStore").then((m) => m.clearReadCache());
+};
+
+export const purgeOrgQueries = (org: string, nextOrg?: string): void => {
   if (!org) return;
   void purgePersistedOrg(org);
+  // Sweep orgs left behind by OLDER sessions too — without this they sit on
+  // disk until the 24 h max age.
+  if (nextOrg) void purgePersistedExceptOrg(nextOrg);
+  clearFieldValueReadCache();
 };
 
 /** Called on logout: nothing from the previous session may survive. */
 export const purgeAllQueries = (): void => {
   queryClient.clear();
   void purgeAllPersisted();
+  clearFieldValueReadCache();
 };
 
 // ── Key helpers ─────────────────────────────────────────────────────────────

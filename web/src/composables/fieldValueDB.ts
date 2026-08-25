@@ -293,6 +293,34 @@ export const clearOrg = async (org: string): Promise<number> => {
   });
 };
 
+/** Drop every record NOT belonging to `keepOrg` — the org-switch sweep. */
+export const clearAllExceptOrg = async (keepOrg: string): Promise<number> => {
+  if (!keepOrg) return 0;
+  let db: IDBDatabase;
+  try {
+    db = await openDB();
+  } catch {
+    return 0;
+  }
+  const keepPrefix = `${keepOrg}|`;
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    let deleted = 0;
+    const req = tx.objectStore(STORE_NAME).openCursor();
+    req.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        if (!String(cursor.key).startsWith(keepPrefix)) {
+          cursor.delete();
+          deleted++;
+        }
+        cursor.continue();
+      } else resolve(deleted);
+    };
+    req.onerror = () => resolve(deleted);
+  });
+};
+
 /** Drop every record, for logout. */
 export const clearAll = async (): Promise<void> => {
   let db: IDBDatabase;

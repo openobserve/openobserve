@@ -1475,9 +1475,10 @@ export default defineComponent({
     async changeOrganizationIdentifier(_next: string, previous: string) {
       this.isLoading = false;
       this.resetStreams();
-      // Drops the previous org's persisted entries; its in-memory ones stay, so
-      // switching back is free. Keys are org-rooted, so nothing can cross over.
-      if (previous) purgeOrgQueries(previous);
+      // Drops the previous org's persisted entries (plus any older session's
+      // other-org residue); in-memory ones stay, so switching back is free.
+      // Keys are org-rooted, so nothing can cross over.
+      if (previous) purgeOrgQueries(previous, _next);
       // Clear notifications from the previous org — they no longer apply.
       dismissAll();
       this.store.dispatch("setOrganizationPasscode", "");
