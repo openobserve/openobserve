@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "Aynı isimde değişken zaten mevcut",
     "pivotTotal": "Toplam",
     "pivotOthers": "Diğerleri",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Eşleşen günlükleri keşfet"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "Değer",
     "source": "Kaynak",
     "target": "Hedef",
-    "value": "Değer"
+    "value": "Değer",
+    "logExplorer": {
+      "title": "Günlük Gezgini",
+      "openInLogs": "Günlüklerde Aç",
+      "invalidParams": "Geçersiz detaylandırma parametreleri",
+      "noEvents": "Bu filtreyle eşleşen olay yok",
+      "filterHint": "İlgili günlükleri keşfetmek için tıklayın",
+      "timestamp": "Zaman Damgası",
+      "queryMode": "SQL",
+      "runQuery": "Sorguyu Çalıştır",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "olay",
+      "events": "olaylar",
+      "prevPage": "Önceki",
+      "nextPage": "Sonraki",
+      "of": " / ",
+      "sqlEditorLabel": "SQL Sorgusu",
+      "resetSql": "Sıfırla",
+      "detail": {
+        "drawerTitle": "Olay Ayrıntısı",
+        "details": "Ayrıntılar",
+        "json": "JSON",
+        "insights": "İçgörüler",
+        "copyLink": "Bağlantıyı Kopyala",
+        "copy": "Kopyala",
+        "copyValue": "Değeri Kopyala",
+        "insightsHint": "Yüklenen {n} olay arasında alan frekansları"
+      },
+      "insights": {
+        "anomalyTitle": "Alan Anomalisi Profili",
+        "anomalyHint": "{n} olay örneklendi",
+        "colField": "Alan",
+        "colRarity": "Nadirlik",
+        "colValue": "Değer",
+        "rarity": {
+          "anomalous": "Anormal",
+          "rare": "Nadir",
+          "uncommon": "Az rastlanan",
+          "common": "Yaygın"
+        },
+        "timelineTitle": "Olay Zaman Çizelgesi",
+        "timelineHint": "Seçilen aralıkta frekans",
+        "timelineEmpty": "Veri yok",
+        "patternsTitle": "Günlük Desenleri",
+        "patternsHint": "Benzer yapıya göre gruplandı",
+        "zScore": "z={value}",
+        "patternsEmpty": "Bu filtre için desen çıkarılmadı",
+        "contextTitle": "Çevredeki Olaylar",
+        "contextHint": "Bu zaman damgasına yakın olaylar",
+        "contextTooltip": "Bu olaydan önceki ve sonraki 3 dakika içinde bu akıştan diğer olaylar — aynı anda başka neler olduğunu gösterir.",
+        "contextEmpty": "Çevredeki olay bulunamadı"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Uyarılar genel bakış bölümü",
