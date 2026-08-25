@@ -31,9 +31,9 @@ const stubs = {
   },
 };
 
-function render(groups: CauseGroup[]) {
+function render(groups: CauseGroup[], loading = false) {
   return mount(OnCallPriorCauses, {
-    props: { groups },
+    props: { groups, loading },
     global: { plugins: [i18n], stubs },
   });
 }
@@ -94,5 +94,16 @@ describe("OnCallPriorCauses", () => {
     expect(wrapper.find('[data-test="oncall-prior-cause-config_change_or_deploy"]').text()).toContain(
       "Config change / deploy",
     );
+  });
+
+  /// While the fetch is in flight `groups` is `[]` — indistinguishable from a
+  /// subject that has genuinely never had a recorded cause. Without `loading`,
+  /// every response flashed "explains itself when nothing has been recorded"
+  /// for a moment before its real causes (if any) arrived.
+  it("does not claim no history while the fetch is still in flight", () => {
+    const wrapper = render([], true);
+
+    expect(wrapper.find('[data-test="oncall-prior-causes-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-prior-causes-loading"]').exists()).toBe(true);
   });
 });

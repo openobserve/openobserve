@@ -25,9 +25,10 @@ import store from "@/test/unit/helpers/store";
 const stubs = {
   OTable: {
     name: "OTable",
-    props: ["data", "columns"],
+    props: ["data", "columns", "loading"],
     template: `<div>
-      <div v-if="!data.length"><slot name="empty" /></div>
+      <div v-if="loading" data-test="skeleton" />
+      <div v-else-if="!data.length"><slot name="empty" /></div>
       <div v-for="row in data" :key="row.id" data-test="row">
         <slot name="cell-opened_at" :row="row" />
         <slot name="cell-state" :row="row" />
@@ -49,9 +50,9 @@ function firing(over: Record<string, unknown> = {}) {
   } as any;
 }
 
-function render(firings: unknown[]) {
+function render(firings: unknown[], loading = false) {
   return mount(OnCallFiringHistory, {
-    props: { firings: firings as any },
+    props: { firings: firings as any, loading },
     global: { plugins: [i18n, store], stubs },
   });
 }
@@ -78,5 +79,14 @@ describe("OnCallFiringHistory", () => {
   it("explains an empty history rather than showing a bare frame", () => {
     const wrapper = render([]);
     expect(wrapper.find('[data-test="oncall-firing-history-empty"]').exists()).toBe(true);
+  });
+
+  /// Before `loading` existed, an in-flight fetch and a genuinely first-ever
+  /// firing were indistinguishable: both rendered `firings: []`, so the "never
+  /// fired before" copy flashed for every response while its history was still
+  /// on the wire, then swapped to the real rows a moment later.
+  it("does not claim first-ever firing while the fetch is still in flight", () => {
+    const wrapper = render([], true);
+    expect(wrapper.find('[data-test="oncall-firing-history-empty"]').exists()).toBe(false);
   });
 });

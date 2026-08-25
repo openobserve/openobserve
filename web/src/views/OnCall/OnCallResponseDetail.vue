@@ -268,10 +268,15 @@
             </OCollapsible>
 
             <OCollapsible :label="t('oncall.tabPriorCauses')" data-test="oncall-response-causes">
-              <OnCallPriorCauses :groups="priorCauses" @open="openResponse" />
+              <OnCallPriorCauses
+                :groups="priorCauses"
+                :loading="priorCausesLoading"
+                @open="openResponse"
+              />
               <OnCallFiringHistory
                 class="mt-4"
                 :firings="firingHistory"
+                :loading="priorCausesLoading"
                 @open="openResponse"
               />
             </OCollapsible>
@@ -286,8 +291,10 @@
               :closed-at="response.closed_at"
             />
 
+            <OnCallEscalationSkeleton v-if="loading && !escalation" />
+
             <OnCallEscalation
-              v-if="escalation"
+              v-else-if="escalation"
               :progress="escalation"
               :events="events"
               :deliveries="deliveries"
@@ -319,8 +326,10 @@
       </OContent>
     </template>
 
+    <OnCallResponseDetailSkeleton v-else-if="loading" />
+
     <OEmptyState
-      v-else-if="!loading"
+      v-else
       size="hero"
       preset="no-data"
       data-test="oncall-response-detail-empty"
@@ -534,6 +543,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import OnCallEscalation from "@/components/oncall/OnCallEscalation.vue";
+import OnCallEscalationSkeleton from "@/components/oncall/OnCallEscalationSkeleton.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
 import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
@@ -552,6 +562,7 @@ import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
+import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -711,6 +722,7 @@ const resolveCause = ref<ResolutionCause | "">("");
 const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
 const firingHistory = ref<OnCallResponse[]>([]);
+const priorCausesLoading = ref(false);
 /// Only the two fields the page shows; the alert payload is large and the rest
 /// of it belongs on the alert's own screen, which the subject row links to.
 const subjectAlert = ref<{
@@ -1155,18 +1167,23 @@ async function fetchSubjectAlert() {
 // responder acting on what is in front of them. The two calls are independent,
 // so one server without the history route still leaves the causes readable.
 async function fetchPriorCauses() {
-  const [causeRes, historyRes] = await Promise.allSettled([
-    oncallService.priorCauses({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    }),
-    oncallService.responseHistory({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    }),
-  ]);
-  priorCauses.value = causeRes.status === "fulfilled" ? (causeRes.value.data ?? []) : [];
-  firingHistory.value = historyRes.status === "fulfilled" ? (historyRes.value.data ?? []) : [];
+  priorCausesLoading.value = true;
+  try {
+    const [causeRes, historyRes] = await Promise.allSettled([
+      oncallService.priorCauses({
+        org_identifier: orgId.value,
+        response_id: responseId.value,
+      }),
+      oncallService.responseHistory({
+        org_identifier: orgId.value,
+        response_id: responseId.value,
+      }),
+    ]);
+    priorCauses.value = causeRes.status === "fulfilled" ? (causeRes.value.data ?? []) : [];
+    firingHistory.value = historyRes.status === "fulfilled" ? (historyRes.value.data ?? []) : [];
+  } finally {
+    priorCausesLoading.value = false;
+  }
 }
 
 // Context, like the history: a failure here must not stop somebody acting on

@@ -23,10 +23,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="body" dense>
       <p class="text-text-secondary mb-3 text-xs">{{ t("oncall.priorCausesHint") }}</p>
 
+      <!-- Reserves the list's shape while the fetch is in flight, so it does
+           not flash "no history yet" — the wrong answer — for a moment before
+           the real one arrives. -->
+      <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-prior-causes-loading">
+        <OSkeleton type="text" class="h-4 w-2/3" />
+        <OSkeleton type="text" class="h-4 w-1/2" />
+      </div>
+
       <!-- An org with no history yet is told how the history gets made, rather
            than being shown an empty box it cannot act on. -->
       <p
-        v-if="!groups.length"
+        v-else-if="!groups.length"
         class="text-text-secondary text-sm"
         data-test="oncall-prior-causes-empty"
       >
@@ -69,10 +77,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { CauseGroup, ResolutionCause } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-defineProps<{ groups: CauseGroup[] }>();
+defineProps<{ groups: CauseGroup[]; loading?: boolean }>();
 const emit = defineEmits<{ open: [responseId: string] }>();
 
 const { t } = useI18nTyped();

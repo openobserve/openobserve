@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :frame="false"
+        :loading="loading"
         pagination="client"
         :show-global-filter="false"
         table-id="oncall-firing-history"
@@ -92,7 +93,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-defineProps<{ firings: OnCallResponse[] }>();
+defineProps<{ firings: OnCallResponse[]; loading?: boolean }>();
 const emit = defineEmits<{ open: [responseId: string] }>();
 
 const { t } = useI18nTyped();
