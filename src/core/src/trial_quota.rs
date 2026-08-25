@@ -663,6 +663,7 @@ fn record_usage_internal(
         node_name: None,
         dashboard_info: None,
         peak_memory_usage: None,
+        region: None,
     };
 
     // Feature breakdown event (informational, not billed)

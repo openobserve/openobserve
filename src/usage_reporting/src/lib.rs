@@ -288,6 +288,7 @@ pub async fn report_request_usage_stats(
             node_name: stats.node_name.clone(),
             dashboard_info: stats.dashboard_info.clone(),
             peak_memory_usage: stats.peak_memory_usage,
+            region: None,
         });
     }
 
@@ -345,6 +346,7 @@ pub async fn report_request_usage_stats(
         node_name: stats.node_name,
         dashboard_info: stats.dashboard_info,
         peak_memory_usage: stats.peak_memory_usage,
+        region: None,
     });
 
     report_usage(usages);
@@ -609,6 +611,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         }
     }
 

@@ -328,6 +328,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let result = queue
@@ -528,6 +529,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         runner.push(ReportingData::Usage(Box::new(usage_data)));
@@ -585,6 +587,7 @@ mod tests {
                 node_name: None,
                 dashboard_info: None,
                 peak_memory_usage: None,
+                region: None,
             };
             runner.push(ReportingData::Usage(Box::new(usage_data)));
         }
@@ -632,6 +635,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
         runner.push(ReportingData::Usage(Box::new(usage_data)));
 
@@ -685,6 +689,7 @@ mod tests {
                 node_name: None,
                 dashboard_info: None,
                 peak_memory_usage: None,
+                region: None,
             };
             runner.push(ReportingData::Usage(Box::new(usage_data)));
         }
@@ -744,6 +749,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let message = ReportingMessage::Data(ReportingData::Usage(Box::new(usage_data)));
@@ -788,6 +794,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let data = ReportingData::Usage(Box::new(usage_data));
@@ -837,6 +844,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         // First message should succeed
@@ -891,6 +899,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let trigger_data = TriggerData {
