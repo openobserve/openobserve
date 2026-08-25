@@ -555,15 +555,21 @@ describe("PipelinesList", () => {
   // shell header now, not in PipelinesList — their tests moved with them.
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // Export no longer writes a file straight away. It opens the shared dialog, so
+  // a pipeline can leave as JSON or as an openobserve_pipeline Terraform
+  // resource — the same flow alerts, SLOs and dashboards use. The download
+  // itself is the dialog's job and is covered by its own tests.
   describe("Export Methods", () => {
-    it("exportPipeline triggers a download for a single pipeline", () => {
+    it("exportPipeline opens the dialog on the pipeline that was clicked", () => {
       wrapper.vm.exportPipeline(mockRealtimePipeline);
 
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
-      expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+      expect(wrapper.vm.showExportDialog).toBe(true);
+      expect(wrapper.vm.pipelinesToExport).toEqual([mockRealtimePipeline]);
+      // The old behaviour wrote the file immediately; it must not any more.
+      expect(global.URL.createObjectURL).not.toHaveBeenCalled();
     });
 
-    it("exportBulkPipelines downloads all selected pipelines and clears selection", () => {
+    it("exportBulkPipelines opens the dialog on every selected pipeline", () => {
       // Populate filteredPipelines so the computed selectedPipelines can resolve them
       wrapper.vm.filteredPipelines = [mockRealtimePipeline, mockScheduledPipeline];
       // Set selection by IDs (the read-only computed derives values from this)
@@ -574,8 +580,54 @@ describe("PipelinesList", () => {
 
       wrapper.vm.exportBulkPipelines();
 
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
-      expect(wrapper.vm.selectedPipelineIds).toEqual([]);
+      expect(wrapper.vm.showExportDialog).toBe(true);
+      expect(wrapper.vm.pipelinesToExport).toHaveLength(2);
+    });
+
+    it("exportBulkPipelines does nothing when nothing is selected", () => {
+      wrapper.vm.selectedPipelineIds = [];
+      wrapper.vm.showExportDialog = false;
+
+      wrapper.vm.exportBulkPipelines();
+
+      expect(wrapper.vm.showExportDialog).toBe(false);
+    });
+
+    it("compiles the selection to Terraform, with an import block per pipeline", () => {
+      // The shared fixture has an empty graph, which the provider rejects, so a
+      // real one is used here — the point of this test is the Terraform tab.
+      wrapper.vm.exportPipeline({
+        ...mockRealtimePipeline,
+        nodes: [
+          {
+            id: "n1",
+            data: { node_type: "stream", stream_name: "test_stream", stream_type: "logs" },
+            position: { x: 0, y: 0 },
+            io_type: "input",
+          },
+          {
+            id: "n2",
+            data: { node_type: "stream", stream_name: "out_stream", stream_type: "logs" },
+            position: { x: 200, y: 0 },
+            io_type: "output",
+          },
+        ],
+        edges: [{ id: "e1", source: "n1", target: "n2" }],
+      });
+
+      const { hcl } = wrapper.vm.pipelinesTerraform;
+      expect(hcl).toContain('resource "openobserve_pipeline"');
+      expect(hcl).toContain("import {");
+      expect(hcl).toContain("to = openobserve_pipeline.");
+    });
+
+    it("reports a pipeline with no graph rather than emitting an invalid resource", () => {
+      // The shared fixture is exactly this case: nodes and edges both empty.
+      wrapper.vm.exportPipeline(mockRealtimePipeline);
+
+      const { hcl, unsupported } = wrapper.vm.pipelinesTerraform;
+      expect(hcl).toBe("");
+      expect(unsupported).toEqual([{ name: "Test Pipeline 1", reason: "incomplete" }]);
     });
   });
 

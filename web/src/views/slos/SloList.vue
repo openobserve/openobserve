@@ -35,7 +35,6 @@
     <template #actions>
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->
-      <IacRegistryLinks data-test="slos-slolist-iac-registries" />
       <OButton
         variant="primary"
         size="sm-action"
@@ -410,7 +409,6 @@ import { useStore } from "vuex";
 
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -482,8 +480,15 @@ const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.i
 const exportDialog = ref(false);
 const exporting = ref(false);
 const slosToExport = ref<Record<string, unknown>[]>([]);
+// The export strips the SLO id (see fetchSloForExport); Terraform import blocks
+// need it back, so it is kept alongside in the same order.
+const sloIdsToExport = ref<string[]>([]);
 const slosTerraform = computed(() =>
-  slosToTerraform(slosToExport.value, { folderId: activeFolderId.value }),
+  slosToTerraform(slosToExport.value, {
+    folderId: activeFolderId.value,
+    orgId: store.state.selectedOrganization.identifier,
+    ids: sloIdsToExport.value,
+  }),
 );
 
 async function fetchSloForExport(id: string): Promise<Record<string, unknown> | null> {
@@ -510,9 +515,18 @@ async function openExport(items: SloListItem[]) {
   exporting.value = true;
   try {
     const fetched = await Promise.all(items.map((item) => fetchSloForExport(item.id)));
-    const usable = fetched.filter((slo): slo is Record<string, unknown> => slo !== null);
+    // Definitions and ids are filtered together so import blocks keep pairing
+    // them by index; dropping a failed fetch from one list alone would shift
+    // every later SLO onto the wrong id.
+    const kept = items
+      .map((item, i) => ({ definition: fetched[i], id: item.id }))
+      .filter((entry): entry is { definition: Record<string, unknown>; id: string } =>
+        Boolean(entry.definition),
+      );
+    const usable = kept.map((entry) => entry.definition);
     if (!usable.length) throw new Error("empty export payload");
     slosToExport.value = usable;
+    sloIdsToExport.value = kept.map((entry) => entry.id);
     exportDialog.value = true;
 
     // A definition that came back empty is a gap in the export. Dropping it

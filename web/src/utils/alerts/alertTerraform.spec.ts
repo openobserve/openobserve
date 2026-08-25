@@ -288,3 +288,144 @@ describe("alertsToTerraform", () => {
     expect(unsupported).toHaveLength(1);
   });
 });
+
+// ── Composite alerts ────────────────────────────────────────────────────────
+// A composite has no stream, no query and no schedule; it combines the states of
+// other alerts. It is a different provider resource type, so the exporter has to
+// dispatch on alert_type rather than treating it as an alert that is missing
+// half its fields.
+const COMPOSITE = {
+  alert_type: "composite",
+  name: "Bad deploy",
+  description: "Errors up right after a deploy",
+  enabled: true,
+  destinations: ["soc-webhook"],
+  trigger_condition: { silence: 30 },
+  composite_condition: {
+    expression: "{2abc} && {3def}",
+    warning_counts_as_firing: true,
+    stale_child_policy: "use_last_state",
+  },
+  tags: ["prod"],
+  priority: 1,
+};
+
+describe("composite alerts", () => {
+  it("renders openobserve_composite_alert, not openobserve_alert", () => {
+    const { hcl, unsupported } = alertsToTerraform([COMPOSITE]);
+
+    expect(unsupported).toEqual([]);
+    expect(hcl).toContain('resource "openobserve_composite_alert" "bad_deploy"');
+    expect(hcl).not.toContain('"openobserve_alert"');
+  });
+
+  it("writes the expression and the attributes a composite actually has", () => {
+    const { hcl } = alertsToTerraform([COMPOSITE]);
+
+    // `=` is aligned across the block, so match each pair rather than a fixed
+    // number of spaces.
+    expect(hcl).toMatch(/expression\s+= "\{2abc\} && \{3def\}"/);
+    expect(hcl).toMatch(/enabled\s+= true/);
+    expect(hcl).toMatch(/destinations\s+= \["soc-webhook"\]/);
+    // silence arrives inside trigger_condition on the wire and is top-level in
+    // the provider schema.
+    expect(hcl).toMatch(/silence\s+= 30/);
+  });
+
+  it("writes none of the query or schedule attributes a composite cannot have", () => {
+    const { hcl } = alertsToTerraform([COMPOSITE]);
+
+    for (const absent of [
+      "stream_name",
+      "stream_type",
+      "query_condition",
+      "trigger_condition",
+      "period",
+      "frequency",
+      "threshold",
+    ]) {
+      expect(hcl, absent).not.toContain(absent);
+    }
+  });
+
+  it("omits the two policy attributes when they are at their default", () => {
+    const { hcl } = alertsToTerraform([COMPOSITE]);
+
+    expect(hcl).not.toContain("warning_counts_as_firing");
+    expect(hcl).not.toContain("stale_child_policy");
+  });
+
+  it("writes the policy attributes in their non-default direction", () => {
+    const { hcl } = alertsToTerraform([
+      {
+        ...COMPOSITE,
+        composite_condition: {
+          ...COMPOSITE.composite_condition,
+          warning_counts_as_firing: false,
+          stale_child_policy: "treat_as_false",
+        },
+      },
+    ]);
+
+    expect(hcl).toMatch(/warning_counts_as_firing\s+= false/);
+    expect(hcl).toMatch(/stale_child_policy\s+= "treat_as_false"/);
+  });
+
+  it("accepts the capitalised alert_type a list row carries", () => {
+    const { hcl } = alertsToTerraform([{ ...COMPOSITE, alert_type: "Composite" }]);
+    expect(hcl).toContain('"openobserve_composite_alert"');
+  });
+
+  it("reports a composite with no expression rather than rendering an invalid one", () => {
+    const { hcl, unsupported } = alertsToTerraform([
+      { ...COMPOSITE, composite_condition: { expression: "" } },
+    ]);
+
+    expect(hcl).toBe("");
+    expect(unsupported).toEqual([{ name: "Bad deploy", reason: "incomplete" }]);
+  });
+
+  it("renders a mixed selection as both resource types", () => {
+    const { hcl } = alertsToTerraform([COMPOSITE, sqlAlert]);
+
+    expect(hcl).toContain('"openobserve_composite_alert" "bad_deploy"');
+    expect(hcl).toContain('"openobserve_alert"');
+  });
+});
+
+describe("import blocks", () => {
+  it("addresses each alert as org/id", () => {
+    const { hcl } = alertsToTerraform([sqlAlert], { orgId: "default", ids: ["2abcXYZ"] });
+
+    expect(hcl).toContain("import {");
+    expect(hcl).toContain('id = "default/2abcXYZ"');
+  });
+
+  it("points a composite at the composite resource type", () => {
+    const { hcl } = alertsToTerraform([COMPOSITE], { orgId: "default", ids: ["9zz"] });
+
+    expect(hcl).toContain("to = openobserve_composite_alert.bad_deploy");
+    expect(hcl).toContain('id = "default/9zz"');
+  });
+
+  it("keeps ids paired with the right resource when one is skipped", () => {
+    // The anomaly config renders nothing, so a naive index walk would attach the
+    // second alert to the first id.
+    const anomaly = { ...sqlAlert, name: "Anomaly", alert_type: "anomaly_detection" };
+    const { hcl } = alertsToTerraform([anomaly, COMPOSITE], {
+      orgId: "default",
+      ids: ["anomaly-id", "composite-id"],
+    });
+
+    expect(hcl).toContain('id = "default/composite-id"');
+    expect(hcl).not.toContain("anomaly-id");
+  });
+
+  it("writes none without an org", () => {
+    expect(alertsToTerraform([sqlAlert], { ids: ["2abcXYZ"] }).hcl).not.toContain("import {");
+  });
+
+  it("writes none for an alert with no id", () => {
+    expect(alertsToTerraform([sqlAlert], { orgId: "default" }).hcl).not.toContain("import {");
+  });
+});

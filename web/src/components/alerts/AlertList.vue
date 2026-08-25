@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
-        <IacRegistryLinks data-test="alert-list-iac-registries" />
         <!-- Import button -->
         <OButton
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
@@ -909,7 +908,6 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
@@ -955,7 +953,6 @@ export default defineComponent({
     AppTabs,
     CompositeReferencesDrawer,
     ExportResourceDialog,
-    IacRegistryLinks,
     AlertSectionTabs,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
@@ -2651,24 +2648,43 @@ export default defineComponent({
     // and the user picks there.
     const showExportDialog = ref(false);
     const alertsToExport = ref<Record<string, unknown>[]>([]);
+    // The export endpoint strips the id (see fetchAlertForExport), but Terraform
+    // import blocks need exactly that id back, so it is kept alongside the
+    // definitions in the order they were fetched.
+    const alertIdsToExport = ref<string[]>([]);
     // Converted here rather than inside the dialog: each resource type has its
     // own exporter, and the dialog only renders what it is handed.
     const alertsTerraform = computed(() =>
-      alertsToTerraform(alertsToExport.value, { folderId: activeFolderId.value }),
+      alertsToTerraform(alertsToExport.value, {
+        folderId: activeFolderId.value,
+        orgId: store.state.selectedOrganization.identifier,
+        ids: alertIdsToExport.value,
+      }),
     );
     const exportLoading = ref(false);
 
     // The /export endpoint strips runtime fields from anomaly configs and works
-    // for ordinary alerts too.
-    const fetchAlertForExport = async (alertId: string) => {
-      const res = await alertsService.export_by_id(
-        store.state.selectedOrganization.identifier,
-        alertId,
-      );
+    // for ordinary alerts too — but it answers 404 for a composite, which has no
+    // query to export. A composite is read through the ordinary GET instead,
+    // which returns its composite_condition and everything else the Terraform
+    // exporter needs.
+    const isCompositeRow = (row: any) =>
+      String(row?.alert_type ?? "").toLowerCase() === "composite";
+
+    const fetchAlertForExport = async (alertId: string, composite = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      const res = composite
+        ? await alertsService.get_by_alert_id(org, alertId)
+        : await alertsService.export_by_id(org, alertId);
       const data = res.data;
       // An id belongs to the alert that was exported, not to the one this
-      // definition will create.
-      if (data && Object.prototype.hasOwnProperty.call(data, "id")) delete data.id;
+      // definition will create. The GET path also carries runtime state that
+      // describes this copy rather than the definition.
+      if (data && typeof data === "object") {
+        for (const key of ["id", "evaluation", "scheduler_job_present", "children"]) {
+          if (Object.prototype.hasOwnProperty.call(data, key)) delete data[key];
+        }
+      }
       return data;
     };
 
@@ -2676,9 +2692,10 @@ export default defineComponent({
       if (exportLoading.value) return;
       exportLoading.value = true;
       try {
-        const alert = await fetchAlertForExport(row.alert_id);
+        const alert = await fetchAlertForExport(row.alert_id, isCompositeRow(row));
         if (!alert) throw new Error("empty export payload");
         alertsToExport.value = [alert];
+        alertIdsToExport.value = [row.alert_id];
         showExportDialog.value = true;
       } catch (error: any) {
         toast({
@@ -2980,13 +2997,20 @@ export default defineComponent({
       try {
         const selected = selectedAlerts.value as any[];
         const fetched = await Promise.all(
-          selected.map((alert: any) => fetchAlertForExport(alert.alert_id)),
+          selected.map((alert: any) => fetchAlertForExport(alert.alert_id, isCompositeRow(alert))),
         );
-        const usable = fetched.filter(Boolean);
+        // Definitions and ids are filtered together, in one pass: import blocks
+        // pair them by index, so dropping a failed fetch from one list without
+        // the other would attach every later alert to the wrong id.
+        const kept = selected
+          .map((alert: any, i: number) => ({ definition: fetched[i], id: alert.alert_id }))
+          .filter((entry) => Boolean(entry.definition));
+        const usable = kept.map((entry) => entry.definition);
         // Every fetch coming back empty is a failure, not an export of nothing:
         // without this the dialog opens on a blank definition.
         if (!usable.length) throw new Error("empty export payload");
         alertsToExport.value = usable;
+        alertIdsToExport.value = kept.map((entry) => entry.id);
         showExportDialog.value = true;
 
         // A definition that came back empty is a gap in the export. Dropping it
