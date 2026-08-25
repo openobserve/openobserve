@@ -771,10 +771,7 @@ const llmExperimentsService = {
     experimentId: string,
     overrides: ExperimentClonePayload = {},
   ): Promise<LlmExperiment> {
-    const response = await http().post(
-      `${base(orgId)}/${experimentId}/clone`,
-      overrides,
-    );
+    const response = await http().post(`${base(orgId)}/${experimentId}/clone`, overrides);
     return normalizeExperiment(response.data);
   },
 };
