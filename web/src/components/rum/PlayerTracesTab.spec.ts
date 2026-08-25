@@ -57,6 +57,14 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
+// Stream discovery: default resolves nothing so every row falls back to the
+// default stream and the pre-discovery tests keep their single-call shape;
+// individual tests override with per-id streams.
+const mockResolveTracesStreamsBulk = vi.fn().mockResolvedValue({});
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTracesStreamsBulk: mockResolveTracesStreamsBulk }),
+}));
+
 // ---------------------------------------------------------------------------
 // Test data factories
 // ---------------------------------------------------------------------------
@@ -295,6 +303,67 @@ describe("PlayerTracesTab", () => {
 
     it("should display the route path in the table row", () => {
       expect(wrapper.text()).toContain("/products");
+    });
+
+    it("gives each row its own stream and fetches metadata per distinct stream", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff"; // → payments_traces
+      const C1 = "01a038ddccc770b9bba3b2df20c12415"; // → checkout_traces
+      mockResolveTracesStreamsBulk.mockResolvedValueOnce({
+        [P1]: "payments_traces",
+        [C1]: "checkout_traces",
+      });
+
+      // RUM hits for both ids; metadata mock answers per queried stream.
+      mockSearch.mockReset();
+      mockFetchQueryDataWithHttpStream.mockReset();
+      mockSearch.mockImplementation((_params: any, source: string) =>
+        Promise.resolve(
+          source === "RUM"
+            ? {
+                data: {
+                  hits: [
+                    createRumHit({ _trace_id: P1, _view_url: "https://example.com/pay" }),
+                    createRumHit({ _trace_id: C1, _view_url: "https://example.com/checkout" }),
+                  ],
+                },
+              }
+            : { data: { hits: [] } },
+        ),
+      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((args: any, handlers: any) => {
+        const stream = args.queryReq.stream_name;
+        const id = stream === "payments_traces" ? P1 : C1;
+        handlers.data(null, {
+          content: { results: { hits: [createTraceMetadata({ trace_id: id })] } },
+        });
+        handlers.complete();
+      });
+
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // metadata fetched once per distinct stream
+      const streamsQueried = mockFetchQueryDataWithHttpStream.mock.calls.map(
+        ([args]: any[]) => args.queryReq.stream_name,
+      );
+      expect(streamsQueried.sort()).toEqual(["checkout_traces", "payments_traces"]);
+
+      // both rows render, each carrying its own stream context
+      expect(wrapper.text()).toContain("/pay");
+      expect(wrapper.text()).toContain("/checkout");
+
+      // clicking the checkout row opens the embedded view against ITS stream
+      const rows = wrapper.findAll('[data-test^="table-row-"]');
+      const checkoutRow = rows.find((r: any) => r.text().includes("/checkout"));
+      expect(checkoutRow).toBeDefined();
+      await checkoutRow!.trigger("click");
+      await flushPromises();
+
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.exists()).toBe(true);
+      expect(traceDetails.props("streamNameProp")).toBe("checkout_traces");
+      expect(traceDetails.props("traceIdProp")).toBe(C1);
     });
 
     it("joins legacy zero-stripped RUM ids with padded traces-stream metadata", async () => {
