@@ -138,39 +138,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </span>
 
-          <!-- A service's identity is already decided: the org's identity sets
-               say a Kubernetes service is cluster + namespace + deployment, and
-               discovery has recorded exactly that per service. Claiming one
-               writes all of it at once, which is the difference between owning
-               a service and reconstructing its address three fields at a time. -->
-          <div
-            v-if="!pairs.length && serviceOptions.length"
-            class="flex flex-wrap items-end gap-2"
-            data-test="oncall-rule-editor-claim-service"
-          >
-            <OSelect
-              v-model="claimedService"
-              :label="t('oncall.ruleEditorOwnService')"
-              :options="serviceOptions"
-              :placeholder="t('oncall.ruleEditorOwnServicePlaceholder')"
-              size="sm"
-              width="md"
-              searchable
-              data-test="oncall-rule-editor-service"
-              @update:model-value="claimService"
-            >
-              <template #tooltip>
-                <OTooltip side="right" :content="t('oncall.ruleEditorOwnServiceHelp')" />
-              </template>
-            </OSelect>
-            <OText variant="meta" class="pb-2">{{ t("oncall.ruleEditorOrByField") }}</OText>
-          </div>
+          <!-- The front door: a level of the estate, not a row of the registry.
+               Almost every claim is "this cluster", "this namespace" or "this
+               service wherever it runs", and each of those writes exactly the
+               dimensions the field builder below would have written by hand. -->
+          <OnCallScopePicker
+            v-if="scoped"
+            :model-value="draftDimensions"
+            :sets="sets"
+            :catalogue="catalogue"
+            :services="services"
+            :aliases="aliases"
+            data-test="oncall-rule-editor-scope"
+            @update:model-value="applyScope"
+            @advanced="useAdvanced"
+          />
 
           <!-- A closed vocabulary for the dimension: free text is how a rule
                ends up pinned to a field nothing ever emits, which reads as
                "never matched". The value stays open — it is data — but the
                values already seen on this dimension are offered first. -->
-          <div v-if="adding" class="flex flex-wrap items-end gap-2">
+          <div v-if="!scoped && adding" class="flex flex-wrap items-end gap-2">
             <OSelect
               v-model="draftName"
               :label="t('oncall.ruleEditorDimensionLabel')"
@@ -235,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <OButton
-            v-else
+            v-else-if="!scoped"
             variant="ghost-primary"
             size="sm"
             icon-left="add"
@@ -249,12 +237,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The dialog used to go quiet here: no request, no message, and a
                disabled Save with nothing on screen saying what was missing. -->
           <OText
-            v-if="adding && addPairProblem"
+            v-if="!scoped && adding && addPairProblem"
             variant="meta"
             data-test="oncall-rule-editor-dimension-problem"
           >
             {{ addPairProblem }}
           </OText>
+
+          <!-- The way back. Advanced is a mode somebody chose, so leaving it has
+               to be as findable as entering it was — otherwise the only exit is
+               cancelling the dialog and starting again. -->
+          <OButton
+            v-if="!scoped && scopeAvailable"
+            variant="ghost-primary"
+            size="sm"
+            icon-left="arrow-back"
+            class="self-start"
+            data-test="oncall-rule-editor-leave-advanced"
+            @click="useScoped"
+          >
+            {{ t("oncall.scopeOwns") }}
+          </OButton>
         </div>
 
         <!-- The team is a picker even on a team's own tab: handing a path to
@@ -356,6 +359,7 @@ import { computed, ref, watch } from "vue";
 
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import OnCallScopePicker from "./OnCallScopePicker.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -367,6 +371,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import type { IdentitySet } from "@/services/service_streams";
 import type {
   DimensionCatalogue,
   DiscoveredService,
@@ -406,6 +411,8 @@ const props = withDefaults(
     catalogue?: DimensionCatalogue;
     /** Services discovery has seen, each claimable as one whole identity. */
     services?: DiscoveredService[];
+    /** The org's identity sets — the ordered hierarchy the scope picker uses. */
+    sets?: IdentitySet[];
     /** Replayed against the draft to answer "what would this catch". */
     signals?: UnroutedSignal[];
     /** The target team's ladder, so "page" says what paging means. */
@@ -421,6 +428,7 @@ const props = withDefaults(
     aliases: () => [],
     catalogue: () => ({ present: [], values: {} }),
     services: () => [],
+    sets: () => [],
     signals: () => [],
     ladder: () => [],
     saving: false,
@@ -456,7 +464,12 @@ watch(
       ([name, value]) => ({ name, value: String(value) }),
     );
     team.value = props.rule?.team_id || props.teamId;
-    adding.value = !pairs.value.length;
+    // An existing rule opens in the builder that can express it. A rule the
+    // levels cannot say — three conditions, a wildcard, a dimension outside the
+    // identity sets — would otherwise be silently rewritten to whatever the
+    // scope picker settled on, which is a rule nobody wrote.
+    scoped.value = scopeAvailable.value && scopeCanExpress(dimensionsOf());
+    adding.value = !scoped.value && !pairs.value.length;
     draftName.value = "";
     draftValue.value = "";
   },
@@ -466,6 +479,13 @@ watch(
 function dimensionsOf(): Record<string, string> {
   return Object.fromEntries(pairs.value.map((pair) => [pair.name, pair.value]));
 }
+
+/// The same map, memoised, because the scope picker watches it deeply.
+///
+/// Bound as a call it would be a fresh object on every render, so the picker's
+/// watcher would fire on its own emit, publish again, and render again — a loop
+/// with no new information in it.
+const draftDimensions = computed(dimensionsOf);
 
 /// Dimensions this org has actually emitted, in the order the registry
 /// recommends, and nothing else.
@@ -490,35 +510,61 @@ const dimensionOptions = computed(() => {
   return [...present, ...onDraft].map((id) => ({ label: label(id), value: id }));
 });
 
-const claimedService = ref("");
-
-/// Discovered services, labelled with the identity a claim would write so the
-/// choice is legible before it is made.
-const serviceOptions = computed(() =>
-  props.services.map((service) => ({
-    label: raw(service.name),
-    value: service.name,
-    description: Object.keys(service.identity).length
-      ? raw(Object.values(service.identity).join(" / "))
-      : t("oncall.ruleEditorServiceNameOnly"),
-  })),
+/// Whether there is an estate to pick levels from at all.
+///
+/// A deployment that has discovered nothing has no clusters, no namespaces and
+/// no services, so the scope picker would be a row of empty selects. The field
+/// builder still works there — it always did — so that is where such a
+/// deployment starts.
+const scopeAvailable = computed(
+  () =>
+    props.services.length > 0 ||
+    props.sets.some((set) =>
+      set.distinguish_by.some(
+        (dimension) => Object.keys(props.catalogue.values[dimension] ?? {}).length > 0,
+      ),
+    ),
 );
 
-/// Fill the conditions from the service's own identity.
+/// Which of the two builders is on screen. Scope by default, because it is what
+/// almost every rule needs; Advanced is reachable in one click and holds
+/// everything scope deliberately cannot say.
+const scoped = ref(true);
+
+/// Whether the levels can state this claim exactly.
 ///
-/// Anything the identity sets do not cover — bare metal, a VM, an appliance —
-/// has no infrastructure identity to write, so the claim falls back to the
-/// service name. That is a real, narrower claim rather than a failure, and the
-/// option said so before it was picked.
-function claimService(name: unknown) {
-  const service = props.services.find((candidate) => candidate.name === String(name));
-  if (!service) return;
-  const identity = Object.keys(service.identity).length
-    ? service.identity
-    : { [SERVICE_DIMENSION]: service.name };
-  pairs.value = Object.entries(identity).map(([key, value]) => ({ name: key, value: String(value) }));
-  claimedService.value = "";
+/// One level, or one level narrowed by a coarser one. Anything else — a
+/// wildcard, a third condition, a dimension no identity set names — is a real
+/// rule the levels have no words for, and pretending otherwise would rewrite it
+/// on open. Empty counts as expressible: that is a new rule.
+function scopeCanExpress(dimensions: Record<string, string>): boolean {
+  const names = Object.keys(dimensions);
+  if (!names.length) return true;
+  if (names.length > 2) return false;
+  if (Object.values(dimensions).some((value) => String(value).endsWith("*"))) return false;
+  const known = new Set<string>([SERVICE_DIMENSION]);
+  for (const set of props.sets) for (const dimension of set.distinguish_by) known.add(dimension);
+  return names.every((name) => known.has(name));
+}
+
+function useAdvanced() {
+  scoped.value = false;
+  adding.value = !pairs.value.length;
+}
+
+function useScoped() {
+  scoped.value = true;
   adding.value = false;
+}
+
+/// The scope picker owns a whole claim, not one condition, so it replaces the
+/// conditions rather than appending to them. Two levels at once is what its
+/// own narrowing control is for.
+function applyScope(dimensions: Record<string, string>) {
+  pairs.value = Object.entries(dimensions).map(([name, value]) => ({
+    name,
+    value: String(value),
+  }));
 }
 
 /// Whether the picker is showing the whole vocabulary because the registry is

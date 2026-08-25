@@ -200,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aliases="aliases"
       :catalogue="catalogue"
       :services="services"
+      :sets="sets"
       :signals="openSignals"
       :saving="saving"
       @update:open="(v: boolean) => (dialogOpen = v)"
@@ -247,7 +248,12 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import alertsService from "@/services/alerts";
-import { getDimensionAnalytics, getServicesList } from "@/services/service_streams";
+import {
+  getDimensionAnalytics,
+  getIdentityConfig,
+  getServicesList,
+} from "@/services/service_streams";
+import type { IdentitySet } from "@/services/service_streams";
 import oncallService from "@/services/oncall";
 import type {
   DimensionCatalogue,
@@ -311,6 +317,9 @@ const openSignals = computed(() => signals.value.filter((signal) => !signal.dism
 /// instead of the whole field vocabulary and a text box.
 const catalogue = ref<DimensionCatalogue>({ present: [], values: {} });
 const services = ref<DiscoveredService[]>([]);
+/// The org's identity sets — an ordered `distinguish_by` per set, which is also
+/// the hierarchy the rule editor offers levels from.
+const sets = ref<IdentitySet[]>([]);
 const ruleToDelete = ref<OwnershipRuleStats | null>(null);
 
 /// The header actions only make sense once the page has something to act on —
@@ -374,7 +383,19 @@ async function fetchAll() {
     return;
   }
   loaded.value = true;
-  await Promise.all([fetchRules(), fetchSignals(), fetchAliases()]);
+  // `fetchCatalogue` and `fetchServices` were written, and nothing called them.
+  // The rule editor on this page therefore had an empty catalogue and an empty
+  // service list for its whole life — no values to pick, no services to claim,
+  // and no way to tell that from a deployment that had genuinely discovered
+  // nothing. The team page called them; this one never did.
+  await Promise.all([
+    fetchRules(),
+    fetchSignals(),
+    fetchAliases(),
+    fetchCatalogue(),
+    fetchServices(),
+    fetchSets(),
+  ]);
 }
 
 async function fetchRules() {
@@ -430,6 +451,15 @@ async function fetchAliases() {
 
 /// Which of those field names this org has ever emitted, and with what values.
 /// Both degrade to empty, which is what this screen did before they existed.
+async function fetchSets() {
+  try {
+    const res = await getIdentityConfig(orgId.value);
+    sets.value = res.data?.sets ?? [];
+  } catch {
+    sets.value = [];
+  }
+}
+
 async function fetchCatalogue() {
   try {
     const res = await getDimensionAnalytics(orgId.value);

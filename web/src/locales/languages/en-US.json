@@ -13726,6 +13726,18 @@
     "ruleEditorServiceNameOnly": "by service name only — no infrastructure identity discovered",
     "ruleEditorOwnServiceHelp": "Pick a service and this claims the whole identity discovery found for it — its cluster, namespace and deployment — instead of you entering each one. Services with no infrastructure identity are claimed by name.",
     "ruleEditorValueHelp": "Values already seen on this field, commonest first. Type your own if it is not listed yet, or end it with * to claim a family, like db-*.",
-    "ruleEditorTeamHelp": "The team paged when a signal matches. Its own escalation ladder decides who is woken and in what order."
+    "ruleEditorTeamHelp": "The team paged when a signal matches. Its own escalation ladder decides who is woken and in what order.",
+    "scopeOwns": "This team owns",
+    "scopeAdvanced": "Advanced",
+    "scopeValuePlaceholder": "Choose one",
+    "scopeEverywhere": "Everywhere",
+    "scopeLevelHelp": "Claim a whole {level}. Everything inside it pages this team, except what a narrower rule claims.",
+    "scopeServiceHelp": "Claim one service. A service beats any cluster or namespace rule that also matches, so this holds wherever the service runs.",
+    "scopeNarrowHelp": "Leave this as Everywhere unless the service changes hands per cluster — one team usually owns a service wherever it runs.",
+    "scopeClaimContainer": "Everything in the {level} {value} pages this team, unless a narrower rule claims it first.",
+    "scopeClaimServiceEverywhere": "{service} pages this team in every cluster and namespace, whoever owns the ones around it.",
+    "scopeClaimServiceHere": "{service} pages this team in {scope} only. Elsewhere it falls to whoever owns the scope around it.",
+    "scopeNothingDiscovered": "Nothing has been discovered yet, so there is no estate to pick from. Use Advanced to write the rule by field, or send some telemetry first.",
+    "scopeAdvancedHint": "Match on any field and value, including ones the levels above do not cover."
   }
 }

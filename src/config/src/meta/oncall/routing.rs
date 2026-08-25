@@ -160,6 +160,71 @@ fn pair_matches(want: &str, actual: &str) -> bool {
     }
 }
 
+/// How fine-grained each dimension is, so routing can say a service is a
+/// narrower thing than the cluster containing it.
+///
+/// Without this, two rules that pin one dimension each are separated only by
+/// how many characters their values happen to have. `{k8s-cluster: production}`
+/// and `{service: payment-gateway}` both match a payment-gateway page in
+/// production, both pin one dimension, and the longer string wins — so
+/// "payments owns payment-gateway everywhere" holds until somebody renames the
+/// cluster to `production-us-east-1-primary`, at which point the cluster team
+/// silently starts taking those pages. That is not a tie-break anyone chose.
+///
+/// The ordering is not invented here. `Distinguish Services By` is already an
+/// **ordered** list per identity set — an org that wrote `[k8s-cluster,
+/// k8s-namespace]` has said a cluster contains namespaces — so the rank is the
+/// position in that list. `service` is finest by definition, being the thing
+/// the sets exist to disambiguate.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DimensionDepth {
+    ranks: HashMap<String, usize>,
+}
+
+impl DimensionDepth {
+    /// Ranks read off the org's identity sets, coarsest first within each set.
+    ///
+    /// Sets are ranked independently rather than concatenated: a record is
+    /// either an ECS task or a Kubernetes pod, so `ecs-task` and `k8s-namespace`
+    /// are never in contention and giving them a shared scale would only invent
+    /// an ordering between two things that never meet.
+    pub fn from_sets<'a>(sets: impl IntoIterator<Item = &'a [String]>) -> Self {
+        let mut ranks: HashMap<String, usize> = HashMap::new();
+        for distinguish_by in sets {
+            for (position, alias) in distinguish_by.iter().enumerate() {
+                if alias == SERVICE_DIMENSION {
+                    continue;
+                }
+                // Coarsest wins on collision: an alias appearing early in one
+                // set and late in another is at best ambiguous, and treating it
+                // as the broader claim keeps a rule from outranking one that
+                // genuinely is narrower.
+                ranks
+                    .entry(alias.clone())
+                    .and_modify(|r| *r = (*r).min(position))
+                    .or_insert(position);
+            }
+        }
+        Self { ranks }
+    }
+
+    /// Where this dimension sits, higher being finer.
+    ///
+    /// `service` is always finest. A dimension no set mentions is coarsest —
+    /// it is not part of the topology anybody described, so it cannot be
+    /// allowed to outrank one that is.
+    pub fn rank_of(&self, alias: &str) -> usize {
+        if alias == SERVICE_DIMENSION {
+            return usize::MAX;
+        }
+        self.ranks.get(alias).map_or(0, |r| r + 1)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ranks.is_empty()
+    }
+}
+
 impl OwnershipRule {
     /// How many dimensions this rule pins — its depth in the path, and the
     /// first term of the specificity ordering.
@@ -167,9 +232,22 @@ impl OwnershipRule {
         self.dimensions.len()
     }
 
+    /// The finest level this rule reaches, and the second term of the ordering.
+    ///
+    /// Compared before exactness so that depth beats pattern shape: a rule
+    /// naming a service is a narrower claim than one naming a cluster whether
+    /// or not either uses a wildcard. Within one depth, exactness still decides.
+    pub fn finest_depth(&self, depths: &DimensionDepth) -> usize {
+        self.dimensions
+            .keys()
+            .map(|k| depths.rank_of(k))
+            .max()
+            .unwrap_or(0)
+    }
+
     /// How many of those dimensions are pinned to a literal value.
     ///
-    /// The second term of the ordering, so that at equal depth an exact match
+    /// The third term of the ordering, so that at equal depth an exact match
     /// always beats a wildcard one: `host=db-01` is a statement about one host,
     /// `host=db-*` a statement about a family, and the narrower claim is the
     /// one whose author meant it.
@@ -180,9 +258,13 @@ impl OwnershipRule {
             .count()
     }
 
-    /// Total literal characters pinned, wildcards' `*` excluded. The third
+    /// Total literal characters pinned, wildcards' `*` excluded. The fourth
     /// term: between `host=db-prod-*` and `host=db-*` the longer prefix is the
     /// more specific claim.
+    ///
+    /// Only ever compares two rules already tied on count, depth and exactness
+    /// — i.e. two wildcards over the same dimension — which is the one place
+    /// where string length is a real signal rather than an accident.
     pub fn literal_chars(&self) -> usize {
         self.dimensions
             .values()
@@ -334,6 +416,9 @@ pub struct RoutingInputs<'a> {
     pub dimensions: Option<&'a HashMap<String, String>>,
     /// Level 3 — the nominated catch-all, if the org has one.
     pub default_team_id: Option<&'a str>,
+    /// How deep each dimension sits, for separating rules of equal specificity.
+    /// Defaulting it is safe: `service` outranks everything with or without it.
+    pub depths: Option<&'a DimensionDepth>,
 }
 
 /// The decision, plus anything routing had to pass over on the way to it.
@@ -515,15 +600,34 @@ pub fn resolve_owner<'a>(
     rules: &'a [OwnershipRule],
     dims: &HashMap<String, String>,
 ) -> Option<&'a OwnershipRule> {
+    resolve_owner_ranked(rules, dims, &DimensionDepth::default())
+}
+
+/// [`resolve_owner`], told how deep each dimension sits.
+///
+/// The ranking only ever separates rules that were already tied, so an org that
+/// has configured no identity sets still routes exactly as before — except that
+/// `service` outranks everything, which is true by definition and needs no
+/// configuration to be true.
+pub fn resolve_owner_ranked<'a>(
+    rules: &'a [OwnershipRule],
+    dims: &HashMap<String, String>,
+    depths: &DimensionDepth,
+) -> Option<&'a OwnershipRule> {
     rules
         .iter()
         .filter(|rule| rule.validate().is_ok() && rule.matches(dims))
         .max_by(|a, b| {
             a.specificity()
                 .cmp(&b.specificity())
-                // Depth first, then exactness: §7's "exact beats wildcard at
-                // the same depth". A wildcard can therefore never outrank a
-                // more specific exact rule, only a shallower one.
+                // Then how fine the claim is. `{service: payment-gateway}` beats
+                // `{k8s-cluster: production}` because a service is a narrower
+                // thing than a cluster — not because its name is longer, which
+                // is what decided it before this term existed.
+                .then_with(|| a.finest_depth(depths).cmp(&b.finest_depth(depths)))
+                // Then exactness: §7's "exact beats wildcard at the same depth".
+                // A wildcard can therefore never outrank a more specific exact
+                // rule, only a shallower one.
                 .then_with(|| a.exact_dimensions().cmp(&b.exact_dimensions()))
                 .then_with(|| a.literal_chars().cmp(&b.literal_chars()))
                 .then_with(|| b.path().cmp(&a.path()))
@@ -578,7 +682,9 @@ pub fn route(inputs: &RoutingInputs<'_>) -> Routed {
 
     let empty = HashMap::new();
     let dims = inputs.dimensions.unwrap_or(&empty);
-    if let Some(rule) = resolve_owner(inputs.rules, dims) {
+    let no_depths = DimensionDepth::default();
+    let depths = inputs.depths.unwrap_or(&no_depths);
+    if let Some(rule) = resolve_owner_ranked(inputs.rules, dims, depths) {
         return Routed {
             decision: RoutingDecision::Ownership {
                 team_id: rule.team_id.clone(),
@@ -695,6 +801,172 @@ mod tests {
             ("service", "payment-gateway"),
         ]);
         assert_eq!(resolve_owner(&rules, &record).unwrap().team_id, "payments");
+    }
+
+    mod hierarchy {
+        use super::*;
+
+        fn k8s_depths() -> DimensionDepth {
+            DimensionDepth::from_sets([
+                ["k8s-cluster".to_string(), "k8s-namespace".to_string()].as_slice(),
+            ])
+        }
+
+        /// The scenario the ranking exists for. A platform team owns a whole
+        /// cluster; a product team owns one service wherever it runs. Both
+        /// rules pin one dimension, so before the depth term the winner was
+        /// whichever value had more characters.
+        #[test]
+        fn test_a_service_rule_beats_a_cluster_rule_at_equal_specificity() {
+            let rules = vec![
+                rule("r_cluster", "platform", &[("k8s-cluster", "production")]),
+                rule("r_svc", "payments", &[("service", "payment-gateway")]),
+            ];
+            let record = dims(&[
+                ("k8s-cluster", "production"),
+                ("service", "payment-gateway"),
+            ]);
+            assert_eq!(
+                resolve_owner_ranked(&rules, &record, &k8s_depths())
+                    .unwrap()
+                    .team_id,
+                "payments",
+            );
+        }
+
+        /// The same estate after somebody renames the cluster. `literal_chars`
+        /// alone put the cluster ahead here — the platform team quietly started
+        /// taking payment-gateway pages, and nothing in the config had changed
+        /// about ownership.
+        #[test]
+        fn test_renaming_a_cluster_does_not_move_a_service_to_another_team() {
+            let rules = vec![
+                rule(
+                    "r_cluster",
+                    "platform",
+                    &[("k8s-cluster", "production-us-east-1-primary")],
+                ),
+                rule("r_svc", "payments", &[("service", "payment-gateway")]),
+            ];
+            let record = dims(&[
+                ("k8s-cluster", "production-us-east-1-primary"),
+                ("service", "payment-gateway"),
+            ]);
+            assert!(
+                rule("x", "_", &[("k8s-cluster", "production-us-east-1-primary")]).literal_chars()
+                    > rule("y", "_", &[("service", "payment-gateway")]).literal_chars(),
+                "the cluster name is the longer string — the pre-ranking tie-break",
+            );
+            assert_eq!(
+                resolve_owner_ranked(&rules, &record, &k8s_depths())
+                    .unwrap()
+                    .team_id,
+                "payments",
+            );
+        }
+
+        /// Depth ranks within a set too, from the order the org wrote.
+        #[test]
+        fn test_a_namespace_rule_beats_a_cluster_rule() {
+            let rules = vec![
+                rule("r_cluster", "platform", &[("k8s-cluster", "production")]),
+                rule("r_ns", "search", &[("k8s-namespace", "search")]),
+            ];
+            let record = dims(&[("k8s-cluster", "production"), ("k8s-namespace", "search")]);
+            assert_eq!(
+                resolve_owner_ranked(&rules, &record, &k8s_depths())
+                    .unwrap()
+                    .team_id,
+                "search",
+            );
+        }
+
+        /// Count still comes first. A rule naming cluster AND namespace is a
+        /// narrower claim than one naming a service, however deep `service` is.
+        #[test]
+        fn test_specificity_still_outranks_depth() {
+            let rules = vec![
+                rule(
+                    "r_pair",
+                    "platform",
+                    &[("k8s-cluster", "production"), ("k8s-namespace", "payments")],
+                ),
+                rule("r_svc", "payments", &[("service", "payment-gateway")]),
+            ];
+            let record = dims(&[
+                ("k8s-cluster", "production"),
+                ("k8s-namespace", "payments"),
+                ("service", "payment-gateway"),
+            ]);
+            assert_eq!(
+                resolve_owner_ranked(&rules, &record, &k8s_depths())
+                    .unwrap()
+                    .team_id,
+                "platform",
+            );
+        }
+
+        /// An org that never described its topology still gets the case that
+        /// matters, because `service` is finest by definition rather than by
+        /// configuration.
+        #[test]
+        fn test_service_outranks_without_any_configured_sets() {
+            let rules = vec![
+                rule("r_cluster", "platform", &[("k8s-cluster", "production")]),
+                rule("r_svc", "payments", &[("service", "payment-gateway")]),
+            ];
+            let record = dims(&[
+                ("k8s-cluster", "production"),
+                ("service", "payment-gateway"),
+            ]);
+            assert!(DimensionDepth::default().is_empty());
+            assert_eq!(
+                resolve_owner(&rules, &record).unwrap().team_id,
+                "payments",
+                "the unranked entry point has to agree, or the two disagree by default",
+            );
+        }
+
+        /// Within one depth, exactness decides — the rule the depth term was
+        /// inserted ahead of, still intact.
+        #[test]
+        fn test_exact_still_beats_wildcard_at_the_same_depth() {
+            let rules = vec![
+                rule("r_exact", "payments", &[("service", "payment-gateway")]),
+                rule("r_glob", "platform", &[("service", "payment-*")]),
+            ];
+            let record = dims(&[("service", "payment-gateway")]);
+            assert_eq!(
+                resolve_owner_ranked(&rules, &record, &k8s_depths())
+                    .unwrap()
+                    .team_id,
+                "payments",
+            );
+        }
+
+        /// A dimension no set mentions cannot outrank one that is part of the
+        /// topology somebody described.
+        #[test]
+        fn test_an_undescribed_dimension_ranks_coarsest() {
+            let depths = k8s_depths();
+            assert_eq!(depths.rank_of("unheard-of"), 0);
+            assert!(depths.rank_of("k8s-cluster") > depths.rank_of("unheard-of"));
+            assert!(depths.rank_of("k8s-namespace") > depths.rank_of("k8s-cluster"));
+            assert!(depths.rank_of("service") > depths.rank_of("k8s-namespace"));
+        }
+
+        /// Sets are ranked independently. An ECS task and a Kubernetes
+        /// namespace never appear on one record, and giving them a shared scale
+        /// would invent an ordering between two things that never meet.
+        #[test]
+        fn test_sets_are_ranked_independently() {
+            let depths = DimensionDepth::from_sets([
+                ["ecs-task".to_string()].as_slice(),
+                ["k8s-cluster".to_string(), "k8s-namespace".to_string()].as_slice(),
+            ]);
+            assert_eq!(depths.rank_of("ecs-task"), depths.rank_of("k8s-cluster"));
+            assert!(depths.rank_of("k8s-namespace") > depths.rank_of("ecs-task"));
+        }
     }
 
     /// A service in the same cluster but a different namespace falls back to
@@ -886,6 +1158,7 @@ mod tests {
                 rules: &rules,
                 dimensions: Some(dimensions),
                 default_team_id: defaulted.then_some("catch-all"),
+                depths: None,
             });
             let label = format!("explicit={explicit} owned={owned} default={defaulted}");
             assert_eq!(routed.decision, want, "{label}");
@@ -1010,6 +1283,7 @@ mod tests {
             rules: &rules,
             dimensions: Some(&matching),
             default_team_id: Some("catch-all"),
+            depths: None,
         });
         assert_eq!(both.team_id(), Some("chosen"));
 

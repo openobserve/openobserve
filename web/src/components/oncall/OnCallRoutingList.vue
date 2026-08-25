@@ -395,6 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aliases="aliases"
       :catalogue="catalogue"
       :services="services"
+      :sets="sets"
       :signals="openSignals"
       :ladder="ladder"
       :saving="saving"
@@ -413,6 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 
 import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
+import type { IdentitySet } from "@/services/service_streams";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -482,6 +484,8 @@ const props = withDefaults(
     catalogue?: DimensionCatalogue;
     /** Services discovery has seen, claimable whole. */
     services?: DiscoveredService[];
+    /** The org's identity sets — the ordered hierarchy the scope picker uses. */
+    sets?: IdentitySet[];
     teamId?: string;
     teamName?: string;
     teams?: { id: string; name: string }[];
@@ -500,6 +504,7 @@ const props = withDefaults(
     aliases: () => [],
     catalogue: () => ({ present: [], values: {} }),
     services: () => [],
+    sets: () => [],
     teamId: "",
     teamName: "",
     teams: () => [],
