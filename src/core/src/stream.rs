@@ -63,9 +63,7 @@ async fn cleanup_related_resources(
         .iter()
         .filter_map(|alert| alert.id)
         .collect::<Vec<_>>();
-    let client = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
+    let client = infra::db::get_orm_client_rw().await;
     crate::alerts::alert::delete_many_for_cascade(client, &org_id, &alert_ids)
         .await
         .map_err(alert_cleanup_error)?;

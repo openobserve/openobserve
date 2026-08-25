@@ -86,7 +86,7 @@ jobs:
       id-token: write
       contents: read
       packages: write
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-16
     steps:
       - name: Remove unused tools
         run: |

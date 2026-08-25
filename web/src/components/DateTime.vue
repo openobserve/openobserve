@@ -580,6 +580,10 @@ export default defineComponent({
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
+        // NOTE: the emit below is already stamped programmatic — `setAbsoluteTime`
+        // above calls `markProgrammaticDateChange()`, and its nextTick reset has
+        // not run yet. Consumers must therefore treat `userChangedValue === false`
+        // as "do not fetch": the parent's own `onMounted` covers the first load.
         saveDate(initialType);
       } catch (e) {
         console.log(e);

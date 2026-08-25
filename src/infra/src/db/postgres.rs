@@ -36,9 +36,9 @@ use tokio::sync::{OnceCell, mpsc};
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, false));
-pub static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true, false));
-pub static CLIENT_DDL: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, true));
+pub(crate) static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true, false));
+pub(crate) static CLIENT_RW: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, false));
+pub(crate) static CLIENT_DDL: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 /// The three pools come from separately configured DSNs whose roles can have
@@ -47,7 +47,7 @@ static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 pub async fn verify_schema_consistency() -> Result<()> {
     let mut schemas = Vec::new();
     for (label, pool) in [
-        ("read-write", &*CLIENT),
+        ("read-write", &*CLIENT_RW),
         ("read-only", &*CLIENT_RO),
         ("ddl", &*CLIENT_DDL),
     ] {
@@ -99,7 +99,7 @@ fn connect(readonly: bool, ddl: bool) -> Pool<Postgres> {
 }
 
 async fn cache_indices() -> HashSet<DBIndex> {
-    let client = CLIENT.clone();
+    let client = CLIENT_RW.clone();
     DB_QUERY_NUMS
         .with_label_values(&["select", "pg_indexes"])
         .inc();
@@ -188,7 +188,7 @@ impl super::Db for PostgresDb {
         start_dt: Option<i64>,
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
         DB_QUERY_NUMS.with_label_values(&["insert", "meta"]).inc();
@@ -260,7 +260,7 @@ impl super::Db for PostgresDb {
         update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         let lock_key = format!("get_for_update_{key}");
         let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
@@ -451,7 +451,7 @@ impl super::Db for PostgresDb {
         }
 
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS.with_label_values(&["delete", "meta"]).inc();
 
         if with_prefix {

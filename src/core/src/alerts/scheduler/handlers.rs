@@ -38,9 +38,8 @@ use config::{
 };
 use cron::Schedule;
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     scheduler::get_scheduler_max_retries,
-    table::get_lock,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
@@ -136,7 +135,7 @@ async fn persist_alert_run_state(
                 .unwrap_or(false)
             });
         if transition_changed || stale_to_fresh {
-            let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let db = get_orm_client_ro().await;
             nudge_composite_parents(
                 db,
                 &alert.org_id,
@@ -224,7 +223,7 @@ async fn persist_alert_run_state(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let db = get_orm_client_ro().await;
         nudge_composite_parents(
             db,
             &alert.org_id,
@@ -537,9 +536,7 @@ async fn confirm_dedup_reservations(fingerprints: &[String], delivered: bool) {
     }
     #[cfg(feature = "enterprise")]
     {
-        let db = infra::db::ORM_CLIENT
-            .get_or_init(infra::db::connect_to_orm)
-            .await;
+        let db = infra::db::get_orm_client_rw().await;
         if let Err(e) =
             crate::alerts::deduplication::confirm_notification_sent(db, fingerprints).await
         {
@@ -681,7 +678,7 @@ async fn handle_composite_alert_trigger(
     // transaction used for state fencing, a missing/stale definition is
     // completed safely through the epoch-fenced scheduler seam. This path is
     // also the required lifecycle behavior after deletion.
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let definition =
         infra::table::alert_composites::get_by_id(db, &trigger.org, &trigger.module_key).await?;
     let Some(definition) = definition else {
@@ -816,8 +813,6 @@ async fn handle_composite_alert_trigger(
     use sea_orm::{
         ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
     };
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
     let transaction = db.begin().await?;
     let lease_deadline = now + config::get_config().limit.alert_schedule_timeout * 1_000_000;
     if !infra::scheduler::renew_claim_in_transaction(
@@ -843,8 +838,6 @@ async fn handle_composite_alert_trigger(
             || current.evaluation_generation != definition.definition.evaluation_generation
     }) {
         transaction.rollback().await?;
-        // released before complete_claim, which takes this lock itself on sqlite
-        drop(_lock);
         trigger.status = db::scheduler::TriggerStatus::Waiting;
         trigger.next_run_at = now + composite_debounce_secs() * 1_000_000;
         let _ = infra::scheduler::complete_claim(trigger).await?;
@@ -852,8 +845,6 @@ async fn handle_composite_alert_trigger(
     }
     infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
     transaction.commit().await?;
-    // released before delivery and complete_claim below, which take this lock themselves
-    drop(_lock);
 
     let mut delivery_retry_at = None;
     if evaluated.result {
@@ -1144,9 +1135,7 @@ async fn handle_anomaly_detection_triggers(
         return Ok(());
     }
 
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let config = anomaly_config_table::get_by_id(db, &trigger.org, &anomaly_id)
         .await
@@ -1284,8 +1273,6 @@ async fn handle_anomaly_detection_triggers(
             let mut active = config.into_active_model();
             active.status = Set(AnomalyStatus::Active.to_i32());
             active.updated_at = Set(run_end_us);
-            // make sure only one client is writing to the database(only for sqlite)
-            let _lock = get_lock().await;
             if let Err(e) = active.update(db).await {
                 log::warn!(
                     "[anomaly_detection] failed to reset status to Active for {anomaly_id}: {e}"
@@ -1444,7 +1431,7 @@ async fn handle_alert_triggers(
 
     // here it can be alert id or alert name
     let alert = if let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) {
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let client = get_orm_client_rw().await;
         match db::alerts::alert::get_by_id(client, &trigger.org, alert_id).await {
             Ok(Some((_, alert))) => alert,
             Ok(None) => {
@@ -2264,7 +2251,8 @@ async fn handle_alert_triggers(
 
         // Apply deduplication if enabled (enterprise-only feature)
         #[cfg(feature = "enterprise")]
-        let data = if let Some(db) = ORM_CLIENT.get() {
+        let data = {
+            let db = get_orm_client_rw().await;
             match crate::alerts::deduplication::apply_deduplication(
                 db,
                 &alert,
@@ -2331,11 +2319,6 @@ async fn handle_alert_triggers(
                     data
                 }
             }
-        } else {
-            log::warn!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Could not connect to ORM for deduplication, continuing without it"
-            );
-            data
         };
 
         // [ENTERPRISE] Collect alert events for batched incident creation
@@ -2924,7 +2907,7 @@ async fn handle_report_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     let (_, max_retries) = get_scheduler_max_retries();
@@ -5304,9 +5287,7 @@ async fn handle_slo_triggers(mut trigger: db::scheduler::Trigger) -> Result<(), 
 
     let slo_id = trigger.module_key.clone();
 
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let slo = infra::table::slos::get(db, &trigger.org, &slo_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -5366,9 +5347,7 @@ async fn handle_slo_backfill_triggers(
 
     let slo_id = trigger.module_key.clone();
 
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let Some(slo) = infra::table::slos::get(db, &trigger.org, &slo_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?

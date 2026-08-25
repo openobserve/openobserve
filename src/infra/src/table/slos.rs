@@ -32,10 +32,7 @@ use sea_orm::{
     PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait, sea_query::Expr,
 };
 
-use super::{
-    entity::{slo_status, slos},
-    get_lock,
-};
+use super::entity::{slo_status, slos};
 use crate::errors::{DbError, Error};
 
 /// What an update did to the writing epoch.
@@ -141,9 +138,6 @@ pub async fn create(
     now: i64,
     editor: Option<&str>,
 ) -> Result<(), Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let txn = db.begin().await?;
     let mut model = to_model(slo, now)?;
     model.created_at = Set(now);
@@ -174,9 +168,6 @@ pub async fn update(
     now: i64,
     editor: Option<&str>,
 ) -> Result<GenerationEffect, Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let txn = db.begin().await?;
 
     let Some(existing) = slos::Entity::find_by_id(slo.id.clone())
@@ -294,9 +285,6 @@ pub async fn bump_generation(
     id: &str,
     now: i64,
 ) -> Result<Option<(i32, i32)>, Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let txn = db.begin().await?;
     let Some(existing) = slos::Entity::find_by_id(id.to_string())
         .filter(slos::Column::Org.eq(org))
@@ -341,9 +329,6 @@ pub async fn bump_generation(
 /// does not instantly free the storage its slices occupy, and pretending
 /// otherwise would let an org delete-and-recreate its way past the cap.
 pub async fn delete(db: &DatabaseConnection, org: &str, id: &str) -> Result<bool, Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let txn = db.begin().await?;
     let Some(model) = slos::Entity::find_by_id(id.to_string())
         .filter(slos::Column::Org.eq(org))
@@ -382,9 +367,6 @@ pub(crate) async fn ids_in_org(db: &DatabaseConnection, org: &str) -> Result<Vec
 /// modules, which resolve their org through `ids_in_org` and therefore run
 /// BEFORE this (`org_cleanup::step_delete_db_resources`).
 pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     slos::Entity::delete_many()
         .filter(slos::Column::Org.eq(org))
         .exec(db)
@@ -407,9 +389,6 @@ pub async fn set_enabled(
     else {
         return Ok(false);
     };
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let mut active = model.into_active_model();
     active.enabled = Set(enabled);
@@ -444,9 +423,6 @@ pub async fn move_to_folder(
     if ids.is_empty() {
         return Ok(0);
     }
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let res = slos::Entity::update_many()
         .col_expr(slos::Column::FolderId, Expr::value(dst_folder_id))
