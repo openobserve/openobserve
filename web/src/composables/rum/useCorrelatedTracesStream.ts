@@ -88,9 +88,12 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
   ): Promise<Record<string, string>> => {
     if (!streams.length || !traceIds.length) return {};
     const idList = traceIds.map((id) => `'${id}'`).join(",");
+    // DISTINCT is load-bearing: the probe scans span rows, and one trace's
+    // spans would otherwise consume the whole limit, leaving sibling ids
+    // unresolved (observed live).
     const sqls = streams.map(
       (stream) =>
-        `select trace_id from "${stream}" where trace_id IN (${idList}) limit ${traceIds.length}`,
+        `select distinct trace_id from "${stream}" where trace_id IN (${idList}) limit ${traceIds.length}`,
     );
 
     // hits[streamIndex] = set of ids found in that stream
@@ -116,17 +119,34 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
             searchType: "UI",
           },
           {
-            data: (_payload: any, response: any) => {
-              const results = response?.content?.results;
-              const queryIndex = results?.query_index;
-              const hits = results?.hits;
-              if (typeof queryIndex !== "number" || !Array.isArray(hits)) return;
-              const bucket = hitsByStreamIndex[queryIndex];
-              if (!bucket) return;
-              for (const hit of hits) {
-                if (typeof hit?.trace_id === "string") bucket.add(hit.trace_id);
-              }
-            },
+            // Wire shape (verified live): each sub-query emits a
+            // `search_response_metadata` event whose results carry
+            // `query_index`, followed by a separate `search_response_hits`
+            // event that has ONLY `{hits}`. Events arrive strictly paired in
+            // SSE order, so the last metadata's index attributes the hits
+            // that follow it.
+            data: (() => {
+              let lastQueryIndex: number | null = null;
+              const harvest = (hits: unknown, queryIndex: number | null) => {
+                if (queryIndex === null || !Array.isArray(hits)) return;
+                const bucket = hitsByStreamIndex[queryIndex];
+                if (!bucket) return;
+                for (const hit of hits) {
+                  if (typeof hit?.trace_id === "string") bucket.add(hit.trace_id);
+                }
+              };
+              return (_payload: any, response: any) => {
+                const results = response?.content?.results;
+                const ownIndex =
+                  typeof results?.query_index === "number" ? results.query_index : null;
+                if (response?.type === "search_response_metadata") {
+                  lastQueryIndex = ownIndex;
+                  harvest(results?.hits, ownIndex);
+                } else {
+                  harvest(results?.hits, ownIndex ?? lastQueryIndex);
+                }
+              };
+            })(),
             error: () => resolve(), // a failed sub-query is a miss, not an error
             complete: () => resolve(),
             reset: () => {},

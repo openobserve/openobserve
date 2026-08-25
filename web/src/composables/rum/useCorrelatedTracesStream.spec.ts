@@ -78,29 +78,39 @@ function idsOfSql(sql: string): string[] {
 }
 
 /**
- * Configure the batched client: for each sub-query, emit hit chunks (tagged
- * with query_index) for ids present in `hitsByStream`, then complete. Chunks
- * are emitted in REVERSE sub-query order to simulate nondeterministic arrival.
+ * Configure the batched client modeling the REAL wire shape (verified live):
+ * each sub-query emits a `search_response_metadata` event whose results carry
+ * `query_index`, followed by a separate `search_response_hits` event that has
+ * ONLY `{hits}` — no query_index. Pairs are emitted in REVERSE sub-query order
+ * to simulate nondeterministic arrival, and hits duplicate per span row (the
+ * probe scans span rows, not distinct traces).
  */
 function mockBatch(hitsByStream: Record<string, string[]>) {
   mockFetchQueryDataWithHttpStream.mockImplementation((args: any, handlers: any) => {
     const sqls: string[] = args.queryReq.query.sql;
-    const chunks: any[] = [];
+    const pairs: any[][] = [];
     sqls.forEach((sql, queryIndex) => {
       const stream = streamOfSql(sql);
       const wanted = idsOfSql(sql);
       const present = (hitsByStream[stream] ?? []).filter((id) => wanted.includes(id));
-      if (present.length) {
-        chunks.push({
+      // every sub-query emits its metadata event, hits or not (as on the wire)
+      pairs.push([
+        {
+          type: "search_response_metadata",
+          content: { results: { hits: [], total: present.length, query_index: queryIndex } },
+        },
+        {
           type: "search_response_hits",
           content: {
-            results: { hits: present.map((id) => ({ trace_id: id })), query_index: queryIndex },
+            // duplicate rows: real traces have many spans per id
+            results: { hits: present.flatMap((id) => [{ trace_id: id }, { trace_id: id }]) },
           },
-        });
-      }
+        },
+      ]);
     });
-    // reversed: later sub-queries "arrive" first
-    for (const chunk of chunks.reverse()) handlers.data(null, chunk);
+    for (const pair of pairs.reverse()) {
+      for (const chunk of pair) handlers.data(null, chunk);
+    }
     handlers.complete();
     return Promise.resolve();
   });
@@ -202,6 +212,9 @@ describe("useCorrelatedTracesStream", () => {
     const sql = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.query.sql[0];
     expect(sql).toContain(`'${T1}'`);
     expect(sql).not.toContain(`'${T1.slice(1)}'`);
+    // probes must count distinct traces, not span rows — a single trace's
+    // spans would otherwise consume the whole limit (found live on pentest)
+    expect(sql.toLowerCase()).toContain("select distinct trace_id");
   });
 
   it("⑧ two concurrent resolves of one id share a single probe pass", async () => {
