@@ -88,6 +88,7 @@
                 {{ awayLabel(row.away) }}
               </OTag>
               <OButton
+                v-if="canConfigure"
                 variant="ghost"
                 size="icon-xs"
                 icon-left="close"
@@ -139,6 +140,7 @@
 
       <template #cell-actions="{ row }">
         <OButton
+          v-if="canConfigure"
           variant="ghost"
           size="icon-sm"
           icon-left="event"
@@ -294,6 +296,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OnCallChannelChips from "@/components/oncall/OnCallChannelChips.vue";
+import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import type {
@@ -343,6 +346,7 @@ const props = withDefaults(
 const emit = defineEmits<{ changed: []; "open-schedule": []; "test-page": [] }>();
 
 const { t } = useI18nTyped();
+const { noteConfigurationDenied } = useOnCallPermissions();
 
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -455,9 +459,13 @@ async function saveAbsence() {
     // just changed too.
     emit("changed");
   } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.awaySaveFailed"),
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.awaySaveFailed"),
     });
   } finally {
     awaySaving.value = false;
@@ -474,9 +482,13 @@ async function removeAbsence(absence: Unavailability) {
     await Promise.all([fetchAbsences(), fetchSegments()]);
     emit("changed");
   } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.awayRemoveFailed"),
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.awayRemoveFailed"),
     });
   }
 }

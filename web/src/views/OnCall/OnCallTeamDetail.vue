@@ -34,7 +34,7 @@
            it to: on a team with nobody in it this would open on an empty
            picker, which is a dead end rather than an action. -->
       <OButton
-        v-if="members.length"
+        v-if="members.length && canConfigure"
         variant="outline"
         size="sm-action"
         data-test="oncall-team-override-btn"
@@ -250,7 +250,7 @@
               :timezone="team?.timezone ?? 'UTC'"
       :viewer-timezone="store.state.timezone"
               :loading="segmentsLoading"
-              :can-cover="hasMembers !== false"
+              :can-cover="hasMembers !== false && canConfigure"
               @fill-gap="onFillGap"
               @add="openScheduleEditor({ mode: 'new' })"
               @edit="openScheduleEditor({ mode: 'edit', id: $event })"
@@ -875,11 +875,15 @@ async function deleteRotation() {
     toast({ variant: "success", message: t("oncall.laneDeleted", { name: raw(name) }) });
     await onScheduleSaved();
   } catch (err: any) {
+    noteConfigurationDenied(err);
     // The server's own sentence: it refuses a save that would leave two
     // rotations equally in force, and which two is the whole story.
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.laneDeleteFailed"),
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.laneDeleteFailed"),
     });
   }
 }
@@ -1000,7 +1004,11 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
     toast({ variant: "success", message: t("oncall.swapSaved") });
     await refreshCoverage();
   } catch (err: any) {
-    const reason = raw(err?.response?.data?.message) || t("oncall.coverSaveFailed");
+    noteConfigurationDenied(err);
+    const reason =
+      err?.response?.status === 403
+        ? t("oncall.configDenied")
+        : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed");
     // Nothing was written, so the server's own sentence is the whole story.
     if (!firstId) {
       toast({ variant: "error", message: reason });
@@ -1067,13 +1075,17 @@ async function saveCover(value: {
     toast({ variant: "success", message: coverSavedMessage(value) });
     await refreshCoverage();
   } catch (err: any) {
+    noteConfigurationDenied(err);
     // Two of the server's sentences are worth showing verbatim, and both name
     // the thing that is wrong: a 409 says who already covers that window, and
     // a 400 says the team has no such rotation — a cover over a position
     // nothing staffs would page nobody.
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
     });
   } finally {
     coverSaving.value = false;
