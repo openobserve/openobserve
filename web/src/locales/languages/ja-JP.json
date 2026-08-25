@@ -488,12 +488,6 @@
       "description": "実験はデータセットに変更を適用し、すべての行をスコアリングして結果を固定するため、後でベースラインと比較できます。",
       "action": "新しい実験",
       "actionDesc": "データセットを選択し、タスクを記述して、実行するスコアラーを選択してください。"
-    },
-    "noRemoteTasks": {
-      "title": "まだリモートタスクはありません",
-      "description": "リモートタスクは、実験が出力を生成するために呼び出すHTTPサービスです。一度登録して接続を確認すれば、各実験は実行時に使用した正確なバージョンを固定できます。",
-      "action": "タスクを登録",
-      "actionDesc": "OpenObserve をエンドポイントに向けて接続をテストします。"
     }
   },
   "common": {
@@ -3731,11 +3725,11 @@
       "k8sTroubleWebhookQ": "アドミッションウェブフックに関するエラーでインストールが失敗します",
       "linuxAgentFixBody": "インストーラーはエージェントをsystemdサービスとして起動します。何も届かない場合は、実行されていることを確認し、認証または接続エラーがないかログを確認してください：",
       "prepareMariadbTitle": "MariaDB の準備",
-      "prepareMariadbDesc": "監視ユーザーを作成します — SQL クライアントで実行してください。**シェルでは実行しないでください**。",
+      "prepareMariadbDesc": "監視ユーザーを作成します — SQL クライアントで実行してください。**シェルではなく**。",
       "runCollectorMariadbDesc": "コレクターを起動します（ユーザーのパスワードは環境変数で指定）。",
       "mariadbHostLabel": "MariaDB ホスト",
-      "verifyMariadbMetricsDesc": "下のテストを実行するか、ストリームで `mysql_*` メトリクスを確認してください（MariaDB は MySQL レシーバー経由で報告されます）。",
-      "mariadbTagline": "OpenTelemetry Collector で MariaDB メトリクスを収集し、OpenObserve に送信します。",
+      "verifyMariadbMetricsDesc": "下の「テスト」をクリックするか、Streams で `mysql_*` メトリクスを確認してください（MariaDB は MySQL レシーバー経由でレポートします）。",
+      "mariadbTagline": "OpenTelemetry Collector を使用して MariaDB メトリクスを収集し、OpenObserve に送信します。",
       "logsStreamNameLabel": "ログストリーム名",
       "macosAgentFixBody": "インストーラーは2つのlaunchdデーモンを登録します：エージェント自体と統合ログブリッジです。何も届かない場合は、両方がロードされていることを確認し、認証または接続エラーがないかエージェントのログを確認してください：",
       "macosAgentServicesFixTitle": "エージェントサービスを確認",
@@ -4042,44 +4036,44 @@
       "verifyAndroidRumDesc": "エミュレーターまたはデバイスでアプリを実行し、いくつかの画面を移動してからTestを押します — ネイティブAndroidイベントは `_rumdata` ストリームに届きます。",
       "verifyIosRumDesc": "シミュレーターまたはデバイスでアプリを実行し、いくつかの画面を移動してからTestを押します — ネイティブiOSイベントは `_rumdata` ストリームに届きます。",
       "dbmPreparePostgresTitle": "データベースモニタリング · アクセス権の付与（オプション）",
-      "dbmPreparePostgresDesc": "**上記のすべては単独で完結しています** — クエリのタイミングは、ここでの設定なしで、アプリケーションのトレースからデータベースにすでに届いています。これらの最後のステップでは、トレースでは決して見られないもの、つまりデータベース自体だけが記録するデッドロックとブロックされたクエリを追加します。コレクターが他のセッションのクエリを読み取れるように `pg_monitor` を付与してください — SQL クライアントで実行してください。**シェルでは実行しないでください**。",
+      "dbmPreparePostgresDesc": "**上記の操作は単独で完結しています** — クエリのタイミングは、ここでの設定なしに、アプリケーションのトレースからデータベースにすでに届いています。これらの最後の手順では、トレースでは決して確認できないもの（デッドロックとブロックされたクエリ）を追加します。これらはデータベース自体だけが記録します。`pg_monitor` を付与して、コレクターが他のセッションのクエリを読み取れるようにします — SQL クライアントで実行してください。**シェルではなく**。",
       "dbmPrepareMysqlTitle": "データベースモニタリング · デッドロック履歴の保持（オプション）",
       "dbmPrepareMariadbTitle": "データベースモニタリング · デッドロック履歴の保持（オプション）",
-      "dbmPrepareMysqlDesc": "**上記のすべては単独で完結しています** — クエリのタイミングは、ここでの設定なしで、アプリケーションのトレースからデータベースにすでに届いています。これらの最後のステップでは、トレースでは決して見られないもの、つまりデータベース自体だけが記録するデッドロックとブロックされたクエリを追加します。完全なデッドロック履歴を有効にしてください — SQL クライアントで実行してください。**シェルでは実行しないでください**。",
-      "dbmPrepareMariadbDesc": "**上記のすべては単独で完結しています** — クエリのタイミングは、ここでの設定なしで、アプリケーションのトレースからデータベースにすでに届いています。これらの最後のステップでは、トレースでは決して見られないもの、つまりデータベース自体だけが記録するデッドロックとブロックされたクエリを追加します。完全なデッドロック履歴を有効にしてください — SQL クライアントで実行してください。**シェルでは実行しないでください**。",
+      "dbmPrepareMysqlDesc": "**上記の操作は単独で完結しています** — クエリのタイミングは、ここでの設定なしに、アプリケーションのトレースからデータベースにすでに届いています。これらの最後の手順では、トレースでは決して確認できないもの（デッドロックとブロックされたクエリ）を追加します。これらはデータベース自体だけが記録します。完全なデッドロック履歴を有効にします — SQL クライアントで実行してください。**シェルではなく**。",
+      "dbmPrepareMariadbDesc": "**上記の操作は単独で完結しています** — クエリのタイミングは、ここでの設定なしに、アプリケーションのトレースからデータベースにすでに届いています。これらの最後の手順では、トレースでは決して確認できないもの（デッドロックとブロックされたクエリ）を追加します。これらはデータベース自体だけが記録します。完全なデッドロック履歴を有効にします — SQL クライアントで実行してください。**シェルではなく**。",
       "dbmPgLoggingTitle": "データベースモニタリング · Postgres にデッドロックを記録させる（オプション）",
-      "dbmPgLoggingDesc": "デッドロックは、以下の設定がオンの場合にのみ Postgres ログに書き込まれます。つまり、このステップによってデッドロックタブが埋まるようになります。プレフィックス行は正確に一致する必要があります。コレクターはプレフィックスを読み取って関与した関係者を特定するため、プレフィックスが異なると、正常に報告しているにもかかわらず何も見つかりません。",
-      "dbmPgLoggingVerifyTitle": "データベースモニタリング · 設定が反映されたことを確認（オプション）",
-      "dbmPgLoggingVerifyDesc": "再起動後にこれを実行してください。いずれかの値がまだ古い設定を示している場合、Postgres は再起動ではなくリロードされており、コレクターは読み取るものを持ちません。",
+      "dbmPgLoggingDesc": "デッドロックは、下記の設定がオンの場合にのみ、Postgres ログに書き込まれます。したがって、この手順によって Deadlocks タブが埋まるようになります。プレフィックス行は正確に一致する必要があります。コレクターはその行を読み取って関係者を特定します。プレフィックスが異なると、コレクターは正常に報告しながらも何も見つけられません。",
+      "dbmPgLoggingVerifyTitle": "データベースモニタリング · 設定が有効になったことを確認（オプション）",
+      "dbmPgLoggingVerifyDesc": "再起動後にこれを実行してください。いずれかの値が依然として古い設定を示している場合、Postgres は再起動ではなくリロードされたことになり、コレクターは読み取るものがありません。",
       "dbmPgAutoExplainTitle": "データベースモニタリング · 実際に実行されたプランの取得（オプション）",
-      "dbmPgAutoExplainDesc": "このステップがないと、クエリプランは実際のパラメータ値なしで計算された汎用的な見積もりになります — 有用ではありますが、実際に実行されたプランではありません。auto_explain は、しきい値より遅いステートメントに対して Postgres が実際に実行したプランを、実際の行数と実際の所要時間とともに記録します。サンプリングするステートメントに測定可能なエグゼキュータオーバーヘッドが追加されるため、忙しいプライマリに適用する前に設定のコメントを読み、上記のロギングステップと同じ再起動で適用してください。",
+      "dbmPgAutoExplainDesc": "この手順がないと、クエリプランは実際のパラメータ値なしで計算された一般的な見積もりであり、役に立ちますが、実際に実行されたプランではありません。auto_explain は、しきい値より遅いステートメントについて、Postgres が実際に実行したプラン（実際の行数と実際の所要時間を含む）を記録します。サンプリングするステートメントに測定可能なエグゼキューターのオーバーヘッドが追加されるため、設定のコメントを読んでからビジーなプライマリに適用し、上記のロギング手順と同じ再起動で実施してください。",
       "dbmConfigureTitle": "データベースモニタリング · コレクターの設定（オプション）",
-      "dbmConfigurePostgresDesc": "`dbm-config.yaml` を書き込みます — 下のデータベースと Postgres ログファイルのパスを設定してください。デッドロックとブロックされたクエリに加えて、この設定はアクティビティサンプルとサーバーのトップクエリ（推定プラン付き）を有効にします。コレクターはデフォルトで両方 OFF になっているため、このファイルの最上位の `events:` ブロックがそれらを有効にします — それがないと、コレクターは正常に見えて何も送信しません。",
-      "dbmConfigureMysqlDesc": "`dbm-config.yaml` を書き込みます — 下のデータベースと MySQL エラーログのパスを設定してください。デッドロックとブロックされたクエリに加えて、この設定はアクティビティサンプルとサーバーのトップクエリを有効にします。コレクターはデフォルトで両方 OFF になっているため、このファイルの最上位の `events:` ブロックがそれらを有効にします — それがないと、コレクターは正常に見えて何も送信しません。",
-      "dbmConfigureMariadbDesc": "`dbm-config.yaml` を書き込みます — 下のデータベースと MariaDB エラーログのパスを設定してください。MariaDB では、デッドロック、ブロックされたクエリ、アクティビティサンプル、トップクエリをここで取得します。mysql レシーバーは MariaDB のプロトコルを話し、正しく識別します。レシーバー自身が報告するギャップが1つあります — MariaDB はサンプリングされたステートメントテキストを公開しないため、アクティビティ行には SQL なしでセッション名が含まれます。",
+      "dbmConfigurePostgresDesc": "`dbm-config.yaml` を書き込みます — 下でデータベースと Postgres ログファイルのパスを設定してください。デッドロックとブロックされたクエリに加えて、この設定はアクティビティサンプルとサーバートップクエリ（推定プラン付き）を有効にします。コレクターはデフォルトで両方とも OFF です。このファイルのトップレベルの `events:` ブロックがそれらを有効にするものです。それがなければ、コレクターは正常に見えても何も送信しません。",
+      "dbmConfigureMysqlDesc": "`dbm-config.yaml` を書き込みます — 下でデータベースと MySQL エラーログのパスを設定してください。デッドロックとブロックされたクエリに加えて、この設定はアクティビティサンプルとサーバートップクエリを有効にします。コレクターはデフォルトで両方とも OFF です。このファイルのトップレベルの `events:` ブロックがそれらを有効にするものです。それがなければ、コレクターは正常に見えても何も送信しません。",
+      "dbmConfigureMariadbDesc": "`dbm-config.yaml` を書き込みます — 下でデータベースと MariaDB エラーログのパスを設定してください。MariaDB では、デッドロック、ブロックされたクエリ、アクティビティサンプル、トップクエリがここで取得されます。mysql レシーバーは MariaDB のプロトコルを話し、正しく識別します。レシーバー自身が報告するギャップが 1 つあります — MariaDB はサンプリングされたステートメントテキストを公開しないため、アクティビティ行は SQL なしでセッションを識別します。",
       "dbmRunTitle": "データベースモニタリング · コレクターの実行（オプション）",
-      "dbmRunPostgresDesc": "両方の設定を一緒に実行します。ステップ 1 で作成した同じロールとパスワードを使用してください。",
-      "dbmRunMysqlDesc": "両方の設定を一緒に実行します。ステップ 1 で作成した同じユーザーとパスワードを使用してください。",
-      "dbmRunMariadbDesc": "両方の設定を一緒に実行します。ステップ 1 で作成した同じユーザーとパスワードを使用してください。",
-      "dbmVerifyTitle": "データベースモニタリング · デッドロックとブロックされたクエリを表示",
-      "dbmVerifyDesc": "**インフラ → データベース** を開き、下のタブを選択します。イベントは、データベースが報告するとすぐに表示されます。空のタブは、何も発生していないのか、それとも何も収集されていないのかを示します。",
-      "dbmVerifyFullDesc": "**インフラ → データベース** を開き、下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。アクティビティタブには、コレクターの開始から1分以内にサンプリングされたセッションが表示され、推定プランはMySQL 8.0.22以降のクエリの詳細ページに表示されます。テーブルのヘルスは、最初の60秒間のスナップショット後に表示されます。",
+      "dbmRunPostgresDesc": "両方の設定をまとめて実行します。ステップ 1 で作成した同じロールとパスワードを使用してください。",
+      "dbmRunMysqlDesc": "両方の設定をまとめて実行します。ステップ 1 で作成した同じユーザーとパスワードを使用してください。",
+      "dbmRunMariadbDesc": "両方の設定をまとめて実行します。ステップ 1 で作成した同じユーザーとパスワードを使用してください。",
+      "dbmVerifyTitle": "データベースモニタリング · デッドロックとブロックされたクエリを確認",
+      "dbmVerifyDesc": "**インフラ → データベース** を開き、下のタブを選択してください。データベースがイベントを報告するとすぐに表示されます。タブが空の場合は、何も発生していないのか、何も収集されていないのかがわかります。",
+      "dbmVerifyFullDesc": "**インフラ → データベース** を開き、下のタブを選択してください。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。Activity タブは、コレクターの起動から 1 分以内にサンプリングされたセッションで埋まります。推定プランは、MySQL 8.0.22 以降のクエリの詳細ページに表示されます。テーブルのヘルスは、最初の 60 秒のスナップショット後に埋まります。",
       "dbmDatabaseLabel": "データベース",
       "dbmPgLogPathLabel": "Postgres ログファイル",
-      "dbmPgLogPathHelp": "コレクターはこのファイルを読み取れる必要があります。次のコマンドで確認できます: SHOW log_directory;",
+      "dbmPgLogPathHelp": "コレクターがこのファイルを読み取れる必要があります。次のコマンドで確認できます: SHOW log_directory;",
       "dbmMysqlLogPathLabel": "MySQL エラーログ",
       "dbmMariadbLogPathLabel": "MariaDB エラーログ",
-      "dbmMysqlLogPathHelp": "コレクターはこのファイルを読み取れる必要があります。次のコマンドで確認できます: SHOW VARIABLES LIKE 'log_error';",
-      "dbmMariadbLogPathHelp": "コレクターはこのファイルを読み取れる必要があります。次のコマンドで確認できます: SHOW VARIABLES LIKE 'log_error';",
-      "dbmPrepareMssqlTitle": "データベース監視 · アクセス権の付与（オプション）",
-      "dbmPrepareMssqlDesc": "**上記はすべて単独で完結しています** — クエリのタイミングは、アプリケーションのトレースからデータベースにすでに届いており、ここでの設定は不要です。この最後のグループは、トレースでは決して見えないもの、つまりデータベース自体だけが記録するデッドロックとブロックされたクエリを追加します。両方の権限が必要です。1つはコレクターが他のセッションを読み取るためのもので、もう1つはデッドロック履歴を読み取るためのものです。これらはSQLクライアントで実行してください。**シェルではなく**。",
-      "dbmConfigureMssqlDesc": "`dbm-config.yaml` を書き込みます — 接続するデータベースを以下に設定してください。SQL Serverでは、デッドロック、ブロックされたクエリ、アクティビティサンプル、トップクエリ、実行プランがここで取得されます。sqlserverレシーバーはインスタンス全体を読み取るため、アクティビティとトップクエリは上記で指定したデータベースに限定されません。",
-      "dbmRunMssqlDesc": "両方の設定を一緒に実行します。手順1で作成したログインとパスワードを使用してください。",
-      "dbmVerifyBlockingDesc": "**インフラ → データベース → ブロックされたクエリ** を開きます。ロックを待っているセッションは、サンプリングされるとすぐに表示されます。空のタブは、何もブロックされていないのか、それとも何も収集されていないのかを示します。",
-      "dbmVerifyFullNoSampleTextDesc": "**インフラ → データベース** を開き、下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。アクティビティタブには、コレクターの開始から1分以内にサンプリングされたセッションが表示され、トップクエリはクエリの詳細ページにプランを表示します。MariaDBはサンプリングされたステートメントテキストを公開しないため、アクティビティの行にはSQLなしでセッション名が表示されます。テーブルのヘルスは、最初の60秒間のスナップショット後に表示されます。",
-      "dbmVerifyFullPlainPlansDesc": "**インフラ → データベース** を開き、下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。アクティビティタブには、コレクターの開始から1分以内にサンプリングされたセッションが表示され、実行プランはクエリの詳細ページに表示されます。テーブルのヘルスは、最初の60秒間のスナップショット後に表示されます。",
-      "dbmVerifyFullSlowTableHealthDesc": "**インフラ → データベース** を開き、下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。アクティビティタブには、コレクターの開始から1分以内にサンプリングされたセッションが表示され、推定プランはクエリの詳細ページに表示されます。テーブルのヘルスは最大5分かかります。スキーマが大きくなるほどテーブルサイズの読み取りが遅くなるため、他の処理ほど頻繁には実行されません。",
-      "dbmVerifyTableHealthDesc": "**インフラ → データベース** を開き、下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。空のタブは、何も発生していないのか、それとも何も収集されていないのかを示します。テーブルのヘルスは、最初の60秒間のスナップショット後に表示されます。"
+      "dbmMysqlLogPathHelp": "コレクターがこのファイルを読み取れる必要があります。次のコマンドで確認できます: SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "コレクターがこのファイルを読み取れる必要があります。次のコマンドで確認できます: SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "データベースモニタリング · アクセス権限を付与（オプション）",
+      "dbmPrepareMssqlDesc": "**上記はすべて単独で完結しています** — クエリのタイミングは、ここでの設定なしでアプリケーションのトレースからデータベースにすでに到達しています。この最後のグループは、トレースでは決して見えないもの、つまりデッドロックとブロックされたクエリを追加します。これらはデータベース自体だけが記録します。両方の権限が必要です。1つはコレクタが他のセッションを読み取るため、もう1つはデッドロック履歴を読み取るためです。SQLクライアントで実行してください。**シェルではありません**。",
+      "dbmConfigureMssqlDesc": "`dbm-config.yaml` を書き込みます — 接続するデータベースを以下に設定してください。SQL Server はここでデッドロック、ブロックされたクエリ、アクティビティサンプル、トップクエリ、実行プランを取得します。sqlserver レシーバーはインスタンス全体を読み取るため、アクティビティとトップクエリは上記で指定したデータベースに限定されません。",
+      "dbmRunMssqlDesc": "両方の設定を一緒に実行します。ステップ1で作成したログインとパスワードを使用してください。",
+      "dbmVerifyBlockingDesc": "**インフラ → データベース → ブロックされたクエリ** を開きます。ロックを待っているセッションは、サンプリングされるとすぐに表示されます。空のタブは、何もブロックされていないか、何も収集されていないかを示します。",
+      "dbmVerifyFullNoSampleTextDesc": "**インフラ → データベース** を開き、以下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。アクティビティタブは、コレクタの起動から1分以内にサンプリングされたセッションで埋まります。トップクエリは、クエリの詳細ページにプランが表示されます。MariaDB はサンプリングされたステートメントテキストを公開しないため、アクティビティの行はSQLなしでセッション名を示します。テーブルのヘルスは最初の60秒のスナップショット後に埋まります。",
+      "dbmVerifyFullPlainPlansDesc": "**インフラ → データベース** を開き、以下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。アクティビティタブは、コレクタの起動から1分以内にサンプリングされたセッションで埋まります。実行プランはクエリの詳細ページに表示されます。テーブルのヘルスは最初の60秒のスナップショット後に埋まります。",
+      "dbmVerifyFullSlowTableHealthDesc": "**インフラ → データベース** を開き、以下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。アクティビティタブは、コレクタの起動から1分以内にサンプリングされたセッションで埋まります。推定プランはクエリの詳細ページに表示されます。テーブルのヘルスには最大5分かかります。テーブルサイズの読み取りはスキーマが大きくなるにつれて遅くなるため、他の処理よりも頻度が低くなります。",
+      "dbmVerifyTableHealthDesc": "**インフラ → データベース** を開き、以下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。空のタブは、何も発生していないか、何も収集されていないかを示します。テーブルのヘルスは最初の60秒のスナップショット後に埋まります。"
     },
     "instrumentBeforeImportTitle": "クライアントをインポートする前に計測する",
     "instrumentBeforeImportBody": "アプリは実行されるがスパンが届かない場合、計測がクライアントのインポート後に読み込まれた可能性があります。initが最初に実行されるように順序を変更してください:",
@@ -7422,16 +7416,16 @@
           "toast": "ダッシュボードパネルからインポートされたクエリ: \"{sourceLabel}\""
         },
         "library": {
-          "label": "エディターでカスタマイズ",
+          "label": "エディタでカスタマイズ",
           "toast": "アラートライブラリから: {sourceLabel}"
         },
         "dbm": {
           "label": "通知する",
-          "toast": "データベース監視からインポート: \"{sourceLabel}\""
+          "toast": "データベースモニタリングからインポート: \"{sourceLabel}\""
         },
         "dbmlocks": {
           "label": "通知する",
-          "toast": "データベース監視からインポート（サーバー視点）: \"{sourceLabel}\""
+          "toast": "データベースモニタリング（サーバー視点）からインポート: \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7454,11 +7448,11 @@
         "noConstants": "選択したパターンには一致させる特徴的なテキストがありません。",
         "sqlModeFilterDropped": "SQLクエリは引き継がれませんでした — アラートは選択したパターンのみに一致します。",
         "patternsUnusable": "このページのどのパターンにも一致させる特徴的なテキストがないため、アラートは検索のみを使用します。",
-        "dbmRollupLag": "データベースの数値は {minutes} 分ごとに集計されるため、このアラートが発動できる頻度もそれに制限されます。リアルタイムのページではありません。",
-        "dbmFingerprintVersion": "このアラートは、1つのクエリの正確な形状に固定されています。クエリのグループ化の方法が変更されると、アラートが一致しなくなる可能性があるため、再作成する必要があります。",
+        "dbmRollupLag": "データベースの数値は {minutes} 分ごとに集計されるため、このアラートはその頻度でしか発火しません — これはリアルタイムのページではありません。",
+        "dbmFingerprintVersion": "このアラートは、1つのクエリの正確な形状に固定されています。クエリのグループ化方法が変更されると、アラートが一致しなくなり、再作成する必要があります。",
         "dbmNoFingerprint": "このクエリには安定した識別子がないため、アラートは代わりにデータベース全体を監視します。",
         "dbmServerVantage": "これは、データベースサーバー自体がロックについて報告した内容を測定するものであり、アプリケーションが待機した時間ではありません。クエリレイテンシアラートと比較しないでください。",
-        "dbmLockSampling": "ロックアクティビティは一定間隔でサンプリングされるため、2つのサンプルの間に発生して解消された競合は記録されません。アラートが静かでも、ブロッキングがなかった証明にはなりません。",
+        "dbmLockSampling": "ロックアクティビティは間隔でサンプリングされるため、2つのサンプルの間に発生して解消された競合は記録されません。アラートが出ないことは、ブロックがなかったことの証明にはなりません。",
         "dbmNoInstance": "単一のデータベースインスタンスが特定されなかったため、このアラートはこのエンジンのすべてのインスタンスを監視します。"
       }
     },
@@ -7500,17 +7494,17 @@
   },
   "alert_library": {
     "header": "アラートライブラリ",
-    "subtitle": "厳選された、すぐにインストールできるアラート。取り込み済みのデータにマッチします。",
+    "subtitle": "厳選された、すぐにインストールできるアラート。すでに取り込んでいるデータと照合されます。",
     "sectionTab": "ライブラリ",
-    "contribute": "GitHubで貢献",
+    "contribute": "GitHub で貢献",
     "searchPlaceholder": "名前、説明、ストリームで検索",
     "searchLabel": "アラートライブラリを検索",
     "categories": "カテゴリ",
     "searchCategories": "カテゴリを検索",
-    "searchCategoriesAria": "カテゴリフィルターを検索",
+    "searchCategoriesAria": "カテゴリフィルタを検索",
     "noCategoryMatch": "一致するカテゴリがありません。",
-    "selectedCount": "{count} 件選択済み",
-    "facetAria": "{label}、{count} 件のアラート",
+    "selectedCount": "{count}件選択中",
+    "facetAria": "{label}、{count}件のアラート",
     "severity": "重大度",
     "severityAll": "すべて",
     "severityCritical": "重大",
@@ -7520,75 +7514,75 @@
     "statNeedsData": "未取り込み",
     "statAll": "すべて",
     "notIngested": "未取り込み: {stream}",
-    "notIngestedHint": "この組織は {stream} を受信していないため、このアラートは発火しません。それでもインストールすると、データが到着し次第動作を開始します。",
-    "alertCount": "{count} 件のアラート | {count} 件のアラート",
+    "notIngestedHint": "この組織は {stream} を受信していないため、このアラートは決して発火しません。それでもインストールすると、データが到着した時点で動作を開始します。",
+    "alertCount": "{count}件のアラート | {count}件のアラート",
     "noCollectorTitle": "ここに一致するデータはまだありません",
-    "noCollectorDescription": "これらの {count} 件のアラートはいずれも、この組織が受信しているストリームをクエリしていません。{group} テレメトリを OpenObserve に送信すると、ここに表示されます。",
+    "noCollectorDescription": "これらの{count}件のアラートは、この組織が受信しているストリームを照会するものはありません。{group} テレメトリを OpenObserve に送信すると、ここに表示されます。",
     "setupGuide": "取り込みガイド",
     "emptyLibraryTitle": "アラートライブラリは空です",
-    "emptyLibraryDescription": "カタログは読み込まれましたが、アラートが含まれていません。これはフィルターの問題ではなく公開の問題です。しばらくして再試行してください。",
+    "emptyLibraryDescription": "カタログは読み込まれましたが、アラートが含まれていません。これはフィルターではなく公開の問題です。しばらくしてから再試行してください。",
     "noMatchesTitle": "これらのフィルターに一致するアラートはありません",
     "noMatchesDescription": "別のカテゴリ、重大度、または検索語を試してください。",
     "clearFilters": "フィルターをクリア",
     "loadFailedTitle": "アラートライブラリを読み込めませんでした",
     "retry": "再試行",
-    "openDetails": "{title} を開く",
+    "openDetails": "{title}を開く",
     "drawer": {
       "dataAvailable": "データあり",
       "streamNotFound": "ストリームが見つかりません",
       "detects": "検出内容",
       "noDescription": "ライブラリに説明がありません。",
-      "needsDataCallout": "このアラートは {stream} をクエリしますが、この組織はそのストリームを受信していません。今インストールすると、決して発火しないアラートが作成されます。",
+      "needsDataCallout": "このアラートは {stream} をクエリしますが、この組織はそれを受信していません。今インストールすると、決して発動しないアラートが作成されます。",
       "query": "クエリ",
       "stream": "ストリーム",
       "streamType": "ストリームタイプ",
-      "metricCondition": "メトリック条件",
-      "matchCount": "一致行が必要",
+      "metricCondition": "メトリクス条件",
+      "matchCount": "一致行数が必要",
       "previewBlocked": "{stream} はこの組織のストリームではないため、評価するものはありません。",
       "wouldTrigger": "発火する",
       "wouldNotTrigger": "発火しない",
       "loading": "ライブラリからこのアラートを読み込んでいます",
       "loadFailed": "このアラートをライブラリから読み込めませんでした。",
-      "customize": "エディターでカスタマイズ",
-      "customizeHint": "このアラートが事前入力された標準のアラートエディターを開きます。",
-      "customizeFailed": "このアラートをエディターで開けませんでした。",
+      "customize": "エディタでカスタマイズ",
+      "customizeHint": "このアラートが事前に入力された標準のアラートエディタを開きます。",
+      "customizeFailed": "このアラートをエディタで開けませんでした。",
       "install": "インストール",
       "neverIngested": "まだデータがありません",
-      "neverIngestedCallout": "{stream} は存在しますが、データを受信したことがないため、このアラートは発火する対象がありません。",
+      "neverIngestedCallout": "{stream} は存在しますが、一度もデータを受信していないため、このアラートが発火する対象がありません。",
       "lastData": "最終データ {when}",
-      "staleCallout": "{stream} が最後にデータを受信したのは {when} です。このアラートは、取り込みが再開されるまで静かなままです。",
-      "unknownTime": "不明な時刻に"
+      "staleCallout": "{stream} が最後にデータを受信したのは {when} です。取り込みが再開されるまで、このアラートは静かな状態が続きます。",
+      "unknownTime": "不明な時刻"
     },
     "install": {
       "title": "ライブラリからインストール",
-      "subtitle": "アラートの通知先、インストールするアラート、および保存先を選択します。",
-      "stepDestination": "通知先",
+      "subtitle": "アラートの通知先、インストールするアラート、および保存場所を選択してください。",
+      "stepDestination": "宛先",
       "stepAlerts": "アラート",
       "stepFolder": "フォルダー",
       "stepTune": "調整",
       "stepInstall": "インストール",
-      "destinationIntro": "このバッチ内のすべてのアラートは、ここで選択した通知先に通知します。ライブラリファイルには、エクスポート元の組織の通知先が記述されていますが、それらは貴組織には存在しません。",
-      "destinationLabel": "通知先",
+      "destinationIntro": "このバッチのすべてのアラートは、ここで選択した宛先に通知します。ライブラリファイルには、エクスポート元の組織の宛先が指定されていますが、それらはこの組織には存在しません。",
+      "destinationLabel": "宛先",
       "destinationPlaceholder": "宛先を選択",
       "destinationsLoadFailed": "既存の宛先を読み込めませんでした。",
       "retry": "再試行",
-      "destinationsNoneBody": "この組織にはまだアラート宛先がないため、これらのアラートの通知先がありません。宛先ページで作成してから、ここに戻って選択してください。",
+      "destinationsNoneBody": "この組織にはまだアラート宛先がないため、これらのアラートの通知先がありません。「宛先」ページで作成し、ここに戻って選択してください。",
       "openDestinations": "宛先を開く",
       "selectAll": "すべて選択",
       "clear": "クリア",
-      "selectedCount": "{count} / {total} 件選択中",
-      "folderIntro": "インストールされたアラートはここに保存されます。このバッチ専用のフォルダを作成するには、+ボタンから作成してください。",
-      "tuneToggle": "このバッチ内のすべてのアラートにこれらを設定",
-      "tuneHint": "バッチ全体に安全に設定できるのはこの2つだけです。しきい値はアラートごとに設定されます。変更するには、そのアラートを開いて単独でインストールしてください。",
+      "selectedCount": "{count} / {total} 選択中",
+      "folderIntro": "インストールされたアラートはここに保存されます。このバッチに専用のフォルダーが必要な場合は、+ ボタンからフォルダーを作成してください。",
+      "tuneToggle": "このバッチのすべてのアラートに設定",
+      "tuneHint": "バッチ全体に安全に設定できるのはこれら2つだけです。しきい値はアラートごとに維持されます。変更するには、そのアラートを開いて単独でインストールしてください。",
       "frequency": "実行間隔",
       "silence": "サイレンス期間",
       "minutes": "分",
       "summaryTuningNone": "ライブラリのデフォルト",
-      "summaryTuningOverride": "{frequency}分ごと、{silence}分間サイレンス",
-      "run": "アラートを{count}件インストール | アラートを{count}件インストール",
-      "retryFailed": "失敗した{count}件を再試行 | 失敗した{count}件を再試行",
-      "allInstalled": "{count}件のアラートをインストールしました | {count}件のアラートをインストールしました",
-      "someFailed": "{installed}件インストール、{failed}件失敗",
+      "summaryTuningOverride": "{frequency} 分ごと、{silence} 分間サイレンス",
+      "run": "{count} アラートをインストール | {count} アラートをインストール",
+      "retryFailed": "{count} 失敗を再試行 | {count} 失敗を再試行",
+      "allInstalled": "{count} アラートをインストールしました | {count} アラートをインストールしました",
+      "someFailed": "{installed} インストール済み、{failed} 失敗",
       "unknownError": "アラートを作成できませんでした。",
       "unreadableConditions": "このアラートのフィルター条件は、このバージョンで読み取れない形式です。インストールするとフィルターなしのアラートが作成されるため、スキップされました。",
       "back": "戻る",
@@ -7599,8 +7593,8 @@
     "error": {
       "network": "ライブラリに到達できませんでした。ネットワーク接続を確認して、もう一度お試しください。",
       "http": "ライブラリサーバーがエラーを返しました。しばらくしてからもう一度お試しください。",
-      "unparseable": "ライブラリがカタログではないものを返しました。",
-      "unsupported_version": "このライブラリカタログは、このバージョンのOpenObserveで読み取れるものよりも新しいです。参照するにはアップグレードしてください。",
+      "unparseable": "ライブラリがカタログ以外のものを返しました。",
+      "unsupported_version": "このライブラリカタログは、このバージョンのOpenObserveで読み取れるよりも新しいものです。参照するにはアップグレードしてください。",
       "malformed": "ライブラリカタログが不完全または破損しています。"
     }
   },
@@ -9344,7 +9338,7 @@
       "batchSize": "バッチサイズ",
       "querySummary": "クエリ概要",
       "responseStatus": "応答ステータス",
-      "viewQueryTrend": "データベースモニタリングでクエリ傾向を表示"
+      "viewQueryTrend": "データベースモニタリングでクエリトレンドを表示"
     },
     "index": {
       "clickHere": "ここをクリック",
@@ -10197,7 +10191,7 @@
     "copyPattern": "パターンをコピー",
     "copied": "コピーされました！",
     "pricingTiers": "価格階層",
-    "pricingTiersDesc": "最初の層がデフォルトです。使用条件が満たされると、追加の階層が適用されます。",
+    "pricingTiersDesc": "最初のティアがデフォルトです。追加のティアは、使用条件とUTC時間枠が満たされた場合に適用されます。",
     "tierName": "階層名",
     "applyTierWhen": "この階層を次の場合に適用します",
     "quickSetup": "クイックセットアップ:",
@@ -10289,7 +10283,25 @@
     "saveShadowedWarning": "保存しましたが、このエントリは同じパターンで優先度が高い「{winner}」に隠されています。他のエントリが削除されるか無効にならない限り、このエントリはコスト計算には使用されません。",
     "modelPricingSaved": "モデル価格を節約しました",
     "errSave": "保存できませんでした",
-    "errLoadModel": "モデルを読み込めませんでした"
+    "errLoadModel": "モデルを読み込めませんでした",
+    "tierDefaultName": "デフォルト",
+    "timeWindows": "アクティブ時間 (UTC)",
+    "timeWindowsDesc": "ピーク時とオフピーク時の料金を請求するプロバイダーのために、このティアを定期的なUTC時間に制限します。",
+    "timeWindowFrom": "開始",
+    "timeWindowTo": "終了",
+    "addTimeWindow": "時間枠を追加",
+    "removeTimeWindow": "時間枠を削除",
+    "addUsageCondition": "使用条件を追加",
+    "removeUsageCondition": "使用条件を削除",
+    "timeWindowInvalid": "ティア \"{name}\": 時刻をHH:MM（24時間UTC）で入力してください。",
+    "timeWindowSameBounds": "ティア \"{name}\": 開始と終了は異なる必要があります。ティアを常にアクティブにするには、時間枠を削除してください。",
+    "timeWindowWrapsHint": "UTCの真夜中をまたぎます。",
+    "tierNeedsRestriction": "ティア \"{name}\" には使用条件と時間枠がないため、到達することはありません。追加するか、ティアを削除してください。",
+    "timeBasedChip": "時間指定",
+    "tierAlwaysActive": "常にアクティブ（デフォルト）",
+    "testAtTimeLabel": "UTC時刻でテスト",
+    "testAtTimeHint": "空のままにすると現在の時刻が使用されます。ピーク/オフピークのティアはこの時刻に基づいて解決されます。",
+    "localTimeHint": "お使いのタイムゾーン: {range}"
   },
   "aiObservability": {
     "title": "LLM オブザーバビリティ",
@@ -10360,9 +10372,7 @@
       "quality": "クオリティ",
       "evalJobs": "評価ジョブ",
       "scorers": "スコアラー",
-      "scoreConfigs": "スコア構成",
-      "remoteTasks": "リモートタスク",
-      "playground": "プレイグラウンド"
+      "scoreConfigs": "スコア構成"
     },
     "subtitle": {
       "llmInsights": "LLM トラフィック全体のレイテンシー、エラー、トークン、コストを追跡します",
@@ -10376,8 +10386,7 @@
       "quality": "スパン、トレース、セッション評価全体でスコア品質を追跡します",
       "evalJobs": "セッション全体で評価ジョブを実行および監視する",
       "scorers": "LLM アウトプットを採点するスコアラーの作成と管理",
-      "scoreConfigs": "評価に使用するスコアリングルーブリックを設定します",
-      "remoteTasks": "実験が呼び出せるHTTPサービス — 一度登録すれば、バージョン管理され再利用可能"
+      "scoreConfigs": "評価に使用するスコアリングルーブリックを設定します"
     },
     "annotate": {
       "button": "注釈",
@@ -10744,8 +10753,7 @@
           "providerRequired": "プロバイダーを選択",
           "userPromptRequired": "ユーザーメッセージは必須です",
           "trialCountRange": "試行回数は1から100の間でなければなりません",
-          "temperatureRange": "温度は0から2の間でなければなりません",
-          "taskRefRequired": "リモートタスクを選択"
+          "temperatureRange": "温度は0から2の間でなければなりません"
         },
         "previewIncomplete": "実行内容を確認するには、タスクセクションを完了してください。",
         "providerRefresh": "プロバイダーを更新",
@@ -10759,19 +10767,7 @@
         "temperatureDeterministic": "0 — モデルは毎回同じように回答します。",
         "trialsDeterministicWarning": "温度0では、すべての試行が同じ回答を返します。",
         "pageTitle": "新しい実験",
-        "nameLabel": "名前",
-        "taskTypeLabel": "タスクタイプ",
-        "taskTypeInline": "インラインプロンプト",
-        "taskTypeInlineHelp": "ここに書いたプロンプトをプロバイダーに対して実行します。",
-        "taskTypeRemote": "リモートタスク",
-        "taskTypeRemoteHelp": "独自のHTTPサービスを呼び出して出力を生成します。",
-        "remoteTaskLabel": "リモートタスク",
-        "remoteTaskPlaceholder": "登録済みのタスクを選択",
-        "remoteTaskHelp": "このバージョンに固定されています。後で新しいバージョンを公開しても、この実行は変更されません。",
-        "remoteTaskEmpty": "リモートタスクの公開バージョンがまだありません。実験で使用するには、タスクを登録してテスト接続に合格させてください。",
-        "taskTimeoutLabel": "タイムアウト（秒）",
-        "taskConcurrencyLabel": "最大同時実行数",
-        "taskOverrideHelp": "この実行では、タスクの登録値を上書きします。"
+        "nameLabel": "名前"
       },
       "columns": {
         "name": "名前",
@@ -11154,417 +11150,6 @@
         "clamp": "ベースラインは {duration} しか実行されませんでした — 各バージョンの最初の {duration} を比較しています。",
         "labelNoEnv": "{version} — {window} · {count} トレース"
       }
-    },
-    "remoteTasks": {
-      "listTitle": "リモートタスク",
-      "searchPlaceholder": "タスクを検索",
-      "newButton": "タスクを登録",
-      "loadError": "リモートタスクを読み込めませんでした",
-      "columns": {
-        "name": "名前",
-        "version": "バージョン",
-        "endpoint": "エンドポイント",
-        "method": "メソッド",
-        "auth": "認証",
-        "signing": "署名",
-        "status": "ステータス",
-        "referencedBy": "参照元",
-        "updated": "更新日時",
-        "actions": "操作"
-      },
-      "auth": {
-        "none": "なし",
-        "bearer": "ベアラー",
-        "basic": "ベーシック",
-        "apiKeyHeader": "APIキー"
-      },
-      "status": {
-        "published": "公開済み",
-        "draft": "下書き",
-        "failed": "テスト失敗",
-        "retired": "廃止"
-      },
-      "statusHint": {
-        "published": "実験はこのバージョンをピン留めできます。",
-        "draft": "未公開です。テスト接続に成功するまで、実験から参照できません。",
-        "retired": "削除済み。公開済みバージョンは履歴として残りますが、参照できなくなります。"
-      },
-      "signingOn": "HMAC",
-      "referencedBy": "{count} 件の実験 | {count} 件の実験",
-      "edit": "編集",
-      "editSecretLocked": "保存された認証情報を持つタスクはまだ編集できません。プラットフォームがシークレット参照を返さないため、下書きを送り返すことができません。",
-      "delete": {
-        "title": "リモートタスクを削除",
-        "message": "「{name}」を削除しますか？公開済みバージョンは履歴として残りますが参照できなくなるため、ピン留めした実験は開始に失敗します。",
-        "success": "リモートタスクを削除しました",
-        "error": "リモートタスクを削除できませんでした"
-      },
-      "form": {
-        "createTitle": "リモートタスクを登録",
-        "editTitle": "リモートタスクを編集",
-        "backTo": "リモートタスク",
-        "identitySection": "識別情報",
-        "endpointSection": "エンドポイント",
-        "authSection": "認証",
-        "contractSection": "リクエスト仕様",
-        "limitsSection": "制限",
-        "signingSection": "リクエスト署名",
-        "nameLabel": "名前",
-        "namePlaceholder": "例: rag-pipeline-staging",
-        "descriptionLabel": "説明",
-        "descriptionPlaceholder": "このサービスの機能と所有者",
-        "methodLabel": "メソッド",
-        "endpointLabel": "エンドポイントURL",
-        "endpointPlaceholder": "https://tasks.example.com/run",
-        "endpointHelp": "資格情報やフラグメントを含まない公開ホスト上の https URL。",
-        "authTypeLabel": "認証タイプ",
-        "tokenLabel": "トークン",
-        "tokenPlaceholder": "一度貼り付け、暗号化して保存されます",
-        "usernameLabel": "ユーザー名",
-        "passwordLabel": "パスワード",
-        "headerNameLabel": "ヘッダー名",
-        "headerNamePlaceholder": "x-api-key",
-        "headersLabel": "カスタムヘッダー",
-        "headerKeyPlaceholder": "x-team",
-        "headerValuePlaceholder": "検索",
-        "addHeader": "ヘッダーを追加",
-        "removeHeader": "ヘッダーを削除",
-        "templateLabel": "ボディテンプレート",
-        "templateHelp": "各行に対してJSONとしてレンダリングされます。以下のプレースホルダーのみ認識され、それ以外は保存時に拒否されます。",
-        "templateVariables": "プレースホルダー",
-        "insertPlaceholder": "{name} を挿入",
-        "responsePathLabel": "出力パス",
-        "responsePathHelp": "サービスのJSONレスポンスから生成された出力を読み取る場所です。ルート、ドット区切りのフィールド、引用符付きのブラケットステップ、数値インデックス。",
-        "timeoutLabel": "タイムアウト（秒）",
-        "attemptsLabel": "最大試行回数",
-        "concurrencyLabel": "最大同時実行数",
-        "limitsHelp": "実験ごとに上書き可能です。",
-        "signingToggle": "すべてのリクエストに署名",
-        "signingKeyLabel": "署名キー",
-        "signingKeyOnce": "接続をテストする前に、これをサービスにコピーしてください。サービスは以下を受け取ります:",
-        "regenerateKey": "新しいキーを生成",
-        "submit": "接続テストと登録",
-        "submitRetry": "再テストと公開",
-        "submitEdit": "接続テストと公開",
-        "saveDraft": "下書きとして保存",
-        "saveDraftBlocked": "資格情報を持つタスクは下書きとして保存できません。後で下書きを開き直すことができないためです。代わりに接続テストで登録してください。",
-        "publishedSuccess": "バージョン {version} として公開されました",
-        "republishedSuccess": "説明が更新されました。バージョン {version} は変更されていません。",
-        "draftSuccess": "下書きが保存されました。公開するには接続をテストしてください。",
-        "draftError": "下書きを保存できませんでした",
-        "publishFailed": "接続テストに失敗したため、何も公開されませんでした。下書きは保存されています。",
-        "createError": "リモートタスクを登録できませんでした",
-        "validation": {
-          "nameRequired": "名前は必須です",
-          "endpointRequired": "エンドポイントURLは必須です",
-          "endpointHttps": "エンドポイントはhttps URLである必要があります",
-          "tokenRequired": "トークンは必須です",
-          "usernameRequired": "ユーザー名は必須です",
-          "passwordRequired": "パスワードは必須です",
-          "headerNameRequired": "ヘッダー名は必須です",
-          "headerKeyRequired": "ヘッダー名は必須です",
-          "headerValueRequired": "ヘッダー値は必須です",
-          "headerReserved": "このヘッダー名はプラットフォームによって設定されているため、上書きできません",
-          "responsePathRequired": "出力パスは必須です",
-          "responsePathRoot": "出力パスはドル記号で始まる必要があります",
-          "timeoutRange": "タイムアウトは1秒から600秒の間である必要があります",
-          "attemptsRange": "最大試行回数は1から3の間である必要があります",
-          "concurrencyRange": "最大同時実行数は1から32の間である必要があります",
-          "signingKeyRequired": "署名キーを生成できませんでした。もう一度お試しください。"
-        }
-      },
-      "generatedSigning": {
-        "title": "署名キーをコピー",
-        "body": "このキーが表示されるのは一度だけです。サービスが署名ヘッダーを検証するために必要です。",
-        "keyIdLabel": "キーID",
-        "keyLabel": "キー",
-        "copy": "キーをコピー",
-        "copied": "コピーしました",
-        "done": "保存しました"
-      },
-      "testPanel": {
-        "title": "接続テスト",
-        "sourceLabel": "サンプル入力",
-        "sourceDataset": "データセットから",
-        "sourceManual": "手動",
-        "datasetLabel": "データセット",
-        "datasetPlaceholder": "データセットを選択",
-        "datasetEmpty": "このデータセットにはサンプリングする項目がありません。",
-        "datasetError": "データセットを読み込めませんでした",
-        "inputLabel": "入力",
-        "inputPlaceholder": "テキスト、またはJSON値",
-        "metadataLabel": "メタデータ",
-        "metadataPlaceholder": "JSONオブジェクト",
-        "run": "接続テスト",
-        "running": "エンドポイントを呼び出しています…",
-        "passed": "接続を確認しました",
-        "failed": "接続に失敗しました",
-        "statusCode": "ステータス",
-        "latency": "レイテンシ",
-        "output": "抽出された出力",
-        "rawRequest": "送信されたリクエスト",
-        "rawResponse": "受信したレスポンス",
-        "idle": "テストを実行すると、リクエストとレスポンスの両方がここに表示されます。",
-        "disabledHint": "最初に名前とエンドポイントを入力してください。"
-      },
-      "detail": {
-        "backTo": "リモートタスク",
-        "loadError": "リモートタスクを読み込めませんでした",
-        "tabs": {
-          "overview": "概要",
-          "versions": "バージョン",
-          "signing": "署名"
-        },
-        "taskRefLabel": "リファレンス",
-        "taskRefHint": "実験ではこの正確な文字列をピン留めします。",
-        "taskRefNone": "まだピン留めするものはありません。先にバージョンを公開してください。",
-        "copyRef": "リファレンスをコピー",
-        "copied": "コピーしました",
-        "configTitle": "設定",
-        "headersTitle": "カスタムヘッダー",
-        "headersNone": "カスタムヘッダーはありません。",
-        "headerSecret": "シークレット",
-        "templateTitle": "ボディテンプレート",
-        "templateDefault": "デフォルトのボディを使用しています。",
-        "verificationError": "前回の接続テストは失敗しました",
-        "fields": {
-          "endpoint": "エンドポイント",
-          "method": "メソッド",
-          "auth": "認証",
-          "contentType": "コンテンツタイプ",
-          "responsePath": "出力パス",
-          "timeout": "タイムアウト",
-          "attempts": "最大試行回数",
-          "concurrency": "最大同時実行数",
-          "signing": "署名",
-          "verifiedAt": "検証済み",
-          "createdAt": "作成日時"
-        },
-        "versionsColumns": {
-          "version": "バージョン",
-          "status": "ステータス",
-          "reference": "参照",
-          "endpoint": "エンドポイント",
-          "verifiedAt": "検証済み"
-        },
-        "discardDraft": "下書きを破棄",
-        "discardDraftTitle": "下書きを破棄",
-        "discardDraftMessage": "未公開の下書きを破棄しますか？公開済みバージョンは変更されません。",
-        "discardDraftSuccess": "下書きを破棄しました",
-        "discardDraftError": "下書きを破棄できませんでした"
-      },
-      "testRun": {
-        "title": "テスト実行",
-        "hint": "登録されたコントラクトを使用して、最新の公開バージョンを最大10個のサンプルに対して実行します。記録はされません：実験、実行記録、履歴も一切残りません。",
-        "samplesLabel": "サンプル",
-        "addSample": "サンプルを追加",
-        "removeSample": "サンプルを削除",
-        "samplePlaceholder": "テキスト、またはJSON値",
-        "run": "サンプルを実行",
-        "running": "実行中…",
-        "error": "テスト実行が失敗しました",
-        "needsPublished": "サンプルを実行する前に、バージョンを公開してください。",
-        "columns": {
-          "row": "サンプル",
-          "status": "ステータス",
-          "output": "出力",
-          "latency": "レイテンシ",
-          "attempts": "試行回数"
-        },
-        "attemptsValue": "{count} / {max}",
-        "resultsTitle": "結果"
-      },
-      "signingPanel": {
-        "title": "署名キー",
-        "hint": "ローテーションは4段階の引き継ぎです：候補キーを作成し、サービスがそれを受け入れることを確認し、アクティベートし、その後古いキーを失効させます。",
-        "disabled": "このタスクではリクエスト署名がオフになっています。署名を有効にした新しいバージョンを公開してオンにしてください。",
-        "loadError": "署名ステータスを読み込めませんでした",
-        "stateCurrent": "現在",
-        "stateCandidate": "候補",
-        "stateRetired": "退役",
-        "keyIdLabel": "キーID",
-        "noKeyId": "キーIDなし",
-        "createdAt": "作成日時",
-        "lastVerifiedAt": "最終検証日時",
-        "graceExpiresAt": "猶予期間終了",
-        "neverVerified": "未検証",
-        "rotate": "候補を作成",
-        "newKeyIdLabel": "新しいキーID",
-        "newKeyIdPlaceholder": "k2",
-        "rotateSuccess": "候補キーが作成されました。今すぐコピーして、テストしてください。",
-        "rotateError": "候補キーを作成できませんでした",
-        "test": "候補をテスト",
-        "testPassed": "候補は受け入れられました。アクティベートできます。",
-        "testFailed": "サービスが候補を拒否したため、アクティベートされませんでした。",
-        "testError": "候補をテストできませんでした",
-        "activate": "候補を有効化",
-        "activateSuccess": "候補が有効になりました。以前のキーは猶予期間が終了するまで有効です。",
-        "activateError": "候補を有効化できませんでした",
-        "graceLabel": "猶予期間",
-        "graceHelp": "以前のキーが機能し続ける期間です。最大24時間。",
-        "graceHours": "{count} 時間 | {count} 時間",
-        "graceNone": "猶予期間なし",
-        "endGrace": "今すぐ猶予を終了",
-        "endGraceTitle": "猶予期間を終了",
-        "endGraceMessage": "以前のキーを直ちに廃止しますか？サービスがそのキーで引き続き検証しているリクエストは失敗し始めます。",
-        "endGraceSuccess": "猶予期間が終了しました",
-        "endGraceError": "猶予期間を終了できませんでした",
-        "noCandidate": "候補キーがありません。ローテーションを開始するには作成してください。"
-      }
-    },
-    "playground": {
-      "title": "プレイグラウンド",
-      "subtitle": "プロンプトを試し、バリアントを比較して、勝者を実験に変えましょう。",
-      "runAll": "すべて実行",
-      "runAllTooltip": "すべてのバリアントを実行",
-      "running": "実行中… ({done}/{total})",
-      "stop": "停止",
-      "recentDrafts": "最近の下書き",
-      "recentDraftsSection": "このブラウザ・直近10件",
-      "recentDraftsEmpty": "最近の下書きはまだありません。",
-      "recentDraftsFoot": "下書きはこのブラウザ内にのみ保存されます。",
-      "draftRestored": "下書きが復元されました。",
-      "fromExperiment": "実験 {name} から複製",
-      "fromDataset": "{name} からサンプリングされた行",
-      "variables": "変数",
-      "rowFields": "行フィールド",
-      "noVariables": "メッセージに {token} がありません — 入力をパラメータ化するために追加してください。",
-      "variablePlaceholder": "{name} の値",
-      "addExpected": "+ 期待される出力",
-      "expectedLabel": "期待される出力",
-      "expectedPlaceholder": "ゴールデンアンサー — 後で参照ベースのスコアリングを可能にします",
-      "removeExpected": "期待される出力を削除",
-      "expectedLeakWarning": "{token} はタスクプロンプトでは利用できません — ゴールデンアンサーはスコアラーにのみ供給されます。",
-      "chipInsert": "クリックしてカーソル位置に挿入",
-      "chipReferenced": "このテンプレートで参照されています — クリックして再度挿入",
-      "chipMissing": "テンプレートで参照されていますが、現在の行で提供されていません — 空でレンダリングされます",
-      "chipScorersOnly": "スコアラーのみ",
-      "variant": "バリアント {label}",
-      "addVariant": "バリアントを追加",
-      "variantCount": "{count}/{max}",
-      "variantLimit": "ベンチには最大 {max} 個のバリアントを保持できます。",
-      "duplicateVariant": "バリアントを複製",
-      "removeVariant": "バリアントを削除",
-      "runVariant": "このバリアントを実行",
-      "createExperiment": "実験を作成",
-      "variantConfig": "バリアント設定",
-      "variantConfigScope": "バリアント {label} に、全 {count} 行にわたって適用されます。",
-      "editVariant": "このバリアントを編集 — 列全体に適用されます",
-      "stale": "古い",
-      "staleTooltip": "前回の実行から設定が変更されました — 出力を更新するには再実行してください",
-      "staleNote": "設定が変更されました — 再実行するまで下の出力は薄暗く表示されます",
-      "provider": "プロバイダー",
-      "providerPlaceholder": "プロバイダーを選択",
-      "model": "モデル",
-      "modelPlaceholder": "モデルを選択または入力",
-      "modelHelp": "任意のモデル名が受け付けられます — 未知の名前は実行時に失敗しますが、ここでは失敗しません",
-      "temperature": "温度",
-      "messages": "メッセージ",
-      "roleSystem": "システム",
-      "roleUser": "ユーザー",
-      "roleAssistant": "アシスタント",
-      "roleTool": "ツール",
-      "addUserMessage": "ユーザー",
-      "addAssistantMessage": "アシスタント",
-      "removeMessage": "メッセージを削除",
-      "readonlyMessage": "トレースから（読み取り専用）",
-      "messagePlaceholder": "{role}メッセージを入力…",
-      "tools": "ツール",
-      "toolsCount": "ツール · {count}",
-      "toolsTitle": "ツール",
-      "toolsIntro": "モデルに渡すツールを定義します。Playground はツールを実行しません — モデルが呼び出しを発行すると、その呼び出し自体が出力となり、実行はそこで終了します。",
-      "toolName": "ツール名",
-      "toolNamePlaceholder": "lookup_order",
-      "toolDescription": "説明",
-      "toolDescriptionPlaceholder": "このツールが行うこと",
-      "toolParameters": "パラメータ",
-      "toolParametersHelp": "JSONスキーマ",
-      "toolParametersPlaceholder": "{ \"type\": \"object\", \"properties\": { } }",
-      "addTool": "ツールを追加",
-      "removeTool": "ツールを削除",
-      "toolsEmpty": "ツールが定義されていません",
-      "toolCall": "ツール呼び出し",
-      "toolCallNote": "実行はここで停止します — Playground はツールを実行しません",
-      "toolInvalidJson": "パラメータは有効な JSON である必要があります",
-      "schema": "スキーマ",
-      "schemaOn": "スキーマ · オン",
-      "schemaTitle": "構造化出力",
-      "schemaToggle": "出力を JSON スキーマに制約する",
-      "schemaHelp": "スキーマが設定されている場合、出力は JSON 形式で表示されます",
-      "schemaInvalidJson": "スキーマは有効な JSON である必要があります",
-      "outputPlaceholder": "出力はここに表示されます — 「Run」を押してください",
-      "outputNotRun": "未実行",
-      "generating": "生成中…",
-      "retry": "再試行",
-      "usageLatency": "{seconds}秒",
-      "usageTokens": "{input}→{output} トークン",
-      "usageCost": "${cost}",
-      "copyOutput": "出力をコピー",
-      "copied": "クリップボードにコピーしました。",
-      "addToMessages": "メッセージに追加",
-      "addToMessagesTooltip": "この出力をアシスタントメッセージとして追加し、会話を続行します",
-      "addedToMessages": "アシスタントメッセージとして出力を追加しました — 次のユーザーターンを追加して再実行してください。",
-      "sampleFromDataset": "データセットからサンプル",
-      "addRow": "行を追加",
-      "rowsSampled": "{count} 行 · 値でサンプリング — 後からデータセットを編集してもこれらは変わりません",
-      "removeRow": "行を削除",
-      "inputColumn": "入力 · {count} 行",
-      "manualRow": "手動",
-      "noReference": "参照なし",
-      "noReferenceTooltip": "この行には期待される出力がありません",
-      "rowFooter": "n={count} — 全データセットの結果を得るには、",
-      "rowFooterLink": "実験を作成",
-      "sampleTitle": "データセットからサンプル",
-      "sampleDataset": "データセット",
-      "sampleDatasetPlaceholder": "データセットを選択",
-      "sampleRowFields": "行フィールド",
-      "sampleRowFieldsHelp": "メッセージ内で {token} として使用可能",
-      "sampleInTemplate": "テンプレート内",
-      "sampleRows": "行",
-      "sampleRowsHelp": "ランダムサンプル · 値でコピー",
-      "sampleMax": "最大 {max}",
-      "sampleCopies": "入力と期待される出力がコピーされます。",
-      "sampleExisting": "既存の行",
-      "sampleReplace": "現在の行を置き換え",
-      "sampleAdd": "現在の行に追加",
-      "sampleAddUsed": "({used}/{max} 使用中)",
-      "sampleScaleNote": "サンプリングにより、ベンチは小さな比較テーブルに切り替わります。全データセットに対する結論を得るには、実験を作成してください。",
-      "sampleSubmit": "{count} 行をサンプリング",
-      "sampleAddSubmit": "{count} 行を追加",
-      "sampleLoadError": "そのデータセットから行を読み込めませんでした。",
-      "sampleEmpty": "そのデータセットにはサンプリングする行がありません。",
-      "addRowTitle": "行を追加",
-      "addRowInput": "入力",
-      "addRowInputPlaceholder": "この行の質問またはタスク",
-      "addRowShowExpected": "+ 期待される出力（オプション）",
-      "addRowHideExpected": "− 期待される出力を非表示",
-      "addRowExpectedPlaceholder": "この行の正解",
-      "zeroRefWarning": "プロンプトが行フィールドを参照していません — すべての {count} 行が同一の出力になります。フィールドをクリックして挿入してください：",
-      "zeroRefSampleWarning": "プロンプトが行フィールドを参照していません — プロンプトに {token} を追加するか、すべてのサンプル行が同一の出力になります。",
-      "zeroRefInserted": "{token} をすべてのバリアントのユーザーメッセージに挿入しました — 適用するには再実行してください。",
-      "runGateTitle": "行フィールドなしで実行しますか？",
-      "runGateMessage": "プロンプトが行フィールドを参照していないため、すべての {rows} 行が同一の出力になります。この実行は {calls} 回のモデル呼び出しを消費します。",
-      "runGateConfirm": "それでも実行",
-      "runGateCancel": "戻ってプロンプトを修正",
-      "rowDetail": "行 {index}",
-      "rowPosition": "{index}/{total}",
-      "previousRow": "前の行",
-      "nextRow": "次の行",
-      "drawerInput": "入力",
-      "drawerExpected": "期待される出力",
-      "drawerNoExpected": "この行には期待される出力はありません。",
-      "drawerRenderedPrompt": "レンダリングされたプロンプト",
-      "drawerRenderedPromptHelp": "この行で実際に送信されたメッセージ（変数が置換済み）",
-      "drawerEmptyMessage": "(空)",
-      "drawerOutputs": "出力 · {count} 個のバリアントを並べて表示",
-      "drawerFrom": "{name} から",
-      "noProviderTitle": "PlaygroundにはLLMプロバイダーが必要です",
-      "noProviderBody": "プロバイダーを接続してプロンプトを実行します。約1分かかります。",
-      "noProviderAction": "プロバイダーを設定",
-      "providerLoadError": "プロバイダーを読み込めませんでした。",
-      "datasetLoadError": "データセットを読み込めませんでした。",
-      "runFailed": "実行に失敗しました。",
-      "backendPending": "サンプル出力に対して実行中 — Playgroundの実行APIはまだ稼働していません。"
     }
   },
   "onlineEvals": {
@@ -14174,24 +13759,22 @@
       "chooseIcon": "アイコンを選択",
       "searchPlaceholder": "アイコンを検索...",
       "removeIcon": "アイコンを削除",
-      "noResults": "検索条件に一致するアイコンはありません",
+      "noResults": "検索に一致するアイコンがありません",
       "groups": {
         "results": "結果",
         "status": "ステータス",
         "services": "サービス",
         "ai": "AI",
-        "creatures": "生物",
+        "creatures": "クリーチャー",
         "infra": "インフラストラクチャ",
         "data": "データ",
         "teams": "チーム",
         "objects": "オブジェクト",
-        "world": "世界"
+        "world": "ワールド"
       }
     },
     "input": {
-      "clear": "クリア",
-      "showValue": "表示",
-      "hideValue": "非表示"
+      "clear": "クリア"
     },
     "dialog": {
       "closeDialog": "ダイアログを閉じる"
@@ -14571,10 +14154,10 @@
       },
       "dataConfidence": {
         "estimated": "≈ 推定",
-        "topNSubset": "top-N のサブセット",
+        "topNSubset": "上位N件のサブセット",
         "live": "ライブ",
-        "belowTopN": "top-N 未満",
-        "truncated": "切り詰め済み",
+        "belowTopN": "上位N未満",
+        "truncated": "省略",
         "gap": "ギャップ"
       }
     }
@@ -15561,17 +15144,17 @@
   "dbm": {
     "common": {
       "reload": "更新",
-      "lastRefreshed": "最終更新: {age}",
-      "loadFailed": "データベースデータを読み込めませんでした。再試行するか、時間範囲を狭めてください。"
+      "lastRefreshed": "最終更新 {age}",
+      "loadFailed": "データベースデータを読み込めませんでした。再試行するか、時間範囲を絞り込んでください。"
     },
     "ai": {
       "suggestFix": "AIに修正方法を尋ねる",
-      "suggestFixHint": "このクエリ、そのエンジン、レイテンシー数値を使ってAIアシスタントを開き、何を変更すべきかを尋ねます。AI自体は何も変更しません。",
+      "suggestFixHint": "このクエリ、そのエンジン、レイテンシー数値をAIアシスタントで開き、何を変更すべきかを尋ねます。それ自体は何も変更しません。",
       "rowSuggestFix": "AIに修正方法を尋ねる",
-      "deadlockFix": "このデッドロックを停止するにはどうすればよいですか？",
+      "deadlockFix": "このデッドロックを止めるにはどうすればよいですか？",
       "deadlockFixHint": "競合する両方のステートメントと行順序の証拠をAIアシスタントに送信します。",
-      "blockingFix": "これがブロックしているのはなぜですか？",
-      "blockingFixHint": "ルートセッションのステートメント、アイドル時間、その背後でスタックしているセッション数をAIアシスタントに送信します。"
+      "blockingFix": "なぜブロックしているのですか？",
+      "blockingFixHint": "ルートセッションのステートメント、そのアイドル時間、そしてその背後で詰まっているセッション数をAIアシスタントに送信します。"
     },
     "filters": {
       "allEngines": "すべてのエンジン",
@@ -15593,22 +15176,22 @@
       }
     },
     "delta": {
-      "new": "このリストに新しく追加",
-      "gone": "実行停止",
-      "newHint": "このクエリは以前、最も重いものの1つではなかったため、比較する対象がありません。以前から実行されていた可能性がありますが、単独で追跡するほど重くはなかっただけかもしれません。",
-      "goneHint": "このクエリは、その日の早い時間帯に実行されましたが、表示している時間範囲には含まれていません。",
+      "new": "このリストに新しく追加されました",
+      "gone": "実行を停止",
+      "newHint": "このクエリは以前は最も重いものの中にはなかったため、比較する対象がありません。以前から実行されていた可能性はありますが、単独で追跡するほど重くはなかっただけです。",
+      "goneHint": "このクエリは当日の早い時間に実行されましたが、現在表示している時間範囲には含まれていません。",
       "comparison": "以前 {previous} → 現在 {current}",
       "noChange": "変化なし",
-      "timesMore": "{ratio}× 多い",
-      "timesFewer": "{ratio}× 少ない",
+      "timesMore": "{ratio}倍増加",
+      "timesFewer": "{ratio}倍減少",
       "wasValue": "以前は {value}"
     },
     "databases": {
       "title": "データベース",
-      "subtitle": "データベースごとのクエリのパフォーマンスと健全性",
+      "subtitle": "データベースごとのクエリパフォーマンスと健全性",
       "searchPlaceholder": "データベースまたはサービスを検索…",
-      "unnamedInstance": "インスタンス名なし",
-      "unnamedInstanceHint": "データベース自身のステートメントレポートはこのエンジンが実行中であることを証明していますが、ホスト名は示していません。セッションサンプリングやインスタンスメトリクスなど、その情報を含むフィードが設定されると、この行にアドレスが表示されます。",
+      "unnamedInstance": "インスタンス名がありません",
+      "unnamedInstanceHint": "データベース自身のステートメントレポートはこのエンジンが稼働していることを証明しますが、ホスト名は示されません。ホスト情報を含むフィード — セッションサンプリングやインスタンスメトリクス — が設定されると、行にアドレスが表示されます。",
       "moreServices": "+{count}",
       "columns": {
         "instance": "データベース",
@@ -15620,7 +15203,7 @@
         "p99": "最も遅い1%",
         "services": "使用元",
         "load": "データベース時間",
-        "attention": "要注意"
+        "attention": "注意が必要"
       },
       "summary": {
         "databases": "データベース",
@@ -15628,16 +15211,16 @@
         "time": "データベース時間",
         "failed": "失敗"
       },
-      "databaseCount": "1件のデータベース | {count}件のデータベース",
-      "openQueries": "そのクエリを表示",
+      "databaseCount": "1 データベース | {count} データベース",
+      "openQueries": "クエリを表示",
       "alertMe": "アラートを受け取る",
       "columnHints": {
-        "qps": "1秒あたりの呼び出し数 — このウィンドウの呼び出し数をその長さで割った値です。そのため、15分ビューと4時間ビューを比較しやすくなります。",
-        "p50": "全呼び出しの半数がこれよりも速く完了しました。完了した呼び出しのみを対象としています — まだ実行中のクエリや、応答が返ってこなかったクエリはここでは測定されません。",
-        "p95": "遅いテール — 20件に1件の呼び出しが少なくともこの時間かかりました。完了した呼び出しのみを対象としています — まだ実行中のクエリや、応答が返ってこなかったクエリはここでは測定されません。",
-        "p99": "最も遅い1%の呼び出しが少なくともこの時間かかりました。完了した呼び出しのみを対象としています — まだ実行中のクエリや、応答が返ってこなかったクエリはここでは測定されません。",
-        "load": "アプリケーションがこのデータベースの待機に費やした合計時間です。クライアント側から測定されるため、このデータベースが処理したトラフィックの量を反映しています — サーバーの負荷ではありません。",
-        "attention": "このインスタンスが、自身のエンジンが公開する制限にどれだけ近いか — 今日はmax_connectionsに対する接続数。ブレンドされたスコアではなく、最も悪い比率。高い順にソートされ、ヘルスを読み取れないインスタンスが先頭に表示されます。見えないものは健康だと確認できないからです。データベースサーバー上で測定されるため、隣のデータベース時間とは比較できません。"
+        "qps": "1秒あたりの呼び出し — このウィンドウの呼び出し数をその長さで割ったもので、15分ビューと4時間ビューを比較しやすくします。",
+        "p50": "すべての呼び出しの半数がこれより速く完了しました。完了した呼び出しのみをカウントします — 実行中のクエリや戻ってこないクエリはここでは測定されません。",
+        "p95": "遅いテール — 20回に1回の呼び出しが少なくともこの時間かかりました。完了した呼び出しのみをカウントします — 実行中のクエリや戻ってこないクエリはここでは測定されません。",
+        "p99": "最悪の1%の呼び出しは少なくともこの時間かかりました。完了した呼び出しのみをカウントします — 実行中のクエリや戻ってこないクエリはここでは測定されません。",
+        "load": "アプリケーションがこのデータベースの待機に費やした合計時間。クライアント側から測定されるため、このデータベースが処理したトラフィックの量を反映します — サーバーの負荷を示すものではありません。",
+        "attention": "このインスタンスが、自身のエンジンが公開する制限にどの程度近いか — 現在は、max_connections に対する接続数。そのような比率の中で最悪の値を示し、ブレンドされたスコアではありません。降順にソートされ、健全性を読み取れないインスタンスが先頭に表示されます。見えないものは健全であるとは言えないからです。データベースサーバー上で測定されるため、隣のデータベース時間とは比較できません。"
       },
       "failedChip": "{count} 失敗",
       "columnSubLabels": {
@@ -15647,46 +15230,46 @@
       },
       "attention": {
         "connections": "接続",
-        "noLimit": "公開された制限なし",
+        "noLimit": "制限が公開されていません",
         "unknown": "未測定"
       }
     },
     "queries": {
       "title": "上位クエリ",
-      "subtitle": "データベース時間を最も消費するクエリ",
-      "subtitleServer": "データベースが実行したステートメント — データベース内部でカウントされ、最も頻繁に実行されたものから順に表示されます。",
-      "searchPlaceholder": "クエリテキスト、テーブル、サービスを検索…",
-      "trendLabel": "このクエリの時間が期間全体でどのように推移したか",
+      "subtitle": "最もデータベース時間を使用しているクエリ",
+      "subtitleServer": "データベースが実行したステートメントで、データベース内部でカウントされます — 最も頻繁に実行された順に表示されます",
+      "searchPlaceholder": "クエリテキスト、テーブル、またはサービスを検索…",
+      "trendLabel": "このクエリの時間が範囲全体でどのように変化したか",
       "otherRow": "その他すべてのクエリ",
-      "truncatedText": "このステートメントは長すぎて完全には保存されていないため、省略されて表示されています。",
+      "truncatedText": "このステートメントは長すぎて完全には保存できなかったため、省略されて表示されています。",
       "stmtClass": {
         "query": "クエリ",
         "queryHint": "実際のSQLのみ — SELECT、INSERT、UPDATE、DELETE。",
         "all": "クエリ + 接続オーバーヘッド",
-        "allHint": "ドライバーがクエリ間で送信する付随処理もカウントします: BEGIN、COMMIT、SET、およびプールされた接続を維持するためのチェック。"
+        "allHint": "また、ドライバーがクエリ間で送信するブックキーピング（BEGIN、COMMIT、SET、プールされた接続を維持するためのチェック）もカウントします。"
       },
       "completionBias": {
-        "title": "失敗が増加する一方で、コールは{drop}%減少しました",
-        "body": "これは通常、クエリが完了せずに詰まっていることを意味します — 完了したクエリのみ測定できるためです。ここでの下降線は回復を意味するとは限りません。"
+        "title": "呼び出しが {drop}% 減少し、失敗が増加しました",
+        "body": "これは通常、クエリが完了せずに滞っていることを意味します — 完了するクエリのみを測定できるためです。ここでの低下は回復を示しているとは限りません。"
       },
       "columns": {
         "query": "クエリ",
-        "calls": "コール",
+        "calls": "呼び出し",
         "p95": "遅いコール",
         "errors": "失敗",
-        "perTrace": "リクエストごと",
+        "perTrace": "リクエストあたり",
         "load": "データベース時間",
         "p99": "最も遅い1%",
         "max": "最悪値",
         "services": "使用元"
       },
       "queryCount": "1種類のクエリ | {count}種類のクエリ",
-      "otherRowDetail": "— {calls} コール。これらにはクエリごとの数値はなく、この合計のみがあります。上記のすべての合計にカウントされます。",
-      "foldRowText": "小さいクエリ 1件 | 小さいクエリ {count}件",
+      "otherRowDetail": "— {calls} コール。これらのクエリごとの数値はなく、この合計のみです。上記のすべての合計に含まれます。",
+      "foldRowText": "1つの小さなクエリ | {count}つの小さなクエリ",
       "serverList": {
         "title": "データベースによって報告されたクエリ",
-        "subtitle": "データベース内で全クライアントにわたってカウントされ、実行頻度の高い順に表示されます。この期間にトレースされたアプリケーションコールはなかったため、通常のリストは空です — これはその間にデータベースが確認した内容です。",
-        "truncated": "最も頻繁に実行された{count}個のステートメント — ここに表示されているよりも多く実行されました",
+        "subtitle": "各クライアントにわたってデータベース内でカウントされ、最も頻繁に実行されたものが最初に表示されます。この時間枠内にトレースされたアプリケーションの呼び出しはなかったため、通常のリストは空です — これはその間にデータベースが確認した内容です。",
+        "truncated": "{count} 個の最も頻繁に実行されたステートメント — ここに表示されているよりも多く実行されました。",
         "columns": {
           "query": "クエリ",
           "calls": "コール",
@@ -15694,12 +15277,12 @@
           "meanTime": "コールあたりの平均"
         },
         "columnHints": {
-          "time": "データベース内部で測定: PostgreSQLの実行時間、MySQLおよびMariaDBの待機時間。アプリケーションが体感したものではありません — ネットワークと接続待機は含まれません。",
-          "mean": "データベース内の時間をコール数で割った値 — 期間全体の平均であり、パーセンタイルではありません。"
+          "time": "データベース内で測定: PostgreSQLでは実行時間、MySQLとMariaDBでは待機時間。アプリケーションが体験した時間ではありません — ネットワークと接続の待機は含まれません。",
+          "mean": "データベース内の時間をコールで割ったもの — 時間枠全体の平均であり、パーセンタイルではありません。"
         }
       },
-      "foldRowDetail": "· データベース時間の{share} · クリックして表示",
-      "foldRowDetailOpen": "· データベース時間の{share} · クリックで折りたたむ",
+      "foldRowDetail": "· {share} のデータベース時間 · クリックして表示",
+      "foldRowDetailOpen": "· {share} のデータベース時間 · クリックで折りたたむ",
       "summary": {
         "queries": "クエリの種類",
         "calls": "コール",
@@ -15707,110 +15290,110 @@
         "failed": "失敗"
       },
       "columnHints": {
-        "calls": "このクエリが実行された回数。データベースが報告する場合はその独自のカウントを使用します — これはトレースを送信するシステムの一部だけでなく、すべてのクライアントをカバーします。client-observedとマークされた行は、データベースが報告しなかったため、代わりにトレースからカウントされます。",
-        "p50": "全コールの半分はこれよりも速く完了しました。完了したコールのみをカウントします — 実行中または応答がないクエリはここでは測定されません。",
-        "p95": "遅いテイル — 20回に1回の呼び出しは少なくともこの時間かかりました。完了した呼び出しのみをカウントします — 実行中または応答がないクエリはここでは測定されません。",
-        "p99": "最悪の1%の呼び出しは少なくともこの時間かかりました。完了した呼び出しのみをカウントします — 実行中または応答がないクエリはここでは測定されません。",
-        "max": "このウィンドウ内で最も遅い単一の呼び出し — 平均ではなく、実際の呼び出しです。",
-        "errors": "これらの呼び出しのうち、エラーで返されたものの数。",
-        "perTrace": "これが1つのリクエスト内で実行される回数。多い場合は通常ループを意味します。",
-        "load": "このクエリがデータベースで費やした合計時間。データベースが報告する場合はその値: Postgresでは実行時間、MySQLとMariaDBでは待機時間 — 各行にどちらかが示されます。client-observedとマークされた行はトレースから測定されるため、ネットワークの往復を含みます。"
+        "calls": "このクエリが実行された回数。データベースが報告する場合はデータベース自身のカウントです — それはトレースを送信するシステムの部分だけでなく、すべてのクライアントを対象とします。「クライアント観測」とマークされた行は、データベースが報告しなかったため、代わりにトレースからカウントされます。",
+        "p50": "すべてのコールの半分がこれよりも速く完了しました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
+        "p95": "遅いテール — 20回に1回のコールが少なくともこの時間かかりました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
+        "p99": "最悪の1%のコールが少なくともこの時間かかりました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
+        "max": "この時間枠内で最も遅い単一のコール — 実測の1回のコールであり、平均ではありません。",
+        "errors": "これらのコールのうち、エラーで返ってきたものの数。",
+        "perTrace": "これが単一のリクエスト内で実行される回数。数値が高い場合は通常ループを意味します。",
+        "load": "このクエリがデータベース内で費やした合計時間。データベースが報告する場合はデータベース自身の数値: Postgresでは実行時間、MySQLとMariaDBでは待機時間 — 各行にどちらかが示されています。「クライアント観測」とマークされた行はトレースから測定されるため、ネットワークの往復が含まれます。"
       },
       "errorsNone": "なし",
       "errorsAll": "すべて",
       "actions": {
         "open": "詳細を開く",
-        "traces": "トレース例を表示",
+        "traces": "サンプルトレースを見る",
         "copy": "クエリをコピー",
         "copied": "クエリをコピーしました",
         "copyFailed": "クエリをコピーできませんでした。",
         "alert": "これが遅くなったらアラート"
       },
       "otherRowTextFor": "{database} の他のすべてのクエリ",
-      "otherRowDetailShort": "— {calls} 回の呼び出し。",
+      "otherRowDetailShort": "— {calls} コール。",
       "columnSubLabels": {
-        "calls": "報告されたサーバー",
-        "load": "報告されたサーバー"
+        "calls": "報告元サーバー",
+        "load": "報告元サーバー"
       }
     },
     "insights": {
-      "showRows": "このクエリを表示 | これら {count} 件のクエリを表示",
+      "showRows": "このクエリを表示 | {count}件のクエリを表示",
       "clearFilter": "フィルターをクリア",
       "alsoAffects": "および他の {count} 件のクエリ | および他の {count} 件のクエリ",
       "showLess": "表示を減らす",
       "more": "さらに {count} 件 | さらに {count} 件",
       "regression": {
-        "title": "通常より {ratio} 倍遅い",
-        "body": "同じトラフィックで {before} → {after}",
-        "rule": "このクエリの遅い呼び出しが {ratio} 倍以上 {baseline} より遅くなったため表示されています。少なくとも {calls} 回の呼び出しにわたります。"
+        "title": "通常より{ratio}倍遅い",
+        "body": "{before} → {after}、トラフィックは同じ",
+        "rule": "このクエリの遅い呼び出しが、少なくとも{calls}回の呼び出しにわたって、{baseline}より{ratio}倍以上遅くなったため表示されています。"
       },
       "new-expensive": {
-        "title": "新しいクエリ、すでに高コスト",
-        "body": "以前は実行されていません · 現在はデータベース時間の {share}",
-        "rule": "このクエリは {baseline} で最も重いものには含まれておらず、現在はデータベース時間の少なくとも {share}% を占めているため表示されています。少なくとも {calls} 回の呼び出しにわたります。以前から実行されていた可能性もありますが、単独で追跡するほど重くはありませんでした。"
+        "title": "新しいクエリ、すでに高負荷",
+        "body": "以前は実行されていなかった・現在はデータベース時間の{share}",
+        "rule": "このクエリは{baseline}で最も重いものには含まれておらず、現在は少なくとも{calls}回の呼び出しにわたってデータベース時間の{share}%以上を占めているため表示されています。以前から実行されていた可能性もありますが、単独で追跡するほど重くはなかっただけです。"
       },
       "n-plus-one": {
-        "title": "リクエストごとに少なくとも {multiplier} 回実行",
-        "body": "データベース時間の {share} · {service}",
-        "rule": "このクエリが1つのリクエスト内で少なくとも {ratio} 回実行されるため表示されています。少なくとも {traces} 件のリクエストにわたります。これは下限値であるため、実際の数はさらに多い可能性があります。正当なバッチ処理も同様に見えることがあります。"
+        "title": "リクエストごとに少なくとも{multiplier}回実行",
+        "body": "データベース時間の{share}・{service}",
+        "rule": "このクエリが1つのリクエスト内で少なくとも{ratio}回実行され、それが少なくとも{traces}リクエストにわたって見られるため表示されています。これは下限値なので、実際の数値はより高い可能性があります。正当なバッチ処理も同じように見えることがあります。"
       },
       "volume-shift": {
-        "title": "処理が増加、低速化ではない",
-        "body": "呼び出しが {ratio} 倍増加、速度は同じ · {service}",
-        "rule": "このクエリは {ratio} 倍以上、{baseline} と比較して多く呼び出され、速度は {latency} 倍以内に保たれているため表示されています。"
+        "title": "呼び出し回数が増加、速度は同じ",
+        "body": "呼び出し回数が{ratio}倍に増加、速度は同じ・{service}",
+        "rule": "このクエリは{baseline}の{ratio}倍以上呼び出されるようになった一方、速度は{latency}倍以内に収まっているため表示されています。変化の原因はそれを呼び出している側にあります。"
       },
       "rank-churn": {
-        "title": "新しい最重クエリ",
-        "body": "#{from} → #{to} に移動",
-        "rule": "クエリが最も重い {into} に、最も重い {from} の外から（{baseline} において）上昇し、データベースの合計時間が増加したため表示されています。",
+        "title": "新しい最重量クエリ",
+        "body": "移動: #{from} → #{to}",
+        "rule": "このクエリが{baseline}で最も重い{from}の外から最も重い{into}に浮上し、その間にデータベース全体の時間が増加したため表示されています。",
         "unranked": "ランク外"
       },
       "hide": "非表示",
       "show": "表示",
-      "findRow": "探す",
+      "findRow": "見つける",
       "all-failing": {
         "title": "すべての呼び出しが失敗しています",
-        "body": "{failed} 回失敗（{total} 回中）· {query}",
-        "rule": "この範囲内のこのクエリへのすべての呼び出しがエラーで返されたため表示されています。"
+        "body": "{total}回のうち{failed}回が失敗・{query}",
+        "rule": "この期間内のこのクエリへのすべての呼び出しがエラーを返したため表示されています。"
       },
       "baseline": {
         "label": "比較対象",
         "previous": "前の期間",
         "yesterday": "昨日の同時刻",
-        "previousShort": "前回比",
+        "previousShort": "前回と比較",
         "previousHint": "この期間の直前の同じ長さの期間と比較します。",
-        "yesterdayShort": "昨日との比較",
-        "yesterdayHint": "1日前の同じ時間帯と比較します。トラフィックが日次サイクルに従う場合や、デプロイ後の変更を確認する場合に便利です。"
+        "yesterdayShort": "昨日と比較",
+        "yesterdayHint": "1日前の同じ時間帯と比較します。トラフィックが日次サイクルに従う場合や、デプロイ後に何が変わったかを確認するのに便利です。"
       }
     },
     "coverage": {
-      "unknownNote": "選択した範囲とフィルターでは測定するものがありません。",
-      "lineHealthy": "このデータベースの時間の{percent}%を表示しています — 最も負荷の高い{count}種類のクエリです。",
-      "lineRemainder": "このデータベースの時間の{percent}%を表示しています。残りは、個別にリストしていない軽いクエリに含まれています。",
-      "lineStale": "集計は{minutes}分遅れているため、最新のクエリはまだ表示されていない可能性があります。",
-      "lineTruncated": "最後の区間では取り込める以上のデータがあったため、最新の数値は過小評価されています。",
-      "lineTruncatedStale": "最後の区間では取り込める以上のデータがあり、集計も{minutes}分遅れています — 最新の数値は過小評価され、最新のクエリはまだ表示されていない可能性があります。",
-      "lineGap": "このウィンドウでは{minutes}分が欠落しています。集計は{stopped}で停止し、{reach}分までしか遡れないため、{from}–{to}をカバーするものはありません。",
-      "lineSubset": "{filter}に絞り込んでいるため、これらのパーセンテージは表示されている行を対象としており、データベース全体を対象としていません。",
-      "lineHealthyAll": "実行されたすべてのクエリを表示しています。ここでの速度はすべての呼び出しで測定されているため、正確です。",
-      "lineHealthyAllEstimated": "実行されたすべてのクエリを表示しています。ここでの速度は複数の時間帯からブレンドされているため、近い値ですが正確ではありません。",
-      "lineCountedTo": "{time}までを集計しました。最後の30秒はまだ取り込み中です。",
-      "lineExact": "すべてのデータベースが報告中です。ここでの速度はすべての呼び出しで測定されているため、正確です。",
-      "lineExactEstimated": "すべてのデータベースが報告中です。ここでの速度は複数の時間帯からブレンドされているため、近い値ですが正確ではありません。",
-      "lineSubsetUnnamed": "フィルターによって合計が集計されるレベルより絞り込まれているため、パーセンテージはデータベース全体ではなく表示されている行を対象としています。",
-      "lineQuery": "タイミングはアプリケーションから測定されるため、ネットワーク時間と空き接続の待ち時間が含まれます。",
-      "lineUncodedErrors": "ここでの失敗の{percent}は理由コードなしで返されたため、数えることはできますが説明はできません。",
-      "lineSubsetStale": "{filter}に絞り込んでおり、集計は{minutes}分遅れています — これらのパーセンテージは表示されている行を対象としており、最新のクエリはまだ表示されていない可能性があります。",
-      "lineSubsetUnnamedStale": "フィルターによって合計が集計されるレベルより絞り込まれており、集計も{minutes}分遅れています — パーセンテージは表示されている行を対象としており、最新のクエリはまだ表示されていない可能性があります。",
-      "lineCountedToBehind": "{time}までを集計しました。{minutes}分遅れています。"
+      "unknownNote": "選択した期間とフィルターでは測定対象がありません。",
+      "lineHealthy": "このデータベースの時間の{percent}%を表示しています — 最も重い{count}種類のクエリです。",
+      "lineRemainder": "このデータベースの時間の{percent}%を表示しています。残りは、個別にリストしていない軽いクエリによるものです。",
+      "lineStale": "集計は{minutes}分遅れているため、最新のクエリはまだここに表示されていない可能性があります。",
+      "lineTruncated": "最後の区間に取り込める量を超えるデータがあったため、最新の数値は過少集計になっています。",
+      "lineTruncatedStale": "最後の区間に取り込める量を超えるデータがあり、さらに集計が{minutes}分遅れています — 最新の数値は過少集計で、最新のクエリもまだここに表示されていない可能性があります。",
+      "lineGap": "このウィンドウでは{minutes}分が欠落しています。集計は{stopped}で停止し、{reach}分までしか遡れないため、{from}–{to}をカバーするデータはありません。",
+      "lineSubset": "{filter}にフィルタリングしているため、これらのパーセンテージはデータベース全体ではなく、表示されている行についてのものです。",
+      "lineHealthyAll": "実行されたすべてのクエリを表示しています。速度はすべての呼び出しにわたって測定されているため、正確です。",
+      "lineHealthyAllEstimated": "実行されたすべてのクエリを表示しています。速度は複数の時間帯からブレンドされているため、近い値ですが正確ではありません。",
+      "lineCountedTo": "{time}まで集計済み。最後の30秒はまだ取り込み中です。",
+      "lineExact": "すべてのデータベースが報告中です。速度はすべての呼び出しにわたって測定されているため、正確です。",
+      "lineExactEstimated": "すべてのデータベースが報告中です。速度は複数の時間帯からブレンドされているため、近い値ですが正確ではありません。",
+      "lineSubsetUnnamed": "フィルターが合計が集計されるレベル以下に絞り込んでいるため、パーセンテージはデータベース全体ではなく表示された行を示しています。",
+      "lineQuery": "タイミングはアプリケーションから測定されるため、ネットワーク時間や空き接続の待ち時間も含まれます。",
+      "lineUncodedErrors": "ここでの失敗の{percent}は理由コードなしで返されたため、カウントはできますが説明はできません。",
+      "lineSubsetStale": "{filter}にフィルタリングしており、集計が{minutes}分遅れています — これらのパーセンテージは表示されている行を示し、最新のクエリはまだここに表示されていない可能性があります。",
+      "lineSubsetUnnamedStale": "フィルターが合計が集計されるレベル以下に絞り込んでおり、集計が{minutes}分遅れています — パーセンテージは表示されている行を示し、最新のクエリはまだここに表示されていない可能性があります。",
+      "lineCountedToBehind": "{time}まで集計済み。{minutes}分遅れています。"
     },
     "breakdown": {
-      "loading": "時間の使われ方を分析中…",
+      "loading": "時間の使われ方を計算中…",
       "noSchema": "スキーマが報告されていません",
-      "noService": "呼び出し元が特定されていません",
-      "nothingToAttribute": "このデータベースの合計はありますが、この範囲のクエリごとの行がないため、どのサービスが時間を費やしたかはわかりません。",
+      "noService": "呼び出し元を特定できません",
+      "nothingToAttribute": "この範囲のこのデータベースの合計はありますが、クエリごとの行がないため、どのサービスが時間を費やしたかはわかりません。",
       "queryCount": "{count} クエリ | {count} クエリ",
-      "shortfall": "これらはこのデータベースの合計より{percent}少なくなります。これは、最も負荷の高い種類のクエリのみが個別に追跡されるためです。"
+      "shortfall": "これらは、最も重い種類のクエリのみが個別に追跡されるため、このデータベースの合計より{percent}少なくなっています。"
     },
     "freshness": {
       "neverAggregated": "この範囲の集計はまだ完了していません。通常、最初の数値は約15分以内に表示されます。"
@@ -15818,39 +15401,39 @@
     "empty": {
       "filtered": {
         "title": "フィルターに一致するクエリがありません",
-        "description": "適用した検索とフィルターに一致するものはありません。",
+        "description": "ここには、適用した検索とフィルターに一致するものはありません。",
         "action": "フィルターをクリア"
       },
-      "title": "まだ何もありません — その正確な理由は次のとおりです",
-      "subtitle": "確認が必要なすべてをチェックしました。",
-      "subtitleCounts": "{pass} 成功、{fail} 失敗。 | {pass} 成功、{fail} 失敗。",
-      "checklistTitle": "チェックした内容",
+      "title": "まだ何もありません — その理由は次のとおりです",
+      "subtitle": "必須条件をすべて確認しました。",
+      "subtitleCounts": "{pass} 件成功、{fail} 件失敗。 | {pass} 件成功、{fail} 件失敗。",
+      "checklistTitle": "確認した内容",
       "showMeHow": "計装方法を表示",
       "checkTrace": "自分のトレースの1つを確認",
       "checks": {
         "enabled": {
-          "ok": "データベース監視はオンになっています",
-          "okDetail": "この組織に対して",
-          "no": "データベース監視はオフになっています",
-          "noDetail": "管理者がこの組織でオンにして、コレクターを再起動できます。"
+          "ok": "データベースモニタリングはオンになっています",
+          "okDetail": "この組織向け",
+          "no": "データベースモニタリングはオフになっています",
+          "noDetail": "管理者がこの組織でこれをオンにして、コレクターを再起動できます。"
         },
         "traces": {
           "ok": "トレースが届いています",
           "okDetail": "この時間範囲で{count}件記録されました",
-          "no": "トレースはまだ到着していません",
-          "noDetail": "データベース監視はトレースから構築されますが、この組織はまだトレースを送信していません。"
+          "no": "トレースはまだ届いていません",
+          "noDetail": "データベースモニタリングはトレースから構築されますが、この組織はまだトレースを送信していません。"
         },
         "permission": {
           "ok": "このデータにアクセスできます",
           "okDetail": "あなたは{org}の管理者です",
           "no": "このデータにアクセスできません",
-          "noDetail": "データベース監視はトレースを読み取りますが、あなたのロールにはトレースへのアクセスが含まれていません。読み取りアクセスについては管理者にお問い合わせください。"
+          "noDetail": "データベースモニタリングはトレースを読み取りますが、あなたのロールにはその権限が含まれていません。読み取りアクセスについて管理者に問い合わせてください。"
         },
         "dbSpans": {
           "ok": "トレースにデータベースが含まれています",
           "okDetail": "データベース呼び出しが記録されています",
-          "no": "トレースにデータベースが含まれていません",
-          "noDetail": "アプリケーションはトレースされていますが、データベースと通信する部分はトレースされていません。お使いの言語向けのデータベース計装を追加すると、ここにクエリが表示されます。"
+          "no": "どのトレースにもデータベースが含まれていません",
+          "noDetail": "アプリケーションはトレースされていますが、データベースと通信する部分はトレースされていません。お使いの言語のデータベース計装を追加すると、クエリがここに表示されます。"
         },
         "counted": {
           "ok": "この範囲の集計が完了しました",
@@ -15862,11 +15445,11 @@
           "ok": "この時間範囲で何かが実行されました",
           "okDetail": "データベース呼び出しが記録されました",
           "no": "選択した時間範囲では何も実行されませんでした",
-          "noDetail": "より広い範囲をお試しください。"
+          "noDetail": "より広い範囲を試してください。"
         },
         "alsoWorthKnowing": {
-          "title": "参考情報",
-          "detail": "それが設定されると、最初のクエリは約15分以内に表示されます。"
+          "title": "その他の参考情報",
+          "detail": "それが整うと、最初のクエリは約15分以内に表示されます。"
         }
       },
       "action": "再試行",
@@ -15878,172 +15461,172 @@
         "overview": "概要",
         "overviewHint": "このクエリの遅さ、実行頻度、実行場所。",
         "plans": "クエリプラン",
-        "plansHint": "データベースがこのクエリを実行する際の手順。遅い原因を調べるにはここから始めてください。",
+        "plansHint": "このクエリを実行するためにデータベースが実行した手順。遅い原因を調べるにはここから始めてください。",
         "callers": "呼び出し元と例",
-        "callersHint": "アプリケーションのどの部分がこのクエリを実行したか、およびトレースとして開ける個々の遅い実行。",
-        "callersLocked": "個々の実行はトレースから得られます。この時間範囲ではこのクエリはトレースされていません。"
+        "callersHint": "アプリケーションのどの部分がこのクエリを実行したか、およびトレースとして開くことができる個々の遅い実行。",
+        "callersLocked": "個々の実行はトレースから取得されます。この時間範囲では、このクエリはトレースされていません。"
       },
       "notFound": {
         "title": "このクエリはこの組織にありません",
-        "description": "このアドレスが示すクエリは、{org} が表示中の範囲で実行していません。組織を切り替えたばかりなら、そのクエリは以前の組織のものです。",
-        "descriptionNoOrg": "このアドレスが示すクエリは、この組織が表示中の範囲で実行していません。組織を切り替えたばかりなら、そのクエリは以前の組織のものです。",
-        "scopeHint": "この組織、時間範囲、スコープでは一致するものはありませんでした。アドレスが別のエンジンやインスタンスから来た場合は、それらのフィルターをクリアするか、リストに戻ってください。",
+        "description": "アドレスが示すクエリは、表示中の期間に {org} が実行していません。組織を切り替えたばかりの場合、そのクエリは以前の組織のものです。",
+        "descriptionNoOrg": "アドレスが示すクエリは、表示中の期間にこの組織が実行していません。組織を切り替えたばかりの場合、それは以前の組織のものです。",
+        "scopeHint": "この組織、時間範囲、スコープでは何も一致しませんでした。アドレスが別のエンジンまたはインスタンスからのものである場合は、それらのフィルターをクリアするか、リストに戻ってください。",
         "missingTitle": "クエリが選択されていません",
-        "missingDescription": "このページは1つのクエリを説明するものですが、アドレスにクエリが指定されていません。組織を切り替えたばかりなら、読んでいたクエリは以前の組織のものです。",
+        "missingDescription": "このページは1つのクエリについて説明していますが、アドレスにクエリが指定されていません。組織を切り替えたばかりの場合、読んでいたクエリは以前の組織のものです。",
         "action": "この組織のクエリを参照"
       },
       "backToQueries": "トップクエリに戻る",
       "backToActivity": "アクティビティに戻る",
-      "backToSamples": "最も遅い呼び出しに戻る",
+      "backToSamples": "最も遅いコールに戻る",
       "backToDeadlocks": "デッドロックに戻る",
-      "latencyTitle": "時間経過に伴う速度",
-      "volumeTitle": "時間経過に伴う呼び出しと失敗",
+      "latencyTitle": "時間ごとの速度",
+      "volumeTitle": "コール数と失敗数の推移",
       "endpointsTitle": "呼び出し元",
-      "endpointsHint": "リクエストがこのクエリを実行したアプリケーションの部分。",
-      "noEndpoints": "この範囲でアプリケーションのどの部分がこれを実行したか特定できませんでした。",
+      "endpointsHint": "このクエリを実行したリクエストが含まれるアプリケーションの部分。",
+      "noEndpoints": "この期間にアプリケーションのどの部分がこれを実行したかを特定できませんでした。",
       "samplesTitle": "最も遅い例",
-      "samplesHint": "各ドットは実際の実行1回を表します — クリックするとリクエスト全体を表示",
-      "noSamples": "この範囲の個別の実行は読み込まれていません。",
-      "noSeries": "選択した範囲ではこのクエリの履歴がありません。",
+      "samplesHint": "各ドットは実際の実行1回を示します。クリックするとリクエスト全体を表示します。",
+      "noSamples": "この期間の個別の実行は読み込まれていません。",
+      "noSeries": "選択した期間には、このクエリの履歴がありません。",
       "liveSeries": "最新のポイントはまだ集計中で、変更される可能性があります。",
-      "noStream": "このクエリを含むトレースストリームを特定できなかったため、呼び出し元と例を読み込めません。",
-      "ambiguousStream": "この組織には複数のトレースストリームがあり、このクエリがどのストリームで実行されているか特定できません。ストリームを選択して、呼び出し元とサンプルトレースを読み込んでください。",
+      "noStream": "このクエリがどのトレースストリームに含まれるかを特定できなかったため、呼び出し元と例を読み込めません。",
+      "ambiguousStream": "この組織には複数のトレースストリームがあり、このクエリがどのストリームで実行されるかを特定できません。ストリームを選択して、呼び出し元とサンプルトレースを読み込んでください。",
       "pickStream": "トレースストリームを選択",
-      "invalidStream": "そのトレースストリーム名は認識できないため、検索を実行しませんでした。",
-      "firstSeen": "{time} にこのリストで最初に表示",
-      "firstSeenHint": "この範囲で、このクエリが単独で追跡するのに十分な負荷があった最初の時点。",
-      "lastSeen": "最終出現 {time}",
-      "lastSeenHint": "この範囲内で、このクエリが単独で追跡するのに十分に重かった最新の時点。現在も実行中かもしれません — これはリストに載った最後の時点です。",
+      "invalidStream": "そのトレースストリーム名は認識できなかったため、検索を実行しませんでした。",
+      "firstSeen": "このリストに最初に表示されたのは {time} です",
+      "firstSeenHint": "この期間内で、このクエリが単独で追跡するほど重かった最も早い時点。",
+      "lastSeen": "このリストに最後に表示されたのは {time} です",
+      "lastSeenHint": "この期間内で、このクエリが単独で追跡するほど重かった最新の時点。現在も実行中かもしれません。これが最後にリストに載った時点です。",
       "errorsByCode": {
-        "title": "理由コード別の失敗",
-        "exactHint": "この範囲のすべての呼び出しにわたってカウントされます。",
-        "sampleHint": "以下の例からカウントされます — サンプルであり、合計ではありません。",
+        "title": "理由コード別の失敗数",
+        "exactHint": "この期間のすべてのコールを集計。",
+        "sampleHint": "以下の例から集計。サンプルであり、合計ではありません。",
         "noCode": "理由コードなし"
       },
       "whereItRuns": {
         "title": "実行場所",
-        "hint": "このクエリのアクティビティを、実行されたデータベースごとに分割したものです。行をクリックすると、このページがそのデータベースに焦点を当てます。",
-        "trackedHint": "これらの数値は、クエリが単独で追跡するのに十分に重かったこの範囲の区間を対象としています。静かな区間はここでは何も追加しないため、最低限の合計としてお読みください。",
+        "hint": "このクエリのアクティビティを実行データベース別に表示します。行をクリックすると、このページがその項目に絞り込まれます。",
+        "trackedHint": "これらの数値は、この期間内でクエリが単独で追跡するほど重かった区間をカバーしています。静かな区間はここに追加されないため、少なくとも合計としてお考えください。",
         "showAll": "すべての場所を表示",
-        "emptyFiltered": "このページがフォーカスしている場所では、このクエリの追跡はありません。すべての場所を表示して、実行された場所を確認してください。",
+        "emptyFiltered": "このページの焦点が当てられている場所では、このクエリの追跡はありません。すべての場所を表示すると、実行場所を確認できます。",
         "noInstance": "インスタンスが報告されていません",
         "focused": "フォーカス中",
-        "focusHint": "このページの数値は現在この行に絞り込まれています。もう一度クリックすると広がります。",
+        "focusHint": "このページの数値は現在この行に絞り込まれています。もう一度クリックすると範囲が広がります。",
         "columns": {
           "location": "実行先",
-          "avg": "呼び出しごとの平均"
+          "avg": "コールあたりの平均"
         }
       },
-      "qps": "1秒あたりの呼び出し",
-      "errorRate": "失敗した呼び出し",
-      "unattributed": "未分類",
-      "sampleOk": "OK",
+      "qps": "1秒あたりのコール数",
+      "errorRate": "失敗したコール",
+      "unattributed": "未帰属",
+      "sampleOk": "正常",
       "sampleError": "失敗",
-      "viewTrace": "リクエストを見る →",
-      "viewTraces": "サンプルトレースを見る",
+      "viewTrace": "リクエストを表示 →",
+      "viewTraces": "サンプルトレースを表示",
       "copySummary": "コピー",
-      "copySummaryHint": "ここにあるすべての数値はすでにこのページにあります。これは単に文章を書くだけで、インシデントの13分目には何もない代わりにメッセージが生成されます。",
-      "summaryCopied": "概要をコピーしました",
-      "summaryCopyFailed": "概要をコピーできませんでした。",
+      "copySummaryHint": "ここにあるすべての数値はすでにこのページに表示されています。これは単に文を書き出すだけで、インシデントの13分目には何もない代わりにメッセージが生成されます。",
+      "summaryCopied": "要約をコピーしました",
+      "summaryCopyFailed": "要約をコピーできませんでした。",
       "columns": {
         "calls": "呼び出し",
         "time": "時間",
-        "duration": "期間",
+        "duration": "所要時間",
         "status": "ステータス",
-        "caller": "呼び出し元",
-        "callShare": "呼び出しの割合",
-        "p50": "半数が下回る"
+        "caller": "発信者",
+        "callShare": "通話の割合",
+        "p50": "半数は下回る"
       },
       "belowTopN": {
-        "title": "このクエリは、この範囲の一部で最も重いものには含まれていませんでした",
-        "body": "最も重いクエリは個別に追跡し、残りはまとめてカウントします。このクエリが十分に重くない場合は、ゼロを描画するのではなくチャートを網掛けします。それでも実行は継続されていました。",
-        "capped": "履歴は保持している限り返ります。"
+        "title": "このクエリは、この範囲の一部では最も重いものには含まれていません",
+        "body": "最も重いクエリは個別に追跡し、残りはまとめてカウントします。このクエリが十分に重くなかった場合、ゼロを描画する代わりにチャートを網掛けします。まだ実行中だったためです。",
+        "capped": "履歴は保持している限り遡れます。"
       },
-      "firstSeenCaveat": "— それ以前から実行されていた可能性がありますが、最も重いものではなかっただけです",
+      "firstSeenCaveat": "— それ以前に実行されていた可能性がありますが、最も重いものには含まれていなかっただけです",
       "copyQuery": "クエリをコピー",
-      "alertMe": "これが遅くなったら通知する",
+      "alertMe": "これが遅くなったらアラート",
       "stats": {
         "load": "データベース時間",
-        "loadShare": "このデータベースの {percent}",
+        "loadShare": "このデータベースの{percent}",
         "calls": "呼び出し",
-        "callsDelta": "以前より {change}",
-        "p50": "半数が下回る",
+        "callsDelta": "以前より{change}",
+        "p50": "半数は下回る",
         "p95": "遅い呼び出し",
         "max": "最悪値",
         "errors": "失敗",
         "noErrors": "エラーなし",
-        "approx": "近いが正確ではない",
+        "approx": "近似（正確ではない）",
         "exact": "正確"
       },
       "overlap": {
-        "serverExecution": "{engine} が実行に費やした時間",
-        "serverWait": "{engine} が待機に費やした時間 — 実行時間ではなく待機時間",
-        "serverCounted": "{engine} が全クライアントでカウント",
-        "clientObserved": "計装された呼び出し元が観測 — データベースはこれを報告していません"
+        "serverExecution": "{engine}が実行に費やした時間",
+        "serverWait": "{engine}が待機に費やした時間 — 待機時間であり、実行時間ではありません",
+        "serverCounted": "すべてのクライアントにわたって{engine}によってカウント",
+        "clientObserved": "計測された呼び出し元によって観測 — データベースはこれを報告しませんでした"
       },
-      "endpointsConcentrated": "1つのエンドポイントがこのクエリの時間の {percent} を占めています。{endpoint} を修正すれば、このクエリは解決します。",
+      "endpointsConcentrated": "1つのエンドポイントがこのクエリの時間の{percent}を占めています。{endpoint}を修正すれば、このクエリも修正されます。",
       "typicalMarker": "遅い呼び出し {value}",
       "plans": {
         "title": "クエリプラン",
         "sourceLabel": "汎用推定プラン",
-        "sourceTooltip": "このプランは、すべてのクエリパラメータを NULL に設定して推定されたもので、実際には実行されませんでした。Postgres は実際のクエリでは異なるプランを実行した可能性があります。これはクエリの構造を確認するためのものであり、所要時間を説明するものではありません。",
-        "stableCaveat": "この期間に1つのプラン形状が取得されました。これはプランの問題を除外するものではありません — 推定プランは実際のプランが変わる間も安定している可能性があり、実行されたプランの取得はログに記録されるほど遅いステートメントのみを対象とするため、このクエリを高速化したプランの変更は取得から完全に消えてしまう可能性があります。",
-        "executedLabel": "実行されたプラン",
-        "executedTooltip": "これは Postgres が実際の実行で実際に実行したプランで、auto_explain が実際のパラメータ値で取得したものです。この行の行数と所要時間は推定ではなく測定値です — ただし、auto_explain のしきい値より遅い実行のみが取得されるため、これらは全実行ではなく遅い部分を表しています。",
-        "capturedDurations": "{count} 件の取得実行における平均 {avg} · 最大 {max}",
+        "sourceTooltip": "このプランは、すべてのクエリパラメータをNULLに設定して推定されたもので、実際には実行されていません。Postgresは実際のクエリで異なるプランを実行した可能性があります。クエリの構造を確認するために使用し、所要時間の説明には使用しないでください。",
+        "stableCaveat": "この期間に1つのプラン形状が取得されました。これはプランの問題を除外しません — 推定プランは実際のプランが変わっても安定している可能性があり、実行済みプランの取得はログに記録されるほど遅いステートメントのみを対象とするため、このクエリを高速化したプラン変更は取得から完全に消えてしまいます。",
+        "executedLabel": "実行済みプラン",
+        "executedTooltip": "これは、Postgresが実際の実行で実行したプランであり、auto_explainが実際のパラメータ値を使用して取得したものです。この行の行数と所要時間は実測値であり、推定値ではありません — ただし、取得されるのはauto_explainのしきい値より遅い実行のみであるため、すべての実行ではなく、遅いテールを表します。",
+        "capturedDurations": "平均 {avg} · 最大 {max}（取得された{count}回の実行）",
         "estVsAct": "推定 {est} → 実際 {act} 行",
-        "driftCallout": "この期間にプラン形状が変更されました。{count} 個の異なる形状が取得されました。これは通常、インデックスが削除されたりテーブルが再分割されたりするなど、スキーマまたは統計の変更を意味します。",
+        "driftCallout": "この期間にプラン形状が変更されました。{count}個の異なる形状が取得されました。これは通常、インデックスの削除やテーブルの再パーティション化など、スキーマまたは統計の変更を意味します。",
         "viewPlans": "プランを表示",
-        "noPlans": "プランは取得されていません",
-        "noPlansHint": "このデータベースのプランをまだコレクタが送信していません。プランの取得を開始するには、コレクタのレシピでトップクエリコレクションを有効にしてください — セットアップページで説明されています。",
+        "noPlans": "取得されたプランはありません",
+        "noPlansHint": "このデータベースのプランはまだどのコレクタからも送信されていません。プランの取得を開始するには、コレクタレシピでトップクエリ収集を有効にしてください — セットアップページでその手順を説明しています。",
         "noPlanForQuery": "このクエリのプランはありません",
-        "noPlanForQueryHint": "このデータベースのプランは取得しています — このクエリにはプランがないだけです。COMMIT、ROLLBACK、SHOW など、データベースが説明できないステートメントでは正常です。",
+        "noPlanForQueryHint": "このデータベースのプランは取得しています — このクエリには単にプランがないだけです。これは、COMMIT、ROLLBACK、SHOWなど、データベースが説明できないステートメントでは正常です。",
         "planHash": "プラン",
-        "firstSeen": "初回検出",
-        "lastSeen": "最終検出",
+        "firstSeen": "初回確認",
+        "lastSeen": "最終確認",
         "noTree": "プランを読み取れませんでした",
         "nodeCost": "コスト {cost}"
       },
       "serverMetrics": {
-        "title": "データベース自身が記録したもの",
+        "title": "データベース自体が記録したもの",
         "subtitle": "サーバー側 — すべてのクライアント",
-        "clientSubtitle": "クライアント観測 — 計装された呼び出し元のみ、完了した呼び出しのみ。実行中のクエリやハングしたクエリはこれらの数値に含まれません。",
-        "instance": "{instance} によって報告",
+        "clientSubtitle": "クライアント側で観測されたもの — 計装された呼び出し元のみ、完了した呼び出しのみ。まだ実行中のクエリやハングしたクエリはこの数値には含まれません。",
+        "instance": "{instance} から報告",
         "instanceWide": "このインスタンス上のすべてのデータベース",
-        "calls": "実行回数",
+        "calls": "実行",
         "rows": "返された行数",
         "meanExecution": "平均実行時間",
         "meanWait": "平均待機時間",
         "sharedBlksHit": "キャッシュからのブロック",
         "sharedBlksRead": "ディスクからのブロック",
         "tempBlksWritten": "書き込まれた一時ブロック",
-        "noMatch": "このクエリのサーバー側記録はありません",
-        "noMatchHint": "データベースは実行したステートメントを報告しますが、これはその中にありません。これは正常です。2つのビューはクエリを異なる方法で識別するため、常に一致するとは限りません。上記のすべてはアプリケーションから測定されたものです。",
-        "ambiguous": "このクエリに該当するデータベースが複数あります",
-        "ambiguousHint": "複数のインスタンスがこの名前のデータベースを報告しているため、どのインスタンスがこのクエリを実行したか判別できません。間違ったインスタンスの数値を表示するより、表示しない方がましです。候補: {instances}。",
+        "noMatch": "このクエリのサーバー側レコードがありません",
+        "noMatchHint": "データベースは実行したステートメントを報告しますが、このクエリはその中に含まれていません。これは正常です。2つのビューはクエリを異なる方法で識別するため、常に一致するとは限りません。上記のすべては依然としてアプリケーションから測定されたものです。",
+        "ambiguous": "このクエリを実行した可能性のあるデータベースが複数あります",
+        "ambiguousHint": "複数のインスタンスがこの名前のデータベースを報告しているため、どれがこのクエリを実行したかを特定できません。間違ったインスタンスの数値を表示するよりも、何も表示しない方がましです。候補: {instances}。",
         "off": "サーバー側のメトリクスが収集されていません",
-        "offHint": "コレクタはまだデータベースからステートメントごとのメトリクスを収集していません。コレクタのレシピでトップクエリコレクションを有効にしてください — セットアップページで説明されています。",
+        "offHint": "コレクターはまだデータベースからステートメントごとのメトリクスを収集していません。コレクターレシピでトップクエリ収集を有効にしてください — セットアップページで手順を説明しています。",
         "setUp": "セットアップ",
         "readFailed": "サーバー側のメトリクスを読み取れませんでした",
-        "readFailedHint": "読み取りに失敗したため、データベースがステートメントを報告しているかどうかについては何も示されません。上記のすべてはアプリケーションから測定されたものです。"
+        "readFailedHint": "読み取りに失敗したため、データベースがステートメントを報告しているかどうかについては何も示されません。上記のすべては依然としてアプリケーションから測定されたものです。"
       },
       "callingServices": {
-        "title": "どのサービスがこれを呼び出したか",
-        "unjoinable": "表示されていません — このステートメントはここで複数種類のデータベース上で実行されるため、どれかを知らずに呼び出し元を照合すると、誤ったサービスを特定することになります。",
+        "title": "このクエリを呼び出したサービス",
+        "unjoinable": "非表示 — このステートメントはここでは複数種類のデータベースで実行されるため、どれかを特定せずに呼び出し元を照合すると、誤ったサービスを指し示すことになります。",
         "tracedCalls": "{calls} 件の呼び出しをトレース",
-        "coverage": "{count}個のサービスが、{traced}回（上記の{executions}回の実行のうち）で見られました。残りはまだトレースしていない呼び出し元からのものです。",
-        "coverageUnknown": "{count}個のサービスが{traced}件のトレース済み呼び出しで見られました。データベースがこのステートメントの合計を報告しなかったため、割合を表示できません。",
-        "noneNamed": "{traced}件の呼び出しがトレースされましたが、いずれもサービスに結び付けられませんでした。それらのトレースはこの時間範囲の外で始まっています。"
+        "coverage": "{count} 件のサービスが {traced} 回のトレース済み実行で確認されました（上記の実行 {executions} 回のうち）。残りはまだトレースしていない呼び出し元からのものです。",
+        "coverageUnknown": "{count} 件のサービスが {traced} 件のトレース済み呼び出しで確認されました。データベースがこのステートメントの合計を報告していないため、割合を表示できません。",
+        "noneNamed": "{traced} 件の呼び出しがトレースされましたが、そのどれもサービスに結び付けることができませんでした — それらのトレースはこの時間範囲の外で開始されています。"
       },
       "callersEmpty": {
         "title": "このクエリのトレース済み呼び出しはまだありません",
-        "description": "データベースはこのステートメントを報告しましたが、それを実行したアプリケーションをトレースしたものはありません。そのため、名前を付ける呼び出し元も、開く個別の実行もありません。このデータベースに接続するサービスをインストルメントすると、ここに表示されます。",
+        "description": "データベースはこのステートメントを報告しましたが、それを実行したアプリケーションをトレースしたものはありません — したがって、名前を挙げる呼び出し元も、開く個別の実行もありません。このデータベースと通信するサービスを計装すると、ここに表示されます。",
         "checklistTitle": "必要な条件",
-        "setUp": "トレースを設定",
+        "setUp": "トレースをセットアップ",
         "checks": {
           "server": {
-            "ok": "データベースがこのクエリを報告しています",
-            "okDetail": "他のタブのタイミングはそこから来ています"
+            "ok": "お使いのデータベースがこのクエリを報告しています",
+            "okDetail": "他のタブのタイミングはここから来ています"
           }
         }
       }
@@ -16054,171 +15637,171 @@
         "serverWait": "待機時間",
         "serverCounted": "サーバー数",
         "clientObserved": "クライアント観測",
-        "serverReported": "データベースが報告した値"
+        "serverReported": "データベースから報告"
       }
     },
     "page": {
       "tabs": {
         "overview": "概要",
-        "queries": "上位クエリ",
+        "queries": "トップクエリ",
         "samples": "最も遅い呼び出し",
-        "samplesHintClient": "このウィンドウでインストルメント済みサービスが観測した完了済み呼び出し。トレースされていない呼び出し元はカウントされないため、これは合計ではなく下限です。表にはその中で最も遅いものが表示されます。",
-        "samplesHintServer": "このウィンドウでデータベースが完了を報告したステートメント（データベース内でカウント）。表にはその中で最も遅いものが表示されます。",
-        "samplesHintUnknown": "このウィンドウで最も遅い個々のデータベース呼び出し。",
+        "samplesHintClient": "このウィンドウで計装されたサービスが観測した完了した呼び出し — トレースなしの呼び出し元はカウントされないため、これは下限であり、合計ではありません。テーブルにはその中で最も遅いものが表示されます。",
+        "samplesHintServer": "このウィンドウ内でデータベースが完了を報告したステートメントで、データベース内でカウントされます。テーブルにはその中で最も遅いものが表示されます。",
+        "samplesHintUnknown": "このウィンドウ内で最も遅い個々のデータベース呼び出し。",
         "deadlocks": "デッドロック",
         "blocked": "ブロックされたクエリ",
         "deadlocksHint": "データベースが報告したデッドロック。",
-        "blockedHint": "現在ロックを待機中のセッション。",
+        "blockedHint": "現在ロックを待っているセッション。",
         "activity": "アクティビティ",
         "activityHint": "データベースが現在実行中のセッション。",
         "tableHealth": "テーブルの健全性",
-        "tableHealthHint": "テーブルサイズ、ブロート、バキューム状態。ブロートとバキュームはPostgreSQLのみです。",
-        "deadlocksLocked": "デッドロックはエンタープライズ機能です。どのクエリが互いにデッドロックしたか、その理由を確認するにはアップグレードしてください。他のデータベースタブはすべてのプランで利用できます。",
-        "blockedLocked": "ブロックされたクエリはエンタープライズ機能です。どのセッションがロックを待機しているか、何がロックを保持しているかを確認するにはアップグレードしてください。他のデータベースタブはすべてのプランで利用できます。",
-        "tableHealthLocked": "テーブルの健全性はエンタープライズ機能です。テーブルサイズ、ブロート、バキューム状態を追跡するにはアップグレードしてください。他のデータベースタブはすべてのプランで利用できます。"
+        "tableHealthHint": "テーブルのサイズ、ブロート、およびバキューム状態。ブロートとバキュームはPostgreSQLのみです。",
+        "deadlocksLocked": "デッドロックはEnterprise機能です。アップグレードすると、どのクエリが互いにデッドロックしたか、その理由を確認できます。他のデータベースタブはすべてのプランで利用できます。",
+        "blockedLocked": "ブロックされたクエリはEnterprise機能です。アップグレードすると、どのセッションがロックを待っているか、何がロックを保持しているかを確認できます。他のデータベースタブはすべてのプランで利用できます。",
+        "tableHealthLocked": "テーブルの健全性はEnterprise機能です。アップグレードすると、テーブルのサイズ、ブロート、バキューム状態を追跡できます。他のデータベースタブはすべてのプランで利用できます。"
       }
     },
     "samples": {
-      "title": "最も遅い呼び出し",
-      "subtitle": "このウィンドウで最も遅い個々のデータベース呼び出し（全データベースとクエリにわたる）。呼び出し元が測定したもので、完了した呼び出しのみ",
+      "title": "最も遅いコール",
+      "subtitle": "このウィンドウ内で、すべてのデータベースとクエリにわたる最も遅い個々のデータベースコール — 呼び出し元が測定したもので、完了したコールのみ",
       "subtitleServer": "このウィンドウでデータベースが完了した最も遅いステートメント（データベース内で測定）",
-      "logOffTitle": "データベースはまだ低速ステートメントをログに記録していません",
-      "logOffDescription": "これらの呼び出しは何もトレースされなかったため、データベースに独自の最も遅いステートメントを問い合わせましたが、何もログに記録されていません。このリストはPostgreSQLのステートメントログ（log_min_duration_statement）から取得されます。これはデフォルトでオフであり、セットアップカードのロギング手順でオンになります。ステートメント単位のキャプチャは現在PostgreSQLのみ対応しているため、MySQLとMariaDBはこのリストにデータを提供できません。上位クエリは代わりにカウンターテーブルを読み取るため、何が最も多く実行されているかを引き続き表示できます。",
+      "logOffTitle": "データベースはまだ遅いステートメントをログに記録していません",
+      "logOffDescription": "これらのコールをトレースしたものはなかったため、データベースに独自の最も遅いステートメントを問い合わせましたが、何もログに記録されていません。このリストはPostgreSQLのステートメントログ（log_min_duration_statement）からのもので、デフォルトではオフになっています — セットアップカードのロギング手順でオンになります。ステートメントごとのキャプチャは現在PostgreSQLのみであるため、MySQLとMariaDBはこのリストにまだ対応していません。上位クエリは代わりにカウンターテーブルを読み取るため、何が最も多く実行されているかを引き続き表示できます。",
       "searchPlaceholder": "クエリテキスト、サービス、またはデータベースを検索…",
       "columns": {
         "query": "クエリ",
-        "when": "日時",
+        "when": "時刻",
         "duration": "所要時間",
         "service": "サービス",
         "status": "ステータス"
       },
       "columnHints": {
-        "duration": "この1回の呼び出しにかかった時間（呼び出し元が測定）。完了した呼び出しのみをカウントします。実行中または応答が返らなかったクエリはここでは測定されません。"
+        "duration": "この1つのコールにかかった時間（呼び出し元による測定）。完了したコールのみをカウントします — まだ実行中のクエリや、応答が返らなかったクエリはここでは測定されません。"
       },
       "failed": "失敗",
       "failedWithCode": "失敗 · {code}",
-      "viewTrace": "この呼び出しが含まれるリクエストを開く",
+      "viewTrace": "このコールが含まれていたリクエストを開く",
       "scatterOk": "完了",
-      "partial": "一部のトレースデータを読み取れなかったため、このリストに呼び出しが含まれていない可能性があります。",
-      "disclosureShort": "各行は実際に完了した1つの呼び出しです",
-      "disclosureDetail": "送信したトレースから、呼び出しを行ったアプリケーションによって測定されます。完了した呼び出しのみがここに表示されます。実行中またはハングして応答が返らなかったクエリは測定されません。",
+      "partial": "一部のトレースデータを読み取れなかったため、このリストからコールが欠落している可能性があります。",
+      "disclosureShort": "各行は実際に完了した1つのコールです",
+      "disclosureDetail": "送信したトレースから、コールを行ったアプリケーションによって測定されます。完了したコールのみがここに表示されます — まだ実行中のクエリや、ハングして応答が返らなかったクエリは測定されません。",
       "counts": {
-        "complete": "このウィンドウ内の{count}件のデータベース呼び出しをすべて、遅い順に表示しています。",
-        "truncated": "このウィンドウ内の最も遅い{count}件の呼び出し — ここに表示されているよりも多く実行されました。",
-        "filtered": "{count}件（{total}件中）を表示中。"
+        "complete": "このウィンドウ内のすべての{count}データベースコールを、遅い順に表示しています。",
+        "truncated": "このウィンドウ内の{count}件の最も遅いコール — ここに表示されているよりも多く実行されました。",
+        "filtered": "{total}件中{count}件のコールを表示中。"
       },
       "serverList": {
-        "title": "データベースが報告した最も遅い呼び出し",
-        "subtitle": "各データベース内でステートメントが完了した瞬間に測定されます。すべてのクライアントがカウントされますが、ネットワークや接続待機は含まれません。このウィンドウにはトレースされたアプリケーション呼び出しがなかったため、通常のリストは空です。ここに表示される呼び出しは、データベース自身のログ記録しきい値によって決まります。これらのステートメント単位のレポートは、現在PostgreSQLからのみ取得されます。コレクターレシピはまだ他のエンジンのステートメントログを取得しないため、MySQLやMariaDBの呼び出しはここに表示されません。",
-        "truncated": "報告された最も遅い{count}件の呼び出し — ここに表示されているよりも多くの呼び出しがしきい値を超えました",
+        "title": "データベースが報告した最も遅いコール",
+        "subtitle": "各データベース内でステートメントが完了した時点で測定されます — すべてのクライアントがカウントされますが、ネットワークと接続の待機は含まれません。トレースされたアプリケーションコールがこのウィンドウに存在しないため、通常のリストは空です。ここに表示されるコールは、データベース自身のロギングしきい値によって決まります。これらのステートメントごとのレポートは現在PostgreSQLのみから取得されます — コレクターレシピは他のエンジンのステートメントログをまだ取得しないため、MySQLとMariaDBのコールはここに表示されません。",
+        "truncated": "報告された{count}件の最も遅いコール — ここに表示されているよりも多くがしきい値を超えました",
         "columns": {
           "query": "クエリ",
-          "when": "日時",
+          "when": "時刻",
           "took": "所要時間",
           "user": "ユーザー"
         },
         "columnHints": {
-          "took": "ステートメントの開始から完了までのデータベース内時間。エンジンが測定した値です。呼び出し元が体感した時間ではありません。ネットワークや接続待機は含まれません。"
+          "took": "ステートメントの開始から完了までのデータベース内時間（エンジンによる測定）。呼び出し元が体感した時間ではありません — ネットワークと接続の待機は含まれません。"
         }
       }
     },
     "rowChips": {
       "new": "このリストに新登場",
-      "slower": "通常より{ratio}倍遅い",
-      "loop": "リクエストごとに{multiplier}回実行",
-      "allFailed": "全{count}件失敗",
-      "busier": "混雑しているが遅くはない",
+      "slower": "{ratio}× 通常より遅い",
+      "loop": "リクエストごとに{multiplier}×実行",
+      "allFailed": "すべて{count}件失敗",
+      "busier": "ビジーだが低速ではない",
       "climbed": "新しい最重量クエリ"
     },
     "deadlocks": {
       "title": "データベース",
       "subtitle": "互いにブロックし合い、ロールバックされたトランザクション",
       "deadlockCount": "デッドロックなし | {count}件のデッドロック | {count}件のデッドロック",
-      "pairCount": "クエリペアなし | {count}クエリペア | {count}クエリペア",
+      "pairCount": "クエリペアなし | {count}件のクエリペア | {count}件のクエリペア",
       "searchPlaceholder": "クエリテキスト、テーブル、またはアプリケーションを検索…",
       "grouping": {
         "pairs": "クエリペアでグループ化",
-        "pairsHint": "互いにデッドロックするクエリのペアごとに1行表示され、発生頻度も示されます。",
+        "pairsHint": "互いにデッドロックするクエリのペアごとに1行、発生頻度付き。",
         "events": "すべてのイベント",
-        "eventsHint": "デッドロックごとに1行表示され、新しい順に並びます。特定の時刻を調べる必要がある場合に使用します。"
+        "eventsHint": "デッドロックごとに1行、新しい順。特定の時刻が必要な場合に使用。"
       },
       "columns": {
         "pair": "互いにデッドロックする2つのクエリ",
         "applications": "アプリケーション",
         "objects": "競合した行",
-        "lastSeen": "最終発生",
+        "lastSeen": "最後の1件",
         "count": "デッドロック",
         "when": "日時",
         "cancelled": "キャンセル済み",
         "finished": "完了"
       },
       "coverage": {
-        "complete": "データベースが報告したすべてのデッドロックがここに表示されています。このウィンドウ内で{deadlocks}件、{pairs}ペアから発生。",
-        "capped": "一度に読み取れるよりも多くのデッドロックが発生しました。ここに表示されているのは取得できた{deadlocks}件で、{pairs}ペアから発生。実際の数はこれより多くなっています。",
-        "readUpTo": "{time}まで読み取られました。",
-        "mysqlPartial": "MySQLデータベースは、innodb_print_all_deadlocksが有効でない限り、最新のデッドロックのみを保持します。"
+        "complete": "データベースが報告したすべてのデッドロックがここにあります — この期間の {deadlocks} 件、{pairs} ペアからのものです。",
+        "capped": "一度に読み取れる数を超えるデッドロックが発生しました。これらは保持している {deadlocks} 件、{pairs} ペアからのものです — 実際の数はさらに多いです。",
+        "readUpTo": "{time} まで読み取り。",
+        "mysqlPartial": "MySQL データベースは、innodb_print_all_deadlocks がオンの場合を除き、最新のデッドロックのみを保持します。"
       },
       "chips": {
-        "oppositeOrder": "行順を逆にする",
-        "cadence": "{seconds}秒ごと",
-        "noQueries": "取得されていないクエリ",
+        "oppositeOrder": "逆の行順序",
+        "cadence": "毎{seconds}秒",
+        "noQueries": "キャプチャされていないクエリ",
         "partial": "片側のみ"
       },
       "rowActions": {
-        "topQueries": "Top queriesでこれらを探す",
+        "topQueries": "Top queries で見つけられます",
         "copy": "両方のクエリをコピー",
-        "alert": "デッドロックを通知する"
+        "alert": "デッドロックについてアラート"
       },
       "detail": {
         "mostRecent": "最新 · {time}",
         "nthOf": "{index} / {total}",
         "earlier": "前へ",
         "later": "次へ",
-        "victim": "データベースによってキャンセルされました",
-        "survivor": "完了を許可",
+        "victim": "データベースによってキャンセル",
+        "survivor": "完了が許可された",
         "pid": "pid {pid}",
         "thread": "スレッド {pid}",
         "transaction": "トランザクション {id}",
-        "eachWaits": "互いに相手を待つ",
+        "eachWaits": "互いに相手を待っている",
         "deadlock": "デッドロック",
-        "noQueryCaptured": "ログにはこのデッドロックが記録されましたが、ステートメントは記録されていません。",
-        "waitingFor": "{target} が完了するのを待っていました。",
-        "waitingForRow": "{target} が完了するのを待っていました — 相手のセッションが既に目的の行を変更していました。",
+        "noQueryCaptured": "ログにはこのデッドロックが記録されていますが、ステートメントは記録されていません。",
+        "waitingFor": "{target} の完了を待っていました。",
+        "waitingForRow": "{target} の完了を待っていました — 他のセッションが既に目的の行を変更していたためです。",
         "rawLock": "{mode} · {target}",
-        "plainTitle": "順に、何が起こったか。",
-        "plainBody": "{a} が1行を変更して保持しました。{b} が別の行を変更して保持しました。その後、それぞれが相手の行を変更しようとしたため、どちらも進めませんでした。データベースは {victim} をキャンセルして決着をつけました — そのアプリケーションはエラーを受け取り、トランザクション全体がロールバックされました。",
-        "fixTitle": "修正が必要なのはデータベースではなく、あなたのコードです。",
-        "fixBody": "この2つのステートメントは {object} の行に逆順でアクセスします。両側を同じ順序で更新してください — 最も小さいIDから — この組み合わせはデッドロックしなくなります。",
-        "fixGeneric": "両側が相手の欲しいものを保持しています。すべてのトランザクションがこれらのロックを同じ順序で取得するようにすれば、この組み合わせはデッドロックしなくなります。",
+        "plainTitle": "発生した順序は次のとおりです。",
+        "plainBody": "{a} が1行を変更して保持しました。{b} が別の行を変更して保持しました。次にそれぞれが相手の行を変更しようとしたため、どちらも進めませんでした。データベースは {victim} をキャンセルして競合を解決しました — そのアプリケーションはエラーを受け取り、トランザクション全体がロールバックされました。",
+        "fixTitle": "修正すべきはコードであり、データベースではありません。",
+        "fixBody": "これらの2つのステートメントは {object} の行に逆順でアクセスします。両側を同じ順序（IDの小さい順）で更新するようにすれば、このペアはデッドロックしなくなります。",
+        "fixGeneric": "両側が相手の求めるものを保持しています。すべてのトランザクションがこれらのロックを同じ順序で取得するようにすれば、このペアはデッドロックしなくなります。",
         "copyForSlack": "コピー",
-        "occurrencesTitle": "この組み合わせがデッドロックした全{count}回",
-        "occurrencesHint": "ポイントを選択すると、上記のものが読み込まれます。",
-        "lostLabel": "{pid} が負けました",
-        "bothSidesLose": "両側がほぼ同じ頻度でキャンセルされます — {a} 対 {b}。問題はどちらのアプリケーションでもなく、順序です。",
+        "occurrencesTitle": "このペアがデッドロックした全{count}回",
+        "occurrencesHint": "ポイントを選択すると、その1件が上に読み込まれます。",
+        "lostLabel": "{pid} がキャンセル",
+        "bothSidesLose": "両側がほぼ均等にキャンセルされています — {a} vs {b}。問題はアプリケーションではなく、順序です。",
         "oneSideLoses": "{pid} は毎回キャンセルされます。",
         "showAbove": "上に表示",
-        "copy": "SQLをコピー",
-        "seeInTopQueries": "Top クエリで表示",
-        "whichService": "どのサービスですか？",
-        "partialTitle": "このデッドロックの片側だけが届きました",
-        "partialBody": "MySQLはデッドロックの各側を別々のログエントリとして書き込みます。相手のエントリはまだ到着していません — このウィンドウの外にあるか、2つの間にログがローテーションされた可能性があります。表示されているものは実際のものです。もう一方のステートメントが単に欠けているだけです。",
-        "copyHint": "この側のステートメントのみをコピーします。",
+        "copy": "SQL をコピー",
+        "seeInTopQueries": "上位クエリで表示",
+        "whichService": "どのサービス？",
+        "partialTitle": "このデッドロックの片側しか届いていません",
+        "partialBody": "MySQLはデッドロックの各側を個別のログエントリとして書き込みます。相手側のエントリはまだ届いていません。このウィンドウ外にあるか、ログがその間にローテーションされた可能性があります。表示されているものは実際のものであり、もう一方のステートメントが単に欠けているだけです。",
+        "copyHint": "この側のステートメントだけをコピーします。",
         "copySqlTooltip": "この側のステートメントをコピー",
-        "copyForSlackHint": "両方のステートメント、この組み合わせがデッドロックした頻度、最後に発生した日時 — チャネルやチケットに貼り付けられるメッセージとして出力します。"
+        "copyForSlackHint": "両方のステートメント、このペアのデッドロック発生回数、最後に発生した時刻を、チャネルやチケットに貼り付けられるメッセージとして記載します。"
       },
       "storm": {
         "title": "デッドロックストーム。",
-        "body": "このウィンドウで {count} 件 — 通常はゼロです。",
+        "body": "このウィンドウ内の {count} 件 — 通常はありません。",
         "copyForSlack": "コピー",
-        "biasWarning": "今、Top クエリ タブは実際より穏やかに見えるでしょう。キャンセルされたクエリは終了しますが、これらのロックの後ろで待機しているクエリはまだ終了していません — そのため、そこに表示される呼び出し回数は、ユーザーが経験している実際より少なくなっています。"
+        "biasWarning": "上位クエリタブは今は実際よりも穏やかに見えるでしょう。キャンセルされたクエリも完了しますが、これらのロックの背後で待機しているクエリは完了していません。そのため、そこでの呼び出し回数はユーザーが経験しているよりも少なくなっています。"
       },
       "summary": {
         "deadlocks": "デッドロック",
         "pairs": "クエリペア"
       },
       "healthy": {
-        "title": "デッドロックなし — そして確かに監視しています",
-        "description": "このウィンドウでは、データベースからデッドロックが1件も報告されていません。これは健全な正常状態であり、収集の欠落ではありません。",
+        "title": "デッドロックはありません — そして確実に監視しています",
+        "description": "このウィンドウ内でデータベースはデッドロックを1件も報告していません。それは健全な正常状態であり、収集の欠落ではありません。",
         "checklistTitle": "確認方法",
         "collectionHealthy": "収集は正常です",
         "checks": {
@@ -16230,96 +15813,96 @@
             "detailUnknownNoFleet": "ログパイプラインは接続されています"
           },
           "reporting": {
-            "title": "デッドロックの報告が有効です",
-            "detail": "Postgresはデフォルトでデッドロックをログに記録し、MySQLでは innodb_print_all_deadlocks がオンになっているため、最新のものだけでなくすべて記録されます。",
-            "detailMysqlPartial": "Postgresはデフォルトでデッドロックをログに記録します。MySQLでは innodb_print_all_deadlocks がオンになっていないため、最新のものだけが保持されます。",
-            "detailUnknown": "Postgresはデフォルトでデッドロックをログに記録します。MySQLでは、SELECT {'@@'}innodb_print_all_deadlocks を実行してください — 1でなければなりません。そうしないと最新のデッドロックしか保持されません。この設定はここから読み取ることはできません。",
-            "titleUnknown": "デッドロックの報告が有効になっていることを確認してください"
+            "title": "デッドロックレポートは有効です",
+            "detail": "Postgresはデフォルトでデッドロックを記録し、MySQLではinnodb_print_all_deadlocksが有効になっているため、最新だけでなくすべてが記録されます。",
+            "detailMysqlPartial": "Postgresはデフォルトでデッドロックを記録します。MySQLではinnodb_print_all_deadlocksが有効になっていないため、最新のものだけが保持されます。",
+            "detailUnknown": "Postgresはデフォルトでデッドロックを記録します。MySQLでは、SELECT {'@@'}innodb_print_all_deadlocks を実行してください — 1である必要があります。そうでないと最新のデッドロックのみが保持されます。この設定をここから読み取ることはできません。",
+            "titleUnknown": "デッドロックレポートが有効になっていることを確認してください"
           },
           "traffic": {
             "title": "これらのデータベースから {lines} 件の他のログ行を確認しました",
-            "detail": "つまりパイプラインはトラフィックを運んでいます — デッドロックがあればそれを通過してきたはずです",
-            "titleUnknown": "ログパイプラインはトラフィックを運んでいます"
+            "detail": "パイプラインにトラフィックが流れているため、デッドロックがあればそれを通過してきたでしょう",
+            "titleUnknown": "ログパイプラインにトラフィックが流れています"
           },
           "lastEver": {
-            "title": "これまでに確認した最後のデッドロック",
+            "title": "最後に確認したデッドロック",
             "detail": "{when}。ウィンドウを広げて確認してください。",
             "titleNone": "これらのデータベースでデッドロックを確認したことはありません",
-            "detailNone": "まだ比較対象がありません — このウィンドウは特に異常ではありません。"
+            "detailNone": "まだ比較するものはありません — このウィンドウは異常ではありません。"
           }
         },
         "widen": "過去24時間に広げる"
       },
       "notCollecting": {
-        "title": "まだデッドロックを確認できません — その正確な理由は次のとおりです",
-        "description": "デッドロックはアプリケーションではなく、データベース自体によって報告されます。4つの項目を確認します。",
+        "title": "まだデッドロックを確認できません — その理由はここにあります",
+        "description": "デッドロックはアプリケーションではなくデータベース自体によって報告されます。4つの項目を確認しています。",
         "checklistTitle": "確認した内容",
         "checks": {
           "queries": {
             "ok": "クエリデータが届いています",
-            "okDetail": "{databases} からの {queries} — Top queries タブは機能しています",
-            "okDetailNoFleet": "{queries} — Top queries タブは機能しています",
+            "okDetail": "{queries} 件が {databases} から届いています — 上位クエリタブは機能しています",
+            "okDetailNoFleet": "{queries} 件 — 上位クエリタブは機能しています",
             "no": "クエリデータも届いていません",
-            "noDetail": "Top queries タブから始めてください — これらのデータベースからはまだ何も届いていません。"
+            "noDetail": "上位クエリタブから始めてください — これらのデータベースからはまだ何も届いていません。"
           },
           "enabled": {
             "ok": "データベースモニタリングは有効です",
-            "okDetail": "この組織の場合",
+            "okDetail": "この組織では",
             "no": "データベースモニタリングは無効です",
-            "noDetail": "収集を開始するには設定で有効にしてください。"
+            "noDetail": "収集を開始するには、設定で有効にしてください。"
           },
           "log": {
-            "no": "データベースからログが送信されていません",
-            "noDetail": "クエリのタイミングはアプリケーションから得られますが、デッドロックはデータベース自身のログにのみ書き込まれます。コレクターをPostgresまたはMySQLのログファイルに向けると、このタブが自動的に埋まります。",
+            "no": "ログを送信しているデータベースはありません",
+            "noDetail": "クエリのタイミングはアプリケーションから取得されますが、デッドロックは常にデータベース自身のログにのみ書き込まれます。コレクタをPostgresまたはMySQLのログファイルに向けると、このタブは自動的に埋まります。",
             "ok": "データベースログが届いています",
-            "okDetail": "つまりデッドロックがあれば私たちに届くはずです — 単にまだ発生していないだけです。"
+            "okDetail": "デッドロックがあれば私たちに届くはずだ — まだ一度も発生していない。"
           },
           "settings": {
-            "title": "開始する前に知っておくべきこと",
-            "detail": "Postgresはデッドロックを2つのログ行にまたがって書き、MySQLは複数行にまたがって書きます — 参加クエリは後の行に含まれます。最初の行だけに一致する設定では、デッドロックが発生したことは記録されますが、すべてのクエリが失われます。私たちのレシピは両方に対応しています。"
+            "title": "開始前に知っておくべきこと",
+            "detail": "Postgresはデッドロックを2つのログ行に分けて書き、MySQLは複数の行に分けて書きます。参加クエリは後の方の行に含まれます。最初の行だけに一致する設定では、デッドロックの発生は記録されますが、クエリはすべて失われます。このレシピは両方に対応します。"
           }
         }
       }
     },
     "blocked": {
       "title": "データベース",
-      "subtitle": "現在ロックを待機中のセッション",
-      "subtitlePast": "このウィンドウ中にロックを待機していたセッション",
-      "waitingCount": "ロックを待機中のセッションはありません | {count} セッションが現在ロックを待機中 | {count} セッションが現在ロックを待機中",
-      "waitingCountPast": "ロックを待機していたセッションはありません | {count} セッションがこのウィンドウ中にロックを待機しました | {count} セッションがこのウィンドウ中にロックを待機しました",
+      "subtitle": "現在ロックを待機しているセッション",
+      "subtitlePast": "この期間中にロックを待機していたセッション",
+      "waitingCount": "ロックを待機しているセッションなし | {count} セッションが現在ロックを待機しています | {count} セッションが現在ロックを待機しています",
+      "waitingCountPast": "ロックを待機していたセッションなし | {count} セッションがこの期間中にロックを待機していました | {count} セッションがこの期間中にロックを待機していました",
       "sessionCount": "セッションなし | {count} セッション | {count} セッション",
       "searchPlaceholder": "クエリテキスト、テーブル、またはアプリケーションを検索…",
       "perspective": {
-        "waiting": "停止中のセッション",
-        "waitingHint": "ロックを待機中のセッションごとに1行、待機時間が長い順に表示します。",
-        "blocking": "ブロック中のセッション",
-        "blockingHint": "ロックを保持しているセッション。その背後で詰まっているすべてのものを含みます。"
+        "waiting": "詰まっているのは誰",
+        "waitingHint": "ロックを待機しているセッションごとに1行表示。待機時間が長い順。",
+        "blocking": "ブロックしているのは誰",
+        "blockingHint": "ロックを保持しているセッション。その背後で全てが詰まっています。"
       },
       "columns": {
-        "stuckQuery": "停止中のクエリ",
+        "stuckQuery": "詰まっているクエリ",
         "session": "セッション",
-        "waitingFor": "待機中",
+        "waitingFor": "待機対象",
         "heldUpBy": "ブロック元",
         "waiting": "待機中",
-        "sessionQuery": "セッションと実行中のクエリ",
+        "sessionQuery": "セッションと実行内容",
         "application": "アプリケーション",
         "blocking": "ブロック中"
       },
       "coverage": {
-        "summary": "最長の待機は {longest} です。すべての待機は、ロックを保持し続けている {roots} に遡ります。",
-        "summaryCapped": "一度に読み取れるよりも多くのセッションが待機していました。取得したセッションのうち、最長の待機は {longest} で、ロックを保持し続けている {roots} に遡ります。",
+        "summary": "最長待ち時間は{longest}です。すべての待機は、ロックを保持したままの{roots}に遡ります。",
+        "summaryCapped": "一度に読み取れるより多くのセッションが待機していました。取得できたセッションの中で、最長待ち時間は{longest}で、ロックを保持したままの{roots}に遡ります。",
         "summaryOneRoot": "1セッション",
         "summaryManyRoots": "{count} セッション",
-        "checked": "{interval} 秒ごとに確認済み。最終確認: {time}。",
-        "checkedUnknown": "データベース自身のロックテーブルからサンプリングされました。"
+        "checked": "{interval}秒ごとにチェック。最終確認は{time}。",
+        "checkedUnknown": "データベース自身のロックテーブルからサンプリングしました。"
       },
       "rowActions": {
         "showChain": "チェーンを表示",
         "copy": "クエリをコピー",
-        "alertMe": "ロック待機について通知する"
+        "alertMe": "ロック待機についてアラートする"
       },
       "waitEvent": {
-        "transaction": "別のトランザクションが完了する",
+        "transaction": "別のトランザクションの終了",
         "row": "行ロック",
         "table": "テーブルロック",
         "extend": "テーブルの拡張",
@@ -16328,96 +15911,96 @@
         "buffer": "データページの読み取り",
         "lock": "ロック"
       },
-      "deep": "{count} の深さ",
-      "notWaiting": "待機なし",
-      "longestWait": "最長待機",
-      "holdsTheLock": "皆が欲しがるロックを保持",
-      "lastStatement": "最後のステートメントは {age} 前",
-      "idleInTransaction": "何も待機していません · 開いたトランザクションでアイドル状態",
+      "deep": "深さ{count}",
+      "notWaiting": "待機していません",
+      "longestWait": "最長待ち時間",
+      "holdsTheLock": "全員が求めるロックを保持",
+      "lastStatement": "最後のステートメントは{age}前",
+      "idleInTransaction": "何も待機していません · オープントランザクションでアイドル中",
       "pills": {
         "root": "ルート — ここから開始",
         "waitingBlocking": "待機中 & ブロック中 {count}",
         "waiting": "待機中"
       },
       "waitingOn": "{pid} を待機中",
-      "degraded": "1つのセッションが {count} をブロックしています。{age} の間トランザクションを開いたままで、その間クエリを実行していません — おそらくコミットを忘れたアプリケーションです。",
+      "degraded": "1つのセッションが{count}をブロックしています。このセッションは{age}の間オープントランザクションを保持し、その間にクエリを実行していません — おそらくコミットを忘れたアプリケーションです。",
       "footer": {
-        "allLeadBack": "すべての {waits} は pid {pid} に遡ります",
-        "allLeadBackDetail": "— {object} にロックを保持している1つのセッション。",
-        "switchToBlocking": "「ブロックしているのは誰か」に切り替え",
-        "releaseAll": "セッション {pid} を終了すると、すべての {count} が解放されます。",
+        "allLeadBack": "すべての{waits}は pid {pid} に遡ります",
+        "allLeadBackDetail": "— {object} に対するロックを保持している1つのセッション。",
+        "switchToBlocking": "「誰がブロックしているか」に切り替える",
+        "releaseAll": "セッション {pid} を終了すると、{count} がすべて解放されます。",
         "releaseAllDetail": "その下のすべては、その1つのロックのためだけに待機しています。",
-        "timeLost": "合計損失時間: {seconds}（{sessions} セッションにわたる）"
+        "timeLost": "合計損失時間: {seconds}（{sessions} セッション）"
       },
       "terminate": {
         "copied": "コピーしました",
-        "hint": "セッションを終了するには、{instance} に対してこれを自分で実行してください。当社が代わりに実行することはありません。",
-        "hintNoInstance": "セッションを終了するには、これを自分で実行してください。当社が代わりに実行することはありません。"
+        "hint": "セッションを終了するには、{instance} に対してこれを自分で実行してください。代わりには実行しません。",
+        "hintNoInstance": "セッションを終了するには、これを自分で実行してください。代わりには実行しません。"
       },
       "summary": {
         "waiting": "待機中のセッション",
-        "longest": "最長待機",
+        "longest": "最長待機時間",
         "chains": "チェーン"
       },
-      "rootCount": "ルートブロッカーなし | {count} ルートブロッカー | {count} ルートブロッカー",
+      "rootCount": "ルートブロッカーなし | {count} 個のルートブロッカー | {count} 個のルートブロッカー",
       "inChain": "チェーン内の {count} セッション",
       "healthy": {
-        "title": "ロックを待機しているものは何もありません",
-        "description": "現在、データベース内のどのセッションも別のセッションの背後で詰まっていません。これは健全な正常状態であり、当社の収集にギャップがあるわけではありません。",
-        "descriptionPast": "この期間中、データベース内のどのセッションも別のセッションの背後で詰まっていませんでした。これは健全な正常状態であり、当社の収集結果にギャップがあるわけではありません。",
-        "checklistTitle": "どのようにしてわかるか",
-        "collectionHealthy": "収集は正常",
+        "title": "ロックを待機しているものはありません",
+        "description": "現在、データベース内のどのセッションも別のセッションにブロックされていません。これは健全な正常状態であり、収集の欠落ではありません。",
+        "descriptionPast": "この期間中、データベース内のどのセッションも別のセッションにブロックされていませんでした。これは健全な正常状態であり、収集したデータの欠落ではありません。",
+        "checklistTitle": "確認方法",
+        "collectionHealthy": "収集は正常です",
         "checks": {
           "sampling": {
             "title": "データベースのロックテーブルを確認しています",
-            "detail": "毎 {interval} 秒 · 最終確認 {age}",
-            "detailUnknown": "コレクターが設定されているスケジュールに従って"
+            "detail": "{interval} 秒ごと · 最終確認 {age}",
+            "detailUnknown": "コレクターに設定されたスケジュールに従って"
           },
           "sessions": {
             "title": "セッションは正常に実行されています",
-            "detail": "アクティブなセッションを確認でき、そのいずれもロック待ち行列にありません"
+            "detail": "アクティブなセッションを確認でき、そのいずれもロックキューに入っていません"
           },
           "meaning": {
-            "title": "このタブが空でない場合に表示されるもの",
-            "detail": "別のセッションが保持するロックを待機しているセッション、およびそれを保持しているセッションへのチェーン。短い待機は正常で自然に解消されます — このタブは、そうでないもののためのものです。"
+            "title": "このタブが空でない場合の表示内容",
+            "detail": "別のセッションが保持するロックを待つセッションと、そのロックを保持しているセッションに至るチェーン。短い待機は正常で、自然に解消されます。このタブは、そうでない待機を表示します。"
           }
         }
       },
       "notCollecting": {
-        "title": "ブロックされたクエリはまだ表示できません — その正確な理由は次のとおりです",
-        "description": "ブロックされたクエリは、データベース内部のロックテーブルでのみ確認できます。3つの項目をチェックします。",
-        "checklistTitle": "チェックした内容",
+        "title": "ブロックされたクエリはまだ表示できません — その理由は次のとおりです",
+        "description": "ブロックされたクエリは、データベース内部のロックテーブルでのみ確認できます。私たちは3つのことをチェックします。",
+        "checklistTitle": "確認した内容",
         "checks": {
           "queries": {
             "ok": "クエリデータが届いています",
-            "okDetail": "{queries}（{databases} から） — Top queries タブは機能しています",
-            "okDetailNoFleet": "{queries} — Top queries タブは機能しています",
+            "okDetail": "{databases} から {queries} — 上位クエリタブは動作しています",
+            "okDetailNoFleet": "{queries} — 上位クエリタブは動作しています",
             "no": "クエリデータも届いていません",
-            "noDetail": "Top queries タブから始めてください — これらのデータベースからはまだ何も届いていません。"
+            "noDetail": "まず上位クエリタブを確認してください — これらのデータベースからはまだ何も届いていません。"
           },
           "enabled": {
-            "ok": "データベースモニタリングが有効です",
-            "okDetail": "この組織に対して",
-            "no": "データベースモニタリングが無効です",
-            "noDetail": "収集を開始するには、Settings で有効にしてください。"
+            "ok": "データベース監視はオンになっています",
+            "okDetail": "この組織では",
+            "no": "データベース監視はオフになっています",
+            "noDetail": "収集を開始するには、設定でオンにしてください。"
           },
           "sampling": {
-            "no": "データベースのロックテーブルをサンプリングするものがありません",
-            "noDetail": "誰が誰を待っているかは、データベース内部にのみ、そして待機が発生している間だけ存在します。コレクターレシピがスケジュールでそれを読み取り、長い待機も記録されるように log_lock_waits を有効にします。",
-            "ok": "ロックテーブルのサンプリングが実行中です",
-            "okDetail": "そのため、ブロックされたセッションが届くはずですが、単に存在しません。"
+            "no": "データベースのロックテーブルはサンプリングされていません",
+            "noDetail": "誰が誰を待っているかという情報は、データベース内にのみ存在し、待機が発生している間だけ存在します。収集レシピはそれをスケジュールに従って読み取り、log_lock_waits を有効にして、長時間の待機も記録します。",
+            "ok": "ロックテーブルのサンプリングが実行されています",
+            "okDetail": "ブロックされたセッションがあれば私たちに届きます — 単に存在しないのです。"
           },
           "settings": {
-            "title": "開始する前に知っておくべきこと",
-            "detail": "log_lock_waits は、待機が deadlock_timeout（デフォルトでは1秒）より長く続いた場合にのみ記録します。それより短い待機は正常であり、記録されません。そのため、このタブはログだけを読むのではなく、ライブでサンプリングするのです。"
+            "title": "始める前に知っておくべきこと",
+            "detail": "log_lock_waits は、待機が deadlock_timeout（デフォルトで1秒）より長く続いた場合にのみ記録します。それより短い待機は正常で、ログに記録されません。そのため、このタブはログだけを読むのではなく、ライブでサンプリングしています。"
           }
         }
       }
     },
     "activity": {
       "title": "アクティビティ",
-      "subtitle": "データベースが現在実行中の内容を、自身のセッションテーブルからサンプリングしたものです。",
-      "subtitlePast": "この期間中にデータベースが実行していた内容を、自身のセッションテーブルからサンプリングしたものです。",
+      "subtitle": "データベースが現在何をしているかを、各データベースのセッションテーブルからサンプリングしています。",
+      "subtitlePast": "この期間中にデータベースが何をしていたかを、各データベースのセッションテーブルからサンプリングしています。",
       "searchPlaceholder": "セッション、ユーザー、アプリケーションを検索",
       "wait": {
         "onCpu": "CPU実行中 / 待機なし",
@@ -16427,11 +16010,11 @@
         "remainderNoShare": "+{count} 件の追加待機イベント"
       },
       "disclosure": {
-        "sampled": "{interval} 秒ごとにサンプリング — これは継続的な記録ではなくスナップショットの連続です。そのため、サンプル間の間隔より短いセッションは、実行されて終了しても見えないことがあります。",
-        "sampledUnknown": "スケジュールでサンプリング — これは継続的な記録ではなくスナップショットの連続です。コレクターのポーリング頻度を判断するには、まだ十分なサンプルが得られていません。",
-        "filtered": "サンプルはコレクターによって既にフィルタリングされています：最新の実行中クエリより古いアイドルセッションは、誰かをブロックしていない限り除外されます。そのため、これはすべての接続の完全なリストではありません。",
-        "short": "{interval}s ごとにサンプリング、事前フィルタリング済み",
-        "shortUnknown": "スケジュールでサンプリング、事前フィルタリング済み",
+        "sampled": "毎 {interval} 秒ごとにサンプリング — これは連続記録ではなくスナップショットの連続です。そのため、サンプル間の間隔より短いセッションは、実行されても見えないまま終了することがあります。",
+        "sampledUnknown": "スケジュールに基づいてサンプリング — これは連続記録ではなくスナップショットの連続です。コレクターがどのくらいの頻度でポーリングするかを判断するには、まだ十分なサンプルが得られていません。",
+        "filtered": "サンプルはコレクターによって事前にフィルタリングされています: 最新の実行中クエリより古いアイドルセッションは、誰かをブロックしていない限り除外されます。そのため、これはすべての接続の完全なリストではありません。",
+        "short": "{interval} 秒ごとにサンプリング、事前フィルタリング済み",
+        "shortUnknown": "スケジュールに基づいてサンプリング、事前フィルタリング済み",
         "more": "この意味"
       },
       "columns": {
@@ -16439,7 +16022,7 @@
         "user": "ユーザー",
         "application": "アプリケーション",
         "state": "状態",
-        "waitEvent": "待機対象",
+        "waitEvent": "待機中",
         "running": "実行時間",
         "lastQuery": "最後のクエリ",
         "query": "クエリ",
@@ -16447,7 +16030,7 @@
       },
       "summary": {
         "sessions": "セッション",
-        "onCpu": "CPU実行中",
+        "onCpu": "CPU上",
         "waiting": "待機中",
         "idleInTransaction": "トランザクション内アイドル"
       },
@@ -16456,136 +16039,136 @@
       },
       "counts": {
         "complete": "{count} 件のセッションを表示中。",
-        "capped": "一度に読み取れないほど多くのセッションがサンプリングされました。これらは取得できた {count} 件です。",
-        "filtered": "{count} 件（{total} 件中）のセッションを表示中。"
+        "capped": "一度に読み取れるよりも多くのセッションがサンプリングされました。これらは取得できた {count} 件です。",
+        "filtered": "{count} 件のセッションを表示中（全 {total} 件中）"
       },
       "transactionOpen": "トランザクション開始から {age}",
       "healthy": {
         "title": "現在実行中のものはありません",
-        "description": "データベースのセッションテーブルをサンプリングしましたが、アクティブなセッションは見つかりませんでした。これはアイドル状態のデータベースでは正常であり、収集の欠落ではありません。",
-        "descriptionPast": "このウィンドウ期間中にデータベースのセッションテーブルをサンプリングしましたが、アクティブなセッションは見つかりませんでした。これはアイドル状態のデータベースでは正常であり、収集の欠落ではありません。",
-        "checklistTitle": "確認方法",
+        "description": "データベースのセッションテーブルをサンプリングしましたが、アクティブなセッションは見つかりませんでした。これはアイドル状態のデータベースでは正常なことであり、収集の欠落ではありません。",
+        "descriptionPast": "この期間中にデータベースのセッションテーブルをサンプリングしましたが、アクティブなセッションは見つかりませんでした。これはアイドル状態のデータベースでは正常なことであり、収集の欠落ではありません。",
+        "checklistTitle": "私たちが知る方法",
         "collectionHealthy": "収集は正常です",
         "checks": {
           "sampling": {
             "title": "データベースのセッションテーブルをサンプリングしています",
             "detail": "{interval} 秒ごと · 最終確認 {age}",
-            "detailUnknown": "コレクターに設定されたスケジュールに従って"
+            "detailUnknown": "コレクターに設定されたスケジュールに基づく"
           },
           "pipeline": {
-            "title": "データベースは私たちに届いています",
-            "detail": "このウィンドウでは、同じパイプラインを通って {lines} 件の他の行が届きました",
-            "detailUnknown": "このデータを運ぶパイプラインは実行中です"
+            "title": "データベースが私たちに到達しています",
+            "detail": "この期間中に同じパイプラインを通過した他の {lines} 行",
+            "detailUnknown": "このデータを運ぶパイプラインが実行されています"
           },
           "meaning": {
-            "title": "このタブが空でない場合に表示されるもの",
-            "detail": "データベースで実行されている各セッション、各セッションが待機している内容、そしてその継続時間。継続的に監視するのではなくサンプリングするため、非常に短いクエリは2回のサンプルの間に終了し、表示されないことがあります。"
+            "title": "このタブが空でない場合に表示される内容",
+            "detail": "データベースが実行中のすべてのセッション、それぞれが何を待っているか、そしてどれだけ続いているか。継続的に監視するのではなくサンプリングするため、非常に短いクエリは2回のサンプル間に終了し、表示されないことがあります。"
           }
         }
       },
       "notCollecting": {
-        "title": "ライブセッションはまだ表示できません — その正確な理由は次のとおりです",
-        "description": "データベースが現在行っていることは、そのデータベース自体のセッションテーブル内にのみ存在します。それをポーリングする何かが必要です。私たちは3つのことを確認します。",
+        "title": "ライブセッションをまだ確認できません — その正確な理由は次のとおりです",
+        "description": "データベースが現在何をしているかは、そのデータベース内のセッションテーブルにのみ存在します。何かがそれをポーリングする必要があります。私たちは3つのことを確認します。",
         "checklistTitle": "確認した内容",
         "checks": {
           "queries": {
-            "ok": "クエリデータは届いています",
-            "okDetail": "{databases} からの {queries} — Top queries タブは機能しています",
+            "ok": "クエリデータが届いています",
+            "okDetail": "{queries} が {databases} から — Top queries タブは機能しています",
             "okDetailNoFleet": "{queries} — Top queries タブは機能しています",
             "no": "クエリデータも届いていません",
             "noDetail": "Top queries タブから始めてください — これらのデータベースからはまだ何も届いていません。"
           },
           "enabled": {
-            "ok": "データベースモニタリングは有効です",
-            "okDetail": "この組織では",
-            "no": "データベースモニタリングは無効です",
-            "noDetail": "収集を開始するには、設定で有効にしてください。"
+            "ok": "データベース監視が有効になっています",
+            "okDetail": "この組織に対して",
+            "no": "データベースモニタリングはオフになっています",
+            "noDetail": "収集を開始するには、設定でオンにしてください。"
           },
           "sampling": {
-            "no": "データベースのセッションテーブルをサンプリングするものがありません",
-            "noDetail": "セッションサンプルはコレクターから取得されます。データベースホストのコレクターレシピで db.server.query_sample を有効にしてください — セットアップページで説明されています。データベースモニタリングがオンになっている場合、OpenObserve はこのフィードを受け入れるため、修正はコレクター側で行います。"
+            "no": "データベースのセッションテーブルをサンプリングしているものはありません",
+            "noDetail": "セッションサンプルはコレクターから取得されます。データベースホストのコレクターレシピで db.server.query_sample を有効にしてください。セットアップページで手順を説明しています。OpenObserve はデータベースモニタリングがオンのときはいつでもこのフィードを受け入れるため、修正はコレクター側にあります。"
           }
         }
       }
     },
     "instanceMetrics": {
       "columnHeader": "インスタンスの健全性",
-      "columnHint": "コレクターがすでに送信しているメトリクスから、上限に対する接続数を示します。レシーバーがこのインスタンスを報告するまで空白です。",
+      "columnHint": "コレクターがすでに送信しているメトリクスに基づく、制限に対する接続数。レシーバーがこのインスタンスを報告するまで空白です。",
       "connectionsOf": "{used} / {limit} 接続",
       "connectionsNoLimit": "{used} 接続",
-      "noLimitHint": "このエンジンのレシーバーは接続上限を独自に公開しないため、件数のみが表示されます。セットアップカードの接続上限レシピ (sqlquery/mysql_limits) が max_connections を収集し、これをパーセンテージに変換します。",
-      "trendLabel": "選択したウィンドウ期間中の接続数",
+      "noLimitHint": "このエンジンのレシーバーは接続制限を独自に公開しないため、数のみが表示されます。セットアップカードの接続制限レシピ (sqlquery/mysql_limits) が max_connections を収集し、これをパーセンテージに変換します。",
+      "trendLabel": "選択した期間内の接続数",
       "cacheHit": "キャッシュヒット {percent}",
       "lagBytes": "レプリカ {value} 遅延",
       "lagSeconds": "レプリカ {value} 遅延",
       "deadlocks": "{count} デッドロック | {count} デッドロック",
-      "noTraffic": "このウィンドウではアプリケーショントラフィックがありません",
-      "noTrafficHint": "コレクターはこのインスタンスを報告していますが、このウィンドウ中にアプリケーションからのクエリはありませんでした。クエリ列が空なのは、何も測定されなかったためであり、高速だったからではありません。",
+      "noTraffic": "この期間にアプリケーショントラフィックがありません",
+      "noTrafficHint": "コレクターはこのインスタンスを報告していますが、この期間にアプリケーションからのクエリはありませんでした。クエリ列が空なのは、何も測定されなかったためであり、高速だったからではありません。",
       "unmatched": {
         "pooler": "このアドレスに一致するインスタンスメトリクスがありません",
-        "poolerHint": "この行は、アプリケーションが接続したアドレスです。コレクターは異なるホストを報告します。これは、間にコネクションプーラーがある場合の見え方です — プーラーのアドレスと実際のデータベースは決して一致しません。",
+        "poolerHint": "この行はアプリケーションが接続したアドレスです。コレクターは異なるホストを報告します。これは中間に接続プーラーがある場合の典型で、プーラーのアドレスと実際のデータベースは決して一致しません。",
         "loopback": "このアドレスに一致するインスタンスメトリクスがありません",
-        "loopbackHint": "この行は localhost を指しています。コレクターはループバックエンドポイントを自身のホスト名に書き換えるため、両方が正常でも2つの名前は決して一致しません。",
+        "loopbackHint": "この行は localhost を指しています。コレクターはループバックエンドポイントを自身のホスト名に書き換えるため、両方が正常でも2つの名前が一致することはありません。",
         "noReceiver": "{engine} レシーバーが報告していません",
-        "noReceiverHint": "アプリケーションはこのデータベースにクエリを実行していますが、{engine} レシーバーがサーバーメトリクスを送信していません。この列を埋めるには、{engine} レシーバーをコレクターに追加してください。",
-        "noReceiverMariadbHint": "アプリケーションはこの MariaDB サーバーにクエリを実行していますが、サーバーメトリクスを送信するものはありません。独立した MariaDB レシーバーは存在しないため、MySQL レシーバーをこのインスタンスに向けると、そのメトリクスがこの列に表示されます。",
+        "noReceiverHint": "アプリケーションはこのデータベースにクエリを実行していますが、{engine} レシーバーがサーバーメトリクスを送信していません。この列を埋めるには、コレクターに {engine} レシーバーを追加してください。",
+        "noReceiverMariadbHint": "アプリケーションはこの MariaDB サーバーにクエリを実行していますが、サーバーメトリクスを送信するものはありません。独立した MariaDB レシーバーは存在しないため、MySQL レシーバーをこのインスタンスに向けると、そのメトリクスがこの列を埋めます。",
         "engineUnsupported": "{engine} では収集されません",
-        "engineUnsupportedHint": "インスタンスメトリクスは PostgreSQL、MySQL、MariaDB で収集されます — {engine} にはまだレシーバーが設定されていないため、この列は空のままです。これはカバレッジに関する注記であり、健全性の判断ではありません。",
+        "engineUnsupportedHint": "インスタンスメトリクスは PostgreSQL、MySQL、MariaDB で収集されます。{engine} 用のレシーバーはまだ配線されていないため、この列は空のままです。これはカバレッジに関する注意であり、健全性の判定ではありません。",
         "unreadable": "インスタンスメトリクスを読み取れませんでした",
-        "unreadableHint": "メトリクスストリームは存在しますが、読み取れませんでした。これは通常、データベース自体の問題というよりも、権限の問題です。"
+        "unreadableHint": "メトリクスストリームは存在しますが読み取れませんでした。これは通常、データベース自体の問題ではなく、権限の問題です。"
       },
-      "limitUnknownHint": "接続数は取得できましたが、制限値が取得できなかったため、割合を表示できません。このコレクターで接続制限メトリックが有効になっているか確認してください。",
-      "noReading": "この期間の読み取りがありません",
-      "noReadingHint": "お使いのコレクターはこのインスタンスを報告していますが、この期間中に接続メトリックを送信しませんでした。レシーバーでメトリックがオフになっているか、インスタンスが報告を停止した可能性があります。",
+      "limitUnknownHint": "接続数は取得できましたが制限値が取得できなかったため、パーセンテージを表示できません。このコレクターで接続制限メトリクスが有効になっているか確認してください。",
+      "noReading": "この期間に読み取りがありません",
+      "noReadingHint": "コレクターはこのインスタンスを報告していますが、この期間に接続メトリクスを送信しませんでした。メトリクスがレシーバーでオフになっているか、インスタンスが報告を停止した可能性があります。",
       "lagLabel": "レプリカ遅延",
       "deadlockLabel": "デッドロック"
     },
     "tableHealth": {
       "title": "テーブルの健全性",
-      "subtitle": "各テーブルのサイズ、肥大化、バキューム状態を新しいスナップショット順に表示します。",
+      "subtitle": "各テーブルのサイズ、肥大化、バキューム状態。最新のスナップショットが最初に表示されます。",
       "searchPlaceholder": "テーブルを検索",
       "never": "なし",
-      "countersCumulative": "スキャン数とバキューム数は、最後の統計リセット以降の累計であり、選択した期間の件数ではありません。",
-      "tuplesEstimated": "行数と肥大化率は、データベースエンジンによる統計上の推定値であり、正確な数値ではありません。",
-      "notCollectingTitle": "テーブル統計はまだありません",
-      "notCollectingDescription": "この期間にテーブル統計を報告したものはありません。このシグナルは個別のコレクターレシピとして提供されます。",
+      "countersCumulative": "スキャン数とバキューム数は、最後の統計リセット以降の累計であり、選択した期間内の回数ではありません。",
+      "tuplesEstimated": "行数と肥大化率はデータベースエンジンによる統計推定値であり、正確な数値ではありません。",
+      "notCollectingTitle": "テーブル統計がまだありません",
+      "notCollectingDescription": "この期間にテーブル統計を報告したものはありません。このシグナルは独立したコレクターレシピとして提供されます。",
       "engineUnsupportedTitle": "このエンジンでは収集されません",
-      "engineUnsupportedDescription": "テーブルの健全性はエンジンごとのコレクターレシピで収集されますが、このエンジンにはレシピがないため、何も収集されません。これは問題がないことを意味するわけではありません。",
+      "engineUnsupportedDescription": "テーブルの健全性はエンジンごとのコレクターレシピで収集されますが、このエンジン用のレシピは提供されていないため、何も収集されません。これは問題がないという意味ではありません。",
       "checklistTitle": "収集を開始するには",
       "checkRecipe": "データベースセットアップガイドの pg_table_stats レシピをコレクター設定に追加してください。",
       "checkGrant": "コレクターユーザーに pg_monitor を付与して、pg_stat_user_tables を読み取れるようにしてください。",
-      "checkRange": "時間範囲を広げてください。レシピは60秒ごとに報告します。",
+      "checkRange": "時間範囲を広げてください。レシピは60秒に1回報告します。",
       "columns": {
         "relation": "テーブル",
         "instance": "インスタンス",
         "totalBytes": "合計サイズ",
         "heapBytes": "ヒープサイズ",
         "overheadBytes": "インデックス + TOAST",
-        "liveTuples": "生存行（推定）",
-        "deadTuples": "デッド行（推定）",
-        "deadTupPct": "肥大化（推定）",
-        "modSinceAnalyze": "分析以降の行数",
+        "liveTuples": "ライブ行数（推定）",
+        "deadTuples": "デッド行数（推定）",
+        "deadTupPct": "ブロート（推定）",
+        "modSinceAnalyze": "ANALYZE後の行数",
         "seqScanCount": "シーケンシャルスキャン（累計）",
         "seqTupRead": "シーケンシャルスキャンされた行数（累計）",
         "idxScanCount": "インデックススキャン（累計）",
-        "autovacuumCount": "自動バキューム（累計）",
+        "autovacuumCount": "自動VACUUM（累計）",
         "frozenXidAge": "Txid 経過時間",
-        "lastVacuum": "最終バキューム",
-        "lastAutovacuum": "最終自動バキューム",
-        "lastAnalyze": "最終分析"
+        "lastVacuum": "最終VACUUM",
+        "lastAutovacuum": "最終自動VACUUM",
+        "lastAnalyze": "最終ANALYZE"
       },
-      "countLine": "{count} 個のテーブル"
+      "countLine": "{count} テーブル"
     },
     "recommendations": {
       "title": "推奨事項",
-      "subtitle": "コレクターが既に報告している内容に対する決定論的なチェック。それぞれが、測定値と超えたしきい値を示します。",
-      "countersCumulative": "インデックススキャン数は、最後の統計リセット以降の累計であり、選択した期間の件数ではありません。",
-      "andMore": "他に {count} 件",
+      "subtitle": "コレクターが既に報告している内容に対する決定的なチェック。各チェックは、測定値と超えた閾値を示します。",
+      "countersCumulative": "インデックススキャン回数は、前回の統計リセット以降の累計であり、選択した期間の回数ではありません。",
+      "andMore": "および、他に {count} 件の同様なもの",
       "unused-index": {
-        "title": "未スキャンのインデックス",
-        "body": "{index} は {relation} 上で記録されたスキャンがなく、{size} を占有しています。",
-        "rule": "統計が最後にリセットされて以来、インデックススキャン数は0で、インデックスは少なくとも {bytes} バイトあります。スキャン数は累計であり、選択した期間の件数ではありません。",
-        "caveat": "累計カウントが0ということは、カウンターが最後にリセットされて以来、プランナーがこのインデックスを選択していないことを意味します。それでもレプリカ、定期的なジョブ、または制約で使用される可能性があります。"
+        "title": "スキャンされていないインデックス",
+        "body": "{relation} 上の {index} には記録されたスキャンがなく、{size} を占有しています。",
+        "rule": "統計の最終リセット以降、インデックススキャン回数は0で、インデックスは少なくとも {bytes} バイトあります。スキャン回数は累計であり、選択した期間の回数ではありません。",
+        "caveat": "累計カウントが0ということは、カウンターが最後にリセットされてからプランナーがこのインデックスを選択していないことを意味します。それでも、レプリカ、定期ジョブ、または制約で使用される可能性があります。"
       },
       "long-running-query": {
         "title": "長時間実行クエリ",
@@ -16593,19 +16176,19 @@
         "rule": "実行中のセッションが少なくとも {seconds} 秒間実行されています。アイドルセッションは除外されます。"
       },
       "high-impact-blocker": {
-        "title": "複数のセッションをブロックしているセッション",
-        "body": "セッション {pid} は、{count} 個のセッションが待機しているチェーンの先頭にいます。",
-        "rule": "ルートブロッカー — 他のセッションをブロックし、自分は待たないセッション — には、チェーン全体で数えて少なくとも {sessions} 個のセッションが後ろで待機しています。"
+        "title": "複数セッションをブロックしているセッション",
+        "body": "セッション {pid} は、{count} 個のセッションが待機しているチェーンの先頭にあります。",
+        "rule": "ルートブロッカー（他のセッションをブロックし、自分は待機しないセッション）の背後には、チェーン全体で少なくとも {sessions} 個のセッションが待機しています。"
       },
       "high-row-count": {
         "title": "呼び出しあたりの行数が多い",
-        "body": "このステートメントは、{rows} 行/回の平均を返しました（{calls} 回の呼び出しにわたって）。",
-        "rule": "1回の呼び出しあたりの平均行数は少なくとも {rows} で、少なくとも {calls} 回の呼び出しにわたります。平均は、サーバーの総行数を呼び出し回数で割ったものです。"
+        "body": "このステートメントは、{calls} 回の呼び出しで平均して1回あたり {rows} 行を返しました。",
+        "rule": "平均行数は1回あたり少なくとも {rows} 行で、少なくとも {calls} 回の呼び出しがあります。平均はサーバーの総行数を呼び出し回数で割ったものです。"
       },
       "enginePartialTitle": "一部のチェックは実行されませんでした",
-      "enginePartialDescription": "未使用インデックスのチェックにはインデックススキャンカウンターが必要ですが、このエンジンでは収集されないため、ここでの空のリストは完全なクリアを意味しません。",
-      "allClearTitle": "しきい値を超えたものはありません",
-      "allClearDescription": "すべてのチェックが実行され、この時間範囲でどのチェックもしきい値を超えませんでした。"
+      "enginePartialDescription": "未使用インデックスのチェックにはインデックススキャンカウンターが必要ですが、このエンジンでは収集されないため、ここで空のリストは問題がないことを意味しません。",
+      "allClearTitle": "閾値を超えたものはありません",
+      "allClearDescription": "すべてのチェックが実行され、この期間内に閾値を超えたものはありません。"
     }
   }
 }

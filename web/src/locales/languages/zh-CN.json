@@ -488,12 +488,6 @@
       "description": "实验会在数据集上运行变更、对每一行评分，并将结果固定下来，以便日后与基线进行对比。",
       "action": "新建实验",
       "actionDesc": "选择数据集、描述任务并选择要运行的评分器。"
-    },
-    "noRemoteTasks": {
-      "title": "尚无远程任务",
-      "description": "远程任务是你的实验调用以生成输出的 HTTP 服务。只需注册一次，验证连接正常，每个实验就可以固定其运行所依据的确切版本。",
-      "action": "注册任务",
-      "actionDesc": "将 OpenObserve 指向你的端点并测试连接。"
     }
   },
   "common": {
@@ -3731,10 +3725,10 @@
       "k8sTroubleWebhookQ": "安装失败，出现有关准入 webhook 的错误",
       "linuxAgentFixBody": "安装程序将代理作为 systemd 服务启动。如果没有内容到达，请确认它正在运行并阅读其日志以查找认证或连接错误：",
       "prepareMariadbTitle": "准备 MariaDB",
-      "prepareMariadbDesc": "创建监控用户——在 SQL 客户端中运行，**而非**你的 shell。",
-      "runCollectorMariadbDesc": "启动收集器（通过环境变量传递用户密码）。",
+      "prepareMariadbDesc": "创建监控用户 — 在 SQL 客户端中运行，**而不是**在 shell 中。",
+      "runCollectorMariadbDesc": "启动采集器（通过环境变量提供用户密码）。",
       "mariadbHostLabel": "MariaDB 主机",
-      "verifyMariadbMetricsDesc": "点击下方的测试，或在 Streams 中查看 `mysql_*` 指标（MariaDB 通过 MySQL 接收器上报）。",
+      "verifyMariadbMetricsDesc": "点击下方的“测试”，或在 Streams 中检查 `mysql_*` 指标（MariaDB 通过 MySQL 接收器上报）。",
       "mariadbTagline": "使用 OpenTelemetry Collector 收集 MariaDB 指标并将其发送到 OpenObserve。",
       "logsStreamNameLabel": "日志流名称",
       "macosAgentFixBody": "安装程序注册了两个 launchd 守护进程：代理本身和统一日志桥。如果没有内容到达，请确认两者都已加载并阅读代理的日志以查找认证或连接错误：",
@@ -4042,44 +4036,44 @@
       "verifyAndroidRumDesc": "在模拟器或设备上运行应用，在几个屏幕间移动，然后点击 Test — 原生 Android 事件会落入 `_rumdata` 流中。",
       "verifyIosRumDesc": "在模拟器或设备上运行应用，在几个屏幕间移动，然后点击 Test — 原生 iOS 事件会落入 `_rumdata` 流中。",
       "dbmPreparePostgresTitle": "数据库监控 · 授予访问权限（可选）",
-      "dbmPreparePostgresDesc": "**以上步骤单独即可完成** — 查询耗时已通过应用程序的追踪信息进入数据库监控，无需在此进行任何设置。最后的这些步骤会补充追踪永远无法看到的信息：死锁和被阻塞的查询，这些只有数据库自身才能记录。授予 `pg_monitor` 权限，以便收集器能够读取其他会话的查询——请在 SQL 客户端中执行，**而不是**在 shell 中执行。",
+      "dbmPreparePostgresDesc": "**以上所有内容本身已完备** — 查询耗时已经通过应用追踪到达数据库，这里无需设置。这些后续步骤添加的是追踪永远看不到的内容：死锁和被阻塞的查询，这些只有数据库本身才能记录。授予 `pg_monitor` 权限，以便采集器能读取其他会话的查询 — 在 SQL 客户端中运行，**而不是**在 shell 中。",
       "dbmPrepareMysqlTitle": "数据库监控 · 保留死锁历史（可选）",
       "dbmPrepareMariadbTitle": "数据库监控 · 保留死锁历史（可选）",
-      "dbmPrepareMysqlDesc": "**以上步骤单独即可完成** — 查询耗时已通过应用程序的追踪信息进入数据库监控，无需在此进行任何设置。最后的这些步骤会补充追踪永远无法看到的信息：死锁和被阻塞的查询，这些只有数据库自身才能记录。开启完整的死锁历史记录——请在 SQL 客户端中执行，**而不是**在 shell 中执行。",
-      "dbmPrepareMariadbDesc": "**以上步骤单独即可完成** — 查询耗时已通过应用程序的追踪信息进入数据库监控，无需在此进行任何设置。最后的这些步骤会补充追踪永远无法看到的信息：死锁和被阻塞的查询，这些只有数据库自身才能记录。开启完整的死锁历史记录——请在 SQL 客户端中执行，**而不是**在 shell 中执行。",
+      "dbmPrepareMysqlDesc": "**以上所有内容本身已完备** — 查询耗时已经通过应用追踪到达数据库，这里无需设置。这些后续步骤添加的是追踪永远看不到的内容：死锁和被阻塞的查询，这些只有数据库本身才能记录。开启完整的死锁历史 — 在 SQL 客户端中运行，**而不是**在 shell 中。",
+      "dbmPrepareMariadbDesc": "**以上所有内容本身已完备** — 查询耗时已经通过应用追踪到达数据库，这里无需设置。这些后续步骤添加的是追踪永远看不到的内容：死锁和被阻塞的查询，这些只有数据库本身才能记录。开启完整的死锁历史 — 在 SQL 客户端中运行，**而不是**在 shell 中。",
       "dbmPgLoggingTitle": "数据库监控 · 让 Postgres 记录死锁（可选）",
-      "dbmPgLoggingDesc": "死锁只会被写入 Postgres 日志，并且只有在以下设置开启时才会写入——因此这一步是让“死锁”选项卡能够显示内容的关键。前缀行必须完全匹配：收集器通过它来识别涉及了哪些会话，如果前缀不同，收集器虽然报告健康，但什么也找不到。",
+      "dbmPgLoggingDesc": "死锁只会在以下设置开启时被写入 Postgres 日志 — 因此这一步是让“死锁”选项卡真正有内容的关键。前缀行必须完全匹配：采集器通过它来识别涉及了哪些会话；如果前缀不同，它将什么都找不到，但仍会报告健康状态。",
       "dbmPgLoggingVerifyTitle": "数据库监控 · 检查设置是否生效（可选）",
-      "dbmPgLoggingVerifyDesc": "请在重启后运行此命令。如果任何值仍显示旧设置，说明 Postgres 是被重载而非重启，收集器将没有内容可读取。",
-      "dbmPgAutoExplainTitle": "数据库监控 · 捕获真实执行的计划（可选）",
-      "dbmPgAutoExplainDesc": "如果没有这一步，查询计划只是基于通用估算生成的，没有使用真实的参数值——虽然有用，但并非实际执行的计划。auto_explain 会记录 Postgres 实际执行的任何超过阈值的语句的计划，附带真实行数和真实耗时。它会给被采样的语句增加可测量的执行器开销，因此在应用到繁忙的主库之前，请阅读设置的注释，并与上面的日志记录步骤一起在同一次重启中启用。",
-      "dbmConfigureTitle": "数据库监控 · 配置收集器（可选）",
-      "dbmConfigurePostgresDesc": "写入 `dbm-config.yaml` — 在下方设置数据库和 Postgres 日志文件的路径。除了死锁和被阻塞的查询外，此配置还会开启活动样本和服务端 Top 查询（含预估计划）：收集器默认将这两项都设为 OFF，因此该文件中的顶层 `events:` 块正是用来启用它们的——没有它，收集器看起来正常，但不会发送任何数据。",
-      "dbmConfigureMysqlDesc": "写入 `dbm-config.yaml` — 在下方设置数据库和 MySQL 错误日志的路径。除了死锁和被阻塞的查询外，此配置还会开启活动样本和服务端 Top 查询：收集器默认将这两项都设为 OFF，因此该文件中的顶层 `events:` 块正是用来启用它们的——没有它，收集器看起来正常，但不会发送任何数据。",
-      "dbmConfigureMariadbDesc": "写入 `dbm-config.yaml` — 在下方设置数据库和 MariaDB 错误日志的路径。MariaDB 在此可获得死锁、被阻塞的查询、活动样本和 Top 查询：mysql 接收器使用 MariaDB 的协议进行通信并正确识别它。接收器自身报告了一个缺口——MariaDB 不公开采样的语句文本，因此活动行只能标识会话，而无法显示其 SQL。",
-      "dbmRunTitle": "数据库监控 · 运行收集器（可选）",
-      "dbmRunPostgresDesc": "同时运行两个配置。请使用你在第 1 步中创建的相同角色和密码。",
-      "dbmRunMysqlDesc": "同时运行两个配置。请使用你在第 1 步中创建的相同用户和密码。",
-      "dbmRunMariadbDesc": "同时运行两个配置。请使用你在第 1 步中创建的相同用户和密码。",
+      "dbmPgLoggingVerifyDesc": "在重启后运行此命令。如果任何值仍然显示旧设置，说明 Postgres 是被重新加载而不是重启，采集器将没有任何可读取的内容。",
+      "dbmPgAutoExplainTitle": "数据库监控 · 捕获真实执行计划（可选）",
+      "dbmPgAutoExplainDesc": "如果没有这一步，查询计划是在没有真实参数值的情况下计算出的通用估算值 — 虽然有用，但绝不是实际执行的计划。auto_explain 会记录 Postgres 实际执行的、任何慢于阈值的语句的计划，包含真实的行数和真实的耗时。它会给所采样的语句增加可测量的执行器开销，因此在应用到繁忙的主库之前，请先阅读设置项中的注释，并将其与上面的日志记录步骤放在同一次重启中完成。",
+      "dbmConfigureTitle": "数据库监控 · 配置采集器（可选）",
+      "dbmConfigurePostgresDesc": "写入 `dbm-config.yaml` — 在下方设置数据库和 Postgres 日志文件的路径。除了死锁和被阻塞的查询之外，此配置还会开启活动采样和服务器热门查询（含估算计划）：采集器默认将两者都设为 OFF，因此此文件中的顶层 `events:` 块就是启用它们的关键 — 如果没有它，采集器看起来正常但什么也不会发送。",
+      "dbmConfigureMysqlDesc": "写入 `dbm-config.yaml` — 在下方设置数据库和 MySQL 错误日志的路径。除了死锁和被阻塞的查询之外，此配置还会开启活动采样和服务器热门查询：采集器默认将两者都设为 OFF，因此此文件中的顶层 `events:` 块就是启用它们的关键 — 如果没有它，采集器看起来正常但什么也不会发送。",
+      "dbmConfigureMariadbDesc": "写入 `dbm-config.yaml` — 在下方设置数据库和 MariaDB 错误日志的路径。MariaDB 在这里获得死锁、被阻塞的查询、活动采样和热门查询：mysql 接收器使用 MariaDB 的协议并能正确识别它。接收器自身报告的一个缺口是 — MariaDB 不公开采样语句的文本，因此活动行只会标识会话，而不会显示其 SQL。",
+      "dbmRunTitle": "数据库监控 · 运行采集器（可选）",
+      "dbmRunPostgresDesc": "同时运行两个配置。使用你在第 1 步中创建的角色和密码。",
+      "dbmRunMysqlDesc": "同时运行两个配置。使用你在第 1 步中创建的用户和密码。",
+      "dbmRunMariadbDesc": "同时运行两个配置。使用你在第 1 步中创建的用户和密码。",
       "dbmVerifyTitle": "数据库监控 · 查看死锁和被阻塞的查询",
-      "dbmVerifyDesc": "打开 **基础设施 → 数据库**，选择下方的一个标签页。只要数据库报告事件，事件就会立即出现——标签页为空表示没有发生任何事件，或者没有收集到任何数据。",
-      "dbmVerifyFullDesc": "打开 **基础设施 → 数据库**，选择下方的一个标签页。只要数据库报告，死锁和被阻塞的查询就会立即出现；采集器启动后一分钟内，“活动”标签页会填充采样会话，在 MySQL 8.0.22 及更高版本中，查询详情页会显示估计执行计划。首次 60 秒快照后，表健康状态开始填充。",
+      "dbmVerifyDesc": "打开 **基础设施 → 数据库** 并在下方选择一个选项卡。事件会在数据库上报后立即出现 — 空的选项卡能告诉你是什么都没发生，还是没有任何数据在收集。",
+      "dbmVerifyFullDesc": "打开 **基础设施 → 数据库** 并在下方选择一个选项卡。死锁和被阻塞的查询会在数据库上报后立即出现；采集器启动后一分钟内，“活动”选项卡就会填满采样会话，而估算计划会出现在 MySQL 8.0.22 及更高版本的查询详情页上。表健康状况在首次 60 秒快照后填充。",
       "dbmDatabaseLabel": "数据库",
       "dbmPgLogPathLabel": "Postgres 日志文件",
-      "dbmPgLogPathHelp": "采集器必须能够读取此文件。可通过以下命令找到它：SHOW log_directory;",
+      "dbmPgLogPathHelp": "采集器必须能够读取此文件。通过以下命令找到它：SHOW log_directory;",
       "dbmMysqlLogPathLabel": "MySQL 错误日志",
       "dbmMariadbLogPathLabel": "MariaDB 错误日志",
-      "dbmMysqlLogPathHelp": "采集器必须能够读取此文件。可通过以下命令找到它：SHOW VARIABLES LIKE 'log_error';",
-      "dbmMariadbLogPathHelp": "采集器必须能够读取此文件。可通过以下命令找到它：SHOW VARIABLES LIKE 'log_error';",
+      "dbmMysqlLogPathHelp": "采集器必须能够读取此文件。通过以下命令找到它：SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "采集器必须能够读取此文件。通过以下命令找到它：SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "数据库监控 · 授予访问权限（可选）",
-      "dbmPrepareMssqlDesc": "**以上所有内容本身已经完整** —— 查询计时已经从应用程序的追踪中到达数据库，无需在此进行任何设置。最后一组增加的是追踪永远无法看到的内容：死锁和被阻塞的查询，这些只有数据库本身才能记录。两个授权都需要——一个让采集器读取其他会话，另一个让它读取死锁历史。请在 SQL 客户端中运行它们，**而不是**在您的 shell 中。",
-      "dbmConfigureMssqlDesc": "写入 `dbm-config.yaml` —— 在下面设置要连接的数据库。SQL Server 将在此处获得死锁、被阻塞的查询、活动样本、顶层查询和执行计划。sqlserver 接收器读取整个实例，因此活动样本和顶层查询不限于您上面指定的数据库。",
-      "dbmRunMssqlDesc": "同时运行两个配置。请使用您在步骤 1 中创建的登录名和密码。",
-      "dbmVerifyBlockingDesc": "打开 **基础设施 → 数据库 → 被阻塞的查询**。一旦采样到等待锁的会话，它就会立即出现——标签页为空表示没有阻塞，或者没有收集到任何数据。",
-      "dbmVerifyFullNoSampleTextDesc": "打开 **基础设施 → 数据库**，选择下方的一个标签页。只要数据库报告，死锁和被阻塞的查询就会立即出现；采集器启动后一分钟内，“活动”标签页会填充采样会话，并且顶层查询会在查询详情页上附带其执行计划。MariaDB 不公开采样的语句文本，因此活动行只显示会话名称而不显示其 SQL。首次 60 秒快照后，表健康状态开始填充。",
-      "dbmVerifyFullPlainPlansDesc": "打开 **基础设施 → 数据库**，选择下方的一个标签页。只要数据库报告，死锁和被阻塞的查询就会立即出现；采集器启动后一分钟内，“活动”标签页会填充采样会话，并且查询详情页会显示执行计划。首次 60 秒快照后，表健康状态开始填充。",
-      "dbmVerifyFullSlowTableHealthDesc": "打开 **基础设施 → 数据库**，选择下方的一个标签页。只要数据库报告，死锁和被阻塞的查询就会立即出现；采集器启动后一分钟内，“活动”标签页会填充采样会话，并且查询详情页会显示估计执行计划。表健康状态最多需要五分钟——读取表大小的速度会随着 schema 的增长而变慢，因此它的运行频率低于其他项。",
-      "dbmVerifyTableHealthDesc": "打开 **基础设施 → 数据库**，选择下方的一个标签页。只要数据库报告，死锁和被阻塞的查询就会立即出现——标签页为空表示没有发生任何事情，或者没有收集到任何数据。首次 60 秒快照后，表健康状态开始填充。"
+      "dbmPrepareMssqlDesc": "**以上所有内容本身已经完整** — 查询计时已经通过应用程序的追踪到达数据库，无需在此进行任何设置。这最后一组添加了追踪永远无法看到的内容：死锁和被阻止的查询，这些只有数据库本身才能记录。两个授权都是必需的 — 一个让收集器读取其他会话，另一个让它读取死锁历史。请在 SQL 客户端中运行它们，**而不是**你的 shell。",
+      "dbmConfigureMssqlDesc": "写入 `dbm-config.yaml` — 在下面设置要连接的数据库。SQL Server 在此获取死锁、被阻止的查询、活动采样、TOP 查询和执行计划。sqlserver 接收器会读取整个实例，因此活动和 TOP 查询不限于你上面命名的数据库。",
+      "dbmRunMssqlDesc": "一起运行两个配置。使用你在步骤 1 中创建的同一登录名和密码。",
+      "dbmVerifyBlockingDesc": "打开 **基础设施 → 数据库 → 被阻止的查询**。等待锁的会话一旦被采样就会立即出现 — 那里的空标签页告诉你是没有发生阻塞，还是没有收集到任何内容。",
+      "dbmVerifyFullNoSampleTextDesc": "打开 **基础设施 → 数据库**，然后选择下面的标签页。一旦数据库报告死锁和被阻止的查询，它们就会立即出现；活动标签页会在收集器启动后一分钟内填满采样会话，TOP 查询在其详情页上带有相应计划。MariaDB 不暴露采样的语句文本，因此活动行会标识会话而不显示其 SQL。表健康度在第一次 60 秒快照后填充。",
+      "dbmVerifyFullPlainPlansDesc": "打开 **基础设施 → 数据库**，然后选择下面的标签页。一旦数据库报告死锁和被阻止的查询，它们就会立即出现；活动标签页会在收集器启动后一分钟内填满采样会话，执行计划会出现在查询的详情页上。表健康度在第一次 60 秒快照后填充。",
+      "dbmVerifyFullSlowTableHealthDesc": "打开 **基础设施 → 数据库**，然后选择下面的标签页。一旦数据库报告死锁和被阻止的查询，它们就会立即出现；活动标签页会在收集器启动后一分钟内填满采样会话，估算计划会出现在查询的详情页上。表健康度最多需要五分钟 — 随着模式增长，读取表大小的速度会变慢，因此它运行的频率低于其他部分。",
+      "dbmVerifyTableHealthDesc": "打开 **基础设施 → 数据库**，然后选择下面的标签页。一旦数据库报告死锁和被阻止的查询，它们就会立即出现 — 那里的空标签页告诉你是什么都没有发生，还是没有收集到任何内容。表健康度在第一次 60 秒快照后填充。"
     },
     "instrumentBeforeImportTitle": "在导入客户端之前插桩",
     "instrumentBeforeImportBody": "如果您的应用运行但没有任何跨度到达，则插桩可能是在导入客户端之后加载的。请调整顺序，让初始化先运行：",
@@ -4565,7 +4559,7 @@
     "folders": "文件夹",
     "searchFolder": "搜索文件夹",
     "folderIcon": "图标",
-    "folderIconAria": "选择一个文件夹图标",
+    "folderIconAria": "选择文件夹图标",
     "deleteFolder": "删除文件夹",
     "deleteFolderMessage": "确定要删除此文件夹吗？",
     "trellisLayout": "网格布局",
@@ -7454,12 +7448,12 @@
         "noConstants": "所选的模式没有可匹配的独特文本。",
         "sqlModeFilterDropped": "您的 SQL 查询未被保留——告警仅匹配所选模式。",
         "patternsUnusable": "此页面上的模式均没有可匹配的独特文本，因此告警仅使用您的搜索。",
-        "dbmRollupLag": "数据库数据每 {minutes} 分钟聚合一次，因此此警报只能以该频率触发——它不是实时页面。",
-        "dbmFingerprintVersion": "此警报固定在某一个查询的确切形态上。如果查询分组方式发生变化，警报可能不再匹配，应重新创建。",
+        "dbmRollupLag": "数据库数字每 {minutes} 分钟聚合一次，因此此警报只能以该频率触发 — 它不是实时页面。",
+        "dbmFingerprintVersion": "此警报固定为某个查询的确切形状。如果查询分组方式发生变化，警报可能无法匹配，应重新创建。",
         "dbmNoFingerprint": "此查询没有稳定的标识符，因此警报改为监视整个数据库。",
-        "dbmServerVantage": "这衡量的是数据库服务器本身报告的锁信息，而不是您的应用程序等待了多长时间。请勿将其与查询延迟警报进行比较。",
-        "dbmLockSampling": "锁活动按时间间隔采样，因此两次采样之间发生并解除的争用不会被记录。警报安静并不能证明没有阻塞。",
-        "dbmNoInstance": "未识别到单个数据库实例，因此此警报监视此引擎的所有实例。"
+        "dbmServerVantage": "这衡量的是数据库服务器本身报告的锁信息，而不是你的应用程序等待的时间。不要将其与查询延迟警报进行比较。",
+        "dbmLockSampling": "锁活动按间隔采样，因此两次采样之间发生并清除的争用永远不会被记录。警报保持安静并不证明没有阻塞。",
+        "dbmNoInstance": "未识别出单个数据库实例，因此此警报监视此引擎的每个实例。"
       }
     },
     "saveFailed": "无法保存警报。",
@@ -7500,7 +7494,7 @@
   },
   "alert_library": {
     "header": "警报库",
-    "subtitle": "精选的、可随时安装的警报，与您已摄取的数据匹配",
+    "subtitle": "精心策划、可直接安装的警报，与你已摄取的数据匹配",
     "sectionTab": "库",
     "contribute": "在 GitHub 上贡献",
     "searchPlaceholder": "按名称、描述或流搜索",
@@ -7511,96 +7505,96 @@
     "noCategoryMatch": "没有匹配的类别。",
     "selectedCount": "已选择 {count} 项",
     "facetAria": "{label}，{count} 个警报",
-    "severity": "严重级别",
+    "severity": "严重程度",
     "severityAll": "全部",
     "severityCritical": "严重",
     "severityWarning": "警告",
     "severityInfo": "信息",
-    "statReady": "准备安装",
+    "statReady": "可安装",
     "statNeedsData": "未摄取",
     "statAll": "全部",
     "notIngested": "未摄取：{stream}",
-    "notIngestedHint": "此组织未接收 {stream}，因此该警报永远不会触发。仍然安装它，一旦数据到达，它就会开始工作。",
+    "notIngestedHint": "此组织未接收 {stream}，因此此警报永远不会触发。还是安装它吧，一旦数据到达，它就会开始工作。",
     "alertCount": "{count} 个警报 | {count} 个警报",
-    "noCollectorTitle": "这里还没有任何内容与您的数据匹配",
-    "noCollectorDescription": "这些 {count} 个警报均未查询此组织正在接收的流。将 {group} 遥测数据发送到 OpenObserve，它们就会在这里显示。",
+    "noCollectorTitle": "这里还没有与你的数据匹配的内容",
+    "noCollectorDescription": "这些 {count} 个警报都没有查询此组织正在接收的流。向 OpenObserve 发送 {group} 遥测数据，它们就会在此处出现。",
     "setupGuide": "摄取指南",
     "emptyLibraryTitle": "警报库为空",
-    "emptyLibraryDescription": "目录已加载，但不包含任何警报。这是发布问题，而非过滤问题 — 请稍后重试。",
-    "noMatchesTitle": "没有警报符合这些筛选条件",
-    "noMatchesDescription": "尝试其他类别、严重级别或搜索词。",
-    "clearFilters": "清除筛选",
+    "emptyLibraryDescription": "目录已加载，但不包含任何警报。这是发布问题，而非筛选问题——请稍后重试。",
+    "noMatchesTitle": "没有警报匹配这些筛选条件",
+    "noMatchesDescription": "请尝试其他类别、严重级别或搜索词。",
+    "clearFilters": "清除筛选条件",
     "loadFailedTitle": "无法加载警报库",
     "retry": "重试",
     "openDetails": "打开 {title}",
     "drawer": {
       "dataAvailable": "数据可用",
       "streamNotFound": "未找到流",
-      "detects": "检测内容",
+      "detects": "它检测什么",
       "noDescription": "库中没有描述。",
-      "needsDataCallout": "此警报查询 {stream}，而此组织未接收该流。现在安装将创建一个永远不会触发的警报。",
+      "needsDataCallout": "此警报查询的 {stream} 是该组织未接收的流。现在安装它将创建一个永远不会触发的警报。",
       "query": "查询",
       "stream": "流",
       "streamType": "流类型",
       "metricCondition": "指标条件",
-      "matchCount": "所需匹配行数",
+      "matchCount": "需要匹配的行数",
       "previewBlocked": "{stream} 不是此组织中的流，因此没有可评估的内容。",
       "wouldTrigger": "会触发",
       "wouldNotTrigger": "不会触发",
       "loading": "正在从库中加载此警报",
       "loadFailed": "无法从库中加载此警报。",
       "customize": "在编辑器中自定义",
-      "customizeHint": "打开预填了此警报的标准警报编辑器。",
+      "customizeHint": "打开已预填此警报的标准警报编辑器。",
       "customizeFailed": "无法在编辑器中打开此警报。",
       "install": "安装",
       "neverIngested": "尚无数据",
-      "neverIngestedCallout": "{stream} 存在但从未接收过数据，因此此警报没有可触发的内容。",
+      "neverIngestedCallout": "{stream} 存在但从未接收过数据，因此此警报没有任何可触发的内容。",
       "lastData": "最后数据 {when}",
-      "staleCallout": "{stream} 最后接收数据的时间为 {when}。在摄取恢复之前，此警报将保持静默。",
+      "staleCallout": "{stream} 最后接收数据的时间是 {when}。在数据摄入恢复之前，此警报将保持静默。",
       "unknownTime": "在未知时间"
     },
     "install": {
       "title": "从库中安装",
-      "subtitle": "选择警报通知的目标、要安装的警报以及归档位置。",
+      "subtitle": "选择警报通知的位置、要安装的警报以及归档位置。",
       "stepDestination": "目标",
       "stepAlerts": "警报",
       "stepFolder": "文件夹",
       "stepTune": "调整",
       "stepInstall": "安装",
-      "destinationIntro": "此批次中的每个警报都会向您在此处选择的目标发送通知。库文件会列出其导出组织中的目标，而这些目标在您的组织中不存在。",
+      "destinationIntro": "此批次中的每个警报都会通知您在此处选择的目标。库文件命名的是其导出组织中的目标，而这些目标在您的组织中不存在。",
       "destinationLabel": "目标",
       "destinationPlaceholder": "选择目标",
       "destinationsLoadFailed": "无法加载您现有的目标。",
       "retry": "重试",
-      "destinationsNoneBody": "此组织尚无警报目标，因此这些警报无处通知。请在“目标”页面上创建一个，然后返回此处选择它。",
-      "openDestinations": "打开目标页面",
+      "destinationsNoneBody": "此组织尚无警报目标，因此这些警报无处通知。请在“目标”页面创建一个，然后返回此处选择它。",
+      "openDestinations": "打开目标",
       "selectAll": "全选",
       "clear": "清除",
-      "selectedCount": "已选 {count} 项（共 {total} 项）",
-      "folderIntro": "已安装的警报会归档在这里。如果此批次需要单独管理，可通过 + 按钮创建文件夹。",
-      "tuneToggle": "为这批警报中的每一条设置这些选项",
-      "tuneHint": "只有这两个选项可以安全地应用于整个批次。阈值仍按警报单独设置——如需更改，请打开该警报并单独安装。",
-      "frequency": "运行频率",
+      "selectedCount": "已选择 {count} / {total}",
+      "folderIntro": "已安装的警报归档在此处。如果此批次需要单独的文件夹，请使用 + 按钮创建。",
+      "tuneToggle": "为此批次中的每个警报设置这些",
+      "tuneHint": "只有这两个可以安全地用于整个批次。阈值保持每个警报独立——要更改某个阈值，请打开该警报并单独安装。",
+      "frequency": "运行间隔",
       "silence": "静默时长",
-      "minutes": "分钟",
+      "minutes": "分",
       "summaryTuningNone": "库默认值",
-      "summaryTuningOverride": "每 {frequency} 分钟运行，静默 {silence} 分钟",
-      "run": "安装 {count} 条警报 | 安装 {count} 条警报",
+      "summaryTuningOverride": "每 {frequency} 分钟，静默 {silence} 分钟",
+      "run": "安装 {count} 个警报 | 安装 {count} 个警报",
       "retryFailed": "重试 {count} 个失败 | 重试 {count} 个失败",
-      "allInstalled": "已安装 {count} 条警报 | 已安装 {count} 条警报",
+      "allInstalled": "{count} 个警报已安装 | {count} 个警报已安装",
       "someFailed": "已安装 {installed}，失败 {failed}",
       "unknownError": "无法创建警报。",
-      "unreadableConditions": "此警报的筛选条件格式当前版本无法读取。安装它会创建一个无筛选条件的警报，因此已跳过。",
+      "unreadableConditions": "此警报的筛选条件格式是此版本无法读取的。安装它将创建一个没有筛选器的警报，因此已跳过。",
       "back": "返回",
       "next": "下一步",
       "cancel": "取消",
       "done": "完成"
     },
     "error": {
-      "network": "无法访问库。请检查网络连接后重试。",
+      "network": "无法访问库。请检查网络连接并重试。",
       "http": "库服务器返回错误。请稍后重试。",
-      "unparseable": "库返回的内容不是目录。",
-      "unsupported_version": "此库目录的版本高于当前 OpenObserve 版本可读取的范围。请升级后浏览。",
+      "unparseable": "库的响应不是目录。",
+      "unsupported_version": "此库目录比此版本的 OpenObserve 能读取的版本新。请升级以浏览它。",
       "malformed": "库目录不完整或已损坏。"
     }
   },
@@ -10197,7 +10191,7 @@
     "copyPattern": "复制模式",
     "copied": "已复制！",
     "pricingTiers": "定价等级",
-    "pricingTiersDesc": "第一层是默认的。满足使用条件时，将适用其他等级。",
+    "pricingTiersDesc": "第一层是默认层。其他层在其使用条件和 UTC 时间窗口满足时生效。",
     "tierName": "等级名称",
     "applyTierWhen": "在以下情况下应用此等级",
     "quickSetup": "快速设置：",
@@ -10289,7 +10283,25 @@
     "saveShadowedWarning": "已保存，但此条目被具有相同模式和更高优先级的 “{winner}” 所掩盖。除非删除或禁用其他条目，否则它永远不会用于成本计算。",
     "modelPricingSaved": "模型定价已保存",
     "errSave": "保存失败",
-    "errLoadModel": "加载模型失败"
+    "errLoadModel": "加载模型失败",
+    "tierDefaultName": "默认",
+    "timeWindows": "活跃时间（UTC）",
+    "timeWindowsDesc": "将此层限制为周期性 UTC 小时，适用于对高峰和低谷费率计费的提供商。",
+    "timeWindowFrom": "从",
+    "timeWindowTo": "到",
+    "addTimeWindow": "添加时间窗口",
+    "removeTimeWindow": "移除时间窗口",
+    "addUsageCondition": "添加使用条件",
+    "removeUsageCondition": "移除使用条件",
+    "timeWindowInvalid": "层 \"{name}\"：请输入 HH:MM（24 小时 UTC）格式的时间。",
+    "timeWindowSameBounds": "层 \"{name}\"：开始和结束时间必须不同。移除该窗口以让此层始终处于活跃状态。",
+    "timeWindowWrapsHint": "跨越 UTC 午夜。",
+    "tierNeedsRestriction": "层 \"{name}\" 没有使用条件也没有时间窗口，因此永远不会生效。请添加一个，或删除该层。",
+    "timeBasedChip": "按时间",
+    "tierAlwaysActive": "始终活跃（默认）",
+    "testAtTimeLabel": "在 UTC 时间测试",
+    "testAtTimeHint": "留空以使用当前时间。高峰/低谷层将以此时间为准。",
+    "localTimeHint": "在您的时区：{range}"
   },
   "aiObservability": {
     "title": "LLM 可观测性",
@@ -10360,9 +10372,7 @@
       "quality": "质量",
       "evalJobs": "评估任务",
       "scorers": "评分器",
-      "scoreConfigs": "分数配置",
-      "remoteTasks": "远程任务",
-      "playground": "试验场"
+      "scoreConfigs": "分数配置"
     },
     "subtitle": {
       "llmInsights": "跟踪 LLM 流量的延迟、错误、Token 和成本",
@@ -10376,8 +10386,7 @@
       "quality": "跨 span、trace 和 session 评估跟踪评分质量",
       "evalJobs": "在会话中运行和监控评估任务",
       "scorers": "创建和管理用于评判 LLM 输出的评分器",
-      "scoreConfigs": "配置评估时使用的评分标准",
-      "remoteTasks": "实验可调用的 HTTP 服务——注册一次，版本化，可复用"
+      "scoreConfigs": "配置评估时使用的评分标准"
     },
     "annotate": {
       "button": "标注",
@@ -10744,8 +10753,7 @@
           "providerRequired": "选择提供商",
           "userPromptRequired": "用户消息为必填项",
           "trialCountRange": "试验次数必须在 1 到 100 之间",
-          "temperatureRange": "温度必须在 0 到 2 之间",
-          "taskRefRequired": "选择远程任务"
+          "temperatureRange": "温度必须在 0 到 2 之间"
         },
         "previewIncomplete": "完成任务部分以查看将运行的内容。",
         "providerRefresh": "刷新提供商",
@@ -10759,19 +10767,7 @@
         "temperatureDeterministic": "0 — 模型每次都以相同方式回答。",
         "trialsDeterministicWarning": "在温度为 0 时，每次试验都会返回相同的答案。",
         "pageTitle": "新建实验",
-        "nameLabel": "名称",
-        "taskTypeLabel": "任务类型",
-        "taskTypeInline": "内联提示",
-        "taskTypeInlineHelp": "在此编写提示词并针对提供商运行。",
-        "taskTypeRemote": "远程任务",
-        "taskTypeRemoteHelp": "调用您自己的 HTTP 服务来生成输出。",
-        "remoteTaskLabel": "远程任务",
-        "remoteTaskPlaceholder": "选择已注册的任务",
-        "remoteTaskHelp": "固定在此版本。以后发布新版本不会更改此运行。",
-        "remoteTaskEmpty": "尚无远程任务发布版本。请注册一个并让其通过测试连接，然后实验才能使用它。",
-        "taskTimeoutLabel": "超时（秒）",
-        "taskConcurrencyLabel": "最大并发",
-        "taskOverrideHelp": "覆盖此运行的任务注册值。"
+        "nameLabel": "名称"
       },
       "columns": {
         "name": "名称",
@@ -11154,417 +11150,6 @@
         "clamp": "基线仅运行了 {duration}——比较每个版本的第一个 {duration}。",
         "labelNoEnv": "{version} — {window} · {count} 条追踪"
       }
-    },
-    "remoteTasks": {
-      "listTitle": "远程任务",
-      "searchPlaceholder": "搜索任务",
-      "newButton": "注册任务",
-      "loadError": "无法加载远程任务",
-      "columns": {
-        "name": "名称",
-        "version": "版本",
-        "endpoint": "端点",
-        "method": "方法",
-        "auth": "认证",
-        "signing": "签名",
-        "status": "状态",
-        "referencedBy": "被引用",
-        "updated": "更新时间",
-        "actions": "操作"
-      },
-      "auth": {
-        "none": "无",
-        "bearer": "Bearer",
-        "basic": "Basic",
-        "apiKeyHeader": "API 密钥"
-      },
-      "status": {
-        "published": "已发布",
-        "draft": "草稿",
-        "failed": "测试失败",
-        "retired": "已停用"
-      },
-      "statusHint": {
-        "published": "实验可以固定此版本。",
-        "draft": "从未发布。在测试连接通过之前，实验无法引用它。",
-        "retired": "已删除。已发布的版本保留以供历史记录，但不再可被引用。"
-      },
-      "signingOn": "HMAC",
-      "referencedBy": "{count} 个实验 | {count} 个实验",
-      "edit": "编辑",
-      "editSecretLocked": "带有存储凭据的任务尚无法编辑：平台永远不会返回机密引用，因此无法发回草稿。",
-      "delete": {
-        "title": "删除远程任务",
-        "message": "删除“{name}”？其已发布版本会保留以供历史记录，但不再可被引用，因此任何固定到其中一个版本的实验都将无法启动。",
-        "success": "远程任务已删除",
-        "error": "无法删除远程任务"
-      },
-      "form": {
-        "createTitle": "注册远程任务",
-        "editTitle": "编辑远程任务",
-        "backTo": "远程任务",
-        "identitySection": "身份",
-        "endpointSection": "端点",
-        "authSection": "认证",
-        "contractSection": "请求契约",
-        "limitsSection": "限制",
-        "signingSection": "请求签名",
-        "nameLabel": "名称",
-        "namePlaceholder": "例如：rag-pipeline-staging",
-        "descriptionLabel": "描述",
-        "descriptionPlaceholder": "此服务的用途及负责人",
-        "methodLabel": "方法",
-        "endpointLabel": "端点 URL",
-        "endpointPlaceholder": "https://tasks.example.com/run",
-        "endpointHelp": "公共主机上的 https URL，不含凭据和片段。",
-        "authTypeLabel": "认证类型",
-        "tokenLabel": "令牌",
-        "tokenPlaceholder": "仅粘贴一次，加密存储",
-        "usernameLabel": "用户名",
-        "passwordLabel": "密码",
-        "headerNameLabel": "标头名称",
-        "headerNamePlaceholder": "x-api-key",
-        "headersLabel": "自定义标头",
-        "headerKeyPlaceholder": "x-team",
-        "headerValuePlaceholder": "搜索",
-        "addHeader": "添加标头",
-        "removeHeader": "移除标头",
-        "templateLabel": "请求体模板",
-        "templateHelp": "每一行都会渲染为 JSON。只有下面的占位符会被识别；保存时其他内容都会被拒绝。",
-        "templateVariables": "占位符",
-        "insertPlaceholder": "插入 {name}",
-        "responsePathLabel": "输出路径",
-        "responsePathHelp": "从你的服务的 JSON 响应中读取生成输出的位置。支持根路径、点号分隔字段、带引号的括号步骤和数字索引。",
-        "timeoutLabel": "超时（秒）",
-        "attemptsLabel": "最大尝试次数",
-        "concurrencyLabel": "最大并发数",
-        "limitsHelp": "可在每个实验中覆盖。",
-        "signingToggle": "为每个请求签名",
-        "signingKeyLabel": "签名密钥",
-        "signingKeyOnce": "在测试连接之前，将此内容复制到你的服务中。你的服务会收到：",
-        "regenerateKey": "生成新密钥",
-        "submit": "测试连接并注册",
-        "submitRetry": "重试测试并发布",
-        "submitEdit": "测试连接并发布",
-        "saveDraft": "保存为草稿",
-        "saveDraftBlocked": "带有凭据的任务无法保存为草稿，因为之后无法重新打开草稿。请改为通过测试连接进行注册。",
-        "publishedSuccess": "已发布为版本 {version}",
-        "republishedSuccess": "描述已更新。版本 {version} 未更改。",
-        "draftSuccess": "草稿已保存。测试连接以发布它。",
-        "draftError": "无法保存草稿",
-        "publishFailed": "测试连接失败，因此未发布任何内容。你的草稿已保存。",
-        "createError": "无法注册远程任务",
-        "validation": {
-          "nameRequired": "名称为必填项",
-          "endpointRequired": "端点 URL 为必填项",
-          "endpointHttps": "端点必须是 https URL",
-          "tokenRequired": "令牌为必填项",
-          "usernameRequired": "用户名为必填项",
-          "passwordRequired": "密码为必填项",
-          "headerNameRequired": "标头名称为必填项",
-          "headerKeyRequired": "标头名称为必填项",
-          "headerValueRequired": "标头值为必填项",
-          "headerReserved": "此标头名称由平台设置，无法覆盖",
-          "responsePathRequired": "输出路径为必填项",
-          "responsePathRoot": "输出路径必须以美元符号开头",
-          "timeoutRange": "超时必须在 1 到 600 秒之间",
-          "attemptsRange": "最大尝试次数必须在 1 到 3 之间",
-          "concurrencyRange": "最大并发数必须在 1 到 32 之间",
-          "signingKeyRequired": "无法生成签名密钥。请重试。"
-        }
-      },
-      "generatedSigning": {
-        "title": "复制你的签名密钥",
-        "body": "此密钥仅显示一次，之后不再显示。你的服务需要它来验证签名标头。",
-        "keyIdLabel": "密钥 ID",
-        "keyLabel": "密钥",
-        "copy": "复制密钥",
-        "copied": "已复制",
-        "done": "我已保存"
-      },
-      "testPanel": {
-        "title": "测试连接",
-        "sourceLabel": "示例输入",
-        "sourceDataset": "来自数据集",
-        "sourceManual": "手动",
-        "datasetLabel": "数据集",
-        "datasetPlaceholder": "选择一个数据集",
-        "datasetEmpty": "此数据集没有可采样的项目。",
-        "datasetError": "无法加载数据集",
-        "inputLabel": "输入",
-        "inputPlaceholder": "文本或 JSON 值",
-        "metadataLabel": "元数据",
-        "metadataPlaceholder": "一个 JSON 对象",
-        "run": "测试连接",
-        "running": "正在调用端点…",
-        "passed": "连接验证成功",
-        "failed": "连接失败",
-        "statusCode": "状态",
-        "latency": "延迟",
-        "output": "提取的输出",
-        "rawRequest": "请求已发送",
-        "rawResponse": "已收到响应",
-        "idle": "运行测试后，请求和响应都会显示在此处。",
-        "disabledHint": "请先填写名称和端点。"
-      },
-      "detail": {
-        "backTo": "远程任务",
-        "loadError": "无法加载远程任务",
-        "tabs": {
-          "overview": "概览",
-          "versions": "版本",
-          "signing": "签名"
-        },
-        "taskRefLabel": "引用",
-        "taskRefHint": "实验会固定此确切的字符串。",
-        "taskRefNone": "暂无固定内容。请先发布一个版本。",
-        "copyRef": "复制引用",
-        "copied": "已复制",
-        "configTitle": "配置",
-        "headersTitle": "自定义请求头",
-        "headersNone": "无自定义请求头。",
-        "headerSecret": "密钥",
-        "templateTitle": "请求体模板",
-        "templateDefault": "使用默认请求体。",
-        "verificationError": "上次测试连接失败",
-        "fields": {
-          "endpoint": "端点",
-          "method": "方法",
-          "auth": "认证",
-          "contentType": "内容类型",
-          "responsePath": "输出路径",
-          "timeout": "超时",
-          "attempts": "最大尝试次数",
-          "concurrency": "最大并发数",
-          "signing": "签名",
-          "verifiedAt": "已验证",
-          "createdAt": "已创建"
-        },
-        "versionsColumns": {
-          "version": "版本",
-          "status": "状态",
-          "reference": "引用",
-          "endpoint": "端点",
-          "verifiedAt": "已验证"
-        },
-        "discardDraft": "丢弃草稿",
-        "discardDraftTitle": "丢弃草稿",
-        "discardDraftMessage": "丢弃未发布的草稿？已发布的版本不受影响。",
-        "discardDraftSuccess": "草稿已丢弃",
-        "discardDraftError": "无法丢弃草稿"
-      },
-      "testRun": {
-        "title": "测试运行",
-        "hint": "使用注册的合约对最多十个样本运行最新发布的版本。不记录任何内容：没有实验、没有执行记录、没有历史。",
-        "samplesLabel": "样本",
-        "addSample": "添加样本",
-        "removeSample": "移除样本",
-        "samplePlaceholder": "文本，或 JSON 值",
-        "run": "运行样本",
-        "running": "运行中…",
-        "error": "测试运行失败",
-        "needsPublished": "在运行样本之前，请先发布一个版本。",
-        "columns": {
-          "row": "样本",
-          "status": "状态",
-          "output": "输出",
-          "latency": "延迟",
-          "attempts": "尝试次数"
-        },
-        "attemptsValue": "{count} / {max}",
-        "resultsTitle": "结果"
-      },
-      "signingPanel": {
-        "title": "签名密钥",
-        "hint": "轮换是一个四步交接过程：创建候选密钥，证明您的服务接受它，激活它，然后让旧密钥过期。",
-        "disabled": "此任务的请求签名已关闭。通过发布启用签名的新版本将其打开。",
-        "loadError": "无法加载签名状态",
-        "stateCurrent": "当前",
-        "stateCandidate": "候选",
-        "stateRetired": "已退役",
-        "keyIdLabel": "密钥 ID",
-        "noKeyId": "无密钥 ID",
-        "createdAt": "已创建",
-        "lastVerifiedAt": "最后验证",
-        "graceExpiresAt": "宽限期结束",
-        "neverVerified": "从未验证",
-        "rotate": "创建候选密钥",
-        "newKeyIdLabel": "新密钥 ID",
-        "newKeyIdPlaceholder": "k2",
-        "rotateSuccess": "候选密钥已创建。请立即复制，然后进行测试。",
-        "rotateError": "无法创建候选密钥",
-        "test": "测试候选密钥",
-        "testPassed": "候选密钥已被接受。您可以激活它。",
-        "testFailed": "您的服务拒绝了候选密钥，因此它未被激活。",
-        "testError": "无法测试候选",
-        "activate": "激活候选",
-        "activateSuccess": "候选已激活。在宽限期结束前，之前的密钥仍然有效。",
-        "activateError": "无法激活候选",
-        "graceLabel": "宽限期",
-        "graceHelp": "之前的密钥继续有效的时间。最长 24 小时。",
-        "graceHours": "{count} 小时 | {count} 小时",
-        "graceNone": "无宽限期",
-        "endGrace": "立即结束宽限期",
-        "endGraceTitle": "结束宽限期",
-        "endGraceMessage": "立即停用之前的密钥？您服务中仍用它验证的请求将开始失败。",
-        "endGraceSuccess": "宽限期已结束",
-        "endGraceError": "无法结束宽限期",
-        "noCandidate": "没有候选密钥。创建一个以开始轮换。"
-      }
-    },
-    "playground": {
-      "title": "试验场",
-      "subtitle": "尝试提示词，比较变体，然后将获胜者转变为实验。",
-      "runAll": "全部运行",
-      "runAllTooltip": "运行每一个变体",
-      "running": "运行中… ({done}/{total})",
-      "stop": "停止",
-      "recentDrafts": "最近草稿",
-      "recentDraftsSection": "此浏览器 · 最近 10 个",
-      "recentDraftsEmpty": "暂无最近草稿。",
-      "recentDraftsFoot": "草稿仅存于此浏览器中。",
-      "draftRestored": "草稿已恢复。",
-      "fromExperiment": "克隆自实验 {name}",
-      "fromDataset": "从 {name} 采样的行",
-      "variables": "变量",
-      "rowFields": "行字段",
-      "noVariables": "消息中没有 {token} — 添加一个以对输入进行参数化。",
-      "variablePlaceholder": "{name} 的值",
-      "addExpected": "+ 预期输出",
-      "expectedLabel": "预期",
-      "expectedPlaceholder": "标准答案 — 之后启用基于参考的评分",
-      "removeExpected": "移除预期输出",
-      "expectedLeakWarning": "{token} 在任务提示中始终不可用 — 标准答案仅提供给评分器。",
-      "chipInsert": "点击插入到光标位置",
-      "chipReferenced": "此模板中已引用 — 点击再次插入",
-      "chipMissing": "模板中已引用但当前行未提供 — 渲染为空",
-      "chipScorersOnly": "仅评分器",
-      "variant": "变体 {label}",
-      "addVariant": "添加变体",
-      "variantCount": "{count}/{max}",
-      "variantLimit": "试验台最多可容纳 {max} 个变体。",
-      "duplicateVariant": "复制变体",
-      "removeVariant": "移除变体",
-      "runVariant": "运行此变体",
-      "createExperiment": "创建实验",
-      "variantConfig": "变体配置",
-      "variantConfigScope": "适用于所有 {count} 行中的变体 {label}。",
-      "editVariant": "编辑此变体 — 适用于整列",
-      "stale": "已过期",
-      "staleTooltip": "自上次运行以来配置已更改 — 重新运行以刷新输出",
-      "staleNote": "配置已更改 — 下方输出已变暗，直到您重新运行。",
-      "provider": "提供商",
-      "providerPlaceholder": "选择提供商",
-      "model": "模型",
-      "modelPlaceholder": "选择或输入模型",
-      "modelHelp": "任何模型名称均可接受 — 未知名称会在运行时失败，而不是在此处。",
-      "temperature": "温度",
-      "messages": "消息",
-      "roleSystem": "系统",
-      "roleUser": "用户",
-      "roleAssistant": "助手",
-      "roleTool": "工具",
-      "addUserMessage": "用户",
-      "addAssistantMessage": "助手",
-      "removeMessage": "删除消息",
-      "readonlyMessage": "来自链路，只读",
-      "messagePlaceholder": "编写{role}消息…",
-      "tools": "工具",
-      "toolsCount": "工具 · {count}",
-      "toolsTitle": "工具",
-      "toolsIntro": "定义传递给模型的工具。Playground 从不执行工具 — 当模型发出调用时，调用本身即输出，运行到此结束。",
-      "toolName": "工具名称",
-      "toolNamePlaceholder": "lookup_order",
-      "toolDescription": "描述",
-      "toolDescriptionPlaceholder": "此工具的作用",
-      "toolParameters": "参数",
-      "toolParametersHelp": "JSON 架构",
-      "toolParametersPlaceholder": "{ \"type\": \"object\", \"properties\": { } }",
-      "addTool": "添加工具",
-      "removeTool": "移除工具",
-      "toolsEmpty": "未定义工具。",
-      "toolCall": "工具调用",
-      "toolCallNote": "运行到此结束 — Playground 不执行工具。",
-      "toolInvalidJson": "参数必须是有效的 JSON。",
-      "schema": "架构",
-      "schemaOn": "架构 · 开启",
-      "schemaTitle": "结构化输出",
-      "schemaToggle": "将输出限制为 JSON 架构",
-      "schemaHelp": "设置架构后，输出将使用 JSON 格式呈现。",
-      "schemaInvalidJson": "架构必须是有效的 JSON。",
-      "outputPlaceholder": "输出显示在此处 — 点击运行。",
-      "outputNotRun": "未运行",
-      "generating": "生成中…",
-      "retry": "重试",
-      "usageLatency": "{seconds}秒",
-      "usageTokens": "{input}→{output} token",
-      "usageCost": "${cost}",
-      "copyOutput": "复制输出",
-      "copied": "已复制到剪贴板。",
-      "addToMessages": "添加到消息",
-      "addToMessagesTooltip": "将此输出作为助手消息追加并继续对话",
-      "addedToMessages": "输出已作为助手消息追加 — 添加下一轮用户消息并重新运行。",
-      "sampleFromDataset": "从数据集抽样",
-      "addRow": "添加行",
-      "rowsSampled": "{count} 行 · 按值抽样 — 后续数据集编辑不会改变它们",
-      "removeRow": "删除行",
-      "inputColumn": "输入 · {count} 行",
-      "manualRow": "手动",
-      "noReference": "无引用",
-      "noReferenceTooltip": "此行没有预期输出",
-      "rowFooter": "n={count} — 如需完整数据集结果，",
-      "rowFooterLink": "创建实验",
-      "sampleTitle": "从数据集抽样",
-      "sampleDataset": "数据集",
-      "sampleDatasetPlaceholder": "选择数据集",
-      "sampleRowFields": "行字段",
-      "sampleRowFieldsHelp": "可在消息中用作 {token}",
-      "sampleInTemplate": "在模板中",
-      "sampleRows": "行",
-      "sampleRowsHelp": "随机抽样 · 按值复制",
-      "sampleMax": "最大 {max}",
-      "sampleCopies": "输入和预期输出会被复制。",
-      "sampleExisting": "现有行",
-      "sampleReplace": "替换当前行",
-      "sampleAdd": "添加到当前",
-      "sampleAddUsed": "（{used}/{max} 已用）",
-      "sampleScaleNote": "抽样会将测试台切换为小型比较表。如需基于完整数据集得出结论，请创建实验。",
-      "sampleSubmit": "抽样 {count} 行",
-      "sampleAddSubmit": "添加 {count} 行",
-      "sampleLoadError": "无法从该数据集加载行。",
-      "sampleEmpty": "该数据集没有可供抽样的行。",
-      "addRowTitle": "添加行",
-      "addRowInput": "输入",
-      "addRowInputPlaceholder": "此行的提问或任务",
-      "addRowShowExpected": "+ 预期输出（可选）",
-      "addRowHideExpected": "− 隐藏预期输出",
-      "addRowExpectedPlaceholder": "此行的标准答案",
-      "zeroRefWarning": "你的提示词未引用任何行字段 — 所有 {count} 行将产生相同输出。点击字段以插入：",
-      "zeroRefSampleWarning": "你的提示词未引用任何行字段 — 在提示词中添加 {token}，否则每个抽样行都会产生相同输出。",
-      "zeroRefInserted": "已将 {token} 插入每个变体的用户消息中 — 重新运行以应用。",
-      "runGateTitle": "不引用行字段直接运行？",
-      "runGateMessage": "你的提示词未引用任何行字段，因此所有 {rows} 行将产生相同输出。此运行将消耗 {calls} 次模型调用。",
-      "runGateConfirm": "仍然运行",
-      "runGateCancel": "返回并修正提示词",
-      "rowDetail": "第 {index} 行",
-      "rowPosition": "{index}/{total}",
-      "previousRow": "上一行",
-      "nextRow": "下一行",
-      "drawerInput": "输入",
-      "drawerExpected": "预期输出",
-      "drawerNoExpected": "此行没有预期输出。",
-      "drawerRenderedPrompt": "渲染后的提示",
-      "drawerRenderedPromptHelp": "此行实际发送的消息，变量已替换",
-      "drawerEmptyMessage": "(空)",
-      "drawerOutputs": "输出 · {count} 个变体并排显示",
-      "drawerFrom": "来自 {name}",
-      "noProviderTitle": "Playground 需要 LLM 提供商",
-      "noProviderBody": "连接提供商以运行提示。大约需要一分钟。",
-      "noProviderAction": "设置提供商",
-      "providerLoadError": "无法加载提供商。",
-      "datasetLoadError": "无法加载数据集。",
-      "runFailed": "运行失败。",
-      "backendPending": "正在针对示例输出运行 — Playground 运行 API 尚未上线。"
     }
   },
   "onlineEvals": {
@@ -14189,9 +13774,7 @@
       }
     },
     "input": {
-      "clear": "清除",
-      "showValue": "显示",
-      "hideValue": "隐藏"
+      "clear": "清除"
     },
     "dialog": {
       "closeDialog": "关闭对话框"
@@ -14570,12 +14153,12 @@
         "global": "全局"
       },
       "dataConfidence": {
-        "estimated": "≈ 估计值",
+        "estimated": "≈ 估算",
         "topNSubset": "top-N 子集",
         "live": "实时",
-        "belowTopN": "低于 top-N",
+        "belowTopN": "top-N 以下",
         "truncated": "已截断",
-        "gap": "间隙"
+        "gap": "缺口"
       }
     }
   },
@@ -15565,13 +15148,13 @@
       "loadFailed": "无法加载数据库数据。请重试，或缩小时间范围。"
     },
     "ai": {
-      "suggestFix": "询问 AI 如何修复此问题",
-      "suggestFixHint": "打开 AI 助手，包含此查询、其引擎和延迟数据，并询问需要更改什么。它本身不会更改任何内容。",
-      "rowSuggestFix": "询问 AI 如何修复此问题",
+      "suggestFix": "向 AI 询问如何修复",
+      "suggestFixHint": "打开 AI 助手，包含此查询、其引擎和延迟数据，并询问需要更改什么。它本身不会做任何更改。",
+      "rowSuggestFix": "向 AI 询问如何修复",
       "deadlockFix": "如何停止此死锁？",
-      "deadlockFixHint": "将两条冲突语句和行序证据发送给 AI 助手。",
-      "blockingFix": "为什么会阻塞？",
-      "blockingFixHint": "将根会话的语句、其空闲时间以及阻塞在其后的会话数量发送给 AI 助手。"
+      "deadlockFixHint": "将两个冲突的语句和行序证据发送给 AI 助手。",
+      "blockingFix": "为什么这会阻塞？",
+      "blockingFixHint": "将根会话的语句、其空闲时间以及有多少会话在其后面等待发送给 AI 助手。"
     },
     "filters": {
       "allEngines": "所有引擎",
@@ -15581,7 +15164,7 @@
       "allServices": "所有服务",
       "scope": "筛选器",
       "clearScope": "全部清除",
-      "removeScope": "移除此筛选条件",
+      "removeScope": "移除此筛选器",
       "popoverTitle": "缩小范围",
       "dimension": {
         "system": "引擎",
@@ -15593,22 +15176,22 @@
       }
     },
     "delta": {
-      "new": "新加入此列表",
+      "new": "新出现在此列表中",
       "gone": "已停止运行",
-      "newHint": "此查询此前不在最繁重的列表中，因此没有可比对象。它可能之前就在运行——只是负载不够高，未能单独跟踪。",
+      "newHint": "此查询之前不在最重的查询中，因此没有可比对的对象。它可能之前就在运行—只是负载不够高，未被单独跟踪。",
       "goneHint": "此查询在今天早些时候运行过，但不在您查看的时间范围内。",
       "comparison": "之前 {previous} → 现在 {current}",
       "noChange": "无变化",
       "timesMore": "{ratio}× 更多",
       "timesFewer": "{ratio}× 更少",
-      "wasValue": "曾为 {value}"
+      "wasValue": "原为 {value}"
     },
     "databases": {
       "title": "数据库",
-      "subtitle": "每个数据库的查询性能与健康状态",
+      "subtitle": "每个数据库的查询性能和健康状况",
       "searchPlaceholder": "搜索数据库或服务…",
       "unnamedInstance": "实例未命名",
-      "unnamedInstanceHint": "数据库自身的语句报告证明此引擎正在运行，但这些报告未指明主机。一旦设置了带有地址的数据源——如会话采样或实例指标——该行将显示地址。",
+      "unnamedInstanceHint": "数据库自身的语句报告证明该引擎正在运行，但未指明主机。一旦设置了包含主机信息的源——如会话采样或实例指标——该行将显示地址。",
       "moreServices": "+{count}",
       "columns": {
         "instance": "数据库",
@@ -15619,102 +15202,102 @@
         "p95": "慢调用",
         "p99": "最慢的 1%",
         "services": "使用方",
-        "load": "数据库时间",
-        "attention": "需要关注"
+        "load": "数据库耗时",
+        "attention": "需要注意"
       },
       "summary": {
         "databases": "数据库",
         "calls": "调用",
-        "time": "数据库时间",
+        "time": "数据库耗时",
         "failed": "失败"
       },
-      "databaseCount": "1 database | {count} databases",
+      "databaseCount": "1 个数据库 | {count} 个数据库",
       "openQueries": "查看其查询",
       "alertMe": "提醒我",
       "columnHints": {
-        "qps": "每秒调用次数——该时间窗口内的调用数除以窗口时长，因此 15 分钟视图和 4 小时视图具有可比性。",
-        "p50": "所有调用中有一半的完成时间快于该值。仅计入已完成的调用——仍在运行或从未返回的查询不计入此处。",
-        "p95": "慢尾——每 20 次调用中就有 1 次至少耗时如此之久。仅计入已完成的调用——仍在运行或从未返回的查询不计入此处。",
-        "p99": "最差的 1% 调用至少耗时如此之久。仅计入已完成的调用——仍在运行或从未返回的查询不计入此处。",
-        "load": "您的应用程序等待此数据库所花费的总时间。从客户端角度测量，因此反映的是该数据库服务的流量大小——而非服务器的负载程度。",
-        "attention": "此实例接近其自身引擎发布限制的程度——当前为连接数对 max_connections 的比例。取最差的比例，而非综合得分。按从高到低排序，健康状态无法读取的实例排在最前面，因为您看不到的实例无法确定其是否健康。在数据库服务器上测量，因此不能与旁边的数据库时间进行比较。"
+        "qps": "每秒调用次数——此窗口内的调用数除以其时长，因此 15 分钟视图和 4 小时视图具有可比性。",
+        "p50": "所有调用中有一半完成速度快于该值。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
+        "p95": "慢尾——每 20 个调用中有 1 个耗时至少这么长。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
+        "p99": "最差的 1% 调用耗时至少这么长。仅统计已完成的调用——仍在运行的查询或从未返回的查询不计入此列。",
+        "load": "您的应用程序等待此数据库所花费的总时间。从客户端测量，因此反映的是此数据库所服务的流量大小——而非服务器负载。",
+        "attention": "该实例与其自身引擎发布的上限之间的接近程度——目前为连接数与 max_connections 的比值。取最差值而非综合得分。按从高到低排序，健康状况无法读取的实例排在顶部，因为看不见的实例无法确认是健康的。在数据库服务器上测量，因此与旁边的数据库耗时不可比。"
       },
-      "failedChip": "{count} 失败",
+      "failedChip": "{count} 次失败",
       "columnSubLabels": {
-        "attention": "服务器",
+        "attention": "服务端",
         "load": "客户端",
         "calls": "客户端"
       },
       "attention": {
-        "connections": "连接",
-        "noLimit": "未公布限制",
+        "connections": "连接数",
+        "noLimit": "未发布限制",
         "unknown": "未测量"
       }
     },
     "queries": {
       "title": "热门查询",
-      "subtitle": "占用数据库时间最多的查询",
-      "subtitleServer": "您的数据库运行的语句，在数据库内部计数——最频繁运行的排在前面",
+      "subtitle": "使用数据库时间最多的查询",
+      "subtitleServer": "您的数据库执行的语句，在数据库内部统计——按运行频率最高的排前面",
       "searchPlaceholder": "搜索查询文本、表或服务…",
-      "trendLabel": "此查询的时间在整个时间范围内的变化情况",
+      "trendLabel": "此查询耗时在此范围内的变化",
       "otherRow": "所有其他查询",
-      "truncatedText": "此语句过长，无法完整存储，因此显示为截断状态。",
+      "truncatedText": "该语句过长，无法完整存储，因此显示为截断形式。",
       "stmtClass": {
         "query": "查询",
-        "queryHint": "仅限真实 SQL — SELECT、INSERT、UPDATE 和 DELETE。",
+        "queryHint": "仅限真实 SQL——SELECT、INSERT、UPDATE 和 DELETE。",
         "all": "查询 + 连接开销",
-        "allHint": "还包括驱动程序在查询之间发送的簿记操作：BEGIN 和 COMMIT、SET，以及保持连接池连接活跃的检查。"
+        "allHint": "同时计入驱动程序在查询之间发送的簿记信息：BEGIN 和 COMMIT、SET，以及保持连接池存活的检查。"
       },
       "completionBias": {
-        "title": "调用量下降了 {drop}%，而失败次数上升",
-        "body": "这通常意味着查询被卡住而无法完成——我们只能测量完成的查询。这里的下降线可能并不意味着正在恢复。"
+        "title": "调用量下降 {drop}%，而失败率上升",
+        "body": "这通常意味着查询被卡住而非完成——而我们只能衡量完成的查询。这里的下降趋势可能不代表正在恢复。"
       },
       "columns": {
         "query": "查询",
-        "calls": "调用次数",
+        "calls": "调用",
         "p95": "慢调用",
         "errors": "失败",
         "perTrace": "每次请求",
-        "load": "数据库时间",
-        "p99": "最慢的 1%",
-        "max": "最差情况",
+        "load": "数据库耗时",
+        "p99": "最慢的1%",
+        "max": "最差记录",
         "services": "使用方"
       },
       "queryCount": "1 种查询 | {count} 种查询",
-      "otherRowDetail": "— {calls} 次调用。我们没有这些查询的逐查询数字，只有这个合计总数。以上每个总计中均包含此数字。",
+      "otherRowDetail": "— {calls} 次调用。我们没有这些查询的逐项数据，只有这个合并总数。上面的每个总计都已计入其中。",
       "foldRowText": "1 个较小的查询 | {count} 个较小的查询",
       "serverList": {
-        "title": "您的数据库报告的查询",
-        "subtitle": "在数据库内部跨所有客户端计数，最频繁运行的排在前面。此时间窗口内没有追踪到的应用程序调用，因此通常的列表为空——这是数据库同时看到的情况。",
-        "truncated": "最频繁运行的 {count} 条语句 — 实际运行的比此处显示的更多",
+        "title": "由您的数据库报告的查询",
+        "subtitle": "在每个客户端上的数据库内部进行统计，最频繁运行的排在前面。此时间窗口内没有已跟踪的应用程序调用，因此通常的列表为空——这是数据库在此期间看到的情况。",
+        "truncated": "最常运行的 {count} 条语句——实际运行的比此处显示的更多",
         "columns": {
           "query": "查询",
           "calls": "调用次数",
-          "totalTime": "数据库内时间",
+          "totalTime": "数据库耗时",
           "meanTime": "平均每次调用"
         },
         "columnHints": {
-          "time": "在数据库内部测量：PostgreSQL 的执行时间，MySQL 和 MariaDB 的等待时间。并非您的应用程序实际经历的时间——网络和连接等待不包含在内。",
-          "mean": "数据库内时间除以调用次数——整个时间窗口的平均值，不是百分位数。"
+          "time": "在数据库内部测量：PostgreSQL 为执行时间，MySQL 和 MariaDB 为等待时间。并非您的应用程序实际体验到的——网络和连接等待时间未包含在内。",
+          "mean": "数据库耗时除以调用次数——时间窗口内的平均值，不是百分位。"
         }
       },
-      "foldRowDetail": "· {share} 的数据库时间 · 点击显示它们",
-      "foldRowDetailOpen": "· {share} 的数据库时间 · 点击折叠回去",
+      "foldRowDetail": "· 占数据库耗时的 {share} · 点击显示",
+      "foldRowDetailOpen": "· 占数据库耗时的 {share} · 点击收起",
       "summary": {
-        "queries": "查询种类",
+        "queries": "查询类型",
         "calls": "调用次数",
-        "time": "数据库时间",
+        "time": "数据库耗时",
         "failed": "失败"
       },
       "columnHints": {
-        "calls": "此查询运行了多少次。在您的数据库报告计数的情况下，使用数据库自身的计数——它涵盖所有客户端，而不仅仅是发送追踪的系统部分。标记为客户端观测到的行改为从追踪中计数，因为您的数据库没有报告它们。",
-        "p50": "所有调用中有一半完成得比这个快。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
-        "p95": "慢尾 — 每20次调用中有1次至少耗时这么久。仅统计已完成的调用 — 仍在运行或从未返回的查询不计入此处。",
-        "p99": "最差的1%调用至少耗时这么久。仅统计已完成的调用 — 仍在运行或从未返回的查询不计入此处。",
-        "max": "此时间窗口中最慢的一次调用 — 一次真实的调用，不是平均值。",
-        "errors": "这些调用中有多少返回了错误。",
-        "perTrace": "在单个请求中此查询运行了多少次。高数字通常意味着循环。",
-        "load": "此查询在数据库中花费的总时间。数据库自身报告的数字（如果有）：Postgres 上为执行时间，但 MySQL 和 MariaDB 上为等待时间 — 每行都会标明。标记为“客户端观测”的行来自追踪，因此包含网络往返时间。"
+        "calls": "此查询运行了多少次。您的数据库在报告时使用其自身的计数——该计数涵盖所有客户端，而不仅仅是发送追踪的系统部分。标记为“客户端观测”的行改为从追踪中计数，因为您的数据库未报告它们。",
+        "p50": "一半的调用完成时间快于此值。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
+        "p95": "慢尾——每 20 次调用中有 1 次耗时至少这么长。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
+        "p99": "最差的 1% 的调用耗时至少这么长。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。",
+        "max": "此时间窗口中最慢的一次真实调用——不是平均值。",
+        "errors": "这些调用中有多少返回错误。",
+        "perTrace": "在单个请求中运行了多少次。较高的数字通常意味着循环。",
+        "load": "此查询在数据库中花费的总时间。您的数据库在报告时使用其自身的数据：Postgres 上为执行时间，而 MySQL 和 MariaDB 上为等待时间——每行会标明。标记为“客户端观测”的行从追踪中测量，因此包含网络往返时间。"
       },
       "errorsNone": "无",
       "errorsAll": "全部",
@@ -15722,15 +15305,15 @@
         "open": "打开详情",
         "traces": "查看示例追踪",
         "copy": "复制查询",
-        "copied": "已复制查询",
+        "copied": "查询已复制",
         "copyFailed": "无法复制查询。",
-        "alert": "如果变慢则提醒我"
+        "alert": "变慢时提醒我"
       },
       "otherRowTextFor": "{database} 上的所有其他查询",
       "otherRowDetailShort": "— {calls} 次调用。",
       "columnSubLabels": {
-        "calls": "报告所在的服务器",
-        "load": "报告所在的服务器"
+        "calls": "报告所在服务器",
+        "load": "报告所在服务器"
       }
     },
     "insights": {
@@ -15742,131 +15325,131 @@
       "regression": {
         "title": "{ratio}× 比平时慢",
         "body": "{before} → {after}，流量相同",
-        "rule": "显示原因：此查询的慢调用比 {baseline} 慢超过 {ratio}×，且至少涉及 {calls} 次调用。"
+        "rule": "显示原因：此查询的慢调用比 {baseline} 慢超过 {ratio}×，且至少跨 {calls} 次调用。"
       },
       "new-expensive": {
-        "title": "新查询，开销已很高",
-        "body": "之前未运行 · 现在占用数据库时间的 {share}",
-        "rule": "显示原因：此查询在 {baseline} 中不属于最重的查询，而现在至少占用数据库时间的 {share}%，且至少涉及 {calls} 次调用。它可能之前就在运行 — 只是负载不够高，无法单独追踪。"
+        "title": "新查询，开销已经很高",
+        "body": "之前未运行 · 现在占数据库时间的 {share}",
+        "rule": "显示原因：此查询在 {baseline} 中不属于最重的查询，而现在至少占用数据库时间的 {share}%，且至少涉及 {calls} 次调用。它之前可能一直在运行——只是负荷不够高，无法单独跟踪。"
       },
       "n-plus-one": {
         "title": "每个请求至少运行 {multiplier}×",
-        "body": "占用数据库时间的 {share} · {service}",
-        "rule": "显示原因：此查询在单个请求内至少运行 {ratio} 次，且至少涉及 {traces} 个请求。这是下限，实际数字可能更高。合法的批量处理也可能呈现相同情况。"
+        "body": "{share} 的数据库时间 · {service}",
+        "rule": "显示原因：此查询在单个请求内至少运行 {ratio} 次，且至少涉及 {traces} 个请求。这是一个下限，实际数字可能更高。合法的批量工作也可能看起来一样。"
       },
       "volume-shift": {
-        "title": "更繁忙，并非更慢",
-        "body": "调用次数多 {ratio}×，速度相同 · {service}",
-        "rule": "显示原因：此查询的调用频率比 {baseline} 高 {ratio}× 以上，而其速度保持在 {latency}× 以内。变化在于调用它的方式。"
+        "title": "更繁忙，并未变慢",
+        "body": "调用次数增加 {ratio}×，速度不变 · {service}",
+        "rule": "显示原因：此查询的调用频率比 {baseline} 高 {ratio}× 以上，同时其速度保持在 {latency}× 以内。变化发生在调用它的地方。"
       },
       "rank-churn": {
         "title": "新的最重查询",
-        "body": "从 #{from} 移至 #{to}",
-        "rule": "显示原因：在 {baseline} 中，一个查询从最重的 {from} 之外攀升到最重的 {into} 之内，同时数据库总时间增长。",
+        "body": "从 #{from} → #{to}",
+        "rule": "显示原因：某个查询从 {baseline} 中最重 {from} 之外攀升到了最重 {into} 之内，同时数据库总时间增长。",
         "unranked": "未排名"
       },
       "hide": "隐藏",
       "show": "显示",
       "findRow": "找到它",
       "all-failing": {
-        "title": "每次调用都在失败",
-        "body": "{failed}/{total} 次调用失败 · {query}",
-        "rule": "显示原因：该范围内对此查询的每次调用都返回了错误。"
+        "title": "每次调用都失败",
+        "body": "{failed} 次失败，共 {total} 次调用 · {query}",
+        "rule": "显示原因：在此时间范围内，此查询的每次调用都返回了错误。"
       },
       "baseline": {
         "label": "对比",
-        "previous": "上一时间段",
-        "yesterday": "昨天同一时段",
-        "previousShort": "与上一时段对比",
-        "previousHint": "与紧接此时间段的前一个长度相同的时间段进行对比。",
-        "yesterdayShort": "对比昨天",
-        "yesterdayHint": "与前一天同一时段对比——当流量遵循每日周期时很有用，也可用于查看自部署以来发生的变化。"
+        "previous": "上一时段",
+        "yesterday": "昨日的同一时段",
+        "previousShort": "对比上一时段",
+        "previousHint": "与紧接此时段之前的等长时段对比。",
+        "yesterdayShort": "对比昨日",
+        "yesterdayHint": "与前一天同一时段对比——当流量遵循每日周期时很有用，或者用于查看部署后发生了什么变化。"
       }
     },
     "coverage": {
-      "unknownNote": "您选择的范围和筛选条件内没有可测量的数据。",
-      "lineHealthy": "您正在查看此数据库 {percent}% 的时间——最重的 {count} 种查询。",
-      "lineRemainder": "您正在查看此数据库 {percent}% 的时间。其余部分来自较轻的查询，我们不会逐一列出。",
-      "lineStale": "我们的统计滞后 {minutes} 分钟，因此最新的查询可能尚未出现在此处。",
-      "lineTruncated": "最后一段时间的数据量超出了我们的处理能力，因此最新的数字被低估了。",
-      "lineTruncatedStale": "最后一段时间的数据量超出了我们的处理能力，并且我们的统计滞后 {minutes} 分钟——最新的数字被低估，最新的查询可能尚未出现在此处。",
-      "lineGap": "此时间窗口缺少 {minutes} 分钟。我们的统计停止于 {stopped}，只能回溯 {reach} 分钟，因此没有任何数据覆盖 {from}–{to}。",
-      "lineSubset": "您已筛选至 {filter}，因此这些百分比描述的是显示的行，而不是整个数据库。",
-      "lineHealthyAll": "您看到的是所有已运行的查询。此处的速度基于每次调用进行测量，因此是准确的。",
-      "lineHealthyAllEstimated": "您看到的是所有已运行的查询。此处的速度是多个时间段的混合结果，因此接近但不完全准确。",
-      "lineCountedTo": "已统计截至 {time}；最后半分钟的数据仍在持续输入。",
-      "lineExact": "所有数据库均已报告。此处的速度基于每次调用进行测量，因此是准确的。",
-      "lineExactEstimated": "所有数据库均已报告。此处的速度是多个时间段的混合结果，因此接近但不完全准确。",
-      "lineSubsetUnnamed": "您的筛选条件将此范围缩小到这些总计汇总的水平以下，因此百分比描述的是显示的行，而不是整个数据库。",
-      "lineQuery": "计时从您的应用程序开始测量，因此包含网络时间和等待空闲连接的时间。",
-      "lineUncodedErrors": "此处的失败中有 {percent} 没有返回原因代码，因此可以计数但无法解释。",
-      "lineSubsetStale": "您已筛选至 {filter}，并且我们的统计滞后 {minutes} 分钟——这些百分比描述的是显示的行，最新的查询可能尚未出现在此处。",
-      "lineSubsetUnnamedStale": "您的筛选条件将此范围缩小到这些总计汇总的水平以下，并且我们的统计滞后 {minutes} 分钟——百分比描述的是显示的行，最新的查询可能尚未出现在此处。",
-      "lineCountedToBehind": "已统计截至 {time}；我们滞后 {minutes} 分钟。"
+      "unknownNote": "在您选择的时间范围和筛选条件下，没有可度量的内容。",
+      "lineHealthy": "您看到的是此数据库时间的 {percent}% — 最重的 {count} 类查询。",
+      "lineRemainder": "您看到的是此数据库时间的 {percent}%。其余部分在较轻的查询中，我们不逐一列出。",
+      "lineStale": "我们的统计滞后 {minutes} 分钟，因此最新的查询可能尚未出现在这里。",
+      "lineTruncated": "最后一段时间的数据量超过了我们的处理能力，因此最新的数字可能少计了。",
+      "lineTruncatedStale": "最后一段时间的数据量超过了我们的处理能力，而且我们的统计滞后 {minutes} 分钟——最新的数字可能少计了，最新的查询也可能尚未出现在这里。",
+      "lineGap": "此窗口缺少 {minutes} 分钟。我们的统计在 {stopped} 停止，只能回溯 {reach} 分钟，因此 {from}–{to} 之间没有任何数据。",
+      "lineSubset": "您已筛选为 {filter}，因此这些百分比描述的是显示的行，而不是整个数据库。",
+      "lineHealthyAll": "您看到的是运行过的每个查询。这里的速度是对每次调用进行衡量的，因此它们是精确的。",
+      "lineHealthyAllEstimated": "您看到的是运行过的每个查询。这里的速度是多个时间段的混合结果，因此接近但不精确。",
+      "lineCountedTo": "已统计至 {time}；最后半分钟的数据仍在进入。",
+      "lineExact": "所有数据库均已上报。这里的速度是对每次调用进行衡量的，因此它们是精确的。",
+      "lineExactEstimated": "所有数据库均已上报。这里的速度是多个时间段的混合结果，因此接近但不精确。",
+      "lineSubsetUnnamed": "您的筛选条件将数据范围缩小到这些总计无法累加的程度，因此百分比描述的是显示的行，而不是整个数据库。",
+      "lineQuery": "计时是从您的应用程序端测量的，因此它们包括网络时间以及等待可用连接的时间。",
+      "lineUncodedErrors": "此处的失败中有 {percent} 返回时没有原因代码，因此它们可以被计数但无法解释。",
+      "lineSubsetStale": "您已筛选为 {filter}，而且我们的统计滞后 {minutes} 分钟——这些百分比描述的是显示的行，最新的查询也可能尚未出现在这里。",
+      "lineSubsetUnnamedStale": "您的筛选条件将数据范围缩小到这些总计无法累加的程度，而且我们的统计滞后 {minutes} 分钟——百分比描述的是显示的行，最新的查询也可能尚未出现在这里。",
+      "lineCountedToBehind": "已统计至 {time}；我们滞后 {minutes} 分钟。"
     },
     "breakdown": {
-      "loading": "正在分析时间的去向……",
+      "loading": "正在分析时间的去向…",
       "noSchema": "未报告 schema",
       "noService": "未识别调用方",
-      "nothingToAttribute": "我们有此数据库的总计数据，但在此范围内没有每个查询的行数据，因此我们无法判断哪个服务占用了时间。",
+      "nothingToAttribute": "我们有此数据库的总计数据，但此范围内没有按查询细分的行，因此无法判断是哪个服务消耗了时间。",
       "queryCount": "{count} 个查询 | {count} 个查询",
-      "shortfall": "这些加起来比此数据库的总计少 {percent}，因为只逐条跟踪最重的查询类型。"
+      "shortfall": "这些加起来比该数据库的总数少 {percent}，因为只对最重的查询类型逐一进行跟踪。"
     },
     "freshness": {
-      "neverAggregated": "我们尚未完成此范围的统计。第一批数字通常大约在 15 分钟内出现。"
+      "neverAggregated": "我们尚未完成此范围的统计。首批数据通常约 15 分钟内出现。"
     },
     "empty": {
       "filtered": {
         "title": "没有查询符合您的筛选条件",
-        "description": "这里没有任何内容符合您应用的搜索和筛选条件。",
+        "description": "这里没有与您应用的搜索和筛选条件匹配的内容。",
         "action": "清除筛选条件"
       },
-      "title": "这里还没有内容——这正是原因",
+      "title": "这里还没有内容——原因如下",
       "subtitle": "我们检查了所有必须为真的条件。",
-      "subtitleCounts": "{pass} 通过，{fail} 不通过。 | {pass} 通过，{fail} 不通过。",
-      "checklistTitle": "我们检查的内容",
-      "showMeHow": "告诉我如何为它埋点",
+      "subtitleCounts": "{pass} 项通过，{fail} 项未通过。 | {pass} 项通过，{fail} 项未通过。",
+      "checklistTitle": "我们检查了哪些条件",
+      "showMeHow": "向我展示如何配置埋点",
       "checkTrace": "检查我的一个追踪",
       "checks": {
         "enabled": {
           "ok": "数据库监控已开启",
           "okDetail": "适用于此组织",
           "no": "数据库监控已关闭",
-          "noDetail": "管理员可以为该组织启用它，然后重新启动采集器。"
+          "noDetail": "管理员可以为该组织开启它，然后重新启动采集器。"
         },
         "traces": {
-          "ok": "您的追踪正在到达",
+          "ok": "您的追踪数据正在到达",
           "okDetail": "此时间范围内记录了 {count} 条",
-          "no": "尚未收到任何追踪",
-          "noDetail": "数据库监控基于追踪构建，而该组织尚未发送任何追踪。"
+          "no": "尚无追踪数据到达",
+          "noDetail": "数据库监控基于追踪数据构建，而该组织尚未发送任何追踪数据。"
         },
         "permission": {
           "ok": "您有权访问此数据",
           "okDetail": "您是 {org} 的管理员",
           "no": "您无权访问此数据",
-          "noDetail": "数据库监控会读取您的追踪，而您的角色不包含这些权限。请向管理员申请读访问权限。"
+          "noDetail": "数据库监控会读取您的追踪数据，但您的角色不包含这些数据。请向管理员申请读取权限。"
         },
         "dbSpans": {
-          "ok": "您的追踪提到了一个数据库",
+          "ok": "您的追踪数据提到了数据库",
           "okDetail": "正在记录数据库调用",
-          "no": "您的追踪中均未提到数据库",
-          "noDetail": "您的应用程序正在被追踪，但与数据库通信的部分并未被追踪。请为您的语言添加数据库插桩，查询就会显示在这里。"
+          "no": "您的追踪数据中未提到任何数据库",
+          "noDetail": "您的应用程序已被追踪，但连接数据库的部分未被追踪。请为您的语言添加数据库埋点，查询便会显示在这里。"
         },
         "counted": {
-          "ok": "我们已完成此时间范围的统计",
-          "okDetail": "数据是最新的",
+          "ok": "我们已完成此范围的统计",
+          "okDetail": "数字是最新的",
           "no": "我们尚未完成统计",
-          "noDetail": "数据库调用已到达，但首批数据尚未就绪。这通常需要几分钟。"
+          "noDetail": "数据库调用已到达，但首批数字尚未就绪。这通常需要几分钟。"
         },
         "window": {
-          "ok": "在此时间范围内有运行内容",
+          "ok": "此时间范围内有活动发生",
           "okDetail": "已记录数据库调用",
-          "no": "在您选择的时间范围内没有运行内容",
+          "no": "您选择的时间范围内没有活动发生",
           "noDetail": "尝试更宽的时间范围。"
         },
         "alsoWorthKnowing": {
-          "title": "另需了解",
-          "detail": "一旦设置完成，首批查询约 15 分钟内出现。"
+          "title": "另外值得了解",
+          "detail": "一旦就绪，首批查询会在约 15 分钟内出现。"
         }
       },
       "action": "重试",
@@ -15876,128 +15459,128 @@
       "title": "查询详情",
       "tabs": {
         "overview": "概览",
-        "overviewHint": "此查询的速度、运行频率以及运行位置。",
+        "overviewHint": "此查询有多慢、运行频率以及运行位置。",
         "plans": "查询计划",
-        "plansHint": "数据库运行此查询所采取的步骤。从这里开始排查其缓慢的原因。",
+        "plansHint": "数据库执行此查询所采取的步骤。从这里开始分析为何缓慢。",
         "callers": "调用方和示例",
-        "callersHint": "您应用程序的哪些部分运行了此查询，以及可展开为追踪的个别慢速运行。",
-        "callersLocked": "个别运行来自追踪。此时间范围内没有任何追踪记录此查询。"
+        "callersHint": "应用程序的哪些部分运行了此查询，以及可打开为追踪的单个慢速运行。",
+        "callersLocked": "单个运行来自追踪。此时间范围内没有追踪到该查询。"
       },
       "notFound": {
-        "title": "此查询不在此组织中",
-        "description": "该地址指向的查询 {org} 在您查看的时间范围内未运行。如果您刚刚切换了组织，它属于您离开的那个组织。",
-        "descriptionNoOrg": "该地址指向的查询在此组织查看的时间范围内未运行。如果您刚刚切换了组织，它属于您离开的那个组织。",
-        "scopeHint": "在此组织、时间范围和范围内没有匹配项。如果该地址来自其他引擎或实例，请清除这些筛选条件或返回列表。",
+        "title": "此查询不属于此组织",
+        "description": "该地址指向的查询 {org} 在您查看的时间范围内尚未运行。如果您刚刚切换了组织，它属于您离开的那个组织。",
+        "descriptionNoOrg": "该地址指向的查询在此组织您查看的时间范围内尚未运行。如果您刚刚切换了组织，它属于您离开的那个组织。",
+        "scopeHint": "在此组织、时间范围和范围内没有匹配项。如果该地址来自其他引擎或实例，请清除这些筛选器或返回列表。",
         "missingTitle": "未选择查询",
-        "missingDescription": "此页面描述一个查询，但地址未指明具体查询。如果您刚刚切换了组织，您正在阅读的查询属于您离开的那个组织。",
+        "missingDescription": "此页面描述一个查询，但地址未指定具体查询。如果您刚刚切换了组织，您正在阅读的查询属于您离开的那个组织。",
         "action": "浏览此组织的查询"
       },
       "backToQueries": "返回热门查询",
       "backToActivity": "返回活动",
       "backToSamples": "返回最慢调用",
       "backToDeadlocks": "返回死锁",
-      "latencyTitle": "随时间变化的速度",
-      "volumeTitle": "随时间变化的调用和失败",
+      "latencyTitle": "速度随时间变化",
+      "volumeTitle": "调用和失败随时间变化",
       "endpointsTitle": "调用来源",
       "endpointsHint": "您的应用程序中请求运行此查询的部分。",
-      "noEndpoints": "我们无法确定您的应用程序在此范围内运行此查询的部分。",
+      "noEndpoints": "我们无法确定在此范围内您的应用程序的哪个部分运行了此查询。",
       "samplesTitle": "最慢示例",
-      "samplesHint": "每个点表示一次真实执行 — 单击可查看完整请求",
-      "noSamples": "未加载此范围的单个执行。",
+      "samplesHint": "每个点代表一次真实执行 — 点击查看完整请求",
+      "noSamples": "此范围未加载单个执行记录。",
       "noSeries": "在您选择的时间范围内没有此查询的历史记录。",
       "liveSeries": "最近的点仍在统计中，可能会发生变化。",
-      "noStream": "我们无法确定哪个追踪流承载此查询，因此无法加载其调用方和示例。",
-      "ambiguousStream": "此组织有多个追踪流，我们无法确定此查询运行在哪个流上。选择一个流以加载其调用方和示例追踪。",
-      "pickStream": "选择追踪流",
-      "invalidStream": "该追踪流名称无法识别，因此未运行搜索。",
-      "firstSeen": "在此列表中首次出现于 {time}",
-      "firstSeenHint": "此范围内该查询足够繁重而单独跟踪的最早时间点。",
-      "lastSeen": "上次出现于 {time}",
-      "lastSeenHint": "此范围内此查询重到足以单独跟踪的最新时间点。它现在可能仍在运行——这是它最后一次上榜。",
+      "noStream": "我们无法确定哪个跟踪流承载此查询，因此无法加载其调用方和示例。",
+      "ambiguousStream": "此组织有多个跟踪流，我们无法确定此查询运行在哪个上。选择一个流以加载其调用方和示例跟踪。",
+      "pickStream": "选择跟踪流",
+      "invalidStream": "该跟踪流名称无法识别，因此我们未运行搜索。",
+      "firstSeen": "首次出现在此列表中于 {time}",
+      "firstSeenHint": "此范围内此查询负载足够高以至于需要单独跟踪的最早点。",
+      "lastSeen": "最后出现于 {time}",
+      "lastSeenHint": "此范围内此查询负载足够高以至于需要单独跟踪的最近点。它可能仍在运行——这是它最后一次出现在列表中。",
       "errorsByCode": {
         "title": "按原因代码分类的失败",
-        "exactHint": "统计此范围内的所有调用。",
-        "sampleHint": "根据下面的示例统计——是样本，不是总数。",
+        "exactHint": "已统计此范围内的每次调用。",
+        "sampleHint": "根据以下示例统计——是样本而非总数。",
         "noCode": "无原因代码"
       },
       "whereItRuns": {
         "title": "运行位置",
-        "hint": "此查询的活动，按运行的数据库拆分。点击一行可将此页面聚焦到该数据库。",
-        "trackedHint": "这些数字涵盖此范围内查询重到足以单独跟踪的时间段——较安静的时间段在这里不增加任何内容，因此请将它们视为至少总数。",
+        "hint": "此查询的活动，按运行所在的数据库划分。点击一行以将本页聚焦于该行。",
+        "trackedHint": "这些数据涵盖此范围内查询负载足够高以至于需要单独跟踪的时段——较安静的时段在此不增加任何内容，因此请将其视为至少总计。",
         "showAll": "显示所有位置",
-        "emptyFiltered": "在此页面聚焦的位置，没有为此查询跟踪到任何内容。显示所有位置以查看其运行位置。",
-        "noInstance": "实例未报告",
+        "emptyFiltered": "在本页聚焦的位置没有跟踪到此查询。显示所有位置以查看其运行位置。",
+        "noInstance": "未报告实例",
         "focused": "已聚焦",
-        "focusHint": "此页面的数字当前限定到这一行。再次点击以扩大范围。",
+        "focusHint": "此页面的数字当前已缩小到该行。再次点击以扩大范围。",
         "columns": {
           "location": "运行于",
           "avg": "每次调用平均值"
         }
       },
       "qps": "每秒调用次数",
-      "errorRate": "失败的调用",
+      "errorRate": "失败调用",
       "unattributed": "未归属",
       "sampleOk": "正常",
       "sampleError": "失败",
       "viewTrace": "查看请求 →",
-      "viewTraces": "查看示例追踪",
+      "viewTraces": "查看示例跟踪",
       "copySummary": "复制",
-      "copySummaryHint": "这里的每个数字都已在此页面上——这只是写出句子，因此事件的第 13 分钟会产生一条消息，而不是什么都没有。",
+      "copySummaryHint": "此页面上的每个数字都已存在——这里只是写出句子，因此事件的第13分钟会产生一条消息，而不是什么都没有。",
       "summaryCopied": "摘要已复制",
       "summaryCopyFailed": "无法复制摘要。",
       "columns": {
         "calls": "调用",
         "time": "时间",
-        "duration": "持续时间",
+        "duration": "时长",
         "status": "状态",
         "caller": "调用方",
         "callShare": "调用占比",
         "p50": "一半低于"
       },
       "belowTopN": {
-        "title": "在此范围的部分时间内，此查询不在最重的查询之列",
-        "body": "我们单独跟踪最重的查询；其余的一起计数。当此查询不够重时，我们会给图表加阴影而不是画零——它仍在运行。",
-        "capped": "历史记录可追溯到我们拥有的最早时间。"
+        "title": "此查询在该范围的部分时段内并非最耗时的查询。",
+        "body": "我们单独跟踪最耗时的查询，其余的一并统计。当此查询不够耗时，我们会为图表着色而不是画零——它仍在运行。",
+        "capped": "历史记录可追溯到我们拥有的最早数据。"
       },
-      "firstSeenCaveat": "——它可能在那之前就在运行，只是不在最重之列",
+      "firstSeenCaveat": "——它可能在此之前已在运行，只是不属于最耗时之列。",
       "copyQuery": "复制查询",
-      "alertMe": "如果此查询变慢，请提醒我",
+      "alertMe": "如果变慢请提醒我",
       "stats": {
         "load": "数据库时间",
-        "loadShare": "此数据库的 {percent}",
+        "loadShare": "此数据库的{percent}",
         "calls": "调用",
-        "callsDelta": "比之前 {change}",
+        "callsDelta": "比之前{change}",
         "p50": "一半低于",
         "p95": "慢调用",
-        "max": "所见最差",
+        "max": "最差值",
         "errors": "失败",
         "noErrors": "无错误",
-        "approx": "接近，并非精确",
+        "approx": "接近，但不精确",
         "exact": "精确"
       },
       "overlap": {
         "serverExecution": "{engine} 执行它所花费的时间",
-        "serverWait": "{engine} 等待它所花费的时间 — 等待时间，而非执行时间",
-        "serverCounted": "由 {engine} 统计，覆盖所有客户端",
-        "clientObserved": "由已接入观测的调用方观察 — 您的数据库未报告此项"
+        "serverWait": "{engine} 等待它所花费的时间——等待时间，而非执行时间",
+        "serverCounted": "由{engine}统计，涵盖每个客户端",
+        "clientObserved": "由已埋点的调用方观察到——您的数据库未报告此项"
       },
-      "endpointsConcentrated": "一个端点占此查询时间的 {percent}。修复 {endpoint} 即修复此查询。",
+      "endpointsConcentrated": "一个端点占用此查询时间的{percent}。修复{endpoint}即可修复此查询。",
       "typicalMarker": "慢调用 {value}",
       "plans": {
         "title": "查询计划",
         "sourceLabel": "通用估算计划",
-        "sourceTooltip": "此计划是在所有查询参数均设为 NULL 的情况下估算的，并未实际运行。Postgres 可能为真实查询运行了不同的计划。用它来查看查询的形态，而不是解释耗时原因。",
-        "stableCaveat": "此时间窗口内仅捕获到一种计划形态。这并不排除计划问题 — 估算计划可能保持稳定而真实计划发生变化，且已执行计划的捕获仅能看到慢到足以记录日志的语句，因此使此查询变快的计划变化会完全从捕获中消失。",
+        "sourceTooltip": "此计划是在所有查询参数都设置为NULL的情况下估算的，并未实际运行。Postgres 可能为真实查询运行了不同的计划。用它来了解查询的结构，而不是解释耗时原因。",
+        "stableCaveat": "在此时间窗口内仅捕获到一种计划形状。这并不能排除计划问题——估算计划可能保持稳定，而实际计划会变化；并且执行计划的捕获只能看到慢到足以记录日志的语句，因此使此查询变快的计划变化会完全从捕获中消失。",
         "executedLabel": "已执行计划",
-        "executedTooltip": "这是 Postgres 为真实执行实际运行的计划，由 auto_explain 使用真实参数值捕获。此行的行数和耗时是测量值而非估算值 — 但仅捕获慢于 auto_explain 阈值的执行，因此它们描述的是慢速尾部，而非每次运行。",
+        "executedTooltip": "这是 Postgres 为真实执行实际运行的计划，由 auto_explain 使用真实参数值捕获。此行的行数和时长是实测值，而非估算值——但只有慢于 auto_explain 阈值的执行才会被捕获，因此它们描述的是慢尾，而不是每次运行。",
         "capturedDurations": "平均 {avg} · 最大 {max}，共 {count} 次捕获执行",
-        "estVsAct": "估算 {est} 行 → 实际 {act} 行",
-        "driftCallout": "此时间窗口内计划形态发生变化。捕获到 {count} 种不同形态，这通常意味着模式或统计信息发生变化，例如索引被删除或表被重新分区。",
+        "estVsAct": "估算 {est} → 实际 {act} 行",
+        "driftCallout": "此窗口中的计划形状已更改。捕获了{count}种不同的形状，这通常意味着模式或统计信息发生了变化，例如索引被删除或表被重新分区。",
         "viewPlans": "查看计划",
         "noPlans": "未捕获到计划",
-        "noPlansHint": "尚无采集器为此数据库提交计划。在采集器配置中启用 Top 查询采集以开始捕获计划 — 设置页面会逐步引导您完成。",
-        "noPlanForQuery": "此查询无计划",
-        "noPlanForQueryHint": "我们正在为此数据库捕获计划 — 此查询恰好没有计划。对于数据库无法解释的语句（如 COMMIT、ROLLBACK 和 SHOW），这属于正常现象。",
+        "noPlansHint": "尚无收集器为此数据库提供计划。在收集器配置中启用顶级查询收集以开始捕获计划——设置页面会逐步说明。",
+        "noPlanForQuery": "此查询没有计划",
+        "noPlanForQueryHint": "我们正在为此数据库捕获计划——此查询只是没有计划。对于数据库无法解释的语句（如 COMMIT、ROLLBACK 和 SHOW）来说，这是正常的。",
         "planHash": "计划",
         "firstSeen": "首次出现",
         "lastSeen": "最后出现",
@@ -16007,8 +15590,8 @@
       "serverMetrics": {
         "title": "数据库自身记录的内容",
         "subtitle": "服务端 — 所有客户端",
-        "clientSubtitle": "客户端观察 — 仅限已接入观测的调用方，且仅限已完成的调用。仍在运行的查询或挂起的查询不计入这些数字。",
-        "instance": "由 {instance} 报告",
+        "clientSubtitle": "客户端观测 — 仅限已埋点的调用方，且仅限已完成的调用。仍在运行或挂起的查询不包含在这些数字中。",
+        "instance": "由 {instance} 上报",
         "instanceWide": "此实例上的所有数据库",
         "calls": "执行次数",
         "rows": "返回行数",
@@ -16018,32 +15601,32 @@
         "sharedBlksRead": "来自磁盘的块",
         "tempBlksWritten": "写入的临时块",
         "noMatch": "此查询没有服务端记录",
-        "noMatchHint": "您的数据库会报告其运行的语句，而此语句不在其中。这很正常：两种视图识别查询的方式不同，因此它们并不总是对应。以上所有数字仍是从您的应用程序测量得到的。",
-        "ambiguous": "可能不止一个数据库对应此查询",
-        "ambiguousHint": "多个实例报告了具有此名称的数据库，因此无法判断哪一个运行了此查询。显示错误实例的数字比不显示更糟。候选：{instances}。",
+        "noMatchHint": "您的数据库会报告它执行的语句，而这条不在其中。这很正常：两种视图对查询的标识方式不同，因此它们并不总能对应上。以上所有内容仍然是根据您的应用程序测量的。",
+        "ambiguous": "可能有多个数据库对应此查询",
+        "ambiguousHint": "多个实例报告了同名数据库，因此无法判断哪一个运行了此查询。显示错误实例的数字比不显示更糟。候选实例：{instances}。",
         "off": "未收集到服务端指标",
-        "offHint": "您的采集器尚未从数据库收集每条语句的指标。在采集器配置中启用 Top 查询采集 — 设置页面会逐步引导您完成。",
+        "offHint": "您的采集器尚未从数据库收集逐语句的指标。请在采集器配置中启用 Top 查询采集 — 设置页面会逐步引导您完成。",
         "setUp": "设置",
         "readFailed": "无法读取服务端指标",
-        "readFailedHint": "读取失败，因此这不能说明您的数据库是否在报告语句。以上所有数字仍是从您的应用程序测量得到的。"
+        "readFailedHint": "读取失败，因此这不说明您的数据库是否在报告语句。以上所有内容仍然是根据您的应用程序测量的。"
       },
       "callingServices": {
-        "title": "您的哪些服务调用了此语句",
-        "unjoinable": "未显示 — 此语句在此处运行于多种数据库之上，在不知道具体哪一种的情况下匹配调用方会错误地命名服务。",
+        "title": "您的哪些服务调用了此查询",
+        "unjoinable": "未显示 — 此语句在此处的多种数据库上运行，在不确定是哪种数据库的情况下匹配调用方会错误地指向服务。",
         "tracedCalls": "已追踪 {calls} 次调用",
-        "coverage": "{count} 个服务出现在 {traced} 个已追踪调用中，这些调用来自上面的 {executions} 次执行。其余来自您尚未追踪的调用方。",
-        "coverageUnknown": "{count} 个服务出现在 {traced} 次已追踪的调用中。您的数据库未报告此语句的总数，因此无法给出占比。",
-        "noneNamed": "已追踪 {traced} 次调用，但其中没有一个能关联到服务——它们的追踪起始时间超出此时间范围。"
+        "coverage": "在上述 {executions} 次执行中，有 {traced} 次看到了 {count} 个服务。其余来自您尚未追踪的调用方。",
+        "coverageUnknown": "在 {traced} 次已追踪调用中看到了 {count} 个服务。您的数据库未报告此语句的总数，因此无法提供占比。",
+        "noneNamed": "已追踪了 {traced} 次调用，但其中没有一次能关联到服务 — 它们的追踪从该时间范围之外开始。"
       },
       "callersEmpty": {
         "title": "此查询尚无已追踪的调用",
-        "description": "您的数据库报告了此语句，但没有追踪到运行它的应用程序——因此没有可指明的调用方，也没有可打开的单独运行。为与此数据库通信的服务添加探针，它们就会出现在这里。",
-        "checklistTitle": "必须满足的条件",
+        "description": "您的数据库报告了此语句，但没有任何追踪记录指向运行它的应用程序 — 因此无法指出调用方，也无法打开单次运行。对访问此数据库的服务进行埋点后，它们会出现在这里。",
+        "checklistTitle": "前提条件",
         "setUp": "设置追踪",
         "checks": {
           "server": {
             "ok": "您的数据库正在报告此查询",
-            "okDetail": "这就是其他标签页中计时数据的来源"
+            "okDetail": "其他选项卡上的时间数据即来源于此"
           }
         }
       }
@@ -16053,37 +15636,37 @@
         "serverExecution": "执行时间",
         "serverWait": "等待时间",
         "serverCounted": "服务器数量",
-        "clientObserved": "客户端观测到",
+        "clientObserved": "客户端观测",
         "serverReported": "由您的数据库报告"
       }
     },
     "page": {
       "tabs": {
-        "overview": "概览",
-        "queries": "热门查询",
-        "samples": "最慢调用",
-        "samplesHintClient": "您的已埋点服务在此时段内观测到的已完成调用——未追踪的调用方不计入，因此这是下限而非总数。表格显示其中最慢的调用。",
-        "samplesHintServer": "您的数据库报告在此时段内完成的语句，在数据库内部计数。表格显示其中最慢的语句。",
-        "samplesHintUnknown": "此时间窗口内最慢的单个数据库调用。",
+        "overview": "概述",
+        "queries": "Top 查询",
+        "samples": "最慢的调用",
+        "samplesHintClient": "您的已埋点服务在此时间窗口内观测到的已完成调用 — 未追踪的调用方不计入，因此这是下限而非总数。表格显示了其中最慢的调用。",
+        "samplesHintServer": "您的数据库报告在此时间窗口内完成的语句，由数据库内部统计。表格显示了其中最慢的语句。",
+        "samplesHintUnknown": "此时间窗口内最慢的单次数据库调用。",
         "deadlocks": "死锁",
-        "blocked": "阻塞的查询",
+        "blocked": "被阻塞的查询",
         "deadlocksHint": "您的数据库报告的死锁。",
         "blockedHint": "当前正在等待锁的会话。",
         "activity": "活动",
         "activityHint": "您的数据库当前正在运行的会话。",
-        "tableHealth": "表健康",
-        "tableHealthHint": "表大小、膨胀和真空状态。膨胀和真空仅适用于 PostgreSQL。",
-        "deadlocksLocked": "死锁是企业版功能。升级可查看哪些查询相互死锁以及原因。其他数据库标签页在所有计划中均可用。",
-        "blockedLocked": "阻塞的查询是企业版功能。升级可查看哪些会话正在等待锁以及什么持有了锁。其他数据库标签页在所有计划中均可用。",
-        "tableHealthLocked": "表健康是企业版功能。升级可跟踪表大小、膨胀和真空状态。其他数据库标签页在所有计划中均可用。"
+        "tableHealth": "表健康状况",
+        "tableHealthHint": "表大小、膨胀和清理状态。膨胀和清理仅适用于 PostgreSQL。",
+        "deadlocksLocked": "死锁是企业版功能。升级以查看哪些查询相互死锁以及原因。其他数据库选项卡在任何计划中都可用。",
+        "blockedLocked": "被阻塞的查询是企业版功能。升级以查看哪些会话正在等待锁以及是什么持有锁。其他数据库选项卡在任何计划中都可用。",
+        "tableHealthLocked": "表健康状况是企业版功能。升级以跟踪表大小、膨胀和清理状态。其他数据库选项卡在任何计划中都可用。"
       }
     },
     "samples": {
-      "title": "最慢调用",
-      "subtitle": "此时间窗口内最慢的单个数据库调用，涵盖所有数据库和查询——按调用方测量的结果，仅包含已完成的调用",
-      "subtitleServer": "您的数据库在此时段内完成的最慢语句，在数据库内部测量",
+      "title": "最慢的调用",
+      "subtitle": "该时间窗口内最慢的各个数据库调用，跨所有数据库和查询——由调用方测量，仅统计已完成的调用",
+      "subtitleServer": "您的数据库在此时间窗口内完成的最慢的语句，在数据库内部测量",
       "logOffTitle": "您的数据库尚未记录慢语句",
-      "logOffDescription": "没有追踪到这些调用，因此我们向数据库询问它们自身最慢的语句——但它们没有记录任何内容。此列表来自 PostgreSQL 的语句日志（log_min_duration_statement），默认情况下该日志处于关闭状态——设置卡片中的日志记录步骤会将其开启。目前仅 PostgreSQL 支持逐语句捕获，因此 MySQL 和 MariaDB 还无法提供此列表。热门查询仍可向您显示哪些查询运行最多，因为它读取的是计数器表。",
+      "logOffDescription": "目前没有追踪到这些调用，因此我们向数据库询问其自身最慢的语句——但它们没有记录任何内容。此列表来自 PostgreSQL 的语句日志（log_min_duration_statement），该日志默认关闭——设置卡中的日志记录步骤会将其打开。目前仅 PostgreSQL 支持按语句捕获，因此 MySQL 和 MariaDB 还无法提供此列表。热门查询仍然可以显示哪些内容运行最多，因为它改为读取计数器表。",
       "searchPlaceholder": "搜索查询文本、服务或数据库…",
       "columns": {
         "query": "查询",
@@ -16093,24 +15676,24 @@
         "status": "状态"
       },
       "columnHints": {
-        "duration": "这次调用耗时多久，由调用方测量。仅计入已完成的调用——仍在运行的查询或从未返回的查询不在此处测量。"
+        "duration": "这次调用的耗时，由调用方测量。仅统计已完成的调用——仍在运行或从未返回的查询不在此测量范围内。"
       },
       "failed": "失败",
       "failedWithCode": "失败 · {code}",
       "viewTrace": "打开此调用所属的请求",
       "scatterOk": "已完成",
-      "partial": "部分追踪数据无法读取，因此此列表中可能缺少某些调用。",
-      "disclosureShort": "每行代表一次真实完成的调用",
-      "disclosureDetail": "由发起调用的应用程序根据您发送的追踪数据进行测量。此处仅包含已完成的调用——仍在运行的查询或挂起后从未返回的查询不会产生测量结果。",
+      "partial": "部分追踪数据无法读取，因此此列表中可能缺少一些调用。",
+      "disclosureShort": "每一行代表一个实际完成的调用",
+      "disclosureDetail": "由发起调用的应用程序根据您发送的追踪进行测量。这里只包含已完成的调用——仍在运行或挂起且未返回的查询不会产生测量结果。",
       "counts": {
         "complete": "显示此窗口中的所有 {count} 个数据库调用，按最慢优先排序。",
-        "truncated": "此窗口中最慢的 {count} 个调用 — 实际运行的比此处显示的更多。",
-        "filtered": "正在显示 {total} 个调用中的 {count} 个。"
+        "truncated": "此窗口中最慢的 {count} 个调用——实际运行的调用比此处显示的更多。",
+        "filtered": "显示 {count} 个调用，共 {total} 个。"
       },
       "serverList": {
         "title": "您的数据库报告的最慢调用",
-        "subtitle": "在每个数据库内部，于语句完成时进行测量 — 所有客户端都被计算在内，但不包括网络和连接等待。此窗口中没有被追踪的应用程序调用，因此通常的列表为空；此处显示的调用由数据库自身的日志阈值决定。这些按语句的报告目前仅来自 PostgreSQL — 收集器配置尚未捕获其他引擎的语句日志，因此 MySQL 和 MariaDB 的调用不会出现在此处。",
-        "truncated": "已报告的最慢的 {count} 个调用 — 超过阈值的调用比此处显示的更多",
+        "subtitle": "在每个数据库内部，语句完成时进行测量——每个客户端都会被计入，但网络和连接等待不计入。此窗口内没有来自已追踪应用程序的调用，因此通常的列表为空；此处显示哪些调用由数据库自身的日志记录阈值决定。这些按语句的报告目前仅来自 PostgreSQL——采集器配置尚未捕获其他引擎的语句日志，因此 MySQL 和 MariaDB 的调用不会出现在此处。",
+        "truncated": "报告的最慢的 {count} 个调用——超过阈值的调用比此处显示的更多",
         "columns": {
           "query": "查询",
           "when": "时间",
@@ -16118,34 +15701,34 @@
           "user": "用户"
         },
         "columnHints": {
-          "took": "从语句开始到完成，引擎测量的数据库内时间。不是任何调用者所经历的 — 不包括网络和连接等待。"
+          "took": "数据库内部从语句开始到完成的时间，由引擎测量。不是任何调用方的体验——不包括网络和连接等待。"
         }
       }
     },
     "rowChips": {
-      "new": "此列表中的新增项",
+      "new": "此列表中的新条目",
       "slower": "比平时慢 {ratio}×",
-      "loop": "每个请求运行 {multiplier}×",
-      "allFailed": "全部 {count} 个失败",
+      "loop": "每个请求运行 {multiplier}× 次",
+      "allFailed": "所有 {count} 次均失败",
       "busier": "更繁忙，而非更慢",
-      "climbed": "新的最重查询"
+      "climbed": "新的最高负载查询"
     },
     "deadlocks": {
       "title": "数据库",
       "subtitle": "相互阻塞并被回滚的事务",
-      "deadlockCount": "无死锁 | {count} 个死锁 | {count} 个死锁",
+      "deadlockCount": "无死锁 | {count} 次死锁 | {count} 次死锁",
       "pairCount": "无查询对 | {count} 个查询对 | {count} 个查询对",
       "searchPlaceholder": "搜索查询文本、表或应用程序…",
       "grouping": {
         "pairs": "按查询对分组",
-        "pairsHint": "每个相互死锁的查询对一行，并显示其发生频率。",
+        "pairsHint": "每个相互死锁的查询对占一行，并显示发生频率。",
         "events": "每个事件",
-        "eventsHint": "每个死锁一行，按最新排序 — 当您需要特定时间时使用此选项。"
+        "eventsHint": "每个死锁占一行，最新在前 — 当您需要具体时间时使用此视图。"
       },
       "columns": {
         "pair": "相互死锁的两个查询",
         "applications": "应用程序",
-        "objects": "争用的行",
+        "objects": "争夺的行",
         "lastSeen": "最后一个",
         "count": "死锁",
         "when": "时间",
@@ -16153,21 +15736,21 @@
         "finished": "已完成"
       },
       "coverage": {
-        "complete": "您的数据库报告的每个死锁都在此处 — 此窗口中有 {deadlocks} 个，来自 {pairs}。",
-        "capped": "发生的死锁比我们一次能读取的更多。这些是我们所拥有的 {deadlocks} 个，来自 {pairs} — 实际数量更高。",
-        "readUpTo": "最多读取到 {time}。",
+        "complete": "您的数据库报告的每个死锁都在这里 — 此窗口中有 {deadlocks} 个，涉及 {pairs} 对。",
+        "capped": "发生的死锁数超过了我们一次能读取的数量。这是现有的 {deadlocks} 个，涉及 {pairs} 对 — 实际数字更高。",
+        "readUpTo": "最多读取 {time}。",
         "mysqlPartial": "除非启用了 innodb_print_all_deadlocks，否则您的 MySQL 数据库仅保留最近的死锁。"
       },
       "chips": {
-        "oppositeOrder": "倒序",
+        "oppositeOrder": "相反的行顺序",
         "cadence": "每 {seconds} 秒",
         "noQueries": "未捕获的查询",
-        "partial": "仅一侧"
+        "partial": "仅单侧"
       },
       "rowActions": {
-        "topQueries": "在 Top queries 中找到这些",
+        "topQueries": "在热门查询中查找这些",
         "copy": "复制两个查询",
-        "alert": "发生死锁时提醒我"
+        "alert": "死锁时提醒我"
       },
       "detail": {
         "mostRecent": "最近 · {time}",
@@ -16176,107 +15759,107 @@
         "later": "更晚",
         "victim": "由数据库取消",
         "survivor": "允许完成",
-        "pid": "进程 {pid}",
+        "pid": "pid {pid}",
         "thread": "线程 {pid}",
         "transaction": "事务 {id}",
-        "eachWaits": "各自等待对方",
+        "eachWaits": "相互等待",
         "deadlock": "死锁",
         "noQueryCaptured": "日志记录了此死锁，但没有记录语句。",
         "waitingFor": "正在等待 {target} 完成。",
-        "waitingForRow": "正在等待 {target} 完成——另一个会话已经修改了它想要的行。",
+        "waitingForRow": "正在等待 {target} 完成 — 另一个会话已经更改了它想要的行。",
         "rawLock": "{mode} · {target}",
         "plainTitle": "按顺序发生了什么。",
-        "plainBody": "{a} 修改了一行并保持锁定。{b} 修改了另一行并保持锁定。然后双方都试图修改对方的行，因此谁也无法继续。数据库通过取消 {victim} 来打破僵局——该应用程序收到错误，其整个事务被回滚。",
-        "fixTitle": "修复方案在您的代码中，而不是在数据库中。",
-        "fixBody": "这两条语句以相反的顺序访问 {object} 行。让双方按相同顺序更新——先从最小 id 开始——这对语句就不会再死锁。",
-        "fixGeneric": "双方各自持有对方想要的锁。让每个事务按相同顺序获取这些锁，这对语句就不会再死锁。",
+        "plainBody": "{a} 更改了一行并持有它。{b} 更改了另一行并持有它。然后双方都试图更改对方的行，因此谁也无法继续。数据库通过取消 {victim} 来打破僵局 — 该应用程序收到错误，其整个事务被回滚。",
+        "fixTitle": "修复在您的代码中，而非数据库。",
+        "fixBody": "这两个语句以相反的顺序访问 {object} 行。让双方按相同顺序更新 — id 最小者优先 — 这对操作就不会再死锁。",
+        "fixGeneric": "双方都持有对方想要的东西。让每个事务按相同顺序获取这些锁，这对操作就不会再死锁。",
         "copyForSlack": "复制",
-        "occurrencesTitle": "此查询对死锁的全部 {count} 次",
-        "occurrencesHint": "选择一个点以加载上方那一个",
-        "lostLabel": "进程 {pid} 落败",
-        "bothSidesLose": "双方被取消的频率大致相当——{a} 对比 {b}。两个应用程序都不是问题所在；问题在于顺序。",
-        "oneSideLoses": "进程 {pid} 每次都被取消。",
-        "showAbove": "显示上方",
+        "occurrencesTitle": "这对操作死锁的所有 {count} 次",
+        "occurrencesHint": "选择一个点以加载上方相应的记录",
+        "lostLabel": "{pid} 落败",
+        "bothSidesLose": "双方被取消的频率大致相当 — {a} vs {b}。两个应用程序都不是问题所在；问题在于顺序。",
+        "oneSideLoses": "{pid} 每次都被取消。",
+        "showAbove": "在上方显示",
         "copy": "复制 SQL",
-        "seeInTopQueries": "在 Top queries 中查看",
+        "seeInTopQueries": "在热门查询中查看",
         "whichService": "哪个服务？",
-        "partialTitle": "这个死锁只有一方传到了我们这边",
-        "partialBody": "MySQL 将死锁的每一方分别写为一条日志。另一方的日志尚未到达——它可能不在这个时间窗口内，或者日志在两者之间发生了轮转。显示的内容是真实的；只是缺少另一条语句。",
-        "copyHint": "仅复制这一方的语句。",
-        "copySqlTooltip": "复制这一方的语句",
-        "copyForSlackHint": "两条语句、此查询对发生死锁的频率以及上次发生的时间——写成一条消息，您可以粘贴到频道或工单中。"
+        "partialTitle": "这个死锁只有一侧到达了我们",
+        "partialBody": "MySQL 将死锁的每一侧写入单独的日志条目。另一侧的条目尚未到达——它可能不在这个时间窗口内，或者日志可能在两者之间被轮转。所显示的是真实的；另一条语句就是缺失了。",
+        "copyHint": "仅复制这一侧的语句。",
+        "copySqlTooltip": "复制这一侧的语句",
+        "copyForSlackHint": "两条语句、这对死锁的频率以及上次发生时间——写成一条消息，你可以粘贴到频道或工单中。"
       },
       "storm": {
         "title": "死锁风暴。",
-        "body": "此窗口中有 {count} 次——通常没有。",
+        "body": "{count} 在此时间窗口内——通常为零。",
         "copyForSlack": "复制",
-        "biasWarning": "预计现在 Top queries 选项卡看起来会比实际情况更平静。被取消的查询仍会完成，但排在这些锁后面的查询尚未完成——因此那里的调用次数低于用户实际遇到的次数。"
+        "biasWarning": "预计热门查询标签页现在看起来会比实际情况更平静。取消的查询仍然会完成，但排在这些锁后面的查询没有完成——因此那里的调用计数低于用户实际体验到的。"
       },
       "summary": {
         "deadlocks": "死锁",
         "pairs": "查询对"
       },
       "healthy": {
-        "title": "没有死锁——我们确实在监测",
-        "description": "您的数据库在此时间窗口内未报告任何死锁。这是健康正常的，而不是我们收集数据有遗漏。",
-        "checklistTitle": "我们如何得知",
+        "title": "没有死锁——我们确实在监控",
+        "description": "您的数据库在此时间窗口内没有报告任何死锁。这是健康正常状态，不是我们采集的缺口。",
+        "checklistTitle": "我们如何知道",
         "collectionHealthy": "采集正常",
         "checks": {
           "reading": {
-            "title": "我们正在读取您数据库的日志",
-            "detail": "{databases} · 最近读取的行 {age}",
-            "detailNoFleet": "最近读取的行 {age}",
+            "title": "我们正在读取您的数据库日志",
+            "detail": "{databases} · 最近读取的行：{age}",
+            "detailNoFleet": "最近读取的行：{age}",
             "detailUnknown": "{databases} — 日志管道已连接",
             "detailUnknownNoFleet": "日志管道已连接"
           },
           "reporting": {
             "title": "死锁报告已开启",
-            "detail": "Postgres 默认记录死锁，您的 MySQL 已开启 innodb_print_all_deadlocks，因此每次死锁都会被记录——而不仅仅是最新一次。",
-            "detailMysqlPartial": "Postgres 默认记录死锁。您的 MySQL 未开启 innodb_print_all_deadlocks，因此只会保留最新一次死锁。",
-            "detailUnknown": "Postgres 默认记录死锁。在 MySQL 上，运行 SELECT {'@@'}innodb_print_all_deadlocks——其值必须为 1，否则只会保留最新一次死锁。我们无法从这里读取此设置。",
+            "detail": "Postgres 默认记录死锁，而您的 MySQL 已开启 innodb_print_all_deadlocks，因此每次死锁都会被记录——而不仅仅是最近一次。",
+            "detailMysqlPartial": "Postgres 默认记录死锁。您的 MySQL 未开启 innodb_print_all_deadlocks，因此只会保留最近一次死锁。",
+            "detailUnknown": "Postgres 默认记录死锁。在 MySQL 上，运行 SELECT {'@@'}innodb_print_all_deadlocks — 它必须为 1，否则只会保留最近一次死锁。我们无法从这里读取此设置。",
             "titleUnknown": "检查死锁报告是否已开启"
           },
           "traffic": {
-            "title": "我们从这些数据库看到了 {lines} 条其他日志行",
-            "detail": "因此管道正在传输流量——死锁本应通过它出现",
+            "title": "我们看到来自这些数据库的其他 {lines} 条日志行",
+            "detail": "因此管道正在传输流量——死锁也会通过它传来",
             "titleUnknown": "日志管道正在传输流量"
           },
           "lastEver": {
             "title": "我们见过的最后一次死锁",
-            "detail": "{when}。扩大时间窗口以查看它。",
+            "detail": "{when}。扩大时间窗口以查看。",
             "titleNone": "我们从未在这些数据库上见过死锁",
-            "detailNone": "暂无对比数据——这个时间窗口并不异常。"
+            "detailNone": "还没有可比的数据——这个窗口并不异常。"
           }
         },
-        "widen": "扩大到最近24小时"
+        "widen": "扩大到最近 24 小时"
       },
       "notCollecting": {
         "title": "我们还看不到死锁——这正是原因所在",
-        "description": "死锁由数据库本身报告，而非您的应用程序。我们检查四项内容。",
+        "description": "死锁是由数据库本身报告的，而不是由您的应用程序报告的。我们检查四件事。",
         "checklistTitle": "我们检查了什么",
         "checks": {
           "queries": {
             "ok": "您的查询数据正在到达",
-            "okDetail": "{queries} 来自 {databases}——“Top queries”标签页正常工作",
-            "okDetailNoFleet": "{queries}——“Top queries”标签页正常工作",
+            "okDetail": "{queries} 来自 {databases} — 热门查询标签页工作正常",
+            "okDetailNoFleet": "{queries} — 热门查询标签页工作正常",
             "no": "也没有查询数据到达",
-            "noDetail": "从“Top queries”标签页开始——目前还没有数据从这些数据库到达我们这里。"
+            "noDetail": "从热门查询标签页开始——这些数据库还没有任何数据到达我们。"
           },
           "enabled": {
             "ok": "数据库监控已开启",
             "okDetail": "对于此组织",
             "no": "数据库监控已关闭",
-            "noDetail": "在“设置”中开启它即可开始收集。"
+            "noDetail": "在设置中开启它以开始采集。"
           },
           "log": {
-            "no": "没有数据库在向我们发送其日志",
-            "noDetail": "查询计时来自您的应用程序，但死锁只会写入数据库自身的日志。将您的采集器指向 Postgres 或 MySQL 日志文件，此标签页便会自动填充。",
+            "no": "没有数据库向我们发送其日志",
+            "noDetail": "查询计时来自您的应用程序，但死锁只会写入数据库自己的日志。将您的采集器指向 Postgres 或 MySQL 日志文件，此标签页就会自动填充。",
             "ok": "数据库日志正在到达",
-            "okDetail": "因此死锁会到达我们这里——只是还没有发生过。"
+            "okDetail": "所以死锁会到达我们这里——只是从未发生过。"
           },
           "settings": {
             "title": "开始前值得了解",
-            "detail": "Postgres 将死锁写入两条日志行，MySQL 则跨多行——涉及的查询记录在后面的日志行中。仅匹配第一行的配置会记录死锁发生但丢失所有查询。我们的方案两者都处理。"
+            "detail": "Postgres 将死锁写入两行日志，MySQL 则跨多行——参与的查询在后面的行中。只匹配第一行的配置会记录死锁发生，但会丢失所有查询。我们的方案两者都能处理。"
           }
         }
       }
@@ -16284,153 +15867,153 @@
     "blocked": {
       "title": "数据库",
       "subtitle": "当前正在等待锁的会话",
-      "subtitlePast": "在此时间窗口内等待过锁的会话",
-      "waitingCount": "没有会话正在等待锁 | {count} 个会话现在正在等待锁 | {count} 个会话现在正在等待锁",
-      "waitingCountPast": "没有会话等待过锁 | {count} 个会话在此时间窗口内等待过锁 | {count} 个会话在此时间窗口内等待过锁",
+      "subtitlePast": "在此窗口期内等待过锁的会话",
+      "waitingCount": "没有会话在等待锁 | {count} 个会话当前正在等待锁 | {count} 个会话当前正在等待锁",
+      "waitingCountPast": "没有会话等待过锁 | {count} 个会话在此窗口期内等待过锁 | {count} 个会话在此窗口期内等待过锁",
       "sessionCount": "没有会话 | {count} 个会话 | {count} 个会话",
       "searchPlaceholder": "搜索查询文本、表或应用程序…",
       "perspective": {
-        "waiting": "谁被卡住了",
-        "waitingHint": "每个等待锁的会话一行，等待时间最长的排在前面。",
+        "waiting": "谁卡住了",
+        "waitingHint": "每个等待锁的会话占一行，等待时间最长的排在最前面。",
         "blocking": "谁在阻塞",
-        "blockingHint": "持有锁的会话，以及所有被它卡住的事务。"
+        "blockingHint": "持有锁的会话，以及所有被它卡住的会话。"
       },
       "columns": {
-        "stuckQuery": "被卡住的查询",
+        "stuckQuery": "卡住的查询",
         "session": "会话",
-        "waitingFor": "正在等待",
-        "heldUpBy": "被以下会话阻塞",
+        "waitingFor": "等待对象",
+        "heldUpBy": "阻塞者",
         "waiting": "等待中",
         "sessionQuery": "会话及其正在运行的内容",
         "application": "应用程序",
-        "blocking": "阻塞"
+        "blocking": "阻塞中"
       },
       "coverage": {
-        "summary": "最长等待为 {longest}。每次等待都可追溯到持有锁未释放的 {roots}。",
-        "summaryCapped": "等待的会话数量超过了我们一次能读取的数量。在我们获取到的会话中，最长等待为 {longest}，它们可追溯到持有锁未释放的 {roots}。",
+        "summary": "最长的等待为 {longest}。每次等待都追溯到持有锁未释放的 {roots}。",
+        "summaryCapped": "等待的会话数超出了我们一次能读取的数量。在已有的会话中，最长的等待为 {longest}，它们追溯到持有锁未释放的 {roots}。",
         "summaryOneRoot": "一个会话",
         "summaryManyRoots": "{count} 个会话",
         "checked": "每 {interval} 秒检查一次；上次检查时间：{time}。",
-        "checkedUnknown": "从您数据库自身的锁表中采样。"
+        "checkedUnknown": "采样自您数据库自身的锁表。"
       },
       "rowActions": {
         "showChain": "显示链路",
         "copy": "复制查询",
-        "alertMe": "锁等待时提醒我"
+        "alertMe": "在锁等待时提醒我"
       },
       "waitEvent": {
-        "transaction": "另一个事务完成",
+        "transaction": "等待另一个事务完成",
         "row": "行锁",
         "table": "表锁",
-        "extend": "表增长",
+        "extend": "等待表增长",
         "advisory": "应用程序锁",
         "object": "对象锁",
-        "buffer": "数据页读取",
+        "buffer": "等待读取数据页",
         "lock": "锁"
       },
-      "deep": "{count} 层",
-      "notWaiting": "未等待",
+      "deep": "深度 {count}",
+      "notWaiting": "未在等待",
       "longestWait": "最长等待",
-      "holdsTheLock": "持有所有人都想要的锁",
-      "lastStatement": "最后一条语句 {age} 前",
-      "idleInTransaction": "未等待任何事物 · 在打开的事务中空闲",
+      "holdsTheLock": "持有所有人想要的锁",
+      "lastStatement": "最后一条语句在 {age} 前",
+      "idleInTransaction": "未等待任何内容 · 在打开的事务中空闲",
       "pills": {
         "root": "根 — 从此处开始",
-        "waitingBlocking": "等待 & 阻塞 {count}",
-        "waiting": "等待"
+        "waitingBlocking": "等待并阻塞 {count}",
+        "waiting": "等待中"
       },
       "waitingOn": "等待 {pid}",
-      "degraded": "一个会话阻塞了 {count}。它已经有一个打开的事务持续 {age}，并且在那段时间内没有运行查询——很可能是应用程序忘记提交。",
+      "degraded": "一个会话阻塞了 {count}。它的事务保持打开状态已有 {age}，且在此期间未运行任何查询——很可能是应用程序忘记提交。",
       "footer": {
         "allLeadBack": "所有 {waits} 都追溯到 pid {pid}",
         "allLeadBackDetail": "— 一个会话，持有对 {object} 的锁。",
         "switchToBlocking": "切换到“谁在阻塞”",
-        "releaseAll": "终止会话 {pid} 将释放所有 {count}。",
-        "releaseAllDetail": "它下面的所有内容只是因为那一把锁而等待。",
-        "timeLost": "总时间损失：{seconds}，跨 {sessions} 个会话"
+        "releaseAll": "结束会话 {pid} 会释放所有 {count}。",
+        "releaseAllDetail": "它下面的所有内容都只是因为那一把锁而在等待。",
+        "timeLost": "总损失时间：{seconds}，涉及 {sessions}"
       },
       "terminate": {
         "copied": "已复制",
-        "hint": "请自行针对 {instance} 运行此命令以终止会话。我们绝不会代您运行。",
-        "hintNoInstance": "请自行运行此命令以终止会话。我们绝不会代您运行。"
+        "hint": "请自行对 {instance} 执行此操作以结束会话。我们不会替你运行。",
+        "hintNoInstance": "请自行执行此操作以结束会话。我们不会替你运行。"
       },
       "summary": {
         "waiting": "等待中的会话",
         "longest": "最长等待",
-        "chains": "链路"
+        "chains": "链"
       },
-      "rootCount": "无根阻塞者 | {count} 个根阻塞者 | {count} 个根阻塞者",
-      "inChain": "链路中的 {count} 个会话",
+      "rootCount": "没有根阻塞者 | {count} 个根阻塞者 | {count} 个根阻塞者",
+      "inChain": "链中有 {count} 个会话",
       "healthy": {
         "title": "没有会话在等待锁",
-        "description": "目前，您数据库中没有会话被其他会话阻塞。这是健康常态，并非我们采集存在缺口。",
-        "descriptionPast": "在此时间窗口内，您数据库中没有会话被其他会话阻塞。这是健康常态，并非我们采集存在缺口。",
+        "description": "当前你的数据库中没有会话被其他会话阻塞。这是健康常态，而不是我们收集数据的缺口。",
+        "descriptionPast": "在此时间窗口内，你的数据库中没有会话被其他会话阻塞。这是健康常态，而不是我们收集数据的缺口。",
         "checklistTitle": "我们如何得知",
-        "collectionHealthy": "采集正常",
+        "collectionHealthy": "数据收集正常",
         "checks": {
           "sampling": {
-            "title": "我们正在检查您数据库的锁表",
-            "detail": "每 {interval} 秒 · 上次检查 {age}",
-            "detailUnknown": "按照您的采集器配置的时间表"
+            "title": "我们正在检查你数据库的锁表",
+            "detail": "每 {interval} 秒 · 上次查看 {age}",
+            "detailUnknown": "根据你的采集器配置的时间表"
           },
           "sessions": {
             "title": "会话运行正常",
-            "detail": "我们能看到活动会话，且没有一个处于锁队列中"
+            "detail": "我们可以看到活动会话，且没有一个在锁队列中"
           },
           "meaning": {
-            "title": "此选项卡在非空时显示的内容",
-            "detail": "一个会话等待另一个会话持有的锁，以及追溯到持有该锁的会话的链路。短暂的等待是正常的，会自行消除——此选项卡专门用于那些不会自行消除的等待。"
+            "title": "此标签页非空时显示的内容",
+            "detail": "一个会话正在等待另一个会话持有的锁，以及回溯到持有该锁的会话的链路。短时间的等待是正常的，且会自行清除——此标签页用于展示那些不会自行清除的等待。"
           }
         }
       },
       "notCollecting": {
-        "title": "我们还看不到被阻塞的查询——以及确切原因",
-        "description": "被阻塞的查询只能从数据库内部、在其锁表中看到。我们会检查三件事。",
+        "title": "我们还看不到被阻塞的查询——以下是确切原因",
+        "description": "被阻塞的查询只能从数据库内部、在其锁表中看到。我们检查三件事。",
         "checklistTitle": "我们检查了什么",
         "checks": {
           "queries": {
-            "ok": "您的查询数据正在到达",
-            "okDetail": "{queries} 来自 {databases} — 热门查询标签正常工作",
-            "okDetailNoFleet": "{queries} — 热门查询标签正常工作",
+            "ok": "你的查询数据正在送达",
+            "okDetail": "{queries} 来自 {databases} — 热门查询标签页正常工作",
+            "okDetailNoFleet": "{queries} — 热门查询标签页正常工作",
             "no": "也没有查询数据到达",
-            "noDetail": "从热门查询标签开始 — 目前还没有来自这些数据库的数据到达我们这里。"
+            "noDetail": "从“热门查询”标签页开始——目前还没有来自这些数据库的数据到达我们这里。"
           },
           "enabled": {
             "ok": "数据库监控已开启",
-            "okDetail": "对此组织",
+            "okDetail": "对于此组织",
             "no": "数据库监控已关闭",
             "noDetail": "在设置中打开它以开始收集。"
           },
           "sampling": {
-            "no": "没有正在采样您数据库的锁表",
-            "noDetail": "谁在等待谁只存在于数据库内部，且仅发生在等待期间。我们的收集器配置按计划读取它，并开启 log_lock_waits，这样长时间的等待也会被记录。",
+            "no": "没有程序在采样你数据库的锁表",
+            "noDetail": "谁在等待谁只存在于数据库内部，且仅发生在等待期间。我们的采集器方案会按计划读取它，并开启 log_lock_waits，以便长时间等待也被记录下来。",
             "ok": "锁表采样正在运行",
-            "okDetail": "因此阻塞的会话会到达我们这里 — 但实际上一个也没有。"
+            "okDetail": "因此被阻塞的会话会到达我们这里——但当前确实没有。"
           },
           "settings": {
             "title": "开始前值得了解",
-            "detail": "log_lock_waits 仅在等待持续时间超过 deadlock_timeout 时记录 — 默认一秒。短于该时间的等待是正常的且不会被记录，这就是为什么此标签实时采样而不是仅读取日志。"
+            "detail": "log_lock_waits 仅在等待持续时间超过 deadlock_timeout（默认一秒）时记录。比这更短的等待是正常的，且不会记录日志，这就是为什么此标签页进行实时采样，而不是仅读取日志。"
           }
         }
       }
     },
     "activity": {
       "title": "活动",
-      "subtitle": "您的数据库当前正在做什么，从它们自己的会话表中采样。",
-      "subtitlePast": "您的数据库在此时间窗口期间在做什么，从它们自己的会话表中采样。",
+      "subtitle": "你的数据库当前正在做什么，从它们自己的会话表中采样。",
+      "subtitlePast": "你的数据库在此时间窗口内正在做什么，从它们自己的会话表中采样。",
       "searchPlaceholder": "搜索会话、用户、应用程序",
       "wait": {
         "onCpu": "在 CPU 上 / 无等待",
         "qualified": "{type}: {event}",
         "plain": "{event}",
-        "remainder": "+{count} 更多等待事件 ({share})",
-        "remainderNoShare": "+{count} 更多等待事件"
+        "remainder": "+{count} 个额外等待事件 ({share})",
+        "remainderNoShare": "+{count} 个额外等待事件"
       },
       "disclosure": {
-        "sampled": "每 {interval} 秒采样一次 — 这是一系列快照，不是连续录制，因此比采样间隔更短的会话可能在未被看到的情况下运行并结束。",
-        "sampledUnknown": "按计划采样 — 这是一系列快照，不是连续录制。我们还没有看到足够的样本来确定您的收集器轮询的频率。",
-        "filtered": "样本已经由您的收集器过滤：早于最新正在运行的查询的空闲会话会被排除，除非它们正在阻塞某人。因此这不是每个连接的完整列表。",
-        "short": "每 {interval} 秒采样一次，并已预过滤",
+        "sampled": "每 {interval} 秒采样一次 — 这是一系列快照，而非连续录制，因此短于采样间隔的会话可能会运行并结束而不被发现。",
+        "sampledUnknown": "按计划采样 — 这是一系列快照，而非连续录制。我们尚未获得足够多的样本来确定你的采集器的轮询频率。",
+        "filtered": "样本已由你的采集器过滤：早于最新运行查询的空闲会话会被排除，除非它们正在阻塞其他会话。因此，这不是所有连接的完整列表。",
+        "short": "每 {interval} 秒采样，并已预过滤",
         "shortUnknown": "按计划采样，并已预过滤",
         "more": "这意味着什么"
       },
@@ -16443,149 +16026,149 @@
         "running": "已运行",
         "lastQuery": "最后查询",
         "query": "查询",
-        "blockedBy": "被阻塞于"
+        "blockedBy": "阻塞者"
       },
       "summary": {
         "sessions": "会话",
         "onCpu": "在 CPU 上",
-        "waiting": "等待中",
-        "idleInTransaction": "事务中空闲"
+        "waiting": "等待",
+        "idleInTransaction": "事务空闲"
       },
       "state": {
-        "unknown": "状态未报告"
+        "unknown": "未报告状态"
       },
       "counts": {
         "complete": "显示 {count} 个会话。",
-        "capped": "采样的会话数超过了我们一次能读取的数量。这些是我们拥有的 {count} 个。",
-        "filtered": "显示 {total} 个会话中的 {count} 个。"
+        "capped": "我们无法一次读取所有采样到的会话。以下是我们拥有的 {count} 个。",
+        "filtered": "显示共 {total} 个会话中的 {count} 个。"
       },
-      "transactionOpen": "事务打开 {age}",
+      "transactionOpen": "事务开启 {age}",
       "healthy": {
         "title": "当前没有正在运行的内容",
-        "description": "我们采样了您的数据库的会话表，未发现活动会话。这是空闲数据库的健康正常状态，而不是我们收集的缺口。",
-        "descriptionPast": "我们在此时间窗口内采样了您的数据库的会话表，未发现活动会话。这是空闲数据库的健康正常状态，而不是我们收集的缺口。",
+        "description": "我们采样了你的数据库会话表，未发现任何活动会话。对于空闲数据库来说，这是健康的正常情况，而不是采集上的缺口。",
+        "descriptionPast": "我们在此时间窗口内采样了你的数据库会话表，未发现任何活动会话。对于空闲数据库来说，这是健康的正常情况，而不是已采集数据中的缺口。",
         "checklistTitle": "我们如何得知",
-        "collectionHealthy": "收集正常",
+        "collectionHealthy": "采集健康",
         "checks": {
           "sampling": {
-            "title": "我们正在采样您的数据库会话表",
+            "title": "我们正在采样你的数据库会话表",
             "detail": "每 {interval} 秒 · 上次查看 {age}",
-            "detailUnknown": "按照您的采集器配置的时间表"
+            "detailUnknown": "按你的采集器配置的计划"
           },
           "pipeline": {
-            "title": "我们正在接收您的数据库数据",
-            "detail": "{lines} 条其他数据在同一时间窗口内通过同一管道传入",
-            "detailUnknown": "承载该数据的管道正在运行"
+            "title": "你的数据库正在向我们传送数据",
+            "detail": "在此窗口内，同一管道传来了 {lines} 行其他数据",
+            "detailUnknown": "承载此数据的管道正在运行"
           },
           "meaning": {
-            "title": "此标签页非空时显示的内容",
-            "detail": "您的数据库运行的每个会话、每个会话在等待什么以及已持续多长时间。由于我们采用采样而非持续监视，非常短的查询可能在两次采样之间完成，永远不会显示。"
+            "title": "此选项卡不为空时显示的内容",
+            "detail": "你的数据库正在运行的每个会话、每个会话在等待什么以及已运行了多久。由于我们采用采样而非持续观察，非常短的查询可能会在两个采样之间完成，从而永远不会出现。"
           }
         }
       },
       "notCollecting": {
-        "title": "我们还无法查看实时会话——以下是确切原因",
-        "description": "数据库当前正在执行的操作仅存在于该数据库自身的会话表中。必须有东西去轮询它。我们检查三件事。",
+        "title": "我们还无法查看实时会话 — 这正是原因所在",
+        "description": "数据库当前正在执行的操作仅存在于该数据库自身的会话表中。必须有某种机制去轮询它。我们会检查三项内容。",
         "checklistTitle": "我们检查的内容",
         "checks": {
           "queries": {
-            "ok": "您的查询数据正在到达",
-            "okDetail": "{queries} 个查询来自 {databases} 个数据库 — Top queries 标签页工作正常",
-            "okDetailNoFleet": "{queries} — Top queries 标签页工作正常",
+            "ok": "你的查询数据正在到达",
+            "okDetail": "{queries} 来自 {databases} — “热门查询”选项卡工作正常",
+            "okDetailNoFleet": "{queries} — “热门查询”选项卡工作正常",
             "no": "也没有查询数据到达",
-            "noDetail": "先从 Top queries 标签页开始——目前还没有收到这些数据库的任何数据。"
+            "noDetail": "请从“热门查询”选项卡开始 — 这些数据库还没有任何数据传送到我们这里。"
           },
           "enabled": {
             "ok": "数据库监控已开启",
-            "okDetail": "适用于此组织",
+            "okDetail": "对于此组织",
             "no": "数据库监控已关闭",
-            "noDetail": "请在“设置”中开启它以开始收集。"
+            "noDetail": "请在设置中开启它以开始收集。"
           },
           "sampling": {
-            "no": "没有组件在采样您的数据库会话表",
-            "noDetail": "会话采样来自您的采集器：请在数据库主机上的采集器配方中启用 db.server.query_sample——设置页面会分步说明。只要数据库监控开启，OpenObserve 就会接受此数据源，因此修复措施在采集器侧。"
+            "no": "没有采集器在采样您的数据库会话表",
+            "noDetail": "会话样本来自您的采集器：在数据库主机上的采集器配方中启用 db.server.query_sample — 设置页面会逐步介绍。只要数据库监控开启，OpenObserve 就会接受此数据流，因此修复在采集器端。"
           }
         }
       }
     },
     "instanceMetrics": {
       "columnHeader": "实例健康",
-      "columnHint": "相对于限制的连接数，来自您的采集器已发送的指标。在接收器上报此实例之前为空白。",
+      "columnHint": "连接数相对于限制，来自您的采集器已发送的指标。在接收器报告此实例之前为空。",
       "connectionsOf": "{used} / {limit} 个连接",
       "connectionsNoLimit": "{used} 个连接",
-      "noLimitHint": "该引擎的接收器本身不发布连接限制，因此只显示计数。设置卡中的连接限制配方（sqlquery/mysql_limits）会收集 max_connections 并将其转换为百分比。",
+      "noLimitHint": "此引擎的接收器本身不发布连接限制，因此仅显示计数。设置卡片中的连接限制配方（sqlquery/mysql_limits）会收集 max_connections 并将其转换为百分比。",
       "trendLabel": "所选时间窗口内的连接数",
       "cacheHit": "缓存命中 {percent}",
       "lagBytes": "副本落后 {value}",
       "lagSeconds": "副本落后 {value}",
-      "deadlocks": "{count} 个死锁 | {count} 个死锁",
-      "noTraffic": "此窗口内无应用流量",
+      "deadlocks": "{count} 次死锁 | {count} 次死锁",
+      "noTraffic": "此时间窗口内无应用程序流量",
       "noTrafficHint": "您的采集器报告了此实例，但在此时间窗口内没有应用程序查询它。其查询列为空是因为没有测量它们，而不是因为它运行很快。",
       "unmatched": {
         "pooler": "没有实例指标与此地址匹配",
-        "poolerHint": "此行是您的应用程序连接到的地址。您的采集器报告不同的主机，这正是中间有连接池时的样子——连接池的地址与实际数据库永远不会匹配。",
+        "poolerHint": "此行是您的应用程序连接的地址。您的采集器报告的是不同的主机，这看起来就像中间有一个连接池 — 连接池的地址与真实数据库永远不会匹配。",
         "loopback": "没有实例指标与此地址匹配",
-        "loopbackHint": "此行指向 localhost。采集器会将回环端点重写为其自身的主机名，因此即使两者都健康，这两个名称也永远不会匹配。",
+        "loopbackHint": "此行指向 localhost。采集器会将回环端点重写为自身的主机名，因此即使两者都正常，这两个名称也永远不会匹配。",
         "noReceiver": "{engine} 接收器未上报",
-        "noReceiverHint": "您的应用程序正在查询此数据库，但没有 {engine} 接收器为其发送服务器指标。请将 {engine} 接收器添加到采集器以填充此列。",
-        "noReceiverMariadbHint": "您的应用程序正在查询此 MariaDB 服务器，但没有任何组件在为其发送服务器指标。没有单独的 MariaDB 接收器——请将 MySQL 接收器指向此实例，其指标就会填充此列。",
+        "noReceiverHint": "您的应用程序正在查询此数据库，但没有 {engine} 接收器在为其发送服务器指标。将 {engine} 接收器添加到您的采集器以填充此列。",
+        "noReceiverMariadbHint": "您的应用程序正在查询此 MariaDB 服务器，但没有东西在为其发送服务器指标。没有单独的 MariaDB 接收器 — 将 MySQL 接收器指向此实例，其指标就会填充此列。",
         "engineUnsupported": "未为 {engine} 收集",
-        "engineUnsupportedHint": "实例指标是针对 PostgreSQL、MySQL 和 MariaDB 收集的——目前尚未为 {engine} 接入接收器，因此此列为空。这是覆盖范围说明，而非健康状态判定。",
+        "engineUnsupportedHint": "实例指标是为 PostgreSQL、MySQL 和 MariaDB 收集的 — 尚未为 {engine} 接入接收器，因此此列保持为空。这是覆盖范围说明，而不是健康判定。",
         "unreadable": "无法读取实例指标",
-        "unreadableHint": "指标流存在但无法读取。这通常是权限问题，而不是数据库本身有什么问题。"
+        "unreadableHint": "指标流存在但无法读取。这通常是权限问题，而不是数据库本身有问题。"
       },
-      "limitUnknownHint": "已收到连接数，但未收到连接限制，因此无法显示百分比。请检查该采集器上是否启用了连接限制指标。",
+      "limitUnknownHint": "已收到连接数但未收到限制，因此无法显示百分比。请检查此采集器上是否已启用连接限制指标。",
       "noReading": "此时间窗口内无读数",
-      "noReadingHint": "您的采集器报告了此实例，但在此时间窗口内未发送任何连接指标。该指标可能在接收端被关闭，或者该实例已停止报告。",
+      "noReadingHint": "您的采集器报告了此实例，但在此时间窗口内未发送任何连接指标。该指标可能在接收器上已关闭，或者实例可能已停止报告。",
       "lagLabel": "副本延迟",
       "deadlockLabel": "死锁"
     },
     "tableHealth": {
       "title": "表健康",
-      "subtitle": "每个表的大小、膨胀和清理状态，最新快照优先显示。",
+      "subtitle": "每个表的大小、膨胀和 vacuum 状态，最新快照优先。",
       "searchPlaceholder": "搜索表",
       "never": "从未",
-      "countersCumulative": "扫描和清理计数是自上次统计重置以来的累计总数，而不是所选时间范围内的计数。",
-      "tuplesEstimated": "行数和膨胀百分比是数据库引擎的统计估算值，并非精确计数。",
+      "countersCumulative": "扫描和 vacuum 计数是自上次统计重置以来的累计总数，而不是所选时间范围内的计数。",
+      "tuplesEstimated": "行数和膨胀百分比是数据库引擎的统计估算值，不是精确计数。",
       "notCollectingTitle": "尚无表统计信息",
-      "notCollectingDescription": "在此时间范围内没有报告表统计信息。此信号作为独立的采集器配方提供。",
+      "notCollectingDescription": "在此时间范围内没有报告表统计信息。此信号作为单独的采集器配方提供。",
       "engineUnsupportedTitle": "未为此引擎收集",
-      "engineUnsupportedDescription": "表健康由每个引擎的采集器配方收集，但没有为这个引擎提供配方，因此不会为其收集任何内容。这并不表示一切正常。",
+      "engineUnsupportedDescription": "表健康由每个引擎的采集器配方收集，并且没有为此引擎提供配方 — 因此不会收集任何内容。这并不表示一切正常。",
       "checklistTitle": "开始收集",
       "checkRecipe": "将 Databases 设置指南中的 pg_table_stats 配方添加到您的采集器配置中。",
-      "checkGrant": "将 pg_monitor 权限授予采集器用户，以便其能够读取 pg_stat_user_tables。",
-      "checkRange": "扩大时间范围——该配方每 60 秒报告一次。",
+      "checkGrant": "授予采集器用户 pg_monitor 权限，以便其读取 pg_stat_user_tables。",
+      "checkRange": "扩大时间范围 — 该配方每 60 秒报告一次。",
       "columns": {
         "relation": "表",
         "instance": "实例",
         "totalBytes": "总大小",
         "heapBytes": "堆大小",
         "overheadBytes": "索引 + TOAST",
-        "liveTuples": "存活行（估计）",
-        "deadTuples": "死行（估计）",
+        "liveTuples": "存活行数（估计）",
+        "deadTuples": "死行数（估计）",
         "deadTupPct": "膨胀（估计）",
-        "modSinceAnalyze": "自 analyze 以来的行数",
+        "modSinceAnalyze": "自分析以来的行数",
         "seqScanCount": "顺序扫描（累计）",
-        "seqTupRead": "顺序扫描行数（累计）",
+        "seqTupRead": "顺序扫描的行数（累计）",
         "idxScanCount": "索引扫描（累计）",
-        "autovacuumCount": "自动清理次数（累计）",
+        "autovacuumCount": "自动清理（累计）",
         "frozenXidAge": "事务 ID 年龄",
         "lastVacuum": "上次清理",
         "lastAutovacuum": "上次自动清理",
-        "lastAnalyze": "上次 analyze"
+        "lastAnalyze": "上次分析"
       },
       "countLine": "{count} 个表"
     },
     "recommendations": {
       "title": "建议",
-      "subtitle": "对采集器已报告的内容进行确定性检查。每项检查都会说明测量值及其超过的阈值。",
-      "countersCumulative": "索引扫描计数是自上次统计重置以来的累计总数，而不是所选时间范围内的计数。",
-      "andMore": "以及 {count} 个类似项",
+      "subtitle": "对收集器已报告的内容进行确定性检查。每项都说明测量值及其超过的阈值。",
+      "countersCumulative": "索引扫描计数是自上次统计重置以来的累计总数，而非所选时间范围内的计数。",
+      "andMore": "以及 {count} 个类似的项",
       "unused-index": {
         "title": "索引未被扫描",
-        "body": "{relation} 上的 {index} 没有记录到扫描，并占用 {size}。",
-        "rule": "自上次统计重置以来，索引扫描计数为 0，并且该索引至少有 {bytes} 字节。扫描计数是累计总数，而不是所选范围内的计数。",
-        "caveat": "累计计数为零意味着自上次计数器重置以来，规划器没有选择该索引。它可能仍然服务于副本、定期任务或约束。"
+        "body": "{relation} 上的索引 {index} 没有扫描记录，占用空间 {size}。",
+        "rule": "自上次统计重置以来，索引扫描计数为 0，且索引至少为 {bytes} 字节。扫描计数是累计总数，而非所选范围内的计数。",
+        "caveat": "累计计数为零意味着自上次计数器重置以来，规划器未选择此索引。它仍可能服务于副本、定期任务或约束。"
       },
       "long-running-query": {
         "title": "长时间运行的查询",
@@ -16593,19 +16176,19 @@
         "rule": "执行中的会话已运行至少 {seconds} 秒。空闲会话不包括在内。"
       },
       "high-impact-blocker": {
-        "title": "阻塞多个会话的会话",
-        "body": "会话 {pid} 位于链的头部，有 {count} 个会话正在等待。",
-        "rule": "根阻塞者——一个阻塞其他会话且不等待任何会话的会话——在其后有至少 {sessions} 个会话等待，按整个链计数。"
+        "title": "阻塞多个会话的阻塞者",
+        "body": "会话 {pid} 位于等待链的头部，有 {count} 个会话在等待。",
+        "rule": "根阻塞者 — 一个阻塞其他会话且不等待任何会话的会话 — 其后至少有 {sessions} 个会话在等待，按整个链计算。"
       },
       "high-row-count": {
         "title": "每次调用行数过高",
-        "body": "该语句在 {calls} 次调用中平均每次返回 {rows} 行。",
-        "rule": "平均每次调用行数至少为 {rows}，至少经过 {calls} 次调用。平均值是服务器总行数除以调用次数。"
+        "body": "该语句在 {calls} 次调用中平均每次调用返回 {rows} 行。",
+        "rule": "平均每次调用行数至少为 {rows}，调用次数至少为 {calls}。平均值是服务器的总行数除以其调用次数。"
       },
-      "enginePartialTitle": "某些检查未运行",
-      "enginePartialDescription": "未使用索引检查需要索引扫描计数器，但该引擎不收集此数据，因此此处列表为空并不代表一切正常。",
-      "allClearTitle": "没有超过阈值",
-      "allClearDescription": "所有检查均已运行，且在此时间范围内均未超过阈值。"
+      "enginePartialTitle": "部分检查未运行",
+      "enginePartialDescription": "未使用的索引检查需要索引扫描计数器，而此引擎不收集该计数器，因此此处列表为空并不代表一切正常。",
+      "allClearTitle": "未超过任何阈值",
+      "allClearDescription": "所有检查均已运行，且在此时间范围内均未超过其阈值。"
     }
   }
 }
