@@ -444,7 +444,8 @@
       "regexPatterns": "wzorce regex",
       "monitors": "monitory",
       "modelPricing": "definicje cen modeli",
-      "variables": "zmienne"
+      "variables": "zmienne",
+      "experiments": "eksperymenty"
     },
     "demo": {
       "pageTitle": "Stany puste — pełny zestaw do przeglądu",
@@ -481,6 +482,18 @@
       "noStreams": "Brak pozyskanych danych",
       "noTraces": "Brak śladów",
       "noUsers": "Brak użytkowników"
+    },
+    "noExperiments": {
+      "title": "Brak eksperymentów",
+      "description": "Eksperyment uruchamia zmianę na zbiorze danych, ocenia każdy wiersz i przypina wynik, aby można go było później porównać z linią bazową.",
+      "action": "Nowy eksperyment",
+      "actionDesc": "Wybierz zbiór danych, opisz zadanie i wybierz moduły oceniające do uruchomienia."
+    },
+    "noRemoteTasks": {
+      "title": "Brak zdalnych zadań",
+      "description": "Zdalne zadanie to usługa HTTP, którą Twoje eksperymenty wywołują, aby uzyskać wyniki. Zarejestruj ją raz, potwierdź, że połączenie działa, a każdy eksperyment będzie mógł przypiąć dokładną wersję, z którą pracował.",
+      "action": "Zarejestruj zadanie",
+      "actionDesc": "Skieruj OpenObserve na swój endpoint i przetestuj połączenie."
     }
   },
   "common": {
@@ -1223,7 +1236,10 @@
     "ingestionText": "Pozyskiwanie danych",
     "navigationLink": "Link nawigacyjny",
     "ariaCurrentPage": "{label} - bieżąca strona",
-    "ariaWithNotifications": "{label} ({count} powiadomień)"
+    "ariaWithNotifications": "{label} ({count} powiadomień)",
+    "infra": "Infrastruktura",
+    "databases": "Bazy danych",
+    "topQueries": "Najczęstsze zapytania"
   },
   "rum": {
     "noSessionReplay": "Brak odtwarzania sesji",
@@ -3442,6 +3458,17 @@
     "languagesLabel": "Języki/Frameworki",
     "otherLabel": "Inne",
     "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "snowflake": "Snowflake",
+    "zookeeper": "Zookeeper",
+    "cassandra": "Cassandra",
+    "aerospike": "Aerospike",
+    "dynamodb": "DynamoDB",
+    "jenkins": "Jenkins",
+    "ansible": "Ansible",
+    "terraform": "Terraform",
+    "gactions": "GitHub Actions",
+    "python": "Python",
     "dotnettracing": ".Net Tracing",
     "dotnetlogs": ".Net Logs",
     "macos": "macOS",
@@ -3703,6 +3730,12 @@
       "k8sTroubleWebhookA": "Webhook operatora OpenTelemetry wymaga, aby najpierw działał webhook cert-managera. Uruchom `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook`, a następnie uruchom ponownie instalację — jest ona idempotentna.",
       "k8sTroubleWebhookQ": "Instalacja kończy się błędem dotyczącym webhooka admission",
       "linuxAgentFixBody": "Instalator uruchamia agenta jako usługę systemd. Jeśli nic nie dociera, potwierdź, że działa, i przeczytaj jego logi pod kątem błędu uwierzytelniania lub łączności:",
+      "prepareMariadbTitle": "Przygotuj MariaDB",
+      "prepareMariadbDesc": "Utwórz użytkownika monitorującego — wykonaj to w kliencie SQL, **nie** w powłoce.",
+      "runCollectorMariadbDesc": "Uruchom kolektor (hasło użytkownika przez zmienną środowiskową).",
+      "mariadbHostLabel": "Host MariaDB",
+      "verifyMariadbMetricsDesc": "Kliknij Test poniżej lub sprawdź Streams pod kątem metryk `mysql_*` (MariaDB raportuje przez odbiornik MySQL).",
+      "mariadbTagline": "Zbieraj metryki MariaDB za pomocą OpenTelemetry Collector i wysyłaj je do OpenObserve.",
       "logsStreamNameLabel": "Nazwa strumienia logów",
       "macosAgentFixBody": "Instalator rejestruje dwa demony launchd: samego agenta i mostek dziennika ujednoliconego. Jeśli nic nie dociera, potwierdź, że oba są załadowane, i przeczytaj log agenta w poszukiwaniu błędu uwierzytelniania lub łączności:",
       "macosAgentServicesFixTitle": "Sprawdź usługi agenta",
@@ -4007,7 +4040,46 @@
       "enableSessionReplayOptionalTitle": "Włącz powtórki sesji (opcjonalnie)",
       "enableSessionReplayNativeDesc": "Powtórki sesji są włączane **osobno** i **nie** dziedziczą punktu końcowego RUM. One również niczego nie dołączają, więc potrzebują pełnego adresu URL `/replay` poniżej. Błąd w tym miejscu jest zwykłą przyczyną, dla której zdarzenia RUM docierają, a powtórki nigdy.",
       "verifyAndroidRumDesc": "Uruchom aplikację na emulatorze lub urządzeniu, przejdź między kilkoma ekranami, a następnie kliknij Test — zdarzenia natywne Androida trafiają do strumienia `_rumdata`.",
-      "verifyIosRumDesc": "Uruchom aplikację na symulatorze lub urządzeniu, przejdź między kilkoma ekranami, a następnie kliknij Test — zdarzenia natywne iOS trafiają do strumienia `_rumdata`."
+      "verifyIosRumDesc": "Uruchom aplikację na symulatorze lub urządzeniu, przejdź między kilkoma ekranami, a następnie kliknij Test — zdarzenia natywne iOS trafiają do strumienia `_rumdata`.",
+      "dbmPreparePostgresTitle": "Monitorowanie bazy danych · Nadaj dostęp (opcjonalnie)",
+      "dbmPreparePostgresDesc": "**Wszystko powyżej jest w pełni samodzielne** — czasy zapytań już trafiają do Bazy danych ze śladów Twojej aplikacji, bez żadnej konfiguracji tutaj. Te ostatnie kroki dodają to, czego ślad nigdy nie zobaczy: zakleszczenia i zablokowane zapytania, które rejestruje tylko sama baza danych. Nadaj uprawnienie `pg_monitor`, aby kolektor mógł czytać zapytania innych sesji — wykonaj to w kliencie SQL, **nie** w powłoce.",
+      "dbmPrepareMysqlTitle": "Monitorowanie bazy danych · Zachowaj historię zakleszczeń (opcjonalnie)",
+      "dbmPrepareMariadbTitle": "Monitorowanie bazy danych · Zachowaj historię zakleszczeń (opcjonalnie)",
+      "dbmPrepareMysqlDesc": "**Wszystko powyżej jest w pełni samodzielne** — czasy zapytań już trafiają do Bazy danych ze śladów Twojej aplikacji, bez żadnej konfiguracji tutaj. Te ostatnie kroki dodają to, czego ślad nigdy nie zobaczy: zakleszczenia i zablokowane zapytania, które rejestruje tylko sama baza danych. Włącz pełną historię zakleszczeń — wykonaj to w kliencie SQL, **nie** w powłoce.",
+      "dbmPrepareMariadbDesc": "**Wszystko powyżej jest w pełni samodzielne** — czasy zapytań już trafiają do Bazy danych ze śladów Twojej aplikacji, bez żadnej konfiguracji tutaj. Te ostatnie kroki dodają to, czego ślad nigdy nie zobaczy: zakleszczenia i zablokowane zapytania, które rejestruje tylko sama baza danych. Włącz pełną historię zakleszczeń — wykonaj to w kliencie SQL, **nie** w powłoce.",
+      "dbmPgLoggingTitle": "Monitorowanie bazy danych · Pozwól Postgresowi rejestrować zakleszczenia (opcjonalnie)",
+      "dbmPgLoggingDesc": "Zakleszczenia są zapisywane tylko w logu Postgresa i tylko wtedy, gdy poniższe ustawienia są włączone — więc ten krok sprawia, że zakładka Zakleszczenia w ogóle się wypełnia. Linia prefiksu musi być dokładnie zgodna: kolektor czyta ją, aby ustalić, kto był zaangażowany, a inny prefiks oznacza, że nie znajdzie niczego, mimo że nadal raportuje, że wszystko jest w porządku.",
+      "dbmPgLoggingVerifyTitle": "Monitorowanie bazy danych · Sprawdź, czy ustawienia zostały zastosowane (opcjonalnie)",
+      "dbmPgLoggingVerifyDesc": "Uruchom to po restarcie. Jeśli jakakolwiek wartość nadal pokazuje stare ustawienie, Postgres został przeładowany, a nie zrestartowany, i kolektor nie będzie miał nic do odczytania.",
+      "dbmPgAutoExplainTitle": "Monitorowanie bazy danych · Przechwytuj rzeczywiste plany wykonania (opcjonalnie)",
+      "dbmPgAutoExplainDesc": "Bez tego kroku plany zapytań są ogólnymi szacunkami obliczanymi bez rzeczywistych wartości parametrów — przydatnymi, ale nigdy nie planem, który faktycznie wykonano. auto_explain rejestruje plan, który Postgres faktycznie wykonał dla każdego polecenia wolniejszego niż próg, z rzeczywistą liczbą wierszy i rzeczywistym czasem wykonania. Dodaje to mierzalny narzut do wykonywania próbkowanych poleceń, więc przeczytaj komentarze w ustawieniach przed zastosowaniem ich na obciążonym serwerze głównym i zastosuj je podczas tego samego restartu, co krok rejestrowania powyżej.",
+      "dbmConfigureTitle": "Monitorowanie bazy danych · Skonfiguruj kolektor (opcjonalnie)",
+      "dbmConfigurePostgresDesc": "Zapisuje plik `dbm-config.yaml` — poniżej ustaw bazę danych i ścieżkę do pliku logu Postgresa. Oprócz zakleszczeń i zablokowanych zapytań ta konfiguracja włącza próbki aktywności i najczęstsze zapytania serwera (z szacunkowymi planami): kolektor domyślnie ma obie funkcje wyłączone, więc blok `events:` na najwyższym poziomie w tym pliku jest tym, co je włącza — bez niego kolektor wygląda na zdrowy i niczego nie wysyła.",
+      "dbmConfigureMysqlDesc": "Zapisuje plik `dbm-config.yaml` — poniżej ustaw bazę danych i ścieżkę do pliku logu błędów MySQL. Oprócz zakleszczeń i zablokowanych zapytań ta konfiguracja włącza próbki aktywności i najczęstsze zapytania serwera: kolektor domyślnie ma obie funkcje wyłączone, więc blok `events:` na najwyższym poziomie w tym pliku jest tym, co je włącza — bez niego kolektor wygląda na zdrowy i niczego nie wysyła.",
+      "dbmConfigureMariadbDesc": "Zapisuje plik `dbm-config.yaml` — poniżej ustaw bazę danych i ścieżkę do pliku logu błędów MariaDB. MariaDB otrzymuje tutaj zakleszczenia, zablokowane zapytania, próbki aktywności i najczęstsze zapytania: odbiornik mysql obsługuje protokół MariaDB i poprawnie ją identyfikuje. Jedną lukę odbiornik zgłasza sam — MariaDB nie udostępnia tekstu próbkowanego polecenia, więc wiersz aktywności podaje sesję bez jej SQL.",
+      "dbmRunTitle": "Monitorowanie bazy danych · Uruchom kolektor (opcjonalnie)",
+      "dbmRunPostgresDesc": "Uruchamia obie konfiguracje razem. Użyj tej samej roli i hasła, które utworzyłeś w kroku 1.",
+      "dbmRunMysqlDesc": "Uruchamia obie konfiguracje razem. Użyj tego samego użytkownika i hasła, które utworzyłeś w kroku 1.",
+      "dbmRunMariadbDesc": "Uruchamia obie konfiguracje razem. Użyj tego samego użytkownika i hasła, które utworzyłeś w kroku 1.",
+      "dbmVerifyTitle": "Monitorowanie bazy danych · Zobacz zakleszczenia i zablokowane zapytania",
+      "dbmVerifyDesc": "Otwórz **Infra → Bazy danych** i wybierz zakładkę poniżej. Zdarzenia pojawiają się, gdy tylko baza danych je zgłosi — pusta zakładka informuje, czy nic się nie wydarzyło, czy nic nie jest zbierane.",
+      "dbmVerifyFullDesc": "Otwórz **Infra → Bazy danych** i wybierz zakładkę poniżej. Zakleszczenia i zablokowane zapytania pojawiają się, gdy tylko baza danych je zgłosi; zakładka Aktywność wypełnia się próbkowanymi sesjami w ciągu minuty od uruchomienia kolektora, a szacunkowe plany pojawiają się na stronie szczegółów zapytania w MySQL 8.0.22 i nowszych. Kondycja tabel wypełnia się po pierwszej 60-sekundowej migawce.",
+      "dbmDatabaseLabel": "Baza danych",
+      "dbmPgLogPathLabel": "Plik dziennika Postgres",
+      "dbmPgLogPathHelp": "Kolektor musi mieć możliwość odczytu tego pliku. Znajdź go za pomocą: SHOW log_directory;",
+      "dbmMysqlLogPathLabel": "Dziennik błędów MySQL",
+      "dbmMariadbLogPathLabel": "Dziennik błędów MariaDB",
+      "dbmMysqlLogPathHelp": "Kolektor musi mieć możliwość odczytu tego pliku. Znajdź go za pomocą: SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "Kolektor musi mieć możliwość odczytu tego pliku. Znajdź go za pomocą: SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "Monitoring baz danych · Nadaj dostęp (opcjonalnie)",
+      "dbmPrepareMssqlDesc": "**Wszystko powyżej jest kompletne samo w sobie** — czasy zapytań już trafiają do Baz danych ze śladów aplikacji, bez żadnej konfiguracji tutaj. Ta ostatnia grupa dodaje to, czego ślad nigdy nie zobaczy: zakleszczenia i zablokowane zapytania, które rejestruje tylko sama baza danych. Obie zgody są potrzebne — jedna pozwala kolektorowi czytać inne sesje, druga pozwala mu czytać historię zakleszczeń. Wykonaj je w kliencie SQL, **nie** w powłoce.",
+      "dbmConfigureMssqlDesc": "Zapisuje `dbm-config.yaml` — ustaw poniżej bazę danych, do której ma się połączyć. SQL Server otrzymuje tutaj zakleszczenia, zablokowane zapytania, próbki aktywności, najczęstsze zapytania i plany wykonania. Odbiornik sqlserver czyta całą instancję, więc aktywność i najczęstsze zapytania nie są ograniczone do bazy danych podanej powyżej.",
+      "dbmRunMssqlDesc": "Uruchamia obie konfiguracje razem. Użyj tego samego loginu i hasła utworzonego w kroku 1.",
+      "dbmVerifyBlockingDesc": "Otwórz **Infra → Bazy danych → Zablokowane zapytania**. Sesje czekające na blokadę pojawiają się, gdy tylko jedna z nich zostanie zarejestrowana — pusta zakładka informuje, czy nic nie jest zablokowane, czy nic nie jest zbierane.",
+      "dbmVerifyFullNoSampleTextDesc": "Otwórz **Infra → Bazy danych** i wybierz zakładkę poniżej. Zakleszczenia i zablokowane zapytania pojawiają się, gdy tylko baza danych je zgłosi; zakładka Aktywność wypełnia się próbkowanymi sesjami w ciągu minuty od uruchomienia kolektora, a najczęstsze zapytania niosą swoje plany na stronie szczegółów zapytania. MariaDB nie ujawnia tekstu próbkowanej instrukcji, więc wiersz aktywności identyfikuje sesję bez jej SQL. Kondycja tabel wypełnia się po pierwszej 60-sekundowej migawce.",
+      "dbmVerifyFullPlainPlansDesc": "Otwórz **Infra → Bazy danych** i wybierz zakładkę poniżej. Zakleszczenia i zablokowane zapytania pojawiają się, gdy tylko baza danych je zgłosi; zakładka Aktywność wypełnia się próbkowanymi sesjami w ciągu minuty od uruchomienia kolektora, a plany wykonania pojawiają się na stronie szczegółów zapytania. Kondycja tabel wypełnia się po pierwszej 60-sekundowej migawce.",
+      "dbmVerifyFullSlowTableHealthDesc": "Otwórz **Infra → Bazy danych** i wybierz zakładkę poniżej. Zakleszczenia i zablokowane zapytania pojawiają się, gdy tylko baza danych je zgłosi; zakładka Aktywność wypełnia się próbkowanymi sesjami w ciągu minuty od uruchomienia kolektora, a szacunkowe plany pojawiają się na stronie szczegółów zapytania. Kondycja tabel zajmuje do pięciu minut — odczyt rozmiarów tabel zwalnia wraz ze wzrostem schematu, więc jest aktualizowana rzadziej niż pozostałe.",
+      "dbmVerifyTableHealthDesc": "Otwórz **Infra → Bazy danych** i wybierz zakładkę poniżej. Zakleszczenia i zablokowane zapytania pojawiają się, gdy tylko baza danych je zgłosi — pusta zakładka informuje, czy nic się nie wydarzyło, czy nic nie jest zbierane. Kondycja tabel wypełnia się po pierwszej 60-sekundowej migawce."
     },
     "instrumentBeforeImportTitle": "Instrumentuj przed zaimportowaniem klienta",
     "instrumentBeforeImportBody": "Jeśli aplikacja działa, ale nie docierają żadne spany, prawdopodobnie instrumentacja została załadowana po zaimportowaniu klienta. Zmień kolejność, aby inicjalizacja została wykonana jako pierwsza:",
@@ -4492,6 +4564,8 @@
     "folder": "Folder",
     "folders": "Foldery",
     "searchFolder": "Szukaj folderu",
+    "folderIcon": "Ikona",
+    "folderIconAria": "Wybierz ikonę folderu",
     "deleteFolder": "Usuń folder",
     "deleteFolderMessage": "Czy na pewno chcesz usunąć ten folder?",
     "trellisLayout": "Układ Trellis",
@@ -6017,6 +6091,7 @@
     "SearchSQLCancelled": "Błąd: Wyszukiwanie SQL zostało anulowane."
   },
   "alerts": {
+    "allAlerts": "Wszystkie alerty",
     "compositeAlert": "Złożony",
     "import": {
       "anomalyImportSuccess": "Wykrywanie anomalii - {index}: \"{name}\" zaimportowano pomyślnie",
@@ -7345,6 +7420,18 @@
         "panel": {
           "label": "Utwórz alert",
           "toast": "Zapytanie zaimportowane z panelu pulpitu: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Dostosuj w edytorze",
+          "toast": "Z biblioteki alertów: {sourceLabel}"
+        },
+        "dbm": {
+          "label": "Alertuj mnie",
+          "toast": "Zaimportowano z monitorowania baz danych: \"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "Alertuj mnie",
+          "toast": "Zaimportowano z monitorowania baz danych (perspektywa serwera): \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7366,7 +7453,13 @@
         "noQueries": "Ten panel nie ma zapytania, na podstawie którego można utworzyć alert.",
         "noConstants": "Wybrane wzorce nie mają charakterystycznego tekstu do dopasowania.",
         "sqlModeFilterDropped": "Twoje zapytanie SQL nie zostało przeniesione — alert dopasowuje tylko wybrane wzorce.",
-        "patternsUnusable": "Żaden ze wzorców na tej stronie nie ma charakterystycznego tekstu do dopasowania, więc alert używa tylko Twojego wyszukiwania."
+        "patternsUnusable": "Żaden ze wzorców na tej stronie nie ma charakterystycznego tekstu do dopasowania, więc alert używa tylko Twojego wyszukiwania.",
+        "dbmRollupLag": "Wartości baz danych są agregowane co {minutes} minut, więc ten alert może być wyzwalany tylko z taką częstotliwością — to nie jest widok w czasie rzeczywistym.",
+        "dbmFingerprintVersion": "Ten alert jest przypięty do dokładnej postaci jednego zapytania. Jeśli sposób grupowania zapytań się zmieni, alert może przestać pasować i należy go utworzyć ponownie.",
+        "dbmNoFingerprint": "To zapytanie nie ma stabilnego identyfikatora, więc alert obserwuje całą bazę danych.",
+        "dbmServerVantage": "To mierzy to, co serwer bazy danych sam zgłosił na temat blokad, a nie jak długo czekała twoja aplikacja. Nie porównuj tego z alertami opóźnień zapytań.",
+        "dbmLockSampling": "Aktywność blokad jest próbkowana w interwałach, więc rywalizacja, która rozpoczęła się i zakończyła między dwoma próbkami, nigdy nie została zarejestrowana. Cichy alert nie jest dowodem, że nie było blokad.",
+        "dbmNoInstance": "Nie zidentyfikowano pojedynczej instancji bazy danych, więc ten alert obserwuje każdą instancję tego silnika."
       }
     },
     "saveFailed": "Nie można zapisać alertu.",
@@ -7405,6 +7498,112 @@
     "impactTemplate": "Używane przez {destinations} · {alerts}",
     "impactDestination": "Używane przez {alerts}"
   },
+  "alert_library": {
+    "header": "Biblioteka alertów",
+    "subtitle": "Starannie wyselekcjonowane, gotowe do instalacji alerty, dopasowane do danych, które już pozyskujesz.",
+    "sectionTab": "Biblioteka",
+    "contribute": "Współtwórz na GitHub",
+    "searchPlaceholder": "Szukaj po nazwie, opisie lub strumieniu",
+    "searchLabel": "Przeszukaj bibliotekę alertów",
+    "categories": "Kategoria",
+    "searchCategories": "Szukaj kategorii",
+    "searchCategoriesAria": "Szukaj filtrów kategorii",
+    "noCategoryMatch": "Brak pasujących kategorii.",
+    "selectedCount": "{count} wybrano",
+    "facetAria": "{label}, {count} alertów",
+    "severity": "Poważność",
+    "severityAll": "Wszystkie",
+    "severityCritical": "Krytyczny",
+    "severityWarning": "Ostrzeżenie",
+    "severityInfo": "Informacja",
+    "statReady": "Gotowy do instalacji",
+    "statNeedsData": "Nie pozyskiwany",
+    "statAll": "Wszystkie",
+    "notIngested": "Nie pozyskiwany: {stream}",
+    "notIngestedHint": "Ta organizacja nie otrzymuje {stream}, więc ten alert nigdy się nie wyzwoli. Zainstaluj go mimo to, a zacznie działać, gdy dane dotrą.",
+    "alertCount": "{count} alert | {count} alerty",
+    "noCollectorTitle": "Nic tu jeszcze nie pasuje do Twoich danych.",
+    "noCollectorDescription": "Żaden z tych {count} alertów nie odpytuje o strumień odbierany przez tę organizację. Wyślij telemetrię {group} do OpenObserve, a pojawią się tutaj.",
+    "setupGuide": "Przewodnik po pozyskiwaniu danych",
+    "emptyLibraryTitle": "Biblioteka alertów jest pusta",
+    "emptyLibraryDescription": "Katalog został wczytany, ale nie zawiera alertów. To problem z publikacją, nie z filtrem — spróbuj ponownie za chwilę.",
+    "noMatchesTitle": "Żadne alerty nie pasują do tych filtrów",
+    "noMatchesDescription": "Spróbuj innej kategorii, ważności lub terminu wyszukiwania.",
+    "clearFilters": "Wyczyść filtry",
+    "loadFailedTitle": "Nie udało się wczytać biblioteki alertów",
+    "retry": "Ponów próbę",
+    "openDetails": "Otwórz {title}",
+    "drawer": {
+      "dataAvailable": "Dane dostępne",
+      "streamNotFound": "Nie znaleziono strumienia",
+      "detects": "Co wykrywa",
+      "noDescription": "Brak opisu w bibliotece.",
+      "needsDataCallout": "Ten alert odpytuje {stream}, którego ta organizacja nie odbiera. Zainstalowanie go teraz utworzy alert, który nigdy nie zostanie wyzwolony.",
+      "query": "Zapytanie",
+      "stream": "Strumień",
+      "streamType": "Typ strumienia",
+      "metricCondition": "Warunek metryki",
+      "matchCount": "Wymagane pasujące wiersze",
+      "previewBlocked": "{stream} nie jest strumieniem w tej organizacji, więc nie ma czego oceniać.",
+      "wouldTrigger": "Zostanie wyzwolony",
+      "wouldNotTrigger": "Nie zostanie wyzwolony",
+      "loading": "Ładowanie tego alertu z biblioteki",
+      "loadFailed": "Nie udało się wczytać tego alertu z biblioteki.",
+      "customize": "Dostosuj w edytorze",
+      "customizeHint": "Otwiera standardowy edytor alertów wstępnie wypełniony tym alertem.",
+      "customizeFailed": "Nie udało się otworzyć tego alertu w edytorze.",
+      "install": "Zainstaluj",
+      "neverIngested": "Jeszcze brak danych",
+      "neverIngestedCallout": "{stream} istnieje, ale nigdy nie otrzymał danych, więc ten alert nie ma się na czym wyzwolić.",
+      "lastData": "Ostatnie dane: {when}",
+      "staleCallout": "{stream} ostatnio otrzymał dane {when}. Ten alert pozostanie uśpiony do czasu wznowienia pozyskiwania danych.",
+      "unknownTime": "w nieznanym czasie"
+    },
+    "install": {
+      "title": "Zainstaluj z biblioteki",
+      "subtitle": "Wybierz, gdzie alerty powiadamiają, które alerty zainstalować i gdzie są umieszczane.",
+      "stepDestination": "Miejsce docelowe",
+      "stepAlerts": "Alerty",
+      "stepFolder": "Folder",
+      "stepTune": "Dostosuj",
+      "stepInstall": "Zainstaluj",
+      "destinationIntro": "Każdy alert w tej partii używa miejsca docelowego wybranego tutaj. Pliki biblioteki zawierają nazwy miejsc docelowych organizacji, z której zostały wyeksportowane, które nie istnieją w Twojej.",
+      "destinationLabel": "Miejsce docelowe",
+      "destinationPlaceholder": "Wybierz miejsce docelowe",
+      "destinationsLoadFailed": "Nie udało się wczytać istniejących miejsc docelowych.",
+      "retry": "Spróbuj ponownie",
+      "destinationsNoneBody": "Ta organizacja nie ma jeszcze miejsc docelowych alertów, więc nie ma gdzie wysyłać powiadomień o tych alertach. Utwórz jedno miejsce docelowe na stronie Miejsca docelowe, a następnie wróć i wybierz je tutaj.",
+      "openDestinations": "Otwórz miejsca docelowe",
+      "selectAll": "Zaznacz wszystko",
+      "clear": "Wyczyść",
+      "selectedCount": "Wybrano {count} z {total}",
+      "folderIntro": "Zainstalowane alerty są tutaj przechowywane. Utwórz folder przyciskiem +, jeśli ta grupa zasługuje na własny.",
+      "tuneToggle": "Ustaw je dla każdego alertu w tej grupie.",
+      "tuneHint": "Tylko te dwie opcje można bezpiecznie ustawić dla całej grupy. Progi pozostają indywidualne dla alertu — zmień jeden, otwierając ten alert i instalując go osobno.",
+      "frequency": "Uruchamiaj co",
+      "silence": "Wycisz na",
+      "minutes": "min",
+      "summaryTuningNone": "Domyślne z biblioteki",
+      "summaryTuningOverride": "Co {frequency} min, wyciszenie na {silence} min",
+      "run": "Zainstaluj {count} alert | Zainstaluj {count} alertów",
+      "retryFailed": "Ponów próbę dla {count} błędu | Ponów próbę dla {count} błędów",
+      "allInstalled": "Zainstalowano {count} alert | Zainstalowano {count} alertów",
+      "someFailed": "Zainstalowano: {installed}, niepowodzenia: {failed}",
+      "unknownError": "Nie można było utworzyć alertu.",
+      "unreadableConditions": "Warunki filtra tego alertu są w formacie, którego ta wersja nie może odczytać. Instalacja utworzyłaby alert bez filtra, więc został on pominięty.",
+      "back": "Wstecz",
+      "next": "Dalej",
+      "cancel": "Anuluj",
+      "done": "Gotowe"
+    },
+    "error": {
+      "network": "Nie można było uzyskać dostępu do biblioteki. Sprawdź połączenie sieciowe i spróbuj ponownie.",
+      "http": "Serwer biblioteki zwrócił błąd. Spróbuj ponownie za chwilę.",
+      "unparseable": "Biblioteka odpowiedziała czymś, co nie jest katalogiem.",
+      "unsupported_version": "Ten katalog biblioteki jest nowszy, niż ta wersja OpenObserve może odczytać. Zaktualizuj, aby go przeglądać.",
+      "malformed": "Katalog biblioteki jest niekompletny lub uszkodzony."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Eksportuj szablon",
     "selected": "Wybrane",
@@ -7429,7 +7628,7 @@
     "importBodyLabel": "Treść szablonu *",
     "importTypeLabel": "Typ szablonu *",
     "importTitleLabel": "Tytuł szablonu *",
-    "header": "Szablony",
+    "header": "Szablony miejsc docelowych",
     "add": "Nowy szablon",
     "edit": "Edytuj",
     "name": "Nazwa",
@@ -7636,6 +7835,7 @@
     "destinationsLoadError": "Błąd podczas ładowania miejsc docelowych"
   },
   "alert_destinations": {
+    "sectionTab": "Miejsca docelowe",
     "chooseTypeTitle": "Wybierz typ",
     "selectDestinationType": "Wybierz typ miejsca docelowego",
     "connectionStepTitle": "Połączenie",
@@ -9143,7 +9343,8 @@
       "rowsReturned": "Zwrócone wiersze",
       "batchSize": "Rozmiar partii",
       "querySummary": "Podsumowanie zapytania",
-      "responseStatus": "Status odpowiedzi"
+      "responseStatus": "Status odpowiedzi",
+      "viewQueryTrend": "Zobacz trend zapytań w monitorowaniu baz danych"
     },
     "index": {
       "clickHere": "Kliknij tutaj",
@@ -9219,6 +9420,7 @@
       "viewRelated": "Pokaż powiązane",
       "logs": "Logi",
       "traces": "Ślady",
+      "databases": "Bazy danych",
       "viewTraces": "Zobacz ślady",
       "operations": "Operacje",
       "metrics": "Metryki",
@@ -10143,7 +10345,8 @@
     "sections": {
       "monitor": "Monitoruj",
       "annotate": "Adnotuj",
-      "evaluate": "Oceń"
+      "evaluate": "Oceń",
+      "experiment": "Eksperyment"
     },
     "nav": {
       "llmInsights": "Insights",
@@ -10153,10 +10356,13 @@
       "discovery": "Odkrywanie",
       "queues": "Kolejki",
       "datasets": "Zbiory danych",
+      "experiments": "Eksperymenty",
       "quality": "Jakość",
       "evalJobs": "Zadania oceny",
       "scorers": "Oceniacze",
-      "scoreConfigs": "Konfiguracje ocen"
+      "scoreConfigs": "Konfiguracje ocen",
+      "remoteTasks": "Zadania zdalne",
+      "playground": "Plac zabaw"
     },
     "subtitle": {
       "llmInsights": "Śledź opóźnienia, błędy, tokeny i koszty w ruchu LLM",
@@ -10166,10 +10372,12 @@
       "discovery": "Znajdź niezdrowe ślady warte przeglądu",
       "queues": "Stanowe listy zadań do przeglądu",
       "datasets": "Twórz złote zbiory danych z adnotowanych śladów i recenzji",
+      "experiments": "Podgląd i tworzenie niezmiennych przebiegów oceny offline",
       "quality": "Śledź jakość ocen w zakresie span, trace i sesji",
       "evalJobs": "Uruchamiaj i monitoruj zadania oceny w swoich sesjach",
       "scorers": "Twórz i zarządzaj oceniającymi, którzy oceniają wyniki LLM",
-      "scoreConfigs": "Skonfiguruj kryteria oceny używane w twoich ewaluacjach"
+      "scoreConfigs": "Skonfiguruj kryteria oceny używane w twoich ewaluacjach",
+      "remoteTasks": "Usługi HTTP, które mogą wywoływać eksperymenty — zarejestrowane raz, wersjonowane, ponownie używane"
     },
     "annotate": {
       "button": "Adnotuj",
@@ -10431,6 +10639,288 @@
         "allReviewedBody": "Każdy element w tej kolejce ma ukończony przegląd."
       }
     },
+    "experiments": {
+      "newButton": "Nowy eksperyment",
+      "createTitle": "Utwórz eksperyment",
+      "immutableHint": "Definicje eksperymentów są niezmienne. Aby uruchomić ponownie ze zmianami, utwórz nowy eksperyment.",
+      "name": "Nazwa",
+      "dataset": "Zbiór danych",
+      "scorers": "Oceniacze",
+      "provider": "Dostawca",
+      "model": "Model (opcjonalnie)",
+      "prompt": "Wbudowany prompt",
+      "trials": "Próby na wiersz",
+      "preview": "Podgląd slotów",
+      "create": "Utwórz",
+      "trial": "próba {index}",
+      "summary": "Zestaw danych v{version} · {trials} prób · {scorers} punktatorów",
+      "previewCounts": "{rows} wierszy × {trials} prób = {slots} slotów",
+      "viewTrace": "Zobacz ślad wykonania",
+      "scoresTitle": "Wyniki",
+      "taskProgress": "Zadania: {completed}/{total} ukończonych · {skipped} pominiętych",
+      "scoringProgress": "Wyniki: {completed}/{total} ukończonych · {skipped} pominiętych",
+      "skipTiers": "Pominięte wiersze: {full} w pełni · {partial} częściowo",
+      "scoreEvidence": "{scorer} · v{version}: {samples} próbek, {noReference} bez referencji, {noTrace} bez śladu",
+      "scorerApplicability": "{scorer} · v{version}: {eligible} kwalifikujących się slotów, {noReference} bez referencji",
+      "loadError": "Nie udało się załadować eksperymentów",
+      "previewError": "Nie udało się wyświetlić podglądu slotów eksperymentu",
+      "createSuccess": "Utworzono eksperyment",
+      "createError": "Nie udało się utworzyć eksperymentu",
+      "cancel": "Anuluj",
+      "retry": "Ponów nieudane sloty",
+      "clone": "Klonuj eksperyment",
+      "cancelSuccess": "Anulowano eksperyment",
+      "cancelError": "Nie udało się anulować eksperymentu",
+      "retrySuccess": "Nieudane sloty w kolejce do ponowienia",
+      "retryError": "Nie udało się ponowić eksperymentu",
+      "cloneSuccess": "Sklonowano eksperyment",
+      "cloneError": "Nie udało się sklonować eksperymentu",
+      "datasetFilter": "Zestaw danych",
+      "nameSearch": "Szukaj eksperymentów",
+      "emptyFiltered": "Brak eksperymentów pasujących do tych filtrów.",
+      "groupCount": "{count} eksperymentów",
+      "viewAll": "Zobacz eksperymenty",
+      "baseline": "Linia bazowa",
+      "setBaseline": "Ustaw linię bazową",
+      "selectForComparison": "Wybierz do porównania",
+      "progress": "{done} z {total} slotów",
+      "noScores": "Brak zagregowanych wyników",
+      "numericScoreSummary": "{name}: {value} ({count} próbek)",
+      "booleanScoreSummary": "{name}: {trueCount} prawdziwych, {falseCount} fałszywych ({count} próbek)",
+      "categoricalScoreSummary": "{name}: {values} ({count} próbek)",
+      "noCost": "Nie zarejestrowano kosztów",
+      "comparisonReasons": {
+        "select_two": "Wybierz dwa eksperymenty do porównania.",
+        "select_only_two": "Wybierz tylko dwa eksperymenty do porównania.",
+        "different_dataset": "Eksperymenty można porównywać tylko wtedy, gdy używają tego samego zestawu danych."
+      },
+      "form": {
+        "namePlaceholder": "prompt_v4_reranker",
+        "descriptionLabel": "Opis",
+        "descriptionPlaceholder": "Krótkie podsumowanie zmian w tym uruchomieniu.",
+        "identitySection": "Tożsamość",
+        "datasetPlaceholder": "Wybierz zestaw danych",
+        "datasetPinned": "Przypięto do wersji v{version} — późniejsze zmiany zestawu danych nigdy nie zmienią wyników tego eksperymentu.",
+        "datasetRows": "{rows} wierszy pasuje.",
+        "sourcesLabel": "Źródła wierszy",
+        "sourcesPlaceholder": "Wszystkie źródła",
+        "sourcesHelp": "Pozostaw puste, aby uruchomić każdy wiersz w zbiorze danych.",
+        "sources": {
+          "trace": "Ślad",
+          "annotation": "Adnotacja",
+          "manual": "Ręcznie"
+        },
+        "tabTask": "Zadanie",
+        "providerPlaceholder": "Wybierz dostawcę",
+        "modelPlaceholder": "Domyślny u dostawcy",
+        "modelHelp": "Pozostaw puste, aby użyć domyślnego modelu dostawcy.",
+        "trialsHelp": "1–100 uruchomień na wiersz. Mnoży koszt.",
+        "systemPromptLabel": "Wiadomość systemowa",
+        "systemPromptPlaceholder": "Opcjonalne instrukcje wysyłane przed każdym wierszem.",
+        "userPromptLabel": "Wiadomość użytkownika",
+        "userPromptPlaceholder": "Odwołuj się do pól zbioru danych przez {'{{ input }}'}.",
+        "variablesLabel": "Wstaw zmienną:",
+        "scorersPlaceholder": "Wybierz oceniacze",
+        "scorersHelp": "Wersje oceniaczy są teraz przypięte — późniejsze zmiany oceniaczy nigdy nie zmienią wyników tego eksperymentu.",
+        "scorersEmpty": "Brak dostępnych oceniaczy. Najpierw utwórz jeden w sekcji Evaluate.",
+        "applicabilityTitle": "Pokrycie oceniaczy",
+        "previewTitle": "Podgląd",
+        "previewEmpty": "Wybierz zbiór danych, aby zobaczyć, co zostanie uruchomione.",
+        "previewLoading": "Obliczanie slotów…",
+        "previewSlots": "sloty do uruchomienia",
+        "skippedFully": "{count} wierszy całkowicie pominiętych — każdy wybrany oceniacz wymaga oczekiwanego wyniku. Pominięte wiersze nie kosztują nic do uruchomienia.",
+        "skippedPartially": "{count} wierszy częściowo pominiętych — zadanie nadal działa, ale oceniacze oparte na wzorcach nie mogą oceniać wierszy bez oczekiwanego wyniku.",
+        "skippedNone": "Każdy dopasowany wiersz może być oceniony w co najmniej jednym wymiarze.",
+        "summaryTitle": "Podsumowanie",
+        "summaryScorers": "{count} przypiętych",
+        "summaryEmpty": "Nie ustawiono",
+        "submit": "Utwórz i uruchom",
+        "leaveTitle": "Odrzucić ten eksperyment?",
+        "leaveMessage": "Ten eksperyment nie został jeszcze utworzony. Opuszczenie teraz spowoduje odrzucenie wszystkich wprowadzonych danych.",
+        "validation": {
+          "nameRequired": "Nazwa jest wymagana",
+          "datasetRequired": "Wybierz zbiór danych",
+          "scorerRequired": "Wybierz co najmniej jednego oceniacza",
+          "providerRequired": "Wybierz dostawcę",
+          "userPromptRequired": "Wiadomość użytkownika jest wymagana",
+          "trialCountRange": "Liczba prób musi wynosić od 1 do 100",
+          "temperatureRange": "Temperatura musi wynosić od 0 do 2",
+          "taskRefRequired": "Wybierz zadanie zdalne"
+        },
+        "previewIncomplete": "Ukończ sekcję zadania, aby zobaczyć, co zostanie uruchomione.",
+        "providerRefresh": "Odśwież dostawców",
+        "providerRefreshError": "Nie udało się odświeżyć dostawców",
+        "providerEndpointLabel": "Punkt końcowy:",
+        "providerDefaultModelLabel": "Domyślny model:",
+        "providerHelp": "Wybierz dostawcę LLM, z którym połączy się ten eksperyment. Zarządzaj dostawcami w {settingsLink}.",
+        "providerHelpSettingsLink": "Ustawienia",
+        "temperatureLabel": "Temperatura",
+        "temperatureHelp": "0–2. Wyższe wartości zwiększają zróżnicowanie wyników.",
+        "temperatureDeterministic": "0 — model odpowiada zawsze tak samo.",
+        "trialsDeterministicWarning": "Przy temperaturze 0 każda próba zwraca tę samą odpowiedź.",
+        "pageTitle": "Nowy eksperyment",
+        "nameLabel": "Nazwa",
+        "taskTypeLabel": "Typ zadania",
+        "taskTypeInline": "Prompt wbudowany",
+        "taskTypeInlineHelp": "Uruchom napisany tutaj prompt u dostawcy.",
+        "taskTypeRemote": "Zadanie zdalne",
+        "taskTypeRemoteHelp": "Wywołaj własny serwis HTTP, aby wygenerować wyniki.",
+        "remoteTaskLabel": "Zadanie zdalne",
+        "remoteTaskPlaceholder": "Wybierz zarejestrowane zadanie",
+        "remoteTaskHelp": "Przypięto do tej wersji. Opublikowanie nowej wersji w przyszłości nie zmieni tego uruchomienia.",
+        "remoteTaskEmpty": "Żadne zadanie zdalne nie ma jeszcze opublikowanej wersji. Zarejestruj jedno i przejdź jego test połączenia, zanim eksperyment będzie mógł go użyć.",
+        "taskTimeoutLabel": "Limit czasu (sekundy)",
+        "taskConcurrencyLabel": "Maksymalna współbieżność",
+        "taskOverrideHelp": "Zastępuje zarejestrowaną wartość zadania dla tego uruchomienia."
+      },
+      "columns": {
+        "name": "Nazwa",
+        "status": "Status",
+        "progress": "Postęp",
+        "scores": "Wyniki",
+        "cost": "Koszt",
+        "created": "Utworzono",
+        "actions": "Akcje"
+      },
+      "datasetFilterPlaceholder": "Wszystkie zbiory danych",
+      "nameSearchPlaceholder": "Szukaj po nazwie",
+      "toggleGroup": "Przełącz grupę zbiorów danych",
+      "addToDataset": "Dodaj",
+      "detail": {
+        "by": "przez {user}",
+        "p50Latency": "Latencja P50",
+        "totalCost": "Całkowity koszt",
+        "highDispersion": "Przypadki o wysokim rozproszeniu",
+        "highDispersionHint": "Wiersze, w których próby są rozbieżne",
+        "scoredRows": "{scored}/{total} ocenionych wierszy",
+        "columns": {
+          "input": "Wejście",
+          "output": "Wyjście",
+          "latency": "Latencja"
+        },
+        "retryFailed": "Ponów nieudane sloty",
+        "loadError": "Nie udało się załadować eksperymentu",
+        "skippedCount": "Pominięto {count}",
+        "datasetVersion": "{dataset} v{version}",
+        "taskType": {
+          "inline_prompt": "Prompt wbudowany",
+          "remote": "Zdalne",
+          "sdk": "SDK"
+        },
+        "trialCount": "{count} próba | {count} prób",
+        "scorerCount": "{count} oceniający | {count} oceniających",
+        "metaLabels": {
+          "dataset": "Zbiór danych",
+          "task": "Zadanie",
+          "model": "Model",
+          "run": "Uruchomienie"
+        },
+        "runSummary": "{trials} · {scorers}",
+        "progress": "Postęp",
+        "scoring": "Punktacja",
+        "scoringDistribution": "{success} sukcesów · {failed} porażek · {pending} oczekujących · {skipped} pominiętych",
+        "compare": "Porównaj",
+        "comparePicker": {
+          "title": "Porównaj z punktem odniesienia",
+          "hint": "Ten przebieg staje się kandydatem. Wybierz punkt odniesienia, z którym będzie porównywany — porównać można tylko przebiegi na tym samym zbiorze danych.",
+          "baselineLabel": "Punkt odniesienia",
+          "baselinePlaceholder": "Wybierz przebieg bazowy",
+          "confirm": "Porównaj",
+          "noPeers": "Brak innych przebiegów na tym zbiorze danych, więc nie ma z czym porównywać.",
+          "loadError": "Nie udało się wczytać przebiegów dostępnych do porównania.",
+          "errors": {
+            "baseline": "Wybierz punkt odniesienia do porównania."
+          }
+        },
+        "slotStatus": "Status",
+        "searchPlaceholder": "Szukaj wejścia lub wyjścia",
+        "statusFilter": "Status",
+        "statusFilterAll": "Wszystkie statusy"
+      },
+      "rowDetail": {
+        "fallbackTitle": "Wiersz eksperymentu",
+        "snapshot": "Migawka v{version}",
+        "previousRow": "Poprzedni wiersz",
+        "nextRow": "Następny wiersz",
+        "rowPosition": "Wiersz {index} z {total}",
+        "input": "Wejście",
+        "expectedOutput": "Oczekiwane wyjście",
+        "output": "Wyjście",
+        "notProvided": "Nie podano",
+        "trials": "Próby",
+        "trial": "Próba {index}",
+        "retryFailedSlot": "Ponów nieudany slot",
+        "viewTrace": "Zobacz ślad",
+        "scores": "Wyniki",
+        "dimension": "Wymiar",
+        "unknownDimension": "Nieznany wymiar",
+        "aggregate": "Agregacja",
+        "latency": "Opóźnienie",
+        "inputTokens": "Tokeny wejściowe",
+        "outputTokens": "Tokeny wyjściowe",
+        "cost": "Koszt",
+        "noDataAvailable": "Brak dostępnych danych",
+        "copyInput": "Kopiuj wejście",
+        "copyOutput": "Kopiuj wyjście",
+        "copied": "Skopiowano {type} do schowka",
+        "copyFailed": "Nie udało się skopiować do schowka",
+        "execution": "Wykonanie",
+        "score": "Wynik"
+      },
+      "compare": "Porównaj",
+      "comparePage": {
+        "title": "Porównaj",
+        "loading": "Ładowanie porównania…",
+        "loadError": "Nie udało się porównać eksperymentów",
+        "rowError": "Nie udało się wczytać porównywanych wierszy",
+        "missing": "Wybierz dwa eksperymenty z listy do porównania",
+        "baseline": "Linia bazowa",
+        "candidate": "Kandydat",
+        "baselinePlaceholder": "Wybierz linię bazową",
+        "candidatePlaceholder": "Wybierz kandydata",
+        "commonRows": "Na podstawie {common} z {total} wierszy",
+        "optionsError": "Nie udało się wczytać eksperymentów dostępnych do porównania",
+        "swap": "Zamień linię bazową i kandydata",
+        "panel": {
+          "bucketTotal": "Łącznie",
+          "bucketRegressed": "Regres",
+          "bucketImproved": "Poprawa",
+          "bucketUnchanged": "Bez zmian",
+          "bucketInconclusive": "Nierozstrzygający",
+          "bucketNew": "Nowy",
+          "bucketMissing": "Brak",
+          "datasetRow": "Wiersz zbioru danych",
+          "outcome": "Wynik",
+          "oneSidedCoverage": "{baseline} tylko w linii bazowej · {candidate} tylko w kandydacie",
+          "oneSided": "Jednostronny",
+          "noRows": "Brak wierszy w tym segmencie",
+          "bucketUncompared": "Nie porównano",
+          "tileCost": "Koszt",
+          "tileLatency": "Opóźnienie (ms)",
+          "tileScoreDimensionsRegressed": "Wymiary oceny z regresją",
+          "tileWeakestScoreDimension": "Najsłabszy wymiar oceny",
+          "ofScoreDimensions": "z {total} zagregowanych wymiarów oceny",
+          "noScoreDimensionMoved": "Żaden wymiar oceny nie uległ zmianie",
+          "unknownScoreDimension": "Nieznany wymiar oceny",
+          "threshold": "Próg",
+          "measurePerRow": "Średnia na wiersz, po próbach"
+        },
+        "rowDrawer": {
+          "fallbackTitle": "Wiersz porównania",
+          "input": "Wejście",
+          "expectedOutput": "Oczekiwane wyjście",
+          "fromDataset": "Ze zbioru danych",
+          "outputHeading": "Wyjście · Linia bazowa vs Kandydat",
+          "scores": "Wyniki",
+          "dimension": "Wymiar",
+          "trial": "Próba {index}",
+          "noContent": "Nie podano",
+          "noOutput": "Brak wyjścia",
+          "absentSide": "Brak w tym uruchomieniu"
+        }
+      },
+      "selectionCount": "{count} z 2 wybranych"
+    },
     "datasets": {
       "listTitle": "Zbiory danych",
       "searchPlaceholder": "Szukaj zbiorów danych...",
@@ -10664,6 +11154,417 @@
         "clamp": "Linia bazowa działała tylko {duration} — porównanie pierwszych {duration} każdej wersji.",
         "labelNoEnv": "{version} — {window} · {count} śladów"
       }
+    },
+    "remoteTasks": {
+      "listTitle": "Zadania zdalne",
+      "searchPlaceholder": "Wyszukaj zadania",
+      "newButton": "Zarejestruj zadanie",
+      "loadError": "Nie udało się wczytać zadań zdalnych",
+      "columns": {
+        "name": "Nazwa",
+        "version": "Wersja",
+        "endpoint": "Punkt końcowy",
+        "method": "Metoda",
+        "auth": "Uwierzytelnianie",
+        "signing": "Podpisywanie",
+        "status": "Status",
+        "referencedBy": "Odwołania",
+        "updated": "Zaktualizowano",
+        "actions": "Akcje"
+      },
+      "auth": {
+        "none": "Brak",
+        "bearer": "Bearer",
+        "basic": "Basic",
+        "apiKeyHeader": "Klucz API"
+      },
+      "status": {
+        "published": "Opublikowany",
+        "draft": "Szkic",
+        "failed": "Test nieudany",
+        "retired": "Wycofany"
+      },
+      "statusHint": {
+        "published": "Eksperyment może przypiąć tę wersję.",
+        "draft": "Nigdy nie opublikowano. Żaden eksperyment nie może się do niej odwołać, dopóki test połączenia nie przejdzie pomyślnie.",
+        "retired": "Usunięto. Opublikowane wersje pozostają w historii, ale nie można się do nich już odwoływać."
+      },
+      "signingOn": "HMAC",
+      "referencedBy": "{count} eksperyment | {count} eksperymentów",
+      "edit": "Edytuj",
+      "editSecretLocked": "Zadanie z zapisanym poświadczeniem nie może być jeszcze edytowane: platforma nigdy nie zwraca referencji do sekretu, więc wersja robocza nie może zostać odesłana.",
+      "delete": {
+        "title": "Usuń zdalne zadanie",
+        "message": "Usunąć “{name}”? Jego opublikowane wersje pozostają w historii, ale nie można się do nich już odwoływać, więc eksperyment przypięty do jednej z nich nie będzie mógł się uruchomić.",
+        "success": "Usunięto zadanie zdalne",
+        "error": "Nie udało się usunąć zadania zdalnego"
+      },
+      "form": {
+        "createTitle": "Zarejestruj zadanie zdalne",
+        "editTitle": "Edytuj zadanie zdalne",
+        "backTo": "Zadania zdalne",
+        "identitySection": "Tożsamość",
+        "endpointSection": "Punkt końcowy",
+        "authSection": "Uwierzytelnianie",
+        "contractSection": "Kontrakt żądania",
+        "limitsSection": "Limity",
+        "signingSection": "Podpisywanie żądań",
+        "nameLabel": "Nazwa",
+        "namePlaceholder": "np. rag-pipeline-staging",
+        "descriptionLabel": "Opis",
+        "descriptionPlaceholder": "Co robi ta usługa i kto jest jej właścicielem",
+        "methodLabel": "Metoda",
+        "endpointLabel": "URL punktu końcowego",
+        "endpointPlaceholder": "https://tasks.example.com/run",
+        "endpointHelp": "Adres URL https na publicznym hoście, bez poświadczeń i bez fragmentu.",
+        "authTypeLabel": "Typ uwierzytelniania",
+        "tokenLabel": "Token",
+        "tokenPlaceholder": "Wklejany raz, przechowywany zaszyfrowany",
+        "usernameLabel": "Nazwa użytkownika",
+        "passwordLabel": "Hasło",
+        "headerNameLabel": "Nazwa nagłówka",
+        "headerNamePlaceholder": "x-api-key",
+        "headersLabel": "Niestandardowe nagłówki",
+        "headerKeyPlaceholder": "x-team",
+        "headerValuePlaceholder": "Szukaj",
+        "addHeader": "Dodaj nagłówek",
+        "removeHeader": "Usuń nagłówek",
+        "templateLabel": "Szablon treści",
+        "templateHelp": "Renderowany jako JSON dla każdego wiersza. Rozumiane są tylko poniższe symbole zastępcze; wszystko inne zostanie odrzucone przy zapisie.",
+        "templateVariables": "Symbole zastępcze",
+        "insertPlaceholder": "Wstaw {name}",
+        "responsePathLabel": "Ścieżka wyjściowa",
+        "responsePathHelp": "Gdzie odczytać wygenerowane dane wyjściowe z odpowiedzi JSON Twojego serwisu. Korzeń, pola rozdzielone kropkami, kroki w cudzysłowach w nawiasach kwadratowych oraz indeksy numeryczne.",
+        "timeoutLabel": "Limit czasu (sekundy)",
+        "attemptsLabel": "Maksymalna liczba prób",
+        "concurrencyLabel": "Maksymalna współbieżność",
+        "limitsHelp": "Możliwe do nadpisania dla każdego eksperymentu.",
+        "signingToggle": "Podpisuj każde żądanie",
+        "signingKeyLabel": "Klucz podpisu",
+        "signingKeyOnce": "Skopiuj to do swojego serwisu przed przetestowaniem połączenia. Twój serwis otrzyma:",
+        "regenerateKey": "Wygeneruj nowy klucz",
+        "submit": "Przetestuj połączenie i zarejestruj",
+        "submitRetry": "Ponów test i opublikuj",
+        "submitEdit": "Przetestuj połączenie i opublikuj",
+        "saveDraft": "Zapisz jako szkic",
+        "saveDraftBlocked": "Zadanie z poświadczeniem nie może zostać zapisane jako szkic, ponieważ szkic nie mógłby zostać później ponownie otwarty. Zarejestruj je za pomocą testowego połączenia.",
+        "publishedSuccess": "Opublikowano jako wersja {version}",
+        "republishedSuccess": "Opis zaktualizowany. Wersja {version} pozostaje bez zmian.",
+        "draftSuccess": "Szkic zapisany. Przetestuj połączenie, aby go opublikować.",
+        "draftError": "Nie udało się zapisać szkicu",
+        "publishFailed": "Połączenie testowe nie powiodło się, więc nic nie zostało opublikowane. Twój szkic został zapisany.",
+        "createError": "Nie udało się zarejestrować zdalnego zadania.",
+        "validation": {
+          "nameRequired": "Nazwa jest wymagana",
+          "endpointRequired": "Adres URL punktu końcowego jest wymagany",
+          "endpointHttps": "Punkt końcowy musi być adresem URL https",
+          "tokenRequired": "Token jest wymagany",
+          "usernameRequired": "Nazwa użytkownika jest wymagana",
+          "passwordRequired": "Hasło jest wymagane",
+          "headerNameRequired": "Nazwa nagłówka jest wymagana",
+          "headerKeyRequired": "Nazwa nagłówka jest wymagana",
+          "headerValueRequired": "Wartość nagłówka jest wymagana",
+          "headerReserved": "Ta nazwa nagłówka jest ustawiana przez platformę i nie może zostać nadpisana",
+          "responsePathRequired": "Ścieżka wyjściowa jest wymagana",
+          "responsePathRoot": "Ścieżka wyjściowa musi zaczynać się od znaku dolara",
+          "timeoutRange": "Limit czasu musi wynosić od 1 do 600 sekund",
+          "attemptsRange": "Maksymalna liczba prób musi wynosić od 1 do 3",
+          "concurrencyRange": "Maksymalna współbieżność musi wynosić od 1 do 32",
+          "signingKeyRequired": "Nie udało się wygenerować klucza podpisu. Spróbuj ponownie."
+        }
+      },
+      "generatedSigning": {
+        "title": "Skopiuj swój klucz podpisu",
+        "body": "Ten klucz jest pokazywany tylko raz i nigdy więcej. Twój serwis potrzebuje go, aby zweryfikować nagłówek podpisu.",
+        "keyIdLabel": "Identyfikator klucza",
+        "keyLabel": "Klucz",
+        "copy": "Kopiuj klucz",
+        "copied": "Skopiowano",
+        "done": "Zapisałem to"
+      },
+      "testPanel": {
+        "title": "Testuj połączenie",
+        "sourceLabel": "Przykładowe dane wejściowe",
+        "sourceDataset": "Z zestawu danych",
+        "sourceManual": "Ręcznie",
+        "datasetLabel": "Zestaw danych",
+        "datasetPlaceholder": "Wybierz zestaw danych",
+        "datasetEmpty": "Ten zestaw danych nie zawiera elementów do próbkowania.",
+        "datasetError": "Nie udało się załadować zestawu danych",
+        "inputLabel": "Dane wejściowe",
+        "inputPlaceholder": "Tekst lub wartość JSON",
+        "metadataLabel": "Metadane",
+        "metadataPlaceholder": "Obiekt JSON",
+        "run": "Testuj połączenie",
+        "running": "Wywoływanie punktu końcowego…",
+        "passed": "Połączenie zweryfikowane",
+        "failed": "Połączenie nieudane",
+        "statusCode": "Status",
+        "latency": "Opóźnienie",
+        "output": "Wyodrębnione dane wyjściowe",
+        "rawRequest": "Wysłano żądanie",
+        "rawResponse": "Otrzymano odpowiedź",
+        "idle": "Żądanie i odpowiedź pojawią się tutaj po uruchomieniu testu.",
+        "disabledHint": "Najpierw wypełnij nazwę i punkt końcowy."
+      },
+      "detail": {
+        "backTo": "Zadania zdalne",
+        "loadError": "Nie udało się załadować zadania zdalnego",
+        "tabs": {
+          "overview": "Przegląd",
+          "versions": "Wersje",
+          "signing": "Podpisywanie"
+        },
+        "taskRefLabel": "Referencja",
+        "taskRefHint": "Eksperymenty przypinają ten dokładny ciąg znaków.",
+        "taskRefNone": "Nie ma jeszcze nic do przypięcia. Najpierw opublikuj wersję.",
+        "copyRef": "Kopiuj referencję",
+        "copied": "Skopiowano",
+        "configTitle": "Konfiguracja",
+        "headersTitle": "Niestandardowe nagłówki",
+        "headersNone": "Brak niestandardowych nagłówków.",
+        "headerSecret": "Sekret",
+        "templateTitle": "Szablon treści",
+        "templateDefault": "Używana jest domyślna treść.",
+        "verificationError": "Ostatni test połączenia nie powiódł się.",
+        "fields": {
+          "endpoint": "Punkt końcowy",
+          "method": "Metoda",
+          "auth": "Uwierzytelnianie",
+          "contentType": "Typ treści",
+          "responsePath": "Ścieżka wyjściowa",
+          "timeout": "Limit czasu",
+          "attempts": "Maksymalna liczba prób",
+          "concurrency": "Maksymalna współbieżność",
+          "signing": "Podpisywanie",
+          "verifiedAt": "Zweryfikowano",
+          "createdAt": "Utworzono"
+        },
+        "versionsColumns": {
+          "version": "Wersja",
+          "status": "Status",
+          "reference": "Referencja",
+          "endpoint": "Punkt końcowy",
+          "verifiedAt": "Zweryfikowano"
+        },
+        "discardDraft": "Odrzuć szkic",
+        "discardDraftTitle": "Odrzuć szkic",
+        "discardDraftMessage": "Odrzucić nieopublikowany szkic? Opublikowane wersje pozostaną nietknięte.",
+        "discardDraftSuccess": "Odrzucono szkic",
+        "discardDraftError": "Nie udało się odrzucić szkicu"
+      },
+      "testRun": {
+        "title": "Przebieg testowy",
+        "hint": "Uruchamia najnowszą opublikowaną wersję przeciwko maksymalnie dziesięciu próbkom przy użyciu zarejestrowanego kontraktu. Nic nie jest zapisywane: żadnych eksperymentów, żadnych rekordów wykonania, żadnej historii.",
+        "samplesLabel": "Próbki",
+        "addSample": "Dodaj próbkę",
+        "removeSample": "Usuń próbkę",
+        "samplePlaceholder": "Tekst lub wartość JSON",
+        "run": "Uruchom próbki",
+        "running": "Uruchamianie…",
+        "error": "Przebieg testowy nie powiódł się",
+        "needsPublished": "Opublikuj wersję przed uruchomieniem na niej próbek.",
+        "columns": {
+          "row": "Próbka",
+          "status": "Status",
+          "output": "Wyjście",
+          "latency": "Opóźnienie",
+          "attempts": "Próby"
+        },
+        "attemptsValue": "{count} z {max}",
+        "resultsTitle": "Wyniki"
+      },
+      "signingPanel": {
+        "title": "Klucze podpisu",
+        "hint": "Rotacja to czteroetapowe przekazanie: utwórz klucz kandydujący, udowodnij, że Twoja usługa go akceptuje, aktywuj go, a następnie pozwól staremu kluczowi wygasnąć.",
+        "disabled": "Podpisywanie żądań jest wyłączone dla tego zadania. Włącz je, publikując nową wersję z włączonym podpisywaniem.",
+        "loadError": "Nie udało się wczytać statusu podpisywania",
+        "stateCurrent": "Aktualny",
+        "stateCandidate": "Kandydat",
+        "stateRetired": "Wycofany",
+        "keyIdLabel": "ID klucza",
+        "noKeyId": "Brak ID klucza",
+        "createdAt": "Utworzono",
+        "lastVerifiedAt": "Ostatnia weryfikacja",
+        "graceExpiresAt": "Koniec karencji",
+        "neverVerified": "Nigdy nie zweryfikowano",
+        "rotate": "Utwórz kandydata",
+        "newKeyIdLabel": "Nowy ID klucza",
+        "newKeyIdPlaceholder": "k2",
+        "rotateSuccess": "Utworzono klucz kandydujący. Skopiuj go teraz, a następnie przetestuj.",
+        "rotateError": "Nie udało się utworzyć klucza kandydującego",
+        "test": "Przetestuj kandydata",
+        "testPassed": "Kandydat został zaakceptowany. Możesz go aktywować.",
+        "testFailed": "Twoja usługa odrzuciła kandydata, więc nie został on aktywowany.",
+        "testError": "Nie można przetestować kandydata",
+        "activate": "Aktywuj kandydata",
+        "activateSuccess": "Kandydat aktywowany. Poprzedni klucz pozostaje ważny do końca okresu przejściowego.",
+        "activateError": "Nie można aktywować kandydata",
+        "graceLabel": "Okres przejściowy",
+        "graceHelp": "Jak długo poprzedni klucz nadal działa. Do 24 godzin.",
+        "graceHours": "{count} godzina | {count} godzin",
+        "graceNone": "Brak okresu przejściowego",
+        "endGrace": "Zakończ okres przejściowy teraz",
+        "endGraceTitle": "Zakończ okres przejściowy",
+        "endGraceMessage": "Wycofać poprzedni klucz natychmiast? Każde żądanie, które Twoja usługa nadal weryfikuje tym kluczem, zacznie kończyć się niepowodzeniem.",
+        "endGraceSuccess": "Okres przejściowy zakończony",
+        "endGraceError": "Nie można zakończyć okresu przejściowego",
+        "noCandidate": "Brak klucza kandydującego. Utwórz go, aby rozpocząć rotację."
+      }
+    },
+    "playground": {
+      "title": "Playground",
+      "subtitle": "Wypróbuj prompt, porównaj warianty, a następnie zamień zwycięzcę w eksperyment.",
+      "runAll": "Uruchom wszystkie",
+      "runAllTooltip": "Uruchom każdy wariant",
+      "running": "Uruchamianie… ({done}/{total})",
+      "stop": "Zatrzymaj",
+      "recentDrafts": "Ostatnie wersje robocze",
+      "recentDraftsSection": "Ta przeglądarka · ostatnie 10",
+      "recentDraftsEmpty": "Brak ostatnich wersji roboczych.",
+      "recentDraftsFoot": "Wersje robocze są przechowywane tylko w tej przeglądarce.",
+      "draftRestored": "Przywrócono wersję roboczą.",
+      "fromExperiment": "Sklonowano z eksperymentu {name}",
+      "fromDataset": "Wiersze próbkowane z {name}",
+      "variables": "Zmienne",
+      "rowFields": "Pola wierszy",
+      "noVariables": "Brak {token} w wiadomościach — dodaj go, aby sparametryzować dane wejściowe.",
+      "variablePlaceholder": "Wartość dla {name}",
+      "addExpected": "+ Oczekiwany wynik",
+      "expectedLabel": "Oczekiwany",
+      "expectedPlaceholder": "Złota odpowiedź — umożliwia późniejszą ocenę na podstawie odniesienia",
+      "removeExpected": "Usuń oczekiwany wynik",
+      "expectedLeakWarning": "{token} nigdy nie jest dostępny w promptach zadań — złote odpowiedzi służą tylko oceniającym.",
+      "chipInsert": "Kliknij, aby wstawić w miejscu kursora",
+      "chipReferenced": "Występuje w tym szablonie — kliknij, aby wstawić ponownie",
+      "chipMissing": "Występuje w szablonie, ale żaden bieżący wiersz go nie dostarcza — renderuje się jako puste",
+      "chipScorersOnly": "Tylko dla oceniających",
+      "variant": "Wariant {label}",
+      "addVariant": "Dodaj wariant",
+      "variantCount": "{count}/{max}",
+      "variantLimit": "Zestaw mieści co najwyżej {max} wariantów.",
+      "duplicateVariant": "Duplikuj wariant",
+      "removeVariant": "Usuń wariant",
+      "runVariant": "Uruchom ten wariant",
+      "createExperiment": "Utwórz eksperyment",
+      "variantConfig": "Konfiguracja wariantu",
+      "variantConfigScope": "Dotyczy wariantu {label} we wszystkich {count} wierszach.",
+      "editVariant": "Edytuj ten wariant — dotyczy całej kolumny",
+      "stale": "Nieaktualne",
+      "staleTooltip": "Konfiguracja zmieniła się od ostatniego uruchomienia — uruchom ponownie, aby odświeżyć dane wyjściowe",
+      "staleNote": "Konfiguracja się zmieniła — poniższe dane wyjściowe są przyciemnione do czasu ponownego uruchomienia.",
+      "provider": "Dostawca",
+      "providerPlaceholder": "Wybierz dostawcę",
+      "model": "Model",
+      "modelPlaceholder": "Wybierz lub wpisz model",
+      "modelHelp": "Każda nazwa modelu jest akceptowana — nieznana nazwa powoduje błąd w czasie uruchamiania, nie tutaj.",
+      "temperature": "Temperatura",
+      "messages": "Wiadomości",
+      "roleSystem": "System",
+      "roleUser": "Użytkownik",
+      "roleAssistant": "Asystent",
+      "roleTool": "Narzędzie",
+      "addUserMessage": "Użytkownik",
+      "addAssistantMessage": "Asystent",
+      "removeMessage": "Usuń wiadomość",
+      "readonlyMessage": "Ze śladu, tylko do odczytu",
+      "messagePlaceholder": "Napisz wiadomość {role}…",
+      "tools": "Narzędzia",
+      "toolsCount": "Narzędzia · {count}",
+      "toolsTitle": "Narzędzia",
+      "toolsIntro": "Zdefiniuj narzędzia przekazywane do modelu. Playground nigdy nie wykonuje narzędzia — gdy model wywoła funkcję, samo wywołanie jest wynikiem i uruchamianie się kończy.",
+      "toolName": "Nazwa narzędzia",
+      "toolNamePlaceholder": "lookup_order",
+      "toolDescription": "Opis",
+      "toolDescriptionPlaceholder": "Co robi to narzędzie",
+      "toolParameters": "Parametry",
+      "toolParametersHelp": "Schemat JSON",
+      "toolParametersPlaceholder": "{ \"type\": \"object\", \"properties\": { } }",
+      "addTool": "Dodaj narzędzie",
+      "removeTool": "Usuń narzędzie",
+      "toolsEmpty": "Nie zdefiniowano narzędzi.",
+      "toolCall": "Wywołanie narzędzia",
+      "toolCallNote": "Uruchamianie zatrzymuje się tutaj — Playground nie wykonuje narzędzi.",
+      "toolInvalidJson": "Parametry muszą być prawidłowym JSON.",
+      "schema": "Schemat",
+      "schemaOn": "Schemat · Wł.",
+      "schemaTitle": "Strukturalne dane wyjściowe",
+      "schemaToggle": "Ogranicz dane wyjściowe do schematu JSON",
+      "schemaHelp": "Dane wyjściowe są wyświetlane z formatowaniem JSON, gdy ustawiony jest schemat.",
+      "schemaInvalidJson": "Schemat musi być prawidłowym JSON.",
+      "outputPlaceholder": "Dane wyjściowe pojawią się tutaj — naciśnij Uruchom.",
+      "outputNotRun": "Nie uruchomiono",
+      "generating": "Generowanie…",
+      "retry": "Ponów",
+      "usageLatency": "{seconds}s",
+      "usageTokens": "{input}→{output} tok",
+      "usageCost": "${cost}",
+      "copyOutput": "Kopiuj wynik",
+      "copied": "Skopiowano do schowka.",
+      "addToMessages": "Dodaj do wiadomości",
+      "addToMessagesTooltip": "Dołącz ten wynik jako wiadomość asystenta i kontynuuj rozmowę",
+      "addedToMessages": "Wynik dołączono jako wiadomość asystenta — dodaj następną turę użytkownika i uruchom ponownie.",
+      "sampleFromDataset": "Pobierz próbkę z zestawu danych",
+      "addRow": "Dodaj wiersz",
+      "rowsSampled": "{count} wierszy · próbkowanych według wartości — późniejsze edycje zestawu danych ich nie zmieniają",
+      "removeRow": "Usuń wiersz",
+      "inputColumn": "Wejście · {count} wierszy",
+      "manualRow": "Ręcznie",
+      "noReference": "Brak odniesienia",
+      "noReferenceTooltip": "Ten wiersz nie ma oczekiwanego wyniku",
+      "rowFooter": "n={count} — dla wyników z pełnego zestawu danych,",
+      "rowFooterLink": "utwórz eksperyment",
+      "sampleTitle": "Pobierz próbkę z zestawu danych",
+      "sampleDataset": "Zestaw danych",
+      "sampleDatasetPlaceholder": "Wybierz zestaw danych",
+      "sampleRowFields": "Pola wiersza",
+      "sampleRowFieldsHelp": "Można użyć jako {token} w wiadomościach",
+      "sampleInTemplate": "W szablonie",
+      "sampleRows": "Wiersze",
+      "sampleRowsHelp": "Losowa próbka · skopiowana przez wartość",
+      "sampleMax": "Maks. {max}",
+      "sampleCopies": "Dane wejściowe i oczekiwany wynik są kopiowane.",
+      "sampleExisting": "Istniejące wiersze",
+      "sampleReplace": "Zastąp bieżące wiersze",
+      "sampleAdd": "Dodaj do bieżących",
+      "sampleAddUsed": "({used}/{max} wykorzystano)",
+      "sampleScaleNote": "Próbkowanie przełącza panel na małą tabelę porównawczą. Aby uzyskać wnioski na podstawie pełnego zestawu danych, utwórz eksperyment.",
+      "sampleSubmit": "Próbkuj {count} wierszy",
+      "sampleAddSubmit": "Dodaj {count} wierszy",
+      "sampleLoadError": "Nie udało się wczytać wierszy z tego zestawu danych.",
+      "sampleEmpty": "Ten zestaw danych nie ma wierszy do próbkowania.",
+      "addRowTitle": "Dodaj wiersz",
+      "addRowInput": "Wejście",
+      "addRowInputPlaceholder": "Pytanie lub zadanie dla tego wiersza",
+      "addRowShowExpected": "+ Oczekiwany wynik (opcjonalnie)",
+      "addRowHideExpected": "− Ukryj oczekiwany wynik",
+      "addRowExpectedPlaceholder": "Złota odpowiedź dla tego wiersza",
+      "zeroRefWarning": "Twój prompt nie odwołuje się do żadnych pól wiersza — wszystkie {count} wierszy dałyby identyczny wynik. Kliknij pole, aby je wstawić:",
+      "zeroRefSampleWarning": "Twój prompt nie odwołuje się do żadnych pól wiersza — dodaj {token} do promptu, w przeciwnym razie każdy próbkowany wiersz da identyczny wynik.",
+      "zeroRefInserted": "Wstawiono {token} do wiadomości użytkownika każdego wariantu — uruchom ponownie, aby zastosować.",
+      "runGateTitle": "Uruchomić bez pól wiersza?",
+      "runGateMessage": "Twój prompt nie odwołuje się do żadnych pól wiersza, więc wszystkie {rows} wierszy dałyby identyczny wynik. To uruchomienie zużywa {calls} wywołań modelu.",
+      "runGateConfirm": "Uruchom mimo to",
+      "runGateCancel": "Wróć i popraw prompt",
+      "rowDetail": "Wiersz {index}",
+      "rowPosition": "{index}/{total}",
+      "previousRow": "Poprzedni wiersz",
+      "nextRow": "Następny wiersz",
+      "drawerInput": "Dane wejściowe",
+      "drawerExpected": "Oczekiwane wyjście",
+      "drawerNoExpected": "Brak oczekiwanego wyjścia w tym wierszu.",
+      "drawerRenderedPrompt": "Wyrenderowany prompt",
+      "drawerRenderedPromptHelp": "Wiadomości faktycznie wysłane dla tego wiersza, z podstawionymi zmiennymi",
+      "drawerEmptyMessage": "(puste)",
+      "drawerOutputs": "Wyjście · {count} wariantów obok siebie",
+      "drawerFrom": "Od {name}",
+      "noProviderTitle": "Playground wymaga dostawcy LLM",
+      "noProviderBody": "Podłącz dostawcę, aby uruchamiać prompty. Zajmie to około minutę.",
+      "noProviderAction": "Skonfiguruj dostawcę",
+      "providerLoadError": "Nie udało się wczytać dostawców.",
+      "datasetLoadError": "Nie udało się wczytać zbiorów danych.",
+      "runFailed": "Uruchomienie nie powiodło się.",
+      "backendPending": "Uruchamianie na przykładowym wyjściu — API uruchamiania Playground nie jest jeszcze aktywne."
     }
   },
   "onlineEvals": {
@@ -13269,8 +14170,28 @@
     "combobox": {
       "noOptionsFound": "Nie znaleziono opcji"
     },
+    "emojiPicker": {
+      "chooseIcon": "Wybierz ikonę",
+      "searchPlaceholder": "Szukaj ikon...",
+      "removeIcon": "Usuń ikonę",
+      "noResults": "Brak ikon odpowiadających Twojemu wyszukiwaniu",
+      "groups": {
+        "results": "Wyniki",
+        "status": "Status",
+        "services": "Usługi",
+        "ai": "AI",
+        "creatures": "Stworzenia",
+        "infra": "Infrastruktura",
+        "data": "Dane",
+        "teams": "Zespoły",
+        "objects": "Obiekty",
+        "world": "Świat"
+      }
+    },
     "input": {
-      "clear": "Wyczyść"
+      "clear": "Wyczyść",
+      "showValue": "Pokaż",
+      "hideValue": "Ukryj"
     },
     "dialog": {
       "closeDialog": "Zamknij okno dialogowe"
@@ -13647,6 +14568,14 @@
       },
       "variableScope": {
         "global": "Globalny"
+      },
+      "dataConfidence": {
+        "estimated": "≈ szacunkowo",
+        "topNSubset": "podzbiór top-N",
+        "live": "na żywo",
+        "belowTopN": "poniżej top-N",
+        "truncated": "obcięty",
+        "gap": "luka"
       }
     }
   },
@@ -14627,6 +15556,1056 @@
     },
     "hover": {
       "deprecated": "**Przestarzałe** — preferuj funkcję kanoniczną."
+    }
+  },
+  "dbm": {
+    "common": {
+      "reload": "Odśwież",
+      "lastRefreshed": "Ostatnio odświeżono {age}",
+      "loadFailed": "Nie udało się wczytać danych bazy danych. Spróbuj ponownie lub zawęź zakres czasu."
+    },
+    "ai": {
+      "suggestFix": "Zapytaj AI, jak to naprawić",
+      "suggestFixHint": "Otwiera asystenta AI z tym zapytaniem, jego silnikiem i liczbami opóźnień oraz pyta, co zmienić. Sam niczego nie zmienia.",
+      "rowSuggestFix": "Zapytaj AI, jak to naprawić",
+      "deadlockFix": "Jak zatrzymać to zakleszczenie?",
+      "deadlockFixHint": "Wysyła obie sprzeczne instrukcje oraz dowody kolejności wierszy do asystenta AI.",
+      "blockingFix": "Dlaczego to blokuje?",
+      "blockingFixHint": "Wysyła instrukcję sesji źródłowej, jej czas bezczynności oraz liczbę sesji zablokowanych za nią do asystenta AI."
+    },
+    "filters": {
+      "allEngines": "Wszystkie silniki",
+      "allInstances": "Wszystkie bazy danych",
+      "allNamespaces": "Wszystkie schematy",
+      "allEnvs": "Wszystkie środowiska",
+      "allServices": "Wszystkie usługi",
+      "scope": "Filtry",
+      "clearScope": "Wyczyść wszystko",
+      "removeScope": "Usuń ten filtr",
+      "popoverTitle": "Zawęź to",
+      "dimension": {
+        "system": "silnik",
+        "instance": "baza danych",
+        "namespace": "schemat",
+        "env": "środowisko",
+        "service": "usługa",
+        "insight": "wniosek"
+      }
+    },
+    "delta": {
+      "new": "nowe na tej liście",
+      "gone": "przestało działać",
+      "newHint": "To zapytanie nie było wcześniej wśród najcięższych, więc nie ma z czym go porównać. Mogło być uruchomione wcześniej — po prostu nie na tyle intensywnie, aby śledzić je osobno.",
+      "goneHint": "To zapytanie działało wcześniej w ciągu dnia, ale nie w zakresie czasu, który teraz przeglądasz.",
+      "comparison": "Wcześniej {previous} → teraz {current}",
+      "noChange": "bez zmian",
+      "timesMore": "{ratio}× więcej",
+      "timesFewer": "{ratio}× mniej",
+      "wasValue": "było {value}"
+    },
+    "databases": {
+      "title": "Bazy danych",
+      "subtitle": "Wydajność zapytań i stan każdej bazy danych",
+      "searchPlaceholder": "Szukaj bazy danych lub usługi…",
+      "unnamedInstance": "Instancja bez nazwy",
+      "unnamedInstanceHint": "Raporty z instrukcji samej bazy danych potwierdzają, że ten silnik działa, ale nie podają nazwy hosta. Wiersz pokaże adres, gdy zostanie skonfigurowany kanał, który go zawiera — próbkowanie sesji lub metryki instancji.",
+      "moreServices": "+{count}",
+      "columns": {
+        "instance": "Baza danych",
+        "calls": "Wywołania",
+        "qps": "Na sekundę",
+        "errorRate": "Nieudane",
+        "p50": "Połowa poniżej",
+        "p95": "Wolne wywołania",
+        "p99": "Najwolniejsze 1%",
+        "services": "Używane przez",
+        "load": "Czas bazy danych",
+        "attention": "Wymaga uwagi"
+      },
+      "summary": {
+        "databases": "Bazy danych",
+        "calls": "Wywołania",
+        "time": "Czas bazy danych",
+        "failed": "Nieudane"
+      },
+      "databaseCount": "1 baza danych | {count} baz danych",
+      "openQueries": "Zobacz jej zapytania",
+      "alertMe": "Powiadom mnie",
+      "columnHints": {
+        "qps": "Wywołania na sekundę — wywołania w tym oknie podzielone przez jego długość, dzięki czemu widok 15-minutowy i 4-godzinny pozostają porównywalne.",
+        "p50": "Połowa wszystkich wywołań zakończyła się szybciej niż to. Liczy tylko zakończone wywołania — zapytanie wciąż działające lub takie, które nigdy nie wróciło, nie jest tutaj mierzone.",
+        "p95": "Wolny ogon — 1 wywołanie na 20 trwało co najmniej tyle. Liczy tylko zakończone wywołania — zapytanie wciąż działające lub takie, które nigdy nie wróciło, nie jest tutaj mierzone.",
+        "p99": "Najgorsze 1% wywołań trwało co najmniej tyle. Liczy tylko zakończone wywołania — zapytanie wciąż działające lub takie, które nigdy nie wróciło, nie jest tutaj mierzone.",
+        "load": "Całkowity czas, jaki Twoje aplikacje spędziły na oczekiwaniu na tę bazę danych. Mierzone po stronie klienta, więc odzwierciedla ilość ruchu obsługiwanego przez tę bazę — a nie obciążenie serwera.",
+        "attention": "Jak blisko limitu, który publikuje silnik tej instancji — dziś, połączenia względem max_connections. Najgorszy taki stosunek, nie wynik mieszany. Sortowane od najwyższych, z instancjami, których zdrowia nie można odczytać na górze, ponieważ tej, której nie widzisz, nie możesz uznać za zdrową. Mierzone na serwerze bazy danych, więc nie jest porównywalne z czasem bazy danych obok."
+      },
+      "failedChip": "{count} nieudanych",
+      "columnSubLabels": {
+        "attention": "serwer",
+        "load": "klient",
+        "calls": "klient"
+      },
+      "attention": {
+        "connections": "połączenia",
+        "noLimit": "brak opublikowanego limitu",
+        "unknown": "nie mierzone"
+      }
+    },
+    "queries": {
+      "title": "Czołowe zapytania",
+      "subtitle": "Zapytania zużywające najwięcej czasu bazy danych",
+      "subtitleServer": "Instrukcje, które uruchomiły Twoje bazy danych, zliczone wewnątrz bazy — od najczęściej uruchamianych",
+      "searchPlaceholder": "Szukaj tekstu zapytania, tabeli lub usługi…",
+      "trendLabel": "Jak zmieniał się czas tego zapytania w wybranym zakresie",
+      "otherRow": "Wszystkie inne zapytania",
+      "truncatedText": "Ta instrukcja była zbyt długa, aby przechować ją w całości, więc jest pokazana w skrócie.",
+      "stmtClass": {
+        "query": "Zapytania",
+        "queryHint": "Tylko prawdziwy SQL — SELECT, INSERT, UPDATE i DELETE.",
+        "all": "Zapytania + narzut połączenia",
+        "allHint": "Liczy również czynności administracyjne, które Twój sterownik wysyła między zapytaniami: BEGIN i COMMIT, SET oraz sprawdzenia, które utrzymują połączenie z puli przy życiu."
+      },
+      "completionBias": {
+        "title": "Liczba wywołań spadła o {drop}%, a liczba błędów wzrosła",
+        "body": "To zwykle oznacza, że zapytania się blokują, zamiast kończyć — a my możemy mierzyć tylko zapytania, które się kończą. Spadająca linia nie musi oznaczać, że następuje poprawa."
+      },
+      "columns": {
+        "query": "Zapytanie",
+        "calls": "Wywołania",
+        "p95": "Wolne wywołania",
+        "errors": "Błędy",
+        "perTrace": "Na żądanie",
+        "load": "Czas bazy danych",
+        "p99": "Najwolniejsze 1%",
+        "max": "Najgorsze zaobserwowane",
+        "services": "Używane przez"
+      },
+      "queryCount": "1 rodzaj zapytania | {count} rodzajów zapytań",
+      "otherRowDetail": "— {calls} wywołań. Nie mamy dla nich liczb na zapytanie, tylko tę połączoną sumę. Liczone w każdej sumie powyżej.",
+      "foldRowText": "1 mniejsze zapytanie | {count} mniejszych zapytań",
+      "serverList": {
+        "title": "Zapytania raportowane przez Twoje bazy danych",
+        "subtitle": "Zliczone wewnątrz bazy dla każdego klienta, od najczęściej uruchamianych. Żadne śledzone wywołania aplikacji nie trafiły w to okno, więc zwykła lista jest pusta — to, co w międzyczasie zobaczyły bazy danych.",
+        "truncated": "{count} najczęściej uruchamianych instrukcji — więcej zostało uruchomionych, niż pokazano tutaj",
+        "columns": {
+          "query": "Zapytanie",
+          "calls": "Wywołania",
+          "totalTime": "Czas w bazie danych",
+          "meanTime": "Średnia na wywołanie"
+        },
+        "columnHints": {
+          "time": "Zmierzony wewnątrz bazy danych: czas wykonania dla PostgreSQL, czas oczekiwania dla MySQL i MariaDB. Nie to, co odczuły Twoje aplikacje — opóźnienia sieci i połączenia nie są uwzględnione.",
+          "mean": "Czas w bazie podzielony przez liczbę wywołań — średnia w oknie, nie percentyl."
+        }
+      },
+      "foldRowDetail": "· {share} czasu bazy danych · kliknij, aby je pokazać",
+      "foldRowDetailOpen": "· {share} czasu bazy danych · kliknij, aby je zwinąć",
+      "summary": {
+        "queries": "Rodzaje zapytań",
+        "calls": "Wywołania",
+        "time": "Czas bazy danych",
+        "failed": "Błędy"
+      },
+      "columnHints": {
+        "calls": "Ile razy wykonano to zapytanie. Własny licznik Twojej bazy danych, jeśli go raportuje — obejmuje to każdego klienta, nie tylko części systemu wysyłające ślady. Wiersze oznaczone jako obserwowane przez klienta są liczone ze śladów, ponieważ Twoja baza danych ich nie raportowała.",
+        "p50": "Połowa wszystkich wywołań zakończyła się szybciej. Liczy tylko zakończone wywołania — zapytanie wciąż działające lub takie, które nie wróciło, nie jest tu mierzone.",
+        "p95": "Wolny ogon — 1 na 20 wywołań trwało co najmniej tyle. Liczy tylko zakończone wywołania — zapytanie wciąż działające lub takie, które nie wróciło, nie jest tutaj mierzone.",
+        "p99": "Najgorszy 1% wywołań trwał co najmniej tyle. Liczy tylko zakończone wywołania — zapytanie wciąż działające lub takie, które nie wróciło, nie jest tutaj mierzone.",
+        "max": "Najwolniejsze pojedyncze wywołanie w tym oknie — jedno rzeczywiste wywołanie, nie średnia.",
+        "errors": "Ile z tych wywołań zakończyło się błędem.",
+        "perTrace": "Ile razy to wykonuje się w ramach jednego żądania. Wysoka liczba zwykle oznacza pętlę.",
+        "load": "Całkowity czas, jaki to zapytanie spędziło w bazie danych. Własna wartość bazy danych, jeśli ją raportuje: czas wykonania w Postgresie, ale czas oczekiwania w MySQL i MariaDB — każdy wiersz podaje, który. Wiersze oznaczone jako obserwowane przez klienta są mierzone na podstawie śladów, więc obejmują sieciową podróż w obie strony."
+      },
+      "errorsNone": "brak",
+      "errorsAll": "wszystkie",
+      "actions": {
+        "open": "Otwórz szczegóły",
+        "traces": "Zobacz przykładowe ślady",
+        "copy": "Kopiuj zapytanie",
+        "copied": "Skopiowano zapytanie",
+        "copyFailed": "Nie udało się skopiować zapytania.",
+        "alert": "Powiadom mnie, jeśli to spowolni"
+      },
+      "otherRowTextFor": "Wszystkie inne zapytania na {database}",
+      "otherRowDetailShort": "— {calls} wywołań.",
+      "columnSubLabels": {
+        "calls": "serwer, na którym odnotowano",
+        "load": "serwer, na którym odnotowano"
+      }
+    },
+    "insights": {
+      "showRows": "Pokaż to zapytanie | Pokaż te {count} zapytania",
+      "clearFilter": "Wyczyść filtr",
+      "alsoAffects": "i {count} inne zapytanie | i {count} inne zapytania",
+      "showLess": "Pokaż mniej",
+      "more": "{count} więcej | {count} więcej",
+      "regression": {
+        "title": "{ratio}× wolniej niż zwykle",
+        "body": "{before} → {after}, ten sam ruch",
+        "rule": "Pokazano, ponieważ wolne wywołania tego zapytania stały się ponad {ratio}× wolniejsze niż {baseline}, przy co najmniej {calls} wywołaniach."
+      },
+      "new-expensive": {
+        "title": "Nowe zapytanie, już kosztowne",
+        "body": "wcześniej nie działało · teraz {share} czasu bazy danych",
+        "rule": "Pokazano, ponieważ to zapytanie nie należało do najcięższych w {baseline}, a teraz zajmuje co najmniej {share}% czasu bazy danych, przy co najmniej {calls} wywołaniach. Mogło działać wcześniej — po prostu nie na tyle intensywnie, by śledzić je osobno."
+      },
+      "n-plus-one": {
+        "title": "Wykonuje się co najmniej {multiplier}× na żądanie",
+        "body": "{share} czasu bazy danych · {service}",
+        "rule": "Pokazano, ponieważ to zapytanie wykonuje się co najmniej {ratio} razy w ramach jednego żądania, przy co najmniej {traces} żądaniach. To dolna granica, więc rzeczywista liczba może być wyższa. Prawidłowe przetwarzanie wsadowe może wyglądać tak samo."
+      },
+      "volume-shift": {
+        "title": "Bardziej obciążone, nie wolniejsze",
+        "body": "wywoływane {ratio}× częściej, ta sama prędkość · {service}",
+        "rule": "Pokazano, ponieważ to zapytanie jest wywoływane ponad {ratio}× częściej niż w {baseline}, podczas gdy jego prędkość pozostała w granicach {latency}×. Zmiana dotyczy tego, co je wywołuje."
+      },
+      "rank-churn": {
+        "title": "Nowe najcięższe zapytanie",
+        "body": "przesunięte z #{from} na #{to}",
+        "rule": "Pokazano, ponieważ zapytanie weszło do najcięższych {into} z poza najcięższych {from} w {baseline}, podczas gdy całkowity czas bazy danych wzrósł.",
+        "unranked": "nierankingowane"
+      },
+      "hide": "Ukryj",
+      "show": "Pokaż",
+      "findRow": "Znajdź to",
+      "all-failing": {
+        "title": "Każde wywołanie kończy się błędem",
+        "body": "{failed} z {total} wywołań zakończyło się błędem · {query}",
+        "rule": "Pokazano, ponieważ każde wywołanie tego zapytania w tym zakresie zakończyło się błędem."
+      },
+      "baseline": {
+        "label": "Porównaj z",
+        "previous": "poprzedni okres",
+        "yesterday": "te same godziny wczoraj",
+        "previousShort": "vs poprzedni",
+        "previousHint": "Porównaj z okresem bezpośrednio poprzedzającym ten, o tej samej długości.",
+        "yesterdayShort": "w porównaniu z wczoraj",
+        "yesterdayHint": "Porównaj z tymi samymi godzinami dzień wcześniej — przydatne, gdy ruch ma cykl dobowy lub chcesz zobaczyć, co się zmieniło od wdrożenia."
+      }
+    },
+    "coverage": {
+      "unknownNote": "Brak danych do zmierzenia w wybranym zakresie i przy wybranych filtrach.",
+      "lineHealthy": "Widzisz {percent}% czasu tej bazy danych — {count} najcięższych rodzajów zapytań.",
+      "lineRemainder": "Widzisz {percent}% czasu tej bazy danych. Reszta to lżejsze zapytania, których nie wymieniamy pojedynczo.",
+      "lineStale": "Nasze zliczanie jest opóźnione o {minutes} min., więc najnowszych zapytań może tu jeszcze nie być.",
+      "lineTruncated": "W ostatnim przedziale było więcej danych, niż mogliśmy przyjąć, więc najnowsze liczby są zaniżone.",
+      "lineTruncatedStale": "W ostatnim przedziale było więcej danych, niż mogliśmy przyjąć, a nasze zliczanie jest opóźnione o {minutes} min. — najnowsze liczby są zaniżone, a najnowsze zapytania mogą jeszcze się tu nie pojawić.",
+      "lineGap": "W tym oknie brakuje {minutes} min. Zliczanie zatrzymało się na {stopped} i może sięgnąć tylko {reach} min. wstecz, więc nic nie obejmuje przedziału {from}–{to}.",
+      "lineSubset": "Przefiltrowano do {filter}, więc te wartości procentowe dotyczą wyświetlanych wierszy, a nie całej bazy danych.",
+      "lineHealthyAll": "Widzisz każde wykonane zapytanie. Prędkości tutaj są mierzone na każdym wywołaniu, więc są dokładne.",
+      "lineHealthyAllEstimated": "Widzisz każde wykonane zapytanie. Prędkości są tu uśrednione z kilku przedziałów czasowych, więc są przybliżone, a nie dokładne.",
+      "lineCountedTo": "Zliczono do {time}; ostatnie pół minuty wciąż jest doliczane.",
+      "lineExact": "Wszystkie bazy danych raportują. Prędkości są mierzone dla każdego wywołania, więc są dokładne.",
+      "lineExactEstimated": "Wszystkie bazy danych raportują. Prędkości są uśrednione z kilku przedziałów czasowych, więc są przybliżone, a nie dokładne.",
+      "lineSubsetUnnamed": "Filtry zawężają dane poniżej poziomu, na którym te sumy się sumują, więc wartości procentowe dotyczą wyświetlanych wierszy, a nie całej bazy danych.",
+      "lineQuery": "Czasy są mierzone w Twojej aplikacji, więc uwzględniają czas transmisji sieciowej i oczekiwanie na wolne połączenie.",
+      "lineUncodedErrors": "{percent} z tych błędów nie miało kodu przyczyny, więc można je policzyć, ale nie wyjaśnić.",
+      "lineSubsetStale": "Przefiltrowano do {filter}, a nasze zliczanie jest opóźnione o {minutes} min. — te wartości procentowe dotyczą wyświetlanych wierszy, a najnowsze zapytania mogą jeszcze się tu nie pojawić.",
+      "lineSubsetUnnamedStale": "Filtry zawężają dane poniżej poziomu, na którym sumują się te sumy, a nasze zliczanie jest opóźnione o {minutes} min. — wartości procentowe dotyczą wyświetlanych wierszy, a najnowsze zapytania mogą jeszcze się tu nie pojawić.",
+      "lineCountedToBehind": "Zliczono do {time}; jesteśmy {minutes} min. w tyle."
+    },
+    "breakdown": {
+      "loading": "Ustalamy, gdzie podział się czas…",
+      "noSchema": "Nie zgłoszono schematu",
+      "noService": "Nie zidentyfikowano wywołującego",
+      "nothingToAttribute": "Mamy łączne wartości dla tej bazy danych, ale brakuje poszczególnych zapytań w tym przedziale, więc nie możemy stwierdzić, która usługa wykorzystała czas.",
+      "queryCount": "{count} zapytanie | {count} zapytań",
+      "shortfall": "Te wartości dają {percent} mniej niż suma dla tej bazy danych, ponieważ tylko najcięższe rodzaje zapytań są rejestrowane pojedynczo."
+    },
+    "freshness": {
+      "neverAggregated": "Jeszcze nie dokończyliśmy zliczania tego przedziału. Pierwsze liczby zwykle pojawiają się w ciągu około 15 minut."
+    },
+    "empty": {
+      "filtered": {
+        "title": "Żadne zapytanie nie pasuje do Twoich filtrów",
+        "description": "Nic nie pasuje do wyszukiwania i filtrów, które zastosowano.",
+        "action": "Wyczyść filtry"
+      },
+      "title": "Jeszcze tu nic nie ma — a oto dokładny powód",
+      "subtitle": "Sprawdziliśmy wszystkie warunki, które muszą być spełnione.",
+      "subtitleCounts": "Zaliczone: {pass}, niezaliczone: {fail}. | Zaliczone: {pass}, niezaliczone: {fail}.",
+      "checklistTitle": "Co sprawdziliśmy",
+      "showMeHow": "Pokaż mi, jak to oprzyrządować",
+      "checkTrace": "Sprawdź jeden z moich śladów",
+      "checks": {
+        "enabled": {
+          "ok": "Monitorowanie baz danych jest włączone",
+          "okDetail": "dla tej organizacji",
+          "no": "Monitorowanie baz danych jest wyłączone",
+          "noDetail": "Administrator może włączyć je dla tej organizacji, a następnie ponownie uruchomić kolektor."
+        },
+        "traces": {
+          "ok": "Twoje ślady docierają",
+          "okDetail": "Zarejestrowano {count} w tym przedziale czasowym.",
+          "no": "Żadne ślady nie nadeszły",
+          "noDetail": "Monitorowanie baz danych opiera się na śladach, a ta organizacja nie wysłała jeszcze żadnych."
+        },
+        "permission": {
+          "ok": "Masz dostęp do tych danych",
+          "okDetail": "jesteś administratorem w {org}",
+          "no": "Nie masz dostępu do tych danych",
+          "noDetail": "Monitorowanie baz danych odczytuje Twoje ślady, a Twoja rola nie daje Ci do nich dostępu. Poproś administratora o uprawnienia do odczytu."
+        },
+        "dbSpans": {
+          "ok": "Twoje ślady odwołują się do bazy danych.",
+          "okDetail": "Wywołania bazy danych są rejestrowane",
+          "no": "Żaden z Twoich śladów nie wspomina o bazie danych",
+          "noDetail": "Twoje aplikacje są śledzone, ale część, która komunikuje się z bazą danych, nie jest. Dodaj instrumentację bazy danych dla swojego języka, a zapytania pojawią się tutaj."
+        },
+        "counted": {
+          "ok": "Zakończyliśmy zliczanie tego zakresu",
+          "okDetail": "liczby są aktualne",
+          "no": "Nie zakończyliśmy jeszcze zliczania",
+          "noDetail": "Wywołania bazy danych dotarły, ale pierwsze liczby nie są jeszcze gotowe. Zwykle zajmuje to kilka minut."
+        },
+        "window": {
+          "ok": "Coś działało w tym zakresie czasu",
+          "okDetail": "zarejestrowano wywołania bazy danych",
+          "no": "Nic nie działało w wybranym zakresie czasu",
+          "noDetail": "Spróbuj szerszego zakresu."
+        },
+        "alsoWorthKnowing": {
+          "title": "Warto również wiedzieć",
+          "detail": "Gdy to zostanie wdrożone, pierwsze zapytania pojawią się w ciągu około 15 minut."
+        }
+      },
+      "action": "Spróbuj ponownie",
+      "viewDocs": "Zobacz dokumentację"
+    },
+    "detail": {
+      "title": "Szczegóły zapytania",
+      "tabs": {
+        "overview": "Przegląd",
+        "overviewHint": "Jak wolne jest to zapytanie, jak często i gdzie jest uruchamiane.",
+        "plans": "Plany zapytań",
+        "plansHint": "Kroki, które Twoja baza danych wykonała, aby uruchomić to zapytanie. Zacznij tutaj, aby dowiedzieć się, dlaczego jest wolne.",
+        "callers": "Wywołujący i przykłady",
+        "callersHint": "Które części Twojej aplikacji uruchomiły to zapytanie oraz pojedyncze wolne wykonania, które możesz otworzyć jako ślad.",
+        "callersLocked": "Pojedyncze wykonania pochodzą ze śledzenia. Nic nie śledziło tego zapytania w tym zakresie czasu."
+      },
+      "notFound": {
+        "title": "Tego zapytania nie ma w tej organizacji",
+        "description": "Adres wskazuje zapytanie, którego {org} nie uruchomiła w wybranym zakresie czasu. Jeśli właśnie przełączyłeś organizacje, należy ono do tej, którą opuściłeś.",
+        "descriptionNoOrg": "Adres wskazuje zapytanie, którego ta organizacja nie uruchomiła w wybranym zakresie czasu. Jeśli właśnie przełączyłeś organizacje, należy ono do tej, którą opuściłeś.",
+        "scopeHint": "Nic nie pasuje do tego w tej organizacji, zakresie czasu i zakresie. Jeśli adres pochodzi z innego silnika lub instancji, wyczyść te filtry lub wróć do listy.",
+        "missingTitle": "Nie wybrano zapytania",
+        "missingDescription": "Ta strona opisuje jedno zapytanie, a adres nie wskazuje żadnego. Jeśli właśnie przełączyłeś organizacje, zapytanie, które czytałeś, należy do tej, którą opuściłeś.",
+        "action": "Przeglądaj zapytania tej organizacji"
+      },
+      "backToQueries": "Wróć do najczęstszych zapytań",
+      "backToActivity": "Wróć do aktywności",
+      "backToSamples": "Wróć do najwolniejszych wywołań",
+      "backToDeadlocks": "Wróć do zakleszczeń",
+      "latencyTitle": "Szybkość w czasie",
+      "volumeTitle": "Wywołania i błędy w czasie",
+      "endpointsTitle": "Skąd jest wywoływane",
+      "endpointsHint": "Części Twojej aplikacji, których żądania uruchomiły to zapytanie.",
+      "noEndpoints": "Nie mogliśmy określić, która część Twojej aplikacji uruchomiła to w tym zakresie.",
+      "samplesTitle": "Najwolniejsze przykłady",
+      "samplesHint": "każda kropka to jedno rzeczywiste wykonanie — kliknij, aby zobaczyć całe żądanie",
+      "noSamples": "Nie załadowano pojedynczych wykonań dla tego zakresu.",
+      "noSeries": "Brak historii dla tego zapytania w wybranym zakresie czasu.",
+      "liveSeries": "Najnowsze punkty są nadal zliczane i mogą się zmienić.",
+      "noStream": "Nie mogliśmy ustalić, który strumień śledzenia przenosi to zapytanie, więc jego wywołujący i przykłady nie mogą zostać załadowane.",
+      "ambiguousStream": "Ta organizacja ma więcej niż jeden strumień śledzenia i nie możemy określić, na którym działa to zapytanie. Wybierz strumień, aby załadować jego wywołujących i przykładowe ślady.",
+      "pickStream": "Wybierz strumień śledzenia",
+      "invalidStream": "Ta nazwa strumienia śledzenia nie jest przez nas rozpoznawana, więc nie uruchomiliśmy wyszukiwania.",
+      "firstSeen": "PO RAZ PIERWSZY POJAWIŁO SIĘ NA TEJ LIŚCIE O {time}",
+      "firstSeenHint": "Najwcześniejszy punkt w tym zakresie, w którym to zapytanie było wystarczająco ciężkie, aby śledzić je osobno.",
+      "lastSeen": "Ostatnio pojawił się o {time}",
+      "lastSeenHint": "Najnowszy punkt w tym przedziale, w którym to zapytanie było na tyle obciążające, że można je było śledzić osobno. Może nadal działać — to ostatni moment, w którym znalazło się na liście.",
+      "errorsByCode": {
+        "title": "Błędy według kodu przyczyny",
+        "exactHint": "Zliczane dla każdego wywołania w tym zakresie.",
+        "sampleHint": "Zliczane na podstawie poniższych przykładów — próbka, a nie suma.",
+        "noCode": "brak kodu przyczyny"
+      },
+      "whereItRuns": {
+        "title": "Gdzie działa",
+        "hint": "Aktywność tego zapytania podzielona według bazy danych, na której działało. Kliknij wiersz, aby skupić na nim tę stronę.",
+        "trackedHint": "Te liczby obejmują odcinki tego zakresu, w których zapytanie było na tyle obciążające, że było śledzone osobno — cichsze odcinki nie dodają tu nic, więc traktuj je jako sumy minimalne.",
+        "showAll": "Pokaż wszystkie lokalizacje",
+        "emptyFiltered": "Nic nie śledzono dla tego zapytania w miejscu, na którym skupiona jest ta strona. Pokaż wszystkie lokalizacje, aby zobaczyć, gdzie działało.",
+        "noInstance": "Instancja nie zgłoszona",
+        "focused": "Skupione",
+        "focusHint": "Liczby na tej stronie są obecnie zawężone do tego wiersza. Kliknij ponownie, aby rozszerzyć.",
+        "columns": {
+          "location": "Działa na",
+          "avg": "Średnio na wywołanie"
+        }
+      },
+      "qps": "Wywołania na sekundę",
+      "errorRate": "Nieudane wywołania",
+      "unattributed": "Nieprzypisane",
+      "sampleOk": "OK",
+      "sampleError": "Nieudane",
+      "viewTrace": "Zobacz żądanie →",
+      "viewTraces": "Zobacz przykładowe trace'e",
+      "copySummary": "Kopiuj",
+      "copySummaryHint": "Każda liczba tutaj jest już na tej stronie — to po prostu tworzy zdanie, więc 13. minuta incydentu generuje komunikat zamiast niczego.",
+      "summaryCopied": "Skopiowano podsumowanie",
+      "summaryCopyFailed": "Nie udało się skopiować podsumowania.",
+      "columns": {
+        "calls": "Wywołania",
+        "time": "Czas",
+        "duration": "Czas trwania",
+        "status": "Status",
+        "caller": "Wywołujący",
+        "callShare": "Udział wywołań",
+        "p50": "Połowa jest poniżej"
+      },
+      "belowTopN": {
+        "title": "To zapytanie nie należało do najcięższych przez część tego zakresu.",
+        "body": "Śledzimy najcięższe zapytania indywidualnie; pozostałe są liczone razem. Tam, gdzie to zapytanie nie było wystarczająco obciążające, zacieniamy wykres zamiast rysować zero — nadal działało.",
+        "capped": "Historia sięga tak daleko, jak mamy dane."
+      },
+      "firstSeenCaveat": "— mogło działać wcześniej, tylko nie było wśród najcięższych.",
+      "copyQuery": "Kopiuj zapytanie",
+      "alertMe": "Powiadom mnie, jeśli to zwolni",
+      "stats": {
+        "load": "Czas w bazie danych",
+        "loadShare": "{percent} tej bazy danych",
+        "calls": "Wywołania",
+        "callsDelta": "{change} niż wcześniej",
+        "p50": "Połowa jest poniżej",
+        "p95": "Wolne wywołania",
+        "max": "Najgorszy zaobserwowany",
+        "errors": "Nieudane",
+        "noErrors": "brak błędów",
+        "approx": "w przybliżeniu, nie dokładnie",
+        "exact": "dokładnie"
+      },
+      "overlap": {
+        "serverExecution": "Czas, który {engine} spędził na jego wykonaniu",
+        "serverWait": "Czas, który {engine} spędził na oczekiwaniu na niego — czas oczekiwania, nie czas wykonania",
+        "serverCounted": "Zliczany przez {engine}, u wszystkich klientów",
+        "clientObserved": "Zaobserwowany przez oprzyrządowanych wywołujących — Twoja baza danych tego nie zgłosiła"
+      },
+      "endpointsConcentrated": "Jeden endpoint odpowiada za {percent} czasu tego zapytania. Napraw {endpoint}, a naprawisz to zapytanie.",
+      "typicalMarker": "Wolne wywołania {value}",
+      "plans": {
+        "title": "Plany zapytań",
+        "sourceLabel": "Ogólny plan szacunkowy",
+        "sourceTooltip": "Ten plan został oszacowany przy wszystkich parametrach zapytania ustawionych na NULL i nigdy nie został faktycznie uruchomiony. Postgres mógł wykonać inny plan dla rzeczywistych zapytań. Użyj go, aby zobaczyć kształt zapytania, a nie wyjaśnić, ile trwało.",
+        "stableCaveat": "W tym oknie przechwycono jeden kształt planu. Nie wyklucza to problemu z planem — plany szacunkowe mogą pozostać stabilne, podczas gdy rzeczywisty plan się zmienia, a przechwytywanie wykonanych planów widzi tylko instrukcje na tyle wolne, aby zostały zarejestrowane, więc zmiana planu, która przyspieszyła to zapytanie, zniknęłaby z przechwytywania całkowicie.",
+        "executedLabel": "Wykonany plan",
+        "executedTooltip": "To jest plan, który Postgres faktycznie wykonał dla rzeczywistego uruchomienia, przechwycony przez auto_explain z rzeczywistymi wartościami parametrów. Liczby wierszy i czasy trwania w tym wierszu są zmierzone, a nie oszacowane — ale przechwytywane są tylko wykonania wolniejsze niż próg auto_explain, więc opisują one wolny ogon, a nie każde uruchomienie.",
+        "capturedDurations": "średnia {avg} · maks. {max} spośród {count} przechwyconych wykonań",
+        "estVsAct": "szac. {est} → rzecz. {act} wierszy",
+        "driftCallout": "Kształt planu zmienił się w tym oknie. Przechwycono {count} różnych kształtów, co zwykle oznacza zmianę schematu lub statystyk, na przykład usunięcie indeksu lub ponowne partycjonowanie tabeli.",
+        "viewPlans": "Zobacz plany",
+        "noPlans": "Nie przechwycono żadnych planów",
+        "noPlansHint": "Żaden kolektor nie przesłał jeszcze planu dla tej bazy danych. Włącz zbieranie najważniejszych zapytań w przepisie kolektora, aby rozpocząć przechwytywanie planów — strona konfiguracji przeprowadzi Cię przez to.",
+        "noPlanForQuery": "Brak planu dla tego zapytania",
+        "noPlanForQueryHint": "Przechwytujemy plany dla tej bazy danych — to zapytanie po prostu nie ma planu. To normalne w przypadku instrukcji, których baza danych nie może wyjaśnić, jak COMMIT, ROLLBACK i SHOW.",
+        "planHash": "Plan",
+        "firstSeen": "Pierwsze wystąpienie",
+        "lastSeen": "Ostatnie wystąpienie",
+        "noTree": "Nie udało się odczytać planu",
+        "nodeCost": "koszt {cost}"
+      },
+      "serverMetrics": {
+        "title": "Co zarejestrowała sama baza danych",
+        "subtitle": "Po stronie serwera — wszyscy klienci",
+        "clientSubtitle": "Obserwowane po stronie klienta — tylko wywołania z instrumentacją, tylko zakończone wywołania. Zapytanie nadal działające lub zawieszone nie znajduje się w tych liczbach.",
+        "instance": "Zgłoszone przez {instance}",
+        "instanceWide": "Wszystkie bazy danych na tej instancji",
+        "calls": "Wykonania",
+        "rows": "Zwrócone wiersze",
+        "meanExecution": "Średni czas wykonania",
+        "meanWait": "Średni czas oczekiwania",
+        "sharedBlksHit": "Bloki z pamięci podręcznej",
+        "sharedBlksRead": "Bloki z dysku",
+        "tempBlksWritten": "Zapisane bloki tymczasowe",
+        "noMatch": "Brak rekordu po stronie serwera dla tego zapytania",
+        "noMatchHint": "Twoja baza danych raportuje instrukcje, które wykonała, a tej nie ma wśród nich. To normalne: te dwa widoki identyfikują zapytanie w różny sposób, więc nie zawsze się pokrywają. Wszystko powyżej nadal jest mierzone z Twojej aplikacji.",
+        "ambiguous": "Więcej niż jedna baza danych mogła uruchomić to zapytanie.",
+        "ambiguousHint": "Kilka instancji raportuje bazę danych o tej nazwie, więc nie ma możliwości ustalenia, która z nich uruchomiła to zapytanie. Pokazywanie liczb z niewłaściwej instancji byłoby gorsze niż niepokazywanie żadnych. Kandydaci: {instances}.",
+        "off": "Nie zebrano metryk po stronie serwera",
+        "offHint": "Twój kolektor nie zbiera jeszcze metryk dla poszczególnych instrukcji z bazy danych. Włącz zbieranie najważniejszych zapytań w przepisie kolektora — strona konfiguracji przeprowadzi Cię przez to.",
+        "setUp": "Skonfiguruj",
+        "readFailed": "Nie można było odczytać metryk po stronie serwera",
+        "readFailedHint": "Odczyt się nie powiódł, więc nie mówi to nic o tym, czy Twoja baza danych raportuje instrukcje. Wszystko powyżej nadal jest mierzone z Twojej aplikacji."
+      },
+      "callingServices": {
+        "title": "Która z Twoich usług to wywołała",
+        "unjoinable": "Nie pokazano — ta instrukcja wykonywana jest w więcej niż jednym typie bazy danych, a dopasowywanie wywołujących bez wiedzy, który to typ, mogłoby wskazać błędne usługi.",
+        "tracedCalls": "{calls} prześledzonych wywołań",
+        "coverage": "Widziano {count} usług w {traced} z {executions} powyższych wykonań. Reszta pochodzi od wywołujących, których jeszcze nie śledzisz.",
+        "coverageUnknown": "Widziano {count} usług w {traced} śledzonych wywołaniach. Twoja baza danych nie zgłosiła sumy dla tego polecenia, więc nie ma udziału do podania.",
+        "noneNamed": "Prześledzono {traced} wywołań, ale żadnego z nich nie można było powiązać z usługą — ich ślady zaczynają się poza tym zakresem czasu."
+      },
+      "callersEmpty": {
+        "title": "Brak jeszcze prześledzonych wywołań dla tego zapytania",
+        "description": "Twoja baza danych zgłosiła to polecenie, ale nic nie śledziło aplikacji, która je uruchomiła — więc nie ma wywołującego do nazwania ani pojedynczego uruchomienia do otwarcia. Zainstrumentuj usługi, które rozmawiają z tą bazą danych, a pojawią się tutaj.",
+        "checklistTitle": "Co musi być prawdą",
+        "setUp": "Skonfiguruj śledzenie",
+        "checks": {
+          "server": {
+            "ok": "Twoja baza danych zgłasza to zapytanie",
+            "okDetail": "stąd pochodzą czasy na innych zakładkach"
+          }
+        }
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "czas wykonania",
+        "serverWait": "czas oczekiwania",
+        "serverCounted": "liczba serwerów",
+        "clientObserved": "zaobserwowane przez klienta",
+        "serverReported": "zgłoszone przez Twoje bazy danych"
+      }
+    },
+    "page": {
+      "tabs": {
+        "overview": "Przegląd",
+        "queries": "Najczęstsze zapytania",
+        "samples": "Najwolniejsze wywołania",
+        "samplesHintClient": "Zakończone wywołania zaobserwowane przez Twoje zainstrumentowane usługi w tym oknie — wywołujący bez śledzenia nie są liczeni, więc to jest dolna granica, a nie suma. Tabela pokazuje najwolniejsze z nich.",
+        "samplesHintServer": "Polecenia, które Twoje bazy danych zgłosiły jako ukończone w tym oknie, zliczone wewnątrz bazy danych. Tabela pokazuje najwolniejsze z nich.",
+        "samplesHintUnknown": "Najwolniejsze pojedyncze wywołania bazy danych w tym oknie.",
+        "deadlocks": "Zakleszczenia",
+        "blocked": "Zablokowane zapytania",
+        "deadlocksHint": "Zakleszczenia zgłoszone przez Twoje bazy danych.",
+        "blockedHint": "Sesje oczekujące na blokadę w tej chwili.",
+        "activity": "Aktywność",
+        "activityHint": "Sesje uruchomione w Twoich bazach danych w tej chwili.",
+        "tableHealth": "Kondycja tabel",
+        "tableHealthHint": "Rozmiar tabeli, nadmiarowość i stan próżni. Nadmiarowość i próżnia dotyczą tylko PostgreSQL.",
+        "deadlocksLocked": "Zakleszczenia to funkcja Enterprise. Zaktualizuj, aby zobaczyć, które zapytania zakleszczyły się względem siebie i dlaczego. Pozostałe zakładki bazy danych działają na każdym planie.",
+        "blockedLocked": "Zablokowane zapytania to funkcja Enterprise. Zaktualizuj, aby zobaczyć, które sesje oczekują na blokadę i co ją trzyma. Pozostałe zakładki bazy danych działają na każdym planie.",
+        "tableHealthLocked": "Kondycja tabel to funkcja Enterprise. Zaktualizuj, aby śledzić rozmiar tabel, nadmiarowość i stan próżni. Pozostałe zakładki bazy danych działają na każdym planie."
+      }
+    },
+    "samples": {
+      "title": "Najwolniejsze wywołania",
+      "subtitle": "Najwolniejsze pojedyncze wywołania bazy danych w tym oknie, dla każdej bazy danych i zapytania — zmierzone przez ich wywołujących, tylko zakończone wywołania",
+      "subtitleServer": "Najwolniejsze polecenia ukończone przez Twoje bazy danych w tym oknie, zmierzone wewnątrz bazy danych",
+      "logOffTitle": "Twoje bazy danych nie rejestrują jeszcze wolnych poleceń",
+      "logOffDescription": "Nic nie śledziło tych wywołań, więc zapytaliśmy bazy danych o ich własne najwolniejsze polecenia — a one nie rejestrują żadnych. Ta lista pochodzi z dziennika poleceń PostgreSQL (log_min_duration_statement), który jest domyślnie wyłączony — krok rejestrowania w karcie konfiguracji go włącza. Przechwytywanie poszczególnych poleceń jest obecnie dostępne tylko dla PostgreSQL, więc MySQL i MariaDB nie mogą jeszcze zasilać tej listy. Najczęstsze zapytania mogą nadal pokazywać, co działa najczęściej, ponieważ czytają tabele liczników.",
+      "searchPlaceholder": "Szukaj tekstu zapytania, usługi lub bazy danych…",
+      "columns": {
+        "query": "Zapytanie",
+        "when": "Kiedy",
+        "duration": "Zajęło",
+        "service": "Usługa",
+        "status": "Status"
+      },
+      "columnHints": {
+        "duration": "Jak długo trwało to jedno wywołanie, zmierzone przez wywołującego. Liczą się tylko zakończone wywołania — zapytanie nadal działające lub takie, które nigdy nie wróciło, nie jest tutaj mierzone."
+      },
+      "failed": "Nieudane",
+      "failedWithCode": "Nieudane · {code}",
+      "viewTrace": "Otwórz żądanie, którego częścią było to wywołanie",
+      "scatterOk": "Ukończone",
+      "partial": "Niektóre dane śledzenia nie mogły zostać odczytane, więc niektóre wywołania mogą nie znajdować się na tej liście.",
+      "disclosureShort": "Każdy wiersz to jedno rzeczywiste ukończone wywołanie",
+      "disclosureDetail": "Zmierzone przez aplikację, która wykonała wywołanie, na podstawie wysyłanych śladów. Są tutaj tylko wywołania, które się zakończyły — zapytanie nadal działające lub takie, które zawisło i nigdy nie wróciło, nie zostało zmierzone.",
+      "counts": {
+        "complete": "Wszystkie wywołania bazy danych w tym oknie ({count}), najwolniejsze najpierw.",
+        "truncated": "Najwolniejsze wywołania w tym oknie — {count} — więcej ich było, niż tu pokazano.",
+        "filtered": "Pokazuję {count} z {total} wywołań."
+      },
+      "serverList": {
+        "title": "Najwolniejsze wywołania zgłaszane przez twoje bazy danych.",
+        "subtitle": "Zmierzono w każdej bazie danych w momencie zakończenia zapytania — każdy klient jest liczony, ale sieć i oczekiwanie na połączenie nie. W tym oknie nie pojawiły się żadne śledzone wywołania aplikacji, więc zwykła lista jest pusta; to, które wywołania się tu pojawią, zależy od progu logowania samej bazy danych. Te raporty per zapytanie pochodzą obecnie wyłącznie z PostgreSQL — przepisy kolektora nie przechwytują jeszcze logów zapytań innych silników, więc wywołania MySQL i MariaDB nie pojawią się tutaj.",
+        "truncated": "Najwolniejsze zgłoszone wywołania ({count}) — więcej przekroczyło próg, niż tu pokazano",
+        "columns": {
+          "query": "Zapytanie",
+          "when": "Kiedy",
+          "took": "Czas trwania",
+          "user": "Użytkownik"
+        },
+        "columnHints": {
+          "took": "Czas w bazie danych od rozpoczęcia do zakończenia zapytania, zmierzony przez silnik. Nie to, czego doświadczył żaden wywołujący — sieć i oczekiwanie na połączenie nie są uwzględnione."
+        }
+      }
+    },
+    "rowChips": {
+      "new": "NOWE NA TEJ LIŚCIE",
+      "slower": "{ratio}× WOLNIEJ NIŻ ZWYKLE",
+      "loop": "URUCHAMIANE {multiplier}× NA ŻĄDANIE",
+      "allFailed": "WSZYSTKIE {count} ZAKOŃCZONE NIEPOWODZENIEM",
+      "busier": "BARDZIEJ OBCIĄŻONY, NIE WOLNIEJSZY",
+      "climbed": "NOWE NAJCIĘŻSZE ZAPYTANIE"
+    },
+    "deadlocks": {
+      "title": "Bazy danych",
+      "subtitle": "Transakcje, które blokowały się nawzajem i zostały wycofane",
+      "deadlockCount": "brak zakleszczeń | {count} zakleszczenie | {count} zakleszczeń",
+      "pairCount": "brak par zapytań | {count} para zapytań | {count} par zapytań",
+      "searchPlaceholder": "Szukaj tekstu zapytania, tabeli lub aplikacji…",
+      "grouping": {
+        "pairs": "Grupuj wg par zapytań",
+        "pairsHint": "Jeden wiersz na parę zapytań, które się wzajemnie zakleszczają, wraz z częstotliwością.",
+        "events": "Każde zdarzenie",
+        "eventsHint": "Jeden wiersz na zakleszczenie, od najnowszych — użyj tej opcji, gdy potrzebujesz konkretnej godziny."
+      },
+      "columns": {
+        "pair": "Dwa zapytania, które się wzajemnie zakleszczają",
+        "applications": "Aplikacje",
+        "objects": "Wiersze, o które walczono",
+        "lastSeen": "Ostatnie",
+        "count": "Zakleszczenia",
+        "when": "Kiedy",
+        "cancelled": "Anulowane",
+        "finished": "Zakończone"
+      },
+      "coverage": {
+        "complete": "Każde zakleszczenie zgłoszone przez Twoje bazy danych jest tutaj — {deadlocks} w tym oknie, z {pairs}.",
+        "capped": "Wydarzyło się więcej zakleszczeń, niż mogliśmy odczytać jednorazowo. Oto {deadlocks}, które mamy, z {pairs} — prawdziwa liczba jest wyższa.",
+        "readUpTo": "Odczytano do {time}.",
+        "mysqlPartial": "Twoja baza MySQL przechowuje tylko najnowsze zakleszczenie, chyba że włączona jest opcja innodb_print_all_deadlocks."
+      },
+      "chips": {
+        "oppositeOrder": "ODWROTNA KOLEJNOŚĆ WIERSZY",
+        "cadence": "CO {seconds}s",
+        "noQueries": "ZAPYTANIA NIEPRZECHWYCONE",
+        "partial": "TYLKO JEDNA STRONA"
+      },
+      "rowActions": {
+        "topQueries": "Znajdź je w Top queries",
+        "copy": "Kopiuj oba zapytania",
+        "alert": "Powiadamiaj mnie o zakleszczeniach"
+      },
+      "detail": {
+        "mostRecent": "Najnowsze · {time}",
+        "nthOf": "{index} z {total}",
+        "earlier": "Wcześniej",
+        "later": "Później",
+        "victim": "Anulowane przez bazę danych",
+        "survivor": "Zezwolono na ukończenie",
+        "pid": "pid {pid}",
+        "thread": "wątek {pid}",
+        "transaction": "transakcja {id}",
+        "eachWaits": "każda czeka na drugą",
+        "deadlock": "zakleszczenie",
+        "noQueryCaptured": "Dziennik zarejestrował to zakleszczenie, ale nie zapisał zapytania.",
+        "waitingFor": "Czekało, aż {target} zakończy.",
+        "waitingForRow": "Czekało, aż {target} zakończy — druga sesja już zmieniła wiersz, który chciało.",
+        "rawLock": "{mode} · {target}",
+        "plainTitle": "Co się wydarzyło, po kolei.",
+        "plainBody": "Strona {a} zmieniła jeden wiersz i go utrzymała. Strona {b} zmieniła inny i go utrzymała. Potem każda próbowała zmienić wiersz drugiej, więc żadna nie mogła się ruszyć. Baza danych rozstrzygnęła impas, anulując {victim} — ta aplikacja otrzymała błąd i cała jej transakcja została wycofana.",
+        "fixTitle": "Poprawka jest w Twoim kodzie, nie w bazie danych.",
+        "fixBody": "Te dwie instrukcje dotykają wierszy {object} w odwrotnej kolejności. Spraw, aby obie strony aktualizowały w tej samej kolejności — od najniższego id — a ta para nie będzie już powodować zakleszczeń.",
+        "fixGeneric": "Obie strony trzymają to, czego chce druga. Spraw, aby każda transakcja pobierała te blokady w tej samej kolejności, a ta para nie będzie już powodować zakleszczeń.",
+        "copyForSlack": "Kopiuj",
+        "occurrencesTitle": "Wszystkie {count} razy, gdy ta para się zakleszczyła",
+        "occurrencesHint": "Wybierz punkt, aby załadować ten powyżej",
+        "lostLabel": "{pid} przegrał",
+        "bothSidesLose": "Obie strony są anulowane mniej więcej równo — {a} vs {b}. Żadna z aplikacji nie jest problemem; problemem jest kolejność.",
+        "oneSideLoses": "{pid} jest anulowany za każdym razem.",
+        "showAbove": "Pokaż powyżej",
+        "copy": "Kopiuj SQL",
+        "seeInTopQueries": "Zobacz w Top queries",
+        "whichService": "Która usługa?",
+        "partialTitle": "Dotarła do nas tylko jedna strona tego zakleszczenia",
+        "partialBody": "MySQL zapisuje każdą stronę zakleszczenia jako osobny wpis dziennika. Wpis partnera nie dotarł — może znajdować się poza tym oknem lub dziennik mógł zostać zrotowany między nimi. To, co jest pokazane, jest prawdziwe; drugie zapytanie po prostu brakuje.",
+        "copyHint": "Kopiuje tylko zapytanie tej strony.",
+        "copySqlTooltip": "Kopiuj zapytanie tej strony",
+        "copyForSlackHint": "Obie instrukcje, jak często ta para się zakleszczała i kiedy to miało miejsce ostatnio — jako wiadomość, którą możesz wkleić na kanał lub do zgłoszenia."
+      },
+      "storm": {
+        "title": "Burza zakleszczeń.",
+        "body": "{count} w tym oknie — zwykle żadne.",
+        "copyForSlack": "Kopiuj",
+        "biasWarning": "Spodziewaj się, że zakładka Top queries będzie wyglądać spokojniej, niż jest w rzeczywistości. Anulowane zapytanie nadal się kończy, ale te oczekujące w kolejce za tymi blokadami nie — więc liczba wywołań tam jest niższa niż to, czego doświadczają Twoi użytkownicy."
+      },
+      "summary": {
+        "deadlocks": "Zakleszczenia",
+        "pairs": "Pary zapytań"
+      },
+      "healthy": {
+        "title": "Brak zakleszczeń — i na pewno sprawdzamy",
+        "description": "Twoje bazy danych nie zgłosiły ani jednego zakleszczenia w tym oknie. To zdrowa norma, a nie luka w tym, co zbieramy.",
+        "checklistTitle": "Skąd wiemy",
+        "collectionHealthy": "Zbieranie danych działa prawidłowo",
+        "checks": {
+          "reading": {
+            "title": "Czytamy logi Twoich baz danych",
+            "detail": "{databases} · ostatnio odczytana linia {age}",
+            "detailNoFleet": "Ostatnio odczytana linia {age}",
+            "detailUnknown": "{databases} — potok logów jest połączony",
+            "detailUnknownNoFleet": "Potok logów jest połączony"
+          },
+          "reporting": {
+            "title": "Raportowanie zakleszczeń jest włączone",
+            "detail": "Postgres domyślnie loguje zakleszczenia, a Twój MySQL ma włączone innodb_print_all_deadlocks, więc każde jest rejestrowane — nie tylko ostatnie.",
+            "detailMysqlPartial": "Postgres domyślnie loguje zakleszczenia. Twój MySQL nie ma włączonego innodb_print_all_deadlocks, więc tylko ostatnie zostanie zachowane.",
+            "detailUnknown": "Postgres domyślnie loguje zakleszczenia. W MySQL uruchom SELECT {'@@'}innodb_print_all_deadlocks — musi wynosić 1, w przeciwnym razie zachowane zostanie tylko ostatnie zakleszczenie. Nie możemy odczytać tego ustawienia stąd.",
+            "titleUnknown": "Sprawdź, czy raportowanie zakleszczeń jest włączone"
+          },
+          "traffic": {
+            "title": "Widzieliśmy {lines} innych linii logów z tych baz danych.",
+            "detail": "więc potok przenosi ruch — zakleszczenie przeszłoby przez niego",
+            "titleUnknown": "Potok logów przenosi ruch."
+          },
+          "lastEver": {
+            "title": "Ostatnie zakleszczenie, jakie kiedykolwiek widzieliśmy",
+            "detail": "{when}. Rozszerz okno, aby to zobaczyć.",
+            "titleNone": "Nigdy nie widzieliśmy zakleszczenia na tych bazach danych.",
+            "detailNone": "Nie ma jeszcze z czym porównać — to okno nie jest niczym niezwykłym."
+          }
+        },
+        "widen": "Rozszerz do ostatnich 24 godzin"
+      },
+      "notCollecting": {
+        "title": "Nie widzimy jeszcze zakleszczeń — i oto dokładnie dlaczego",
+        "description": "Zakleszczenia są zgłaszane przez samą bazę danych, a nie przez Twoje aplikacje. Sprawdzamy cztery rzeczy.",
+        "checklistTitle": "Co sprawdziliśmy",
+        "checks": {
+          "queries": {
+            "ok": "Dane Twoich zapytań docierają.",
+            "okDetail": "{queries} z {databases} — zakładka Top queries działa",
+            "okDetailNoFleet": "{queries} — zakładka Top queries działa",
+            "no": "Żadne dane zapytań również nie docierają",
+            "noDetail": "Zacznij od zakładki Top queries — nic jeszcze do nas nie dociera z tych baz danych."
+          },
+          "enabled": {
+            "ok": "Monitorowanie baz danych jest włączone.",
+            "okDetail": "dla tej organizacji",
+            "no": "Monitorowanie baz danych jest wyłączone.",
+            "noDetail": "Włącz to w Ustawieniach, aby rozpocząć zbieranie."
+          },
+          "log": {
+            "no": "Żadna baza danych nie wysyła nam swojego logu.",
+            "noDetail": "Czasy zapytań pochodzą z Twoich aplikacji, ale zakleszczenia są zapisywane wyłącznie w logu samej bazy danych. Skieruj swój kolektor na plik logu Postgres lub MySQL, a ta zakładka wypełni się sama.",
+            "ok": "Log bazy danych dociera.",
+            "okDetail": "więc zakleszczenie by do nas dotarło — po prostu jeszcze go nie było."
+          },
+          "settings": {
+            "title": "Warto wiedzieć przed rozpoczęciem",
+            "detail": "Postgres zapisuje zakleszczenie w dwóch liniach logu, a MySQL w kilku — uczestniczące zapytania znajdują się w późniejszych. Konfiguracja, która dopasowuje tylko pierwszą linię, odnotowuje, że zakleszczenie miało miejsce, i traci wszystkie zapytania. Nasz przepis radzi sobie z obydwoma."
+          }
+        }
+      }
+    },
+    "blocked": {
+      "title": "Bazy danych",
+      "subtitle": "Sesje obecnie oczekujące na blokadę",
+      "subtitlePast": "Sesje, które czekały na blokadę w tym oknie",
+      "waitingCount": "brak sesji oczekujących na blokadę | {count} sesja oczekująca na blokadę w tej chwili | {count} sesji oczekujących na blokadę w tej chwili",
+      "waitingCountPast": "brak sesji, które czekały na blokadę | {count} sesja czekała na blokadę w tym oknie | {count} sesji czekało na blokadę w tym oknie",
+      "sessionCount": "brak sesji | {count} sesja | {count} sesji",
+      "searchPlaceholder": "Szukaj tekstu zapytania, tabeli lub aplikacji…",
+      "perspective": {
+        "waiting": "Kto utknął",
+        "waitingHint": "Jeden wiersz na sesję oczekującą na blokadę, najdłuższe oczekiwanie jako pierwsze.",
+        "blocking": "Kto blokuje",
+        "blockingHint": "Sesja trzymająca blokadę, z wszystkim, co utknęło za nią."
+      },
+      "columns": {
+        "stuckQuery": "Zapytanie, które utknęło",
+        "session": "Sesja",
+        "waitingFor": "Oczekuje na",
+        "heldUpBy": "Zablokowane przez",
+        "waiting": "Oczekiwanie",
+        "sessionQuery": "Sesja i co wykonuje",
+        "application": "Aplikacja",
+        "blocking": "Blokowanie"
+      },
+      "coverage": {
+        "summary": "Najdłuższe oczekiwanie to {longest}. Każde oczekiwanie prowadzi do {roots} trzymających blokadę.",
+        "summaryCapped": "Więcej sesji czekało, niż mogliśmy odczytać naraz. Z tych, które mamy, najdłuższe oczekiwanie to {longest} i prowadzą one do {roots} trzymających blokadę.",
+        "summaryOneRoot": "jedna sesja",
+        "summaryManyRoots": "{count} sesji",
+        "checked": "Sprawdzane co {interval} sekund; ostatni przegląd {time}.",
+        "checkedUnknown": "Pobrano z tabel blokad Twojej bazy danych."
+      },
+      "rowActions": {
+        "showChain": "Pokaż łańcuch",
+        "copy": "Kopiuj zapytanie",
+        "alertMe": "Alertuj mnie o oczekiwaniu na blokady"
+      },
+      "waitEvent": {
+        "transaction": "zakończenia innej transakcji",
+        "row": "blokady wiersza",
+        "table": "blokady tabeli",
+        "extend": "rozrostu tabeli",
+        "advisory": "blokady aplikacji",
+        "object": "blokady obiektu",
+        "buffer": "odczytu strony danych",
+        "lock": "blokady"
+      },
+      "deep": "{count} poziomów",
+      "notWaiting": "nie oczekuje",
+      "longestWait": "NAJDŁUŻSZE OCZEKIWANIE",
+      "holdsTheLock": "POSIADA BLOKADĘ, KTÓREJ WSZYSCY CHCĄ",
+      "lastStatement": "ostatnie zapytanie {age} temu",
+      "idleInTransaction": "nie oczekuje na nic · bezczynny w otwartej transakcji",
+      "pills": {
+        "root": "KORZEŃ — ZACZNIJ TUTAJ",
+        "waitingBlocking": "OCZEKUJE I BLOKUJE {count}",
+        "waiting": "OCZEKUJE"
+      },
+      "waitingOn": "czeka na {pid}",
+      "degraded": "Jedna sesja blokuje {count}. Ma otwartą transakcję od {age} i w tym czasie nie wykonała zapytania — najprawdopodobniej aplikacja, która zapomniała o zatwierdzeniu.",
+      "footer": {
+        "allLeadBack": "Wszystkie {waits} prowadzą do pid {pid}",
+        "allLeadBackDetail": "— jedna sesja, trzymająca blokadę na {object}.",
+        "switchToBlocking": "Przełącz na „Kto blokuje”",
+        "releaseAll": "Zakończenie sesji {pid} zwalnia wszystkie {count}.",
+        "releaseAllDetail": "Wszystko poniżej czeka tylko z powodu tej jednej blokady.",
+        "timeLost": "łączny stracony czas: {seconds} w {sessions} sesjach"
+      },
+      "terminate": {
+        "copied": "Skopiowano",
+        "hint": "Uruchom to sam na {instance}, aby zakończyć sesję. Nigdy nie robimy tego za Ciebie.",
+        "hintNoInstance": "Uruchom to sam, aby zakończyć sesję. Nigdy nie robimy tego za Ciebie."
+      },
+      "summary": {
+        "waiting": "Oczekujące sesje",
+        "longest": "Najdłuższe oczekiwanie",
+        "chains": "Łańcuchy"
+      },
+      "rootCount": "brak głównych blokujących | {count} główny blokujący | {count} głównych blokujących",
+      "inChain": "{count} sesji w łańcuchu",
+      "healthy": {
+        "title": "Nic nie czeka na blokadę",
+        "description": "Żadna sesja w Twoich bazach danych nie utknęła teraz za inną. To zdrowa norma, a nie luka w tym, co zbieramy.",
+        "descriptionPast": "Żadna sesja w Twoich bazach danych nie utknęła za inną w tym oknie. To zdrowa norma, a nie luka w tym, co zebraliśmy.",
+        "checklistTitle": "Skąd wiemy",
+        "collectionHealthy": "Zbieranie zdrowe",
+        "checks": {
+          "sampling": {
+            "title": "Sprawdzamy tabele blokad Twoich baz danych",
+            "detail": "co {interval} sekund · ostatnie sprawdzenie {age}",
+            "detailUnknown": "zgodnie z harmonogramem skonfigurowanym dla Twojego kolektora"
+          },
+          "sessions": {
+            "title": "Sesje działają normalnie",
+            "detail": "widzimy aktywne sesje i żadna z nich nie czeka w kolejce na blokadę"
+          },
+          "meaning": {
+            "title": "Co pokazuje ta zakładka, gdy nie jest pusta",
+            "detail": "Sesja czekająca na blokadę trzymaną przez inną oraz łańcuch prowadzący do sesji, która ją trzyma. Krótkie oczekiwania są normalne i znikają same — ta zakładka jest dla tych, które nie znikają."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "Nie widzimy jeszcze zablokowanych zapytań — a oto dokładny powód",
+        "description": "Zablokowane zapytanie jest widoczne tylko wewnątrz bazy danych, w jej tabelach blokad. Sprawdzamy trzy rzeczy.",
+        "checklistTitle": "Co sprawdziliśmy",
+        "checks": {
+          "queries": {
+            "ok": "Dane zapytań docierają",
+            "okDetail": "{queries} z {databases} — zakładka Top queries działa",
+            "okDetailNoFleet": "{queries} — zakładka Top queries działa",
+            "no": "Żadne dane zapytań też nie docierają",
+            "noDetail": "Zacznij od zakładki Top queries — nic jeszcze do nas nie dociera z tych baz danych."
+          },
+          "enabled": {
+            "ok": "Monitorowanie baz danych jest włączone",
+            "okDetail": "dla tej organizacji",
+            "no": "Monitorowanie baz danych jest wyłączone",
+            "noDetail": "Włącz je w Ustawieniach, aby rozpocząć zbieranie."
+          },
+          "sampling": {
+            "no": "Nic nie próbkuje tabel blokad Twoich baz danych",
+            "noDetail": "To, kto czeka na kogo, istnieje tylko wewnątrz bazy danych i tylko w trakcie oczekiwania. Nasz przepis kolektora odczytuje to zgodnie z harmonogramem i włącza log_lock_waits, aby długie oczekiwania były również rejestrowane.",
+            "ok": "Próbkowanie tabel blokad działa",
+            "okDetail": "więc zablokowana sesja dotarłaby do nas — po prostu jej nie ma."
+          },
+          "settings": {
+            "title": "Warto wiedzieć przed rozpoczęciem",
+            "detail": "log_lock_waits rejestruje oczekiwanie tylko wtedy, gdy trwa dłużej niż deadlock_timeout — domyślnie jedną sekundę. Krótsze oczekiwania są normalne i pozostają niezarejestrowane, dlatego ta zakładka próbkuje na żywo, a nie tylko czyta log."
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "Aktywność",
+      "subtitle": "Co Twoje bazy danych robią teraz, próbkowane z ich własnych tabel sesji.",
+      "subtitlePast": "Co Twoje bazy danych robiły w tym oknie, próbkowane z ich własnych tabel sesji.",
+      "searchPlaceholder": "Szukaj sesji, użytkowników, aplikacji",
+      "wait": {
+        "onCpu": "Na CPU / bez oczekiwania",
+        "qualified": "{type}: {event}",
+        "plain": "{event}",
+        "remainder": "+{count} więcej zdarzeń oczekiwania ({share})",
+        "remainderNoShare": "+{count} więcej zdarzeń oczekiwania"
+      },
+      "disclosure": {
+        "sampled": "Próbkowane co {interval} sekund — to seria migawek, a nie ciągłe nagrywanie, więc sesja krótsza niż odstęp między próbkami może działać i zakończyć się niewidocznie.",
+        "sampledUnknown": "Próbkowane zgodnie z harmonogramem — to seria migawek, a nie ciągłe nagrywanie. Nie widzieliśmy jeszcze wystarczającej liczby próbek, aby ustalić, jak często odpytywany jest Twój kolektor.",
+        "filtered": "Próbka jest już filtrowana przez Twój kolektor: bezczynne sesje starsze niż najnowsze działające zapytanie są pomijane, chyba że blokują kogoś. Więc to nie jest pełna lista wszystkich połączeń.",
+        "short": "Próbkowane co {interval}s i wstępnie filtrowane",
+        "shortUnknown": "Próbkowane zgodnie z harmonogramem i wstępnie filtrowane",
+        "more": "Co to oznacza"
+      },
+      "columns": {
+        "session": "Sesja",
+        "user": "Użytkownik",
+        "application": "Aplikacja",
+        "state": "Stan",
+        "waitEvent": "Czeka na",
+        "running": "Czas działania",
+        "lastQuery": "Ostatnie zapytanie",
+        "query": "Zapytanie",
+        "blockedBy": "Zablokowane przez"
+      },
+      "summary": {
+        "sessions": "Sesje",
+        "onCpu": "Na CPU",
+        "waiting": "Oczekiwanie",
+        "idleInTransaction": "Bezczynna w transakcji"
+      },
+      "state": {
+        "unknown": "Stan niezgłoszony"
+      },
+      "counts": {
+        "complete": "Wyświetlanie {count} sesji.",
+        "capped": "Próbkowano więcej sesji, niż mogliśmy odczytać naraz. Oto {count}, które mamy.",
+        "filtered": "Wyświetlanie {count} z {total} sesji."
+      },
+      "transactionOpen": "transakcja otwarta {age}",
+      "healthy": {
+        "title": "Nic teraz nie działa",
+        "description": "Przeanalizowaliśmy tabele sesji Twoich baz danych i nie znaleźliśmy aktywnych sesji. To zdrowa norma dla bezczynnej bazy danych, a nie luka w tym, co zbieramy.",
+        "descriptionPast": "Przeanalizowaliśmy tabele sesji Twoich baz danych w tym oknie i nie znaleźliśmy aktywnych sesji. To zdrowa norma dla bezczynnej bazy danych, a nie luka w tym, co zebraliśmy.",
+        "checklistTitle": "Skąd wiemy",
+        "collectionHealthy": "Zbieranie działa prawidłowo",
+        "checks": {
+          "sampling": {
+            "title": "Próbkujemy tabele sesji Twoich baz danych",
+            "detail": "co {interval} sekund · ostatnie spojrzenie {age}",
+            "detailUnknown": "zgodnie z harmonogramem skonfigurowanym w Twoim kolektorze"
+          },
+          "pipeline": {
+            "title": "Twoje bazy danych do nas docierają",
+            "detail": "{lines} innych linii przeszło przez ten sam potok w tym oknie",
+            "detailUnknown": "potok, który przenosi te dane, działa"
+          },
+          "meaning": {
+            "title": "Co pokazuje ta karta, gdy nie jest pusta",
+            "detail": "Każda sesja uruchomiona przez Twoje bazy danych, na co każda z nich czeka i jak długo to trwa. Ponieważ próbkujemy, a nie obserwujemy ciągle, bardzo krótkie zapytania mogą zakończyć się między dwiema próbkami i nigdy się nie pojawić."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "Nie widzimy jeszcze sesji na żywo — i oto dokładnie dlaczego",
+        "description": "To, co baza danych robi w tej chwili, istnieje tylko wewnątrz tej bazy, w jej własnej tabeli sesji. Coś musi ją odpytywać. Sprawdzamy trzy rzeczy.",
+        "checklistTitle": "Co sprawdziliśmy",
+        "checks": {
+          "queries": {
+            "ok": "Twoje dane zapytań docierają",
+            "okDetail": "{queries} z {databases} — karta Top queries działa",
+            "okDetailNoFleet": "{queries} — karta Top queries działa",
+            "no": "Żadne dane zapytań również nie docierają",
+            "noDetail": "Zacznij od karty Top queries — nic jeszcze do nas nie dociera z tych baz danych."
+          },
+          "enabled": {
+            "ok": "Monitorowanie baz danych jest włączone",
+            "okDetail": "dla tej organizacji",
+            "no": "Monitorowanie baz danych jest wyłączone",
+            "noDetail": "Włącz je w Ustawieniach, aby rozpocząć zbieranie."
+          },
+          "sampling": {
+            "no": "Nic nie próbkuje tabel sesji Twoich baz danych",
+            "noDetail": "Próbki sesji pochodzą z Twojego kolektora: włącz db.server.query_sample w przepisie kolektora na hoście bazy danych — strona konfiguracji przeprowadzi Cię przez to. OpenObserve akceptuje ten strumień, gdy monitorowanie bazy danych jest włączone, więc poprawka leży po stronie kolektora."
+          }
+        }
+      }
+    },
+    "instanceMetrics": {
+      "columnHeader": "Zdrowie instancji",
+      "columnHint": "Połączenia względem limitu, z metryk, które Twój kolektor już wysyła. Puste, dopóki odbiorca nie zgłosi tej instancji.",
+      "connectionsOf": "{used} z {limit} połączeń",
+      "connectionsNoLimit": "{used} połączeń",
+      "noLimitHint": "Odbiorca dla tego silnika nie publikuje limitu połączeń samodzielnie, więc pokazywana jest tylko liczba. Przepis limitu połączeń z karty konfiguracji (sqlquery/mysql_limits) zbiera max_connections i zamienia to na procent.",
+      "trendLabel": "Połączenia w wybranym oknie",
+      "cacheHit": "Trafienie w cache {percent}",
+      "lagBytes": "Replika {value} w tyle",
+      "lagSeconds": "Replika {value} w tyle",
+      "deadlocks": "{count} deadlock | {count} deadlocki",
+      "noTraffic": "Brak ruchu aplikacji w tym oknie",
+      "noTrafficHint": "Twój kolektor zgłasza tę instancję, ale żadna aplikacja nie odpytywała jej w tym oknie. Jej kolumny zapytań są puste, ponieważ nic ich nie mierzyło, a nie dlatego, że była szybka.",
+      "unmatched": {
+        "pooler": "Brak metryk instancji pasujących do tego adresu",
+        "poolerHint": "Ten wiersz to adres, z którym połączyła się Twoja aplikacja. Twój kolektor zgłasza inne hosty, co wygląda jak pośredniczący pooler połączeń — adres poolera i rzeczywista baza danych nigdy się nie zgadzają.",
+        "loopback": "Brak metryk instancji pasujących do tego adresu",
+        "loopbackHint": "Ten wiersz wskazuje na localhost. Kolektor przepisuje punkt końcowy pętli zwrotnej na własną nazwę hosta, więc te dwie nazwy nigdy nie mogą się zgodzić, nawet gdy obie są zdrowe.",
+        "noReceiver": "Odbiorca {engine} nie raportuje",
+        "noReceiverHint": "Twoje aplikacje odpytują tę bazę danych, ale żaden odbiorca {engine} nie wysyła dla niej metryk serwera. Dodaj odbiorcę {engine} do swojego kolektora, aby wypełnić tę kolumnę.",
+        "noReceiverMariadbHint": "Twoje aplikacje odpytują ten serwer MariaDB, ale nic nie wysyła dla niego metryk serwera. Nie ma osobnego odbiorcy MariaDB — wskaż odbiorcę MySQL na tę instancję, a jej metryki wypełnią tę kolumnę.",
+        "engineUnsupported": "Nie zbierane dla {engine}",
+        "engineUnsupportedHint": "Metryki instancji są zbierane dla PostgreSQL, MySQL i MariaDB — żaden odbiorca nie jest jeszcze podłączony dla {engine}, więc ta kolumna pozostaje pusta. To uwaga o zasięgu, a nie ocena zdrowia.",
+        "unreadable": "Nie można było odczytać metryk instancji",
+        "unreadableHint": "Strumienie metryk istnieją, ale nie można ich odczytać. To zwykle problem z uprawnieniami, a nie coś złego z bazą danych."
+      },
+      "limitUnknownHint": "Liczba połączeń została dostarczona, ale limit nie, więc nie można pokazać procentu. Sprawdź, czy metryka limitu połączeń jest włączona w tym kolektorze.",
+      "noReading": "Brak odczytu w tym oknie",
+      "noReadingHint": "Twój kolektor raportuje tę instancję, ale nie wysłał żadnej metryki połączeń w tym oknie. Metryka może być wyłączona na odbiorniku lub instancja mogła przestać raportować.",
+      "lagLabel": "Opóźnienie repliki",
+      "deadlockLabel": "zakleszczenia"
+    },
+    "tableHealth": {
+      "title": "Kondycja tabel",
+      "subtitle": "Rozmiar, rozdęcie i stan vacuum dla każdej tabeli, od najnowszego zrzutu.",
+      "searchPlaceholder": "Szukaj tabel",
+      "never": "Nigdy",
+      "countersCumulative": "Liczby skanowań i vacuum to sumy od ostatniego resetu statystyk, a nie liczby dla wybranego zakresu czasu.",
+      "tuplesEstimated": "Liczby wierszy i procent rozdęcia to szacunki statystyczne z silnika bazy danych, a nie dokładne liczby.",
+      "notCollectingTitle": "Brak jeszcze statystyk tabel",
+      "notCollectingDescription": "Nic nie raportowało statystyk tabel w tym zakresie czasu. Ten sygnał jest dostarczany jako osobny przepis kolektora.",
+      "engineUnsupportedTitle": "Nie zbierane dla tego silnika",
+      "engineUnsupportedDescription": "Kondycja tabel jest zbierana przez przepis kolektora dla każdego silnika, a dla tego silnika nie ma dostarczonego przepisu — więc nic nie jest zbierane. Nie oznacza to, że wszystko jest w porządku.",
+      "checklistTitle": "Aby rozpocząć zbieranie",
+      "checkRecipe": "Dodaj przepis pg_table_stats z przewodnika konfiguracji baz danych do konfiguracji swojego kolektora.",
+      "checkGrant": "Przyznaj rolę pg_monitor użytkownikowi kolektora, aby mógł czytać pg_stat_user_tables.",
+      "checkRange": "Poszerz zakres czasu — przepis raportuje co 60 sekund.",
+      "columns": {
+        "relation": "Tabela",
+        "instance": "Instancja",
+        "totalBytes": "Całkowity rozmiar",
+        "heapBytes": "Rozmiar sterty",
+        "overheadBytes": "Indeks + TOAST",
+        "liveTuples": "Żywe wiersze (szac.)",
+        "deadTuples": "Martwe wiersze (szac.)",
+        "deadTupPct": "Rozdęcie (szac.)",
+        "modSinceAnalyze": "Wiersze od analizy",
+        "seqScanCount": "Skanowania sekwencyjne (łącznie)",
+        "seqTupRead": "Wiersze zeskanowane sekwencyjnie (łącznie)",
+        "idxScanCount": "Skanowania indeksów (łącznie)",
+        "autovacuumCount": "Autovacuum (łącznie)",
+        "frozenXidAge": "Wiek TxID",
+        "lastVacuum": "Ostatnie vacuum",
+        "lastAutovacuum": "Ostatni autovacuum",
+        "lastAnalyze": "Ostatnia analiza"
+      },
+      "countLine": "{count} tabel"
+    },
+    "recommendations": {
+      "title": "Zalecenia",
+      "subtitle": "Deterministyczne sprawdzenia tego, co kolektor już raportuje. Każde z nich podaje pomiar i próg, który został przekroczony.",
+      "countersCumulative": "Liczby skanowań indeksów to sumy od ostatniego resetu statystyk, a nie liczby dla wybranego zakresu czasu.",
+      "andMore": "i {count} więcej podobnych",
+      "unused-index": {
+        "title": "Indeks nie był skanowany",
+        "body": "{index} na {relation} nie ma zarejestrowanych skanowań i zajmuje {size}.",
+        "rule": "Liczba skanowań indeksu wynosi 0 od ostatniego resetu statystyk, a indeks ma co najmniej {bytes} bajtów. Liczby skanowań to sumy całkowite, a nie liczby dla wybranego zakresu.",
+        "caveat": "Całkowita liczba równa zero oznacza, że planista nie wybrał tego indeksu od ostatniego resetu liczników. Może on nadal służyć replice, cyklicznemu zadaniu lub ograniczeniu."
+      },
+      "long-running-query": {
+        "title": "Długotrwałe zapytanie",
+        "body": "Sesja {pid} wykonuje się od {duration}.",
+        "rule": "Wykonywana sesja działa co najmniej od {seconds} sekund. Sesje bezczynne są wykluczone."
+      },
+      "high-impact-blocker": {
+        "title": "Bloker blokujący kilka sesji",
+        "body": "Sesja {pid} jest na czele łańcucha z {count} oczekującymi sesjami.",
+        "rule": "Główny bloker — sesja, która blokuje inne i na nikogo nie czeka — ma co najmniej {sessions} sesji oczekujących za sobą, liczonych w całym łańcuchu."
+      },
+      "high-row-count": {
+        "title": "Duża liczba wierszy na wywołanie",
+        "body": "To polecenie zwracało średnio {rows} wierszy na wywołanie w przypadku {calls} wywołań.",
+        "rule": "Średnia liczba wierszy na wywołanie wynosi co najmniej {rows}, przy co najmniej {calls} wywołaniach. Średnia to całkowita liczba wierszy serwera podzielona przez liczbę wywołań."
+      },
+      "enginePartialTitle": "Niektóre kontrole nie zostały uruchomione",
+      "enginePartialDescription": "Kontrola nieużywanych indeksów wymaga licznika skanów indeksu, który nie jest zbierany dla tego silnika, więc pusta lista tutaj nie oznacza, że wszystko jest w porządku.",
+      "allClearTitle": "Nic nie przekroczyło progu",
+      "allClearDescription": "Wszystkie kontrole zostały uruchomione i żadna nie przekroczyła swojego progu w tym zakresie czasu."
     }
   }
 }
