@@ -127,6 +127,18 @@ impl AddMembersRequest {
         }
         all
     }
+
+    /// Whether this body names anybody at all.
+    ///
+    /// Both fields default, so `{}`, `{"user_emails":[]}` and a body whose only
+    /// key was misspelled all deserialized to "add nobody" and answered 200 —
+    /// a team that reads as configured and pages no one. Whatever the caller
+    /// got wrong, no emails arrived, and that is the thing worth refusing.
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    fn names_nobody(&self) -> bool {
+        self.user_emails.iter().all(|e| e.trim().is_empty())
+            && self.user_email.as_deref().is_none_or(|e| e.trim().is_empty())
+    }
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -645,7 +657,7 @@ fn to_response(e: anyhow::Error) -> Response {
 pub async fn create_team(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateTeamRequest>,
+    ValidatedJson(body): ValidatedJson<CreateTeamRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -756,7 +768,7 @@ pub async fn get_team(
 pub async fn update_team(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<UpdateTeamRequest>,
+    ValidatedJson(body): ValidatedJson<UpdateTeamRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -871,12 +883,20 @@ pub async fn list_members(
 pub async fn add_member(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<AddMembersRequest>,
+    ValidatedJson(body): ValidatedJson<AddMembersRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // Refused rather than answered 200: a caller that meant to add six
+        // people and mistyped the key should hear about it, not read success
+        // and find an empty roster at 3am.
+        if body.names_nobody() {
+            return MetaHttpResponse::bad_request(
+                "no members named — send `user_email` or a non-empty `user_emails`",
+            );
         }
         let emails = body.emails();
         match o2_enterprise::enterprise::oncall::service::add_members(&org_id, &team_id, &emails)
@@ -993,7 +1013,7 @@ pub async fn get_schedule(
 pub async fn set_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetScheduleRequest>,
+    ValidatedJson(body): ValidatedJson<SetScheduleRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -1178,7 +1198,7 @@ pub async fn who_is_on_call(
 pub async fn create_override(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateOverrideRequest>,
+    ValidatedJson(body): ValidatedJson<CreateOverrideRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -1407,7 +1427,7 @@ pub async fn get_policy(
 pub async fn set_policy(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetPolicyRequest>,
+    ValidatedJson(body): ValidatedJson<SetPolicyRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -1529,7 +1549,7 @@ pub async fn get_team_channel(
 pub async fn set_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetTeamChannelRequest>,
+    ValidatedJson(body): ValidatedJson<SetTeamChannelRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2043,7 +2063,7 @@ pub async fn get_response(
 pub async fn resolve_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<ResolveRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<ResolveRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2089,7 +2109,7 @@ pub async fn resolve_response(
 pub async fn add_note(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<AddNoteRequest>,
+    ValidatedJson(body): ValidatedJson<AddNoteRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2288,7 +2308,7 @@ pub async fn acknowledge_response(
 pub async fn snooze_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SnoozeRequest>,
+    ValidatedJson(body): ValidatedJson<SnoozeRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2334,7 +2354,7 @@ pub async fn snooze_response(
 pub async fn handoff_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<HandoffRequest>,
+    ValidatedJson(body): ValidatedJson<HandoffRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2404,7 +2424,7 @@ pub async fn handoff_response(
 pub async fn confirm_recovery(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<ConfirmRecoveryRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<ConfirmRecoveryRequest>>,
 ) -> Response {
     // Recovery is ordered (`00-simplified-flow` §4): the incident closes on the
     // slowest dependent, not on the root cause, and the owner team cannot close
@@ -2480,7 +2500,7 @@ pub async fn confirm_recovery(
 pub async fn escalate_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<EscalateRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<EscalateRequest>>,
 ) -> Response {
     // Not a handoff. A handoff gives the page away; this keeps it and adds
     // people to it, which is what a responder means by "I need more help".
@@ -2562,7 +2582,7 @@ pub async fn escalate_response(
 pub async fn send_test_page(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<TestPageRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<TestPageRequest>>,
 ) -> Response {
     // `oncall`, not `oncall_responses`: this proves a configuration, and the
     // person who configures who gets woken is the one who should be able to
@@ -2727,7 +2747,7 @@ pub async fn list_ownership_rules(
 pub async fn create_ownership_rule(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateOwnershipRuleRequest>,
+    ValidatedJson(body): ValidatedJson<CreateOwnershipRuleRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2789,7 +2809,7 @@ pub async fn create_ownership_rule(
 pub async fn update_ownership_rule(
     Path((org_id, rule_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateOwnershipRuleRequest>,
+    ValidatedJson(body): ValidatedJson<CreateOwnershipRuleRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2958,7 +2978,7 @@ pub async fn get_routing_config(
 pub async fn set_routing_config(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetRoutingConfigRequest>,
+    ValidatedJson(body): ValidatedJson<SetRoutingConfigRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -3002,7 +3022,7 @@ pub async fn set_routing_config(
 pub async fn preview_routing(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<PreviewRoutingRequest>,
+    ValidatedJson(body): ValidatedJson<PreviewRoutingRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -3793,7 +3813,7 @@ pub async fn list_unavailability(
 pub async fn create_unavailability(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateUnavailabilityRequest>,
+    ValidatedJson(body): ValidatedJson<CreateUnavailabilityRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -4027,7 +4047,7 @@ pub async fn get_contact(
 pub async fn set_contact(
     Path((org_id, subject_email)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetContactRequest>,
+    ValidatedJson(body): ValidatedJson<SetContactRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -4230,7 +4250,7 @@ pub async fn list_my_deliveries(
 pub async fn mark_deliveries_read(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<MarkReadRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<MarkReadRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -4593,7 +4613,7 @@ async fn carry_page_history_into_incident(
 pub async fn promote_to_incident(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<PromoteRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<PromoteRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {

@@ -577,12 +577,25 @@ impl EscalationPolicy {
     /// tables: the severity/channel matrix in `00-simplified-flow.md` §2 and
     /// the escalation timing table in §3.
     ///
-    /// | | t=0 | 5 min | 15 min | 30 min | 60 min |
-    /// |---|---|---|---|---|---|
-    /// | P1 | primary **+** secondary | whole team | whole team | whole team | whole team |
-    /// | P2 | primary | secondary | whole team | whole team | — |
-    /// | P3 | primary | — | secondary | whole team | — |
-    /// | P4, P5 | nobody, ever | | | | |
+    /// | | t=0 | 5 min | 15 min | 30 min |
+    /// |---|---|---|---|---|
+    /// | P1 | primary **+** secondary | whole team | whole team | — |
+    /// | P2 | primary | secondary | whole team | — |
+    /// | P3 | primary | — | secondary | whole team |
+    /// | P4, P5 | nobody, ever | | | |
+    ///
+    /// **The whole team is told twice at most, and never after 15 minutes.**
+    /// It used to repeat at 30 and 60 too, which on a twelve-person team meant
+    /// one unacknowledged P1 sent fifty notifications and woke the entire
+    /// on-call organisation four times. Nobody chose that — it is the policy
+    /// every team is created with — and the fourth ring has never reached
+    /// anybody the first did not. What it reliably does is teach people to mute
+    /// the pager, which costs the *next* incident.
+    ///
+    /// The repeats were not a design choice either. They existed because a
+    /// level could only name the whole team, so there was nowhere else for the
+    /// ladder to go; a level can now name any rotation, so a team that wants
+    /// depth adds one instead of ringing the same phones again.
     ///
     /// **P1 is parallel.** Everyone who can fix a critical outage is paged at
     /// once; §2 says so in as many words ("no 5-minute delays between primary
@@ -653,8 +666,6 @@ impl EscalationPolicy {
                         ),
                         LadderStep::new(5 * m, deeper()),
                         LadderStep::new(15 * m, deeper()),
-                        LadderStep::new(30 * m, deeper()),
-                        LadderStep::new(60 * m, deeper()),
                     ],
                     channels: vec![Channel::Email],
                 },
@@ -666,7 +677,6 @@ impl EscalationPolicy {
                         Some(LadderStep::new(0, primary())),
                         secondary().map(|s| LadderStep::new(5 * m, s)),
                         Some(LadderStep::new(15 * m, deeper())),
-                        Some(LadderStep::new(30 * m, deeper())),
                     ]
                     .into_iter()
                     .flatten()
@@ -1101,14 +1111,19 @@ mod tests {
         let later = plan(&steps(AlertPriority::P2), 5 * MIN, &[0]);
         assert_eq!(targets_of(&later), vec![EscalationTarget::rotation("rot_secondary")]);
 
-        // Third and fourth are the whole team. There is no "everyone on the
-        // schedule" rung any more: it unioned every slot, which is not a thing
-        // a level can name now that a level names one rotation.
+        // The whole team, once, and then the ladder is done. It used to say
+        // this twice more; repeating the same twelve phones at 30 and 60
+        // minutes never reached anybody the first ring had not.
         let l1 = plan(&steps(AlertPriority::P2), 15 * MIN, &[0, 5 * MIN]);
         assert_eq!(targets_of(&l1), vec![EscalationTarget::WholeTeam]);
 
-        let last = plan(&steps(AlertPriority::P2), 30 * MIN, &[0, 5 * MIN, 15 * MIN]);
-        assert_eq!(targets_of(&last), vec![EscalationTarget::WholeTeam]);
+        assert!(
+            matches!(
+                plan(&steps(AlertPriority::P2), 30 * MIN, &[0, 5 * MIN, 15 * MIN]),
+                LadderAction::Exhausted
+            ),
+            "nothing is left after the whole team has been told"
+        );
     }
 
     /// The shipped defaults ARE the design's tables — `00-simplified-flow.md`
@@ -1128,8 +1143,6 @@ mod tests {
                     (0, &[EscalationTarget::rotation("rot_primary"), EscalationTarget::rotation("rot_secondary")]),
                     (5 * MIN, &[EscalationTarget::WholeTeam]),
                     (15 * MIN, &[EscalationTarget::WholeTeam]),
-                    (30 * MIN, &[EscalationTarget::WholeTeam]),
-                    (60 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
             ),
             (
@@ -1138,7 +1151,6 @@ mod tests {
                     (0, &[EscalationTarget::rotation("rot_primary")]),
                     (5 * MIN, &[EscalationTarget::rotation("rot_secondary")]),
                     (15 * MIN, &[EscalationTarget::WholeTeam]),
-                    (30 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
             ),
             (
@@ -1323,18 +1335,20 @@ mod tests {
     #[test]
     fn test_a_late_wakeup_fires_every_missed_rung_at_once() {
         let s = steps(AlertPriority::P1);
-        match plan(&s, 40 * MIN, &[]) {
+        // Ten minutes in: the first two rungs were missed and the third is
+        // still ahead, which is what makes this a catch-up rather than an end.
+        match plan(&s, 10 * MIN, &[]) {
             LadderAction::Notify {
                 due,
                 next_wakeup_micros,
             } => {
                 assert_eq!(
                     due.iter().map(|s| s.after_micros).collect::<Vec<_>>(),
-                    vec![0, 5 * MIN, 15 * MIN, 30 * MIN]
+                    vec![0, 5 * MIN]
                 );
                 assert_eq!(
                     next_wakeup_micros,
-                    Some(60 * MIN),
+                    Some(15 * MIN),
                     "the last rung is still ahead"
                 );
             }
@@ -1823,8 +1837,8 @@ mod tests {
         let (sent, ended) = one_tick(&p1, &[], RungOutcome::NoRecipients, 0, 1_000);
         assert_eq!(
             sent,
-            vec![0, 5 * MIN, 15 * MIN, 30 * MIN, 60 * MIN],
-            "a ladder that resolves to nobody at every level is finished, and waiting an hour to say so helps no one"
+            vec![0, 5 * MIN, 15 * MIN],
+            "a ladder that resolves to nobody at every level is finished, and waiting to say so helps no one"
         );
         assert_eq!(ended, None, "and the ladder is spent");
     }
