@@ -21,7 +21,7 @@ use axum::{
     Json, http,
     response::{IntoResponse, Response},
 };
-use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
+use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value};
 use config::meta::stream::{StreamParams, StreamType};
 
 #[tracing::instrument(skip(cleanup_enrichment_table_resources))]
@@ -75,7 +75,10 @@ async fn cleanup_related_resources(
         if let Err(e) = crate::pipeline::db::delete(&pipeline.id).await {
             return Err((
                 http::StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
+                [(
+                    ERROR_HEADER,
+                    error_header_value(&format!("failed to delete stream: {e}")),
+                )],
                 Json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     format!(

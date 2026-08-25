@@ -37,7 +37,7 @@ use transform::compile_vrl_function;
 use crate::{
     common::meta::{
         authz::Authz,
-        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
     },
     http::map_error_to_http_response,
 };
@@ -376,7 +376,7 @@ pub async fn update_function(
             {
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
-                    [(ERROR_HEADER, e.to_string())],
+                    [(ERROR_HEADER, error_header_value(&e.to_string()))],
                     Json(MetaHttpResponse::message(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
                         format!(

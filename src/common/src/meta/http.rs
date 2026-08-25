@@ -15,7 +15,7 @@
 
 use axum::{
     Json,
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
 use infra::errors;
@@ -243,6 +243,18 @@ impl HttpResponse {
             .into_response()
     }
 
+    /// Send an error response in json format that also reports the message through
+    /// [`ERROR_HEADER`] for the audit log.
+    pub fn error_with_header(code: StatusCode, error: impl ToString) -> Response {
+        let error = error.to_string();
+        (
+            code,
+            [(ERROR_HEADER, error_header_value(&error))],
+            Json(Self::error(code, &error)),
+        )
+            .into_response()
+    }
+
     /// Send a response in json format, status code is 200.
     /// The payload should be serde-serializable.
     pub fn json<T: Serialize>(payload: T) -> Response {
@@ -268,6 +280,31 @@ impl IntoResponse for HttpResponse {
         };
         (status, Json(self)).into_response()
     }
+}
+
+/// Build an [`ERROR_HEADER`] value out of an error message.
+///
+/// These messages interpolate user-supplied names (org, stream, field type), so they can hold
+/// anything. Control bytes make `HeaderValue` construction fail, which costs the whole response:
+/// axum replaces it with a bare 500 that hides the real status and message. Non-ascii bytes are
+/// accepted but then `HeaderValue::to_str` refuses to read them back, so the audit log silently
+/// drops the message. Escaping everything outside visible ascii avoids both.
+pub fn error_header_value(message: &str) -> HeaderValue {
+    let needs_escape = |c: char| !matches!(c, ' '..='~' | '\t');
+    let value = if message.contains(needs_escape) {
+        let mut escaped = String::with_capacity(message.len());
+        for c in message.chars() {
+            if needs_escape(c) {
+                escaped.extend(c.escape_default());
+            } else {
+                escaped.push(c);
+            }
+        }
+        HeaderValue::from_str(&escaped)
+    } else {
+        HeaderValue::from_str(message)
+    };
+    value.unwrap_or_else(|_| HeaderValue::from_static("error"))
 }
 
 #[cfg(test)]
@@ -499,6 +536,43 @@ mod tests {
     fn test_http_response_too_many_requests() {
         let response = HttpResponse::too_many_requests("slow down");
         assert_eq!(response.status(), http::StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[test]
+    fn test_error_header_value_passes_ascii_through_unchanged() {
+        let message = "stream 'my-stream' is reserved\tand cannot be created";
+        assert_eq!(error_header_value(message).to_str().unwrap(), message);
+    }
+
+    #[test]
+    fn test_error_header_value_escapes_unreadable_chars() {
+        // Control bytes make `HeaderValue::from_str` fail outright; non-ascii ones make
+        // `to_str` fail, which is what the audit middleware reads the header with.
+        for (message, expected) in [
+            (
+                "invalid data type: v^\u{11}0K",
+                "invalid data type: v^\\u{11}0K",
+            ),
+            ("org Q\u{b4}\u{ed}\u{cd}j", "org Q\\u{b4}\\u{ed}\\u{cd}j"),
+            ("a\u{7f}b", "a\\u{7f}b"),
+        ] {
+            assert_eq!(error_header_value(message).to_str().unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_error_with_header_keeps_status_for_unprintable_message() {
+        // A control byte in the message used to fail header construction, which made axum
+        // replace the whole response with a bare 500 "failed to parse header value".
+        let response = HttpResponse::error_with_header(
+            StatusCode::BAD_REQUEST,
+            "invalid data type: v^\u{11}0K",
+        );
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.headers().get(ERROR_HEADER).unwrap(),
+            "invalid data type: v^\\u{11}0K"
+        );
     }
 
     #[test]
