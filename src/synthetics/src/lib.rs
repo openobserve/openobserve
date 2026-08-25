@@ -42,6 +42,49 @@
 #[cfg(test)]
 pub(crate) static CONFIG_SWAP_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+/// Whether THIS crate was compiled with the `cloud` feature — the fixture for
+/// the compile-time guard against **F6**.
+///
+/// `openobserve-synthetics` had no `cloud` feature at all, so every
+/// `#[cfg(feature = "cloud")]` written inside it compiled to nothing, silently.
+/// The failure mode is the worst kind: no error, no log, no metric — the emit
+/// simply is not there, and the first symptom is a revenue number that never
+/// moves. Nothing at runtime can detect it, because the detector would be the
+/// code that vanished.
+///
+/// So the check is made at COMPILE time and placed in the crates that know the
+/// answer. Every crate that depends on this one and defines its own `cloud`
+/// (`src/jobs`, `src/api/management`) carries
+///
+/// ```ignore
+/// #[cfg(feature = "cloud")]
+/// const _: () = assert!(openobserve_synthetics::BUILT_WITH_CLOUD);
+/// ```
+///
+/// — so a `cloud` build that fails to forward the feature down here does not
+/// compile. See §8.1, §9C T39, §11 F6.
+///
+/// **It must stay `cfg!`, never `#[cfg]`.** The macro form always evaluates,
+/// so the constant exists in every build shape and is simply `false` in the
+/// ones without `cloud`. Attributing the constant instead would delete it from
+/// exactly those builds, and each downstream `const _: () = assert!(...)` would
+/// then fail on a missing item rather than on the condition it is there to
+/// check — or be "fixed" by wrapping it in a `#[cfg]` of its own, which is
+/// silent absence again, one level further out.
+///
+/// **Known limit of the T39 guard.** It proves `cloud` reached this crate *from
+/// a crate that has it*. It cannot prove `cloud` reached those crates: the
+/// assertions in `src/jobs` and `src/api/management` are themselves
+/// `#[cfg(feature = "cloud")]`, so if the root's `cloud` list ever stopped
+/// forwarding to `openobserve-jobs` (or to `openobserve-api-management`, which
+/// it reaches only through `openobserve-api-http/cloud`) the assertion would
+/// not be compiled at all — the same silent-absence bug one level up. The root
+/// binary crate cannot carry the guard either: it has no direct dependency on
+/// `openobserve-synthetics`. `src/synthetics/tests/build_shapes.sh` compiles
+/// those two crates with `--features cloud` (T39, opt-in) rather than relying
+/// on the root.
+pub const BUILT_WITH_CLOUD: bool = cfg!(feature = "cloud");
+
 pub mod alerting;
 pub mod dispatcher;
 pub mod job_api;
