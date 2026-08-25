@@ -841,6 +841,54 @@ accumulate one per visit.
   only. **§23**: console clean (no DataCloneError / recursive-update / unhandled rejections);
   the config-404 errors once per mount, no retry storm.
 
+## Still untested — the definitive list
+
+Everything below is what has NOT been verified across all five rounds, and what it takes to
+test it. Anything not listed here has been tested and passes (or is a filed finding above).
+
+### Needs a backend flag flipped
+
+| Surface | Plan § | What it needs | Notes |
+| --- | --- | --- | --- |
+| Synthetics list + monitor CRUD + results | §11 | `ZO_SYNTHETICS_ENABLED=true` | route guard redirects to Home while off |
+| Synthetics agent tokens | §11.1 | same flag | includes the tokens-never-persisted check |
+| Actions list caching + CRUD + Logs menu | §13 | `ZO_ACTIONS_ENABLED=true` | page renders; `getAllActions` correctly no-ops while off — the `r` fix and cache path are unexercised |
+| Alert-form workflow dropdown (form flow) | §6.2 / finding #15 | `workflows_enabled=true` | the fix is in and verified at the query layer; the actual dropdown flow never runs while off |
+
+### Needs data no reachable org has
+
+| Surface | Plan § | What it needs | Notes |
+| --- | --- | --- | --- |
+| Trace DAG cache | §16 | a backend serving `/traces/{id}/dag` AND traces with populated `gen_ai_*` columns | endpoint 404s for every trace on both envs; verified meanwhile that the 404 is neither cached nor retried |
+| LLM Insights charts / KPI / error table | §22.3a | gen_ai-instrumented traces | `selectionKey` quantization verified as a pure function; the panel-cache repaint flow needs real charts |
+| Incidents: status-filter forks, pagination | §6.6 | actual incidents | endpoint works, 0 incidents in every org |
+| Anomaly detection lists + history | §6.9 | anomaly alerts | none configured anywhere |
+| Alert-detail History pagination prefetch | §6.5 | an alert with >25 history rows | quantized caching verified; the standalone page's prefetch was verified in the parallel run, but that page has no UI entry |
+| RUM sessions pagination + refresh | §21 | RUM traffic | page loads clean, zero sessions |
+| Billing (usage, invoices, checkout URLs) | §22.4 | a cloud deployment (`isCloud=true`) | routes absent on-prem |
+| Pipeline editor flows, per-pipeline History UI | §9.1/9.3 | at least one pipeline | `pipelineHistoryQuery` is spec-covered; the page flow was never clicked through |
+| Import flows (dashboard/alert/destination/template/pipeline) | §5.5, §6.3/6.4, §9.1 | file-upload interaction | write-through after import is the same invalidation path as create, which passes everywhere |
+
+### Needs infrastructure this harness cannot provide
+
+| Surface | Plan § | What it needs |
+| --- | --- | --- |
+| New-deploy detection prompt | §2.1a | a live redeploy of the backend while the app is open |
+| Field-value residue across users | §2.3 / §24-6 | a second, RBAC-restricted user in the same org (the fix — read-cache cleared on purge — is in; the two-user scenario itself is unverified) |
+| Offline → back online refetch | §23 | DevTools network toggling (not available in the in-app browser) |
+| localStorage quota-full degradation | §23 | an org with enough streams to blow the ~5 MB budget |
+| Multi-tab convergence | §23 | two simultaneous app tabs |
+| Private-browsing storage fallback | §23 | a private window |
+
+### Small UI gaps never clicked through
+
+- §5.4 annotations (drag-select flow), §5.6 dashboard picker inside the Reports form,
+  §14.7 org cleanup-tasks polling dialog (control not present on these builds),
+  §15.5 built-in regex patterns tab (not present), §15.1 org-settings save propagation,
+  bulk-delete flows for roles/groups/functions (single-delete verified everywhere).
+
+---
+
 ## Not testable / follow-up rounds
 
 > **Second round in `_meta`** (org with live self-monitoring data, plus data we
