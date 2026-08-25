@@ -41,12 +41,220 @@ const TICK: Duration = Duration::from_secs(5);
 /// Max synthetics to pull per tick.
 const FETCH_LIMIT: u64 = 500;
 
+/// Minimum gap between two identical trial-gate log lines for one check.
+///
+/// The gate's verdict is stable by construction: a lapsed trial does not
+/// un-lapse on its own, and a billing query that is failing is usually failing
+/// on the next tick too. One line per denied check per tick therefore turns a
+/// single lapsed org with twenty 1-minute checks into twenty warnings a minute,
+/// forever, and buries the warnings that describe something new.
+///
+/// Same value and same reasoning as `reaper::orphan::RENOTIFY_AFTER_US`. A
+/// `const` rather than a config knob: there is no existing knob to reuse, and
+/// nothing an operator would tune here.
+#[cfg(any(test, feature = "cloud"))]
+const TRIAL_GATE_LOG_COOLDOWN_US: i64 = 3_600 * 1_000_000; // 1h
+
 /// Wire format for one engine+device combo inside `browser_devices` JSON.
 #[derive(Serialize)]
 struct BrowserDeviceEntry<'a> {
     execution_id: String,
     engine: &'a str,
     device: &'a str,
+}
+
+/// Whether the org holds a `customer_billings` row, and what kind.
+///
+/// Three states, not two: the canonical rule
+/// (`openobserve-core::organization::is_org_in_free_trial_period`,
+/// `src/core/src/organization.rs`) short-circuits the date check only for a
+/// *paid* row — "no row" and "a free row" both fall through to the dates. That
+/// function is not reachable from here (`openobserve-synthetics` does not
+/// depend on `openobserve-core`, and it is `#[cfg(feature = "cloud")]`
+/// besides), so the rule is re-derived locally from
+/// `o2_enterprise::enterprise::cloud::billings` plus
+/// `infra::table::organizations` — both already dependencies of this crate.
+///
+/// The DB reads stay in the caller on purpose: the decision below is then pure,
+/// so §7.1's ordering and §7.2's live bug are unit-testable without a database.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BillingSubscription {
+    /// No `customer_billings` row for the org at all.
+    Absent,
+    /// A row whose `subscription_type.is_free_sub()` is true.
+    Free,
+    /// A row on a paid plan — Rate, Enterprise or ExternalContract.
+    Paid,
+}
+
+/// The trial gate's verdict for one due check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrialGate {
+    /// Fan the check out over its locations.
+    Run,
+    /// Skip the WHOLE check: no `synthetics_runs` row, no `synthetics_jobs`
+    /// rows, no Lambda invoked. The scheduler logs one throttled `warn!`
+    /// carrying this `error_source` and moves on — **nothing is persisted**, so
+    /// the denied slot leaves no row a user, a saved query or an alert rule can
+    /// see.
+    ///
+    /// Recording the slot needs the triggers-stream / dead-letter plumbing of
+    /// Phase 2 item 2.4 — an API endpoint plus org and `_meta` ingest tokens
+    /// the scheduler does not hold (see `reaper::orphan` for the shape of it).
+    /// That is M-sized and deliberately not in this XS item.
+    Skip { error_source: &'static str },
+}
+
+/// Throttles a repeating log line to one per `(key, reason)` per window.
+///
+/// Modelled on `reaper::orphan`'s renotify cooldown — the state is "when did
+/// this last get through", and an entry is written only when the line was
+/// actually emitted. Unlike that one there is no per-pass batch to prune
+/// against, so [`LogCooldown::allow`] expires entries itself; that, not the
+/// insert, is what bounds the map when a throttled check is deleted.
+#[cfg(any(test, feature = "cloud"))]
+struct LogCooldown {
+    last: dashmap::DashMap<(String, &'static str), i64>,
+    window_us: i64,
+}
+
+/// `error_source` for a slot the trial gate denied.
+///
+/// Joins `queue` / `orphan` / `dispatch` / `probe` in the vocabulary
+/// `crate::alerting` documents; like `orphan` it describes the *absence* of a
+/// job rather than the fate of one, and it is the only value that means the
+/// customer's own account state stopped the check.
+pub const ERROR_SOURCE_TRIAL: &str = "trial";
+
+/// The trial gate's own log throttle. Process-wide because the flood it bounds
+/// is process-wide; per-node like `reaper::orphan`'s map, for the same reason.
+#[cfg(feature = "cloud")]
+static TRIAL_GATE_LOG: std::sync::LazyLock<LogCooldown> =
+    std::sync::LazyLock::new(|| LogCooldown::new(TRIAL_GATE_LOG_COOLDOWN_US));
+
+#[cfg(any(test, feature = "cloud"))]
+impl LogCooldown {
+    fn new(window_us: i64) -> Self {
+        Self {
+            last: dashmap::DashMap::new(),
+            window_us,
+        }
+    }
+
+    /// Whether this line may be emitted now, recording the emission when it may.
+    ///
+    /// Takes `now_us` instead of reading a clock so the window is testable
+    /// without sleeping — the same reason [`trial_gate_decision`] takes one.
+    fn allow(&self, key: &str, reason: &'static str, now_us: i64) -> bool {
+        let entry = (key.to_string(), reason);
+        // Copied out rather than held: DashMap would deadlock on the insert
+        // below if the read guard were still alive on the same shard.
+        let last = self.last.get(&entry).map(|v| *v);
+        if last.is_some_and(|t| now_us.saturating_sub(t) < self.window_us) {
+            return false;
+        }
+        self.last.insert(entry, now_us);
+        // A check deleted while it is being throttled never comes back to
+        // refresh its entry, so expiry is the only thing bounding this map.
+        self.last
+            .retain(|_, t| now_us.saturating_sub(*t) < self.window_us);
+        true
+    }
+}
+
+/// Whether the trial gate needs its two database reads for this check.
+///
+/// Asked BEFORE either read. Two arms of [`trial_gate_decision`] answer `Run`
+/// without consulting a subscription or a date, and the reads that feed them
+/// cost a `customer_billings` lookup plus an `organizations` lookup per due
+/// check per 5s tick:
+///
+///   * `O2_CLOUD_TRIAL_PERIOD_ENABLED` defaults to **false**
+///     (`o2_enterprise::enterprise::common::config`), so without this the default cloud build
+///     issued both reads for every due check of every org, forever, and then unconditionally
+///     returned `Run`. The flag is the escape hatch if the gate ever misfires in production; it has
+///     to switch off the WORK, not merely the verdict.
+///   * `_meta` is exempt by construction, and core's `is_org_in_free_trial_period` returns before
+///     its own reads for it too.
+///
+/// This mirrors the read SHAPE of core's copy of the rule; the verdict stays in
+/// [`trial_gate_decision`], which is still handed `trial_period_enabled` and
+/// still owns arms 1 and 2. Nothing here decides anything the pure function
+/// does not also decide — a caller that skipped this check would get the same
+/// answers, only slower.
+///
+/// One arm of core's shape is deliberately NOT mirrored: core reads
+/// `organizations` **only** in its `Absent | Free` branch, so a paid org costs
+/// it one read where it costs us two. Skipping that read for `Paid` would mean
+/// deciding `Paid ⇒ Run` in the caller, because `trial_ends_at` is a by-value
+/// argument here — the decision would then live in two places and arm 3 of the
+/// pure function would stop being reachable from production. One extra
+/// primary-key read for orgs that are paying us is the cheaper trade.
+pub fn trial_gate_reads_needed(trial_period_enabled: bool, org_id: &str) -> bool {
+    trial_period_enabled && org_id != config::META_ORG_ID
+}
+
+/// Gate 1 of §7.1 — may this check run at all?
+///
+/// **Evaluated ONCE PER DUE CHECK, hoisted ABOVE the
+/// `for location in &synthetic.locations` loop.** Per-location evaluation would
+/// issue N identical billing reads per tick and, once Phase 2 lands, could
+/// deduct from the one-time free pool for a check the gate has already denied.
+/// `trial_gate_is_hoisted_out_of_the_location_loop` pins the shape.
+///
+/// Mirrors `is_org_in_free_trial_period` arm for arm:
+///   1. `trial_period_enabled` off             => `Run` (checking disabled fleet-wide)
+///   2. `org_id == config::META_ORG_ID`        => `Run` (the meta org is never gated)
+///   3. [`BillingSubscription::Paid`]          => `Run` (the dates are irrelevant)
+///   4. `Absent` or `Free`                     => `Run` iff `now_us <= trial_ends_at`
+///
+/// Arm 4's comparison is load-bearing: core denies on `now > trial_ends_at`, so
+/// the boundary instant itself still runs. `now_us == trial_ends_at` is pinned
+/// below so a future `>=` cannot slip in unnoticed.
+///
+/// Pure by construction, which is also E20: the verdict is a function of this
+/// tick's inputs and nothing else, so a trial that expires between enqueue and
+/// ack cannot reach back and un-enqueue a job — it only changes the NEXT tick.
+///
+/// The caller wraps this in `#[cfg(feature = "cloud")]` (§8.1). The decision
+/// itself is not cfg'd so that it is testable in every build shape; it reads no
+/// config and touches no database, so compiling it into OSS costs nothing.
+pub fn trial_gate_decision(
+    trial_period_enabled: bool,
+    org_id: &str,
+    subscription: BillingSubscription,
+    trial_ends_at: i64,
+    now_us: i64,
+) -> TrialGate {
+    // Arm 1 — `O2_CLOUD_TRIAL_PERIOD_ENABLED=false`: trial enforcement is off
+    // fleet-wide, so nothing is gated and no date is consulted.
+    if !trial_period_enabled {
+        return TrialGate::Run;
+    }
+
+    // Arm 2 — the meta org has no billing row and no trial by construction.
+    if org_id == config::META_ORG_ID {
+        return TrialGate::Run;
+    }
+
+    // Arm 3 — a paid row (Rate, Enterprise, ExternalContract) short-circuits the
+    // dates entirely. Arm 4 — no row at all, or a row whose plan is Free, both
+    // fall through to them.
+    match subscription {
+        BillingSubscription::Paid => TrialGate::Run,
+        BillingSubscription::Absent | BillingSubscription::Free => {
+            // Core denies on `now > org.trial_ends_at`, so the boundary instant
+            // itself is still INSIDE the trial. Keep this `<=`; a `>=` here
+            // would move the boundary by one microsecond.
+            if now_us <= trial_ends_at {
+                TrialGate::Run
+            } else {
+                TrialGate::Skip {
+                    error_source: ERROR_SOURCE_TRIAL,
+                }
+            }
+        }
+    }
 }
 
 pub async fn run() {
@@ -91,6 +299,128 @@ pub async fn run() {
         };
 
         for synthetic in synthetics {
+            // ---- Gate 1 of §7.1 — the TRIAL gate -------------------------------
+            //
+            // Evaluated ONCE for the whole check and hoisted ABOVE the
+            // `for location in &synthetic.locations` fan-out below, so it costs
+            // one pair of reads per due check rather than one per location, and
+            // so it cannot interleave with the per-location deduct that becomes
+            // gate 3 in Phase 2 (§7.1 states burning a one-time grant for a
+            // check the trial gate denies as a MUST NOT).
+            //
+            // Placed before `synthetics_runs::insert_run` as well: a denied
+            // check creates no run row, enqueues no job and invokes no Lambda.
+            // That is the whole point — §7.2's live bug is that we pay for the
+            // Lambda, the browser journey and the S3 write for a trial-expired
+            // org whose result is then rejected at ingest with a 429 and
+            // discarded. Under step billing it gets worse: steps arrive on the
+            // ack, which is not an ingest route, so the org would be BILLED for
+            // data it never receives.
+            //
+            // `cfg(cloud)`, NOT `cfg(enterprise)` (§8.1). `cloud` implies
+            // `enterprise`, never the reverse — a self-hosted Enterprise cluster
+            // has no trials and no `customer_billings` rows, and gating on
+            // `enterprise` would fire this on every one of them.
+            //
+            // Deliberately NOT doing here: no dead-letter, no trigger-stream
+            // result row. §7.3 specifies "skip slot, dead-letter, result row"
+            // for the QUOTA case only, which is Phase 2 item 2.4.
+            #[cfg(feature = "cloud")]
+            {
+                use o2_enterprise::enterprise::{
+                    cloud::billings, common::config::get_config as get_o2_config,
+                };
+
+                // Read per tick, like `jitter_enabled` above, so the kill
+                // switch takes effect on a config reload and not at the next
+                // restart.
+                let trial_period_enabled = get_o2_config().cloud.trial_period_enabled;
+
+                // Asked BEFORE either read — see `trial_gate_reads_needed`.
+                // With the flag off, which is the DEFAULT, this whole block
+                // issues no database traffic at all.
+                if trial_gate_reads_needed(trial_period_enabled, &synthetic.org_id) {
+                    // FAIL OPEN. Both reads are inputs to a decision that can
+                    // only ever STOP a customer's monitoring, so a transient
+                    // billing or metadata read failure must not be able to stop
+                    // it: on an error we log and run the check. The alternative
+                    // — treating an unreadable row as "expired" — turns one
+                    // flaky query into silently dark monitoring for a paying
+                    // customer, and the failure is invisible because a skipped
+                    // check looks exactly like a check that was never due.
+                    //
+                    // Every `warn!` below is throttled by `TRIAL_GATE_LOG`: a
+                    // persistently broken billing query would otherwise emit one
+                    // line per check per 5s tick and bury everything else.
+                    let gate_inputs = match billings::get_billing_by_org_id(&synthetic.org_id).await
+                    {
+                        Ok(billing) => {
+                            // Three states, not two: core short-circuits the
+                            // dates only for a *paid* row. `None` and a row
+                            // whose `subscription_type.is_free_sub()` is true
+                            // both fall through to them.
+                            let subscription = match billing {
+                                None => BillingSubscription::Absent,
+                                Some(b) if b.subscription_type.is_free_sub() => {
+                                    BillingSubscription::Free
+                                }
+                                Some(_) => BillingSubscription::Paid,
+                            };
+                            match infra::table::organizations::get(&synthetic.org_id).await {
+                                Ok(org) => Some((subscription, org.trial_ends_at)),
+                                Err(e) => {
+                                    if TRIAL_GATE_LOG.allow(&synthetic.id, "org_read", now_us) {
+                                        tracing::warn!(
+                                            synthetics_id = %synthetic.id,
+                                            org_id = %synthetic.org_id,
+                                            "[synthetics scheduler] trial gate: \
+                                             organizations::get failed, running the check \
+                                             anyway (logged at most hourly per check): {e}"
+                                        );
+                                    }
+                                    None
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            if TRIAL_GATE_LOG.allow(&synthetic.id, "billing_read", now_us) {
+                                tracing::warn!(
+                                    synthetics_id = %synthetic.id,
+                                    org_id = %synthetic.org_id,
+                                    "[synthetics scheduler] trial gate: get_billing_by_org_id \
+                                     failed, running the check anyway (logged at most hourly \
+                                     per check): {e}"
+                                );
+                            }
+                            None
+                        }
+                    };
+
+                    if let Some((subscription, trial_ends_at)) = gate_inputs {
+                        let verdict = trial_gate_decision(
+                            trial_period_enabled,
+                            &synthetic.org_id,
+                            subscription,
+                            trial_ends_at,
+                            now_us,
+                        );
+                        if let TrialGate::Skip { error_source } = verdict {
+                            if TRIAL_GATE_LOG.allow(&synthetic.id, ERROR_SOURCE_TRIAL, now_us) {
+                                tracing::warn!(
+                                    synthetics_id = %synthetic.id,
+                                    org_id = %synthetic.org_id,
+                                    error_source = %error_source,
+                                    "[synthetics scheduler] trial period over — skipping check, \
+                                     no run row, no jobs, no Lambda (logged at most hourly per \
+                                     check; a lapsed trial does not un-lapse)"
+                                );
+                            }
+                            continue;
+                        }
+                    }
+                }
+            }
+
             // The SLOT that made this check due — not the tick that noticed it.
             //
             // `synthetics_jobs_dedup_uq (synthetics_id, location, scheduled_ts)`
@@ -1006,4 +1336,741 @@ mod tests {
             "subsequent passes are pure fixed-rate advances"
         );
     }
+}
+
+/// The trial gate — §7.1 order of gates, §7.2's live bug, E19/E20, T34.
+///
+/// Every case here is a pure call: no database, no config, no clock. That is
+/// deliberate and is itself part of the contract — see [`trial_gate_decision`].
+#[cfg(test)]
+mod trial_gate_tests {
+    use super::{
+        BillingSubscription, ERROR_SOURCE_TRIAL, LogCooldown, TRIAL_GATE_LOG_COOLDOWN_US,
+        TrialGate, trial_gate_decision, trial_gate_reads_needed,
+    };
+
+    /// Trial checking on, which is Cloud's real posture. The disabled arm gets
+    /// its own test.
+    const ON: bool = true;
+    const OFF: bool = false;
+
+    /// A trial that ended at this instant. Round micros so the boundary case
+    /// below is exact rather than approximately exact.
+    const TRIAL_ENDS: i64 = 1_800_000_000_000_000;
+    const AN_HOUR: i64 = 3_600_000_000;
+
+    /// Any org that is not `_meta`.
+    const ORG: &str = "cust_7f2a";
+
+    /// A KSUID-shaped check id, for the cooldown tests — the throttle is keyed
+    /// by `synthetics_checks.id`, so it sees this shape in production.
+    const A_CHECK: &str = "2iRXmH4pQ7bLtVzKcN9sYdFgWjE";
+
+    fn run(expected: TrialGate, actual: TrialGate, why: &str) {
+        assert_eq!(expected, actual, "{why}");
+    }
+
+    /// The skip verdict, spelled once so every assertion below agrees on the
+    /// `error_source` the result row must carry.
+    fn skip() -> TrialGate {
+        TrialGate::Skip {
+            error_source: ERROR_SOURCE_TRIAL,
+        }
+    }
+
+    /// This file with the test modules sliced off, so a structural assertion
+    /// cannot match the text of the test that makes it.
+    fn source_above_the_tests() -> String {
+        let whole = include_str!("scheduler.rs");
+        let tests_start = whole
+            .find("\n#[cfg(test)]")
+            .expect("scheduler.rs must still end in test modules");
+        whole[..tests_start].to_string()
+    }
+
+    /// Byte range of the brace-balanced block opened by the first call to
+    /// `needle` that is not its own definition site.
+    fn guarded_block(src: &str, needle: &str) -> (usize, usize) {
+        let def_ident_at = src
+            .find(&["fn ", needle].concat())
+            .expect("the guard must be defined in this file")
+            + 3;
+        let call_at = src
+            .match_indices(needle)
+            .map(|(i, _)| i)
+            .find(|i| *i != def_ident_at)
+            .expect("the guard must be called from the scheduler");
+        let open = call_at
+            + src[call_at..]
+                .find('{')
+                .expect("a block must follow the guard");
+        let mut depth = 0usize;
+        for (i, c) in src[open..].char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return (open, open + i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("the guard's block is not brace-balanced");
+    }
+
+    /// The vocabulary value itself, pinned.
+    ///
+    /// Nothing WRITES it yet: the denied slot is logged and not persisted (see
+    /// [`TrialGate::Skip`]), so no alert rule and no run-list filter can select
+    /// on it today. What this pins is the spelling that the §7.2 vocabulary —
+    /// and the Phase 2 item 2.4 result row that will finally carry it — has to
+    /// keep. It is also the cooldown key the scheduler throttles the skip line
+    /// with.
+    #[test]
+    fn the_error_source_is_trial() {
+        assert_eq!(ERROR_SOURCE_TRIAL, "trial");
+    }
+
+    /// **T34 — the live bug of §7.2.**
+    ///
+    /// A trial-expired org with no billing row is exactly the shape that costs
+    /// us a Lambda invocation, a browser journey and an S3 write, and then has
+    /// its result rejected at ingest with a 429 and discarded. The customer
+    /// sees nothing; we pay for all of it. Under step billing it gets worse —
+    /// steps arrive on the *ack*, which is not an ingest route, so the org
+    /// would be BILLED for data it never receives.
+    ///
+    /// The gate must deny before anything is enqueued, so no Lambda is ever
+    /// invoked for this check.
+    #[test]
+    fn t34_trial_expired_org_is_skipped() {
+        run(
+            skip(),
+            trial_gate_decision(
+                ON,
+                ORG,
+                BillingSubscription::Absent,
+                TRIAL_ENDS,
+                TRIAL_ENDS + 1,
+            ),
+            "a trial-expired org with no billing row must not be scheduled at all",
+        );
+    }
+
+    /// The other half of T34: inside the trial, the same org runs. Without this
+    /// a gate that denied everything would pass the test above.
+    #[test]
+    fn an_org_still_inside_its_trial_runs() {
+        run(
+            TrialGate::Run,
+            trial_gate_decision(
+                ON,
+                ORG,
+                BillingSubscription::Absent,
+                TRIAL_ENDS,
+                TRIAL_ENDS - AN_HOUR,
+            ),
+            "a live trial is the normal case and must not be gated",
+        );
+    }
+
+    /// Arm 1. `O2_CLOUD_TRIAL_PERIOD_ENABLED=false` is the fleet-wide kill
+    /// switch for trial enforcement — self-hosted-like behaviour on a `cloud`
+    /// build, and the escape hatch if the gate ever misfires in production.
+    /// It must win over every date, which is why it is the first arm.
+    #[test]
+    fn trial_checking_disabled_runs_regardless_of_dates() {
+        for subscription in [
+            BillingSubscription::Absent,
+            BillingSubscription::Free,
+            BillingSubscription::Paid,
+        ] {
+            run(
+                TrialGate::Run,
+                trial_gate_decision(
+                    OFF,
+                    ORG,
+                    subscription,
+                    TRIAL_ENDS,
+                    TRIAL_ENDS + 365 * 24 * AN_HOUR,
+                ),
+                "with trial checking off, nothing is gated — not even a year past expiry",
+            );
+        }
+    }
+
+    /// Arm 2. `_meta` has no billing row and no trial by construction; gating
+    /// it would silently stop the platform's own synthetic checks.
+    #[test]
+    fn the_meta_org_always_runs() {
+        run(
+            TrialGate::Run,
+            trial_gate_decision(
+                ON,
+                config::META_ORG_ID,
+                BillingSubscription::Absent,
+                TRIAL_ENDS,
+                TRIAL_ENDS + 365 * 24 * AN_HOUR,
+            ),
+            "the meta org is exempt in `is_org_in_free_trial_period` and must stay exempt here",
+        );
+        assert_eq!(
+            config::META_ORG_ID,
+            "_meta",
+            "the exemption is keyed on this literal in core's copy of the rule"
+        );
+    }
+
+    /// Arm 3. A paying customer's `trial_ends_at` is ancient and irrelevant —
+    /// they subscribed. Reading the dates for them would stop every paid org's
+    /// checks the moment its original trial window lapsed.
+    ///
+    /// `Paid` also covers ExternalContract orgs (§7.4), which must never be
+    /// blocked by this gate.
+    #[test]
+    fn a_paid_subscription_runs_past_trial_end() {
+        run(
+            TrialGate::Run,
+            trial_gate_decision(
+                ON,
+                ORG,
+                BillingSubscription::Paid,
+                TRIAL_ENDS,
+                TRIAL_ENDS + 365 * 24 * AN_HOUR,
+            ),
+            "a paid subscription short-circuits the date check entirely",
+        );
+    }
+
+    /// Arm 4, the half that is easy to get wrong: a `customer_billings` row
+    /// EXISTS, so a naive `subscription.is_some()` test would let it run. Core
+    /// looks at `subscription_type.is_free_sub()`, and a free row falls through
+    /// to the dates exactly like no row at all.
+    #[test]
+    fn a_free_subscription_past_trial_end_is_skipped() {
+        run(
+            skip(),
+            trial_gate_decision(
+                ON,
+                ORG,
+                BillingSubscription::Free,
+                TRIAL_ENDS,
+                TRIAL_ENDS + 1,
+            ),
+            "a free-plan row is not a subscription for this purpose — the dates still decide",
+        );
+    }
+
+    /// A free row inside the window still runs — the mirror of the above, so
+    /// the free arm cannot degenerate into "always skip".
+    #[test]
+    fn a_free_subscription_inside_the_window_runs() {
+        run(
+            TrialGate::Run,
+            trial_gate_decision(
+                ON,
+                ORG,
+                BillingSubscription::Free,
+                TRIAL_ENDS,
+                TRIAL_ENDS - 1,
+            ),
+            "free plan, trial not yet over",
+        );
+    }
+
+    /// **The boundary, pinned deliberately.**
+    ///
+    /// Core denies on `now > org.trial_ends_at`, so the instant `trial_ends_at`
+    /// itself is still inside the trial. A later refactor to `>=` would move
+    /// the boundary by one microsecond — invisible in every other test here,
+    /// and a real (if tiny) behaviour change for an org whose scheduler tick
+    /// lands exactly on the boundary. Two adjacent instants, both asserted, so
+    /// the direction of the comparison is unambiguous.
+    #[test]
+    fn the_boundary_instant_still_runs() {
+        run(
+            TrialGate::Run,
+            trial_gate_decision(ON, ORG, BillingSubscription::Absent, TRIAL_ENDS, TRIAL_ENDS),
+            "now == trial_ends_at is INSIDE the trial — core uses `now > trial_ends_at` to deny",
+        );
+        run(
+            skip(),
+            trial_gate_decision(
+                ON,
+                ORG,
+                BillingSubscription::Absent,
+                TRIAL_ENDS,
+                TRIAL_ENDS + 1,
+            ),
+            "one microsecond later is outside it",
+        );
+    }
+
+    /// **E19 — a contract that expires.**
+    ///
+    /// Contract expiry deletes the org's `customer_billings` row, which turns
+    /// [`BillingSubscription::Paid`] into [`BillingSubscription::Absent`] with
+    /// no other state changing. The gate must then fall through to the dates —
+    /// whose `trial_ends_at` is long past for any org that was ever on a
+    /// contract — and skip. Critically it SKIPS the slot; the check itself
+    /// stays enabled, so re-signing resumes it with no customer action.
+    #[test]
+    fn e19_contract_expiry_flips_the_verdict_by_the_row_alone() {
+        let (org, ends, now) = (ORG, TRIAL_ENDS, TRIAL_ENDS + 365 * 24 * AN_HOUR);
+        run(
+            TrialGate::Run,
+            trial_gate_decision(ON, org, BillingSubscription::Paid, ends, now),
+            "while the contract row exists the org runs",
+        );
+        run(
+            skip(),
+            trial_gate_decision(ON, org, BillingSubscription::Absent, ends, now),
+            "the row is deleted at contract end — same org, same dates, opposite verdict",
+        );
+    }
+
+    /// **E20 — a trial that expires between enqueue and ack.**
+    ///
+    /// The guarantee is that the gate has no memory and no side effects: its
+    /// verdict is a function of THIS tick's inputs, so it cannot reach back and
+    /// un-enqueue a job. Concretely, evaluating it at a later `now_us` (and
+    /// getting `Skip`) must not change what it answers for the earlier tick
+    /// that already enqueued — and re-asking the earlier question must give the
+    /// earlier answer, every time.
+    ///
+    /// This is what makes "in-flight acks still bill; the next enqueue blocks"
+    /// a property of the gate rather than of the ack path.
+    #[test]
+    fn e20_expiry_mid_flight_only_affects_the_next_tick() {
+        let before = TRIAL_ENDS - AN_HOUR;
+        let after = TRIAL_ENDS + AN_HOUR;
+
+        let at_enqueue =
+            trial_gate_decision(ON, ORG, BillingSubscription::Absent, TRIAL_ENDS, before);
+        run(
+            TrialGate::Run,
+            at_enqueue,
+            "the enqueueing tick was inside the trial",
+        );
+
+        run(
+            skip(),
+            trial_gate_decision(ON, ORG, BillingSubscription::Absent, TRIAL_ENDS, after),
+            "a later tick, past expiry, blocks the NEXT enqueue",
+        );
+
+        // The earlier tick's verdict is unchanged and unchangeable: no memo, no
+        // interior mutability, no clock read of its own.
+        for _ in 0..3 {
+            run(
+                at_enqueue,
+                trial_gate_decision(ON, ORG, BillingSubscription::Absent, TRIAL_ENDS, before),
+                "the gate is pure — the already-enqueued job is never reconsidered",
+            );
+        }
+    }
+
+    /// **§7.1 — the gate is HOISTED OUT of the location loop.**
+    ///
+    /// Asserted over the source itself, because the property is structural: it
+    /// is about where the call sits, and a call in the wrong place still
+    /// returns the right answer. `lib.rs::nothing_on_the_run_path_publishes`
+    /// pins a rate invariant the same way and for the same reason.
+    ///
+    /// Two things would go wrong if the call moved inside the loop. Today: N
+    /// billing + organizations reads per due check per tick instead of one —
+    /// a check with 6 locations sextuples the load the gate adds. From Phase 2:
+    /// the deduct is gate 3, INSIDE the loop, so a per-location gate would
+    /// interleave with it and could burn a one-time grant on a check the gate
+    /// had already denied — which §7.1 states as a MUST NOT.
+    ///
+    /// Counting excludes the definition site, so the assertion is "exactly one
+    /// CALL", independent of where in the file the function is defined.
+    #[test]
+    fn trial_gate_is_hoisted_out_of_the_location_loop() {
+        // Assembled at runtime for the parts that also appear in this test's
+        // own text, so nothing here can match itself once the tests module is
+        // (as it is below) sliced off.
+        let gate = ["trial_gate", "_decision("].concat();
+        let loop_head = ["for location in &synthetic", ".locations {"].concat();
+
+        let whole = include_str!("scheduler.rs");
+        let tests_start = whole
+            .find("\n#[cfg(test)]")
+            .expect("scheduler.rs must still end in test modules");
+        let src = &whole[..tests_start];
+
+        let loop_at = src
+            .find(&loop_head)
+            .expect("the per-location fan-out loop must still exist in scheduler::run");
+
+        let def_at = src
+            .find(&["fn ", &gate].concat())
+            .expect("trial_gate_decision must be defined in this file");
+        // `fn ` is 3 bytes; that is where the identifier itself starts.
+        let def_ident_at = def_at + 3;
+
+        let calls: Vec<usize> = src
+            .match_indices(&gate)
+            .map(|(i, _)| i)
+            .filter(|i| *i != def_ident_at)
+            .collect();
+
+        assert_eq!(
+            calls.len(),
+            1,
+            "the trial gate must be called exactly once per due check — {} call site(s) found. \
+             One per location would multiply the billing reads by the location count and, from \
+             Phase 2, could deduct from the free pool for a check the gate denies (§7.1).",
+            calls.len()
+        );
+        assert!(
+            calls[0] < loop_at,
+            "the trial gate call is at byte {} and the location loop opens at byte {} — the gate \
+             MUST be hoisted ABOVE the loop (§7.1)",
+            calls[0],
+            loop_at
+        );
+    }
+
+    /// **The gate must PREVENT the work, not merely precede the fan-out.**
+    ///
+    /// `trial_gate_is_hoisted_out_of_the_location_loop` pins the call above the
+    /// location loop, which is §7.1's ordering requirement — but the run row is
+    /// written *before* that loop, so a call that satisfied it could still sit
+    /// below `synthetics_runs::insert_run` and leave a denied check with a
+    /// zero-job run row hanging in the UI forever.
+    ///
+    /// §7.2's guarantee is stronger and is what this pins: on `Skip` there is no
+    /// run row, no job, and therefore no Lambda invocation — the dispatcher only
+    /// ever sees rows `synthetics_jobs::enqueue` wrote.
+    ///
+    /// Structural for the same reason as the test above: it is a property of
+    /// where the call sits, and a call in the wrong place still returns the
+    /// right answer.
+    #[test]
+    fn a_denied_check_cannot_reach_insert_run_or_enqueue() {
+        let gate = ["trial_gate", "_decision("].concat();
+        let insert_run = ["synthetics_runs::", "insert_run("].concat();
+        let enqueue = ["synthetics_jobs::", "enqueue("].concat();
+
+        let whole = include_str!("scheduler.rs");
+        let tests_start = whole
+            .find("\n#[cfg(test)]")
+            .expect("scheduler.rs must still end in test modules");
+        let src = &whole[..tests_start];
+
+        let def_ident_at = src
+            .find(&["fn ", &gate].concat())
+            .expect("trial_gate_decision must be defined in this file")
+            + 3;
+        let call_at = src
+            .match_indices(&gate)
+            .map(|(i, _)| i)
+            .find(|i| *i != def_ident_at)
+            .expect("the trial gate must be called from the scheduler");
+
+        let insert_at = src
+            .find(&insert_run)
+            .expect("the scheduler must still write the run row");
+        let enqueue_at = src
+            .find(&enqueue)
+            .expect("the scheduler must still enqueue jobs");
+
+        assert!(
+            call_at < insert_at,
+            "the trial gate is called at byte {call_at} but the run row is written at byte \
+             {insert_at} — a denied check would still leave a run row behind (§7.2)"
+        );
+        assert!(
+            call_at < enqueue_at,
+            "the trial gate is called at byte {call_at} but jobs are enqueued at byte \
+             {enqueue_at} — a denied check must never reach the queue, which is what stops the \
+             Lambda invocation we pay for (§7.2, T34)"
+        );
+
+        // The verdict must be ACTED ON, not merely computed — and "there is a
+        // `continue` somewhere below the call" is too weak to pin that: the
+        // per-check body has another early exit above the run row (the
+        // zero-location guard), so a gate whose verdict was computed and then
+        // dropped would still have one under it. So walk the `Skip` arm's own
+        // block and require the exit to be INSIDE it.
+        let arm_kw = "= verdict {";
+        let brace_at = call_at
+            + src[call_at..]
+                .find(arm_kw)
+                .expect("the gate's verdict must be matched against `TrialGate::Skip`")
+            + arm_kw.len()
+            - 1;
+        let mut depth = 0usize;
+        let mut arm_end = None;
+        for (i, c) in src[brace_at..].char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        arm_end = Some(brace_at + i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let arm_end = arm_end.expect("the Skip arm's block must be brace-balanced");
+        assert!(
+            src[brace_at..arm_end].contains("continue;"),
+            "the trial gate's `Skip` arm does not leave the per-check body, so a denied check \
+             falls straight through to `insert_run` and the enqueue below it (§7.2, T34)"
+        );
+    }
+
+    // ── the fleet-wide kill switch must also switch off the COST ────────────
+
+    /// `O2_CLOUD_TRIAL_PERIOD_ENABLED` defaults to **false**, so this is the
+    /// shape almost every build runs in. Before the short-circuit the scheduler
+    /// still issued a `customer_billings` read and an `organizations` read per
+    /// due check per 5s tick and then unconditionally answered `Run` — the flag
+    /// disabled the decision without disabling the work.
+    #[test]
+    fn the_kill_switch_skips_the_reads_entirely() {
+        assert!(
+            !trial_gate_reads_needed(OFF, ORG),
+            "with trial checking off there is no date to consult, so there is nothing to read"
+        );
+        assert!(
+            trial_gate_reads_needed(ON, ORG),
+            "with it on the gate genuinely needs a subscription and a trial end date"
+        );
+    }
+
+    /// Arm 2, at the caller. `is_org_in_free_trial_period` returns for `_meta`
+    /// before either of its own reads; this keeps the read shape the same.
+    #[test]
+    fn the_meta_org_needs_no_reads_either() {
+        assert!(!trial_gate_reads_needed(ON, config::META_ORG_ID));
+    }
+
+    /// The short-circuit must not change any verdict — it only removes reads
+    /// whose result the pure function was going to ignore. Asserted directly:
+    /// wherever the caller skips the reads, [`trial_gate_decision`] says `Run`
+    /// for every input it could have read.
+    #[test]
+    fn skipping_the_reads_never_changes_the_verdict() {
+        for (enabled, org) in [
+            (OFF, ORG),
+            (OFF, config::META_ORG_ID),
+            (ON, config::META_ORG_ID),
+        ] {
+            assert!(!trial_gate_reads_needed(enabled, org));
+            for subscription in [
+                BillingSubscription::Absent,
+                BillingSubscription::Free,
+                BillingSubscription::Paid,
+            ] {
+                for now in [
+                    TRIAL_ENDS - AN_HOUR,
+                    TRIAL_ENDS,
+                    TRIAL_ENDS + 365 * 24 * AN_HOUR,
+                ] {
+                    run(
+                        TrialGate::Run,
+                        trial_gate_decision(enabled, org, subscription, TRIAL_ENDS, now),
+                        "the caller only skips the reads where the verdict is `Run` regardless",
+                    );
+                }
+            }
+        }
+    }
+
+    /// **The reads must sit BEHIND the short-circuit, not merely after it.**
+    ///
+    /// Structural for the same reason as the two tests above: a read hoisted
+    /// back above the guard still returns the right answer and still produces
+    /// the right verdict — it just costs two queries per check per tick again.
+    /// So walk the guard's own block and require both reads to be inside it.
+    #[test]
+    fn the_gates_reads_sit_inside_the_short_circuit() {
+        let guard = ["trial_gate", "_reads_needed("].concat();
+        let billing_read = ["get_billing_by", "_org_id("].concat();
+        let org_read = ["infra::table::organizations", "::get("].concat();
+
+        let src = source_above_the_tests();
+        let (open, end) = guarded_block(&src, &guard);
+
+        for read in [&billing_read, &org_read] {
+            let sites: Vec<usize> = src.match_indices(read.as_str()).map(|(i, _)| i).collect();
+            assert_eq!(
+                sites.len(),
+                1,
+                "the trial gate must issue `{read}` exactly once per due check, found {}",
+                sites.len()
+            );
+            assert!(
+                sites[0] > open && sites[0] < end,
+                "`{read}` is at byte {} but the short-circuit's block is bytes {open}..{end} — \
+                 the read must not be issued before the gate has decided it needs it",
+                sites[0]
+            );
+        }
+    }
+
+    // ── the warn flood ──────────────────────────────────────────────────────
+
+    /// The second identical line inside the window is suppressed; the window
+    /// expiring re-enables it.
+    #[test]
+    fn a_repeated_line_is_emitted_once_per_window() {
+        let log = LogCooldown::new(TRIAL_GATE_LOG_COOLDOWN_US);
+        let t0 = TRIAL_ENDS;
+        assert!(
+            log.allow(A_CHECK, ERROR_SOURCE_TRIAL, t0),
+            "the first line always gets through — the throttle must not hide the problem"
+        );
+        assert!(
+            !log.allow(A_CHECK, ERROR_SOURCE_TRIAL, t0),
+            "the same tick must not log the same thing twice"
+        );
+        assert!(
+            !log.allow(
+                A_CHECK,
+                ERROR_SOURCE_TRIAL,
+                t0 + TRIAL_GATE_LOG_COOLDOWN_US - 1
+            ),
+            "one microsecond short of the window is still inside it"
+        );
+        assert!(
+            log.allow(A_CHECK, ERROR_SOURCE_TRIAL, t0 + TRIAL_GATE_LOG_COOLDOWN_US),
+            "the window expiring must re-enable the line"
+        );
+        assert!(
+            !log.allow(A_CHECK, ERROR_SOURCE_TRIAL, t0 + TRIAL_GATE_LOG_COOLDOWN_US),
+            "and start a fresh window rather than staying open"
+        );
+    }
+
+    /// The flood itself, at its real cadence: one lapsed org with twenty
+    /// 1-minute checks, half an hour of 5-second ticks. Unthrottled that is
+    /// 20 x 360 = 7 200 warnings.
+    #[test]
+    fn a_lapsed_org_does_not_re_log_every_tick() {
+        let log = LogCooldown::new(TRIAL_GATE_LOG_COOLDOWN_US);
+        let ids: Vec<String> = (0..20).map(|i| format!("check_{i}")).collect();
+        let mut lines = 0usize;
+        for tick in 0..360i64 {
+            let now = TRIAL_ENDS + tick * 5_000_000; // TICK is 5s
+            for id in &ids {
+                if log.allow(id, ERROR_SOURCE_TRIAL, now) {
+                    lines += 1;
+                }
+            }
+        }
+        assert_eq!(
+            lines,
+            ids.len(),
+            "half an hour of ticks must cost one line per check, not one per check per tick"
+        );
+    }
+
+    /// The reasons are independent. A billing query that is failing must not
+    /// silence the trial-expiry line for the same check, and one check's line
+    /// must not silence another's.
+    #[test]
+    fn the_cooldown_is_keyed_by_check_and_reason() {
+        let log = LogCooldown::new(TRIAL_GATE_LOG_COOLDOWN_US);
+        let t0 = TRIAL_ENDS;
+        assert!(log.allow(A_CHECK, ERROR_SOURCE_TRIAL, t0));
+        assert!(
+            log.allow(A_CHECK, "billing_read", t0),
+            "a different reason for the same check is a different line"
+        );
+        assert!(
+            log.allow("another_check", ERROR_SOURCE_TRIAL, t0),
+            "a different check is a different line"
+        );
+        assert!(!log.allow(A_CHECK, ERROR_SOURCE_TRIAL, t0));
+    }
+
+    /// Expiry is what BOUNDS the map. A check deleted while it is being
+    /// throttled never comes back to refresh its entry, so nothing else would
+    /// ever remove it.
+    #[test]
+    fn expired_entries_are_dropped_so_the_map_stays_bounded() {
+        let log = LogCooldown::new(TRIAL_GATE_LOG_COOLDOWN_US);
+        for i in 0..100u32 {
+            log.allow(&format!("deleted_{i}"), ERROR_SOURCE_TRIAL, TRIAL_ENDS);
+        }
+        assert_eq!(log.last.len(), 100, "precondition: all hundred are tracked");
+        log.allow(
+            A_CHECK,
+            ERROR_SOURCE_TRIAL,
+            TRIAL_ENDS + TRIAL_GATE_LOG_COOLDOWN_US,
+        );
+        assert_eq!(
+            log.last.len(),
+            1,
+            "entries older than the window can no longer suppress anything and must be dropped"
+        );
+    }
+
+    /// **Every trial-gate `warn!` must go through the throttle.**
+    ///
+    /// Structural, and the counterpart to the behavioural tests above: those
+    /// prove the throttle works, this proves the gate uses it. An unthrottled
+    /// line added to the gate would pass every other test in this module and
+    /// reinstate the flood.
+    #[test]
+    fn every_trial_gate_warning_is_throttled() {
+        let guard = ["trial_gate", "_reads_needed("].concat();
+        let src = source_above_the_tests();
+        let (open, end) = guarded_block(&src, &guard);
+        let block = &src[open..end];
+
+        let warns = block.matches("tracing::warn!").count();
+        assert_eq!(
+            warns, 3,
+            "the trial gate has three log lines — two fail-open reads and the deny — found {warns}"
+        );
+        assert_eq!(
+            block
+                .matches(&["TRIAL_GATE_LOG", ".allow("].concat())
+                .count(),
+            warns,
+            "every one of the gate's {warns} warnings must be guarded by the cooldown, or a \
+             lapsed org logs once per check per 5s tick forever"
+        );
+    }
+}
+
+/// **T39 / F6 — `cloud` must reach this crate.**
+///
+/// The runtime half. The load-bearing half is the `const _: () = assert!(...)`
+/// in every crate that depends on this one and defines `cloud`
+/// (`src/jobs/src/lib.rs`, `src/api/management/src/lib.rs`): a silently-absent
+/// `cfg` cannot be caught at runtime, because the code that would have reported
+/// it is the code that vanished.
+#[cfg(test)]
+mod cloud_feature_tests {
+    /// `BUILT_WITH_CLOUD` must reflect the compiling crate's own feature set,
+    /// not a constant someone pinned. If this ever disagrees with `cfg!`, every
+    /// downstream compile-time assertion becomes a tautology.
+    #[test]
+    fn built_with_cloud_reflects_this_crates_feature() {
+        assert_eq!(crate::BUILT_WITH_CLOUD, cfg!(feature = "cloud"));
+    }
+
+    /// `cloud` implies `enterprise` in every sibling crate's feature list
+    /// (§8.1), and the emit needs `o2_enterprise` to exist at all. A `cloud`
+    /// that did not pull `enterprise` would compile happily and emit nothing —
+    /// F6 wearing a different hat — so this is checked at compile time too,
+    /// not asserted at run time where a `cfg!` comparison is a tautology
+    /// clippy rightly complains about.
+    #[cfg(feature = "cloud")]
+    const _: () = assert!(
+        cfg!(feature = "enterprise"),
+        "`cloud` must be defined as `[\"enterprise\", \"o2_enterprise/cloud\"]` — the shape \
+         every sibling crate already uses (§8.1)"
+    );
 }
