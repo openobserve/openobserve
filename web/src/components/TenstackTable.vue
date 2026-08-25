@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </tr>
             <tr
               v-for="{ row, idx } in renderedDashboardRows"
-              :key="row.id"
+              :key="idx"
               :data-index="idx"
               :ref="(node: any) => measureDashboardRow(node)"
               class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
@@ -1234,6 +1234,16 @@ const tableRowSize = ref(0);
 
 const columnOrder = ref<any>([]);
 
+/** Dashboard virtual scroll builds the TanStack row model over the visible window
+ *  only. TanStack materialises a Row object per data row (~6KB heap each) and does
+ *  so regardless of virtualisation — virtual scroll bounds the DOM, not the model —
+ *  so a panel returning millions of rows would OOM the tab. Driven by a watcher on
+ *  virtualRows rather than a computed to keep the model out of the virtualiser's
+ *  own dependency chain. */
+const DASH_WINDOW_FALLBACK = 60;
+const dashWindowStart = shallowRef(0);
+const dashWindowEnd = shallowRef(DASH_WINDOW_FALLBACK);
+
 const tableRows = shallowRef<any[]>([...(props.rows ?? [])]);
 
 // ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
@@ -1295,6 +1305,12 @@ const usesSeparateBorders = computed(
 // panels (typically ≤1000 rows).
 const dashVirtualEnabled = computed(
   () => !props.useVirtualScroll && !props.showPagination && !props.wrap,
+);
+
+/** Row-model windowing applies only to the dashboard virtual path. Pivot mode reads
+ *  across the whole model, so it keeps every row. */
+const dashWindowed = computed(
+  () => dashVirtualEnabled.value && !isPivotMode.value,
 );
 
 // Pivot sort state (managed manually — TanStack sort is disabled for pivot).
@@ -1640,7 +1656,11 @@ watch(
 
 let table: any = useVueTable({
   get data() {
-    return tableRows.value || [];
+    const rows = tableRows.value || [];
+    if (dashWindowed.value) {
+      return rows.slice(dashWindowStart.value, dashWindowEnd.value);
+    }
+    return rows;
   },
   get columns() {
     // Dashboard: use converted TanStack columns; Logs: use columns prop as-is.
@@ -1762,7 +1782,11 @@ const formattedRows = computed(() => {
  *  primitive value — so `rowVirtualizerOptions` won't re-evaluate (and
  *  `_willUpdate` / ResizeObserver won't re-fire) when `formattedRows`
  *  gets a new array reference with the same length. */
-const rowCount = computed(() => formattedRows.value?.length ?? 0);
+const rowCount = computed(() =>
+  dashWindowed.value
+    ? (tableRows.value?.length ?? 0)
+    : (formattedRows.value?.length ?? 0),
+);
 
 /** Rows for current page (dashboard).
  *  When pagination is enabled, slices by page. Otherwise returns all rows —
@@ -1935,6 +1959,25 @@ const measureDashboardRow = (node: any) => {
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
+watch(
+  [virtualRows, dashWindowed, rowCount],
+  ([items, windowed, total]: any) => {
+    if (!windowed) {
+      dashWindowStart.value = 0;
+      dashWindowEnd.value = total;
+      return;
+    }
+    if (!items.length) {
+      dashWindowStart.value = 0;
+      dashWindowEnd.value = Math.min(total, DASH_WINDOW_FALLBACK);
+      return;
+    }
+    dashWindowStart.value = items[0].index;
+    dashWindowEnd.value = items[items.length - 1].index + 1;
+  },
+  { immediate: true, flush: "sync" },
+);
+
 const totalSize = computed(
   () => rowVirtualizer.value.getTotalSize() + (props.rowHeight ?? 0),
 );
@@ -1959,8 +2002,9 @@ const renderedDashboardRows = computed(() => {
   if (dashVirtualEnabled.value) {
     const items = virtualRows.value;
     const rows = formattedRows.value ?? [];
+    const offset = dashWindowed.value ? dashWindowStart.value : 0;
     return items
-      .map((vi: any) => ({ row: rows[vi.index], idx: vi.index }))
+      .map((vi: any) => ({ row: rows[vi.index - offset], idx: vi.index }))
       .filter((r: any) => r.row);
   }
   // Paginated mode: use TanStack's global row index so page 2+ emits correct position
