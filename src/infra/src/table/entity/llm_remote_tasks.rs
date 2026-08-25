@@ -18,6 +18,7 @@ use sea_orm::entity::prelude::*;
 /// The version a head's single mutable draft occupies. A draft carries no
 /// version number of its own, and an Experiment may only pin `version >= 1`.
 pub const DRAFT_VERSION: i32 = 0;
+const _: () = assert!(DRAFT_VERSION < 1);
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "llm_remote_tasks")]
@@ -57,12 +58,6 @@ impl ActiveModelBehavior for ActiveModel {}
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_draft_sits_below_every_publishable_version() {
-        assert_eq!(DRAFT_VERSION, 0);
-        assert!(DRAFT_VERSION < 1);
-    }
 
     #[test]
     fn test_model_construction() {
