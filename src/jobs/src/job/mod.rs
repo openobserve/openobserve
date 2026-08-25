@@ -920,10 +920,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     ("input".to_string(), input_tokens),
                     ("output".to_string(), output_tokens),
                 ]);
-                db::model_pricing::calculate_cost_from_definition(&definition, &usage)
-                    .cost
-                    .get("total")
-                    .copied()
+                db::model_pricing::calculate_cost_from_definition(
+                    &definition,
+                    &usage,
+                    Some(timestamp),
+                )
+                .cost
+                .get("total")
+                .copied()
             },
         );
 
