@@ -22,7 +22,7 @@ use config::{
 #[allow(clippy::single_component_path_imports)]
 use db;
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_ro,
     errors::{Error, Result},
     scheduler,
 };
@@ -105,7 +105,7 @@ async fn update(msg: Message) -> Result<()> {
     }
     // First check if the module record exists in this region, to verify that the module record
     // is not deleted.
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     match trigger.module {
         TriggerModule::Alert => {
             let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) else {
