@@ -79,13 +79,11 @@ pub async fn set(trace_id: &str, schema_key: &str, format: &str, files: Vec<File
 }
 
 pub fn clear(trace_id: &str) {
-    // Remove all files for the given trace_id; keys are always "{trace_id}/schema=.../format=...",
-    // so match on the separator or a trace id would also sweep one it merely prefixes
-    let prefix = format!("{trace_id}/");
+    // Remove all files for the given trace_id
     let r = FILES.read();
     let keys = r
         .keys()
-        .filter(|x| x.starts_with(&prefix))
+        .filter(|x| x.starts_with(trace_id))
         .cloned()
         .collect::<Vec<_>>();
     drop(r);
