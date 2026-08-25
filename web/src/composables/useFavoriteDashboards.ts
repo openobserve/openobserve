@@ -15,7 +15,7 @@
 
 import { settingQuery } from "@/services/settings.queries";
 import { settingKeys } from "@/services/settings.querykeys";
-import { queryClient } from "@/composables/query/queryClient";
+import { queryClient, setPersistedQueryData } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
@@ -85,7 +85,7 @@ export function useFavoriteDashboards() {
       : [...prev, d]; // optimistic
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
-      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
+      setPersistedQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
     } catch (e: any) {
       favorites.value = prev; // revert
       toast({
@@ -110,7 +110,7 @@ export function useFavoriteDashboards() {
     favorites.value = next;
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
-      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
+      setPersistedQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
     } catch {
       // The cached copy is now behind the screen; drop it so the next load
       // reconciles from the server.

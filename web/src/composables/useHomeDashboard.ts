@@ -15,7 +15,7 @@
 
 import { settingQuery } from "@/services/settings.queries";
 import { settingKeys } from "@/services/settings.querykeys";
-import { queryClient } from "@/composables/query/queryClient";
+import { queryClient, setPersistedQueryData } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
@@ -72,7 +72,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
-      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), d);
+      setPersistedQueryData(settingKeys.one(org, SETTING_KEY), d);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({
@@ -88,7 +88,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard.value = null; // optimistic
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
-      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), null);
+      setPersistedQueryData(settingKeys.one(org, SETTING_KEY), null);
     } catch (e: any) {
       // A 404 means the setting is already gone — this is the desired end state,
       // not a failure. The backend now clears home_dashboard itself when the
