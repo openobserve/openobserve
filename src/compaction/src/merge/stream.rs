@@ -22,7 +22,7 @@ use config::{
     utils::time::hour_micros,
 };
 use hashbrown::{HashMap, HashSet};
-use infra::{file_list as infra_file_list, schema::get_partition_time_level};
+use infra::{cache::file_data, file_list as infra_file_list, schema::get_partition_time_level};
 use metrics_index::MetricsFileLayout;
 use search::datafusion::merge::MergeMode;
 use search_service::file_list;
@@ -322,6 +322,11 @@ pub async fn merge_by_stream(
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
+
+                // the merged source files still sit in this node's disk cache
+                // (downloaded by `cache_remote_files`); drop them now instead of
+                // waiting for capacity eviction
+                file_data::delete::add(delete_file_list.iter().map(|f| f.key.clone()).collect());
 
                 // collect orphan blooms after writing file list successfully
                 for file in delete_file_list {
