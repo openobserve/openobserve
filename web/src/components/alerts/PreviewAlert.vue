@@ -94,7 +94,7 @@ const props = defineProps({
 // second, separately-triggered fetch — the dropdown's options refresh in
 // lockstep with "the preview query firing", not on a different cadence.
 const emit = defineEmits<{
-  (e: "schema-updated", projections: string[]): void;
+  (e: "schema-updated", payload: { projections: string[]; hasHaving: boolean }): void;
 }>();
 
 // Strip axis labels from field config so ECharts doesn't render axis titles
@@ -451,8 +451,14 @@ const fetchQuerySchema = async () => {
     // SQL tab's Multi Alert value-column dropdown — see the emit declaration
     // above. Only meaningful for the raw SQL tab (this branch only runs when
     // selectedTab === "sql"; the aggregation branch above, Custom's
-    // BE-generated SQL, returns before reaching here).
-    emit("schema-updated", extractedFields.projections);
+    // BE-generated SQL, returns before reaching here). `having` is the user's
+    // own SQL HAVING clause (parsed server-side), not the alert's "Alert if
+    // [column]" condition — its presence warns that it filters the result
+    // set before that condition ever sees it.
+    emit("schema-updated", {
+      projections: extractedFields.projections,
+      hasHaving: !!extractedFields.having,
+    });
 
     const chartType = determineChartType(extractedFields);
     dashboardPanelData.data.type = chartType;

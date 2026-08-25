@@ -1199,6 +1199,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
+            <OBanner
+              v-if="localTab === 'sql' && isMultiAlert && sqlQueryHasHaving"
+              dense
+              variant="warning"
+              class="mt-2"
+              :content="t('alerts.queryConfig.sqlHavingClauseWarning')"
+              data-test="alert-sql-having-clause-warning"
+            />
+
             <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
             <div v-if="isRealTime === 'false'" class="mt-2 flex flex-col gap-0 px-1">
               <!-- Check every -->
@@ -1777,6 +1786,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
@@ -1802,6 +1812,7 @@ export default defineComponent({
     OIcon,
     OFormInput,
     OFormSelect,
+    OBanner,
   },
   props: {
     tab: {
@@ -1859,6 +1870,10 @@ export default defineComponent({
     sqlAggColumnOptions: {
       type: Array as PropType<string[]>,
       default: () => [],
+    },
+    sqlQueryHasHaving: {
+      type: Boolean,
+      default: false,
     },
     isAggregationEnabled: {
       type: Boolean,

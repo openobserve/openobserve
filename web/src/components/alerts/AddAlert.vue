@@ -307,6 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :streamName="formData.stream_name"
                     :sqlQueryErrorMsg="sqlQueryErrorMsg"
                     :sqlAggColumnOptions="sqlAggColumnOptions"
+                    :sqlQueryHasHaving="sqlQueryHasHaving"
                     :isAggregationEnabled="isAggregationEnabled"
                     :beingUpdated="beingUpdated"
                     :isSeeding="isLoadingPrefill"
@@ -681,8 +682,9 @@ export default defineComponent({
     // refresh) — reuse that response instead of a second, differently-timed
     // fetch. QueryConfig's own watcher on this prop does the actual
     // clear-if-missing comparison; this handler only forwards the list.
-    const handleSqlSchemaUpdated = (projections: string[]) => {
-      alertForm.sqlAggColumnOptions.value = projections;
+    const handleSqlSchemaUpdated = (payload: { projections: string[]; hasHaving: boolean }) => {
+      alertForm.sqlAggColumnOptions.value = payload.projections;
+      alertForm.sqlQueryHasHaving.value = payload.hasHaving;
     };
 
     const isAnomalyDetectionEnabled = computed(

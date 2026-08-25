@@ -529,6 +529,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // /result_schema call PreviewAlert already makes every time the preview
   // query itself fires (sql_simple_multi_alert_fe_prd.md §11.2/§11.3).
   const sqlAggColumnOptions = ref<string[]>([]);
+  // Whether the user's own SQL carries a HAVING clause — same emit as above.
+  // Drives the QueryConfig warning that it runs before the Multi Alert's own
+  // "Alert if [column]" condition.
+  const sqlQueryHasHaving = ref(false);
   const validateSqlQueryPromise = ref<Promise<unknown>>();
   const addAlertFormRef = ref(null);
   const viewSqlEditorDialog = ref(false);
@@ -2919,6 +2923,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     sqlQueryErrorMsg,
     sqlErrorRanges,
     sqlAggColumnOptions,
+    sqlQueryHasHaving,
     validateSqlQueryPromise,
     addAlertFormRef,
     viewSqlEditorDialog,
