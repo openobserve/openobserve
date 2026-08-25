@@ -408,7 +408,7 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
     };
 
     // Try to get the alert to update.
-    let Some((_, alert_m)) = get_model_by_id(conn, org_id, alert_id).await? else {
+    let Some((_, alert_m)) = get_model_by_id(&txn, org_id, alert_id).await? else {
         return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertNotFound).into());
     };
 

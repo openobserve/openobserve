@@ -62,7 +62,7 @@ pub async fn get_by_name<C: ConnectionTrait + TransactionTrait>(
 ) -> Result<Option<(MetaFolder, MetaReport)>, Error> {
     let txn = conn.begin().await?;
     let Some(models) = queries::SelectReportAndJoinRelationsResult::get(
-        conn,
+        &txn,
         org_id,
         folder_snowflake_id,
         report_name,
@@ -82,7 +82,7 @@ pub async fn get_by_id<C: ConnectionTrait + TransactionTrait>(
 ) -> Result<Option<(MetaFolder, MetaReport)>, Error> {
     let txn = conn.begin().await?;
     let Some(models) =
-        queries::SelectReportAndJoinRelationsResult::get_by_id(conn, report_id).await?
+        queries::SelectReportAndJoinRelationsResult::get_by_id(&txn, report_id).await?
     else {
         return Ok(None);
     };
@@ -326,7 +326,7 @@ pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
     let txn = conn.begin().await?;
 
     let Some(models) =
-        queries::SelectReportAndJoinRelationsResult::get_by_id(conn, report_id).await?
+        queries::SelectReportAndJoinRelationsResult::get_by_id(&txn, report_id).await?
     else {
         return Err(Error::ReportNotFound);
     };
@@ -419,7 +419,7 @@ pub async fn delete_by_name<C: ConnectionTrait + TransactionTrait>(
 ) -> Result<String, Error> {
     let txn = conn.begin().await?;
     let Some((_folder_model, Some(report_model))) =
-        queries::get_report_from_folder(conn, org_id, folder_snowflake_id, report_name).await?
+        queries::get_report_from_folder(&txn, org_id, folder_snowflake_id, report_name).await?
     else {
         return Ok(String::new());
     };
