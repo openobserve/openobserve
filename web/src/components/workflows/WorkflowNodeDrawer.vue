@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <section
         v-if="showIo && !readonlyBody && !nodeMissingFromRun"
         data-test="workflow-ndv-input"
-        class="relative flex w-[var(--io-w)] min-w-0 shrink-0 flex-col gap-2"
+        class="relative flex w-[var(--io-w,16.25rem)] min-w-0 shrink-0 flex-col gap-2"
         :style="{ '--io-w': inputWidth + 'px' }"
       >
         <!-- Drag handle on Input's RIGHT edge (sits in the gap toward Config).
@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showIo && !nodeMissingFromRun"
         data-test="workflow-ndv-output"
         class="relative flex min-w-0 flex-col gap-2"
-        :class="isReadonlyTrigger ? 'flex-1' : 'w-[var(--io-w)] shrink-0'"
+        :class="isReadonlyTrigger ? 'flex-1' : 'w-[var(--io-w,16.25rem)] shrink-0'"
         :style="isReadonlyTrigger ? undefined : { '--io-w': outputWidth + 'px' }"
       >
         <!-- Drag handle on Output's LEFT edge (sits in the gap toward Config). Extends

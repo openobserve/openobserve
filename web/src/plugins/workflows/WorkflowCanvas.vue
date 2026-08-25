@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="actionSlot && !readOnly"
     data-test="workflow-flow-action-slot"
-    class="absolute top-[var(--wf-oy)] left-[var(--wf-ox)] z-10 flex origin-top -translate-x-1/2 scale-[var(--wf-oz)] flex-col items-center"
+    class="absolute top-[var(--wf-oy,0)] left-[var(--wf-ox,0)] z-10 flex origin-top -translate-x-1/2 scale-[var(--wf-oz,1)] flex-col items-center"
     :style="{
       '--wf-ox': actionSlot.left + 'px',
       '--wf-oy': actionSlot.top + 'px',
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-for="pt in appendPoints"
     :key="pt.id"
     data-test="workflow-flow-append-add"
-    class="absolute top-[var(--wf-oy)] left-[var(--wf-ox)] z-20 flex origin-top -translate-x-1/2 scale-[var(--wf-oz)] flex-col items-center"
+    class="absolute top-[var(--wf-oy,0)] left-[var(--wf-ox,0)] z-20 flex origin-top -translate-x-1/2 scale-[var(--wf-oz,1)] flex-col items-center"
     :style="{ '--wf-ox': pt.left + 'px', '--wf-oy': pt.top + 'px', '--wf-oz': pt.zoom }"
     @mouseenter="onAppendEnter(pt.id)"
     @mouseleave="onNodeMouseLeave"

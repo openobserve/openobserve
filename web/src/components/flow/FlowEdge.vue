@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        literal px lands in a class. -->
   <EdgeLabelRenderer v-if="insertable">
     <div
-      class="pointer-events-auto absolute top-0 left-0 [transform:var(--wf-edge-mid)]"
+      class="pointer-events-auto absolute top-0 left-0 [transform:var(--wf-edge-mid,none)]"
       :style="{ '--wf-edge-mid': `translate(-50%, -50%) translate(${path[1]}px, ${path[2]}px)` }"
       @mouseenter="emit('insert-enter')"
       @mouseleave="emit('insert-leave')"
