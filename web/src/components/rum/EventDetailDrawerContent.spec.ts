@@ -88,6 +88,13 @@ function createMockError(overrides: Record<string, any> = {}) {
 // Mock related resources
 const mockRelatedResources = [createMockResource(), createMockError()];
 
+// Stream discovery: defaults to the constant so the padded-navigation tests
+// keep their `stream: "default"` shape; tests override for custom streams.
+const mockResolveTracesStream = vi.fn().mockResolvedValue("default");
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTracesStream: mockResolveTracesStream }),
+}));
+
 // ============================================================================
 // TEST HELPERS
 // ============================================================================
@@ -826,6 +833,33 @@ describe("EventDetailDrawerContent", () => {
           }),
         }),
       );
+
+      windowOpenSpy.mockRestore();
+    });
+
+    it("opens the tab synchronously (popup-safe) and points it at the resolved stream", async () => {
+      // The user-gesture context dies at the first await: window.open must be
+      // called BEFORE the resolver settles, then the window is pointed at the
+      // resolved-stream route.
+      await waitForRelatedResources(wrapper);
+
+      const fakeWin: any = { location: { href: "" } };
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => fakeWin);
+      let openedBeforeResolve = false;
+      mockResolveTracesStream.mockImplementationOnce(async () => {
+        openedBeforeResolve = windowOpenSpy.mock.calls.length > 0;
+        return "payments_traces";
+      });
+
+      const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+      expect(traceButtons.length).toBeGreaterThan(0);
+      await traceButtons[0].trigger("click");
+      await flushPromises();
+
+      expect(windowOpenSpy).toHaveBeenCalledWith("", "_blank");
+      expect(openedBeforeResolve).toBe(true);
+      expect(fakeWin.location.href).toContain("stream=payments_traces");
+      expect(fakeWin.location.href).toContain("trace_id=");
 
       windowOpenSpy.mockRestore();
     });
