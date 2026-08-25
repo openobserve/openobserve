@@ -35,15 +35,13 @@ pub fn metrics_index_stream(stream_type: StreamType, schema: &Schema) -> bool {
 }
 
 /// True when `stream_type` uses the metrics index layout
-/// (`ZO_METRICS_INDEX_ENABLED`): Parquet metrics files ordered by
+/// (`ZO_METRICS_INDEX_ENABLED`): metrics files ordered by
 /// `(__hash__, _timestamp)`, so readers must not assume a `_timestamp` order.
 pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
     if stream_type != StreamType::Metrics {
         return false;
     }
-    let cfg = get_config();
-    cfg.compact.metrics_index_enabled
-        && cfg.common.file_format.for_stream(stream_type) == FileFormat::Parquet
+    get_config().compact.metrics_index_enabled
 }
 
 /// Metrics-specific physical layout encoded in a file-name prefix so readers
@@ -51,13 +49,14 @@ pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricsFileLayout {
     /// File ordered by `(__hash__ ASC, _timestamp ASC)` but not finalized:
-    /// written by the ingester and by incremental compactor merges of the
-    /// still-open hour (`hash-sorted-v1-{id}.parquet`).
+    /// written as Parquet by the ingester and in the configured format by
+    /// incremental compactor merges of the still-open hour
+    /// (`hash-sorted-v1-{id}.parquet` or `.vortex`).
     HashSorted,
     /// Size-bounded file ordered by `(__hash__ ASC, _timestamp ASC)` with a
     /// `.midx` metrics index (see [`MetricsFileLayout::metrics_index_path`]);
     /// written by the compactor's hour-end merge
-    /// (`indexed-v1-{id}.parquet`).
+    /// (`indexed-v1-{id}.parquet` or `.vortex`).
     Indexed,
 }
 
@@ -110,7 +109,7 @@ impl MetricsFileLayout {
     /// The `.midx` metrics-index object of an indexed metrics data file. Stored like
     /// the Tantivy index — under its own root instead of next to the data —
     /// but in a distinct tree:
-    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.parquet`
+    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.vortex`
     /// -> `files/{org}/midx/{stream}/{date}/{hour}/indexed-v1-{id}.midx`.
     pub fn metrics_index_path(path: &str) -> Option<String> {
         if Self::of(path) != Some(Self::Indexed) {
