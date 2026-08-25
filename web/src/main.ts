@@ -107,7 +107,7 @@ const getConfig = async () => {
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
-    if (res.data.rum?.enabled && import.meta.env.VITE_DISABLE_RUM !== "true") {
+    if (res.data.rum?.enabled) {
       const options = {
         clientToken: res.data.rum.client_token,
         applicationId: res.data.rum.application_id,
