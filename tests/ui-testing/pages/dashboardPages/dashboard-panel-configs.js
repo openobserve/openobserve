@@ -60,6 +60,12 @@ export default class DashboardPanelConfigs {
     this.wrapcell = page.locator(
       '[data-test="dashboard-config-wrap-table-cells"]'
     );
+    this.showPagination = page.locator(
+      '[data-test="dashboard-config-show-pagination"]'
+    );
+    this.rowsPerPage = page.locator(
+      '[data-test="dashboard-config-rows-per-page"]'
+    );
     this.transpose = page.locator(
       '[data-test="dashboard-config-table_transpose"]'
     );
@@ -312,6 +318,37 @@ export default class DashboardPanelConfigs {
   async selectWrapCell() {
     await this.wrapcell.waitFor({ state: "visible" });
     await this.wrapcell.click();
+  }
+
+  // Show pagination toggle (disables dashboard virtual scroll)
+  async selectShowPagination() {
+    await this.showPagination.waitFor({ state: "visible" });
+    await this.showPagination.click();
+  }
+
+  // Rows per page input (only visible after show-pagination is enabled)
+  async setRowsPerPage(value) {
+    await this.rowsPerPage.waitFor({ state: "visible" });
+    await this.rowsPerPage.click();
+    await this.rowsPerPage.fill(String(value));
+  }
+
+  // Read the wrap-cells toggle state (guard before asserting virtual-scroll bypass)
+  async isWrapCellEnabled() {
+    let ariaChecked = await this.wrapcell.getAttribute("aria-checked");
+    if (ariaChecked === null) {
+      ariaChecked = await this.wrapcell.getAttribute("aria-pressed");
+    }
+    return ariaChecked === "true";
+  }
+
+  // Read the show-pagination toggle state (guard before asserting paged rows)
+  async isShowPaginationEnabled() {
+    let ariaChecked = await this.showPagination.getAttribute("aria-checked");
+    if (ariaChecked === null) {
+      ariaChecked = await this.showPagination.getAttribute("aria-pressed");
+    }
+    return ariaChecked === "true";
   }
   //Transpose
   async selectTranspose() {

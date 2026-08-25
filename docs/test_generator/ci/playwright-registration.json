@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Core",
+  "spec_filename": "dashboard-virtual-scroll.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

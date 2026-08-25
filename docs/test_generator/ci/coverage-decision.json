@@ -1,0 +1,15 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Dashboards/dashboard-virtual-scroll.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-table-chart.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-table-pagination.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-pivot-table.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-table-copy-cell.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-table-csv-download.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-config-table.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_note": "Add \"dashboard-virtual-scroll.spec.js\" to the Dashboards-Core group's run_files in .github/workflows/playwright.yml (run-context playwright_group: Dashboards-Core).",
+  "rationale": "No existing spec asserts dashboard-table row windowing: bounded DOM row count, spacer rows (tr[aria-hidden=true]), or the data-index window sliding on scroll. dashboard-table-chart.spec.js only checks basic rendering/sorting; dashboard-table-pagination.spec.js and dashboard-config-table.spec.js exercise wrap/pagination controls but never assert virtual scroll is bypassed (no spacers + unbounded rows). This is a distinct area within Dashboards -> new spec."
+}

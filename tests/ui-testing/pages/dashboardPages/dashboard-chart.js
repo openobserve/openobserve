@@ -426,6 +426,19 @@ export default class ChartTypeSelector {
   }
 
   /**
+   * Switch to Custom SQL query mode by clicking "SQL" first, then "Custom SQL".
+   * Mirrors the proven dashboard-table-pagination.spec.js custom-SQL path, where
+   * the "Custom SQL" sub-option is revealed only after selecting SQL mode.
+   */
+  async switchToCustomSQLMode() {
+    await this.sqlQueryTypeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.sqlQueryTypeBtn.click();
+    await this.customQueryTypeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.customQueryTypeBtn.click();
+    testLogger.debug('Switched to custom SQL query mode');
+  }
+
+  /**
    * Enter a custom SQL query in the Monaco editor
    * @param {string} query - The SQL query to enter
    */

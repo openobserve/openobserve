@@ -1,0 +1,25 @@
+{
+  "feature_slug": "dashboard-table-virtual-windowing",
+  "feature_title": "Dashboard Table Virtual Scroll Row Windowing",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-virtual-scroll.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-virtual-scroll.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/components/TenstackTable.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed file is web/src/components/TenstackTable.vue, an open-source UI component with no enterprise-owned path (no enterprise/, o2_enterprise/, or src/enterprise/). No enterprise keywords (cipher, SSO, SAML, RBAC, SDR, etc.) appear in the changed path or symbols, so this is an OSS change.",
+    "skip": "No skip marker applies: feature_hint.txt and trigger_comment.txt are both empty (no explicit opt-out or 'skip' request), and the change is not docs/CI/comment-only. It touches a shared Vue component that alters the dashboard table's rendered row model, so it is user-facing.",
+    "e2e": "E2E is warranted: the diff changes the dashboard virtual-scroll path in TenstackTable.vue by windowing the TanStack row model (slice over dashWindowStart/dashWindowEnd), changing rowCount to the full tableRows length when windowed, and switching the rendered row key from row.id to idx. This alters how dashboard rows are materialized, keyed, and reconciled during scroll and must be verified against real rendering behavior.",
+    "area": "The change lives in a shared component whose modified branches are gated to the dashboard virtual path (dashVirtualEnabled / isPivotMode), so it affects dashboard table rendering. Existing dashboard specs live under tests/ui-testing/playwright-tests/Dashboards/, making Dashboards the correct area.",
+    "group": "Dashboards-Core is the closest matrix shard: it holds core dashboard rendering/table specs (dashboard.spec.js, dashboard2.spec.js, dashboardtype.spec.js) in .github/workflows/playwright.yml, which is where a virtual-scroll/table-windowing regression belongs.",
+    "existing_tests": "No Playwright E2E specs (tests/ui-testing/playwright-tests/) are present in the diff — the only file changed is web/src/components/TenstackTable.vue, a Vue component, not an E2E spec."
+  }
+}

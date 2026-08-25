@@ -1,0 +1,17 @@
+{
+  "feature_slug": "dashboard-table-virtual-windowing",
+  "feature_title": "Dashboard Table Virtual Scroll Row Windowing",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-virtual-scroll.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-virtual-scroll.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/components/TenstackTable.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

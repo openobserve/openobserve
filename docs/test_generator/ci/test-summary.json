@@ -1,0 +1,27 @@
+[
+  {
+    "title": "should render a bounded window of rows with spacer rows for a large dataset",
+    "action": "new",
+    "verifies": "a large dataset renders only a bounded window of DOM rows (<=100) plus spacer rows, not the full set"
+  },
+  {
+    "title": "should slide the render window toward the tail when scrolling to the bottom",
+    "action": "new",
+    "verifies": "scrolling to the bottom advances the rendered data-index window toward the dataset tail"
+  },
+  {
+    "title": "should disable virtual scroll when wrap cells is enabled (no spacers, unbounded rows)",
+    "action": "new",
+    "verifies": "enabling wrap cells bypasses virtual scroll: zero spacer rows and unbounded rendered rows"
+  },
+  {
+    "title": "should disable virtual scroll when pagination is enabled (paged rows, no spacers)",
+    "action": "new",
+    "verifies": "enabling pagination bypasses virtual scroll: exactly rowsPerPage rows, no spacers, paged footer visible"
+  },
+  {
+    "title": "should render all rows with no spacers for a small dataset that fits the viewport",
+    "action": "new",
+    "verifies": "a small dataset renders its full window with zero spacer rows"
+  }
+]
