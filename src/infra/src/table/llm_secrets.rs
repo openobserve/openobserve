@@ -17,7 +17,7 @@ use sea_orm::{
 };
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     errors,
     table::{
         cipher,
@@ -67,7 +67,7 @@ impl std::fmt::Debug for SecretRecord {
 }
 
 pub async fn client() -> &'static DatabaseConnection {
-    ORM_CLIENT.get_or_init(connect_to_orm).await
+    get_orm_client_rw().await
 }
 
 fn encrypt_data(dek: &[u8], plaintext: &str) -> Result<String, errors::Error> {

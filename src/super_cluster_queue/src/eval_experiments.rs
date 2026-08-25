@@ -6,7 +6,7 @@
 // (at your option) any later version.
 
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     errors::{Error, Result},
     table::entity::llm_experiments,
 };
@@ -38,7 +38,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 async fn apply_put(experiment: llm_experiments::Model) -> Result<()> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     match llm_experiments::Entity::find_by_id(&experiment.id)
         .one(db)
         .await?
