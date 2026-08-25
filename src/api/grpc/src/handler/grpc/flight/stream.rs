@@ -30,6 +30,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::grpc::flight::{SessionGuard, partition_encoder::PartitionEncoderStream};
 
+/// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
+/// which is what the receiving channel accepts.
+pub(crate) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
+
 pub struct FlightEncoderStreamBuilder {
     options: IpcWriteOptions,
     max_flight_data_size: usize,
@@ -513,7 +517,7 @@ mod tests {
             .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
             options,
-            33554432,
+            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
         )
         .build(partitions, tracing::Span::none());
@@ -568,7 +572,7 @@ mod tests {
 
         let stream = FlightEncoderStreamBuilder::new(
             IpcWriteOptions::default(),
-            33554432,
+            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
         )
         .build(vec![ok_partition, panic_partition], tracing::Span::none());
@@ -686,7 +690,7 @@ mod tests {
             .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
             options,
-            33554432,
+            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
         )
         .build(partitions, tracing::Span::none());
@@ -759,7 +763,7 @@ mod tests {
             .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
             options,
-            33554432,
+            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
         )
         .build(vec![inner], tracing::Span::none());
