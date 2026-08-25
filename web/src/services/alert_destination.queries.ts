@@ -18,9 +18,12 @@ import destination from "./alert_destination";
 import { destinationKeys } from "./alert_destination.querykeys";
 import type { DestinationModule } from "./alert_destination.querykeys";
 import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
-/** Read by the alert form, pipelines and IAM — hence the persisted policy. */
+/**
+ * Read by the alert form, pipelines and IAM. Memory-only: destination payloads
+ * can carry webhook Authorization headers and PagerDuty/Opsgenie/ServiceNow
+ * keys, which must not sit in localStorage like the other config lists do.
+ */
 export const destinationsQuery = (org: string, module?: DestinationModule) =>
   queryOptions({
     queryKey: destinationKeys.list(org, module),
@@ -37,7 +40,6 @@ export const destinationsQuery = (org: string, module?: DestinationModule) =>
       ).data ?? [],
     staleTime: CONFIG_STALE_TIME,
     gcTime: LONG_GC_TIME,
-    persister: localStoragePersister,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────
