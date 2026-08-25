@@ -97,7 +97,7 @@ use std::{
 
 use config::{cluster::LOCAL_NODE, meta::synthetics::SyntheticFrequency};
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_ro,
     table::{org_ingestion_tokens, synthetics_checks, synthetics_checks::OrphanCandidate},
 };
 
@@ -346,7 +346,7 @@ pub async fn run() {
             continue;
         }
 
-        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let db = get_orm_client_ro().await;
         detect(
             db,
             &client,

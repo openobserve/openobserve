@@ -33,6 +33,7 @@
 //! each other.
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::now_micros};
+use infra::db::get_orm_client_rw;
 
 pub fn run() {
     if !LOCAL_NODE.is_scheduler() {
@@ -67,9 +68,7 @@ pub fn run() {
 }
 
 async fn sweep() -> Result<(), anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let slos = infra::table::slos::list_enabled(db)
         .await

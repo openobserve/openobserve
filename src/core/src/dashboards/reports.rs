@@ -40,7 +40,7 @@ use db::{
 };
 use futures::{StreamExt, future::try_join_all};
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table,
 };
 use itertools::Itertools;
@@ -117,7 +117,7 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let cfg = get_config();
     if cfg.common.report_server_url.is_empty() {
         // Check if SMTP is enabled, otherwise don't save the report
@@ -250,14 +250,14 @@ pub async fn save(
 }
 
 pub async fn get(org_id: &str, folder_id: &str, name: &str) -> Result<Report, ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     db::dashboards::reports::get(conn, org_id, folder_id, name)
         .await
         .map_err(|_| ReportError::ReportNotFound)
 }
 
 pub async fn get_by_id(org_id: &str, report_id: &str) -> Result<(Folder, Report), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     match table::reports::get_by_id(conn, report_id).await {
         Ok(Some((folder, report))) if report.org_id == org_id => Ok((folder, report)),
         Ok(_) => Err(ReportError::ReportNotFound),
@@ -270,7 +270,7 @@ pub async fn list(
     filters: ReportListFilters,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<table::reports::ListReportsQueryResult>, ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let params = filters.into_params(org_id);
     let reports = db::dashboards::reports::list(conn, &params)
         .await
@@ -293,7 +293,7 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, folder_id: &str, name: &str) -> Result<(), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
 
     // Existence check — db::delete returns empty string if not found.
     if db::dashboards::reports::get(conn, org_id, folder_id, name)
@@ -324,7 +324,7 @@ pub async fn delete(org_id: &str, folder_id: &str, name: &str) -> Result<(), Rep
 }
 
 pub async fn delete_by_id(org_id: &str, report_id: &str) -> Result<(), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let (folder, _) = get_by_id(org_id, report_id).await?;
 
     db::dashboards::reports::delete_by_id(conn, org_id, report_id)
@@ -345,7 +345,7 @@ pub async fn delete_by_id(org_id: &str, report_id: &str) -> Result<(), ReportErr
 }
 
 pub async fn trigger(org_id: &str, folder_id: &str, name: &str) -> Result<(), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
         Ok(report) => report,
         _ => {
@@ -368,7 +368,7 @@ pub async fn enable(
     name: &str,
     value: bool,
 ) -> Result<(), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
 
     // TODO: The "get" and "update" operations should be in a transaction.
     let mut report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
@@ -384,7 +384,7 @@ pub async fn enable(
 }
 
 pub async fn enable_by_id(org_id: &str, report_id: &str, value: bool) -> Result<(), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let (_, mut report) = get_by_id(org_id, report_id).await?;
     report.enabled = value;
     db::dashboards::reports::update_by_id(conn, report_id, None, report)
@@ -398,7 +398,7 @@ pub async fn update_by_id(
     new_folder_id: Option<&str>,
     mut report: Report,
 ) -> Result<(), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let cfg = get_config();
 
     if cfg.common.report_server_url.is_empty() {
@@ -483,7 +483,7 @@ pub async fn move_to_folder(
     report_ids: &[String],
     dst_folder_id: &str,
 ) -> Result<(), ReportError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     for report_id in report_ids {
         let (curr_folder, report) = get_by_id(org_id, report_id).await?;
 

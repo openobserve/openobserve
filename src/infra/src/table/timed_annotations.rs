@@ -22,15 +22,9 @@ use sea_orm::{
     TransactionTrait, prelude::Expr,
 };
 
-use super::{
-    entity::{
-        dashboards, folders, timed_annotation_panels,
-        timed_annotations::{self},
-    },
-    get_lock,
-};
+use super::entity::{dashboards, folders, timed_annotation_panels, timed_annotations};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -40,10 +34,7 @@ pub async fn get(
     start_time: i64,
     end_time: i64,
 ) -> Result<Vec<TimedAnnotation>, errors::Error> {
-    // make sure only one client is writing to the database (only for SQLite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     // Step 1: Resolve the user-facing `dashboard_id` to the primary key (KSUID)
     let dashboard_record = dashboards::Entity::find()
@@ -189,10 +180,7 @@ pub async fn get(
 }
 
 pub async fn delete(dashboard_id: &str, timed_annotation_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let dashboard_record = dashboards::Entity::find()
         .filter(dashboards::Column::DashboardId.eq(dashboard_id))
         .one(client)
@@ -224,10 +212,7 @@ pub async fn delete_many(
     dashboard_id: &str,
     timed_annotation_ids: &[String],
 ) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let dashboard_record = dashboards::Entity::find()
         .filter(dashboards::Column::DashboardId.eq(dashboard_id))
         .one(client)
@@ -268,10 +253,7 @@ pub async fn delete_many(
 /// timed_annotation_panels are deleted first because SQLite does not enforce FK cascades
 /// unless `PRAGMA foreign_keys = ON` is set.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database (only for SQLite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Step 1: Collect folder PKs for this org
     let folder_ids: Vec<String> = folders::Entity::find()
@@ -331,11 +313,8 @@ pub async fn get_one(
     dashboard_id: &str,
     timed_annotation_id: &str,
 ) -> Result<TimedAnnotation, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     // Initialize the ORM client
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     // Step 1: Resolve the user-facing `dashboard_id` to the primary key
     let dashboard_record = dashboards::Entity::find()
@@ -399,11 +378,8 @@ pub async fn update(
     dashboard_id: &str,
     timed_annotation: TimedAnnotation,
 ) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     // Initialize the ORM client
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let txn = client.begin().await?;
 
@@ -552,10 +528,7 @@ pub async fn add_many(
     timed_annotations: Vec<TimedAnnotation>,
     use_given_id: bool,
 ) -> Result<Vec<TimedAnnotation>, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let txn = client.begin().await?;
     let mut inserted_annotations = Vec::new();
