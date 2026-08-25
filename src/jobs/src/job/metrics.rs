@@ -278,7 +278,7 @@ async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
         .set(common::infra::wal::lock_files_len() as i64);
     metrics::INGEST_WAL_PENDING_DELETE_FILES
         .with_label_values::<&str>(&[])
-        .set(db::file_list::local::get_pending_delete().await.len() as i64);
+        .set(infra::file_list::pending_delete::len().await as i64);
     Ok(())
 }
 

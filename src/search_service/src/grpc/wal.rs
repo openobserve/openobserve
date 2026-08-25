@@ -639,7 +639,7 @@ async fn get_file_list(
             path
         }
         Err(_) => {
-            return Ok((vec![], wal::SearchingFiles::none(&query.trace_id)));
+            return Ok((vec![], wal::SearchingFiles::empty(&query.trace_id)));
         }
     };
 
@@ -704,13 +704,13 @@ async fn get_file_list(
         .collect::<Vec<_>>();
 
     if files.is_empty() {
-        return Ok((vec![], wal::SearchingFiles::none(&query.trace_id)));
+        return Ok((vec![], wal::SearchingFiles::empty(&query.trace_id)));
     }
 
     // filter by pending delete
     let mut files = infra::file_list::pending_delete::filter(files).await;
     if files.is_empty() {
-        return Ok((vec![], wal::SearchingFiles::none(&query.trace_id)));
+        return Ok((vec![], wal::SearchingFiles::empty(&query.trace_id)));
     }
 
     let files_num = files.len();

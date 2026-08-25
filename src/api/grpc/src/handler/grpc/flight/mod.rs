@@ -61,8 +61,8 @@ pub mod visitor;
 #[derive(Default)]
 pub struct FlightServiceImpl;
 
-/// Owns the wal locks and datafusion file list of one `do_get`, releasing them on drop so a
-/// request cancelled before it can produce a response stream cannot leave them pinned.
+/// Releases the wal locks and datafusion file list registered under this trace id on drop, so
+/// a request cancelled before it can produce a response stream cannot leave them pinned.
 pub(crate) struct SessionGuard {
     trace_id: String,
 }

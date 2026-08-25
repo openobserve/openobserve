@@ -72,7 +72,8 @@ impl SearchingFileLocker {
 }
 
 impl SearchingFiles {
-    pub fn none(trace_id: &str) -> Self {
+    /// An empty guard, for the paths that return before any lock is taken.
+    pub fn empty(trace_id: &str) -> Self {
         Self {
             trace_id: trace_id.to_string(),
             files: HashSet::new(),
