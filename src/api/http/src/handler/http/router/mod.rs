@@ -395,7 +395,7 @@ fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
         return false;
     };
     let task_path = &segments[tasks + 1..];
-    (method == Method::POST && task_path.is_empty())
+    (method == Method::POST && (task_path.is_empty() || task_path == &["test"]))
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
@@ -1250,6 +1250,7 @@ pub fn service_routes() -> Router {
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
                 .route("/{org_id}/tasks", get(remote_tasks::list_remote_tasks).post(remote_tasks::create_remote_task))
+                .route("/{org_id}/tasks/test", post(remote_tasks::test_remote_task))
                 .route("/{org_id}/tasks/{entity_id}/auth", put(remote_tasks::replace_remote_task_auth_secret).delete(remote_tasks::revoke_remote_task_auth_secret))
                 .route("/{org_id}/tasks/{entity_id}/headers/{header_name}/secret", put(remote_tasks::replace_remote_task_header_secret).delete(remote_tasks::revoke_remote_task_header_secret))
                 .route("/{org_id}/tasks/{entity_id}/signing/rotate", post(remote_tasks::rotate_remote_task_signing_secret))
@@ -1258,6 +1259,7 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/tasks/{entity_id}/signing/end_grace", post(remote_tasks::end_remote_task_signing_grace))
                 .route("/{org_id}/tasks/{entity_id}/signing", get(remote_tasks::get_remote_task_signing_status).delete(remote_tasks::revoke_remote_task_signing_secret))
                 .route("/{org_id}/tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
+                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
                 .route("/{org_id}/tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
                 .route("/{org_id}/tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
                 .route("/{org_id}/tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
@@ -1735,6 +1737,7 @@ mod tests {
     fn audit_redacts_every_remote_task_secret_write_body() {
         for (method, path) in [
             (Method::POST, "api/org/tasks"),
+            (Method::POST, "api/org/tasks/test"),
             (Method::PUT, "api/org/tasks/task-1/auth"),
             (Method::PUT, "api/org/tasks/task-1/headers/x-api-key/secret"),
             (Method::POST, "api/org/tasks/task-1/signing/rotate"),

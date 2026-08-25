@@ -291,6 +291,32 @@ impl CreateRemoteTaskRequestBody {
     }
 }
 
+impl std::fmt::Debug for CreateRemoteTaskRequestBody {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CreateRemoteTaskRequestBody")
+            .field("name", &self.name)
+            .field("description", &self.description)
+            .field("endpoint", &self.endpoint)
+            .field("http_method", &self.http_method)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A complete inline Remote Task candidate and the sample sent by a stateless
+/// connection test. The candidate fields intentionally match registration so
+/// the UI can send the same form state without first creating a Task head.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestRemoteTaskRequestBody {
+    #[serde(flatten)]
+    #[schema(inline)]
+    pub candidate: CreateRemoteTaskRequestBody,
+    #[serde(default)]
+    pub input: Option<serde_json::Value>,
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
 /// What a header looks like on the way out: its key, and its literal value only
 /// when it has one. A header backed by a Secret reports that it is, never what.
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -395,6 +421,18 @@ pub struct RemoteTaskResponseBody {
     pub is_active: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Number of live Experiments pinned to any published version of this
+    /// head. Populated by the list endpoint, which can compute all heads in one
+    /// batch; omitted from single-version responses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub referenced_by: Option<u64>,
+}
+
+impl RemoteTaskResponseBody {
+    pub fn with_referenced_by(mut self, referenced_by: u64) -> Self {
+        self.referenced_by = Some(referenced_by);
+        self
+    }
 }
 
 impl From<RemoteTask> for RemoteTaskResponseBody {
@@ -439,6 +477,7 @@ impl From<RemoteTask> for RemoteTaskResponseBody {
             is_active: task.is_active,
             created_at: task.created_at,
             updated_at: task.updated_at,
+            referenced_by: None,
         }
     }
 }
@@ -507,6 +546,67 @@ pub struct PublishRemoteTaskResponseBody {
     pub error: Option<String>,
     pub task: RemoteTaskResponseBody,
     pub report: VerificationReportBody,
+}
+
+/// Result of testing an inline Remote Task candidate. Unlike publication,
+/// this response carries no Task because the operation is deliberately
+/// stateless.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestRemoteTaskResponseBody {
+    pub verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub report: VerificationReportBody,
+}
+
+/// Query parameters for aggregating execution statistics for a Remote Task.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTaskStatsQuery {
+    pub window_ms: u64,
+    #[serde(default)]
+    pub version: Option<i32>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTaskLatencyStatsBody {
+    pub p50: Option<f64>,
+    pub p95: Option<f64>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTaskStatsResponseBody {
+    pub window_ms: u64,
+    pub total_runs: u64,
+    pub ok_runs: u64,
+    pub error_runs: u64,
+    pub skipped_runs: u64,
+    pub latency_ms: RemoteTaskLatencyStatsBody,
+    pub referencing_experiments: u64,
+}
+
+impl From<openobserve_core::llm_evaluations::remote_tasks::stats::RemoteTaskStats>
+    for RemoteTaskStatsResponseBody
+{
+    fn from(
+        value: openobserve_core::llm_evaluations::remote_tasks::stats::RemoteTaskStats,
+    ) -> Self {
+        Self {
+            window_ms: value.window_ms,
+            total_runs: value.total_runs,
+            ok_runs: value.ok_runs,
+            error_runs: value.error_runs,
+            skipped_runs: value.skipped_runs,
+            latency_ms: RemoteTaskLatencyStatsBody {
+                p50: value.p50_latency_ms,
+                p95: value.p95_latency_ms,
+            },
+            referencing_experiments: value.referencing_experiments,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -691,6 +791,43 @@ mod tests {
         assert_eq!(json["entityId"], "head-1");
         assert!(json.get("task").is_none());
         assert!(json.get("generatedSigningSecret").is_some());
+    }
+
+    #[test]
+    fn stateless_test_accepts_registration_fields_at_the_top_level() {
+        let body: TestRemoteTaskRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "summarizer",
+            "endpoint": "https://tasks.example.com/run",
+            "input": { "question": "hello" },
+            "metadata": { "source": "manual" }
+        }))
+        .unwrap();
+
+        assert_eq!(body.candidate.name, "summarizer");
+        assert_eq!(body.input.unwrap()["question"], "hello");
+        assert_eq!(body.metadata.unwrap()["source"], "manual");
+    }
+
+    #[test]
+    fn stats_response_uses_the_ui_camel_case_contract() {
+        let body = RemoteTaskStatsResponseBody::from(
+            openobserve_core::llm_evaluations::remote_tasks::stats::RemoteTaskStats {
+                window_ms: 86_400_000,
+                total_runs: 4,
+                ok_runs: 2,
+                error_runs: 1,
+                skipped_runs: 1,
+                p50_latency_ms: Some(12.5),
+                p95_latency_ms: None,
+                referencing_experiments: 3,
+            },
+        );
+        let json = serde_json::to_value(body).unwrap();
+
+        assert_eq!(json["windowMs"], 86_400_000);
+        assert_eq!(json["latencyMs"]["p50"], 12.5);
+        assert!(json["latencyMs"]["p95"].is_null());
+        assert_eq!(json["referencingExperiments"], 3);
     }
 }
 

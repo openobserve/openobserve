@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{extract::Path, response::Response};
+use axum::{
+    extract::{Path, Query},
+    response::Response,
+};
 use db::authz::{remove_ownership, set_ownership};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
@@ -32,12 +35,13 @@ use crate::{
         ActivateRemoteTaskSecretRequestBody, CreateRemoteTaskRequestBody,
         CreateRemoteTaskResponseBody, ListRemoteTasksResponseBody, PublishRemoteTaskResponseBody,
         RemoteTaskRequestBody, RemoteTaskResponseBody, RemoteTaskSecretMetadataBody,
-        RemoteTaskSigningStatusResponseBody, ReplaceRemoteTaskSecretRequestBody,
-        RotateRemoteTaskSecretRequestBody, TestConnectionRequestBody,
+        RemoteTaskSigningStatusResponseBody, RemoteTaskStatsQuery, RemoteTaskStatsResponseBody,
+        ReplaceRemoteTaskSecretRequestBody, RotateRemoteTaskSecretRequestBody,
+        TestConnectionRequestBody, TestRemoteTaskRequestBody, TestRemoteTaskResponseBody,
         TestRemoteTaskSecretCandidateResponseBody, TestRunRequestBody, TestRunResponseBody,
         VerificationReportBody, WrittenRemoteTaskSecretResponseBody,
     },
-    service::llm_evaluations::remote_tasks::{self, RemoteTaskError},
+    service::llm_evaluations::remote_tasks::{self, RemoteTaskError, stats::RemoteTaskStatsError},
 };
 
 fn remote_task_error_response(value: RemoteTaskError) -> Response {
@@ -58,6 +62,27 @@ fn remote_task_error_response(value: RemoteTaskError) -> Response {
         | RemoteTaskError::UnpinnedReference(_)
         | RemoteTaskError::Invalid(_) => MetaHttpResponse::bad_request(value),
         RemoteTaskError::Secret(error) => secret_error_response(error),
+    }
+}
+
+fn remote_task_stats_error_response(value: RemoteTaskStatsError) -> Response {
+    match value {
+        RemoteTaskStatsError::RemoteTask(error) => remote_task_error_response(error),
+        error @ RemoteTaskStatsError::InvalidWindow => MetaHttpResponse::bad_request(error),
+        error @ RemoteTaskStatsError::VersionNotFound(_) => MetaHttpResponse::not_found(error),
+        RemoteTaskStatsError::Experiment(error) => {
+            log::error!("[RemoteTaskStats] experiment lookup failed: {error}");
+            MetaHttpResponse::internal_error("Internal server error")
+        }
+        RemoteTaskStatsError::Search(error) => {
+            log::error!("[RemoteTaskStats] search failed: {error}");
+            MetaHttpResponse::internal_error("Internal server error")
+        }
+        error @ (RemoteTaskStatsError::IncompleteSearch
+        | RemoteTaskStatsError::MalformedResponse(_)) => {
+            log::error!("[RemoteTaskStats] {error}");
+            MetaHttpResponse::internal_error("Internal server error")
+        }
     }
 }
 
@@ -607,6 +632,10 @@ pub async fn list_remote_tasks(
     };
     match remote_tasks::list(&org_id).await {
         Ok(list) => {
+            let referenced_by = match remote_tasks::stats::referenced_by_counts(&org_id).await {
+                Ok(counts) => counts,
+                Err(error) => return remote_task_stats_error_response(error),
+            };
             #[cfg(feature = "enterprise")]
             let list = list
                 .into_iter()
@@ -619,7 +648,15 @@ pub async fn list_remote_tasks(
                     )
                 })
                 .collect::<Vec<_>>();
-            let body: ListRemoteTasksResponseBody = list.into();
+            let body = ListRemoteTasksResponseBody {
+                list: list
+                    .into_iter()
+                    .map(|task| {
+                        let count = referenced_by.get(&task.entity_id).copied().unwrap_or(0);
+                        RemoteTaskResponseBody::from(task).with_referenced_by(count)
+                    })
+                    .collect(),
+            };
             MetaHttpResponse::json(body)
         }
         Err(err) => remote_task_error_response(err),
@@ -663,6 +700,59 @@ pub async fn create_remote_task(
             MetaHttpResponse::json(body)
         }
         Err(err) => remote_task_error_response(err),
+    }
+}
+
+/// TestRemoteTask
+#[utoipa::path(
+    post,
+    path = "/{org_id}/tasks/test",
+    context_path = "/api",
+    tag = "RemoteTasks",
+    operation_id = "TestRemoteTask",
+    summary = "Test an inline remote task",
+    description = "Calls an inline Remote Task candidate once using the submitted contract and write-only Secret material. No Task, version, execution record, or Secret row is written.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = inline(TestRemoteTaskRequestBody), description = "Complete registration candidate plus sample input and metadata"),
+    responses(
+        (status = 200, body = inline(TestRemoteTaskResponseBody)),
+        (status = 400, description = "Bad Request", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "test"})),
+    ),
+)]
+pub async fn test_remote_task(
+    Path(org_id): Path<String>,
+    axum::Json(body): axum::Json<TestRemoteTaskRequestBody>,
+) -> Response {
+    let TestRemoteTaskRequestBody {
+        candidate,
+        input,
+        metadata,
+    } = body;
+    let registration = match candidate.into_registration() {
+        Ok(registration) => registration,
+        Err(error) => return MetaHttpResponse::bad_request(error),
+    };
+    let sample = sample_context(TestConnectionRequestBody { input, metadata });
+    match remote_tasks::test_registration(&org_id, registration, &sample).await {
+        Ok(VerificationOutcome::Passed(report)) => {
+            MetaHttpResponse::json(TestRemoteTaskResponseBody {
+                verified: true,
+                error: None,
+                report: report.into(),
+            })
+        }
+        Ok(VerificationOutcome::Failed { error, report }) => {
+            MetaHttpResponse::json(TestRemoteTaskResponseBody {
+                verified: false,
+                error: Some(error),
+                report: report.into(),
+            })
+        }
+        Err(error) => remote_task_error_response(error),
     }
 }
 
@@ -729,6 +819,41 @@ pub async fn list_remote_task_versions(
             MetaHttpResponse::json(body)
         }
         Err(err) => remote_task_error_response(err),
+    }
+}
+
+/// GetRemoteTaskStats
+#[utoipa::path(
+    get,
+    path = "/{org_id}/tasks/{entity_id}/stats",
+    context_path = "/api",
+    tag = "RemoteTasks",
+    operation_id = "GetRemoteTaskStats",
+    summary = "Get remote task execution statistics",
+    description = "Aggregates latest-wins terminal execution records whose own server timestamp falls inside the requested window. The head includes every published version unless version narrows it.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("entity_id" = String, Path, description = "Remote task head id"),
+        ("windowMs" = u64, Query, description = "Window ending now, measured against execution-record _timestamp"),
+        ("version" = Option<i32>, Query, description = "Optional published version"),
+    ),
+    responses(
+        (status = 200, body = inline(RemoteTaskStatsResponseBody)),
+        (status = 400, description = "Bad Request", body = ()),
+        (status = 404, description = "Not Found", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "stats"})),
+    ),
+)]
+pub async fn get_remote_task_stats(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    Query(query): Query<RemoteTaskStatsQuery>,
+) -> Response {
+    match remote_tasks::stats::get(&org_id, &entity_id, query.version, query.window_ms).await {
+        Ok(stats) => MetaHttpResponse::json(RemoteTaskStatsResponseBody::from(stats)),
+        Err(error) => remote_task_stats_error_response(error),
     }
 }
 

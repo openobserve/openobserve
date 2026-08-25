@@ -74,7 +74,41 @@ describe("versions", () => {
   });
 });
 
+describe("stats", () => {
+  it("requests head-wide stats for the execution-record window", async () => {
+    mockGet.mockResolvedValue({ data: { windowMs: 86_400_000, totalRuns: 4 } });
+    const result = await remoteTasksService.stats("org-1", "head-1", 86_400_000);
+    expect(mockGet).toHaveBeenCalledWith("/api/org-1/tasks/head-1/stats", {
+      params: { windowMs: 86_400_000 },
+    });
+    expect(result.totalRuns).toBe(4);
+  });
+
+  it("narrows stats to an explicit published version", async () => {
+    mockGet.mockResolvedValue({ data: { windowMs: 1_000, totalRuns: 1 } });
+    await remoteTasksService.stats("org-1", "head-1", 1_000, 2);
+    expect(mockGet).toHaveBeenCalledWith("/api/org-1/tasks/head-1/stats", {
+      params: { windowMs: 1_000, version: 2 },
+    });
+  });
+});
+
 describe("draft lifecycle", () => {
+  it("tests the complete candidate without creating a task", async () => {
+    mockPost.mockResolvedValue({
+      data: { verified: true, report: { latencyMs: 12 } },
+    });
+    const candidate = {
+      name: "summarizer",
+      endpoint: "https://tasks.example.com/run",
+      input: { question: "hello" },
+      metadata: { source: "manual" },
+    };
+    const result = await remoteTasksService.testCandidate("org-1", candidate);
+    expect(mockPost).toHaveBeenCalledWith("/api/org-1/tasks/test", candidate);
+    expect(result.verified).toBe(true);
+  });
+
   it("registers the complete task and write-only Secrets in one request", async () => {
     mockPost.mockResolvedValue({
       data: {

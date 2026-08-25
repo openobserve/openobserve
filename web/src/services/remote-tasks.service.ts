@@ -75,6 +75,8 @@ export interface RemoteTask {
   isActive: boolean;
   createdAt: number;
   updatedAt: number;
+  /** Live experiments pinned to any published version of this task head. */
+  referencedBy?: number;
 }
 
 /**
@@ -187,12 +189,34 @@ export interface RemoteTaskTestConnectionPayload {
   metadata?: any;
 }
 
+export type RemoteTaskCandidateTestPayload = CreateRemoteTaskPayload &
+  RemoteTaskTestConnectionPayload;
+
 export interface RemoteTaskVerificationReport {
   rawRequest: string;
   rawResponse: string;
   statusCode?: number;
   parsedOutput?: any;
   latencyMs: number;
+}
+
+export interface RemoteTaskCandidateTestResult {
+  verified: boolean;
+  error?: string;
+  report: RemoteTaskVerificationReport;
+}
+
+export interface RemoteTaskStats {
+  windowMs: number;
+  totalRuns: number;
+  okRuns: number;
+  errorRuns: number;
+  skippedRuns: number;
+  latencyMs: {
+    p50: number | null;
+    p95: number | null;
+  };
+  referencingExperiments: number;
 }
 
 /**
@@ -242,10 +266,28 @@ const remoteTasksService = {
   versions: async (orgId: string, entityId: string): Promise<RemoteTask[]> =>
     unwrapList<RemoteTask>(await http().get(`/api/${orgId}/tasks/${entityId}/versions`)),
 
+  stats: async (
+    orgId: string,
+    entityId: string,
+    windowMs: number,
+    version?: number,
+  ): Promise<RemoteTaskStats> => {
+    const params: Record<string, number> = { windowMs };
+    if (version != null) params.version = version;
+    return (await http().get(`/api/${orgId}/tasks/${entityId}/stats`, { params })).data;
+  },
+
   create: async (
     orgId: string,
     payload: CreateRemoteTaskPayload,
   ): Promise<CreateRemoteTaskResult> => (await http().post(`/api/${orgId}/tasks`, payload)).data,
+
+  /** Test a complete form candidate without creating a task or Secret row. */
+  testCandidate: async (
+    orgId: string,
+    payload: RemoteTaskCandidateTestPayload,
+  ): Promise<RemoteTaskCandidateTestResult> =>
+    (await http().post(`/api/${orgId}/tasks/test`, payload)).data,
 
   replaceAuth: async (
     orgId: string,
