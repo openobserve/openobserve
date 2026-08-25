@@ -334,7 +334,7 @@ const fetchQuerySchema = async () => {
     //             concat(group[0]) AS x_axis_2, concat(group[1]) AS x_axis_3 …
     // We clean the query, rename zo_sql_val→zo_sql_num, and wire the fields
     // directly so we get a multi-series line chart with a threshold mark-line.
-    if (props.isAggregationEnabled) {
+    if (props.selectedTab === "custom" && props.isAggregationEnabled) {
       const queryForPreview = cleanAggregationQuery(props.query);
 
       // Build breakdown from aggregation group_by fields.
@@ -1393,8 +1393,6 @@ const refreshData = () => {
   // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
 };
 
-// Track if this is the initial load to prevent duplicate API calls
-let isInitialLoad = true;
 let lastRefreshTime = 0;
 
 const refreshDataOnce = () => {
@@ -1427,13 +1425,6 @@ watch(
   () => {
     // Skip if editor is open - we'll refresh when it closes
     if (props.isEditorOpen) {
-      return;
-    }
-
-    // Skip the first watch trigger on mount since onMounted will handle it
-    if (isInitialLoad) {
-      isInitialLoad = false;
-      lastRefreshTime = Date.now(); // stamp so 200ms debounce blocks rapid follow-up
       return;
     }
 
