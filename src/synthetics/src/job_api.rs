@@ -20,9 +20,565 @@
 //!   POST /api/synthetics/jobs/lease
 //!   POST /api/synthetics/jobs/ack
 
+// ── Step billing — SPEC §4.1 step 3 d–g, §4.4, §9 items 1.4 / 1.9 / 1.10 ─────
+//
+// `ack` COMPUTES the usage events and RETURNS them on [`AckResponse`]; it never
+// sends them. `openobserve-synthetics` does not depend on `usage_reporting`,
+// and the ack is served by `openobserve-api-management` — which depends on both
+// — so the fire-and-forget `usage_reporting::report_usage(..)` happens in the
+// `job_ack` handler over there.
+//
+// The obvious alternative — a `OnceCell` callback installed from
+// `openobserve_synthetics::init()`, copying o2-enterprise's `GET_USAGE_FN`
+// idiom — is SPEC §11 **F6** in a new disguise. `init()` runs only under
+// `if LOCAL_NODE.is_scheduler()` (`src/jobs/src/job/mod.rs:1000`, the call at
+// :1008), while the ack is routed to `openobserve-api-management::job_ack`
+// (`src/api/http/src/handler/http/router/mod.rs:1335`) on **API** nodes, where
+// the cell would be unset. The emit would compile, link, run, and meter
+// nothing, silently. Returning data cannot fail that way, and it makes every
+// guard below a pure function testable without a queue, a database or a global.
+#[cfg(feature = "cloud")]
+pub(crate) mod billing {
+    use chrono::{Datelike, Timelike};
+    use config::meta::{
+        self_reporting::usage::{UsageData, UsageEvent},
+        stream::StreamType,
+    };
+    use infra::table::{
+        synthetics_jobs::LeasedRow,
+        synthetics_locations::{self, KIND_PRIVATE},
+    };
+
+    use super::AckRequest;
+
+    /// Where the execution physically ran — SPEC §8.2's *venue* axis, which is
+    /// orthogonal to the `cloud`/`enterprise` *deployment* axis. A Cloud org
+    /// running a private agent is a `cloud` build that MUST NOT bill, and
+    /// neither gate substitutes for the other.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum Venue {
+        /// An o2-operated location. We paid AWS for the compute, so we bill it.
+        Public,
+        /// A private agent: the customer's own hardware (§8.2, E13, T17).
+        Private,
+        /// The location registry could not answer — see [`resolve_venue`].
+        Unresolved,
+    }
+
+    /// The two SPEC §9A switches, read once per ack and threaded in as data so
+    /// that both positions of both flags are testable without touching the
+    /// process environment or the config `LazyLock`.
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct BillingFlags {
+        /// `O2_SYNTHETICS_BILLING_ENABLED`, default **false**.
+        ///
+        /// SPEC §9D: *"the emit MUST be independently disable-able at runtime —
+        /// add `O2_SYNTHETICS_BILLING_ENABLED` to the emit path itself, not
+        /// only to enforcement. Otherwise the only rollback for a mis-metering
+        /// incident is a redeploy."* §11 **F2** says the same from the other
+        /// side: its stated mitigation is to *"keep `O2_SYNTHETICS_BILLING_
+        /// ENABLED` off until the fleet is uniform"*, which only keeps the new
+        /// `UsageEvent` strings out of `_usage` — the thing that halts metering
+        /// fleet-wide on an un-upgraded scheduler — if this flag gates the
+        /// WRITE. So: false ⇒ zero events, full stop.
+        pub billing_enabled: bool,
+        /// `O2_SYNTHETICS_STEP_CLAMP_ENABLED`, default **true** — SPEC §9A,
+        /// *"allows disabling the §4.4.1 clamp in an incident without a
+        /// deploy"*. False bills the probe's raw count. The `warn` still fires
+        /// and says the clamp was off, because with it off the over-report is
+        /// no longer visible in the numbers themselves.
+        pub clamp_enabled: bool,
+    }
+
+    /// Everything the emit needs from one ack. Built by [`inputs_from`].
+    ///
+    /// Grouped rather than passed loose because the asymmetry between two of
+    /// these fields is load-bearing and only legible side by side:
+    /// `steps_configured` and `combos` are **frozen** onto the job row at
+    /// enqueue (so a mid-flight journey edit cannot reprice work already
+    /// dispatched — §4.4.1, E5, T13) while `retries` is read from the **live**
+    /// check, exactly as §4.4.1's snippet does. That is deliberate.
+    pub(crate) struct BillingInputs<'a> {
+        pub org_id: &'a str,
+        pub job_id: &'a str,
+        pub synthetics_id: &'a str,
+        /// SPEC §4.1 step 3d.
+        pub venue: Venue,
+        /// SPEC §4.1 step 3f: `"queue"` means the job never ran.
+        pub error_source: &'a str,
+        /// Probe-reported, never trusted — clamped at §4.4.1's ceiling.
+        pub steps_executed: u32,
+        /// Probe-reported. Never billed, so never clamped.
+        pub steps_defined: u32,
+        pub browser_ms: u64,
+        /// FROZEN at enqueue. Per combo: the scheduler freezes
+        /// `steps.len().max(1)` (`DueCheck::try_from`), not the fan-out product.
+        pub steps_configured: i32,
+        /// FROZEN at enqueue — the engine+device combinations this one job runs
+        /// sequentially. `None` for a protocol check.
+        pub combos: Option<u32>,
+        /// LIVE, from the current check definition (§4.4.1's `check.retries`).
+        pub retries: i32,
+        /// The ack instant, in microseconds. One value for every row of the ack
+        /// so they cannot straddle an hour boundary.
+        pub now_us: i64,
+        /// SPEC §9 item 1.11 — see the call site in [`super::ack`].
+        pub region: Option<String>,
+    }
+
+    /// What one ack bills, and which of the two §4.4 guards fired.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct BillableSteps {
+        /// `size` of the `SyntheticsSteps` row.
+        pub billable: u32,
+        /// `size` of the `_SyntheticsStepsDefined` row.
+        pub defined: u32,
+        /// §4.4.1: the probe reported above the ceiling.
+        pub clamped: bool,
+        /// §4.4.2: the probe reported zero.
+        pub zero_fallback: bool,
+        /// What the clamp compared against — carried for the log line.
+        pub ceiling: u32,
+    }
+
+    /// The fields every synthetics usage row shares, resolved once per ack.
+    ///
+    /// ## What may and may not carry a number — SPEC §4.2's hard rule
+    ///
+    /// `ingest_usages` (openobserve-core `self_reporting::ingestion`) buckets
+    /// rows by `GroupKey` and, on a collision, touches **three** fields: `size`
+    /// and `num_records` **sum**, while `response_time` is summed and then
+    /// divided by the count — it is an **average**. Every other field,
+    /// **`request_body` included**, is taken from the FIRST row of the bucket
+    /// and the rest are discarded.
+    ///
+    /// So `size` is the only channel a summable quantity may travel in, which
+    /// is why each of the four counts is its own `UsageEvent` rather than a
+    /// field on one. `request_body` is left EMPTY on purpose (T20): a per-run
+    /// count put there would be the hour's first ack's count, reported as if it
+    /// were the hour's.
+    struct RowTemplate {
+        timestamp: i64,
+        year: i32,
+        month: u32,
+        day: u32,
+        hour: u32,
+        event_time_hour: String,
+        org_id: String,
+        region: Option<String>,
+    }
+
+    impl BillingInputs<'_> {
+        /// A browser check is exactly one whose job row froze a
+        /// `browser_devices` list. That column is written by the scheduler if
+        /// and only if `check_type == Browser`, and unlike the LIVE check's
+        /// `check_type` it cannot change under an in-flight job.
+        fn is_browser(&self) -> bool {
+            self.combos.is_some()
+        }
+
+        /// Combinations this job ran, floored at 1.
+        fn combo_count(&self) -> u32 {
+            self.combos.unwrap_or(1).max(1)
+        }
+
+        /// Steps ONE full pass of the frozen definition executes, across every
+        /// combo — SPEC §4.2's `configured × combos`.
+        ///
+        /// `steps_configured` is `NOT NULL` and floored at 1 at both sources
+        /// (`DueCheck::try_from` for new rows, a `DEFAULT 50` backfill for rows
+        /// that predate the column), so `.max(1)` never fires in practice. It
+        /// is here so that a corrupt or negative value can only ever produce a
+        /// ceiling of at least one step. A ZERO ceiling would clamp real
+        /// executed work down to nothing, which is precisely the outcome
+        /// §4.4.2 forbids.
+        fn frozen_definition(&self) -> u32 {
+            let configured = u32::try_from(self.steps_configured.max(1)).unwrap_or(u32::MAX);
+            configured.saturating_mul(self.combo_count())
+        }
+    }
+
+    impl RowTemplate {
+        fn new(i: &BillingInputs<'_>) -> Self {
+            let now = chrono::DateTime::from_timestamp_micros(i.now_us)
+                .unwrap_or_else(chrono::Utc::now)
+                .naive_utc();
+            Self {
+                timestamp: i.now_us,
+                year: now.year(),
+                month: now.month(),
+                day: now.day(),
+                hour: now.hour(),
+                event_time_hour: format!(
+                    "{:04}{:02}{:02}{:02}",
+                    now.year(),
+                    now.month(),
+                    now.day(),
+                    now.hour()
+                ),
+                org_id: i.org_id.to_string(),
+                region: i.region.clone(),
+            }
+        }
+
+        fn build(&self, event: UsageEvent, size: f64, unit: &str) -> UsageData {
+            UsageData {
+                _timestamp: self.timestamp,
+                event,
+                year: self.year,
+                month: self.month,
+                day: self.day,
+                hour: self.hour,
+                event_time_hour: self.event_time_hour.clone(),
+                org_id: self.org_id.clone(),
+                // §4.2, T20 — see the type doc above.
+                request_body: String::new(),
+                // The one field that survives aggregation as a SUM.
+                size,
+                // Mirrors o2-enterprise's `MeteringEventName::unit()` for the
+                // same event, so a human reading `_usage` and a human reading
+                // the metering log see the same word. Nothing bills on this
+                // field — `azure::meter_quantity` branches on `unit()`, not on
+                // this string — but a disagreement between the two would be
+                // read as a bug by whoever found it.
+                unit: unit.to_string(),
+                // No user acked this; a probe did. Empty rather than a
+                // synthetic address, because `user_email` is part of `GroupKey`
+                // and a per-probe value would shard the hour's bucket by probe.
+                user_email: String::new(),
+                // MUST stay 0.0. `ingest_usages` AVERAGES this field, so it can
+                // never carry a summable quantity (see the type doc).
+                response_time: 0.0,
+                stream_type: StreamType::Logs,
+                // Sums to "acks this org made this hour" — §4.1 step 5's
+                // `60 acks × 14 steps ⇒ size = 840, num_records = 60`.
+                num_records: 1,
+                dropped_records: 0,
+                // `_usage` is the destination; there is no source stream behind
+                // a synthetics step.
+                stream_name: String::new(),
+                trace_id: None,
+                cached_ratio: None,
+                scan_files: None,
+                compressed_size: None,
+                min_ts: None,
+                max_ts: None,
+                search_type: None,
+                search_event_context: None,
+                took_wait_in_queue: None,
+                result_cache_ratio: None,
+                function: None,
+                is_partial: false,
+                work_group: None,
+                node_name: None,
+                region: self.region.clone(),
+                dashboard_info: None,
+                peak_memory_usage: None,
+            }
+        }
+    }
+
+    /// SPEC §4.1 step 3d — item **1.4**. Reads the location registry (a
+    /// whole-table cache with a 30 s TTL) and classifies the venue.
+    ///
+    /// # Which way a failure errs, and why that is the safe way
+    ///
+    /// Only a row positively resolved as public bills. BOTH a lookup error and
+    /// a missing row yield [`Venue::Unresolved`], which emits nothing.
+    ///
+    /// The two directions are not symmetric. Billing a customer for compute
+    /// they own is a wrong invoice: customer-visible, refundable, and a trust
+    /// event. Failing to bill work we did pay for is our own revenue, bounded
+    /// by the length of the incident, and still reconstructable afterwards from
+    /// `synthetics_jobs` / `synthetics_runs`, which are written either way.
+    ///
+    /// The asymmetry is sharper than "one is worse". `get` is served from a
+    /// whole-table cache whose refresh is a single query, so an `Err` means the
+    /// database was unreachable — a FLEET-WIDE condition, not a per-org one.
+    /// Erring towards "bill it" would over-bill every org at once, private-agent
+    /// orgs included, at exactly the moment we are least able to notice. Erring
+    /// the other way under-reports for that same window and shows up as a
+    /// visible hole in the Phase 1 dark data, which is the signal you want.
+    ///
+    /// `Ok(None)` is not an error but is treated the same way: the registry is
+    /// the only thing that knows whose hardware ran a job, so a location that
+    /// is not in it is a location whose venue we do not know. Phase 1 exists to
+    /// MEASURE; a missing registry row should surface as missing volume, not
+    /// hide inside a plausible-looking bill.
+    pub(crate) async fn resolve_venue(location: &str) -> Venue {
+        match synthetics_locations::get(location).await {
+            Ok(Some(row)) if row.kind == KIND_PRIVATE => Venue::Private,
+            Ok(Some(_)) => Venue::Public,
+            Ok(None) => {
+                tracing::warn!(
+                    location = %location,
+                    "[synthetics] billing: location is not in the registry — venue unknown, \
+                     not billing this ack"
+                );
+                Venue::Unresolved
+            }
+            Err(e) => {
+                tracing::error!(
+                    location = %location,
+                    "[synthetics] billing: location lookup failed, not billing this ack: {e}"
+                );
+                Venue::Unresolved
+            }
+        }
+    }
+
+    /// Number of engine+device combinations frozen onto the job row, or `None`
+    /// for a protocol check.
+    ///
+    /// The scheduler writes this column if and only if the check is a browser
+    /// check, so its PRESENCE is the frozen check-type signal — the live
+    /// `check_type` could have been edited since the job was dispatched.
+    ///
+    /// An unreadable or empty list still means "browser", with one combo: the
+    /// column exists, so the scheduler put it there. Floored to 1 for the same
+    /// reason `frozen_definition` floors `steps_configured` — a zero fan-out is
+    /// a zero ceiling, and a zero ceiling bills real work as nothing.
+    pub(crate) fn frozen_combos(browser_devices: Option<&str>) -> Option<u32> {
+        let raw = browser_devices?;
+        let n = serde_json::from_str::<Vec<serde_json::Value>>(raw)
+            .ok()
+            .and_then(|v| u32::try_from(v.len()).ok())
+            .unwrap_or(1);
+        Some(n.max(1))
+    }
+
+    /// Gathers one ack's billing inputs from the FROZEN job row and the probe's
+    /// request.
+    ///
+    /// This exists as its own function so that the frozen/live split is
+    /// testable: `steps_configured` and `combos` can only come from `row`, and
+    /// `retries` can only come from the caller's argument — which [`super::ack`]
+    /// sources from the LIVE check. T13/E5 is a property of this wiring, not of
+    /// the arithmetic downstream of it.
+    pub(crate) fn inputs_from<'a>(
+        row: &'a LeasedRow,
+        req: &'a AckRequest,
+        live_retries: i32,
+        venue: Venue,
+        now_us: i64,
+        region: Option<String>,
+    ) -> BillingInputs<'a> {
+        BillingInputs {
+            org_id: &row.org_id,
+            job_id: &row.id,
+            synthetics_id: &row.synthetics_id,
+            venue,
+            error_source: &req.error_source,
+            steps_executed: req.steps_executed,
+            steps_defined: req.steps_defined,
+            browser_ms: req.browser_ms,
+            steps_configured: row.steps_configured,
+            combos: frozen_combos(row.browser_devices.as_deref()),
+            retries: live_retries,
+            now_us,
+            region,
+        }
+    }
+
+    /// SPEC §4.4.1 (clamp, item **1.9**) + §4.4.2 (zero fallback), as pure
+    /// arithmetic.
+    ///
+    /// # Overflow and sign
+    ///
+    /// `LeasedRow::steps_configured` is `i32` while §4.4.1's snippet is `u32`,
+    /// so the conversion happens here, at the clamp site. Every operand is a
+    /// `u32` and every combining operation is `saturating_*`, so the result is
+    /// in `1..=u32::MAX` for every input — `steps_configured = i32::MAX`,
+    /// `combos = u32::MAX` and `retries = i32::MAX` together still land on
+    /// `u32::MAX` rather than wrapping. The only signed input is `retries`, and
+    /// `.max(0)` reads a negative one as "no retries", i.e. one attempt: the
+    /// smallest ceiling that still cannot be zero.
+    pub(crate) fn resolve_billable(flags: BillingFlags, i: &BillingInputs<'_>) -> BillableSteps {
+        let definition = i.frozen_definition();
+        let attempts = u32::try_from(i.retries.max(0))
+            .unwrap_or(u32::MAX)
+            .saturating_add(1);
+        let ceiling = definition.saturating_mul(attempts);
+
+        // §4.2: `_SyntheticsStepsDefined` is `configured × combos`. Prefer the
+        // probe's own number — it describes the journey that ACTUALLY ran, so
+        // after a mid-flight edit it is the honest denominator for §4.3's
+        // `executed / defined` ratio — and fall back to the frozen definition
+        // only when the probe is too old to send one. Never clamped: nothing
+        // bills on it, so a wild value costs a wrong ratio, not a wrong invoice.
+        let defined = if i.steps_defined == 0 {
+            definition
+        } else {
+            i.steps_defined
+        };
+
+        // §4.4.2 keys on the RAW reported value, not on the clamped one: a 0
+        // means "a probe built before items 1.2a/1.2b", and billing zero for
+        // real work is worse than billing the definition.
+        if i.steps_executed == 0 {
+            let billable = if i.is_browser() {
+                // Browser ⇒ the frozen definition, across every combo.
+                definition
+            } else {
+                // Protocol ⇒ 1 (§1.1: one request is one step). NOT `attempts`:
+                // a probe old enough to omit `steps_executed` also defaults
+                // `attempts` to 0, so deriving from it would bill a guess off a
+                // guess.
+                1
+            };
+            return BillableSteps {
+                billable,
+                defined,
+                clamped: false,
+                zero_fallback: true,
+                ceiling,
+            };
+        }
+
+        let over_ceiling = i.steps_executed > ceiling;
+        let billable = if flags.clamp_enabled {
+            i.steps_executed.min(ceiling)
+        } else {
+            i.steps_executed
+        };
+        BillableSteps {
+            billable,
+            defined,
+            clamped: over_ceiling,
+            zero_fallback: false,
+            ceiling,
+        }
+    }
+
+    /// SPEC §4.1 step 3 d–g — items **1.4**, **1.9**, **1.10**: the guards, in
+    /// the order the spec states them, and then the emit.
+    ///
+    /// Returns the rows `job_ack` hands to `usage_reporting::report_usage` —
+    /// EMPTY whenever this ack must not be billed.
+    ///
+    /// Step 3c (`ack_complete` ⇒ `None`) is enforced by [`super::ack`] itself,
+    /// which returns [`super::stale_lease_response`] before ever reaching here;
+    /// that response carries no events, which is T14/T15.
+    ///
+    /// Step 3h (pool reconcile) is Phase 2 item 2.3 and is deliberately absent.
+    pub(crate) fn events_for_ack(flags: BillingFlags, i: BillingInputs<'_>) -> Vec<UsageData> {
+        // ── The §9A / §9D master switch ─────────────────────────────────────
+        // Authoritative. `ack` re-checks it before the registry read, purely to
+        // avoid that read (and its failure logging) on a node that is not
+        // metering at all; the two must agree, and THIS is the one that decides.
+        if !flags.billing_enabled {
+            return Vec::new();
+        }
+
+        // ── d. Venue — item 1.4 (§8.2, E13, T17) ────────────────────────────
+        match i.venue {
+            Venue::Public => {}
+            Venue::Private | Venue::Unresolved => return Vec::new(),
+        }
+
+        // ── e. Clamp (§4.4.1) + zero fallback (§4.4.2) — item 1.9 ───────────
+        let steps = resolve_billable(flags, &i);
+
+        // ── f. The job never ran (E11, T16) ─────────────────────────────────
+        // `"queue"` means it waited behind other jobs until its own
+        // `valid_until` passed. That is our scheduling lag, not their work.
+        //
+        // The two `warn`s from step e are logged BELOW this guard rather than
+        // inside `resolve_billable`. The arithmetic order is exactly the spec's
+        // (e, then f); only the logging is deferred, because a queue-errored ack
+        // always carries `steps_executed = 0` and would otherwise fire the
+        // §4.4.2 warning — whose meaning is "an un-upgraded probe is still in
+        // the fleet", and which §9B alert A3 pages on — for a job no probe ever
+        // touched.
+        if i.error_source == "queue" {
+            return Vec::new();
+        }
+
+        // §4.4.1: MUST log every clamp at `warn` — it means a probe bug or a
+        // definition mismatch (§9B alert A2).
+        if steps.clamped {
+            if flags.clamp_enabled {
+                tracing::warn!(
+                    job_id = %i.job_id,
+                    synthetics_id = %i.synthetics_id,
+                    org_id = %i.org_id,
+                    reported = i.steps_executed,
+                    ceiling = steps.ceiling,
+                    billed = steps.billable,
+                    "[synthetics] steps_executed exceeds ceiling — clamped"
+                );
+            } else {
+                tracing::warn!(
+                    job_id = %i.job_id,
+                    synthetics_id = %i.synthetics_id,
+                    org_id = %i.org_id,
+                    reported = i.steps_executed,
+                    ceiling = steps.ceiling,
+                    billed = steps.billable,
+                    "[synthetics] steps_executed exceeds ceiling but the clamp is DISABLED \
+                     (O2_SYNTHETICS_STEP_CLAMP_ENABLED=false) — billing the reported count"
+                );
+            }
+        }
+        // §4.4.2, and §9B alert A3: this firing after the probe rollout has
+        // completed means the deploy order was inverted (§11 F9).
+        if steps.zero_fallback {
+            tracing::warn!(
+                job_id = %i.job_id,
+                synthetics_id = %i.synthetics_id,
+                org_id = %i.org_id,
+                browser = i.is_browser(),
+                billed = steps.billable,
+                "[synthetics] probe reported steps_executed = 0 — falling back to the frozen \
+                 definition rather than billing zero"
+            );
+        }
+
+        // ── g. THE EMIT (§4.2) ──────────────────────────────────────────────
+        let row = RowTemplate::new(&i);
+        let mut events = Vec::with_capacity(3);
+
+        // Exactly ONE of `SyntheticsSteps` / `SyntheticsFreeSteps` per ack.
+        //
+        // PHASE 1 EMITS `SyntheticsSteps` UNCONDITIONALLY. The free-pool split
+        // is Phase 2 item 2.3 (deduct at enqueue, reconcile at ack — §6.3):
+        // until that pool exists nothing can decide that an ack is free, and
+        // guessing would put un-reconcilable rows into `_usage`. When 2.3
+        // lands the branch goes HERE and nowhere else — `SyntheticsFreeSteps`
+        // already exists as a `UsageEvent` and is already non-billable in
+        // o2-enterprise's `MeteringEventName::is_billable`.
+        events.push(row.build(
+            UsageEvent::SyntheticsSteps,
+            f64::from(steps.billable),
+            "steps",
+        ));
+
+        // ALWAYS, alongside every billable ack — T19. It is half of §4.3's
+        // `executed / defined` ratio, and it cannot be reconstructed later: by
+        // the time anyone asks, the definition may already have been edited.
+        events.push(row.build(
+            UsageEvent::_SyntheticsStepsDefined,
+            f64::from(steps.defined),
+            "steps",
+        ));
+
+        // The v2 duration hedge. Skipped at zero: it is a browser-only
+        // quantity, and a 0 adds nothing to `SUM(size)` while adding a
+        // permanent zero-valued bucket to every protocol org's every hour.
+        if i.browser_ms > 0 {
+            events.push(row.build(UsageEvent::_SyntheticsBrowserMs, i.browser_ms as f64, "ms"));
+        }
+
+        events
+    }
+}
+
 use std::collections::HashMap;
 
-use config::meta::synthetics::{Synthetic, SyntheticAuth, for_each_string_at_path};
+use config::meta::{
+    self_reporting::usage::UsageData,
+    synthetics::{Synthetic, SyntheticAuth, for_each_string_at_path},
+};
 use infra::{
     db::ORM_CLIENT,
     table::{
@@ -166,6 +722,39 @@ pub struct AckRequest {
     /// streak and must not page the customer. See `alerting::classify`.
     #[serde(default)]
     pub error_source: String,
+    /// Steps this execution actually EXECUTED, summed across every attempt and
+    /// excluding skipped ones. **The billed quantity** (spec §2.1, §4.4).
+    ///
+    /// It arrives here and nowhere else: 43% of executions are missing from
+    /// `synthetics_step_results`, so a count derived from the results stream
+    /// would under-bill silently. Never trusted as sent — the ack clamps it at
+    /// the ceiling frozen onto the job row at enqueue (§4.4.1).
+    ///
+    /// `#[serde(default)]` is the rollback story, not a convenience. Two probe
+    /// repos gain this field on their own release cadence, so acks without it
+    /// are the norm until both ship and again the moment either is rolled back,
+    /// and an ack this server rejects is a discarded check result. A 0 is
+    /// therefore "an older probe", which is why §4.4.2 falls back to the frozen
+    /// count rather than billing zero.
+    #[serde(default)]
+    pub steps_executed: u32,
+    /// Steps the journey DEFINES for this execution. Reported, never billed.
+    ///
+    /// Carried alongside `steps_executed` because it is the pair that makes a
+    /// bill answerable: `executed / defined` under 1.0 means the journey failed
+    /// partway, over 1.0 means retries fired (§4.3). Neither number tells that
+    /// story alone, and this one cannot be recovered afterwards — by the time
+    /// anyone asks, the definition it came from may already have been edited.
+    #[serde(default)]
+    pub steps_defined: u32,
+    /// Browser wall-clock milliseconds for this execution.
+    ///
+    /// The duration hedge: if per-step pricing turns out to track cost worse
+    /// than per-second does, this is the v2 migration path, and it only works
+    /// if the history exists BEFORE the decision. Collected from the first day
+    /// of metering for that reason; nothing bills on it.
+    #[serde(default)]
+    pub browser_ms: u64,
 }
 
 fn default_trigger_type() -> String {
@@ -538,6 +1127,23 @@ pub struct AckResponse {
     /// this the message degraded to a bare count. Both sides also make a
     /// partial recovery expressible.
     pub passing_locations: Vec<String>,
+    /// The usage rows this ack should meter — SPEC §4.1 step 3g, item 1.10.
+    ///
+    /// Returned as DATA rather than emitted here. `openobserve-synthetics` does
+    /// not depend on `usage_reporting`, so the fire-and-forget
+    /// `usage_reporting::report_usage(..)` is performed by the `job_ack` handler
+    /// in `openobserve-api-management`, which depends on both. See the `billing`
+    /// module doc for why the `OnceCell`-callback alternative is F6 in disguise.
+    ///
+    /// EMPTY on every path that must not bill: a duplicate or late ack (§4.1
+    /// step 3c, T14/T15), a private venue (T17), an `error_source = "queue"`
+    /// ack (T16), and any build without the `cloud` feature (§8.1, T40).
+    ///
+    /// `#[serde(skip)]`, and it MUST stay that way: this struct is the HTTP body
+    /// of a single ack, so serializing it would ship an org's billing rows to a
+    /// probe agent. Pinned by a test.
+    #[serde(skip)]
+    pub usage_events: Vec<UsageData>,
 }
 
 /// The notification a completed run should send, resolved against the check's
@@ -817,6 +1423,44 @@ fn redact_auth(auth: SyntheticAuth) -> SyntheticAuth {
     }
 }
 
+/// The 200 an ack that did not apply gets — SPEC §4.1 step 3c.
+///
+/// `ack_complete` returned `None`, which means either a duplicate ack (T14/E8)
+/// or a late one from a holder the reaper already evicted (T15/E9). The probe
+/// did its work and is entitled to its 200, but nothing here may touch run
+/// accounting a second time — and nothing here may bill. `usage_events` is
+/// empty, and that is the whole of exactly-once on the billing side: this is
+/// the only way out of `ack` that skips the emit, and it cannot construct a
+/// response that carries one.
+fn stale_lease_response(
+    job_id: String,
+    trigger_type: String,
+    check: synthetics_jobs::LeasedRow,
+) -> AckResponse {
+    AckResponse {
+        run_complete: false,
+        run_status: None,
+        job_count: 0,
+        org_id: check.org_id,
+        job_id,
+        run_id: check.run_id,
+        synthetics_id: check.synthetics_id,
+        synthetics_name: check.synthetics_name,
+        synthetic_type: String::new(),
+        target: String::new(),
+        destinations: Vec::new(),
+        location: check.location,
+        pool: check.pool,
+        trigger_type,
+        alert: AlertDecision::Silent,
+        status_reason: None,
+        consecutive_failures: 0,
+        failing_locations: Vec::new(),
+        passing_locations: Vec::new(),
+        usage_events: Vec::new(),
+    }
+}
+
 /// Acknowledges completion of a job.
 /// Marks the job complete, increments the run counter, and returns context for notifications.
 /// Returns `run_complete = true` when all jobs in the run have acked.
@@ -881,27 +1525,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
             claimed_by = req.claimed_by.as_deref().unwrap_or("<not sent>"),
             "[synthetics] stale_lease: ack dropped, job is no longer claimed by this agent"
         );
-        return Ok(AckResponse {
-            run_complete: false,
-            run_status: None,
-            job_count: 0,
-            org_id: check.org_id,
-            job_id: req.job_id,
-            run_id: check.run_id,
-            synthetics_id: check.synthetics_id,
-            synthetics_name: check.synthetics_name,
-            synthetic_type: String::new(),
-            target: String::new(),
-            destinations: Vec::new(),
-            location: check.location,
-            pool: check.pool,
-            trigger_type: req.trigger_type,
-            alert: AlertDecision::Silent,
-            status_reason: None,
-            consecutive_failures: 0,
-            failing_locations: Vec::new(),
-            passing_locations: Vec::new(),
-        });
+        return Ok(stale_lease_response(req.job_id, req.trigger_type, check));
     }
 
     // Increment run counter; Some(run_result) when all jobs have acked.
@@ -982,6 +1606,56 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         .and_then(|v| v.as_str().map(str::to_owned))
         .unwrap_or_default();
 
+    // ── Step billing — SPEC §4.1 step 3 d–g, items 1.4 / 1.9 / 1.10 ─────────
+    //
+    // Computed here, emitted by the `job_ack` handler in
+    // `openobserve-api-management` (see the `billing` module doc). Placed after
+    // the live check is in hand because §4.4.1 reads `retries` from it, and
+    // after step 3c's early return because a duplicate ack must bill nothing.
+    //
+    // Step 3h — pool reconcile — is Phase 2 item 2.3 and is deliberately absent.
+    #[cfg(feature = "cloud")]
+    let usage_events = {
+        let ent = o2_enterprise::enterprise::common::config::get_config();
+        let flags = billing::BillingFlags {
+            billing_enabled: ent.cloud.synthetics_billing_enabled,
+            clamp_enabled: ent.cloud.synthetics_step_clamp_enabled,
+        };
+        // The master switch is re-checked inside `events_for_ack`, and THAT is
+        // the authoritative check. This one only avoids the registry read, and
+        // its failure logging, on a node that is not metering at all.
+        let venue = if flags.billing_enabled {
+            billing::resolve_venue(&check.location).await
+        } else {
+            billing::Venue::Unresolved
+        };
+        // Item 1.11: the region whose node WROTE the row — EXEC-SPEC §11A's
+        // attribution axis. Only a super cluster has one, so a single-region
+        // deployment leaves it `None` rather than stamping the `"default"`
+        // placeholder, which would say nothing while looking like an answer.
+        //
+        // It is NOT the probe's execution region. That is `check.location`, and
+        // giving one column two meanings would make the first query that joins
+        // the two wrong.
+        //
+        // The section is bound locally on purpose: the source-level guard
+        // `lib.rs::nothing_on_the_run_path_publishes` counts the dotted
+        // `enabled` access on that config section against the number of
+        // super-cluster PUBLISHES in this file, and this is a read. Reaching it
+        // through a binding keeps that count honest instead of inflating it.
+        let sc = &ent.super_cluster;
+        let region = (sc.enabled && !sc.region.is_empty()).then(|| sc.region.clone());
+        billing::events_for_ack(
+            flags,
+            billing::inputs_from(&check, &req, synthetic.retries, venue, now_us, region),
+        )
+    };
+    // §8.1: a self-hosted Enterprise build has `enterprise` and NOT `cloud`.
+    // Gating on `enterprise` would write synthetics usage rows onto every
+    // customer's own cluster.
+    #[cfg(not(feature = "cloud"))]
+    let usage_events = Vec::new();
+
     // Decide the notification, once per RUN. Per-job would alert once per
     // location for the same outage, and would advance the failure streak by the
     // fan-out factor rather than by one.
@@ -1039,6 +1713,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         consecutive_failures,
         failing_locations,
         passing_locations,
+        usage_events,
     })
 }
 
@@ -1162,4 +1837,1030 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         crate::alerting::AlertOutcome::Recovered => AlertDecision::Recovered,
     };
     (decision, next.consecutive_failures)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The minimum an ack has ever had to carry. Everything else on
+    /// `AckRequest` is `#[serde(default)]`, which is what makes the rollback
+    /// story in spec §9D true.
+    fn old_probe_ack() -> serde_json::Value {
+        serde_json::json!({
+            "job_id": "2MNfNTxePfZ1pnY5gKVLkwsVRXv",
+            "status": "up",
+            "response_time_ms": 812.5,
+            "attempts": 1
+        })
+    }
+
+    /// **The rollback guarantee (§9D, Phase 1 wire).** The probes gain these
+    /// three fields in two other repos, on their own release cadence. Until
+    /// they ship — and again the moment either is rolled back — every ack
+    /// arrives WITHOUT them, and an ack this server rejects is a check result
+    /// thrown away, not a billing error. So absence must parse, and must parse
+    /// to zero rather than to anything that would be mistaken for a real count.
+    #[test]
+    fn an_old_probe_acks_without_the_billing_fields_and_is_still_accepted() {
+        let req: AckRequest = serde_json::from_value(old_probe_ack())
+            .expect("an ack from a probe built before these fields must still deserialize");
+
+        assert_eq!(req.steps_executed, 0);
+        assert_eq!(req.steps_defined, 0);
+        assert_eq!(req.browser_ms, 0);
+        // And the rest of the ack is untouched by the widening.
+        assert_eq!(req.job_id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
+        assert_eq!(req.status, "up");
+        assert_eq!(req.attempts, 1);
+    }
+
+    /// The new-probe shape: all three present, carried through unchanged. The
+    /// `18 executed / 14 defined` pair is the retry case from §4.3 — executed
+    /// above defined is normal and must not be sanitised on the way in.
+    #[test]
+    fn an_ack_carrying_all_three_billing_fields_deserializes_them() {
+        let mut body = old_probe_ack();
+        body["attempts"] = serde_json::json!(2);
+        body["steps_executed"] = serde_json::json!(18);
+        body["steps_defined"] = serde_json::json!(14);
+        body["browser_ms"] = serde_json::json!(42_137_u64);
+
+        let req: AckRequest = serde_json::from_value(body).unwrap();
+
+        assert_eq!(req.steps_executed, 18);
+        assert_eq!(req.steps_defined, 14);
+        assert_eq!(req.browser_ms, 42_137);
+    }
+
+    /// The probe side of the wire, written the way the two probe repos write
+    /// it. Field names, not types, are the coupling here: this struct and
+    /// `AckRequest` are compiled from different repositories and are never
+    /// checked against each other by a compiler.
+    #[derive(Serialize)]
+    struct ProbeAck {
+        job_id: String,
+        status: String,
+        attempts: i32,
+        steps_executed: u32,
+        steps_defined: u32,
+        browser_ms: u64,
+    }
+
+    /// **The rename guard.** `#[serde(default)]` makes a mis-named field
+    /// silent: it does not fail, it yields 0 — and a 0 `steps_executed` is
+    /// indistinguishable from an old probe, so a rename on either side would
+    /// zero the bill with no error anywhere. So the keys are asserted as
+    /// literal strings first — a `ProbeAck` renamed in step with `AckRequest`
+    /// would round-trip perfectly and prove nothing — and only then round-
+    /// tripped, which is what pins the two ends to the same three names.
+    #[test]
+    fn the_billing_field_names_on_the_wire_are_pinned() {
+        let sent = ProbeAck {
+            job_id: "2MNfNTxePfZ1pnY5gKVLkwsVRXv".to_string(),
+            status: "up".to_string(),
+            attempts: 2,
+            steps_executed: 18,
+            steps_defined: 14,
+            browser_ms: 42_137,
+        };
+        let wire = serde_json::to_value(&sent).unwrap();
+
+        assert_eq!(
+            wire["steps_executed"].as_u64(),
+            Some(18),
+            "wire name: steps_executed"
+        );
+        assert_eq!(
+            wire["steps_defined"].as_u64(),
+            Some(14),
+            "wire name: steps_defined"
+        );
+        assert_eq!(
+            wire["browser_ms"].as_u64(),
+            Some(42_137),
+            "wire name: browser_ms"
+        );
+
+        let back: AckRequest = serde_json::from_value(wire).unwrap();
+        assert_eq!(back.steps_executed, sent.steps_executed);
+        assert_eq!(back.steps_defined, sent.steps_defined);
+        assert_eq!(back.browser_ms, sent.browser_ms);
+    }
+
+    /// The failure the pin above exists to catch, demonstrated. camelCase is
+    /// the realistic slip — the probes are a Go binary and a Node one — and it
+    /// does not fail: it is accepted and bills nothing. The server cannot tell
+    /// the result apart from a probe that genuinely executed no steps, which is
+    /// why the three names are pinned rather than trusted.
+    #[test]
+    fn a_misnamed_billing_field_silently_bills_zero() {
+        let mut body = old_probe_ack();
+        body["stepsExecuted"] = serde_json::json!(18);
+        body["stepsDefined"] = serde_json::json!(14);
+        body["browserMs"] = serde_json::json!(42_137_u64);
+
+        let req: AckRequest = serde_json::from_value(body).unwrap();
+
+        assert_eq!(req.steps_executed, 0);
+        assert_eq!(req.steps_defined, 0);
+        assert_eq!(req.browser_ms, 0);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Step billing — SPEC §9C T1–T21, §10 E1–E13/E21/E22, §11 F6/F7/F9.
+    //
+    // Every guard in SPEC §4.1 step 3 is a pure function here, so a "duplicate ack
+    // bills nothing" test needs no database, no usage queue and no globals.
+    // ─────────────────────────────────────────────────────────────────────────────
+    #[cfg(feature = "cloud")]
+    mod billing {
+        use config::meta::{
+            self_reporting::usage::{UsageData, UsageEvent},
+            stream::StreamType,
+        };
+        use infra::table::synthetics_jobs::LeasedRow;
+
+        use crate::job_api::{
+            AckRequest, AlertDecision,
+            billing::{
+                BillingFlags, BillingInputs, Venue, events_for_ack, frozen_combos, inputs_from,
+            },
+            stale_lease_response,
+        };
+
+        /// 2026-08-25T13:47:11Z, so the derived hour fields are checkable literals.
+        const NOW_US: i64 = 1_787_665_631_000_000;
+
+        /// Phase 1 as deployed once the operator flips the switch: the emit live,
+        /// the clamp on.
+        const LIVE: BillingFlags = BillingFlags {
+            billing_enabled: true,
+            clamp_enabled: true,
+        };
+
+        /// A browser ack that ran on a public location and completed cleanly.
+        /// `steps_configured` is per combo (what the scheduler freezes), `combos` is
+        /// the fan-out inside this one job.
+        fn browser(
+            configured: i32,
+            combos: u32,
+            retries: i32,
+            executed: u32,
+        ) -> BillingInputs<'static> {
+            BillingInputs {
+                org_id: "acme",
+                job_id: "2MNfNTxePfZ1pnY5gKVLkwsVRXv",
+                synthetics_id: "chk_1",
+                venue: Venue::Public,
+                error_source: "",
+                steps_executed: executed,
+                steps_defined: 0,
+                browser_ms: 0,
+                steps_configured: configured,
+                combos: Some(combos),
+                retries,
+                now_us: NOW_US,
+                region: None,
+            }
+        }
+
+        /// A protocol ack: no `browser_devices` column, one step per attempt (§1.1).
+        fn protocol(retries: i32, executed: u32) -> BillingInputs<'static> {
+            BillingInputs {
+                combos: None,
+                steps_configured: 1,
+                retries,
+                steps_executed: executed,
+                ..browser(1, 1, retries, executed)
+            }
+        }
+
+        /// The `size` of the one row carrying `event`, or `None` if absent.
+        fn size_for(events: &[UsageData], event: UsageEvent) -> Option<f64> {
+            let mut matching = events.iter().filter(|e| e.event == event);
+            let first = matching.next()?.size;
+            assert!(
+                matching.next().is_none(),
+                "{event} must appear at most once per ack"
+            );
+            Some(first)
+        }
+
+        fn billed(events: &[UsageData]) -> Option<f64> {
+            size_for(events, UsageEvent::SyntheticsSteps)
+        }
+
+        fn defined(events: &[UsageData]) -> Option<f64> {
+            size_for(events, UsageEvent::_SyntheticsStepsDefined)
+        }
+
+        // ── Counting — §9C T1, T2, T3, T9 ───────────────────────────────────────
+
+        /// **T1.** `http`/`tcp`/`tls`/`ssh`, one attempt ⇒ one step. §1.1: one
+        /// request is one step.
+        #[test]
+        fn t1_protocol_check_one_attempt_bills_one_step() {
+            let events = events_for_ack(LIVE, protocol(0, 1));
+            assert_eq!(billed(&events), Some(1.0));
+        }
+
+        /// **T2.** A 14-step journey, one combo, no retry ⇒ 14 billed and 14
+        /// defined.
+        #[test]
+        fn t2_browser_fourteen_steps_one_combo_no_retry() {
+            let events = events_for_ack(LIVE, browser(14, 1, 0, 14));
+            assert_eq!(billed(&events), Some(14.0));
+            assert_eq!(defined(&events), Some(14.0));
+        }
+
+        /// **T3 / E21 / E22.** 14 steps × 2 combos × 3 locations = 84.
+        ///
+        /// Combos are sequential INSIDE one job (§1.2), so one ack carries all of a
+        /// location's combos: 28. Locations are separate jobs with separate acks
+        /// (E22), so the 84 is a sum over three acks — which is what
+        /// `ingest_usages` does with `size` for a shared `GroupKey`.
+        ///
+        /// ⚠ This is the case that decides whether the clamp ceiling includes the
+        /// combo factor. SPEC §4.4.1's snippet reads `configured × (retries + 1)`,
+        /// which for this ack is 14 — it would clamp 28 down to 14 and under-bill
+        /// by the fan-out factor, and E21's twelve-combo check by 12×. §4.2 defines
+        /// "defined" as `configured × combos`, so the ceiling must use the same
+        /// product. See the note on `frozen_definition`.
+        #[test]
+        fn t3_browser_fourteen_steps_two_combos_three_locations_sums_to_84() {
+            let per_location = events_for_ack(LIVE, browser(14, 2, 0, 28));
+            assert_eq!(
+                billed(&per_location),
+                Some(28.0),
+                "one location, two combos"
+            );
+            assert_eq!(defined(&per_location), Some(28.0));
+
+            let total: f64 = (0..3)
+                .map(|_| billed(&events_for_ack(LIVE, browser(14, 2, 0, 28))).unwrap())
+                .sum();
+            assert_eq!(total, 84.0, "3 locations × 2 combos × 14 steps");
+        }
+
+        /// **E21.** Twelve combos, one ack, no clamp: 12 × 14 = 168.
+        #[test]
+        fn e21_twelve_combos_bill_twelve_times_the_steps_in_one_ack() {
+            let events = events_for_ack(LIVE, browser(14, 12, 0, 168));
+            assert_eq!(billed(&events), Some(168.0));
+        }
+
+        /// **T9.** A protocol check that took three attempts bills three steps —
+        /// retries are billed additively (§2.3, decision 2).
+        #[test]
+        fn t9_protocol_three_attempts_bills_three_steps() {
+            // `attempts = 3` is `retries = 2`.
+            let events = events_for_ack(LIVE, protocol(2, 3));
+            assert_eq!(billed(&events), Some(3.0));
+        }
+
+        /// **E1 / E2 / E3 / E4.** Partial and retried runs bill what executed.
+        /// The server bills the probe's count; these differ only in that count.
+        #[test]
+        fn e1_e2_e3_partial_and_retried_runs_bill_what_executed() {
+            // E1 — fails at step 4 of 14, no retry.
+            let events = events_for_ack(LIVE, browser(14, 1, 0, 4));
+            assert_eq!(billed(&events), Some(4.0));
+            assert_eq!(defined(&events), Some(14.0), "defined is still the journey");
+
+            // E2 — fails at 4, retry completes 14: 18 cumulative, under the
+            // ceiling of 14 × 2 = 28.
+            let events = events_for_ack(LIVE, browser(14, 1, 1, 18));
+            assert_eq!(billed(&events), Some(18.0));
+
+            // E3 — fails at step 1: the one step that ran.
+            let events = events_for_ack(LIVE, browser(14, 1, 0, 1));
+            assert_eq!(billed(&events), Some(1.0));
+        }
+
+        // ── Guards — §9C T10–T18 ────────────────────────────────────────────────
+
+        /// **T10 / E6.** A probe reporting above `configured × combos ×
+        /// (retries + 1)` is clamped to the ceiling.
+        #[test]
+        fn t10_a_report_above_the_ceiling_is_clamped() {
+            // ceiling = 14 × 1 × (0 + 1) = 14
+            let events = events_for_ack(LIVE, browser(14, 1, 0, 9_999));
+            assert_eq!(billed(&events), Some(14.0));
+        }
+
+        /// **T10, the boundary.** Exactly at the ceiling is not clamped; one above
+        /// is. An off-by-one here silently over- or under-bills every retried run.
+        #[test]
+        fn t10_the_clamp_boundary_is_inclusive_of_the_ceiling() {
+            // ceiling = 14 × 2 combos × (1 retry + 1) = 56
+            assert_eq!(
+                billed(&events_for_ack(LIVE, browser(14, 2, 1, 56))),
+                Some(56.0)
+            );
+            assert_eq!(
+                billed(&events_for_ack(LIVE, browser(14, 2, 1, 57))),
+                Some(56.0)
+            );
+        }
+
+        /// **§9A `O2_SYNTHETICS_STEP_CLAMP_ENABLED = false`.** The incident switch:
+        /// the over-report is billed as reported, without a deploy.
+        #[test]
+        fn the_clamp_can_be_disabled_at_runtime() {
+            let flags = BillingFlags {
+                clamp_enabled: false,
+                ..LIVE
+            };
+            assert_eq!(
+                billed(&events_for_ack(flags, browser(14, 1, 0, 9_999))),
+                Some(9_999.0)
+            );
+            // And it changes nothing when nothing was over the ceiling.
+            assert_eq!(
+                billed(&events_for_ack(flags, browser(14, 1, 0, 14))),
+                Some(14.0)
+            );
+        }
+
+        /// **T11 / E7.** An old probe sends `steps_executed = 0` on a browser
+        /// check ⇒ bill the frozen definition, across every combo. Never 0.
+        #[test]
+        fn t11_zero_from_an_old_browser_probe_falls_back_to_the_frozen_definition() {
+            assert_eq!(
+                billed(&events_for_ack(LIVE, browser(14, 1, 0, 0))),
+                Some(14.0)
+            );
+            assert_eq!(
+                billed(&events_for_ack(LIVE, browser(14, 2, 0, 0))),
+                Some(28.0),
+                "the fallback is the whole definition, combos included"
+            );
+        }
+
+        /// **T12.** The same from a protocol probe ⇒ 1, not the attempt count: an
+        /// old probe's `attempts` is itself defaulted to 0.
+        #[test]
+        fn t12_zero_from_an_old_protocol_probe_falls_back_to_one() {
+            assert_eq!(billed(&events_for_ack(LIVE, protocol(0, 0))), Some(1.0));
+            assert_eq!(
+                billed(&events_for_ack(LIVE, protocol(2, 0))),
+                Some(1.0),
+                "retries must not inflate a fallback"
+            );
+        }
+
+        /// **§4.4.2's whole point.** No input to a billable ack bills zero.
+        #[test]
+        fn f9_no_billable_ack_ever_bills_zero_steps() {
+            for configured in [1, 5, 14, 50] {
+                for combos in [1_u32, 2, 12] {
+                    for retries in [0, 1, 3] {
+                        for executed in [0_u32, 1, 14, 1_000_000] {
+                            let events = events_for_ack(
+                                LIVE,
+                                browser(configured, combos, retries, executed),
+                            );
+                            let size = billed(&events).expect("a public ack must bill");
+                            assert!(
+                                size >= 1.0,
+                                "configured={configured} combos={combos} retries={retries} \
+                                 executed={executed} billed {size}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        /// **T13 / E5.** The journey was edited 14 → 8 while these jobs were in
+        /// flight. The ceiling uses the count FROZEN on the job row; `retries`
+        /// comes from the LIVE check. That asymmetry is §4.4.1's, deliberately, and
+        /// it is a property of the WIRING — so this goes through `inputs_from`,
+        /// which is the only place either value can enter.
+        #[test]
+        fn t13_the_ceiling_uses_the_frozen_count_not_the_live_one() {
+            // Enqueued when the journey defined 14 steps; edited to 8 since.
+            let mut row = leased_row();
+            row.steps_configured = 14;
+            row.browser_devices = Some(one_combo());
+            let req = probe_ack(14, 0);
+
+            // `inputs_from` cannot see the live 8 at all — there is no parameter
+            // for it. A ceiling built from the edited definition would clamp this
+            // to 8; the frozen 14 does not.
+            let events = events_for_ack(
+                LIVE,
+                inputs_from(&row, &req, 0, Venue::Public, NOW_US, None),
+            );
+            assert_eq!(billed(&events), Some(14.0));
+        }
+
+        /// The other half of the asymmetry: `retries` DOES move the ceiling, and it
+        /// is the caller's argument — `ack` sources it from the live check — not
+        /// anything on the frozen row.
+        #[test]
+        fn the_live_retry_count_moves_the_ceiling_and_the_frozen_row_does_not_carry_it() {
+            let mut row = leased_row();
+            row.steps_configured = 8;
+            row.browser_devices = Some(one_combo());
+            let req = probe_ack(16, 0);
+
+            // retries = 1 ⇒ ceiling 8 × (1 + 1) = 16.
+            let events = events_for_ack(
+                LIVE,
+                inputs_from(&row, &req, 1, Venue::Public, NOW_US, None),
+            );
+            assert_eq!(billed(&events), Some(16.0));
+
+            // retries = 0 ⇒ ceiling 8, and the same ack clamps.
+            let events = events_for_ack(
+                LIVE,
+                inputs_from(&row, &req, 0, Venue::Public, NOW_US, None),
+            );
+            assert_eq!(billed(&events), Some(8.0));
+        }
+
+        /// `inputs_from` reads each value from exactly one place: the frozen row,
+        /// the probe's request, or the caller. Mixing them up is the failure T13
+        /// and §4.4.1's asymmetry exist to prevent, and it would be invisible in
+        /// the arithmetic tests above.
+        #[test]
+        fn inputs_from_takes_the_frozen_values_from_the_row_and_the_reported_ones_from_the_request()
+        {
+            let mut row = leased_row();
+            row.org_id = "acme".to_string();
+            row.id = "job_7".to_string();
+            row.synthetics_id = "chk_7".to_string();
+            row.steps_configured = 14;
+            row.browser_devices = Some(two_combos());
+
+            let mut req = probe_ack(18, 14);
+            req.browser_ms = 42_137;
+            req.error_source = "probe".to_string();
+
+            let i = inputs_from(&row, &req, 3, Venue::Public, NOW_US, Some("eu-1".into()));
+
+            // From the FROZEN row.
+            assert_eq!(i.steps_configured, 14);
+            assert_eq!(i.combos, Some(2));
+            assert_eq!(i.org_id, "acme");
+            assert_eq!(i.job_id, "job_7");
+            assert_eq!(i.synthetics_id, "chk_7");
+            // From the probe's REQUEST.
+            assert_eq!(i.steps_executed, 18);
+            assert_eq!(i.steps_defined, 14);
+            assert_eq!(i.browser_ms, 42_137);
+            assert_eq!(i.error_source, "probe");
+            // From the CALLER — the live check.
+            assert_eq!(i.retries, 3);
+            assert_eq!(i.venue, Venue::Public);
+            assert_eq!(i.now_us, NOW_US);
+            assert_eq!(i.region.as_deref(), Some("eu-1"));
+        }
+
+        /// A protocol job has no `browser_devices` column, so `inputs_from` reports
+        /// no combos — which is what makes the §4.4.2 fallback take the protocol
+        /// branch.
+        #[test]
+        fn inputs_from_reads_a_protocol_job_as_having_no_combos() {
+            let mut row = leased_row();
+            row.browser_devices = None;
+            row.steps_configured = 1;
+            let req = probe_ack(0, 0);
+
+            let events = events_for_ack(
+                LIVE,
+                inputs_from(&row, &req, 0, Venue::Public, NOW_US, None),
+            );
+            assert_eq!(billed(&events), Some(1.0));
+        }
+
+        /// **T14 / E8 — duplicate ack.** `ack_complete` returned `None`, so the ack
+        /// did not apply. Exactly-once: the response carries no usage events.
+        #[test]
+        fn t14_a_duplicate_ack_emits_nothing() {
+            let resp = stale_lease_response(
+                "2MNfNTxePfZ1pnY5gKVLkwsVRXv".to_string(),
+                "scheduled".to_string(),
+                leased_row(),
+            );
+            assert!(resp.usage_events.is_empty());
+            // …and it still touches no run accounting.
+            assert!(!resp.run_complete);
+            assert_eq!(resp.job_count, 0);
+            assert_eq!(resp.alert, AlertDecision::Silent);
+        }
+
+        /// **T15 / E9 — late ack from an evicted holder.** The reaper handed the
+        /// job to another agent; `ack_complete` returns `None` for the same reason,
+        /// through the same path, so it bills the same nothing.
+        #[test]
+        fn t15_a_late_ack_from_an_evicted_holder_emits_nothing() {
+            let resp = stale_lease_response(
+                "2MNfNTxePfZ1pnY5gKVLkwsVRXv".to_string(),
+                "scheduled".to_string(),
+                leased_row(),
+            );
+            assert!(resp.usage_events.is_empty());
+        }
+
+        /// **T16 / E11.** `error_source = "queue"` — the job waited behind other
+        /// jobs until its own `valid_until` passed and was never executed. Our
+        /// scheduling lag, not the customer's work.
+        #[test]
+        fn t16_a_queue_error_emits_nothing() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    error_source: "queue",
+                    ..browser(14, 1, 0, 0)
+                },
+            );
+            assert!(events.is_empty());
+
+            // Even if a probe somehow reported real steps alongside it.
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    error_source: "queue",
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            assert!(events.is_empty());
+        }
+
+        /// **T17 / E13 / §8.2.** A private agent is the customer's own hardware.
+        /// A Cloud org running one is a `cloud` build that MUST NOT bill.
+        #[test]
+        fn t17_a_private_venue_emits_nothing() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    venue: Venue::Private,
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            assert!(events.is_empty());
+        }
+
+        /// **Item 1.4, the failure direction.** A venue we could not resolve — the
+        /// registry read failed, or the location has no row — bills nothing. Only a
+        /// positively-public row bills.
+        #[test]
+        fn an_unresolved_venue_emits_nothing() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    venue: Venue::Unresolved,
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            assert!(events.is_empty());
+        }
+
+        /// **T18 / E12.** A Lambda invoke failure DOES bill — `mark_failure`
+        /// reaches `ack_complete`, and the invocation cost us money. Only `"queue"`
+        /// is exempt; `"dispatch"` and `"probe"` are not.
+        #[test]
+        fn t18_a_lambda_invoke_failure_still_bills() {
+            for source in ["dispatch", "probe"] {
+                let events = events_for_ack(
+                    LIVE,
+                    BillingInputs {
+                        error_source: source,
+                        ..browser(14, 1, 0, 3)
+                    },
+                );
+                assert_eq!(
+                    billed(&events),
+                    Some(3.0),
+                    "error_source={source} must still bill"
+                );
+            }
+        }
+
+        // ── Events — §9C T19, T20, T21 ──────────────────────────────────────────
+
+        /// **T19.** `_SyntheticsStepsDefined` accompanies EVERY billable ack — it
+        /// is half of §4.3's ratio and cannot be reconstructed later.
+        #[test]
+        fn t19_every_billable_ack_carries_steps_defined() {
+            for (configured, combos, retries, executed) in [
+                (14, 1, 0, 14),
+                (14, 2, 1, 3),
+                (1, 1, 0, 0),
+                (50, 12, 3, 99_999),
+            ] {
+                let events = events_for_ack(LIVE, browser(configured, combos, retries, executed));
+                assert!(billed(&events).is_some());
+                assert!(
+                    defined(&events).is_some(),
+                    "no _SyntheticsStepsDefined for ({configured}, {combos}, {retries}, {executed})"
+                );
+            }
+        }
+
+        /// `_SyntheticsStepsDefined` reports what the PROBE says the journey
+        /// defined, and falls back to the frozen definition only when the probe is
+        /// too old to say. It is never clamped — nothing bills on it.
+        #[test]
+        fn steps_defined_prefers_the_probe_and_is_never_clamped() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    steps_defined: 8,
+                    ..browser(14, 1, 0, 8)
+                },
+            );
+            assert_eq!(defined(&events), Some(8.0), "the probe's own number");
+
+            // Absurdly large, and still not clamped: it is not billed.
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    steps_defined: 4_000,
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            assert_eq!(defined(&events), Some(4_000.0));
+            assert_eq!(billed(&events), Some(14.0), "…while the BILLED count is");
+        }
+
+        /// **T21.** Nothing on this path marks a free or underscore variant
+        /// billable. Phase 1 emits `SyntheticsSteps` and never
+        /// `SyntheticsFreeSteps` — the free-pool split is Phase 2 item 2.3.
+        #[test]
+        fn t21_phase_one_emits_the_billable_variant_and_never_the_free_one() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    browser_ms: 42_137,
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            let names: Vec<String> = events.iter().map(|e| e.event.to_string()).collect();
+            assert_eq!(
+                names,
+                vec![
+                    "SyntheticsSteps".to_string(),
+                    "_SyntheticsStepsDefined".to_string(),
+                    "_SyntheticsBrowserMs".to_string(),
+                ]
+            );
+            assert!(
+                !events
+                    .iter()
+                    .any(|e| e.event == UsageEvent::SyntheticsFreeSteps),
+                "the free-pool branch is Phase 2 item 2.3 and must not be emitted yet"
+            );
+        }
+
+        /// Exactly one of the two step-count variants per ack (§4.2).
+        #[test]
+        fn exactly_one_billable_or_free_step_event_per_ack() {
+            let events = events_for_ack(LIVE, browser(14, 1, 0, 14));
+            let count = events
+                .iter()
+                .filter(|e| {
+                    matches!(
+                        e.event,
+                        UsageEvent::SyntheticsSteps | UsageEvent::SyntheticsFreeSteps
+                    )
+                })
+                .count();
+            assert_eq!(count, 1);
+        }
+
+        /// `_SyntheticsBrowserMs` carries `browser_ms`, and is omitted when there
+        /// is none — a protocol ack has no browser duration to report.
+        #[test]
+        fn browser_ms_is_emitted_only_when_there_is_a_duration() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    browser_ms: 42_137,
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            assert_eq!(
+                size_for(&events, UsageEvent::_SyntheticsBrowserMs),
+                Some(42_137.0)
+            );
+
+            let events = events_for_ack(LIVE, protocol(0, 1));
+            assert_eq!(size_for(&events, UsageEvent::_SyntheticsBrowserMs), None);
+        }
+
+        /// **T20 / §4.2's hard rule.** `ingest_usages` sums only `size` and
+        /// `num_records`; `response_time` is AVERAGED and `request_body` keeps the
+        /// FIRST row of the bucket. So a per-run count must travel in `size` and
+        /// nowhere else.
+        #[test]
+        fn t20_no_per_run_count_travels_outside_size() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    browser_ms: 42_137,
+                    steps_defined: 14,
+                    // retries = 1 ⇒ ceiling 28, so the 18 is not clamped here.
+                    ..browser(14, 1, 1, 18)
+                },
+            );
+            assert_eq!(events.len(), 3);
+            for e in &events {
+                assert_eq!(e.request_body, "", "request_body keeps only the FIRST row");
+                assert_eq!(
+                    e.response_time, 0.0,
+                    "response_time is averaged, not summed"
+                );
+                assert_eq!(e.num_records, 1, "sums to the ack count for the hour");
+            }
+            // And every number that must survive summation is in `size`.
+            assert_eq!(billed(&events), Some(18.0));
+            assert_eq!(defined(&events), Some(14.0));
+            assert_eq!(
+                size_for(&events, UsageEvent::_SyntheticsBrowserMs),
+                Some(42_137.0)
+            );
+        }
+
+        /// The remaining `UsageData` fields a metering row needs to be readable and
+        /// to aggregate into the right bucket.
+        #[test]
+        fn the_usage_row_is_shaped_for_the_metering_pipeline() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    browser_ms: 5,
+                    region: Some("us-west-2".to_string()),
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            for e in &events {
+                assert_eq!(e.org_id, "acme", "the metering loop groups by org_id");
+                assert_eq!(e._timestamp, NOW_US);
+                assert_eq!(e.year, 2026);
+                assert_eq!(e.month, 8);
+                assert_eq!(e.day, 25);
+                assert_eq!(e.hour, 13);
+                assert_eq!(e.event_time_hour, "2026082513");
+                assert_eq!(e.stream_type, StreamType::Logs);
+                assert_eq!(e.stream_name, "");
+                assert_eq!(e.user_email, "", "a probe acked, not a user");
+                assert_eq!(e.dropped_records, 0);
+                assert!(!e.is_partial);
+                assert_eq!(e.region.as_deref(), Some("us-west-2"));
+                assert!(e.trace_id.is_none());
+                assert!(e.search_type.is_none());
+                assert!(e.dashboard_info.is_none());
+            }
+            // `unit` mirrors o2-enterprise's `MeteringEventName::unit()` for the
+            // same event — never "MB" (§11 F3).
+            for e in &events {
+                let expected = match e.event {
+                    UsageEvent::_SyntheticsBrowserMs => "ms",
+                    _ => "steps",
+                };
+                assert_eq!(e.unit, expected, "{} carries the wrong unit", e.event);
+                assert_ne!(e.unit, "MB");
+            }
+        }
+
+        /// All four rows of one ack share a `GroupKey` hour, so an ack that lands
+        /// either side of an hour boundary cannot split itself across two.
+        #[test]
+        fn all_rows_of_one_ack_share_one_timestamp() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    browser_ms: 5,
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            let first = &events[0];
+            for e in &events {
+                assert_eq!(e._timestamp, first._timestamp);
+                assert_eq!(e.event_time_hour, first.event_time_hour);
+                assert_eq!(
+                    (e.year, e.month, e.day, e.hour),
+                    (first.year, first.month, first.day, first.hour)
+                );
+            }
+        }
+
+        // ── The §9A / §9D master switch ─────────────────────────────────────────
+
+        /// **§9D's MUST.** `O2_SYNTHETICS_BILLING_ENABLED = false` stops the emit
+        /// itself — the rollback for a mis-metering incident is a config flip, not
+        /// a redeploy. This is also §11 F2's stated mitigation, which is a no-op
+        /// unless the flag gates the WRITE.
+        #[test]
+        fn the_master_switch_off_emits_nothing() {
+            let off = BillingFlags {
+                billing_enabled: false,
+                ..LIVE
+            };
+            assert!(events_for_ack(off, browser(14, 1, 0, 14)).is_empty());
+            assert!(events_for_ack(off, protocol(0, 1)).is_empty());
+        }
+
+        /// **§9A.** `BILLING_ENABLED = false` with the emit code live is the
+        /// Phase 1 shipping state, and it is a supported configuration rather than
+        /// an accident of ordering: the path is REACHED, it is inert, it returns a
+        /// well-formed empty result, and it is independent of the clamp switch.
+        #[test]
+        fn both_flag_positions_are_supported_and_the_two_flags_are_independent() {
+            for clamp_enabled in [true, false] {
+                let off = BillingFlags {
+                    billing_enabled: false,
+                    clamp_enabled,
+                };
+                assert!(
+                    events_for_ack(off, browser(14, 1, 0, 9_999)).is_empty(),
+                    "the master switch wins regardless of the clamp switch"
+                );
+                let on = BillingFlags {
+                    billing_enabled: true,
+                    clamp_enabled,
+                };
+                let expected = if clamp_enabled { 14.0 } else { 9_999.0 };
+                assert_eq!(
+                    billed(&events_for_ack(on, browser(14, 1, 0, 9_999))),
+                    Some(expected),
+                    "the clamp switch decides only the clamp"
+                );
+            }
+        }
+
+        // ── Arithmetic safety ───────────────────────────────────────────────────
+
+        /// No input can overflow, panic, or produce a negative or zero ceiling.
+        /// `steps_configured` is `i32` on the row while §4.4.1's snippet is `u32`,
+        /// so the cast is at the clamp site and every combining op saturates.
+        #[test]
+        fn the_clamp_arithmetic_cannot_overflow_or_go_negative() {
+            let extremes = [
+                // (steps_configured, combos, retries, executed)
+                (i32::MAX, u32::MAX, i32::MAX, u32::MAX),
+                (i32::MAX, 1, 0, u32::MAX),
+                (1, u32::MAX, i32::MAX, 1),
+                // Impossible at the source (NOT NULL, floored at 1) — asserted so a
+                // corrupt row can only ever floor UP, never to a zero ceiling.
+                (0, 1, 0, 14),
+                (-1, 1, 0, 14),
+                (i32::MIN, 1, i32::MIN, 14),
+            ];
+            for (configured, combos, retries, executed) in extremes {
+                let events = events_for_ack(LIVE, browser(configured, combos, retries, executed));
+                let size = billed(&events).expect("a public ack must bill");
+                assert!(
+                    size >= 1.0 && size.is_finite(),
+                    "({configured}, {combos}, {retries}, {executed}) billed {size}"
+                );
+            }
+        }
+
+        // ── The frozen check-type / fan-out signal ──────────────────────────────
+
+        /// `browser_devices` is written by the scheduler iff the check is a browser
+        /// check, so its PRESENCE is the frozen check type — unlike the live
+        /// `check_type`, it cannot change under an in-flight job.
+        #[test]
+        fn frozen_combos_reads_the_fan_out_off_the_job_row() {
+            assert_eq!(frozen_combos(None), None, "protocol: no column");
+            assert_eq!(
+                frozen_combos(Some(
+                    r#"[{"execution_id":"a","engine":"chromium","device":"desktop"}]"#
+                )),
+                Some(1)
+            );
+            assert_eq!(
+                frozen_combos(Some(
+                    r#"[{"execution_id":"a","engine":"chromium","device":"desktop"},
+                        {"execution_id":"b","engine":"webkit","device":"mobile"}]"#
+                )),
+                Some(2)
+            );
+            // Present but unreadable or empty is still "browser", floored to one
+            // combo: a zero fan-out is a zero ceiling, and a zero ceiling bills
+            // real work as nothing.
+            assert_eq!(frozen_combos(Some("[]")), Some(1));
+            assert_eq!(frozen_combos(Some("not json")), Some(1));
+        }
+
+        /// A protocol job's `browser_devices` is NULL, so the zero-fallback takes
+        /// the protocol branch even when the frozen `steps_configured` is not 1.
+        #[test]
+        fn the_absent_browser_devices_column_is_what_makes_a_check_protocol() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    combos: None,
+                    steps_configured: 14,
+                    ..browser(14, 1, 0, 0)
+                },
+            );
+            assert_eq!(billed(&events), Some(1.0), "protocol falls back to 1");
+        }
+
+        // ── The wire contract of the returned events ────────────────────────────
+
+        /// The usage rows ride back on `AckResponse` as DATA and must never reach
+        /// the probe. `AckResponse` is the HTTP body of a single ack, so the field
+        /// is `#[serde(skip)]` — pinned here because dropping that attribute would
+        /// silently start shipping the org's billing rows to a probe agent.
+        #[test]
+        fn the_usage_events_never_serialize_onto_the_probes_response() {
+            let mut resp = stale_lease_response(
+                "2MNfNTxePfZ1pnY5gKVLkwsVRXv".to_string(),
+                "scheduled".to_string(),
+                leased_row(),
+            );
+            resp.usage_events = events_for_ack(LIVE, browser(14, 1, 0, 14));
+            assert!(!resp.usage_events.is_empty(), "precondition");
+
+            let wire = serde_json::to_value(&resp).unwrap();
+            let obj = wire.as_object().unwrap();
+            assert!(!obj.contains_key("usage_events"));
+            let text = wire.to_string();
+            for leaked in ["usage_events", "SyntheticsSteps", "_SyntheticsStepsDefined"] {
+                assert!(!text.contains(leaked), "`{leaked}` leaked to the probe");
+            }
+        }
+
+        /// An `AckRequest` carrying the three billing fields feeds them straight
+        /// into the guard chain — the wire and the arithmetic agree on units.
+        #[test]
+        fn an_ack_request_feeds_the_guards_directly() {
+            let req: AckRequest = serde_json::from_value(serde_json::json!({
+                "job_id": "2MNfNTxePfZ1pnY5gKVLkwsVRXv",
+                "status": "down",
+                "attempts": 2,
+                "steps_executed": 18,
+                "steps_defined": 14,
+                "browser_ms": 42_137_u64,
+            }))
+            .unwrap();
+
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    steps_executed: req.steps_executed,
+                    steps_defined: req.steps_defined,
+                    browser_ms: req.browser_ms,
+                    error_source: &req.error_source,
+                    retries: req.attempts - 1,
+                    ..browser(14, 1, 1, 0)
+                },
+            );
+            assert_eq!(billed(&events), Some(18.0));
+            assert_eq!(defined(&events), Some(14.0));
+            assert_eq!(
+                size_for(&events, UsageEvent::_SyntheticsBrowserMs),
+                Some(42_137.0)
+            );
+        }
+
+        fn one_combo() -> String {
+            r#"[{"execution_id":"a","engine":"chromium","device":"desktop"}]"#.to_string()
+        }
+
+        fn two_combos() -> String {
+            r#"[{"execution_id":"a","engine":"chromium","device":"desktop"},
+                {"execution_id":"b","engine":"webkit","device":"mobile"}]"#
+                .to_string()
+        }
+
+        /// An ack as a current probe sends it.
+        fn probe_ack(steps_executed: u32, steps_defined: u32) -> AckRequest {
+            let mut req: AckRequest = serde_json::from_value(serde_json::json!({
+                "job_id": "2MNfNTxePfZ1pnY5gKVLkwsVRXv",
+                "status": "up",
+                "attempts": 1,
+            }))
+            .unwrap();
+            req.steps_executed = steps_executed;
+            req.steps_defined = steps_defined;
+            req
+        }
+
+        fn leased_row() -> LeasedRow {
+            LeasedRow {
+                id: "2MNfNTxePfZ1pnY5gKVLkwsVRXv".to_string(),
+                synthetics_id: "chk_1".to_string(),
+                synthetics_name: "checkout journey".to_string(),
+                org_id: "acme".to_string(),
+                location: "us-east-1".to_string(),
+                pool: "aws-browser".to_string(),
+                scheduled_ts: NOW_US,
+                valid_until: NOW_US + 60_000_000,
+                dispatch_attempts: 1,
+                run_id: "run_1".to_string(),
+                browser_devices: Some("[]".to_string()),
+                steps_configured: 14,
+                metadata: "{}".to_string(),
+            }
+        }
+    }
 }

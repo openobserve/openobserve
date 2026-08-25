@@ -901,15 +901,24 @@ pub async fn job_ack(
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         };
         let mut results = Vec::with_capacity(req.acks.len());
+        // Collected across the WHOLE batch and reported once: `report_usage`
+        // spawns a task per call, and a batch is one probe's lease cycle.
+        let mut usage = Vec::new();
         for ack in req.acks {
             let job_id = ack.job_id.clone();
             match process_ack(ack, &org_id).await {
-                Ok(resp) => results.push(serde_json::json!({
-                    "job_id": job_id,
-                    "ok": true,
-                    "run_complete": resp.run_complete,
-                })),
+                Ok(mut resp) => {
+                    take_usage(&mut resp, &mut usage);
+                    results.push(serde_json::json!({
+                        "job_id": job_id,
+                        "ok": true,
+                        "run_complete": resp.run_complete,
+                    }));
+                }
                 Err(e) => {
+                    // No response, so no events: an ack that failed did not
+                    // complete a job, and `ack_complete` is what authorises a
+                    // bill (spec §4.1 step 3c).
                     tracing::error!(job_id = %job_id, "[synthetics] job_ack: {e}");
                     results.push(serde_json::json!({
                         "job_id": job_id,
@@ -919,6 +928,7 @@ pub async fn job_ack(
                 }
             }
         }
+        report_step_usage(usage);
         return MetaHttpResponse::json(serde_json::json!({ "results": results }));
     }
 
@@ -929,7 +939,14 @@ pub async fn job_ack(
         }
     };
     match process_ack(req, &org_id).await {
-        Ok(resp) => MetaHttpResponse::json(resp),
+        Ok(mut resp) => {
+            // Same two steps as the batch arm, so neither path can drift from
+            // the other and the source guard below can count both.
+            let mut usage = Vec::new();
+            take_usage(&mut resp, &mut usage);
+            report_step_usage(usage);
+            MetaHttpResponse::json(resp)
+        }
         Err(e) => {
             let msg = e.to_string();
             if msg.starts_with("forbidden") {
@@ -939,6 +956,47 @@ pub async fn job_ack(
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
         }
     }
+}
+
+/// Moves the usage rows one ack produced into a batch accumulator.
+///
+/// Trivial on purpose, and a named function rather than an inline `append` so
+/// that both arms of `job_ack` go through the same two steps and a source guard
+/// can count them. Dropping this call is the failure mode that matters: the
+/// send below still happens, with an empty vector, and the ack still returns
+/// 200 — silent lost revenue with nothing to alert on.
+fn take_usage(
+    resp: &mut openobserve_synthetics::job_api::AckResponse,
+    into: &mut Vec<config::meta::self_reporting::usage::UsageData>,
+) {
+    into.append(&mut resp.usage_events);
+}
+
+/// Emits the synthetics step-billing usage rows an ack produced — SPEC §4.1
+/// step 3g, item 1.10.
+///
+/// `job_api::ack` computes these rows and returns them as data, and this is
+/// where they are sent. The split exists because `openobserve-synthetics` does
+/// not depend on `usage_reporting` while this crate depends on both, and
+/// because the alternative — a `OnceCell` callback installed from
+/// `openobserve_synthetics::init()` — is SPEC §11 **F6** in a new disguise:
+/// `init()` runs only under `if LOCAL_NODE.is_scheduler()`
+/// (`src/jobs/src/job/mod.rs:1000`), while this handler serves the ack on API
+/// nodes, where the cell would be unset and the emit would silently do nothing.
+///
+/// Fire-and-forget by design: `report_usage` spawns and returns, and a probe
+/// that did its work is owed its 200 whether or not the usage queue accepted
+/// the row.
+///
+/// Deliberately branchless. An earlier version skipped the send for an empty
+/// vector — which it is on every non-cloud build and on every ack the guards in
+/// `job_api::billing` dropped — but that branch is unreachable from a unit test
+/// (the send spawns onto the global usage queue), so a mutation that turned it
+/// into "never send" survived, on the revenue path, silently. A no-op spawn per
+/// ack is cheaper than an untestable branch there, and this handler already
+/// makes one unconditional usage-queue call per ack for trigger telemetry.
+fn report_step_usage(usage: Vec<config::meta::self_reporting::usage::UsageData>) {
+    usage_reporting::report_usage(usage);
 }
 
 /// Runs one job ack through the enterprise service plus the per-ack side
@@ -1587,5 +1645,128 @@ pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::self_reporting::usage::{UsageData, UsageEvent};
+    use openobserve_synthetics::job_api::{AckResponse, AlertDecision};
+
+    use super::take_usage;
+
+    fn ack_response(usage_events: Vec<UsageData>) -> AckResponse {
+        AckResponse {
+            run_complete: false,
+            run_status: None,
+            job_count: 1,
+            org_id: "acme".to_string(),
+            job_id: "job_1".to_string(),
+            run_id: "run_1".to_string(),
+            synthetics_id: "chk_1".to_string(),
+            synthetics_name: "checkout".to_string(),
+            synthetic_type: "browser".to_string(),
+            target: "https://example.com".to_string(),
+            destinations: Vec::new(),
+            location: "us-east-1".to_string(),
+            pool: "aws-browser".to_string(),
+            trigger_type: "scheduled".to_string(),
+            alert: AlertDecision::Silent,
+            status_reason: None,
+            consecutive_failures: 0,
+            failing_locations: Vec::new(),
+            passing_locations: Vec::new(),
+            usage_events,
+        }
+    }
+
+    fn steps(size: f64) -> UsageData {
+        UsageData {
+            event: UsageEvent::SyntheticsSteps,
+            size,
+            ..UsageData::init_for_reflection()
+        }
+    }
+
+    /// SPEC §4.1 step 3g. A batch is one probe's lease cycle, and every ack in
+    /// it that billed must be reported — in order, and in ONE send, because
+    /// `report_usage` spawns a task per call.
+    ///
+    /// An ack that ERRORED contributes nothing: it produced no `AckResponse`,
+    /// and `ack_complete` is what authorises a bill (§4.1 step 3c). This mirrors
+    /// the accumulation in the batch arm of `job_ack`, which cannot be called
+    /// here without an HTTP request and a database.
+    #[test]
+    fn a_batch_reports_the_usage_of_every_ack_in_it() {
+        let batch: Vec<anyhow::Result<AckResponse>> = vec![
+            Ok(ack_response(vec![steps(14.0), steps(14.0)])),
+            Err(anyhow::anyhow!("job not found")),
+            // A private-venue or duplicate ack: succeeded, billed nothing.
+            Ok(ack_response(Vec::new())),
+            Ok(ack_response(vec![steps(28.0)])),
+        ];
+
+        // Reached through a function pointer so this call does not count
+        // towards the source guard below, which counts calls by name.
+        let drain: fn(&mut AckResponse, &mut Vec<UsageData>) = take_usage;
+        let mut usage = Vec::new();
+        // `.flatten()` drops the errored ack, which is exactly the handler's
+        // behaviour: an ack that errored produced no `AckResponse` and so has
+        // no events to take.
+        for mut resp in batch.into_iter().flatten() {
+            drain(&mut resp, &mut usage);
+        }
+
+        assert_eq!(
+            usage.iter().map(|u| u.size).collect::<Vec<_>>(),
+            vec![14.0, 14.0, 28.0],
+            "every billed ack in the batch, in order, and nothing from the errored one"
+        );
+    }
+
+    /// Every path out of the ack handler must report the usage it produced.
+    ///
+    /// `report_usage` is fire-and-forget, so an unreported vector is silent lost
+    /// revenue — §9B alert A4's "emit failures", except that a dropped vector
+    /// never even reaches the counter. There are exactly two paths today, the
+    /// single ack and the batch, and this pins that a third cannot be added
+    /// without one.
+    ///
+    /// The needles are assembled rather than written out, so that this test's
+    /// own source does not count towards the totals it asserts — the same
+    /// device `openobserve-synthetics`'s `nothing_on_the_run_path_publishes`
+    /// uses.
+    #[test]
+    fn every_ack_path_reports_the_usage_it_produced() {
+        let source = include_str!("mod.rs");
+        // One definition plus one call per path, for each of the three steps an
+        // ack path must take: run the ack, take its usage rows, send them.
+        for (needle, what) in [
+            (["process", "_ack("].concat(), "runs an ack"),
+            (
+                ["take", "_usage("].concat(),
+                "takes the usage rows it returned",
+            ),
+            (["report_step", "_usage("].concat(), "sends them"),
+        ] {
+            assert_eq!(
+                source.matches(&needle).count(),
+                3,
+                "one definition and exactly two call sites are expected for the step that \
+                 {what}; an ack path is missing it, or a third path was added"
+            );
+        }
+
+        // And the send itself. `report_step_usage` is the one line in this file
+        // that a unit test cannot reach — it hands off to the global usage
+        // queue — so it is pinned here instead. Without this, emptying that
+        // function's body is a silent "never meter anything".
+        assert_eq!(
+            source
+                .matches(&["usage_reporting::report", "_usage("].concat())
+                .count(),
+            1,
+            "the hand-off to the usage queue is gone; nothing is metered"
+        );
     }
 }
