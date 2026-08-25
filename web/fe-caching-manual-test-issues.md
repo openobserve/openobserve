@@ -204,6 +204,11 @@ passcode where a placeholder appears.
 
 ### 7. Favourites and the home-dashboard pin are permanently lost on reload
 
+> **FIXED (earlier round, commit `83b0085b8a`).** This run's measurement predates the fix:
+> the four `setQueryData` sites now write through `setPersistedQueryData()` (setQueryData +
+> `persistQueryByKey`). Re-verified live: the star and the pin both survive a hard reload,
+> the persisted entries update the moment the toggle lands.
+
 ```
 Module:            Dashboards -> favourites (§5.1) and the org-wide home-dashboard pin
 UI path:           Dashboards -> star a row · a dashboard's "Set as Home" -> press F5
@@ -265,6 +270,11 @@ home pin is org-wide, so it reverts for everyone. It does **not** self-heal.
 
 ### 8. `_o2_removeDashboardCache()` no longer clears the panel cache (regression)
 
+> **FIXED.** The helper now removes the in-memory panel queries AND sweeps IndexedDB by key
+> shape (`["org",<any org>,"panels",…]` via `cacheRemoveWhere`), covering entries that were
+> only ever on disk — metrics-explorer cards and other dashboards included. Verified live:
+> 10 panel entries (dashboard + explorer) → 0 after one call, memory also clean.
+
 ```
 Module:            Dashboards -> panel result cache (§5.2)
 UI path:           any dashboard -> Console -> await window._o2_removeDashboardCache()
@@ -305,6 +315,9 @@ misreports success, so anyone told to "clear the cache and retry" gets a false r
 ---
 
 ### 9. (pre-existing, not this branch) `forceLoad` forks the panel cache key
+
+> **Left as-is, by the same main-parity decision as finding #2** — `getCacheKey()` is
+> character-for-character identical on `main`. Filed for a future cleanup.
 
 ```
 Module:            Dashboards -> panel result cache (§5.2)
@@ -368,6 +381,10 @@ Datasets & Queues here; both worth checking).
 
 ### 10. Destination webhook credentials written to localStorage in plaintext
 
+> **FIXED (earlier round, commit `831728799a`).** This run predates the fix:
+> `destinationsQuery` no longer declares a persister, so the payload (headers included) is
+> memory-only. Re-verified live: a fresh destinations fetch writes nothing to localStorage.
+
 | Field | Detail |
 | --- | --- |
 | **Module** | Alerts → Destinations (§6.3) |
@@ -410,6 +427,15 @@ strip `headers` before it reaches the persister. Same question at lower stakes f
 ---
 
 ### 11. A forced fetch permanently rewrites a query's stored `staleTime` to 0
+
+> **FIXED.** Every forced read now invalidates the exact key
+> (`invalidateQueries({ …, refetchType: "none" })`) and then fetches with the query's own
+> declared options — `queryClient` called directly at each site, no wrapper layer. Applied
+> to `fetchInto`'s force path and all ~20 direct `{ …options, staleTime: 0 }` spreads
+> (buildVersionChecker's `/config` re-check included). Verified live: `/config` keeps
+> `staleTime: Infinity` through `checkForNewVersion()`; a synthetic probe shows cached read
+> → no call, invalidate+fetch → forced call, stored staleTime untouched; the Alerts and
+> Dashboards `r`-refresh still fire exactly one request each.
 
 | Field | Detail |
 | --- | --- |
@@ -479,6 +505,10 @@ followed by a normal `fetchQuery`, or use `refetchQueries`, rather than passing
 
 ### 12. Enrichment table status is re-requested on every visit
 
+> **FIXED.** New `enrichmentTableStatusesQuery` (default 30 s tier, focus revalidate);
+> the list page reads through it and the Refresh path forces. Verified live: first visit
+> fetches status + stream list, an immediate revisit fires zero enrichment requests.
+
 | Field | Detail |
 | --- | --- |
 | **Module** | Pipelines → Enrichment Tables (§10.2) |
@@ -505,6 +535,10 @@ warm visit: GET /api/default/enrichment_tables/status      ← stream list corre
 
 ### 13. Alerts → History re-reads the whole alert list on every visit
 
+> **FIXED.** `fetchAlertsList` now reads through `alertsListQuery(org, "")` instead of the
+> raw service. Verified live: first visit fetches the list once, a revisit fires zero
+> alert-list requests.
+
 | Field | Detail |
 | --- | --- |
 | **Module** | Alerts → History (§6.5) |
@@ -525,6 +559,12 @@ alert list.
 
 ### 14. (out of scope) An unused alert template cannot be deleted
 
+> **Not reproducible on the current branch.** The row's delete button opens the ordinary
+> confirm dialog (OK/Cancel); confirmed live with a fresh unused template — DELETE fired,
+> row gone. The 0-deps "Used by …" dialog with only a Close button is the **Used-by cell's**
+> informational popup, not the delete path — the parallel run likely clicked that, or ran
+> older code. Re-check on the branch tip before filing.
+
 Found while testing C7; **not a caching defect**, recorded because it blocks that test.
 
 | Field | Detail |
@@ -543,6 +583,12 @@ Found while testing C7; **not a caching defect**, recorded because it blocks tha
 ---
 
 ### 15. The alert form's workflow dropdown bypasses the cache
+
+> **FIXED.** `AlertDestinationsField.fetchWorkflows` reads through
+> `queryClient.fetchQuery(workflowsQuery(org))`, sharing the Workflows page's entry.
+> Live verification is limited on this backend (`workflows_enabled` is off, so the dropdown
+> path never runs); the query itself verified live — one request, entry cached, second read
+> free. Re-verify the form flow on a backend with workflows enabled.
 
 | Field | Detail |
 | --- | --- |
@@ -587,6 +633,10 @@ dropdown shares the entry the Workflows page already populates.
 ---
 
 ### 16. The trace DAG is persisted to IndexedDB but never served from it
+
+> **FIXED.** `traceDagQuery` now declares `staleTime: SESSION_STALE_TIME` (Infinity), as
+> the inventory documents — the key already carries the time window. Verified via the
+> declaration (UI needs an LLM-instrumented trace, unavailable here).
 
 | Field | Detail |
 | --- | --- |
@@ -637,6 +687,12 @@ ingesting a trace with `gen_ai.*` attributes.
 
 ---
 ### 17. Raw `Date.now()` in cache keys — still unquantized on AI Insights/Sessions and Pipeline History
+
+> **FIXED.** (a) `selectionKey()` in `llmInsightsCache.ts` quantizes via `quantizeRange()`
+> — one change covers the panel-cache identity, the KPI cache and the error table; verified:
+> two keys minted 5 s apart for the same window are identical. (b) Pipeline History moved
+> off raw `http()` onto a new cached `pipelineHistoryQuery` with a quantized, stable-filtered
+> key (`pipelineKeys.history`); its Refresh forces; component specs updated and green.
 
 ```
 Module:            AI -> LLM Insights / Sessions (§22.3a) · Pipelines -> History (§9.3)
