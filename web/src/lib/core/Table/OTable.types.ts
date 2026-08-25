@@ -501,6 +501,8 @@ export interface OTableSlots<TData = any> {
     value: any;
     active?: boolean;
   }) => any;
+  /** Inline actions right of the built-in copy button (requires `enable-cell-copy`). */
+  "copy-actions"?: (props: { columnId: string; row: TData; value: any }) => any;
   /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
    *  (`row.original`) + row index. `active` is only ever passed to the reserved
    *  `cell-hover-actions` key, which this signature has to admit. */

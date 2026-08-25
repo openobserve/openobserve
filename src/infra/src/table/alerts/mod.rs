@@ -42,7 +42,7 @@ use super::{
     folders::folder_type_into_i16,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     errors::{self, FromStrError, PutAlertError},
 };
 
@@ -223,7 +223,6 @@ pub async fn get_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<Option<(MetaFolder, MetaAlert)>, errors::Error> {
-    let _lock = super::get_lock().await;
     let models = get_model_by_id(conn, org_id, alert_id).await?;
 
     if let Some((folder_model, alert_model)) = models {
@@ -244,7 +243,6 @@ pub async fn get_by_name<C: ConnectionTrait>(
     stream_name: &str,
     alert_name: &str,
 ) -> Result<Option<(MetaFolder, MetaAlert)>, errors::Error> {
-    let _lock = super::get_lock().await;
     let models = get_model_by_name(
         conn,
         org_id,
@@ -273,7 +271,6 @@ pub async fn put<C: TransactionTrait>(
     folder_id: &str,
     alert: MetaAlert,
 ) -> Result<MetaAlert, errors::Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let rslt: Result<alerts::Model, errors::Error> = match get_model_by_name(
         &txn,
@@ -341,7 +338,6 @@ pub async fn create<C: TransactionTrait>(
     alert: MetaAlert,
     use_given_id: bool,
 ) -> Result<MetaAlert, errors::Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     // Get the destination folder.
@@ -396,7 +392,6 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
         return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertMissingID).into());
     };
 
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     // Try to get the new parent folder if a folder ID is provided.
@@ -413,7 +408,7 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
     };
 
     // Try to get the alert to update.
-    let Some((_, alert_m)) = get_model_by_id(conn, org_id, alert_id).await? else {
+    let Some((_, alert_m)) = get_model_by_id(&txn, org_id, alert_id).await? else {
         return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertNotFound).into());
     };
 
@@ -438,7 +433,6 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
     alerts::Entity::delete_many()
         .filter(alerts::Column::Org.eq(org_id))
         .filter(alerts::Column::Id.eq(alert_id.to_string()))
@@ -456,7 +450,6 @@ pub async fn delete_by_name<C: ConnectionTrait>(
     stream_name: &str,
     alert_name: &str,
 ) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
     let model = get_model_by_name(
         conn,
         org_id,
@@ -480,7 +473,6 @@ pub async fn list<C: ConnectionTrait>(
     conn: &C,
     params: ListAlertsParams,
 ) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
-    let _lock = super::get_lock().await;
     let alerts = list_models(conn, params)
         .await?
         .into_iter()
@@ -520,7 +512,6 @@ pub async fn list_slo_burn_window_pairs<C: ConnectionTrait>(
     slo_id: &str,
     exclude_alert_id: Option<&str>,
 ) -> Result<Vec<(i64, i64)>, errors::Error> {
-    let _lock = super::get_lock().await;
     let query = alerts::Entity::find()
         .filter(alerts::Column::Org.eq(org))
         .filter(alerts::Column::SloId.eq(slo_id))
@@ -563,7 +554,6 @@ pub async fn list_alerts_by_slo<C: ConnectionTrait>(
     org: &str,
     slo_id: &str,
 ) -> Result<Vec<(String, String)>, errors::Error> {
-    let _lock = super::get_lock().await;
     Ok(alerts::Entity::find()
         .filter(alerts::Column::Org.eq(org))
         .filter(alerts::Column::SloId.eq(slo_id))
@@ -594,7 +584,6 @@ pub async fn last_written_us<C: ConnectionTrait>(
     org: &str,
     alert_id: &str,
 ) -> Result<Option<i64>, errors::Error> {
-    let _lock = super::get_lock().await;
     Ok(alerts::Entity::find_by_id(alert_id.to_string())
         .filter(alerts::Column::Org.eq(org))
         .one(conn)
@@ -604,7 +593,6 @@ pub async fn last_written_us<C: ConnectionTrait>(
 
 /// Lists all alerts.
 pub async fn list_all<C: ConnectionTrait>(conn: &C) -> Result<Vec<MetaAlert>, errors::Error> {
-    let _lock = super::get_lock().await;
     let alerts = list_all_models(conn)
         .await?
         .into_iter()
@@ -1055,10 +1043,7 @@ fn update_mutable_fields(
 
 /// Deletes all alerts belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // Init the ORM client BEFORE taking the lock: connect_to_orm acquires the
-    // same lock internally, so locking first can deadlock on the initial connect.
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let client = get_orm_client_rw().await;
     alerts::Entity::delete_many()
         .filter(alerts::Column::Org.eq(org_id))
         .exec(client)

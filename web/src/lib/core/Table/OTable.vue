@@ -1355,6 +1355,16 @@ defineExpose({
                 :active="caProps.active"
               />
             </template>
+
+            <!-- Inline actions beside the copy button -->
+            <template v-if="slots['copy-actions']" #copy-actions="ccaProps">
+              <slot
+                name="copy-actions"
+                :column-id="ccaProps.columnId"
+                :row="ccaProps.row"
+                :value="ccaProps.value"
+              />
+            </template>
           </OTableBody>
 
           <!-- ── Footer (sticky totals row) ─────────────────────── -->

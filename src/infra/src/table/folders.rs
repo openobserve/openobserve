@@ -20,12 +20,9 @@ use sea_orm::{
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
-use super::{
-    entity::folders::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::folders::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, FromStrError},
 };
 
@@ -56,7 +53,7 @@ pub async fn get(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<Option<Folder>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let folder = get_model(client, org_id, folder_id, folder_type)
         .await
         .map(|f| f.map(Folder::from))?;
@@ -69,7 +66,7 @@ pub async fn get_by_name(
     folder_name: &str,
     folder_type: FolderType,
 ) -> Result<Option<Folder>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let folder = get_model_by_name(client, org_id, folder_name, folder_type)
         .await
         .map(|f| f.map(Folder::from))?;
@@ -91,7 +88,7 @@ pub async fn list_folders(
     org_id: &str,
     folder_type: FolderType,
 ) -> Result<Vec<Folder>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let folders = list_models(client, org_id, folder_type)
         .await?
         .into_iter()
@@ -108,9 +105,7 @@ pub async fn put(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let model = match get_model(client, org_id, &folder.folder_id, folder_type).await? {
         // If a folder with the given folder_id already exists, get that folder
@@ -158,9 +153,7 @@ pub async fn delete(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = get_model(client, org_id, folder_id, folder_type).await?;
 
     if let Some(model) = model {
@@ -180,7 +173,7 @@ pub async fn get_pk_by_name(
     name: &str,
     folder_type: FolderType,
 ) -> Result<Option<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(get_model(client, org_id, name, folder_type)
         .await?
         .map(|m| m.id))
@@ -191,7 +184,7 @@ pub async fn get_pk_by_name(
 /// Used to translate the stored PK back to the user-visible name when building
 /// API responses for anomaly detection configs.
 pub async fn get_name_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(Entity::find_by_id(pk)
         .one(client)
         .await?
@@ -205,7 +198,7 @@ pub async fn get_name_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
 pub async fn get_name_and_display_name_by_pk(
     pk: &str,
 ) -> Result<Option<(String, String)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(Entity::find_by_id(pk)
         .one(client)
         .await?
@@ -258,9 +251,7 @@ async fn list_models(
 
 /// Deletes all folders belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org_id))
         .exec(client)

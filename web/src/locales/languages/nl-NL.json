@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "Er bestaat al een variabele met dezelfde naam",
     "pivotTotal": "Totaal",
     "pivotOthers": "Overige",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Verken overeenkomende logs"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "Waarde",
     "source": "Bron",
     "target": "Doelwit",
-    "value": "Waarde"
+    "value": "Waarde",
+    "logExplorer": {
+      "title": "Logverkenner",
+      "openInLogs": "Openen in Logs",
+      "invalidParams": "Ongeldige drilldown-parameters",
+      "noEvents": "Geen gebeurtenissen voldoen aan dit filter",
+      "filterHint": "Klik om gerelateerde logs te verkennen",
+      "timestamp": "Tijdstempel",
+      "queryMode": "SQL",
+      "runQuery": "Query uitvoeren",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "gebeurtenis",
+      "events": "gebeurtenissen",
+      "prevPage": "Vorige",
+      "nextPage": "Volgende",
+      "of": "van",
+      "sqlEditorLabel": "SQL-query",
+      "resetSql": "Reset",
+      "detail": {
+        "drawerTitle": "Gebeurtenisdetails",
+        "details": "Details",
+        "json": "JSON",
+        "insights": "Inzichten",
+        "copyLink": "Link kopiëren",
+        "copy": "Kopiëren",
+        "copyValue": "Waarde kopiëren",
+        "insightsHint": "Veldfrequenties over {n} geladen gebeurtenissen"
+      },
+      "insights": {
+        "anomalyTitle": "Veldanomalieprofiel",
+        "anomalyHint": "{n} gebeurtenissen gesampled",
+        "colField": "Veld",
+        "colRarity": "Zeldzaamheid",
+        "colValue": "Waarde",
+        "rarity": {
+          "anomalous": "Afwijkend",
+          "rare": "Zeldzaam",
+          "uncommon": "Ongewoon",
+          "common": "Algemeen"
+        },
+        "timelineTitle": "Gebeurtenistijdlijn",
+        "timelineHint": "Frequentie over geselecteerd bereik",
+        "timelineEmpty": "Geen gegevens",
+        "patternsTitle": "Logpatronen",
+        "patternsHint": "Gegroepeerd op vergelijkbare structuur",
+        "zScore": "z={value}",
+        "patternsEmpty": "Geen patronen geëxtraheerd voor dit filter",
+        "contextTitle": "Omringende gebeurtenissen",
+        "contextHint": "Gebeurtenissen nabij dit tijdstempel",
+        "contextTooltip": "Andere gebeurtenissen uit deze stream in de 3 minuten voor en na deze gebeurtenis — toont wat er op hetzelfde moment nog meer gebeurde.",
+        "contextEmpty": "Geen omringende gebeurtenissen gevonden"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Sectie overzicht van waarschuwingen",

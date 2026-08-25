@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "Переменная с таким именем уже существует",
     "pivotTotal": "Итого",
     "pivotOthers": "Прочие",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Изучить соответствующие логи"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "Значение",
     "source": "Источник",
     "target": "Цель",
-    "value": "Значение"
+    "value": "Значение",
+    "logExplorer": {
+      "title": "Просмотр логов",
+      "openInLogs": "Открыть в логах",
+      "invalidParams": "Недопустимые параметры детализации",
+      "noEvents": "Ни одно событие не соответствует этому фильтру",
+      "filterHint": "Нажмите, чтобы просмотреть связанные логи",
+      "timestamp": "Временная метка",
+      "queryMode": "SQL",
+      "runQuery": "Выполнить запрос",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "событие",
+      "events": "события",
+      "prevPage": "Назад",
+      "nextPage": "Далее",
+      "of": "из",
+      "sqlEditorLabel": "SQL-запрос",
+      "resetSql": "Сбросить",
+      "detail": {
+        "drawerTitle": "Детали события",
+        "details": "Подробности",
+        "json": "JSON",
+        "insights": "Аналитика",
+        "copyLink": "Копировать ссылку",
+        "copy": "Копировать",
+        "copyValue": "Копировать значение",
+        "insightsHint": "Частота полей среди {n} загруженных событий"
+      },
+      "insights": {
+        "anomalyTitle": "Профиль аномалий полей",
+        "anomalyHint": "{n} событий отобрано",
+        "colField": "Поле",
+        "colRarity": "Редкость",
+        "colValue": "Значение",
+        "rarity": {
+          "anomalous": "Аномальное",
+          "rare": "Редкое",
+          "uncommon": "Нечастое",
+          "common": "Обычное"
+        },
+        "timelineTitle": "Временная шкала событий",
+        "timelineHint": "Частота в выбранном диапазоне",
+        "timelineEmpty": "Нет данных",
+        "patternsTitle": "Шаблоны логов",
+        "patternsHint": "Сгруппировано по схожей структуре",
+        "zScore": "z={value}",
+        "patternsEmpty": "Шаблоны для этого фильтра не извлечены",
+        "contextTitle": "Окружающие события",
+        "contextHint": "События рядом с этой временной меткой",
+        "contextTooltip": "Другие события из этого потока за 3 минуты до и после этого события — показывает, что еще происходило в тот же момент времени.",
+        "contextEmpty": "Окружающие события не найдены"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Раздел обзора оповещений",

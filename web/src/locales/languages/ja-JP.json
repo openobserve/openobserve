@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "同じ名前の変数が既に存在します。",
     "pivotTotal": "合計",
     "pivotOthers": "その他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "一致するログを探索"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "値",
     "source": "ソース",
     "target": "ターゲット",
-    "value": "値"
+    "value": "値",
+    "logExplorer": {
+      "title": "ログエクスプローラー",
+      "openInLogs": "ログで開く",
+      "invalidParams": "無効なドリルダウンパラメータ",
+      "noEvents": "このフィルタに一致するイベントがありません",
+      "filterHint": "クリックして関連ログを探索",
+      "timestamp": "タイムスタンプ",
+      "queryMode": "SQL",
+      "runQuery": "クエリを実行",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "イベント",
+      "events": "イベント",
+      "prevPage": "前へ",
+      "nextPage": "次へ",
+      "of": "/",
+      "sqlEditorLabel": "SQLクエリ",
+      "resetSql": "リセット",
+      "detail": {
+        "drawerTitle": "イベント詳細",
+        "details": "詳細",
+        "json": "JSON",
+        "insights": "インサイト",
+        "copyLink": "リンクをコピー",
+        "copy": "コピー",
+        "copyValue": "値をコピー",
+        "insightsHint": "読み込んだ {n} 件のイベントにわたるフィールド頻度"
+      },
+      "insights": {
+        "anomalyTitle": "フィールド異常プロファイル",
+        "anomalyHint": "{n} 件のイベントをサンプリング",
+        "colField": "フィールド",
+        "colRarity": "希少度",
+        "colValue": "値",
+        "rarity": {
+          "anomalous": "異常",
+          "rare": "希少",
+          "uncommon": "やや希少",
+          "common": "一般的"
+        },
+        "timelineTitle": "イベントタイムライン",
+        "timelineHint": "選択した範囲の頻度",
+        "timelineEmpty": "データなし",
+        "patternsTitle": "ログパターン",
+        "patternsHint": "類似構造でグループ化",
+        "zScore": "z={value}",
+        "patternsEmpty": "このフィルタに対して抽出されたパターンはありません",
+        "contextTitle": "前後のイベント",
+        "contextHint": "このタイムスタンプの近くのイベント",
+        "contextTooltip": "このイベントの前後3分間にこのストリーム内で発生した他のイベント — 同じ時点で他に何が起こっていたかを示します。",
+        "contextEmpty": "周辺のイベントが見つかりません"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "アラート概要セクション",

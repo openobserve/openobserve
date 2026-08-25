@@ -13,14 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{get_config, meta::meta_store::MetaStore};
 use migration::Migrator;
 use sea_orm_migration::MigratorTrait;
 
-use crate::{
-    db::{ORM_CLIENT_DDL, connect_to_orm_ddl, sqlite::CLIENT_RW},
-    dist_lock,
-};
+use crate::{db::get_orm_client_ddl, dist_lock};
 
 pub mod action_scripts;
 pub mod alert_composites;
@@ -97,7 +93,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
 pub async fn migrate() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/database/migration", 0).await?;
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     // This is a hack to fix the failing alerts migration
     // For postgres, we need to run the migration that populates the alerts table first.
     // Otherwise, the `m20250109_092400_recreate_tables_with_ksuids` migration will fail.
@@ -111,7 +107,7 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
 /// Get the index of the migration that populates the alerts table.
 /// This index is used as the first stage of the migration process.
 async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     let migrations = Migrator::get_pending_migrations(client).await?;
     let mut index: u32 = 0;
     for (i, migration) in migrations.iter().enumerate() {
@@ -128,7 +124,7 @@ async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
 }
 
 pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     Migrator::down(client, steps).await?;
     Ok(())
 }
@@ -139,32 +135,6 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     org_users::create_table().await?;
 
     Ok(())
-}
-
-/// Acquires a lock on the SQLite client if the ORM runs on SQLite.
-///
-/// `connect_to_orm` uses the shared SQLite pool for every meta store except
-/// PostgreSQL, so the predicate here must match it — keying off
-/// `ZO_META_STORE=sqlite` alone would silently disable every lock site for
-/// other non-postgres values while the ORM still writes SQLite.
-///
-/// The guard wraps one process-wide, non-reentrant mutex serializing every
-/// SQLite write (raw meta-store puts, the coordinator, scheduler backends, and
-/// all ORM table writers). Acquire it at most once per call chain: the function
-/// that owns the write or transaction takes it; helpers that receive an open
-/// transaction must not. Drop the guard before calling anything that acquires
-/// it internally (coordinator emits, `db::scheduler` calls, other table write
-/// functions) — a nested acquisition deadlocks the process.
-///
-/// # Returns
-/// - `Some(MutexGuard)` if the ORM runs on SQLite
-/// - `None` if PostgreSQL is configured
-pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sqlx::Sqlite>>> {
-    if MetaStore::from(get_config().common.meta_store.as_str()) != MetaStore::PostgreSQL {
-        Some(CLIENT_RW.lock().await)
-    } else {
-        None
-    }
 }
 
 #[macro_export]

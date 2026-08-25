@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "Une variable portant le même nom existe déjà",
     "pivotTotal": "Total",
     "pivotOthers": "Autres",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Explorer les journaux correspondants"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "Valeur",
     "source": "Source",
     "target": "Cible",
-    "value": "Valeur"
+    "value": "Valeur",
+    "logExplorer": {
+      "title": "Explorateur de journaux",
+      "openInLogs": "Ouvrir dans les journaux",
+      "invalidParams": "Paramètres d'exploration invalides",
+      "noEvents": "Aucun événement ne correspond à ce filtre",
+      "filterHint": "Cliquer pour explorer les journaux associés",
+      "timestamp": "Horodatage",
+      "queryMode": "SQL",
+      "runQuery": "Exécuter la requête",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "événement",
+      "events": "événements",
+      "prevPage": "Précédent",
+      "nextPage": "Suivant",
+      "of": "sur",
+      "sqlEditorLabel": "Requête SQL",
+      "resetSql": "Réinitialiser",
+      "detail": {
+        "drawerTitle": "Détail de l'événement",
+        "details": "Détails",
+        "json": "JSON",
+        "insights": "Analyses",
+        "copyLink": "Copier le lien",
+        "copy": "Copier",
+        "copyValue": "Copier la valeur",
+        "insightsHint": "Fréquences des champs sur {n} événements chargés"
+      },
+      "insights": {
+        "anomalyTitle": "Profil d'anomalie des champs",
+        "anomalyHint": "{n} événements échantillonnés",
+        "colField": "Champ",
+        "colRarity": "Rareté",
+        "colValue": "Valeur",
+        "rarity": {
+          "anomalous": "Anomal",
+          "rare": "Rare",
+          "uncommon": "Peu courant",
+          "common": "Courant"
+        },
+        "timelineTitle": "Chronologie des événements",
+        "timelineHint": "Fréquence sur la plage sélectionnée",
+        "timelineEmpty": "Aucune donnée",
+        "patternsTitle": "Motifs de journaux",
+        "patternsHint": "Regroupés par structure similaire",
+        "zScore": "z={value}",
+        "patternsEmpty": "Aucun motif extrait pour ce filtre",
+        "contextTitle": "Événements environnants",
+        "contextHint": "Événements proches de cet horodatage",
+        "contextTooltip": "Autres événements de ce flux dans les 3 minutes avant et après cet événement — montre ce qui se passait d'autre au même moment.",
+        "contextEmpty": "Aucun événement environnant trouvé"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Section d'aperçu des alertes",

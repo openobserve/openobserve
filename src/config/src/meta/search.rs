@@ -1488,6 +1488,10 @@ pub struct ResultSchemaResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub having: Option<HavingNode>,
     pub timeseries_field: Option<String>,
+    #[serde(default)]
+    pub where_clause: String,
+    #[serde(default)]
+    pub where_by_stream: std::collections::HashMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<CrossLinksResponse>,
 }

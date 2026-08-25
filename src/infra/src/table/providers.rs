@@ -22,9 +22,8 @@
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Schema, Set};
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
     table::{
         cipher,
@@ -93,7 +92,7 @@ fn model_to_provider(model: Model, dek: &[u8]) -> Result<Provider, errors::Error
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -117,8 +116,6 @@ pub async fn add(provider: &Provider) -> Result<(), errors::Error> {
         Some(encrypt_data(&dek, &plaintext)?)
     };
 
-    let _lock = get_lock().await;
-
     let record = ActiveModel {
         id: Set(provider.id.clone()),
         org_id: Set(provider.org_id.clone()),
@@ -133,7 +130,7 @@ pub async fn add(provider: &Provider) -> Result<(), errors::Error> {
         updated_at: Set(provider.updated_at),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record).exec(client).await?;
 
     Ok(())
@@ -149,8 +146,6 @@ pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
         Some(encrypt_data(&dek, &plaintext)?)
     };
 
-    let _lock = get_lock().await;
-
     let record = ActiveModel {
         id: Set(provider.id.clone()),
         org_id: Set(provider.org_id.clone()),
@@ -165,14 +160,14 @@ pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
         updated_at: Set(provider.updated_at),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update(record).exec(client).await?;
 
     Ok(())
 }
 
 pub async fn get(id: &str) -> Result<Option<Provider>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let model = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
 
@@ -186,7 +181,7 @@ pub async fn get(id: &str) -> Result<Option<Provider>, errors::Error> {
 }
 
 pub async fn get_all_by_org(org_id: &str) -> Result<Vec<Provider>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let rows = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -205,7 +200,7 @@ pub async fn get_all_by_org(org_id: &str) -> Result<Vec<Provider>, errors::Error
 }
 
 pub async fn get_default(org_id: &str) -> Result<Option<Provider>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let model = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -223,9 +218,7 @@ pub async fn get_default(org_id: &str) -> Result<Option<Provider>, errors::Error
 }
 
 pub async fn delete(id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Id.eq(id))
         .exec(client)
@@ -235,9 +228,7 @@ pub async fn delete(id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn delete_all_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)
@@ -247,7 +238,7 @@ pub async fn delete_all_by_org(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn exists(id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
 
     Ok(record.is_some())

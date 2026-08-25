@@ -24,18 +24,15 @@ use sea_orm::{
 };
 use svix_ksuid::KsuidLike;
 
-use super::{
-    entity::{alert_incident_alerts, alert_incidents},
-    get_lock,
-};
+use super::entity::{alert_incident_alerts, alert_incidents};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
 /// Get incident by ID
 pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     alert_incidents::Entity::find_by_id(id)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
@@ -53,7 +50,7 @@ pub async fn create(
     first_alert_at: i64,
     title: Option<String>,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
 
@@ -75,9 +72,6 @@ pub async fn create(
         updated_at: Set(now),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     model
         .insert(client)
         .await
@@ -98,11 +92,8 @@ pub async fn add_alert_to_incident(
     alert_fired_at: i64,
     correlation_reason: &str,
 ) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     // Use transaction for atomic update
     let txn = client
@@ -172,11 +163,8 @@ pub async fn update_status(
     id: &str,
     status: &str,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let incident = get(org_id, id)
         .await?
@@ -202,11 +190,8 @@ pub async fn update_title(
     id: &str,
     title: &str,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let incident = get(org_id, id)
         .await?
@@ -228,11 +213,8 @@ pub async fn update_severity(
     id: &str,
     severity: &str,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let incident = get(org_id, id)
         .await?
@@ -255,7 +237,7 @@ pub async fn list(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let mut query = alert_incidents::Entity::find()
         .select_only()
@@ -292,7 +274,7 @@ pub async fn list(
 pub async fn get_incident_alerts(
     incident_id: &str,
 ) -> Result<Vec<alert_incident_alerts::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     alert_incident_alerts::Entity::find()
         .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
@@ -310,7 +292,7 @@ pub async fn find_open_incident_by_alert_id(
     org_id: &str,
     alert_id: &str,
 ) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     // Step 1: find all incident IDs that reference this alert_id in the junction table
     let rows = alert_incident_alerts::Entity::find()
@@ -345,7 +327,7 @@ pub async fn find_open_incident_containing_alert(
     org_id: &str,
     alert_id: &str,
 ) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let rows = alert_incident_alerts::Entity::find()
         .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
@@ -381,7 +363,7 @@ pub async fn get_alert_counts(
         return Ok(std::collections::HashMap::new());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     #[derive(Debug, FromQueryResult)]
     struct CountResult {
@@ -411,7 +393,7 @@ pub async fn get_alert_counts(
 
 /// Count open incidents for an org
 pub async fn count_open(org_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
@@ -423,7 +405,7 @@ pub async fn count_open(org_id: &str) -> Result<u64, errors::Error> {
 
 /// Count incidents with optional status filter
 pub async fn count(org_id: &str, status: Option<&str>) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let mut query =
         alert_incidents::Entity::find().filter(alert_incidents::Column::OrgId.eq(org_id));
@@ -481,11 +463,8 @@ pub async fn update_topology(
     id: &str,
     topology: &config::meta::alerts::incidents::IncidentTopology,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let incident = get(org_id, id)
         .await?
@@ -525,11 +504,8 @@ pub async fn update_incident_metadata(
     group_values: Option<serde_json::Value>,
     key_type: Option<&str>,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let incident = get(org_id, id)
         .await?
@@ -585,7 +561,7 @@ pub async fn find_open_incidents_filtered(
     created_after: Option<i64>,
     limit: Option<u64>,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let mut query = alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
@@ -626,11 +602,8 @@ pub async fn upgrade_incident_group_values(
     alert_count: i32,
     last_alert_at: i64,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let incident = get(org_id, id)
         .await?
@@ -667,17 +640,12 @@ pub async fn auto_resolve_stale(
 ) -> Result<(u64, Vec<(String, String)>), errors::Error> {
     const PAGE_SIZE: u64 = 500;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
     let cutoff = now - stale_threshold_micros;
 
     let mut resolved_ids = Vec::new();
     loop {
-        // make sure only one client is writing to the database(only for sqlite).
-        // Re-acquired per page so a large backlog doesn't monopolize the global
-        // write lock; each pass shrinks the non-resolved candidate set.
-        let _lock = get_lock().await;
-
         // Find open/acknowledged incidents with last_alert_at older than threshold
         let stale_incidents = alert_incidents::Entity::find()
             .filter(alert_incidents::Column::Status.ne("resolved"))
@@ -718,10 +686,7 @@ pub async fn auto_resolve_stale(
 
 /// Deletes all alert incidents belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     alert_incidents::Entity::delete_many()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .exec(client)
