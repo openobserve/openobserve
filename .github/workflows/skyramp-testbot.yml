@@ -133,7 +133,7 @@ jobs:
 
       # ── Testbot action ────────────────────────────────────────────────────────
 
-      - uses: skyramp/testbot@56c939dd9d2764e637c02739915731767769c045 # v0.11.6
+      - uses: skyramp/testbot@3d8f06f7223f2a7c187e4f3f3ed2b2e074770e8e # v0.11.10
         env:
           SKYRAMP_FEATURE_POM_REUSE: '1'
         with:
