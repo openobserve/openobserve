@@ -27,8 +27,14 @@ pub(super) static METRICS_INDEX_SELECTION_CACHE: LazyLock<Mutex<MetricsIndexSele
     LazyLock::new(|| Mutex::new(MetricsIndexSelectionCache::default()));
 
 pub(super) struct MetricsIndexSelectionCache {
-    entries: LruCache<String, Arc<Vec<Range<usize>>>>,
+    entries: LruCache<String, MetricsIndexSelection>,
     memory_size: usize,
+}
+
+#[derive(Clone)]
+pub(super) struct MetricsIndexSelection {
+    pub(super) ranges: Arc<Vec<Range<usize>>>,
+    pub(super) exact: bool,
 }
 
 impl Default for MetricsIndexSelectionCache {
@@ -45,19 +51,19 @@ impl MetricsIndexSelectionCache {
         key.len() + std::mem::size_of::<Vec<Range<usize>>>() + std::mem::size_of_val(ranges)
     }
 
-    pub(super) fn get(&mut self, key: &str) -> Option<Arc<Vec<Range<usize>>>> {
+    pub(super) fn get(&mut self, key: &str) -> Option<MetricsIndexSelection> {
         self.entries.get(key).cloned()
     }
 
-    pub(super) fn insert(&mut self, key: String, ranges: Arc<Vec<Range<usize>>>) {
-        let size = Self::entry_size(&key, &ranges);
+    pub(super) fn insert(&mut self, key: String, selection: MetricsIndexSelection) {
+        let size = Self::entry_size(&key, &selection.ranges);
         if size > METRICS_INDEX_SELECTION_CACHE_MAX_BYTES {
             return;
         }
-        if let Some(previous) = self.entries.insert(key.clone(), Arc::clone(&ranges)) {
+        if let Some(previous) = self.entries.insert(key.clone(), selection) {
             self.memory_size = self
                 .memory_size
-                .saturating_sub(Self::entry_size(&key, &previous));
+                .saturating_sub(Self::entry_size(&key, &previous.ranges));
         }
         self.memory_size += size;
         while self.memory_size > METRICS_INDEX_SELECTION_CACHE_MAX_BYTES {
@@ -66,7 +72,7 @@ impl MetricsIndexSelectionCache {
             };
             self.memory_size = self
                 .memory_size
-                .saturating_sub(Self::entry_size(&key, &evicted));
+                .saturating_sub(Self::entry_size(&key, &evicted.ranges));
         }
     }
 }

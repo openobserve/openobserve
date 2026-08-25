@@ -27,7 +27,7 @@ mod writer;
 pub use layout::{
     METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
 };
-pub use pruner::search;
+pub use pruner::{MetricsIndexSearchOutcome, search};
 pub use writer::MetricsIndexWriter;
 
 #[cfg(test)]
@@ -45,7 +45,7 @@ mod tests {
 
     use super::{
         METRICS_INDEX_ROW_COUNT,
-        pruner::{create_physical_filter, metrics_index_labels},
+        pruner::{create_physical_filter, matcher_label_plan, metrics_index_labels},
         reader::{MetricsIndexData, decode_metrics_index, evaluate_metrics_index},
     };
 
@@ -79,6 +79,16 @@ mod tests {
         let only_hash_excluded =
             Matchers::new(vec![Matcher::new(MatchOp::Equal, "trace_id", "trace-b")]);
         assert_eq!(metrics_index_labels(&schema, &only_hash_excluded), None);
+
+        let exact = matcher_label_plan(
+            &schema,
+            &Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]),
+        )
+        .unwrap();
+        assert!(exact.exact_candidate);
+
+        let partial = matcher_label_plan(&schema, &matchers).unwrap();
+        assert!(!partial.exact_candidate);
     }
 
     #[test]
