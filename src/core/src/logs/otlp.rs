@@ -29,11 +29,7 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{
-        flatten,
-        json::{self, estimate_json_bytes},
-        schema::format_stream_name,
-    },
+    utils::{flatten, json, schema::format_stream_name},
 };
 use infra::{errors::Result, schema::get_flatten_level};
 use ingestion_common::{IngestionStatus, StreamStatus};
@@ -89,7 +85,6 @@ pub async fn handle_request(
     let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::new();
     let mut original_options = Vec::new();
-    let mut timestamps = Vec::new();
     // End pipeline params construction
 
     if !executable_pipelines.is_empty() {
@@ -187,7 +182,6 @@ pub async fn handle_request(
                     }
                 }
 
-                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
                 rec["severity"] = if !log_record.severity_text.is_empty() {
                     log_record.severity_text.to_owned().into()
                 } else {
@@ -201,6 +195,7 @@ pub async fn handle_request(
                     rec[local_attr.key.as_str()] =
                         get_val_with_type_retained(&local_attr.value.as_ref());
                 });
+                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
 
                 match TraceId::from_bytes(
                     log_record
@@ -277,10 +272,9 @@ pub async fn handle_request(
                     // buffer the records and originals for pipeline batch processing
                     pipeline_inputs.push(rec);
                     original_options.push(original_data);
-                    timestamps.push(timestamp);
                 } else {
                     let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *size += estimate_json_bytes(&rec);
+                    *size += json::estimate_json_bytes(&rec);
                     // JSON Flattening - use per-stream flatten level
                     let flatten_level =
                         get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
@@ -415,7 +409,25 @@ pub async fn handle_request(
                         }
 
                         for (idx, mut res) in stream_pl_results {
-                            let original_size = estimate_json_bytes(&res);
+                            let timestamp =
+                                match super::handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+                                    Ok(ts) => ts,
+                                    Err(e) => {
+                                        stream_status.status.failed += 1;
+                                        stream_status.status.error = e.to_string();
+                                        metrics::INGEST_ERRORS
+                                            .with_label_values(&[
+                                                org_id,
+                                                StreamType::Logs.as_str(),
+                                                &stream_name,
+                                                TS_PARSE_FAILED,
+                                            ])
+                                            .inc();
+                                        continue;
+                                    }
+                                };
+
+                            let original_size = json::estimate_json_bytes(&res);
                             // get json object
                             let mut local_val = match res.take() {
                                 json::Value::Object(v) => v,
@@ -510,7 +522,7 @@ pub async fn handle_request(
                             let (ts_data, fn_num) = json_data_by_stream
                                 .entry(destination_stream.clone())
                                 .or_insert((Vec::new(), None));
-                            ts_data.push((timestamps[idx], local_val));
+                            ts_data.push((timestamp, local_val));
                             *fn_num = Some(function_no); // no pl -> no func
                         }
                     }
@@ -524,14 +536,31 @@ pub async fn handle_request(
             .iter()
             .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
-            for (idx, mut rec) in pipeline_inputs.iter().cloned().enumerate() {
+            for (idx, mut res) in pipeline_inputs.iter().cloned().enumerate() {
+                let timestamp = match super::handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+                    Ok(ts) => ts,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        metrics::INGEST_ERRORS
+                            .with_label_values(&[
+                                org_id,
+                                StreamType::Logs.as_str(),
+                                &stream_name,
+                                TS_PARSE_FAILED,
+                            ])
+                            .inc();
+                        continue;
+                    }
+                };
+
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                *size += estimate_json_bytes(&rec);
+                *size += json::estimate_json_bytes(&res);
 
                 let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
-                rec = flatten::flatten_with_level(rec, flatten_level)?;
+                res = flatten::flatten_with_level(res, flatten_level)?;
 
-                let mut local_val = match rec.take() {
+                let mut local_val = match res.take() {
                     json::Value::Object(v) => v,
                     _ => unreachable!(),
                 };
@@ -600,7 +629,7 @@ pub async fn handle_request(
                 let (ts_data, fn_num) = json_data_by_stream
                     .entry(stream_name.clone())
                     .or_insert((Vec::new(), None));
-                ts_data.push((timestamps[idx], local_val));
+                ts_data.push((timestamp, local_val));
                 *fn_num = Some(0);
             }
         }
@@ -609,7 +638,6 @@ pub async fn handle_request(
     // drop variables
     drop(executable_pipelines);
     drop(original_options);
-    drop(timestamps);
     drop(user_defined_schema_map);
     drop(streams_need_original_map);
 
