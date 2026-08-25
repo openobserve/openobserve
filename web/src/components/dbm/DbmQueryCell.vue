@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip v-if="titleAttr" :content="raw(titleAttr)" />
       {{ text || raw("—") }}
     </span>
-    <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+    <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
       <OTag v-if="dbSystem" type="dbSystem" :value="dbSystem" size="xs" />
       <template v-for="item in shownItems" :key="item.key">
         <span class="opacity-45">·</span>

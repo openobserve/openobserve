@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ raw(row.query ?? "—") }}
               </span>
 
-              <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+              <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
                 <OTag type="dbSystem" :value="row.db_system" size="xs" />
                 <template v-if="row.application">
                   <span class="opacity-45">·</span>
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
             <span
               v-if="row.waitEventLabel && row.waitEventRaw"
-              class="text-text-label text-3xs font-mono"
+              class="text-text-secondary text-3xs font-mono"
             >
               <OTooltip :content="raw(row.waitEventRaw)" />
               {{ raw(row.waitEventRaw) }}
@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ row.blockingCount }}
             </span>
-            <span class="text-text-label text-3xs">
+            <span class="text-text-secondary text-3xs">
               {{ t("dbm.blocked.sessionCount", { count: row.blockingCount }, row.blockingCount) }}
             </span>
           </div>
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-else class="flex flex-col items-end leading-tight">
             <span class="text-text-muted">{{ raw("—") }}</span>
-            <span class="text-text-label text-3xs">{{ t("dbm.blocked.notWaiting") }}</span>
+            <span class="text-text-secondary text-3xs">{{ t("dbm.blocked.notWaiting") }}</span>
           </div>
         </template>
 

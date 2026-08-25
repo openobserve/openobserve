@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
   >
     <p
-      class="border-border-subtle bg-surface-panel text-text-label text-2xs border-b px-3 py-1.5 font-semibold"
+      class="border-border-subtle bg-surface-panel text-text-secondary text-2xs border-b px-3 py-1.5 font-semibold"
     >
       {{ title }}
     </p>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center gap-2">
         <span
-          class="text-3xs grid size-3.5 shrink-0 place-items-center rounded-full font-bold leading-none text-white"
+          class="text-3xs grid size-3.5 shrink-0 place-items-center rounded-full leading-none font-bold text-white"
           :class="STATUS_TONES[check.status]"
         >
           {{ STATUS_GLYPHS[check.status] }}

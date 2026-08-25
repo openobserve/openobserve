@@ -164,14 +164,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip v-if="row.pairTitle" :content="raw(row.pairTitle)" />
               <template v-if="row.queries[0]">
                 {{ raw(row.queries[0]) }}
-                <span v-if="row.queries[1]" class="text-text-label px-1">{{ raw("⇄") }}</span>
+                <span v-if="row.queries[1]" class="text-text-secondary px-1">{{ raw("⇄") }}</span>
                 {{ raw(row.queries[1] ?? "") }}
               </template>
               <span v-else class="text-text-secondary italic">
                 {{ t("dbm.deadlocks.detail.noQueryCaptured") }}
               </span>
             </div>
-            <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <template v-if="row.db_instance">
                 <span class="opacity-45">·</span>
@@ -208,7 +208,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
               {{ row.objects.length || raw("—") }}
             </span>
-            <span class="text-text-label text-3xs truncate">{{ raw(row.objects[0] ?? "") }}</span>
+            <span class="text-text-secondary text-3xs truncate">{{
+              raw(row.objects[0] ?? "")
+            }}</span>
           </div>
         </template>
 
@@ -217,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body font-mono text-xs tabular-nums">
               {{ formatClock(row.lastSeen) }}
             </span>
-            <span class="text-text-label text-3xs">{{ formatAge(row.lastSeen) }}</span>
+            <span class="text-text-secondary text-3xs">{{ formatAge(row.lastSeen) }}</span>
           </div>
         </template>
 
@@ -228,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex flex-col items-end leading-tight">
               <span class="text-text-heading text-compact font-mono font-semibold tabular-nums">
                 {{ row.count }}
-                <span class="text-text-label text-3xs font-normal">
+                <span class="text-text-secondary text-3xs font-normal">
                   {{ formatPercent(row.share, 0) }}
                 </span>
               </span>
@@ -314,18 +316,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dbm-deadlocks-occurrences"
               >
                 <div class="mb-1.5 flex items-center gap-2">
-                  <h4 class="text-text-label text-2xs font-semibold">
+                  <h4 class="text-text-secondary text-2xs font-semibold">
                     {{ t("dbm.deadlocks.detail.occurrencesTitle", { count: row.count }) }}
                   </h4>
                   <div class="flex-1"></div>
-                  <span class="text-text-label text-3xs">
+                  <span class="text-text-secondary text-3xs">
                     {{ t("dbm.deadlocks.detail.occurrencesHint") }}
                   </span>
                 </div>
 
                 <div class="flex flex-col gap-1">
                   <div v-for="lane in row.lanes" :key="lane.pid" class="flex items-center gap-2">
-                    <span class="text-text-label text-3xs w-16 shrink-0 text-right font-mono">
+                    <span class="text-text-secondary text-3xs w-16 shrink-0 text-right font-mono">
                       {{ t("dbm.deadlocks.detail.lostLabel", { pid: lane.pid }) }}
                     </span>
                     <div
@@ -356,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <p class="text-text-label text-3xs mt-1.5">
+                <p class="text-text-secondary text-3xs mt-1.5">
                   {{ row.victimSummary }}
                 </p>
               </div>

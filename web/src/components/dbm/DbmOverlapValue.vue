@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The marker names the MEASUREMENT, and its tooltip spells the whole
            sentence out — the short form fits the column, the long form is what
            settles an argument about which number is being quoted. -->
-      <span class="text-text-label text-3xs" data-test="dbm-overlap-qualifier">
+      <span class="text-text-secondary text-3xs" data-test="dbm-overlap-qualifier">
         <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
         {{ qualifierLabel }}
       </span>

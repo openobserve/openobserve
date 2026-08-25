@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dbm.samples.partial") }}
             </span>
             <div class="flex-1"></div>
-            <span class="text-text-label flex shrink-0 items-center gap-1">
+            <span class="text-text-secondary flex shrink-0 items-center gap-1">
               <OIcon name="info-outline" class="size-3 shrink-0" />
               {{ t("dbm.samples.disclosureShort") }}
               <OTooltip side="top" :content="t('dbm.samples.disclosureDetail')" />
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h2 class="text-text-heading text-sm font-semibold">
             {{ t("dbm.samples.serverList.title") }}
           </h2>
-          <p class="text-text-label text-xs">
+          <p class="text-text-secondary text-xs">
             {{ t("dbm.samples.serverList.subtitle") }}
           </p>
         </div>
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body block truncate text-xs">{{ raw(row.db_user || "—") }}</span>
           </template>
           <template #bottom>
-            <div v-if="serverTruncated" class="text-text-label px-page-edge py-1.5 text-xs">
+            <div v-if="serverTruncated" class="text-text-secondary px-page-edge py-1.5 text-xs">
               {{ t("dbm.samples.serverList.truncated", { count: serverRows.length }) }}
             </div>
           </template>

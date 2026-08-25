@@ -150,12 +150,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.breakdown.noService") }}
               </span>
               <template v-else>
-                <OIcon name="database" size="xs" class="text-text-label shrink-0" />
+                <OIcon name="database" size="xs" class="text-text-secondary shrink-0" />
                 <span class="text-text-heading text-2xs min-w-0 truncate font-semibold">
                   {{ row.name ? raw(row.name) : t("dbm.breakdown.noSchema") }}
                 </span>
               </template>
-              <span class="text-text-label text-3xs shrink-0">
+              <span class="text-text-secondary text-3xs shrink-0">
                 {{ t("dbm.breakdown.queryCount", { count: row.queryCount }, row.queryCount) }}
               </span>
             </template>
@@ -171,13 +171,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  exists but named no host. Saying so beats a blank name line. -->
             <span
               v-else
-              class="text-text-label text-compact truncate italic"
+              class="text-text-secondary text-compact truncate italic"
               data-test="dbm-databases-unnamed-instance"
             >
               {{ t("dbm.databases.unnamedInstance") }}
               <OTooltip side="bottom" :content="t('dbm.databases.unnamedInstanceHint')" />
             </span>
-            <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <template v-if="row.db_namespace">
                 <span class="opacity-45">·</span>
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    the client-vantage list cannot show by construction. -->
               <template v-if="row.trafficless">
                 <span class="opacity-45">·</span>
-                <span class="text-text-label italic" data-test="dbm-databases-no-traffic">
+                <span class="text-text-secondary italic" data-test="dbm-databases-no-traffic">
                   {{ t("dbm.instanceMetrics.noTraffic") }}
                   <OTooltip side="bottom" :content="t('dbm.instanceMetrics.noTrafficHint')" />
                 </span>
@@ -243,7 +243,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               !isBreakdownRow(row) && row.critical
                 ? 'text-status-error-text font-semibold'
-                : 'text-text-muted'
+                : noQueryFigures(row)
+                  ? 'text-text-muted'
+                  : 'text-text-secondary'
             "
           >
             <template v-if="noQueryFigures(row)">{{ raw("—") }}</template>
@@ -327,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : formatPercent(attentionOf(row).ratio, 0)
               }}
             </span>
-            <span class="text-text-label text-3xs">{{ attentionLabel(row) }}</span>
+            <span class="text-text-secondary text-3xs">{{ attentionLabel(row) }}</span>
           </div>
         </template>
 
@@ -352,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
                 {{ formatNs(row.total_time_ns) }}
               </span>
-              <span class="text-text-label text-3xs font-mono tabular-nums">
+              <span class="text-text-secondary text-3xs font-mono tabular-nums">
                 {{ formatPercent(row.share, 0) }}
               </span>
             </span>
@@ -361,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  vantage named reads as time the ENGINE spent, which on
                  MySQL/MariaDB would be wait time. This is span time, and it
                  includes network and pool wait the server never sees (T7). -->
-            <span class="text-text-label text-3xs" data-test="dbm-databases-load-qualifier">
+            <span class="text-text-secondary text-3xs" data-test="dbm-databases-load-qualifier">
               <OTooltip
                 :content="t('dbm.detail.overlap.clientObserved', { engine: engineOf(row) ?? '' })"
               />

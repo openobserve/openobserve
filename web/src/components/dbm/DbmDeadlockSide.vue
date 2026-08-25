@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ raw(participant.query) }}
     </code>
-    <span v-else class="text-text-label text-2xs italic">
+    <span v-else class="text-text-secondary text-2xs italic">
       {{ t("dbm.deadlocks.detail.noQueryCaptured") }}
     </span>
 

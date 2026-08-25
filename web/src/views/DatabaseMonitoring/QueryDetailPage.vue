@@ -114,8 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Identity: the statement, then the dimensions that locate it. -->
       <section v-if="hasQuery" class="flex flex-col gap-2" data-test="dbm-detail-identity">
         <div class="flex flex-wrap items-center gap-1.5">
-          <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" />
-          <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="xs" />
+          <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" size="md" />
+          <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="md" />
           <span v-if="firstSeenTime" class="text-text-secondary text-xs">
             <i18n-t keypath="dbm.detail.firstSeen" tag="span">
               <template #time>
@@ -172,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="hasQuery"
         :model-value="activeTab"
         align="left"
+        bordered
         class="shrink-0"
         data-test="dbm-detail-tabs"
         @change="onTabChange"
@@ -304,7 +305,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OButton
               variant="outline"
-              size="sm"
+              size="xs"
+              icon-right="open-in-new"
               class="shrink-0"
               data-test="dbm-detail-server-metrics-setup"
               @click="openDbmSetup"
@@ -585,7 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              needs the way back, not a page that quietly hid the exit. -->
             <div
               v-if="!whereRows.length"
-              class="text-text-muted p-6 pt-2 text-sm"
+              class="text-text-secondary p-6 pt-2 text-sm"
               data-test="dbm-detail-where-empty"
             >
               {{ t("dbm.detail.whereItRuns.emptyFiltered") }}
@@ -612,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="whereRow.isChild"
                     name="database"
                     size="xs"
-                    class="text-text-label shrink-0"
+                    class="text-text-secondary shrink-0"
                   />
                   <span
                     class="min-w-0 truncate"
@@ -670,7 +672,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     isCriticalErrorRate(whereRow.errors, whereRow.calls)
                       ? 'text-status-error-text font-semibold'
-                      : 'text-text-muted'
+                      : whereRow.errorRate === null
+                        ? 'text-text-muted'
+                        : 'text-text-secondary'
                   "
                 >
                   <template v-if="whereRow.errorRate === null">{{ raw("—") }}</template>
@@ -2189,7 +2193,7 @@ const headlineStats = computed(() => {
       // would make one failure in a million read as loudly as a total outage.
       tone: isCriticalErrorRate(errorsForRate, callsForRate)
         ? "text-status-error-text"
-        : "text-text-label",
+        : "text-text-secondary",
     },
   ];
 });
@@ -2895,10 +2899,11 @@ const loadQueryInsights = async (token: number = requestSeq.current()) => {
  * setup page instead of describing an env var and stopping there.
  */
 const openDbmSetup = () => {
-  router.push({
+  const href = router.resolve({
     name: DBM_SETUP_ROUTE,
     query: { org_identifier: store.state.selectedOrganization.identifier },
-  });
+  }).href;
+  window.open(href, "_blank", "noopener");
 };
 
 /**

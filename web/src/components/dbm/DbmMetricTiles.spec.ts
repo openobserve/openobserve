@@ -99,7 +99,7 @@ describe("DbmMetricTiles", () => {
     expect(tile.text()).not.toContain("p95");
     expect(tile.text()).not.toContain("2× more");
     expect(tile.get("div").classes()).toEqual(
-      expect.arrayContaining(["text-text-label", "text-3xs", "font-semibold"]),
+      expect.arrayContaining(["text-text-secondary", "text-3xs", "font-semibold"]),
     );
   });
 

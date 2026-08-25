@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body text-xs font-medium">
               {{ t("dbm.queries.foldRowText", { count: row.foldCount ?? 0 }) }}
             </span>
-            <span class="text-text-label text-3xs truncate">
+            <span class="text-text-secondary text-3xs truncate">
               {{
                 tailExpanded
                   ? t("dbm.queries.foldRowDetailOpen", { share: formatPercent(row.share, 0) })
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div
               v-if="!row.isOther"
-              class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate"
+              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate"
               :class="row.isTail ? 'pl-4' : ''"
             >
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Every remainder states its own call count; only the first
                  explains what a remainder is, because three copies of the same
                  sentence is what made this block unreadable. -->
-            <span v-else class="text-text-label text-3xs">
+            <span v-else class="text-text-secondary text-3xs">
               {{
                 row.otherRowExplained
                   ? t("dbm.queries.otherRowDetail", { calls: formatCount(row.calls) })
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h2 class="text-text-heading text-sm font-semibold">
             {{ t("dbm.queries.serverList.title") }}
           </h2>
-          <p class="text-text-label text-xs">
+          <p class="text-text-secondary text-xs">
             {{ t("dbm.queries.serverList.subtitle") }}
           </p>
         </div>
@@ -536,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #bottom>
-            <div v-if="serverTruncated" class="text-text-label px-page-edge py-1.5 text-xs">
+            <div v-if="serverTruncated" class="text-text-secondary px-page-edge py-1.5 text-xs">
               {{ t("dbm.queries.serverList.truncated", { count: serverRows.length }) }}
             </div>
           </template>
@@ -1874,7 +1874,7 @@ const errorLabel = (row: QueryRow): I18nText =>
     : raw(formatCount(row.errors));
 
 const errorClass = (row: QueryRow) => {
-  if ((row.errors ?? 0) <= 0) return "text-text-muted";
+  if ((row.errors ?? 0) <= 0) return "text-text-secondary";
   return row.critical ? "text-status-error-text font-bold" : "text-status-error-text";
 };
 

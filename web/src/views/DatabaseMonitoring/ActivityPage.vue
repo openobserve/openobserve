@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span
               v-if="waitStrip.shown.length"
-              class="text-text-label text-3xs shrink-0 font-semibold"
+              class="text-text-secondary text-3xs shrink-0 font-semibold"
             >
               {{ t("dbm.activity.columns.waitEvent") }}
             </span>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-2xs font-mono tabular-nums">
                 {{ formatCount(bucket.sessions) }}
               </span>
-              <span v-if="bucket.share !== null" class="text-text-label text-3xs font-mono">
+              <span v-if="bucket.share !== null" class="text-text-secondary text-3xs font-mono">
                 {{ formatPercent(bucket.share, 0) }}
               </span>
             </span>
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  missed, and the full three sentences ride in the tooltip so
                  they cost the table no rows. -->
             <span
-              class="text-text-label text-2xs flex shrink-0 items-center gap-1"
+              class="text-text-secondary text-2xs flex shrink-0 items-center gap-1"
               data-test="dbm-activity-disclosure"
             >
               <OIcon name="info-outline" class="size-3 shrink-0" />
