@@ -85,7 +85,7 @@ pub async fn search_parquet(
             .unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
-    let files = get_file_list(
+    let (files, mut locks) = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,
         query.time_range,
@@ -103,7 +103,6 @@ pub async fn search_parquet(
         return Ok((vec![], ScanStats::new(), HashSet::new()));
     }
 
-    let mut lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
     let cfg = get_config();
     // get file metadata to build file_list
     let files_num = files.len();
@@ -133,8 +132,7 @@ pub async fn search_parquet(
         .await;
     for file in files_metadata {
         if file.meta.is_empty() {
-            wal::release_files(std::slice::from_ref(&file.key));
-            lock_files.retain(|f| f != &file.key);
+            locks.release_one(&file.key);
             continue;
         }
         if let Some((min_ts, max_ts)) = query.time_range
@@ -146,8 +144,7 @@ pub async fn search_parquet(
                 file.meta.min_ts,
                 file.meta.max_ts
             );
-            wal::release_files(std::slice::from_ref(&file.key));
-            lock_files.retain(|f| f != &file.key);
+            locks.release_one(&file.key);
             continue;
         }
         new_files.push(file);
@@ -157,16 +154,12 @@ pub async fn search_parquet(
     let mut scan_stats = ScanStats::new();
     scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
-        // release all files
-        wal::release_files(&lock_files);
         return Ok((vec![], scan_stats, HashSet::new()));
     }
 
     let scan_stats = match file_list::calculate_files_size(&files).await {
         Ok(size) => size,
         Err(err) => {
-            // release all files
-            wal::release_files(&lock_files);
             log::error!("[trace_id {trace_id}] calculate files size error: {err}",);
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 "calculate files size error".to_string(),
@@ -200,8 +193,6 @@ pub async fn search_parquet(
 
     // check memory circuit breaker
     if let Err(e) = ingester::check_memory_circuit_breaker() {
-        // release all files
-        wal::release_files(&lock_files);
         return Err(Error::ResourceError(e.to_string()));
     }
 
@@ -214,7 +205,7 @@ pub async fn search_parquet(
         target_partitions: cfg.limit.cpu_num,
     };
 
-    let table = match TableBuilder::new()
+    let table = TableBuilder::new()
         .sorted_by_time(sorted_by_time)
         .file_stat_cache(file_stat_cache.clone())
         .index_condition(index_condition.clone())
@@ -224,18 +215,10 @@ pub async fn search_parquet(
             files,
             Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
         )
-        .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            // release all files
-            wal::release_files(&lock_files);
-            return Err(e.into());
-        }
-    };
+        .await?;
 
-    // lock these files for this request
-    wal::lock_request(&query.trace_id, &lock_files);
+    // hand the locks to the request; released by wal::release_request on stream teardown
+    locks.into_request();
 
     log::info!(
         "{}",
@@ -493,7 +476,7 @@ async fn get_file_list(
     search_partition_keys: &[(String, String)],
     partition_time_level: PartitionTimeLevel,
     memtable_ids: HashSet<u64>,
-) -> Result<Vec<FileKey>, Error> {
+) -> Result<(Vec<FileKey>, wal::SearchingFiles), Error> {
     let wal_dir = match Path::new(&get_config().common.data_wal_dir).canonicalize() {
         Ok(path) => {
             let mut path = path.to_str().unwrap().to_string();
@@ -504,7 +487,7 @@ async fn get_file_list(
             path
         }
         Err(_) => {
-            return Ok(vec![]);
+            return Ok((vec![], wal::SearchingFiles::empty(&query.trace_id)));
         }
     };
 
@@ -566,13 +549,13 @@ async fn get_file_list(
         .collect::<Vec<_>>();
 
     if files.is_empty() {
-        return Ok(vec![]);
+        return Ok((vec![], wal::SearchingFiles::empty(&query.trace_id)));
     }
 
     // filter by pending delete
     let mut files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
     if files.is_empty() {
-        return Ok(vec![]);
+        return Ok((vec![], wal::SearchingFiles::empty(&query.trace_id)));
     }
 
     let files_num = files.len();
@@ -587,7 +570,7 @@ async fn get_file_list(
     }
 
     // lock theses files
-    wal::lock_files(&files);
+    let mut locks = wal::SearchingFiles::lock(&query.trace_id, &files);
 
     let stream_params = Arc::new(StreamParams::new(
         &query.org_id,
@@ -618,7 +601,7 @@ async fn get_file_list(
                     "[trace_id {}] skip wal parquet file: {file} time_range: [{file_min_ts},{file_max_ts}]",
                     query.trace_id,
                 );
-                wal::release_files(std::slice::from_ref(file));
+                locks.release_one(file);
                 continue;
             }
         }
@@ -626,10 +609,10 @@ async fn get_file_list(
         if match_source(stream_params.clone(), time_range, &filters, &file_key).await {
             result.push(file_key);
         } else {
-            wal::release_files(std::slice::from_ref(file));
+            locks.release_one(file);
         }
     }
-    Ok(result)
+    Ok((result, locks))
 }
 
 fn adapt_batch(
