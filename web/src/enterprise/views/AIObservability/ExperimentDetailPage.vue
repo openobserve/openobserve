@@ -416,8 +416,19 @@ const metricCards = computed<MetricCard[]>(() => {
   if (!results) return [];
   const aggregate = results.aggregateSummary;
   const task = results.taskProgress;
-  // A fixed four: per-scorer cards would grow the row without bound (the API
-  // puts no cap on pinned scorers). Per-scorer values live in the table columns.
+  const scoring = results.scoringProgress;
+  const scoreDistribution = (results.scoreSummaries ?? []).reduce(
+    (distribution, summary) => ({
+      success: distribution.success + summary.sampleCount,
+      failed: distribution.failed + summary.errorCount,
+      pending: distribution.pending + summary.pendingCount,
+      skipped: distribution.skipped + summary.skippedCount,
+    }),
+    { success: 0, failed: 0, pending: 0, skipped: 0 },
+  );
+  // Scoring stays one run-level card: per-scorer cards would grow the row
+  // without bound (the API puts no cap on pinned scorers). Per-scorer values
+  // live in the table columns.
   const cards: MetricCard[] = [];
   cards.push({
     key: "p50",
@@ -452,6 +463,16 @@ const metricCards = computed<MetricCard[]>(() => {
         : undefined,
       icon: "check-circle" as IconName,
       dataTest: "ai-experiment-detail-progress",
+    });
+  }
+  if (scoring && (scoring.total > 0 || results.scoreSummaries?.length)) {
+    cards.push({
+      key: "scoring",
+      label: t("aiObservability.experiments.detail.scoring"),
+      value: `${scoring.completed}/${scoring.total}`,
+      footer: t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
+      icon: "fact-check" as IconName,
+      dataTest: "ai-experiment-detail-scoring",
     });
   }
   return cards;

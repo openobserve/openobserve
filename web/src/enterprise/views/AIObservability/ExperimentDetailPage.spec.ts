@@ -104,6 +104,47 @@ describe("ExperimentDetailPage", () => {
     expect(wrapper.text()).not.toContain("scorer-9");
   });
 
+  it("shows the scoring status distribution in the run summary", async () => {
+    const experiment = makeExperiment({
+      id: "exp-1",
+      name: "run one",
+      datasetId: "ds-1",
+      scorers: [{ id: "scorer-9", version: 1 }],
+    });
+    const detail = makeExperimentDetail(experiment, {
+      results: {
+        executions: [],
+        scores: [],
+        scoringProgress: { completed: 8, total: 29, skipped: 0 },
+        scoreSummaries: [
+          {
+            scorerId: "scorer-9",
+            scorerVersion: 1,
+            name: "answer_relevance",
+            scoreConfigId: "config-9",
+            scoreConfigName: "answer_relevance",
+            scoreConfigVersion: 3,
+            sampleCount: 0,
+            errorCount: 8,
+            pendingCount: 21,
+            noReferenceCount: 0,
+            noTraceCount: 0,
+            skippedCount: 0,
+            value: null,
+          },
+        ],
+      },
+    });
+    get.mockResolvedValue(detail);
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+
+    const scoring = wrapper.get('[data-test="ai-experiment-detail-scoring"]');
+    expect(scoring.text()).toContain("8/29");
+    expect(scoring.text()).toContain("0 successful · 8 failed · 21 pending · 0 skipped");
+  });
+
   it("reads as prose: humanized task type and singular counts", async () => {
     const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
     experiment.task = {
