@@ -423,6 +423,35 @@ pub struct PreviewResponse {
     pub history: SnapshotHistory,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateDomainRequest {
+    pub domain: String,
+}
+
+/// The DNS TXT record the admin needs to create — `txt_name`/`txt_value`
+/// spelled out because the raw `domain` + `verification_token` pairing isn't
+/// self-explanatory to a non-engineer reading it off an API response.
+#[derive(Debug, Clone, Serialize)]
+pub struct CreateDomainResponse {
+    pub id: String,
+    pub domain: String,
+    pub txt_name: String,
+    pub txt_value: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DomainAdminView {
+    pub id: String,
+    pub domain: String,
+    /// 0 pending, 1 verified, 2 failed.
+    pub verification_state: i32,
+    /// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed.
+    pub verification_failure_reason: Option<i32>,
+    pub verified_at: Option<i64>,
+    pub last_checked_at: Option<i64>,
+    pub created_at: i64,
+}
+
 fn default_snooze_hours() -> i64 {
     6
 }

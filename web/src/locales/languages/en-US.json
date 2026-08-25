@@ -14285,6 +14285,35 @@
         "resolved": "Resolved"
       }
     },
+    "domains": {
+      "action": "Manage domains",
+      "title": "Custom domains — {name}",
+      "empty": "No custom domains added yet.",
+      "loadFailed": "Failed to load domains",
+      "addLabel": "Add a domain",
+      "addPlaceholder": "status.brandname.com",
+      "addButton": "Add",
+      "addFailed": "Failed to add domain",
+      "recordInstructions": "Create this DNS TXT record, then verify:",
+      "verifyNow": "Verify now",
+      "verifying": "Verifying...",
+      "verifyFailed": "Verification failed",
+      "deleteTitle": "Remove this domain?",
+      "deleteBody": "\"{domain}\" will stop resolving to this status page.",
+      "deleting": "Removing domain...",
+      "deleted": "Domain removed",
+      "deleteFailed": "Failed to remove domain",
+      "state": {
+        "pending": "Pending",
+        "verified": "Verified",
+        "failed": "Failed"
+      },
+      "failureReason": {
+        "0": "TXT record not found",
+        "1": "TXT record found, but the value doesn't match",
+        "2": "DNS resolution failed"
+      }
+    },
     "preview": {
       "title": "Live preview",
       "subtitle": "How your public page looks as you edit",

@@ -108,6 +108,28 @@ export interface PreviewResponse {
   };
 }
 
+export interface CreateDomainResponse {
+  id: string;
+  domain: string;
+  txt_name: string;
+  txt_value: string;
+}
+
+// 0 pending, 1 verified, 2 failed.
+export type DomainVerificationState = 0 | 1 | 2;
+// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed.
+export type DomainFailureReason = 0 | 1 | 2 | null;
+
+export interface StatusPageDomain {
+  id: string;
+  domain: string;
+  verification_state: DomainVerificationState;
+  verification_failure_reason: DomainFailureReason;
+  verified_at: number | null;
+  last_checked_at: number | null;
+  created_at: number;
+}
+
 const statusPagesService = {
   list: (orgIdentifier: string) => http().get(`/api/${orgIdentifier}/status_pages`),
 
@@ -157,6 +179,18 @@ const statusPagesService = {
 
   addNoticeUpdate: (orgIdentifier: string, noticeId: string, body: string) =>
     http().post(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/updates`, { body }),
+
+  listDomains: (orgIdentifier: string, id: string) =>
+    http().get(`/api/${orgIdentifier}/status_pages/${id}/domains`),
+
+  createDomain: (orgIdentifier: string, id: string, domain: string) =>
+    http().post(`/api/${orgIdentifier}/status_pages/${id}/domains`, { domain }),
+
+  deleteDomain: (orgIdentifier: string, domainId: string) =>
+    http().delete(`/api/${orgIdentifier}/status_pages/domains/${domainId}`),
+
+  verifyDomain: (orgIdentifier: string, domainId: string) =>
+    http().post(`/api/${orgIdentifier}/status_pages/domains/${domainId}/verify`, {}),
 };
 
 export default statusPagesService;

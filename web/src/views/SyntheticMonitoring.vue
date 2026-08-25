@@ -249,6 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="confirmDeleteStatusPage"
         @post-update="openPostUpdate"
         @view-updates="openNoticeHistory"
+        @manage-domains="openDomains"
       />
     </div>
 
@@ -398,6 +399,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @deleted="refreshPageHealth(noticeHistoryPage.id)"
     />
 
+    <!-- Custom domains -->
+    <DomainsDialog
+      v-if="statusPagesEnabled && domainsPage"
+      v-model:open="showDomains"
+      :org-identifier="orgIdentifier"
+      :page-id="domainsPage.id"
+      :page-name="domainsPage.name"
+    />
+
   </OPageLayout>
 </template>
 
@@ -421,6 +431,7 @@ import StatusPagesList from "@/views/synthetics/status-pages/StatusPagesList.vue
 import CreateStatusPageDialog from "@/views/synthetics/status-pages/CreateStatusPageDialog.vue";
 import PostUpdateDialog from "@/views/synthetics/status-pages/PostUpdateDialog.vue";
 import NoticeHistoryDialog from "@/views/synthetics/status-pages/NoticeHistoryDialog.vue";
+import DomainsDialog from "@/views/synthetics/status-pages/DomainsDialog.vue";
 import statusPagesService, {
   type StatusPageListItem,
   type PreviewResponse,
@@ -953,6 +964,14 @@ const openNoticeHistory = (page: StatusPageListItem) => {
   noticeHistoryPage.value = page;
   showNoticeHistory.value = true;
   refreshPageHealth(page.id);
+};
+
+const showDomains = ref(false);
+const domainsPage = ref<StatusPageListItem | null>(null);
+
+const openDomains = (page: StatusPageListItem) => {
+  domainsPage.value = page;
+  showDomains.value = true;
 };
 
 const confirmDeleteStatusPage = async (page: StatusPageListItem) => {

@@ -628,3 +628,65 @@ fn not_found() -> Response {
         ))
         .unwrap_or_default()
 }
+
+/// Runs ahead of all normal routing (see `create_app_router`'s top-level
+/// `.layer`) because a custom domain and OpenObserve's own UI/API answer at
+/// the exact same paths (`/` included) — Host is the only thing that tells
+/// them apart, and axum's router can't branch on it. Intercepts ONLY when the
+/// incoming Host matches a domain someone has actually claimed (any
+/// verification state); every other request — in particular the app's own
+/// real hostname, `localhost`, or an IP — falls through to normal routing
+/// completely untouched, so this can never regress ordinary traffic. Only a
+/// `verification_state = 1` claim resolves to tenant data; a claimed-but-
+/// unverified or released domain still gets intercepted (so it never reaches
+/// the app's own UI either — see `domain_not_connected`), it just doesn't get
+/// served *content*, per the design's ownership-gate rule.
+pub async fn host_route_middleware(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let cfg = config::get_config();
+    if !cfg.synthetics.enabled || !cfg.synthetics.status_pages_enabled {
+        return next.run(request).await;
+    }
+    let Some(host) = host_header(request.headers()) else {
+        return next.run(request).await;
+    };
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Ok(Some(claim)) = table::get_domain_claim_by_host(conn, &host).await else {
+        return next.run(request).await;
+    };
+    if claim.verification_state != 1 {
+        return domain_not_connected();
+    }
+    let Ok(Some(owning_page)) = table::get_page_by_id(&claim.org_id, &claim.status_page_id).await
+    else {
+        return domain_not_connected();
+    };
+    let headers = request.headers().clone();
+    match request.uri().path() {
+        "/api/status_pages_public_by_host" => snapshot(Path(owning_page.slug), headers).await,
+        _ => page(Path(owning_page.slug), headers).await,
+    }
+}
+
+fn host_header(headers: &axum::http::HeaderMap) -> Option<String> {
+    let host = headers.get(header::HOST)?.to_str().ok()?;
+    Some(host.split(':').next().unwrap_or(host).to_ascii_lowercase())
+}
+
+/// A domain that hasn't cleared ownership verification (or was released)
+/// must never render tenant data, verified or not — this is the deliberately
+/// content-free response for that case, distinct from [`not_found`] because
+/// the domain-routing layer, unlike the slug layer, sits in front of hosts an
+/// admin is actively trying to connect and deserves a clearer signal than a
+/// generic 404 that a page simply doesn't exist.
+fn domain_not_connected() -> Response {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .body(Body::from(
+            "This domain isn't connected to a status page yet.",
+        ))
+        .unwrap_or_default()
+}

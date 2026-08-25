@@ -1509,6 +1509,18 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
                     post(status_pages::admin::mark_false_positive),
+                )
+                .route(
+                    "/{org_id}/status_pages/{id}/domains",
+                    get(status_pages::admin::list_domains).post(status_pages::admin::create_domain),
+                )
+                .route(
+                    "/{org_id}/status_pages/domains/{did}",
+                    delete(status_pages::admin::delete_domain),
+                )
+                .route(
+                    "/{org_id}/status_pages/domains/{did}/verify",
+                    post(status_pages::admin::verify_domain),
                 );
         }
 
@@ -1770,6 +1782,18 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             .merge(other_service_routes())
             .merge(proxy_routes(true))
     };
+
+    // Custom-domain host routing runs ahead of EVERYTHING below, including the
+    // UI's own "/" redirect — a vanity Host and OpenObserve's own hostname
+    // answer at identical paths, so Host is the only signal that can tell
+    // them apart, and it has to be checked before normal routing claims the
+    // request. See `host_route_middleware`'s doc comment for the fall-through
+    // guarantee that keeps this safe for ordinary (non-custom-domain) traffic.
+    if config::get_config().synthetics.status_pages_enabled {
+        app = app.layer(middleware::from_fn(
+            status_pages::public::host_route_middleware,
+        ));
+    }
 
     // Ensure redirect takes into account base_uri
     let web_path = format!("{}/web/", cfg.common.base_uri);

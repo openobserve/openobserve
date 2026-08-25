@@ -70,6 +70,7 @@ pub mod status_page_audit_log;
 pub mod status_page_check_snoozes;
 pub mod status_page_component_checks;
 pub mod status_page_components;
+pub mod status_page_custom_domains;
 pub mod status_page_notice_components;
 pub mod status_page_notice_updates;
 pub mod status_page_notices;

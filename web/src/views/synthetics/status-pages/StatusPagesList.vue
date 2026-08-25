@@ -178,6 +178,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("statusPages.copyUrl") }}
             </ODropdownItem>
 
+            <ODropdownItem
+              :data-test="`status-pages-domains-item-${(row as any).id}`"
+              @select="emit('manage-domains', row)"
+            >
+              <template #icon-left>
+                <OIcon name="dns" size="sm" />
+              </template>
+              {{ t("statusPages.domains.action") }}
+            </ODropdownItem>
+
             <ODropdownSeparator />
 
             <ODropdownItem
@@ -249,6 +259,7 @@ const emit = defineEmits<{
   "new-page": [];
   "post-update": [row: StatusPageListItem];
   "view-updates": [row: StatusPageListItem];
+  "manage-domains": [row: StatusPageListItem];
 }>();
 
 const { t } = useI18nTyped();

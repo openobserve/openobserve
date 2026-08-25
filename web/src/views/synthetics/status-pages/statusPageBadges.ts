@@ -89,3 +89,18 @@ export function noticeStateBadge(state: number): {
       return { variant: "success-outline", labelKey: "statusPages.notices.state.resolved" };
   }
 }
+
+// verification_state: 0 pending, 1 verified, 2 failed.
+export function domainStateBadge(state: number): {
+  variant: BadgeVariant;
+  labelKey: I18nKey;
+} {
+  switch (state) {
+    case 1:
+      return { variant: "success-outline", labelKey: "statusPages.domains.state.verified" };
+    case 2:
+      return { variant: "error-outline", labelKey: "statusPages.domains.state.failed" };
+    default:
+      return { variant: "default-outline", labelKey: "statusPages.domains.state.pending" };
+  }
+}

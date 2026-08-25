@@ -27,8 +27,8 @@ use sea_orm::{
 
 use super::entity::{
     status_page_check_snoozes, status_page_component_checks, status_page_components,
-    status_page_notice_components, status_page_notice_updates, status_page_notices,
-    status_page_snapshots, status_pages, synthetics_checks,
+    status_page_custom_domains, status_page_notice_components, status_page_notice_updates,
+    status_page_notices, status_page_snapshots, status_pages, synthetics_checks,
 };
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -746,6 +746,9 @@ fn action_code(action: &str) -> i32 {
         "delete_notice" => 7,
         "notice_update" => 8,
         "mark_false_positive" => 9,
+        "create_domain" => 10,
+        "delete_domain" => 11,
+        "verify_domain" => 12,
         _ => 99,
     }
 }
@@ -853,4 +856,123 @@ pub async fn replace_components(
         }
     }
     Ok(())
+}
+
+/// Insert a domain claim after checking live-uniqueness. Not a single atomic
+/// DB constraint (see the migration's note on portable partial indexes) — the
+/// existence check and the insert are covered by the same table-wide write
+/// lock the other mutation paths in this file use, so a second concurrent
+/// claim for the same domain blocks behind the first rather than racing it.
+pub async fn insert_domain_if_unclaimed(
+    model: &status_page_custom_domains::Model,
+) -> Result<bool, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    let claimed = status_page_custom_domains::Entity::find()
+        .filter(status_page_custom_domains::Column::Domain.eq(model.domain.clone()))
+        .filter(status_page_custom_domains::Column::ReleasedAt.is_null())
+        .count(conn)
+        .await?
+        > 0;
+    if claimed {
+        return Ok(false);
+    }
+    model.clone().into_active_model().insert(conn).await?;
+    Ok(true)
+}
+
+pub async fn list_domains_for_page(
+    org_id: &str,
+    page_id: &str,
+) -> Result<Vec<status_page_custom_domains::Model>, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(status_page_custom_domains::Entity::find()
+        .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
+        .filter(status_page_custom_domains::Column::StatusPageId.eq(page_id))
+        .filter(status_page_custom_domains::Column::ReleasedAt.is_null())
+        .order_by_asc(status_page_custom_domains::Column::CreatedAt)
+        .all(conn)
+        .await?)
+}
+
+pub async fn get_domain_by_id(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<status_page_custom_domains::Model>, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(status_page_custom_domains::Entity::find_by_id(id)
+        .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
+        .one(conn)
+        .await?)
+}
+
+/// Pending/failed domains due a verification pass — the loop's own delta
+/// filter, so a fast tick interval stays cheap even with many settled
+/// domains. `before` bounds staleness: a row already checked this tick isn't
+/// picked up again until the next one.
+pub async fn list_domains_due_for_check<C: ConnectionTrait>(
+    conn: &C,
+    before: i64,
+    limit: u64,
+) -> Result<Vec<status_page_custom_domains::Model>, errors::Error> {
+    Ok(status_page_custom_domains::Entity::find()
+        .filter(status_page_custom_domains::Column::ReleasedAt.is_null())
+        .filter(status_page_custom_domains::Column::VerificationState.ne(1))
+        .filter(
+            status_page_custom_domains::Column::LastCheckedAt
+                .is_null()
+                .or(status_page_custom_domains::Column::LastCheckedAt.lt(before)),
+        )
+        .order_by_asc(status_page_custom_domains::Column::LastCheckedAt)
+        .limit(limit)
+        .all(conn)
+        .await?)
+}
+
+pub async fn update_domain(model: &status_page_custom_domains::Model) -> Result<(), errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    let am = model.clone().into_active_model().reset_all();
+    am.update(conn).await?;
+    Ok(())
+}
+
+/// Tombstone (never hard-delete, see the entity doc comment). Returns whether
+/// a live row existed to release.
+pub async fn release_domain(org_id: &str, id: &str, at: i64) -> Result<bool, errors::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    let Some(existing) = status_page_custom_domains::Entity::find_by_id(id)
+        .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
+        .filter(status_page_custom_domains::Column::ReleasedAt.is_null())
+        .one(conn)
+        .await?
+    else {
+        return Ok(false);
+    };
+    let mut am = existing.into_active_model();
+    am.released_at = sea_orm::ActiveValue::Set(Some(at));
+    am.verification_state = sea_orm::ActiveValue::Set(0);
+    am.updated_at = sea_orm::ActiveValue::Set(at);
+    am.update(conn).await?;
+    Ok(true)
+}
+
+/// The public hot-path lookup: a live claim for this Host, in ANY
+/// verification state. Deliberately not verified-only — the host-routing
+/// middleware needs to distinguish "not our domain, fall through to normal
+/// app routing" (no row at all) from "our domain, but not yet servable"
+/// (a row whose `verification_state != 1`), and only the caller can safely
+/// tell those apart, since falling through on the latter would let an
+/// unverified/released domain reach the app's own UI/API instead of the
+/// neutral holding response the design requires.
+pub async fn get_domain_claim_by_host<C: ConnectionTrait>(
+    conn: &C,
+    domain: &str,
+) -> Result<Option<status_page_custom_domains::Model>, errors::Error> {
+    Ok(status_page_custom_domains::Entity::find()
+        .filter(status_page_custom_domains::Column::Domain.eq(domain))
+        .filter(status_page_custom_domains::Column::ReleasedAt.is_null())
+        .one(conn)
+        .await?)
 }

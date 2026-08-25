@@ -28,8 +28,8 @@ use axum::{
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::status_pages::{
-    CreateNoticeRequest, CreatePageRequest, MarkFalsePositiveRequest, NoticeUpdateRequest,
-    SetComponentsRequest, UpdateNoticeRequest, UpdatePageRequest,
+    CreateDomainRequest, CreateNoticeRequest, CreatePageRequest, MarkFalsePositiveRequest,
+    NoticeUpdateRequest, SetComponentsRequest, UpdateNoticeRequest, UpdatePageRequest,
 };
 use openobserve_api_common::extractors::Headers;
 
@@ -264,6 +264,54 @@ pub async fn mark_false_positive(
             MetaHttpResponse::ok("marked")
         }
         Err(e) => map_err("mark_false_positive", e),
+    }
+}
+
+pub async fn list_domains(Path((org_id, id)): Path<(String, String)>) -> Response {
+    match openobserve_core::status_pages::list_domains(&org_id, &id).await {
+        Ok(domains) => MetaHttpResponse::json(domains),
+        Err(e) => map_err("list_domains", e),
+    }
+}
+
+pub async fn create_domain(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<CreateDomainRequest>,
+) -> Response {
+    match openobserve_core::status_pages::create_domain(&org_id, &id, body).await {
+        Ok(resp) => {
+            audit(&org_id, &user.user_id, "create_domain", Some(&resp.id)).await;
+            MetaHttpResponse::json(resp)
+        }
+        Err(e) => map_err("create_domain", e),
+    }
+}
+
+pub async fn delete_domain(
+    Path((org_id, did)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::status_pages::delete_domain(&org_id, &did).await {
+        Ok(true) => {
+            audit(&org_id, &user.user_id, "delete_domain", Some(&did)).await;
+            MetaHttpResponse::ok("deleted")
+        }
+        Ok(false) => MetaHttpResponse::not_found("not found"),
+        Err(e) => map_err("delete_domain", e),
+    }
+}
+
+pub async fn verify_domain(
+    Path((org_id, did)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::status_pages::verify_domain_now(&org_id, &did).await {
+        Ok(domain) => {
+            audit(&org_id, &user.user_id, "verify_domain", Some(&did)).await;
+            MetaHttpResponse::json(domain)
+        }
+        Err(e) => map_err("verify_domain", e),
     }
 }
 

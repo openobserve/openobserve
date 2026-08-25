@@ -456,6 +456,7 @@ pub(crate) fn synthetics_restart_required_changes(
         enabled,
         status_pages_enabled,
         status_page_rebuild_interval,
+        status_page_domain_verify_interval,
         status_page_trust_proxy_headers,
         status_page_public_rpm,
         lambda_browser: _,
@@ -486,6 +487,10 @@ pub(crate) fn synthetics_restart_required_changes(
     // Read once when the rebuilder loop starts.
     if old.status_page_rebuild_interval != *status_page_rebuild_interval {
         changed.push("ZO_STATUS_PAGE_REBUILD_INTERVAL");
+    }
+    // Read once when the domain-verify loop starts.
+    if old.status_page_domain_verify_interval != *status_page_domain_verify_interval {
+        changed.push("ZO_STATUS_PAGE_DOMAIN_VERIFY_INTERVAL");
     }
     // Read live per request; no restart needed, so not reported here — bind
     // them so the exhaustive match compiles.
@@ -930,6 +935,15 @@ pub struct Synthetics {
         help = "Seconds between status-page snapshot rebuild ticks."
     )]
     pub status_page_rebuild_interval: u64,
+    /// Seconds between custom-domain DNS ownership verification ticks. Kept
+    /// far tighter than the snapshot rebuild interval so a newly-added domain
+    /// with already-correct DNS doesn't sit pending for a full minute-plus.
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_VERIFY_INTERVAL",
+        default = 30,
+        help = "Seconds between custom-domain DNS ownership verification ticks."
+    )]
+    pub status_page_domain_verify_interval: u64,
     /// Trust `X-Forwarded-For` for the public status-page password-attempt
     /// limiter. Off by default: a spoofable header must not be the rate-limit
     /// key unless a trusted proxy sets it.

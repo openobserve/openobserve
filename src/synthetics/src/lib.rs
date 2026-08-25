@@ -204,6 +204,7 @@ fn spawn_workers() {
     // incident-engine half claim-gated, the snapshot half per region.
     if config::get_config().synthetics.status_pages_enabled {
         tokio::spawn(status_pages::run());
+        tokio::spawn(status_pages::run_domain_verifier());
     }
     // Its own task, not a step on the reaper's tick: a pass is up to a thousand
     // rows of outbound HTTP, and the reaper's lease bookkeeping cannot wait

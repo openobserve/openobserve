@@ -27,6 +27,7 @@ aws-sdk-lambda.workspace = true
 chrono.workspace = true
 config.workspace = true
 dashmap.workspace = true
+hickory-resolver.workspace = true
 infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }

@@ -513,6 +513,81 @@ pub async fn preview(
     Ok(Some(PreviewResponse { current, history }))
 }
 
+/// Claims a candidate domain for a page. Lowercases/punycodes before the
+/// live-uniqueness check so `Status.Brandname.COM` and
+/// `status.brandname.com` collide as the same string (R-3 note: the row is
+/// still org-scoped by `org_id`, but domain uniqueness is deliberately
+/// global — a second org must never be able to claim a domain another org
+/// already holds).
+pub async fn create_domain(
+    org_id: &str,
+    page_id: &str,
+    req: config::meta::status_pages::CreateDomainRequest,
+) -> Result<config::meta::status_pages::CreateDomainResponse, anyhow::Error> {
+    let domain = normalize_domain(&req.domain)?;
+    if table::get_page_by_id(org_id, page_id).await?.is_none() {
+        anyhow::bail!("validation: page not found");
+    }
+    let now = now_micros();
+    let token = format!("o2v_{}", generate_random_string(32));
+    let model = infra::table::entity::status_page_custom_domains::Model {
+        id: config::ider::generate(),
+        org_id: org_id.to_string(),
+        status_page_id: page_id.to_string(),
+        domain: domain.clone(),
+        verification_token: token.clone(),
+        verification_state: 0,
+        verification_failure_reason: None,
+        verified_at: None,
+        released_at: None,
+        last_checked_at: None,
+        created_at: now,
+        updated_at: now,
+    };
+    let claimed = table::insert_domain_if_unclaimed(&model).await?;
+    if !claimed {
+        anyhow::bail!("validation: domain is already claimed");
+    }
+    Ok(config::meta::status_pages::CreateDomainResponse {
+        id: model.id,
+        domain,
+        txt_name: format!("_o2-verify.{}", model.domain),
+        txt_value: token,
+    })
+}
+
+pub async fn list_domains(
+    org_id: &str,
+    page_id: &str,
+) -> Result<Vec<config::meta::status_pages::DomainAdminView>, anyhow::Error> {
+    Ok(table::list_domains_for_page(org_id, page_id)
+        .await?
+        .into_iter()
+        .map(to_domain_view)
+        .collect())
+}
+
+/// Tombstones the claim (R-3: org-scoped, so a delete for another org's
+/// domain id is a no-op returning false, not a leak).
+pub async fn delete_domain(org_id: &str, id: &str) -> Result<bool, anyhow::Error> {
+    Ok(table::release_domain(org_id, id, now_micros()).await?)
+}
+
+/// Runs one immediate verification pass for a single domain — the admin-facing
+/// "Verify now" action, distinct from the background loop's periodic sweep, so
+/// an admin who just fixed their DNS doesn't have to wait for the next tick.
+pub async fn verify_domain_now(
+    org_id: &str,
+    id: &str,
+) -> Result<config::meta::status_pages::DomainAdminView, anyhow::Error> {
+    let Some(model) = table::get_domain_by_id(org_id, id).await? else {
+        anyhow::bail!("validation: domain not found");
+    };
+    let checked = openobserve_synthetics::status_pages::check_domain_ownership(model).await?;
+    table::update_domain(&checked).await?;
+    Ok(to_domain_view(checked))
+}
+
 // ── Super-cluster emit (enterprise, gated on super_cluster.enabled) ──────────
 // Follows the synthetics idiom: cfg(enterprise) + super_cluster.enabled (NO
 // !local_mode — synthetics does not gate on it). Best-effort: a publish failure
@@ -782,6 +857,26 @@ fn is_valid_hex_color(s: &str) -> bool {
     s.len() == 7 && s.starts_with('#') && s[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+/// Lowercases and strips a trailing dot; rejects anything that isn't a
+/// plausible hostname. Real DNS validity (does it resolve, is it an apex,
+/// etc.) is the verifier job's problem, not this fast synchronous check's.
+fn normalize_domain(raw: &str) -> Result<String, anyhow::Error> {
+    let d = raw.trim().trim_end_matches('.').to_ascii_lowercase();
+    if d.is_empty() || d.len() > 253 || !d.contains('.') {
+        anyhow::bail!("validation: not a valid domain");
+    }
+    let valid = d.split('.').all(|label| {
+        !label.is_empty()
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    });
+    if !valid {
+        anyhow::bail!("validation: not a valid domain");
+    }
+    Ok(d)
+}
+
 fn to_admin_view(
     m: page_entity::Model,
     health: Option<config::meta::status_pages::ComponentStatus>,
@@ -832,6 +927,20 @@ fn to_notice_view(
         component_ids,
         created_at: m.created_at,
         updated_at: m.updated_at,
+    }
+}
+
+fn to_domain_view(
+    m: infra::table::entity::status_page_custom_domains::Model,
+) -> config::meta::status_pages::DomainAdminView {
+    config::meta::status_pages::DomainAdminView {
+        id: m.id,
+        domain: m.domain,
+        verification_state: m.verification_state,
+        verification_failure_reason: m.verification_failure_reason,
+        verified_at: m.verified_at,
+        last_checked_at: m.last_checked_at,
+        created_at: m.created_at,
     }
 }
 
