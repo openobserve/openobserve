@@ -1,6 +1,18 @@
-// @vitest-environment jsdom
 // Copyright 2026 OpenObserve Inc.
 //
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 // Behavior tests for the experiment create form. At least one test drives the
 // REAL <OForm> so an unwired `:schema` (which would let an empty form "save")
 // is caught rather than assumed.
@@ -253,7 +265,7 @@ describe("ExperimentForm", () => {
       expect(identity.element.contains(el.element)).toBe(true);
     }
 
-    // The heading is static text now; the name is no longer the page title.
+    // The heading is static text; the name is not the page title.
     const title = wrapper.find('[data-test="ai-experiment-form-title"]');
     expect(title.exists()).toBe(true);
     expect(
@@ -279,9 +291,9 @@ describe("ExperimentForm", () => {
     expect(wrapper.find('[data-test="ai-experiment-form-sdk-snippet"]').exists()).toBe(false);
   });
 
-  // The backend accepts 1..100 (MAX_TRIAL_COUNT); the old 1/2/3/5 dropdown came
-  // from the prototype's mock data and was narrower than the schema itself.
-  it("accepts a trial count above the old fixed list", async () => {
+  // The backend accepts 1..100 (MAX_TRIAL_COUNT), so the field must not be
+  // restricted to a fixed list.
+  it("accepts any trial count the backend allows", async () => {
     wrapper = await createWrapper();
     fillValid(wrapper);
     setField(wrapper, "trialCount", 40);

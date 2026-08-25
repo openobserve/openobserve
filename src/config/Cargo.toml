@@ -64,9 +64,6 @@ rand.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-# Declared here rather than in `[workspace.dependencies]`: the enterprise
-# build overwrites the workspace root with `Cargo.toml.openobserve`, so a
-# root entry has to be kept in step across three manifests to survive.
 serde_with = { version = "3", features = ["macros", "json"] }
 sha256.workspace = true
 sqlparser.workspace = true

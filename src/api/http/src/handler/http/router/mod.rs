@@ -379,6 +379,12 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
     }
 }
 
+/// Whether this request's body carries a Remote Task secret in plaintext.
+///
+/// `audit_middleware` records request bodies verbatim, so the create call and
+/// every write under `auth`, `headers`, or `signing` has to be redacted —
+/// otherwise the audit trail becomes a second, unencrypted copy of the secret
+/// store.
 #[cfg(feature = "enterprise")]
 fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
     if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {

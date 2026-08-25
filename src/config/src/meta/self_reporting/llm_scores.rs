@@ -491,9 +491,8 @@ impl LlmScoreRecord {
             annotation_source: Some(LlmScoreAnnotationSource::Manual),
             task_producer: Some(EvaluationTaskProducer::Manual),
             task_trigger_reason: Some(String::new()),
-            // A `serde_as` JSON field infers as one Utf8 column. The old nested value
-            // flattened away to nothing here, which is why every `metadata_*`
-            // column used to arrive through schema evolution instead.
+            // A `serde_as` JSON field infers as one Utf8 column, so this has to
+            // carry a non-empty value for the `metadata_*` columns to appear.
             scorer_metadata: Some(serde_json::json!({})),
             annotation_metadata: Some(serde_json::json!({})),
             author: Some(String::new()),
