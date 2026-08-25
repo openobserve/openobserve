@@ -46,6 +46,19 @@ export const functionsQuery = (org: string) =>
     persister: localStoragePersister,
   });
 
+/**
+ * URL-import job statuses for enrichment tables. Volatile (jobs progress), so
+ * it takes the default freshness window rather than the config tier — a warm
+ * revisit is free, a pending job's status is at most one window behind.
+ */
+export const enrichmentTableStatusesQuery = (org: string) =>
+  queryOptions({
+    queryKey: functionKeys.enrichmentStatuses(org),
+    queryFn: async (): Promise<Record<string, unknown>> =>
+      (await jstransform.get_all_enrichment_table_statuses(org)).data ?? {},
+    refetchOnWindowFocus: true,
+  });
+
 /** Create or update, chosen by the caller — both invalidate the same scope. */
 export const saveFunctionMutation = (org: string, isUpdate: () => boolean) =>
   mutationOptions({

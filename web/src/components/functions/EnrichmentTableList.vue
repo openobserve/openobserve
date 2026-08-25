@@ -416,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
+import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -432,7 +433,6 @@ import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import jsTransformService from "@/services/jstransform";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -620,17 +620,24 @@ export default defineComponent({
         // Fetch both streams and URL job statuses in parallel
         const [streamsRes, statusRes] = await Promise.all([
           getStreams("enrichment_tables", false, false, force),
-          jsTransformService
-            .get_all_enrichment_table_statuses(store.state.selectedOrganization.identifier)
-            .catch((err: any) => {
-              // If status API fails, continue with empty status map
-              console.warn("Error fetching URL statuses:", err);
-              return { data: {} };
-            }),
+          (force
+            ? queryClient.invalidateQueries({ queryKey: enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier).queryKey, exact: true, refetchType: "none" }).then(() =>
+                queryClient.fetchQuery(
+                  enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier),
+                ),
+              )
+            : queryClient.fetchQuery(
+                enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier),
+              )
+          ).catch((err: any) => {
+            // If status API fails, continue with empty status map
+            console.warn("Error fetching URL statuses:", err);
+            return {};
+          }),
         ]);
 
         const res: any = streamsRes;
-        const urlJobMap = statusRes.data || {};
+        const urlJobMap: Record<string, any> = statusRes || {};
 
         // Create a map of stream names from the streams list
         const streamMap = new Map();

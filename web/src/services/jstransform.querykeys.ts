@@ -28,4 +28,5 @@ import { orgKey } from "@/composables/query/keys";
 export const functionKeys = {
   all: (org: string) => orgKey(org, "functions"),
   list: (org: string) => orgKey(org, "functions", "list"),
+  enrichmentStatuses: (org: string) => orgKey(org, "functions", "enrichmentStatuses"),
 };
