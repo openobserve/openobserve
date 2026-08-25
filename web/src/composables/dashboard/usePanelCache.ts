@@ -42,7 +42,7 @@ import { toRaw } from "vue";
 import { hashKey } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { idbPersister, IDB_PREFIX } from "@/composables/query/persisters";
-import { cacheRemoveByPrefix } from "@/composables/query/idbStorage";
+import { cacheRemoveByPrefix, cacheRemoveWhere } from "@/composables/query/idbStorage";
 import { LONG_GC_TIME } from "@/composables/query/cachePolicy";
 import { panelKeyDigest } from "@/composables/query/panelKey";
 import { panelKeys } from "./panel.querykeys";
@@ -119,20 +119,24 @@ const panelEntryOptions = {
 
 const isPanelKey = (key: readonly unknown[]) => key[0] === "org" && key[2] === "panels";
 
+// Matches the persisted form of every panel key, any org: the persister keys
+// storage by the hashed array, so `"panels"` sits at the third position.
+const PERSISTED_PANEL_KEY = /^\["org",("(?:[^"\\]|\\.)*"|null),"panels"/;
+
 window._o2_removeDashboardCache = async (): Promise<void> => {
   try {
     const cache = queryClient.getQueryCache();
-    await Promise.all(
-      cache
-        .getAll()
-        .filter((query) => isPanelKey(query.queryKey))
-        .map(async (query) => {
-          await idbPersister.removeQueries?.({ queryKey: query.queryKey, exact: true });
-          cache.remove(query);
-        }),
+    cache
+      .getAll()
+      .filter((query) => isPanelKey(query.queryKey))
+      .forEach((query) => cache.remove(query));
+    // Entries that were only ever on disk have no in-memory query to walk, so
+    // sweep the store by key shape — main's version cleared the whole store.
+    await cacheRemoveWhere(
+      (key) =>
+        key.startsWith(`${IDB_PREFIX}-`) &&
+        PERSISTED_PANEL_KEY.test(key.slice(IDB_PREFIX.length + 1)),
     );
-    // Entries that were only ever on disk have no in-memory query to walk.
-    await idbPersister.persisterGc?.();
   } catch (error) {
     console.error("Error clearing dashboard cache:", error);
   }
