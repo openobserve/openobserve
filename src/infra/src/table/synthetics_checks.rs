@@ -1058,13 +1058,10 @@ fn build_active_model(check: &Synthetic) -> Result<ActiveModel, errors::Error> {
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
     match t {
         SyntheticType::Http => "http",
-        SyntheticType::Api => "api",
         SyntheticType::Tcp => "tcp",
         SyntheticType::Tls => "tls",
         SyntheticType::Ssh => "ssh",
         SyntheticType::Browser => "browser",
-        SyntheticType::Ping => "ping",
-        SyntheticType::Dns => "dns",
     }
 }
 
@@ -1154,12 +1151,76 @@ mod tests {
     fn test_monitor_type_to_str() {
         assert_eq!(check_type_to_str(&SyntheticType::Http), "http");
         assert_eq!(check_type_to_str(&SyntheticType::Browser), "browser");
-        assert_eq!(check_type_to_str(&SyntheticType::Api), "api");
         assert_eq!(check_type_to_str(&SyntheticType::Tcp), "tcp");
         assert_eq!(check_type_to_str(&SyntheticType::Tls), "tls");
         assert_eq!(check_type_to_str(&SyntheticType::Ssh), "ssh");
-        assert_eq!(check_type_to_str(&SyntheticType::Ping), "ping");
-        assert_eq!(check_type_to_str(&SyntheticType::Dns), "dns");
+    }
+
+    /// `check_type_to_str` writes the column; serde reads it back. If the two
+    /// ever disagree on a type, every stored row of that type turns unreadable
+    /// on the next read — so the round-trip is pinned, not assumed.
+    #[test]
+    fn test_check_type_to_str_round_trips_through_serde() {
+        for t in [
+            SyntheticType::Http,
+            SyntheticType::Browser,
+            SyntheticType::Tcp,
+            SyntheticType::Tls,
+            SyntheticType::Ssh,
+        ] {
+            let stored = check_type_to_str(&t);
+            let back: SyntheticType =
+                serde_json::from_value(serde_json::Value::String(stored.to_string()))
+                    .unwrap_or_else(|e| panic!("{stored} did not read back: {e}"));
+            assert_eq!(back, t, "{stored}");
+        }
+    }
+
+    /// `Api`, `Ping` and `Dns` were removed — no probe ever implemented them.
+    /// A row that still holds one of those strings is now unreadable, and this
+    /// asserts that outcome rather than leaving it undocumented. Both
+    /// conversions are checked because both are on live paths: `Synthetic` for
+    /// the list/get APIs, `DueCheck` for the scheduler.
+    #[test]
+    fn test_removed_check_types_make_a_stored_row_unreadable() {
+        for dead in ["api", "ping", "dns"] {
+            let mut m = make_model();
+            m.synthetics_type = dead.to_string();
+
+            // Asserted on the wrapper's own text too: serde already quotes the
+            // unknown variant, so `contains(dead)` alone tests nothing of ours.
+            let err = Synthetic::try_from(m.clone())
+                .err()
+                .unwrap_or_else(|| panic!("{dead} must not convert into Synthetic"));
+            let err = err.to_string();
+            assert!(
+                err.contains("invalid synthetics_type"),
+                "{dead}: the error must name the offending column, got: {err}"
+            );
+            assert!(
+                err.contains(dead),
+                "{dead}: the error must name the offending value, got: {err}"
+            );
+
+            let err = DueCheck::try_from(m.clone())
+                .err()
+                .unwrap_or_else(|| panic!("{dead} must not convert into DueCheck"));
+            let err = err.to_string();
+            assert!(
+                err.contains("invalid synthetics_type"),
+                "{dead}: the error must name the offending column, got: {err}"
+            );
+            assert!(
+                err.contains(dead),
+                "{dead}: the error must name the offending value, got: {err}"
+            );
+            // The scheduler converts a whole batch — an error without the row
+            // id names nothing.
+            assert!(
+                err.contains(&m.id),
+                "{dead}: the DueCheck error must name the check id, got: {err}"
+            );
+        }
     }
 
     #[test]
