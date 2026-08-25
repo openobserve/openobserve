@@ -361,11 +361,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  vantage named reads as time the ENGINE spent, which on
                  MySQL/MariaDB would be wait time. This is span time, and it
                  includes network and pool wait the server never sees (T7). -->
-            <span
-              class="text-text-label text-3xs"
-              :title="t('dbm.detail.overlap.clientObserved', { engine: engineOf(row) ?? '' })"
-              data-test="dbm-databases-load-qualifier"
-            >
+            <span class="text-text-label text-3xs" data-test="dbm-databases-load-qualifier">
+              <OTooltip
+                :content="t('dbm.detail.overlap.clientObserved', { engine: engineOf(row) ?? '' })"
+              />
               {{ t("dbm.list.overlap.clientObserved") }}
             </span>
           </span>
@@ -1517,10 +1516,11 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
-    size: 72,
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 92,
     sortable: false,
-    meta: { align: "right" },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 

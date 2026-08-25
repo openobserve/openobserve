@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span
               v-if="waitStrip.shown.length"
-              class="text-text-label text-3xs shrink-0 font-semibold tracking-wide uppercase"
+              class="text-text-label text-3xs shrink-0 font-semibold"
             >
               {{ t("dbm.activity.columns.waitEvent") }}
             </span>

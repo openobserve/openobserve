@@ -160,7 +160,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              with the ⇄ between them rather than sitting in two columns. -->
         <template #cell-pair="{ row }">
           <div class="flex min-w-0 flex-col gap-px">
-            <div class="text-text-code min-w-0 truncate font-mono text-xs" :title="row.pairTitle">
+            <div class="text-text-code min-w-0 truncate font-mono text-xs">
+              <OTooltip v-if="row.pairTitle" :content="raw(row.pairTitle)" />
               <template v-if="row.queries[0]">
                 {{ raw(row.queries[0]) }}
                 <span v-if="row.queries[1]" class="text-text-label px-1">{{ raw("⇄") }}</span>
@@ -179,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-for="chip in row.chips"
                 :key="chip.id"
-                class="rounded-default text-3xs ml-0.5 px-1 py-px font-semibold tracking-wide uppercase"
+                class="rounded-default text-3xs ml-0.5 px-1 py-px font-semibold"
                 :class="chip.tone"
               >
                 {{ chip.label }}
@@ -313,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dbm-deadlocks-occurrences"
               >
                 <div class="mb-1.5 flex items-center gap-2">
-                  <h4 class="text-text-label text-2xs font-semibold tracking-wide uppercase">
+                  <h4 class="text-text-label text-2xs font-semibold">
                     {{ t("dbm.deadlocks.detail.occurrencesTitle", { count: row.count }) }}
                   </h4>
                   <div class="flex-1"></div>
@@ -747,10 +748,11 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
-    size: 96,
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 108,
     enableSorting: false,
-    meta: { align: "right" },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
 

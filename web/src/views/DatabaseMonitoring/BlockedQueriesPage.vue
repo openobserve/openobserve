@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex min-w-0 flex-1 flex-col gap-px">
               <div v-if="row.pill" class="flex min-w-0 items-center gap-1.5">
                 <span
-                  class="text-3xs shrink-0 rounded-full px-1.5 py-px font-bold tracking-wide uppercase"
+                  class="text-3xs shrink-0 rounded-full px-1.5 py-px font-bold"
                   :class="row.pill.tone"
                   :data-test="`dbm-blocked-pill-${row.kind}`"
                 >
@@ -168,10 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
 
-              <span
-                class="text-text-code min-w-0 truncate font-mono text-xs"
-                :title="row.query ?? ''"
-              >
+              <span class="text-text-code min-w-0 truncate font-mono text-xs">
+                <OTooltip v-if="row.query" :content="raw(row.query)" />
                 {{ raw(row.query ?? "—") }}
               </span>
 
@@ -191,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <span
                   v-if="row.longestWait"
-                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ml-0.5 px-1 py-px font-semibold tracking-wide uppercase"
+                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ml-0.5 px-1 py-px font-semibold"
                 >
                   {{ t("dbm.blocked.longestWait") }}
                 </span>
@@ -235,8 +233,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="row.waitEventLabel && row.waitEventRaw"
               class="text-text-label text-3xs font-mono"
-              :title="row.waitEventRaw"
             >
+              <OTooltip :content="raw(row.waitEventRaw)" />
               {{ raw(row.waitEventRaw) }}
             </span>
           </div>
@@ -263,10 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-application="{ row }">
-          <span
-            class="text-text-body block truncate font-mono text-xs"
-            :title="row.application ?? ''"
-          >
+          <span class="text-text-body block truncate font-mono text-xs">
+            <OTooltip v-if="row.application" :content="raw(row.application)" />
             {{ raw(row.application ?? "—") }}
           </span>
         </template>
@@ -721,10 +717,11 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "actions",
-          header: raw(""),
-          size: 200,
+          header: t("dbm.common.actions"),
+          isAction: true,
+          size: 92,
           enableSorting: false,
-          meta: { align: "right" },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
         },
       ]
     : [
@@ -764,10 +761,11 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "actions",
-          header: raw(""),
-          size: 112,
+          header: t("dbm.common.actions"),
+          isAction: true,
+          size: 92,
           enableSorting: false,
-          meta: { align: "right" },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
         },
       ],
 );

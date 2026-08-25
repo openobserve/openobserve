@@ -14848,7 +14848,8 @@
     "common": {
       "reload": "Refresh",
       "lastRefreshed": "Last refreshed {age}",
-      "loadFailed": "Could not load database data. Try again, or narrow the time range."
+      "loadFailed": "Could not load database data. Try again, or narrow the time range.",
+      "actions": "Actions"
     },
     "ai": {
       "suggestFix": "Ask AI how to fix this",
@@ -14870,12 +14871,12 @@
       "removeScope": "Remove this filter",
       "popoverTitle": "Narrow this down",
       "dimension": {
-        "system": "engine",
-        "instance": "database",
-        "namespace": "schema",
-        "env": "environment",
-        "service": "service",
-        "insight": "insight"
+        "system": "Engine",
+        "instance": "Database",
+        "namespace": "Schema",
+        "env": "Environment",
+        "service": "Service",
+        "insight": "Insight"
       }
     },
     "delta": {
@@ -15196,9 +15197,9 @@
       "ambiguousStream": "This organization has more than one trace stream, and we can't tell which one this query runs on. Pick a stream to load its callers and sample traces.",
       "pickStream": "Choose a trace stream",
       "invalidStream": "That trace stream name isn't one we recognize, so we didn't run the search.",
-      "firstSeen": "FIRST APPEARED IN THIS LIST AT {time}",
+      "firstSeen": "First appeared in this list at {time}",
       "firstSeenHint": "The earliest point in this range where this query was heavy enough to track on its own.",
-      "lastSeen": "LAST APPEARED AT {time}",
+      "lastSeen": "Last appeared at {time}",
       "lastSeenHint": "The most recent point in this range where this query was heavy enough to track on its own. It may still be running now — this is the last time it made the list.",
       "errorsByCode": {
         "title": "Failures by reason code",
@@ -15409,12 +15410,12 @@
       }
     },
     "rowChips": {
-      "new": "NEW TO THIS LIST",
-      "slower": "{ratio}× SLOWER THAN USUAL",
-      "loop": "RUNS {multiplier}× PER REQUEST",
-      "allFailed": "ALL {count} FAILED",
-      "busier": "BUSIER, NOT SLOWER",
-      "climbed": "NEW HEAVIEST QUERY"
+      "new": "New to this list",
+      "slower": "{ratio}× slower than usual",
+      "loop": "Runs {multiplier}× per request",
+      "allFailed": "All {count} failed",
+      "busier": "Busier, not slower",
+      "climbed": "New heaviest query"
     },
     "deadlocks": {
       "title": "Databases",
@@ -15445,10 +15446,10 @@
         "mysqlPartial": "Your MySQL database keeps only the most recent deadlock unless innodb_print_all_deadlocks is on."
       },
       "chips": {
-        "oppositeOrder": "OPPOSITE ROW ORDER",
-        "cadence": "EVERY {seconds}s",
-        "noQueries": "QUERIES NOT CAPTURED",
-        "partial": "ONE SIDE ONLY"
+        "oppositeOrder": "Opposite row order",
+        "cadence": "Every {seconds}s",
+        "noQueries": "Queries not captured",
+        "partial": "One side only"
       },
       "rowActions": {
         "topQueries": "Find these in Top queries",
@@ -15465,8 +15466,8 @@
         "pid": "pid {pid}",
         "thread": "thread {pid}",
         "transaction": "transaction {id}",
-        "eachWaits": "each waits for the other",
-        "deadlock": "deadlock",
+        "eachWaits": "Each waits for the other",
+        "deadlock": "Deadlock",
         "noQueryCaptured": "The log recorded this deadlock but not the statement.",
         "waitingFor": "Was waiting for {target} to finish.",
         "waitingForRow": "Was waiting for {target} to finish — the other session had already changed the row it wanted.",
@@ -15616,14 +15617,14 @@
       },
       "deep": "{count} deep",
       "notWaiting": "not waiting",
-      "longestWait": "LONGEST WAIT",
-      "holdsTheLock": "HOLDS THE LOCK EVERYONE WANTS",
+      "longestWait": "Longest wait",
+      "holdsTheLock": "Holds the lock everyone wants",
       "lastStatement": "last statement {age} ago",
       "idleInTransaction": "not waiting for anything · idle in an open transaction",
       "pills": {
-        "root": "ROOT — START HERE",
-        "waitingBlocking": "WAITING & BLOCKING {count}",
-        "waiting": "WAITING"
+        "root": "Root — start here",
+        "waitingBlocking": "Waiting & blocking {count}",
+        "waiting": "Waiting"
       },
       "waitingOn": "waiting on {pid}",
       "degraded": "One session is holding up {count}. It has had an open transaction for {age} and hasn't run a query in that time — most likely an application that forgot to commit.",

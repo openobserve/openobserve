@@ -49,11 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The marker names the MEASUREMENT, and its tooltip spells the whole
            sentence out — the short form fits the column, the long form is what
            settles an argument about which number is being quoted. -->
-      <span
-        class="text-text-label text-3xs"
-        :title="qualifierTitle"
-        data-test="dbm-overlap-qualifier"
-      >
+      <span class="text-text-label text-3xs" data-test="dbm-overlap-qualifier">
+        <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
         {{ qualifierLabel }}
       </span>
     </template>
@@ -66,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { DbmOverlapSource } from "@/utils/dbm/overlapMetrics";
 
@@ -116,10 +114,8 @@ const qualifierLabel = computed(() =>
 const qualifierTitle = computed(() =>
   props.qualifierKey === null
     ? undefined
-    : String(
-        t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
-          engine: props.engine ?? "",
-        }),
-      ),
+    : t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
+        engine: props.engine ?? "",
+      }),
 );
 </script>

@@ -116,16 +116,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-wrap items-center gap-1.5">
           <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" />
           <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="xs" />
-          <span v-if="firstSeenLabel" class="text-text-secondary text-xs">
-            {{ firstSeenLabel }}
+          <span v-if="firstSeenTime" class="text-text-secondary text-xs">
+            <i18n-t keypath="dbm.detail.firstSeen" tag="span">
+              <template #time>
+                <span class="text-text-primary font-semibold tabular-nums">{{
+                  firstSeenTime
+                }}</span>
+              </template>
+            </i18n-t>
             <OTooltip side="bottom" :content="t('dbm.detail.firstSeenHint')" />
           </span>
           <span
-            v-if="lastSeenLabel"
+            v-if="lastSeenTime"
             class="text-text-secondary text-xs"
             data-test="dbm-detail-last-seen"
           >
-            {{ lastSeenLabel }}
+            <i18n-t keypath="dbm.detail.lastSeen" tag="span">
+              <template #time>
+                <span class="text-text-primary font-semibold tabular-nums">{{ lastSeenTime }}</span>
+              </template>
+            </i18n-t>
             <OTooltip side="bottom" :content="t('dbm.detail.lastSeenHint')" />
           </span>
           <div class="flex-1"></div>
@@ -196,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              column: they are the two vantages on the same two measures, and
              the `order-*` classes that hoist the populated one on a zero-trace
              fleet only work while they share a flex parent. -->
-        <OTabPanel name="overview" layout="flex-col" class="gap-4">
+        <OTabPanel name="overview" layout="flex-col" content-class="gap-4">
           <!-- The headline numbers, before the charts: minute 0 of an incident is
            "how bad and how much of the database is it", and that is figures,
            not a graph.
@@ -220,20 +230,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            in a second branch: one copy of each section, one source of truth for
            its states, and the trace-led order restored the moment traces
            return. -->
-          <div
-            v-if="traceVantage"
-            class="text-text-muted text-xs"
-            data-test="dbm-detail-stats-provenance"
-          >
-            {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
+          <!-- The provenance caption belongs TO the tiles, so it rides with them
+               as one group (tight gap-1.5) rather than floating a full section
+               gap above a bordered card. The group keeps the order-2 swap so a
+               zero-trace fleet still hoists the server block above it. -->
+          <div class="flex flex-col gap-1.5" :class="traceVantage ? '' : 'order-2'">
+            <div
+              v-if="traceVantage"
+              class="text-text-secondary text-xs"
+              data-test="dbm-detail-stats-provenance"
+            >
+              {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
+            </div>
+            <DbmMetricTiles
+              :items="visibleHeadlineStats"
+              with-sub-labels
+              tile-data-test="dbm-detail-stat"
+              data-test="dbm-detail-stats"
+            />
           </div>
-          <DbmMetricTiles
-            :items="visibleHeadlineStats"
-            with-sub-labels
-            :class="traceVantage ? '' : 'order-2'"
-            tile-data-test="dbm-detail-stat"
-            data-test="dbm-detail-stats"
-          />
 
           <!-- Plan drift, promoted. "It got slow because the plan changed" is the
            most actionable finding on this page, and the section that computes it
@@ -283,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="traceVantage ? '' : 'order-1'"
             data-test="dbm-detail-server-metrics"
           >
-            <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-off">
+            <span class="text-text-secondary text-xs" data-test="dbm-detail-server-metrics-off">
               {{ t("dbm.detail.serverMetrics.off") }}
               <OTooltip side="top" :content="t('dbm.detail.serverMetrics.offHint')" />
             </span>
@@ -500,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Hidden entirely rather than shown as two empty axes labelled "No
            history for this query" — there is no history because nothing traced
            it, and an empty chart reads as a gap in data we should have. -->
-          <div v-if="traceVantage" class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div v-if="traceVantage" class="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <DbmHistoryPanel
               :title="t('dbm.detail.latencyTitle')"
               :empty-label="t('dbm.detail.noSeries')"
@@ -723,7 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              three tables. It is SERVER-vantage, so it is populated on a fleet
              with no traced traffic at all — exactly where the Overview panel
              collapses to two tiles and the Callers tab locks. -->
-        <OTabPanel name="plans" layout="flex-col" class="gap-4">
+        <OTabPanel name="plans" layout="flex-col" content-class="gap-4">
           <!-- Query plans. Provenance is PER ROW now (W-E3): generic NULL-bound
            estimates keep the gap tag — the statement EXPLAINed with every bind
            set to NULL, never executed, no latency ever shown beside it.
@@ -910,7 +925,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              together because they share one dependency: the resolved trace
              stream. The picker below is literally the control for the two
              tables under it, so it lives on their tab and nowhere else. -->
-        <OTabPanel name="callers" layout="flex-col" class="gap-4">
+        <OTabPanel name="callers" layout="flex-col" content-class="gap-4">
           <!-- The two panels below read RAW traces, so they need to know which
            trace stream this fingerprint lives on — and the queries endpoint does
            not carry it. With several streams in the org there is no way to tell,
@@ -1787,10 +1802,9 @@ const identityChips = computed(() => {
  * the cut by a traffic shift would otherwise be labelled new, and mislabeling
  * it is the fastest way this page loses a DBA's trust.
  */
-const firstSeenLabel = computed(() => {
+const firstSeenTime = computed<string | null>(() => {
   const first = history.value?.points.find((point) => point.plottable);
-  if (!first) return null;
-  return t("dbm.detail.firstSeen", { time: formatClock(first.timestamp) });
+  return first ? formatClock(first.timestamp) : null;
 });
 
 /**
@@ -1799,12 +1813,12 @@ const firstSeenLabel = computed(() => {
  * most recent tracked activity). Suppressed when it would restate first-seen's
  * timestamp: one tracked window means the two chips would print one fact twice.
  */
-const lastSeenLabel = computed(() => {
+const lastSeenTime = computed<string | null>(() => {
   const points = history.value?.points ?? [];
   const first = points.find((point) => point.plottable);
   const last = [...points].reverse().find((point) => point.plottable);
   if (!first || !last || last.timestamp === first.timestamp) return null;
-  return t("dbm.detail.lastSeen", { time: formatClock(last.timestamp) });
+  return formatClock(last.timestamp);
 });
 
 const hasSeries = computed(() => (history.value?.points.length ?? 0) > 0);
@@ -2234,7 +2248,13 @@ const endpointColumns = computed<OTableColumnDef<EndpointCallerRow>[]>(() => [
       headerTooltip: t("dbm.queries.columnHints.p95"),
     },
   },
-  { id: "actions", header: raw(""), size: 60, isAction: true },
+  {
+    id: "actions",
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 84,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+  },
 ]);
 
 // ─── Where it runs ───────────────────────────────────────────────────────────
@@ -2344,7 +2364,13 @@ const sampleColumns = computed<OTableColumnDef<SampleRow>[]>(() => [
     meta: { align: "right" },
   },
   { id: "status", header: t("dbm.detail.columns.status"), size: 120, sortable: false },
-  { id: "actions", header: raw(""), size: 60, isAction: true },
+  {
+    id: "actions",
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 84,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+  },
 ]);
 
 // ─── Loading ─────────────────────────────────────────────────────────────────

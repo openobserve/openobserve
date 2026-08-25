@@ -67,12 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            time on Postgres, WAIT time on MySQL/MariaDB. The column heading is
            the generic "Database time" and this list mixes engines, so the
            distinction can only be stated per row. -->
-      <span
-        v-if="qualifier"
-        class="text-text-label text-3xs"
-        :title="qualifierTitle"
-        data-test="dbm-overlap-qualifier"
-      >
+      <span v-if="qualifier" class="text-text-label text-3xs" data-test="dbm-overlap-qualifier">
+        <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
         {{ qualifier }}
       </span>
       <OProgressBar v-if="showsShare" :value="share" :variant="barVariant" size="xs" class="w-18" />
@@ -85,6 +81,7 @@ import { computed } from "vue";
 
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SparklinePoint, SparklineTone } from "@/lib/data/Sparkline/OSparkline.types";
 import { useI18nTyped } from "@/types/i18n";
 import { formatNs, formatPercent } from "@/utils/dbm/format";
@@ -142,11 +139,9 @@ const qualifier = computed(() =>
 const qualifierTitle = computed(() =>
   props.qualifierKey === null
     ? undefined
-    : String(
-        t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
-          engine: props.engine ?? "",
-        }),
-      ),
+    : t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
+        engine: props.engine ?? "",
+      }),
 );
 
 /** A single query owning this much of a database's time is worth noticing. */

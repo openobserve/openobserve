@@ -23,33 +23,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ticket, look at an example trace, set an alert) a three-step detour through a
   detail page. So the four things a reader actually does next live on the row.
 
-  They are hidden until hover/focus because a column of 14 identical button
-  clusters is visual noise that competes with the data — but they are in the
-  DOM and focusable throughout, so keyboard users reach them in tab order and
-  screen readers announce them. `opacity` rather than `v-if` is what makes that
-  true; `display:none` would take them out of the tab order entirely.
+  Always visible, matching the app-standard action column on the Dashboards and
+  Alerts lists — one consistent "Actions" column across the product rather than
+  a DBM-only hover-reveal. They stay in the DOM and focusable, so keyboard users
+  reach them in tab order and screen readers announce them.
 -->
 <template>
-  <div
-    class="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100"
-    :data-test="dataTest"
-  >
+  <div class="flex items-center justify-end gap-1" :data-test="dataTest">
     <OButton
       v-for="action in actions"
       :key="action.id"
-      variant="ghost-muted"
-      size="icon-xs"
+      variant="ghost"
+      size="icon-sm"
       :icon-left="action.icon"
       :data-test="`${dataTest}-${action.id}`"
       @click.stop="emit('action', action.id)"
     >
       <!-- `left`, the convention for an icon-only action in a table's trailing
-           cell — it opens INTO the row rather than over the row above, and it
-           is what the other right-edge row actions already use (the
-           open-in-new buttons on Slowest calls and Query detail). These
-           buttons carry no label, so the tooltip is the only thing naming
-           them; where it opens is the difference between reading it and
-           covering the row you are pointing at. -->
+           cell — it opens INTO the row rather than over the row above. These
+           buttons carry no label, so the tooltip is the only thing naming them. -->
       <OTooltip side="left" :content="action.label" />
     </OButton>
   </div>
@@ -61,7 +53,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 
-/** One inline action. `id` is what the row emits back to the page. */
+/** One row action. `id` is what the row emits back to the page. */
 export interface DbmRowAction {
   id: string;
   icon: IconName;

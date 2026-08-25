@@ -18,6 +18,13 @@ export interface OTabPanelProps {
   layout?: TabPanelLayout;
   /** Makes the panel root element fill 100% of parent height. Default: false */
   stretch?: boolean;
+  /**
+   * Extra classes for the panel root. Use this rather than a bare `class=` on
+   * `<OTabPanel>`: the component has multiple template roots, so Vue cannot
+   * auto-inherit a `class` attribute onto the rendered element and drops it
+   * silently. A prop is always received, so it actually lands.
+   */
+  contentClass?: string;
 }
 
 export interface OTabPanelSlots {

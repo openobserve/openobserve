@@ -46,14 +46,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the quiet weight — the tile says what it means and what it is. Only
            the grid that HAS sub-labels pays for the row that holds them. -->
       <div v-if="withSubLabels" class="flex items-baseline gap-1">
-        <span class="text-text-label text-3xs font-semibold tracking-wide uppercase">
+        <span class="text-text-label text-3xs font-semibold">
           {{ item.label }}
         </span>
         <span v-if="item.sub" class="text-text-muted text-3xs" :data-test="`${tileDataTest}-sub`">
           {{ item.sub }}
         </span>
       </div>
-      <div v-else class="text-text-label text-3xs font-semibold tracking-wide uppercase">
+      <div v-else class="text-text-label text-3xs font-semibold">
         {{ item.label }}
       </div>
       <div

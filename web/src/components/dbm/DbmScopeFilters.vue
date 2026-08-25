@@ -46,28 +46,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <!-- The placeholder already names the dimension ("All engines"), so a
-           label above each select would say it twice. -->
-      <div class="flex w-72 flex-col gap-1.5 p-1">
-        <p class="text-text-label text-3xs px-1 font-semibold tracking-wide uppercase">
-          {{ t("dbm.filters.popoverTitle") }}
-        </p>
-        <OSelect
-          v-for="filter in filters"
-          :key="filter.key"
-          :model-value="filter.value"
-          :options="filter.options"
-          size="sm"
-          :searchable="false"
-          clearable
-          :placeholder="filter.placeholder"
-          :data-test="`dbm-queries-filter-${filter.key}`"
-          @update:model-value="filter.onChange"
-        />
-        <div v-if="activeCount" class="flex items-center gap-1.5 px-1 pt-0.5">
+      <!-- A titled panel of labelled fields over a pinned action row, so the
+           popover reads as one thing to fill in and dismiss rather than a loose
+           stack of selects. Each select carries its dimension via OSelect's own
+           label; the placeholder names the unset state ("All engines"). The
+           label string is the same one the toolbar chip shows, so the two agree. -->
+      <div class="flex w-72 flex-col">
+        <div class="flex flex-col gap-2.5 p-3">
+          <p class="text-text-primary text-sm font-semibold" data-test="dbm-queries-scope-title">
+            {{ t("dbm.filters.popoverTitle") }}
+          </p>
+          <OSelect
+            v-for="filter in filters"
+            :key="filter.key"
+            :label="filter.dimension"
+            :model-value="filter.value"
+            :options="filter.options"
+            size="md"
+            :searchable="false"
+            clearable
+            :placeholder="filter.placeholder"
+            :data-test="`dbm-queries-filter-${filter.key}`"
+            @update:model-value="filter.onChange"
+          />
+        </div>
+
+        <!-- Pinned action row: just Clear all — the filters apply live, so there
+             is nothing to submit and no Done to press. Kept present but disabled
+             with nothing set, so its place never shifts. -->
+        <div class="border-border-default flex items-center border-t px-3 py-2.5">
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="outline"
+            size="sm"
+            :disabled="!activeCount"
             data-test="dbm-queries-scope-clear"
             @click="emit('clear')"
           >
