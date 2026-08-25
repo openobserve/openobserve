@@ -22,8 +22,10 @@ module.exports = defineConfig({
   globalTimeout: process.env.CI ? 40 * 60 * 1000 : undefined,
   /* Output directory for test artifacts */
   outputDir: './test-results',
-  /* Exclude archived tests from all test runs */
-  testIgnore: ['**/test-archives/**', '**/*_old.js'],
+  /* Exclude archived tests, and Skyramp-generated specs — those import the
+     @skyramp/skyramp runtime, which the Skyramp executor provides and this
+     project does not depend on. They run in the Skyramp Testbot job. */
+  testIgnore: ['**/test-archives/**', '**/*_old.js', '**/skyramp/**'],
   /* Global setup and teardown */
   globalSetup: './playwright-tests/utils/global-setup.js',
   globalTeardown: './playwright-tests/utils/global-teardown.js',
