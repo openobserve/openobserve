@@ -130,6 +130,7 @@ const props = defineProps({
 const emit = defineEmits<{
   (e: "remove"): void;
   (e: "close"): void;
+  (e: "saved"): void;
 }>();
 
 const store = useStore();
@@ -265,6 +266,7 @@ const handleSave = async () => {
       }
     }
 
+    emit("saved");
     handleClose();
   }
 };
@@ -288,6 +290,7 @@ const confirmDelete = async () => {
   const annotationId = annotationData.value.annotation_id ?? "";
   await deleteAnnotationWrite.mutateAsync([annotationId]);
 
+  emit("saved");
   handleClose();
 };
 

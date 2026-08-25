@@ -213,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardId="dashboardId"
         :annotation="annotationToAddEdit"
         @close="closeAddAnnotation"
+        @saved="reloadAnnotations"
         :panelsList="panelsList"
       />
       <!-- Alert Context Menu -->
@@ -661,6 +662,7 @@ export default defineComponent({
       searchRequestTraceIds,
       loadingProgressPercentage,
       isPartialData,
+      reloadAnnotations,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -1605,6 +1607,7 @@ export default defineComponent({
       validatePanelData,
       isAddAnnotationDialogVisible,
       closeAddAnnotation,
+      reloadAnnotations,
       isAddAnnotationMode,
       toggleAddAnnotationMode,
       annotationToAddEdit,

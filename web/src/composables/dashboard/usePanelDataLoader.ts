@@ -186,6 +186,31 @@ export const usePanelDataLoader = (
     );
   };
 
+  // The window the displayed data was produced with — the executed range on a
+  // live run, the entry's range on a cache restore. Can differ from the picker.
+  let renderedTimeRange: { start: number; end: number } | null = null;
+
+  // Refetch annotations alone (after an annotation save/delete) — the panel's
+  // query result is untouched, so re-running loadData would be wasted work.
+  const reloadAnnotations = async () => {
+    const window = renderedTimeRange;
+    if (!shouldFetchAnnotations() || !window) return;
+    try {
+      const annotationList = await refreshAnnotations(window.start, window.end);
+      state.annotations = annotationList || [];
+      // Write through, or the cached panel entry restores the stale list. Keep
+      // the entry's cacheTimeRange as the data's window — the picker may have
+      // moved since the displayed result was produced.
+      await savePanelCache(
+        getCacheKey(),
+        { ...toRaw(state) },
+        { start_time: window.start, end_time: window.end },
+      );
+    } catch (error) {
+      console.error("Failed to refresh annotations:", error);
+    }
+  };
+
   // Wire up variable substitution composable
   // (owns the currentDependentVariablesData / currentDynamicVariablesData snapshots)
   const {
@@ -422,6 +447,8 @@ export const usePanelDataLoader = (
       } else {
         return;
       }
+
+      renderedTimeRange = { start: startISOTimestamp, end: endISOTimestamp };
 
       log("loadData: panelcache: no cache restored, continue firing, runCount ", runCount);
 
@@ -804,6 +831,13 @@ export const usePanelDataLoader = (
       // set that the cache is restored
       isRestoredFromCache = true;
 
+      if (cache?.cacheTimeRange?.start_time && cache?.cacheTimeRange?.end_time) {
+        renderedTimeRange = {
+          start: cache.cacheTimeRange.start_time,
+          end: cache.cacheTimeRange.end_time,
+        };
+      }
+
       // if selected time range is not matched with the cache time range
       if (
         selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
@@ -821,5 +855,6 @@ export const usePanelDataLoader = (
   return {
     ...toRefs(state),
     loadData,
+    reloadAnnotations,
   };
 };
