@@ -366,15 +366,43 @@ async fn publish_usage(usages: Vec<UsageData>) {
     }
 
     for usage in usages {
+        let event = usage.event;
         if let Err(e) = USAGE_QUEUE
             .enqueue(ReportingData::Usage(Box::new(usage)))
             .await
         {
-            log::error!(
-                "[SELF-REPORTING] Failed to send usage data to background ingesting job: {e}"
-            );
+            record_usage_enqueue_failure(event, &e);
         }
     }
+}
+
+/// SPEC §9B.1 row 8 / §9B.2 alert **A4** — a usage row the queue refused.
+///
+/// ## Why the counter is here and not at the caller
+///
+/// §9B.1 puts *"emit failures"* at §4.1 step 3g, the synthetics emit, and notes
+/// that `report_usage` is fire-and-forget so the failure is *"otherwise
+/// invisible"*. It is invisible AT THAT CALL SITE specifically:
+/// [`report_usage`] spawns [`publish_usage`] and returns `()`, so its caller has
+/// no `Result` to inspect and could only ever count rows it handed over — which
+/// is a useful number (`openobserve-api-management` keeps it) but is not a
+/// failure signal, and dressing it up as one would give A4 an alert that can
+/// never fire.
+///
+/// Inside the spawned task the enqueue DOES return a `Result`, and this is it.
+/// A4 becomes real: `increase(zo_usage_enqueue_failures_total{event=~"Synthetics.*"}[15m]) > 0`.
+///
+/// Labelled by event and not by org: the variant set is closed and small, the
+/// counter is shared with every other billed dimension, and an org label on a
+/// metric whose normal value is zero would put a customer-chosen string into its
+/// cardinality.
+///
+/// The `event` is taken BEFORE the enqueue because the row is moved into it.
+fn record_usage_enqueue_failure(event: UsageEvent, error: &dyn std::fmt::Display) {
+    config::metrics::USAGE_ENQUEUE_FAILURES_TOTAL
+        .with_label_values(&[event.to_string().as_str()])
+        .inc();
+    log::error!("[SELF-REPORTING] Failed to send usage data to background ingesting job: {error}");
 }
 
 pub async fn start() -> Result<(), String> {
@@ -728,6 +756,67 @@ mod tests {
         // Verify both channels received responses
         assert!(start_receiver.await.is_ok());
         assert!(shutdown_receiver.await.is_ok());
+    }
+
+    /// SPEC §9B.1 row 8 / **A4**. The one place in the emit path where a
+    /// failure is observable at all.
+    ///
+    /// Called through a function pointer, and asserted on its own label value,
+    /// so this is deterministic under `cargo test`'s thread pool: no other test
+    /// writes these labels.
+    #[test]
+    fn a_refused_usage_row_is_counted_under_its_own_event() {
+        let record: fn(UsageEvent, &dyn std::fmt::Display) = record_usage_enqueue_failure;
+        let count = |event: UsageEvent| {
+            config::metrics::USAGE_ENQUEUE_FAILURES_TOTAL
+                .with_label_values(&[event.to_string().as_str()])
+                .get()
+        };
+
+        let before = (
+            count(UsageEvent::SyntheticsSteps),
+            count(UsageEvent::SyntheticsFreeSteps),
+        );
+        record(UsageEvent::SyntheticsSteps, &"channel closed");
+
+        assert_eq!(
+            count(UsageEvent::SyntheticsSteps) - before.0,
+            1,
+            "A4's counter did not move for the event that was refused",
+        );
+        assert_eq!(
+            count(UsageEvent::SyntheticsFreeSteps) - before.1,
+            0,
+            "the failure was attributed to the wrong event — A4 would page for the free pool \
+             while the billable row is the one being lost",
+        );
+    }
+
+    /// The enqueue error is the only failure signal the emit path has, so the
+    /// counting must not drift back to being a bare `log::error!`.
+    ///
+    /// A log line is not alertable from Prometheus, and §9B.2 rates A4 an
+    /// **error** — silent revenue loss. The needles are assembled so this
+    /// test's own source does not satisfy them.
+    #[test]
+    fn every_refused_usage_row_goes_through_the_counter() {
+        let source = include_str!("lib.rs");
+        assert_eq!(
+            source
+                .matches(&["record_usage_enqueue", "_failure("].concat())
+                .count(),
+            2,
+            "one definition and exactly one call site are expected for A4's counter",
+        );
+        let body = source
+            .split_once(&["async fn publish", "_usage("].concat())
+            .expect("the usage publisher")
+            .1;
+        let end = body.find("\n}\n").expect("end of publish_usage");
+        assert!(
+            body[..end].contains(&["record_usage_enqueue", "_failure("].concat()),
+            "the enqueue failure is no longer counted; A4 has nothing to alert on",
+        );
     }
 
     #[test]

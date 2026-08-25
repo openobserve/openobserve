@@ -532,6 +532,18 @@ pub(crate) mod billing {
         // §4.4.1: MUST log every clamp at `warn` — it means a probe bug or a
         // definition mismatch (§9B alert A2).
         if steps.clamped {
+            // §9B.1 row 6. Counted here rather than inside `resolve_billable`
+            // for the same reason the `warn` is: the guards above (the master
+            // switch, the venue, and `error_source = "queue"`) all mean "this
+            // ack is not ours to bill", and an ack we do not bill cannot have
+            // over-reported anything we care about.
+            //
+            // OUTSIDE the `clamp_enabled` branch below, deliberately. A2 asks
+            // *"is a probe over-reporting"*, not *"did we clamp"*, and the
+            // incident switch that stops the clamping (§9A) is exactly the
+            // window in which the over-report stops being visible in the
+            // billed numbers.
+            config::metrics::SYNTHETICS_STEP_CLAMP_TOTAL.inc();
             if flags.clamp_enabled {
                 tracing::warn!(
                     job_id = %i.job_id,
@@ -558,6 +570,12 @@ pub(crate) mod billing {
         // §4.4.2, and §9B alert A3: this firing after the probe rollout has
         // completed means the deploy order was inverted (§11 F9).
         if steps.zero_fallback {
+            // §9B.1 row 7. Behind the `error_source = "queue"` guard above and
+            // not inside `resolve_billable`, which is the whole point: a
+            // queue-errored ack always carries `steps_executed = 0`, so the
+            // arithmetic says "fell back" for a job no probe ever touched, and
+            // A3 would page on ordinary scheduling lag.
+            config::metrics::SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.inc();
             tracing::warn!(
                 job_id = %i.job_id,
                 synthetics_id = %i.synthetics_id,
@@ -3587,6 +3605,203 @@ mod tests {
             req.steps_executed = steps_executed;
             req.steps_defined = steps_defined;
             req
+        }
+
+        // ── SPEC §9B.1 rows 6 and 7 — the two guard counters ────────────────
+        //
+        // ## Why these are source assertions and not delta assertions
+        //
+        // Both counters are process-global `prometheus::IntCounter`s, and
+        // `cargo test` runs this module on many threads. Dozens of tests above
+        // call `events_for_ack` with over-ceiling and zero-step inputs, so a
+        // `before`/`after` delta measures its neighbours' increments as well as
+        // its own: an exact-delta test passes alone and fails in the suite,
+        // which is worse than no test. A mutex here cannot help, because the
+        // other callers are not holding it.
+        //
+        // The three mutations that matter — the counter never increments, it
+        // increments on the other branch, it increments unconditionally — are
+        // all edits to two lines inside `events_for_ack`, so they are pinned
+        // where they live. `the_guard_counters_move_only_below_every_guard`
+        // does that, and `each_guard_counter_moves_on_its_own_branch` pins
+        // which branch each sits in. The runtime half is
+        // `the_guard_counters_really_move`, which is monotone and so is immune
+        // to the interference above.
+        //
+        // The needles are assembled from fragments so that this test's own
+        // source does not satisfy the searches it makes — the same device
+        // `every_ack_path_reports_the_usage_it_produced` uses in
+        // `openobserve-api-management`.
+
+        fn clamp_counter_needle() -> String {
+            ["SYNTHETICS_STEP_CLAMP", "_TOTAL.inc()"].concat()
+        }
+
+        fn zero_fallback_counter_needle() -> String {
+            ["SYNTHETICS_STEP_ZERO_FALLBACK", "_TOTAL.inc()"].concat()
+        }
+
+        /// **§9B.1 rows 6 and 7.** Each counter is incremented from inside its
+        /// OWN `if`, exactly once, and nowhere else.
+        ///
+        /// A2 and A3 mean different things — *"a probe is over-reporting"* and
+        /// *"un-upgraded probes are still in the fleet"* (§11 **F9**) — and
+        /// swapping the two `.inc()` calls produces a build in which each alert
+        /// fires for the other's cause, with no test, log or number
+        /// disagreeing.
+        #[test]
+        fn each_guard_counter_moves_on_its_own_branch() {
+            let source = include_str!("job_api.rs");
+            let clamp = clamp_counter_needle();
+            let zero_fallback = zero_fallback_counter_needle();
+
+            assert_eq!(
+                source.matches(&clamp).count(),
+                1,
+                "the §4.4.1 clamp counter must be incremented from exactly one place",
+            );
+            assert_eq!(
+                source.matches(&zero_fallback).count(),
+                1,
+                "the §4.4.2 zero-fallback counter must be incremented from exactly one place",
+            );
+
+            // The clamp branch runs first and the zero-fallback branch second,
+            // so the text between them is the clamp branch and everything after
+            // is the fallback branch.
+            let clamp_branch_opens = source.find("if steps.clamped {").expect("clamp branch");
+            let fallback_branch_opens = source
+                .find("if steps.zero_fallback {")
+                .expect("zero-fallback branch");
+            assert!(clamp_branch_opens < fallback_branch_opens);
+
+            let clamp_at = source.find(&clamp).expect("clamp counter");
+            let fallback_at = source.find(&zero_fallback).expect("zero-fallback counter");
+            assert!(
+                clamp_branch_opens < clamp_at && clamp_at < fallback_branch_opens,
+                "the clamp counter is not inside `if steps.clamped`",
+            );
+            assert!(
+                fallback_branch_opens < fallback_at,
+                "the zero-fallback counter is not inside `if steps.zero_fallback`",
+            );
+        }
+
+        /// **The counters sit BELOW every guard**, which is what stops them
+        /// alerting on work that is not ours.
+        ///
+        /// Three guards return before the emit, and each one would produce a
+        /// false alert if a counter were hoisted above it:
+        ///
+        ///   * the §9A/§9D master switch — a dark node is not a metering fleet, and A2/A3 both
+        ///     describe one;
+        ///   * the venue (§8.2, E13) — a private agent is the customer's own hardware, and an
+        ///     `Unresolved` venue means the registry read failed FLEET-WIDE, so a counter there
+        ///     pages on a database blip;
+        ///   * `error_source = "queue"` (E11) — the job never ran, and it carries `steps_executed =
+        ///     0`, so §4.4.2's arithmetic says "fell back" for a job no probe ever touched. A3
+        ///     would then page on ordinary scheduling lag while claiming the probe rollout was
+        ///     deployed backwards.
+        ///
+        /// The emitted-rows side of all three is already pinned by
+        /// `the_master_switch_off_emits_nothing`, `t16_a_queue_error_emits_nothing` and
+        /// `t17_a_private_venue_emits_nothing`; this is the same statement for
+        /// the counters, which those tests cannot make.
+        #[test]
+        fn the_guard_counters_move_only_below_every_guard() {
+            let source = include_str!("job_api.rs");
+            let body = source
+                .split_once("pub(crate) fn events_for_ack(")
+                .expect("events_for_ack")
+                .1;
+
+            let clamp_at = body.find(&clamp_counter_needle()).expect("clamp counter");
+            let fallback_at = body
+                .find(&zero_fallback_counter_needle())
+                .expect("zero-fallback counter");
+
+            for (guard, what) in [
+                ("if !flags.billing_enabled {", "the §9A/§9D master switch"),
+                ("match i.venue {", "the §8.2 venue gate"),
+                (r#"if i.error_source == "queue" {"#, "the E11 queue guard"),
+            ] {
+                let guard_at = body.find(guard).unwrap_or_else(|| panic!("{what} is gone"));
+                assert!(
+                    guard_at < clamp_at,
+                    "the clamp counter was hoisted above {what}",
+                );
+                assert!(
+                    guard_at < fallback_at,
+                    "the zero-fallback counter was hoisted above {what}",
+                );
+            }
+        }
+
+        /// The runtime half: the two counters really are wired to the two
+        /// globals the alerts query, and an ack that trips a guard really does
+        /// move one.
+        ///
+        /// Monotone (`>=`), because the counters are shared with every other
+        /// test in this binary and an exact delta would measure them too. That
+        /// is enough for the two mutations this half is here to catch — a
+        /// deleted `.inc()` and an `.inc()` on the wrong global — and the
+        /// branch itself is pinned above.
+        #[test]
+        fn the_guard_counters_really_move() {
+            let clamp_before = config::metrics::SYNTHETICS_STEP_CLAMP_TOTAL.get();
+            // 14 configured x 1 combo x (0 retries + 1) = ceiling 14; 20 reported.
+            events_for_ack(LIVE, browser(14, 1, 0, 20));
+            assert!(
+                config::metrics::SYNTHETICS_STEP_CLAMP_TOTAL.get() > clamp_before,
+                "a clamped ack did not move zo_synthetics_step_clamp_total",
+            );
+
+            let fallback_before = config::metrics::SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.get();
+            events_for_ack(LIVE, browser(14, 1, 0, 0));
+            assert!(
+                config::metrics::SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.get() > fallback_before,
+                "a zero-reporting ack did not move zo_synthetics_step_zero_fallback_total",
+            );
+        }
+
+        /// The counter answers *"did a probe over-report"*, which is A2's
+        /// question, so it must NOT be conditioned on whether the clamp was
+        /// enabled to do anything about it.
+        ///
+        /// `O2_SYNTHETICS_STEP_CLAMP_ENABLED=false` is the §9A incident switch
+        /// and it bills the reported count verbatim — precisely the window in
+        /// which an over-report stops being visible in the billed numbers, so
+        /// losing the counter there would blind A2 exactly when it matters
+        /// most. Pinned as source because the `.inc()` must sit OUTSIDE the
+        /// inner `if flags.clamp_enabled`, which no delta assertion can see.
+        #[test]
+        fn the_clamp_counter_still_fires_while_the_clamp_is_disabled() {
+            let source = include_str!("job_api.rs");
+            let clamp_branch = source
+                .split_once("if steps.clamped {")
+                .expect("clamp branch")
+                .1;
+            let counter_at = clamp_branch
+                .find(&clamp_counter_needle())
+                .expect("clamp counter");
+            let switch_at = clamp_branch
+                .find("if flags.clamp_enabled {")
+                .expect("the clamp switch");
+            assert!(
+                counter_at < switch_at,
+                "the clamp counter was moved inside `if flags.clamp_enabled`, so disabling the \
+                 clamp in an incident now also silences A2",
+            );
+
+            // …and the switch still does what it says.
+            const UNCLAMPED: BillingFlags = BillingFlags {
+                billing_enabled: true,
+                clamp_enabled: false,
+            };
+            assert_eq!(
+                billed(&events_for_ack(UNCLAMPED, browser(14, 1, 0, 20))),
+                Some(20.0),
+            );
         }
 
         fn leased_row() -> LeasedRow {

@@ -836,12 +836,52 @@ fn buffer_flush(org_id: &str, feature: TrialQuotaFeature, cost: i64) {
         feature_key: feature.feature_key().to_string(),
         cost,
     }) {
-        // §9B.2 alert A5 — "pool adjustment failures > 0" is an ERROR, because
-        // under a one-time grant the loss is permanent.
-        log::error!(
-            "[TRIAL_QUOTA] Flush channel full, DROPPING pool record for org={org_id} feature={feature} cost={cost}: {e}"
-        );
+        record_flush_drop(org_id, feature, cost, &e);
     }
+}
+
+/// SPEC §9B.1 row 9 / §9B.2 alert **A5** — one pool movement lost on its way to
+/// the database.
+///
+/// The `log::error!` was already here and is already at the severity §9B.2 asks
+/// for; what it could not do is be alerted on. A log line is not a Prometheus
+/// series, and A5 is *"pool adjustment failures > 0"* — a threshold, evaluated
+/// continuously, on a number that is normally zero.
+///
+/// Labelled by `trial_quota_usage.feature`, a fixed code-defined set, so §6.1's
+/// one-time synthetics grant can be alerted on separately from AI credits. The
+/// two fail differently: an AI credit lost to a full channel is a monthly pool
+/// the org gets back, and a synthetics step is not.
+///
+/// Deliberately NOT labelled by org, even though the log line carries one: this
+/// counter's normal value is zero, an org id is customer-chosen, and the drop
+/// that produces this is a fleet-wide overload in which every org is dropping
+/// at once — which is exactly when a per-org label is at its most expensive and
+/// least useful.
+///
+/// # ⚠️ What this does not fix — §11 **F8** is still open
+///
+/// This counts the loss; nothing here recovers it. The in-memory counter has
+/// already moved, so this node keeps enforcing the right number until it
+/// restarts, at which point `init_from_db` reloads a total short by the dropped
+/// amount and the org silently gets those units back. Under a one-time grant
+/// that is permanent. The channel, its 10,000 bound and its lack of
+/// acknowledgement are unchanged and out of scope here — see `buffer_flush`'s
+/// own note, and §9B.3's reconciliation job, which measures the residue.
+fn record_flush_drop(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+    cost: i64,
+    error: &dyn std::fmt::Display,
+) {
+    config::metrics::TRIAL_QUOTA_FLUSH_DROPS_TOTAL
+        .with_label_values(&[feature.feature_key()])
+        .inc();
+    // §9B.2 alert A5 — "pool adjustment failures > 0" is an ERROR, because
+    // under a one-time grant the loss is permanent.
+    log::error!(
+        "[TRIAL_QUOTA] Flush channel full, DROPPING pool record for org={org_id} feature={feature} cost={cost}: {error}"
+    );
 }
 
 /// Broadcast a signed pool movement to the other nodes.
@@ -2216,6 +2256,75 @@ mod tests {
             limits.get(&scope("acme", TrialQuotaPool::SyntheticsSteps)),
             None,
             "the step grant keeps its deployment default",
+        );
+    }
+
+    // ── SPEC §9B.1 row 9 / §9B.2 alert A5 ───────────────────────────────────
+
+    /// **A5.** A dropped flush record is counted, under its own pool's label.
+    ///
+    /// Reached through a function pointer so the call does not count towards
+    /// `every_dropped_pool_record_is_counted` below, and asserted on one label
+    /// value so it is deterministic under `cargo test`'s thread pool.
+    #[test]
+    fn a_dropped_pool_record_is_counted_against_its_own_pool() {
+        let record: fn(&str, TrialQuotaFeature, i64, &dyn std::fmt::Display) = record_flush_drop;
+        let dropped = |feature: TrialQuotaFeature| {
+            config::metrics::TRIAL_QUOTA_FLUSH_DROPS_TOTAL
+                .with_label_values(&[feature.feature_key()])
+                .get()
+        };
+
+        let before = (
+            dropped(TrialQuotaFeature::SyntheticsSteps),
+            dropped(TrialQuotaFeature::AiChat),
+        );
+        record(
+            "acme",
+            TrialQuotaFeature::SyntheticsSteps,
+            14,
+            &"channel full",
+        );
+
+        assert_eq!(
+            dropped(TrialQuotaFeature::SyntheticsSteps) - before.0,
+            1,
+            "A5's counter did not move for the pool that lost the record",
+        );
+        assert_eq!(
+            dropped(TrialQuotaFeature::AiChat) - before.1,
+            0,
+            "the drop was attributed to the wrong pool — a synthetics step lost under a \
+             ONE-TIME grant is permanent, an AI credit is not",
+        );
+    }
+
+    /// The drop path must stay behind the counter.
+    ///
+    /// `buffer_flush`'s error branch is unreachable from a unit test: it needs
+    /// the process-global 10,000-slot channel to be full, and filling it would
+    /// leave every later test in this binary running against a saturated queue.
+    /// So the wiring is pinned in source instead — the same reason the branch
+    /// existed for years with nothing but a log line to show for it.
+    ///
+    /// The needles are assembled so this test's own source does not satisfy
+    /// them.
+    #[test]
+    fn every_dropped_pool_record_is_counted() {
+        let source = include_str!("trial_quota.rs");
+        assert_eq!(
+            source.matches(&["record_flush", "_drop("].concat()).count(),
+            2,
+            "one definition and exactly one call site are expected for A5's counter",
+        );
+        let body = source
+            .split_once(&["fn buffer", "_flush("].concat())
+            .expect("the flush buffer")
+            .1;
+        let end = body.find("\n}\n").expect("end of buffer_flush");
+        assert!(
+            body[..end].contains(&["record_flush", "_drop("].concat()),
+            "the dropped record is no longer counted; A5 has nothing to alert on",
         );
     }
 

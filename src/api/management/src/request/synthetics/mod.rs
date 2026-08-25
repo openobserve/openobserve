@@ -996,7 +996,79 @@ fn take_usage(
 /// ack is cheaper than an untestable branch there, and this handler already
 /// makes one unconditional usage-queue call per ack for trigger telemetry.
 fn report_step_usage(usage: Vec<config::meta::self_reporting::usage::UsageData>) {
+    record_step_usage_metrics(&usage);
     usage_reporting::report_usage(usage);
+}
+
+/// SPEC §9B.1 rows 1-5 — the Prometheus half of the step-billing signals.
+///
+/// ## Why this exists when the usage stream already has the numbers
+///
+/// §9B.1 sources four of its ten signals from the stream: `SUM(size) WHERE
+/// event = ...`, per org, per hour. That stays their source of truth — it is
+/// retained, queryable after the fact, and it is what the invoice is built
+/// from. These counters are a SECOND copy of the same four numbers, taken here,
+/// on a different path.
+///
+/// Two copies is the point. `report_usage` above spawns a task and returns
+/// `()`, so §9B.1 row 8's *"emit failures"* has nothing to observe at this call
+/// site — there is no `Result` to inspect, and inventing one would produce an
+/// alert that can never fire. What CAN be counted honestly is what was handed
+/// over. Compare it against the stream and the difference is the fire-and-forget
+/// path losing rows:
+///
+/// ```text
+///   counter above stream  ⇒  rows were computed and never landed
+///   counter equals stream ⇒  the emit is whole
+///   counter at zero       ⇒  nothing reached this function at all
+/// ```
+///
+/// The last line is the one no other test or log covers: `take_usage` dropping
+/// its rows, or this call being removed, leaves the ack returning 200 with
+/// nothing metered.
+///
+/// ## What it does NOT catch
+///
+/// It cannot see anything that happens after the hand-off *inside* one process
+/// and be believed on its own: a queue that rejects every row still leaves this
+/// counter advancing. That failure is counted where it is actually observable —
+/// `usage_reporting::publish_usage`, which does get a `Result` back —
+/// as `zo_usage_enqueue_failures_total`. Nor does it see rows the guards in
+/// `job_api::billing` correctly dropped, because those never become rows.
+fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::UsageData]) {
+    use config::meta::self_reporting::usage::UsageEvent;
+
+    for row in usage {
+        // `size` is the count itself (§4.2: it is the only field `ingest_usages`
+        // sums), and it is an `f64` on the wire while a Prometheus counter takes
+        // a `u64`. Negative is not representable by anything upstream — every
+        // producer is a `u32`/`u64` widened — so the floor is a guard against a
+        // future one, not a case that fires today.
+        let size = if row.size > 0.0 { row.size as u64 } else { 0 };
+        match row.event {
+            // Steps, all three of them, under one counter so §4.3's
+            // `executed / defined` ratio is one PromQL division.
+            UsageEvent::SyntheticsSteps
+            | UsageEvent::SyntheticsFreeSteps
+            | UsageEvent::_SyntheticsStepsDefined => {
+                config::metrics::SYNTHETICS_STEPS_TOTAL
+                    .with_label_values(&[row.org_id.as_str(), row.event.to_string().as_str()])
+                    .inc_by(size);
+            }
+            // Milliseconds, so its own counter — see the metric's own note.
+            UsageEvent::_SyntheticsBrowserMs => {
+                config::metrics::SYNTHETICS_BROWSER_MS_TOTAL
+                    .with_label_values(&[row.org_id.as_str()])
+                    .inc_by(size);
+            }
+            // Everything else is another dimension's row travelling through the
+            // shared usage type. A catch-all is right here — this function owns
+            // four events, not the twenty-odd in the enum — but it does mean a
+            // FIFTH synthetics event would be silently uncounted until it is
+            // added above.
+            _ => {}
+        }
+    }
 }
 
 /// The org's one-time free step grant, as it stands right now — SPEC §6.1,
@@ -1902,6 +1974,228 @@ mod tests {
             1,
             "the hand-off to the usage queue is gone; nothing is metered"
         );
+    }
+
+    // ── SPEC §9B.1 rows 1-5 — the emit-side counters ────────────────────────
+    //
+    // Deterministic without a mutex, unlike the two guard counters in
+    // `openobserve-synthetics`: these are labelled per org, so each test reads
+    // back only the label values it wrote and no other test can touch them.
+
+    /// The four counts one ack can carry, read back from the labelled
+    /// counters. `None` where the label value does not exist yet.
+    fn recorded(org: &str) -> (u64, u64, u64, u64) {
+        let steps = |event: &str| {
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, event])
+                .get()
+        };
+        (
+            steps("SyntheticsSteps"),
+            steps("SyntheticsFreeSteps"),
+            steps("_SyntheticsStepsDefined"),
+            config::metrics::SYNTHETICS_BROWSER_MS_TOTAL
+                .with_label_values(&[org])
+                .get(),
+        )
+    }
+
+    /// Reached through a function pointer so these calls do not count towards
+    /// `the_emit_hand_off_counts_what_it_sends`, which counts call sites by
+    /// name — the same device `a_batch_reports_the_usage_of_every_ack_in_it`
+    /// uses for `take_usage`.
+    fn record(usage: &[UsageData]) {
+        let record_metrics: fn(&[UsageData]) = super::record_step_usage_metrics;
+        record_metrics(usage);
+    }
+
+    fn usage_row(org: &str, event: UsageEvent, size: f64) -> UsageData {
+        UsageData {
+            org_id: org.to_string(),
+            event,
+            size,
+            ..UsageData::init_for_reflection()
+        }
+    }
+
+    /// **§9B.1 rows 1, 2, 3 and 5.** Every count lands under its own label, and
+    /// under the right one.
+    ///
+    /// The three sizes are deliberately all different. §4.3 calls `executed /
+    /// defined` *"the single most useful number"*, and the way to get it wrong
+    /// is to record the ratio upside down — which two equal numbers would hide
+    /// completely. 4 billed against 14 defined is §9C's **T4**: a journey that
+    /// failed at step 4 of 14. Inverted, that org reads as 3.5x retries firing
+    /// instead of a check failing three quarters of the way through, and A1
+    /// alerts on the drift in the wrong direction.
+    #[test]
+    fn the_emit_counters_record_each_count_under_its_own_label() {
+        let org = "o9b1-billable";
+        let before = recorded(org);
+
+        record(&[
+            usage_row(org, UsageEvent::SyntheticsSteps, 4.0),
+            usage_row(org, UsageEvent::_SyntheticsStepsDefined, 14.0),
+            usage_row(org, UsageEvent::_SyntheticsBrowserMs, 9_100.0),
+        ]);
+
+        let after = recorded(org);
+        assert_eq!(after.0 - before.0, 4, "billed steps");
+        assert_eq!(after.1 - before.1, 0, "nothing came out of the free pool");
+        assert_eq!(after.2 - before.2, 14, "defined steps");
+        assert_eq!(after.3 - before.3, 9_100, "browser milliseconds");
+    }
+
+    /// **§9B.1 row 4.** Free-pool consumption is its own label value, not a
+    /// second name for the billable one.
+    ///
+    /// §4.2 emits exactly one of `SyntheticsSteps` / `SyntheticsFreeSteps` per
+    /// ack, and they answer opposite questions: one is the invoice line, the
+    /// other is §6.1's grant burning down. Folding them together would show a
+    /// free org generating revenue.
+    #[test]
+    fn free_pool_consumption_is_counted_apart_from_billable_steps() {
+        let org = "o9b1-free";
+        let before = recorded(org);
+
+        record(&[
+            usage_row(org, UsageEvent::SyntheticsFreeSteps, 28.0),
+            usage_row(org, UsageEvent::_SyntheticsStepsDefined, 28.0),
+        ]);
+
+        let after = recorded(org);
+        assert_eq!(after.0 - before.0, 0, "a free ack is not billable steps");
+        assert_eq!(after.1 - before.1, 28);
+        assert_eq!(after.2 - before.2, 28);
+    }
+
+    /// Milliseconds and steps are different units, so `browser_ms` must never
+    /// reach the step counter. Summing a counter across its label values is the
+    /// first thing any dashboard does, and a family that mixes units produces a
+    /// number that means nothing — and here it would mean "this org executed
+    /// nine thousand steps".
+    #[test]
+    fn browser_milliseconds_never_reach_the_step_counter() {
+        let org = "o9b1-units";
+        let before = recorded(org);
+
+        record(&[usage_row(org, UsageEvent::_SyntheticsBrowserMs, 9_100.0)]);
+
+        let after = recorded(org);
+        assert_eq!((after.0, after.1, after.2), (before.0, before.1, before.2));
+        // …and not under a `_SyntheticsBrowserMs` label value of the step
+        // counter either, which `recorded` does not read and a dashboard
+        // summing the family would.
+        assert_eq!(
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, "_SyntheticsBrowserMs"])
+                .get(),
+            0,
+        );
+        assert_eq!(after.3 - before.3, 9_100);
+    }
+
+    /// An ack carries only synthetics rows today, but the same handler already
+    /// makes an unconditional trigger-telemetry call, and `report_usage` is
+    /// shared with every other billed dimension. A row that is not one of §4.2's
+    /// four must contribute nothing rather than open a label value named after
+    /// it.
+    ///
+    /// The foreign event's OWN label value is asserted, not just the four
+    /// synthetics ones. Reading only the four is how this test first passed
+    /// against a mutant that dropped the `match` entirely and counted every row
+    /// under `event = "<whatever it was>"`: the bogus series existed, it was
+    /// simply not one this test looked at. `zo_synthetics_steps_total` summed
+    /// across its label values is what a dashboard shows, so a series nobody
+    /// asserts on is still on the chart.
+    #[test]
+    fn a_non_synthetics_row_is_not_counted_as_steps() {
+        let org = "o9b1-foreign";
+        let before = recorded(org);
+        let foreign = |event: UsageEvent| {
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, event.to_string().as_str()])
+                .get()
+        };
+
+        record(&[
+            usage_row(org, UsageEvent::Ingestion, 1_000.0),
+            usage_row(org, UsageEvent::AiCredits, 5.0),
+        ]);
+
+        assert_eq!(
+            recorded(org),
+            before,
+            "none of the four synthetics counts moved"
+        );
+        for event in [UsageEvent::Ingestion, UsageEvent::AiCredits] {
+            assert_eq!(
+                foreign(event),
+                0,
+                "{event} opened a label value on the synthetics step counter",
+            );
+        }
+    }
+
+    /// Counting is per org — A1 asks *"has THIS org's ratio drifted from its own
+    /// trailing baseline"*, which an aggregate cannot answer.
+    #[test]
+    fn each_org_is_counted_separately() {
+        let (a, b) = ("o9b1-org-a", "o9b1-org-b");
+        let (before_a, before_b) = (recorded(a), recorded(b));
+
+        record(&[
+            usage_row(a, UsageEvent::SyntheticsSteps, 3.0),
+            usage_row(b, UsageEvent::SyntheticsSteps, 7.0),
+        ]);
+
+        assert_eq!(recorded(a).0 - before_a.0, 3);
+        assert_eq!(recorded(b).0 - before_b.0, 7);
+    }
+
+    /// The emit hand-off must count what it sends — SPEC §9B.1 row 8, and the
+    /// reason there are two copies of the same number at all.
+    ///
+    /// `report_step_usage` cannot be called from a unit test: it hands off to
+    /// the global usage queue. So this pins, in source, that the counting call
+    /// is still there and still unconditional. Deleting it does not fail
+    /// anything else — the ack still returns 200, the rows are still sent, and
+    /// the Prometheus side simply reads zero, which is indistinguishable from
+    /// "this deployment bills nothing".
+    ///
+    /// It also pins that `report_step_usage` stays BRANCHLESS. An earlier
+    /// version skipped the send for an empty vector; that branch was
+    /// unreachable from a unit test, so a mutation turning it into "never send"
+    /// survived on the revenue path. A `if usage.is_empty() { return; }` in
+    /// front of the counter would reintroduce exactly that.
+    #[test]
+    fn the_emit_hand_off_counts_what_it_sends() {
+        let source = include_str!("mod.rs");
+        assert_eq!(
+            source
+                .matches(&["record_step_usage", "_metrics("].concat())
+                .count(),
+            2,
+            "one definition and exactly one call site are expected for the §9B.1 emit counter",
+        );
+
+        let body = source
+            .split_once(&["fn report_step", "_usage("].concat())
+            .expect("the emit hand-off")
+            .1;
+        let end = body.find("\n}\n").expect("end of report_step_usage");
+        let body = &body[..end];
+        assert!(
+            body.contains(&["record_step_usage", "_metrics(&usage)"].concat()),
+            "the emit counter is no longer called from the hand-off",
+        );
+        for branch in ["if ", "return", "match "] {
+            assert!(
+                !body.contains(branch),
+                "`report_step_usage` must stay branchless — a `{branch}` here is the \
+                 unreachable-branch mutation that already survived once on this path",
+            );
+        }
     }
 
     /// SPEC §6.1 / §7.3 — every state of the org's grant maps to exactly one
