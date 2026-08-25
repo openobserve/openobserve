@@ -783,6 +783,53 @@ describe("EventDetailDrawerContent", () => {
       windowOpenSpy.mockRestore();
     });
 
+    it("pads a legacy zero-stripped trace_id before navigating to traceDetails", async () => {
+      // Arrange — a resource whose id SDK 0.4.x stored zero-stripped (31 hex chars)
+      const legacyResource = createMockResource({
+        _oo_trace_id: "1a034c1aabc72f78880daf6c9755cff",
+      });
+      if (globalThis.server) {
+        globalThis.server.use(
+          http.post(
+            `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+            async ({ request }) => {
+              const body = (await request.json()) as any;
+              if (body?.query?.sql?.includes("action_id")) {
+                return HttpResponse.json({ took: 0, hits: [legacyResource], total: 1 });
+              }
+              return HttpResponse.json({ took: 0, hits: [], total: 0 });
+            },
+          ),
+        );
+      }
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+      await waitForRelatedResources(wrapper);
+
+      const routerResolveSpy = vi.spyOn(router, "resolve");
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+      expect(traceButtons.length).toBeGreaterThan(0);
+
+      // Act
+      await traceButtons[0].trigger("click");
+      await flushPromises();
+
+      // Assert — route carries the padded 32-char id the traces stream stores
+      expect(routerResolveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traceDetails",
+          query: expect.objectContaining({
+            trace_id: "01a034c1aabc72f78880daf6c9755cff",
+            stream: "default",
+          }),
+        }),
+      );
+
+      windowOpenSpy.mockRestore();
+    });
+
     it("opens trace in a new browser tab when view-trace-btn is clicked", async () => {
       // Arrange
       await waitForRelatedResources(wrapper);

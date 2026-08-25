@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="traceDetailsRef"
           mode="embedded"
           :trace-id-prop="selectedTrace.traceId"
-          stream-name-prop="default"
+          :stream-name-prop="RUM_CORRELATION_TRACES_STREAM"
           :span-list-prop="[]"
           :start-time-prop="selectedTraceStartTime"
           :end-time-prop="selectedTraceEndTime"
@@ -212,7 +212,12 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
-import { rumFieldSql, rumFieldNotNullSql } from "@/utils/rum/fields";
+import {
+  rumFieldSql,
+  rumFieldNotNullSql,
+  normalizeTraceId,
+  RUM_CORRELATION_TRACES_STREAM,
+} from "@/utils/rum/fields";
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -374,7 +379,7 @@ async function fetchTraceMetadata(traceIds: string[]): Promise<Record<string, an
     fetchQueryDataWithHttpStream(
       {
         queryReq: {
-          stream_name: "default",
+          stream_name: RUM_CORRELATION_TRACES_STREAM,
           filter,
           start_time: searchStartTime,
           end_time: searchEndTime,
@@ -481,10 +486,13 @@ async function fetchTraces() {
       return;
     }
 
-    // Deduplicate by trace_id, keep first occurrence for view context
+    // Deduplicate by trace_id, keep first occurrence for view context.
+    // Canonicalize the id: SDK 0.4.x stored it zero-stripped, while the traces
+    // stream stores the padded 32-char form — the metadata join and the embedded
+    // trace view both need the stream's form.
     const traceMap = new Map<string, any>();
     for (const hit of rumHits) {
-      const traceId = hit._trace_id;
+      const traceId = normalizeTraceId(hit._trace_id) || hit._trace_id;
       if (!traceId || traceMap.has(traceId)) continue;
       const viewUrl = hit._view_url || hit.view_url || "";
       traceMap.set(traceId, {

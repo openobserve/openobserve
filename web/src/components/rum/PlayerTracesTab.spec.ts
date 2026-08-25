@@ -297,6 +297,28 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.text()).toContain("/products");
     });
 
+    it("joins legacy zero-stripped RUM ids with padded traces-stream metadata", async () => {
+      // SDK 0.4.x stored the id zero-stripped (31 hex chars) in _rumdata while
+      // the traces stream stores the padded 32-char form — the join must still hit.
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: "1a034c1aabc72f78880daf6c9755cff" })],
+        [createTraceMetadata({ trace_id: "01a034c1aabc72f78880daf6c9755cff" })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Row survives the metadata filter (previously dropped: raw 31-char key
+      // never matched the 32-char metadata key)
+      expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("/products");
+
+      // The traces-stream metadata query was filtered on the padded id
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.filter).toContain("01a034c1aabc72f78880daf6c9755cff");
+      expect(queryReq.stream_name).toBe("default");
+    });
+
     it("should display trace count badge in filter bar", () => {
       const badge = wrapper.find('[data-test="rum-player-traces-tab-count-badge"]');
       expect(badge.exists()).toBe(true);

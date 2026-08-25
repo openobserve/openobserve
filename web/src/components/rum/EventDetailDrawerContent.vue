@@ -443,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { rumField } from "@/utils/rum/fields";
+import { rumField, normalizeTraceId, RUM_CORRELATION_TRACES_STREAM } from "@/utils/rum/fields";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -610,10 +610,16 @@ const viewResourceDetails = (resource: any) => {
  * Opens in a new tab
  */
 const navigateToSpecificTrace = (traceId: string) => {
-  if (!traceId) return;
+  // Canonicalize: SDK 0.4.x stored ids zero-stripped, but the traces stream
+  // (and therefore the trace-details page) uses the padded 32-char form.
+  const canonicalTraceId = normalizeTraceId(traceId) || traceId;
+  if (!canonicalTraceId) return;
 
   // Find the resource with this trace_id to get timing information
-  const resource = relatedResources.value.find((r: any) => rumField(r, "trace_id") === traceId);
+  const resource = relatedResources.value.find(
+    (r: any) =>
+      (normalizeTraceId(rumField(r, "trace_id")) || rumField(r, "trace_id")) === canonicalTraceId,
+  );
 
   // Use resource timing if available, otherwise use event timing
   const startTime = resource?.date
@@ -627,8 +633,8 @@ const navigateToSpecificTrace = (traceId: string) => {
   const route = router.resolve({
     name: "traceDetails",
     query: {
-      stream: "default", // RUM traces stream
-      trace_id: traceId,
+      stream: RUM_CORRELATION_TRACES_STREAM,
+      trace_id: canonicalTraceId,
       from: startTime,
       to: endTime,
       org_identifier: store.state.selectedOrganization.identifier,
