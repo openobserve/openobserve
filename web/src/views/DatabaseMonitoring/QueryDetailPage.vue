@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="storage"
     title-data-test="dbm-detail-title"
     scroll
+    bleed
   >
     <!-- With no query to scope, refresh, copy and the window picker all act on
          nothing — copy in particular composes its summary from a row that is
@@ -112,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Identity: the statement, then the dimensions that locate it. -->
-      <section v-if="hasQuery" class="flex flex-col gap-2" data-test="dbm-detail-identity">
+      <section v-if="hasQuery" class="px-page-edge flex flex-col gap-2" data-test="dbm-detail-identity">
         <div class="flex flex-wrap items-center gap-1.5">
           <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" size="md" />
           <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="md" />
@@ -166,14 +167,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the Callers tab locked with the same lock+tooltip treatment when the
            vantage that fills it reported nothing.
 
-           No horizontal padding: a tab strip's first label self-aligns to the
-           page-edge grid, so the labels line up with the statement above. -->
+           `px-page-edge` insets the labels to the page-edge grid (lining up with
+           the statement above) while `bordered` draws a full-bleed bottom divider
+           across the padded strip — matching the header's own border. -->
       <OTabs
         v-if="hasQuery"
         :model-value="activeTab"
         align="left"
         bordered
-        class="shrink-0"
+        class="px-page-edge shrink-0"
         data-test="dbm-detail-tabs"
         @change="onTabChange"
       >
@@ -207,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              column: they are the two vantages on the same two measures, and
              the `order-*` classes that hoist the populated one on a zero-trace
              fleet only work while they share a flex parent. -->
-        <OTabPanel name="overview" layout="flex-col" content-class="gap-4">
+        <OTabPanel name="overview" layout="flex-col" content-class="gap-4 px-page-edge">
           <!-- The headline numbers, before the charts: minute 0 of an incident is
            "how bad and how much of the database is it", and that is figures,
            not a graph.
@@ -483,6 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            coverage to be stale about. -->
           <DbmCoverageLine
             v-if="traceVantage && (clientRowFound || !serverAnswering)"
+            class="-mx-page-edge"
             :freshness="freshness"
             :hits="row ? [row] : []"
             :top-n-subset="topNSubset"
@@ -633,14 +636,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t("dbm.detail.whereItRuns.noInstance")
                     }}
                   </span>
-                  <OTag
+                  <!-- Tooltip is a SIBLING of the tag, not its child: OTag's
+                       default slot overrides the `label` prop, so a tooltip
+                       placed inside would blank the "focused" text. -->
+                  <span
                     v-if="isWhereRowActive(whereRow, whereScope)"
-                    :label="t('dbm.detail.whereItRuns.focused')"
-                    size="xs"
+                    class="inline-flex shrink-0"
                     :data-test="`dbm-detail-where-focused-${whereRow.rowKey}`"
                   >
+                    <OTag :label="t('dbm.detail.whereItRuns.focused')" size="sm" />
                     <OTooltip side="top" :content="t('dbm.detail.whereItRuns.focusHint')" />
-                  </OTag>
+                  </span>
                 </div>
               </template>
               <template #cell-load="{ row: whereRow }">
@@ -742,7 +748,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              three tables. It is SERVER-vantage, so it is populated on a fleet
              with no traced traffic at all — exactly where the Overview panel
              collapses to two tiles and the Callers tab locks. -->
-        <OTabPanel name="plans" layout="flex-col" content-class="gap-4">
+        <OTabPanel name="plans" layout="flex-col" content-class="gap-4 px-page-edge">
           <!-- Query plans. Provenance is PER ROW now (W-E3): generic NULL-bound
            estimates keep the gap tag — the statement EXPLAINed with every bind
            set to NULL, never executed, no latency ever shown beside it.
@@ -929,7 +935,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              together because they share one dependency: the resolved trace
              stream. The picker below is literally the control for the two
              tables under it, so it lives on their tab and nowhere else. -->
-        <OTabPanel name="callers" layout="flex-col" content-class="gap-4">
+        <OTabPanel name="callers" layout="flex-col" content-class="gap-4 px-page-edge">
           <!-- The two panels below read RAW traces, so they need to know which
            trace stream this fingerprint lives on — and the queries endpoint does
            not carry it. With several streams in the org there is no way to tell,
