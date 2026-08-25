@@ -12,7 +12,7 @@ markup — don't guess a prop name.
 
 | File | Covers |
 | --- | --- |
-| [references/core-display.md](core-display.md) | Badge/Tag/DimensionChip, StatusDot, Card, Code, Collapsible, EmptyState, Icon, Separator, Shortcut, **Text (typography)**, VirtualScroll |
+| [references/core-display.md](core-display.md) | Badge/Tag/DimensionChip, Card, Code, Collapsible, EmptyState, Icon, Separator, Shortcut, **Text (typography)**, VirtualScroll |
 | [references/core-controls-table.md](core-controls-table.md) | **Button**/ButtonGroup, Navbar, RefreshButton, Splitter, ToggleGroup, **Table** (+ cell renderers) |
 | [references/forms-inputs.md](forms-inputs.md) | Input/Textarea, Select, Combobox, SearchInput, Checkbox, Radio, Switch, OptionGroup |
 | [references/forms-specialized.md](forms-specialized.md) | **Form + useOForm**, Color, Date, DateTimeRange, Time, File, Range, Slider |
@@ -38,7 +38,6 @@ markup — don't guess a prop name.
 | Show a page/module header | `OPageHeader` (rule 1) | — |
 | Render tabular data | `OTable` + `OTableColumnDef[]` | core-controls-table |
 | Show a status label / count / tag | `OBadge`, `OTag`, `ODimensionChip` | core-display |
-| Show a compact lifecycle state without a label | `OStatusDot` | core-display |
 | Group content in a surface | `OCard` (+ `OCardSection`, `OCardActions`) | core-display |
 | Body / heading / muted text | `OText` (pick the `variant`) | core-display |
 | Show an icon | `OIcon` (`name` from the icon registry) | core-display |

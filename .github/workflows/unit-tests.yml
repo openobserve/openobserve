@@ -285,8 +285,6 @@ jobs:
 
       - name: Type-check (any error fails)
         working-directory: web
-        env:
-          NODE_OPTIONS: --max-old-space-size=8192
         run: npm run type-check:app
 
   unit_tests_summary:
