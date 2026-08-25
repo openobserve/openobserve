@@ -222,7 +222,9 @@ export default class DashboardMaxQueryRange {
    *   await allDone;
    *
    * @param {number} n - number of distinct search responses to wait for
-   * @returns {Promise<void>}
+   * @param {number} [timeout=45000] - ms to wait for all n responses
+   * @returns {Promise<void>} resolves once n responses arrive; REJECTS on
+   *   timeout, reporting how many actually landed
    */
   createNSearchResponsesPromise(n, timeout = 45000) {
     const orgName = process.env.ORGNAME || "default";

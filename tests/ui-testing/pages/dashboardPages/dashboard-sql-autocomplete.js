@@ -162,10 +162,6 @@ export default class DashboardSqlAutocomplete {
     }).catch(() => []);
   }
 
-  // True when the editor's suggest controller has items available
-  // (i.e. the suggestion list is currently being shown). Reads the
-  // completion model length rather than the SuggestModel state enum
-  // since the state enum's "Open" value differs across Monaco versions.
   // Poll until the suggest controller reports items, returning whether it opened.
   //
   // isAutocompleteOpen() below is a single point-in-time read, so gating
@@ -173,6 +169,8 @@ export default class DashboardSqlAutocomplete {
   // test skips its checks while still reporting PASSED. Use this wherever the
   // suggestions are EXPECTED; keep isAutocompleteOpen() for asserting they are
   // absent, where waiting would be pointless.
+  //
+  // @param {number} [timeout=8000] - ms to wait for the suggestion list
   async waitForAutocompleteOpen(timeout = 8000) {
     return this.page
       .waitForFunction(
@@ -197,6 +195,10 @@ export default class DashboardSqlAutocomplete {
       .catch(() => false);
   }
 
+  // True when the editor's suggest controller has items available
+  // (i.e. the suggestion list is currently being shown). Reads the
+  // completion model length rather than the SuggestModel state enum
+  // since the state enum's "Open" value differs across Monaco versions.
   async isAutocompleteOpen() {
     return this.page.evaluate(() => {
       const m = (window).monaco;

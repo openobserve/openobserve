@@ -45,6 +45,10 @@ export default class DashboardPromQLEditor {
    * PromQL-suggestion tests were skipped this way on alpha, where the toggle is
    * definitely present. A genuine absence (non-enterprise build) still skips,
    * just after actually waiting for it.
+   *
+   * @param {number} [timeout=15000] - ms to wait for the toggle before
+   *   concluding PromQL is unavailable
+   * @returns {Promise<boolean>}
    */
   async isPromqlAvailable(timeout = 15000) {
     return this.promqlQueryTypeBtn
