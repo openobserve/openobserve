@@ -58,6 +58,38 @@ export default class DashboardImport {
     );
   }
 
+  /**
+   * Make the "JSON file" tab the ACTIVE one and wait for its file input.
+   *
+   * The file control renders under v-if="activeTab == 'import_json_file'", so a
+   * tab that is merely visible is not enough — on any other tab the input never
+   * mounts. Retries, because a click landing while the page is still settling is
+   * silently dropped and leaves the tab unchanged.
+   */
+  async ensureFileTabActive(timeout = 15000) {
+    const fileTab = this.page.locator('[data-test="tab-import_json_file"]');
+    await fileTab.waitFor({ state: "visible", timeout });
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const active = await fileTab
+        .getAttribute("data-state")
+        .then((v) => v === "active")
+        .catch(() => false);
+      if (!active) await fileTab.click({ timeout: 10000 }).catch(() => {});
+
+      const attached = await this.inputFile
+        .waitFor({ state: "attached", timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (attached) return;
+    }
+
+    throw new Error(
+      'ensureFileTabActive: the import_json_file tab never became active — ' +
+        'dashboard-import-file-control-field never attached'
+    );
+  }
+
   //Import dashboard button on dashboard page
   async clickImportDashboard() {
     await this.importButton.waitFor({ state: "visible", timeout: 15000 });
@@ -65,8 +97,6 @@ export default class DashboardImport {
     const customOption = this.page.locator(
       '[data-test="dashboard-import-custom"]'
     );
-    const fileTab = this.page.locator('[data-test="tab-import_json_file"]');
-
     // "Custom" runs router.push("/dashboards/import"), so tab-import_json_file
     // only exists once ImportDashboard.vue has mounted on the new route. The
     // previous version never checked that the route actually changed: a dropdown
@@ -84,19 +114,7 @@ export default class DashboardImport {
         await customOption.click();
         await this.page.waitForURL(/\/dashboards\/import/, { timeout: 15000 });
       }
-      await fileTab.waitFor({ state: "visible", timeout: 15000 });
-
-      // Being able to SEE the tab is not the same as being ON it: the file
-      // control renders under v-if="activeTab == 'import_json_file'", so on the
-      // URL tab the attached-wait below can never resolve.
-      const fileTabActive = await fileTab
-        .getAttribute("data-state")
-        .then((v) => v === "active")
-        .catch(() => false);
-      if (!fileTabActive) {
-        await fileTab.click();
-      }
-      await this.inputFile.waitFor({ state: "attached", timeout: 15000 });
+      await this.ensureFileTabActive(15000);
     }).toPass({ timeout: 60000, intervals: [500, 1000, 2000] });
   }
 
@@ -127,18 +145,11 @@ export default class DashboardImport {
    *   without touching the shared fixture on disk.
    */
   async uploadDashboardFile(fileContentPath, { title } = {}) {
-    const fileTab = this.page.locator('[data-test="tab-import_json_file"]');
-    try {
-      await fileTab.waitFor({ state: "visible", timeout: 10000 });
-      await fileTab.click({ timeout: 10000 });
-      await this.inputFile.waitFor({ state: "attached", timeout: 10000 });
-    } catch (error) {
-      // Tab might already be active, continue
-    }
-
-    // The file control renders the underlying input as hidden — wait for
-    // `attached` (not visible) since setInputFiles works on hidden inputs.
-    await this.inputFile.waitFor({ state: "attached", timeout: 20000 });
+    // The old version wrapped this in a try/catch commented "tab might already
+    // be active" — but an already-active tab makes these waits SUCCEED, not
+    // throw. All the catch did was hide a lost click, leaving the wait below to
+    // fail against a tab that was never activated.
+    await this.ensureFileTabActive(20000);
 
     // When a title override is requested, upload an in-memory copy rather than
     // the fixture path, so the file on disk is never mutated.
