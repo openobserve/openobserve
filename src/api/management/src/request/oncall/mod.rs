@@ -71,6 +71,7 @@ async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) 
 // ── Request bodies ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreateTeamRequest {
     pub name: String,
     #[serde(default = "default_timezone")]
@@ -84,6 +85,7 @@ fn default_timezone() -> String {
 }
 
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct UpdateTeamRequest {
     #[serde(default)]
     pub name: Option<String>,
@@ -110,6 +112,7 @@ where
 /// people", and forcing the client to fan out one request per person is the
 /// most tedious part of the flow.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct AddMembersRequest {
     #[serde(default)]
     pub user_email: Option<String>,
@@ -127,9 +130,22 @@ impl AddMembersRequest {
         }
         all
     }
+
+    /// Whether this body names anybody at all.
+    ///
+    /// Both fields default, so `{}`, `{"user_emails":[]}` and a body whose only
+    /// key was misspelled all deserialized to "add nobody" and answered 200 —
+    /// a team that reads as configured and pages no one. `deny_unknown_fields`
+    /// now catches the typo; this catches the honestly-empty body.
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    fn names_nobody(&self) -> bool {
+        self.user_emails.iter().all(|e| e.trim().is_empty())
+            && self.user_email.as_deref().is_none_or(|e| e.trim().is_empty())
+    }
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SetScheduleRequest {
     /// Absent means "the team's own zone". It used to default to UTC, so a
     /// client that omitted it silently shifted every restriction window on an
@@ -147,6 +163,7 @@ pub struct SetScheduleRequest {
 /// the shape §C.3 published and the UI is built against. Which fields a given
 /// preset takes is the catalogue's job to say, not this struct's.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct FromPresetRequest {
     /// Absent means the team's own zone, exactly as `PUT /schedule` means it.
     /// Every window the preset generates is read in this one zone — there is no
@@ -167,6 +184,7 @@ pub struct FromPresetRequest {
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
     /// How many times the ladder runs before `final_action`. 1..=5.
@@ -197,6 +215,7 @@ pub struct SetPolicyRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ListResponsesQuery {
     pub team_id: Option<String>,
     /// Include closed records. Off by default: the home screen is what still
@@ -236,6 +255,7 @@ pub struct ListResponsesQuery {
 /// that does not render push tokens would erase one every time somebody saved a
 /// phone number.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SetContactRequest {
     #[serde(default, deserialize_with = "double_option")]
     pub phone: Option<Option<String>>,
@@ -246,6 +266,7 @@ pub struct SetContactRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct InboxQuery {
     /// Only what nobody has looked at — what a badge counts.
     #[serde(default)]
@@ -263,6 +284,7 @@ pub struct InboxQuery {
 /// `all` is the "clear my inbox" button and is bounded server-side; naming ids
 /// is what a list does as it scrolls.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct MarkReadRequest {
     #[serde(default)]
     pub event_ids: Vec<String>,
@@ -279,6 +301,7 @@ fn yes() -> bool {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MyTeamsQuery {
     /// Answer for this instant (micros) instead of now.
     pub at: Option<i64>,
@@ -290,6 +313,7 @@ pub struct MyTeamsQuery {
 /// an obvious answer for "lately", and forcing every caller to compute
 /// timestamps is how a dashboard tile ends up hardcoding the wrong month.
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CauseAnalyticsQuery {
     pub team_id: Option<String>,
     /// Micros, inclusive. Defaults to 30 days before `to`.
@@ -300,6 +324,7 @@ pub struct CauseAnalyticsQuery {
 
 /// Promotes a firing to a full incident.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct PromoteRequest {
     /// Absent takes the record's own title, which is nearly always right and
     /// is one less field to fill in mid-page.
@@ -312,6 +337,7 @@ pub struct PromoteRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OnCallQuery {
     /// Resolve at this instant (micros) instead of now, so the UI can show a
     /// future week without a second endpoint.
@@ -319,6 +345,7 @@ pub struct OnCallQuery {
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreateOwnershipRuleRequest {
     pub team_id: String,
     /// `{alias_id: value}` — the same vocabulary the service-identity config
@@ -327,6 +354,7 @@ pub struct CreateOwnershipRuleRequest {
 }
 
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ResolveRequest {
     /// Why it happened. Optional, but it is what makes the next firing of the
     /// same rule useful history rather than a list of dates.
@@ -338,11 +366,13 @@ pub struct ResolveRequest {
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct AddNoteRequest {
     pub body: String,
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SnoozeRequest {
     /// How long to stay quiet, in minutes.
     pub minutes: i64,
@@ -351,6 +381,7 @@ pub struct SnoozeRequest {
 /// Exactly one of `to` (a person on this team) or `to_team_id` (ownership
 /// moves to another team, and their on-call is paged under their rotation).
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct HandoffRequest {
     #[serde(default)]
     pub to: Option<String>,
@@ -363,6 +394,7 @@ pub struct HandoffRequest {
 /// An impacted team saying its own service is clear. The cause belongs to the
 /// owner team's record, not to this one, so there is nothing else to send.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ConfirmRecoveryRequest {
     #[serde(default)]
     pub note: Option<String>,
@@ -370,6 +402,7 @@ pub struct ConfirmRecoveryRequest {
 
 /// "This needs more people, now." Optional context for the timeline.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct EscalateRequest {
     #[serde(default)]
     pub note: Option<String>,
@@ -378,6 +411,7 @@ pub struct EscalateRequest {
 /// Which ladder to prove. Priorities page differently, so "does paging work"
 /// has a different answer per priority and the caller has to say which one.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct TestPageRequest {
     /// 1–5. Defaults to P2, the highest priority whose ladder starts with one
     /// person: P1 pages the primary, the secondary and everyone on the schedule
@@ -399,11 +433,13 @@ impl Default for TestPageRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HistoryQuery {
     pub limit: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct PreviewRoutingRequest {
     #[serde(default)]
     pub oncall_team: Option<String>,
@@ -423,18 +459,21 @@ pub struct PreviewRoutingRequest {
 /// one field, so "send the state you want" is unambiguous and clearing needs no
 /// second endpoint and no sentinel value.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SetRoutingConfigRequest {
     #[serde(default)]
     pub default_team_id: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OwnershipQuery {
     pub team_id: Option<String>,
 }
 
 /// "Cover for me" — `architecture/02` §5, as one request.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreateOverrideRequest {
     /// Which rotation is being covered. Omitted means the team's primary, which
     /// is what "cover for me" means on a team that has never thought about
@@ -465,6 +504,7 @@ pub struct CreateOverrideRequest {
 /// Both bounds or neither. A half-specified window is a client bug, and
 /// answering it with the unfiltered list would look like it worked.
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OverrideWindowQuery {
     pub from: Option<i64>,
     pub to: Option<i64>,
@@ -473,6 +513,7 @@ pub struct OverrideWindowQuery {
 /// The window a resolved-schedule read covers. Both bounds are required: this
 /// endpoint has no useful default, and inventing one would hide the bound.
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ResolvedScheduleQuery {
     pub from: i64,
     pub to: i64,
@@ -486,6 +527,7 @@ pub struct ResolvedScheduleQuery {
 /// A person, a window, or both. Listing every absence an org has ever recorded
 /// is not a question anything asks, so it is not one this answers.
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct UnavailabilityQuery {
     #[serde(default)]
     pub user_email: Option<String>,
@@ -497,6 +539,7 @@ pub struct UnavailabilityQuery {
 
 /// "I am away 20 Aug – 3 Sep."
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreateUnavailabilityRequest {
     /// Whose absence. Omitted means the caller's own, which is the common case
     /// and the one that must not need an administrator.
@@ -513,16 +556,19 @@ pub struct CreateUnavailabilityRequest {
 /// Carried as a query param on the confirmation GET and as a form field on
 /// the POST that actually acknowledges.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct AckQuery {
     pub token: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RemoveMemberQuery {
     pub user_email: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct UnroutedQuery {
     /// A dismissed entry is kept rather than deleted — the evidence that the
     /// gap existed is the point — so asking for them back is opt-in. Left off,
@@ -552,6 +598,7 @@ impl UnroutedQuery {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CoverageGapsQuery {
     /// Answer for this instant (micros) instead of now, so the same call can
     /// ask "will anybody be on call at 2am on Sunday?".
@@ -560,6 +607,7 @@ pub struct CoverageGapsQuery {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeliveriesQuery {
     pub limit: Option<u64>,
     pub offset: Option<u64>,
@@ -571,6 +619,7 @@ pub struct DeliveriesQuery {
 /// delivery ledger, which is the only on-call table that grows without an
 /// upper bound.
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LookbackQuery {
     /// Days. Clamped `1..=366`.
     pub days: Option<i64>,
@@ -581,6 +630,7 @@ pub struct LookbackQuery {
 /// answer per priority, and defaulting it would answer a question nobody
 /// asked.
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EscalationPreviewQuery {
     /// `P1`–`P5`, or `1`–`5`. Defaults to P1 — the ladder somebody opening
     /// this screen is checking.
@@ -591,6 +641,7 @@ pub struct EscalationPreviewQuery {
 
 /// The ownership list with its usage figures beside it.
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OwnershipStatsQuery {
     pub team_id: Option<String>,
     /// Days of history the counts cover. Clamped `1..=366`.
@@ -645,7 +696,7 @@ fn to_response(e: anyhow::Error) -> Response {
 pub async fn create_team(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateTeamRequest>,
+    ValidatedJson(body): ValidatedJson<CreateTeamRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -756,7 +807,7 @@ pub async fn get_team(
 pub async fn update_team(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<UpdateTeamRequest>,
+    ValidatedJson(body): ValidatedJson<UpdateTeamRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -871,12 +922,20 @@ pub async fn list_members(
 pub async fn add_member(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<AddMembersRequest>,
+    ValidatedJson(body): ValidatedJson<AddMembersRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // Refused rather than answered 200: a caller that meant to add six
+        // people and mistyped the key should hear about it, not read success
+        // and find an empty roster at 3am.
+        if body.names_nobody() {
+            return MetaHttpResponse::bad_request(
+                "no members named — send `user_email` or a non-empty `user_emails`",
+            );
         }
         let emails = body.emails();
         match o2_enterprise::enterprise::oncall::service::add_members(&org_id, &team_id, &emails)
@@ -993,7 +1052,7 @@ pub async fn get_schedule(
 pub async fn set_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetScheduleRequest>,
+    ValidatedJson(body): ValidatedJson<SetScheduleRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -1178,7 +1237,7 @@ pub async fn who_is_on_call(
 pub async fn create_override(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateOverrideRequest>,
+    ValidatedJson(body): ValidatedJson<CreateOverrideRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -1407,7 +1466,7 @@ pub async fn get_policy(
 pub async fn set_policy(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetPolicyRequest>,
+    ValidatedJson(body): ValidatedJson<SetPolicyRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -1444,6 +1503,7 @@ pub async fn set_policy(
 /// make the field impossible to turn off, because clearing it would silently
 /// resurrect whatever the policy still had in it.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SetTeamChannelRequest {
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
@@ -1529,7 +1589,7 @@ pub async fn get_team_channel(
 pub async fn set_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetTeamChannelRequest>,
+    ValidatedJson(body): ValidatedJson<SetTeamChannelRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2043,7 +2103,7 @@ pub async fn get_response(
 pub async fn resolve_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<ResolveRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<ResolveRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2089,7 +2149,7 @@ pub async fn resolve_response(
 pub async fn add_note(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<AddNoteRequest>,
+    ValidatedJson(body): ValidatedJson<AddNoteRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2288,7 +2348,7 @@ pub async fn acknowledge_response(
 pub async fn snooze_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SnoozeRequest>,
+    ValidatedJson(body): ValidatedJson<SnoozeRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2334,7 +2394,7 @@ pub async fn snooze_response(
 pub async fn handoff_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<HandoffRequest>,
+    ValidatedJson(body): ValidatedJson<HandoffRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2404,7 +2464,7 @@ pub async fn handoff_response(
 pub async fn confirm_recovery(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<ConfirmRecoveryRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<ConfirmRecoveryRequest>>,
 ) -> Response {
     // Recovery is ordered (`00-simplified-flow` §4): the incident closes on the
     // slowest dependent, not on the root cause, and the owner team cannot close
@@ -2480,7 +2540,7 @@ pub async fn confirm_recovery(
 pub async fn escalate_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<EscalateRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<EscalateRequest>>,
 ) -> Response {
     // Not a handoff. A handoff gives the page away; this keeps it and adds
     // people to it, which is what a responder means by "I need more help".
@@ -2562,7 +2622,7 @@ pub async fn escalate_response(
 pub async fn send_test_page(
     Path((org_id, team_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<TestPageRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<TestPageRequest>>,
 ) -> Response {
     // `oncall`, not `oncall_responses`: this proves a configuration, and the
     // person who configures who gets woken is the one who should be able to
@@ -2727,7 +2787,7 @@ pub async fn list_ownership_rules(
 pub async fn create_ownership_rule(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateOwnershipRuleRequest>,
+    ValidatedJson(body): ValidatedJson<CreateOwnershipRuleRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2789,7 +2849,7 @@ pub async fn create_ownership_rule(
 pub async fn update_ownership_rule(
     Path((org_id, rule_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateOwnershipRuleRequest>,
+    ValidatedJson(body): ValidatedJson<CreateOwnershipRuleRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -2958,7 +3018,7 @@ pub async fn get_routing_config(
 pub async fn set_routing_config(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetRoutingConfigRequest>,
+    ValidatedJson(body): ValidatedJson<SetRoutingConfigRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -3002,7 +3062,7 @@ pub async fn set_routing_config(
 pub async fn preview_routing(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<PreviewRoutingRequest>,
+    ValidatedJson(body): ValidatedJson<PreviewRoutingRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -3793,7 +3853,7 @@ pub async fn list_unavailability(
 pub async fn create_unavailability(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<CreateUnavailabilityRequest>,
+    ValidatedJson(body): ValidatedJson<CreateUnavailabilityRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -4027,7 +4087,7 @@ pub async fn get_contact(
 pub async fn set_contact(
     Path((org_id, subject_email)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<SetContactRequest>,
+    ValidatedJson(body): ValidatedJson<SetContactRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -4230,7 +4290,7 @@ pub async fn list_my_deliveries(
 pub async fn mark_deliveries_read(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<MarkReadRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<MarkReadRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -4593,7 +4653,7 @@ async fn carry_page_history_into_incident(
 pub async fn promote_to_incident(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<Option<PromoteRequest>>,
+    ValidatedJson(body): ValidatedJson<Option<PromoteRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
