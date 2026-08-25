@@ -40,6 +40,13 @@ vi.mock("@/services/search", () => ({
   },
 }));
 
+// Stream discovery: defaults to the constant so existing tests keep their
+// `from "default"` shape; individual tests override to a custom stream.
+const mockResolveTracesStream = vi.fn().mockResolvedValue("default");
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTracesStream: mockResolveTracesStream }),
+}));
+
 // Mock vuex store
 const mockStore = {
   state: {
@@ -259,6 +266,25 @@ describe("useTraceCorrelation", () => {
       const sql: string = apmCall[0].query.query.sql;
       expect(sql).toContain('from "default"');
       expect(sql).toContain("trace_id = '01a034c1aabc72f78880daf6c9755cff'");
+    });
+
+    it("queries the discovered stream when the trace lives outside default", async () => {
+      const traceId = ref("01a034c1aabc72f78880daf6c9755cff");
+      mockResolveTracesStream.mockResolvedValueOnce("payments_traces");
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      expect(mockResolveTracesStream).toHaveBeenCalledWith(
+        "01a034c1aabc72f78880daf6c9755cff",
+        expect.any(Number),
+        expect.any(Number),
+      );
+      const apmCall = vi.mocked(searchService.search).mock.calls[1];
+      const sql: string = apmCall[0].query.query.sql;
+      expect(sql).toContain('from "payments_traces"');
     });
 
     it("reports the canonical padded id in correlationData", async () => {

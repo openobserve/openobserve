@@ -18,12 +18,8 @@ import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
-import {
-  normalizeTraceId,
-  rumFieldEqualsAnySql,
-  traceIdLookupVariants,
-  RUM_CORRELATION_TRACES_STREAM,
-} from "@/utils/rum/fields";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { normalizeTraceId, rumFieldEqualsAnySql, traceIdLookupVariants } from "@/utils/rum/fields";
 
 export interface TraceCorrelationData {
   trace_id: string;
@@ -53,6 +49,7 @@ export default function useTraceCorrelation(
 ) {
   const store = useStore();
   const { getStream } = useStreams(t);
+  const { resolveTracesStream } = useCorrelatedTracesStream(t);
   const correlationData = ref<TraceCorrelationData | null>(null);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
@@ -135,16 +132,23 @@ export default function useTraceCorrelation(
 
       const rumEvents = rumResponse.data.hits || [];
 
-      // Try to query backend trace data from the traces stream RUM correlates
-      // against, using the canonical padded id — the traces stream always stores
-      // the full 32-char form.
+      // Try to query backend trace data from whichever traces stream actually
+      // contains this trace (discovered + cached; falls back to the default
+      // stream), using the canonical padded id — the traces stream always
+      // stores the full 32-char form.
       let backendSpans: any[] = [];
       let hasTrace = false;
+
+      const tracesStream = await resolveTracesStream(
+        canonicalTraceId,
+        range.startTime,
+        range.endTime,
+      );
 
       try {
         const traceQuery = {
           query: {
-            sql: `select * from "${RUM_CORRELATION_TRACES_STREAM}" where trace_id = '${canonicalTraceId}' order by start_time`,
+            sql: `select * from "${tracesStream}" where trace_id = '${canonicalTraceId}' order by start_time`,
             start_time: range.startTime,
             end_time: range.endTime,
             from: 0,
