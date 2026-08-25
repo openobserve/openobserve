@@ -23,20 +23,13 @@ import i18n from "@/locales";
 /// offered — which is the whole point of this component — without driving a
 /// listbox.
 const stubs = {
-  OToggleGroup: {
-    name: "OToggleGroup",
-    props: ["modelValue"],
-    template: `<div data-test="modes"><slot /></div>`,
-  },
-  OToggleGroupItem: {
-    name: "OToggleGroupItem",
-    props: ["value"],
-    template: `<button :data-value="value" @click="$parent.$emit('update:modelValue', value)"><slot name="icon-left" /><slot /></button>`,
-  },
+  // Each select renders its options as buttons, so a test can assert what was
+  // offered — the point of this component — without driving a listbox. The
+  // level select is tagged so level clicks and value clicks stay separable.
   OSelect: {
     name: "OSelect",
     props: ["modelValue", "options", "label"],
-    template: `<div :data-label="label"><button
+    template: `<div :data-label="label" :data-test="$attrs['data-test']"><button
         v-for="option in options"
         :key="String(option.value)"
         :data-option="String(option.value)"
@@ -44,8 +37,11 @@ const stubs = {
         @click="$emit('update:modelValue', option.value)"
       >{{ option.label }}</button></div>`,
   },
+  OButton: {
+    name: "OButton",
+    template: `<button :data-test="$attrs['data-test']" @click="$emit('click')"><slot /></button>`,
+  },
   OTooltip: { name: "OTooltip", template: "<span />" },
-  OIcon: { name: "OIcon", template: "<i />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   ODimensionChip: {
     name: "ODimensionChip",
@@ -78,8 +74,20 @@ function render(props: Record<string, unknown> = {}) {
   });
 }
 
+function levelSelect(wrapper: ReturnType<typeof render>) {
+  return wrapper.find('[data-test="oncall-scope-level"]');
+}
+
 function modes(wrapper: ReturnType<typeof render>) {
-  return wrapper.findAll("[data-value]").map((node) => node.attributes("data-value"));
+  return levelSelect(wrapper)
+    .findAll("[data-option]")
+    .map((node) => node.attributes("data-option"));
+}
+
+/// Choose a level, then a value for it — the two-step every claim goes through.
+async function claim(wrapper: ReturnType<typeof render>, level: string, value: string) {
+  await levelSelect(wrapper).find(`[data-option="${level}"]`).trigger("click");
+  await wrapper.find(`[data-test="oncall-scope-value"] [data-option="${value}"]`).trigger("click");
 }
 
 describe("OnCallScopePicker", () => {
@@ -89,7 +97,8 @@ describe("OnCallScopePicker", () => {
   it("offers levels coarsest first, from the identity set's own order", () => {
     const wrapper = render();
 
-    expect(modes(wrapper)).toEqual(["k8s-cluster", "k8s-namespace", "service", "advanced"]);
+    // Advanced is a button beside the row, not a kind of thing a team can own.
+    expect(modes(wrapper)).toEqual(["k8s-cluster", "k8s-namespace", "service"]);
   });
 
   /// The failure this component exists to remove. The registry files anything
@@ -108,8 +117,7 @@ describe("OnCallScopePicker", () => {
   it("claims a whole cluster as one dimension", async () => {
     const wrapper = render();
 
-    await wrapper.find('[data-value="k8s-cluster"]').trigger("click");
-    await wrapper.find('[data-option="production"]').trigger("click");
+    await claim(wrapper, "k8s-cluster", "production");
 
     const emitted = wrapper.emitted("update:modelValue");
     expect(emitted?.at(-1)?.[0]).toEqual({ "k8s-cluster": "production" });
@@ -120,7 +128,7 @@ describe("OnCallScopePicker", () => {
   it("says how much of the estate each value covers", () => {
     const wrapper = render();
 
-    const option = wrapper.find('[data-option="production"]');
+    const option = wrapper.find('[data-test="oncall-scope-value"] [data-option="production"]');
     expect(option.attributes("data-description")).toContain("48");
   });
 
@@ -129,8 +137,7 @@ describe("OnCallScopePicker", () => {
   it("claims a service everywhere unless narrowed", async () => {
     const wrapper = render();
 
-    await wrapper.find('[data-value="service"]').trigger("click");
-    await wrapper.find('[data-option="payment-gateway"]').trigger("click");
+    await claim(wrapper, "service", "payment-gateway");
 
     expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({
       service: "payment-gateway",
@@ -140,11 +147,10 @@ describe("OnCallScopePicker", () => {
   it("narrows a service to one enclosing scope when asked", async () => {
     const wrapper = render();
 
-    await wrapper.find('[data-value="service"]').trigger("click");
-    await wrapper.find('[data-option="payment-gateway"]').trigger("click");
-    // The second select is the narrowing one; its "everywhere" entry is blank.
-    const narrow = wrapper.findAll("[data-label]")[1];
-    await narrow.find('[data-option="production"]').trigger("click");
+    await claim(wrapper, "service", "payment-gateway");
+    await wrapper
+      .find('[data-test="oncall-scope-narrow"] [data-option="production"]')
+      .trigger("click");
 
     expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({
       "k8s-cluster": "production",
@@ -157,9 +163,8 @@ describe("OnCallScopePicker", () => {
   it("drops the value when the level changes", async () => {
     const wrapper = render();
 
-    await wrapper.find('[data-value="k8s-cluster"]').trigger("click");
-    await wrapper.find('[data-option="production"]').trigger("click");
-    await wrapper.find('[data-value="k8s-namespace"]').trigger("click");
+    await claim(wrapper, "k8s-cluster", "production");
+    await levelSelect(wrapper).find('[data-option="k8s-namespace"]').trigger("click");
 
     expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({});
   });
@@ -167,7 +172,7 @@ describe("OnCallScopePicker", () => {
   it("hands off to the field builder when Advanced is chosen", async () => {
     const wrapper = render();
 
-    await wrapper.find('[data-value="advanced"]').trigger("click");
+    await wrapper.find('[data-test="oncall-scope-mode-advanced"]').trigger("click");
 
     expect(wrapper.emitted("advanced")).toHaveLength(1);
   });
@@ -177,11 +182,10 @@ describe("OnCallScopePicker", () => {
   it("spells out what the claim leaves to narrower rules", async () => {
     const wrapper = render();
 
-    await wrapper.find('[data-value="k8s-cluster"]').trigger("click");
-    await wrapper.find('[data-option="production"]').trigger("click");
+    await claim(wrapper, "k8s-cluster", "production");
 
-    const claim = wrapper.find('[data-test="oncall-scope-picker-consequence"]');
-    expect(claim.text()).toContain("unless a narrower rule claims it");
+    const claimBox = wrapper.find('[data-test="oncall-scope-picker-consequence"]');
+    expect(claimBox.text()).toContain("unless a narrower rule claims it");
   });
 
   /// A service beats a cluster in the engine's ranking, so the sentence beside
@@ -190,8 +194,7 @@ describe("OnCallScopePicker", () => {
   it("says a service claim holds against the scopes around it", async () => {
     const wrapper = render();
 
-    await wrapper.find('[data-value="service"]').trigger("click");
-    await wrapper.find('[data-option="payment-gateway"]').trigger("click");
+    await claim(wrapper, "service", "payment-gateway");
 
     expect(wrapper.find('[data-test="oncall-scope-picker-consequence"]').text()).toContain(
       "whoever owns the ones around it",
@@ -205,6 +208,19 @@ describe("OnCallScopePicker", () => {
 
     const chips = wrapper.findAll("[data-chip]").map((node) => node.attributes("data-chip"));
     expect(chips).toEqual(["k8s-namespace=payments"]);
+  });
+
+  /// The bug that made every level past the first read as an unclickable tab:
+  /// choosing a level publishes an empty claim, and the watcher re-derived the
+  /// level from those empty dimensions, putting it straight back to the first.
+  it("keeps the chosen level after it publishes an empty claim", async () => {
+    const wrapper = render();
+
+    await levelSelect(wrapper).find('[data-option="k8s-cluster"]').trigger("click");
+    await wrapper.vm.$nextTick();
+
+    const valueLabel = wrapper.find('[data-test="oncall-scope-value"]').attributes("data-label");
+    expect(valueLabel).toBe("k8s-cluster");
   });
 
   it("shows a service claim with its narrowing, coarsest chip first", () => {

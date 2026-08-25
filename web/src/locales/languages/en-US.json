@@ -13729,6 +13729,7 @@
     "ruleEditorTeamHelp": "The team paged when a signal matches. Its own escalation ladder decides who is woken and in what order.",
     "scopeOwns": "This team owns",
     "scopeAdvanced": "Advanced",
+    "scopeLevelPickerHelp": "What kind of thing this team owns. Levels come from your Distinguish Services By order, so a cluster contains a namespace contains a service — and a claim on the finer one always wins.",
     "scopeValuePlaceholder": "Choose one",
     "scopeEverywhere": "Everywhere",
     "scopeLevelHelp": "Claim a whole {level}. Everything inside it pages this team, except what a narrower rule claims.",

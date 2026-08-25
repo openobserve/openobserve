@@ -42,45 +42,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col gap-3" data-test="oncall-scope-picker">
-    <!-- The levels, coarsest first, so the row itself reads as the hierarchy.
-         Colour is `dimensionVariant`, the same function that colours these
-         dimensions in the incident list and the correlation chips — a cluster
-         is the same colour here as everywhere else it is named. -->
-    <OToggleGroup
-      :model-value="mode"
-      data-test="oncall-scope-picker-modes"
-      @update:model-value="(v: unknown) => v && selectMode(String(v))"
-    >
-      <OToggleGroupItem
-        v-for="level in levels"
-        :key="level.dimension"
-        :value="level.dimension"
-        size="sm"
-        :data-test="`oncall-scope-mode-${level.dimension}`"
-      >
-        <template #icon-left>
-          <!-- A filled dot rather than an icon per level: the levels are not a
-               fixed set the product can ship icons for, and the dot carries the
-               dimension's own colour, which is the thing worth recognising. -->
-          <span
-            class="size-2 shrink-0 rounded-full"
-            :class="dotClassOf(level.dimension)"
-            aria-hidden="true"
-          />
-        </template>
-        {{ raw(level.label) }}
-      </OToggleGroupItem>
-
-      <OToggleGroupItem value="advanced" size="sm" data-test="oncall-scope-mode-advanced">
-        <template #icon-left><OIcon name="tune" size="sm" /></template>
-        {{ t("oncall.scopeAdvanced") }}
-      </OToggleGroupItem>
-    </OToggleGroup>
-
-    <!-- One level selected: one value to pick, and for the finest level an
-         optional narrowing to a single enclosing scope. -->
-    <div v-if="active" class="flex flex-wrap items-end gap-2" data-test="oncall-scope-picker-value">
+    <!-- One row, read as a sentence: **owns** *this kind of thing* **=** *this
+         one*. It was a tab strip per level, which broke down as soon as a real
+         org appeared — five platforms means five tabs, in an order nobody
+         chose, with a Kubernetes shop landing on Azure Resource Group because
+         it sorted first. A select scales to any number of levels, costs one
+         line instead of two, and puts the level and its value side by side
+         where the claim actually reads. -->
+    <div class="flex flex-wrap items-end gap-2" data-test="oncall-scope-picker-value">
       <OSelect
+        :model-value="mode"
+        :label="t('oncall.scopeOwns')"
+        :options="levelOptions"
+        size="sm"
+        width="sm"
+        searchable
+        data-test="oncall-scope-level"
+        @update:model-value="(v: unknown) => v && selectMode(String(v))"
+      >
+        <template #tooltip>
+          <OTooltip side="right" :content="t('oncall.scopeLevelPickerHelp')" />
+        </template>
+      </OSelect>
+
+      <OSelect
+        v-if="active"
         :model-value="value"
         :label="raw(active.label)"
         :options="valueOptions"
@@ -115,6 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip side="right" :content="t('oncall.scopeNarrowHelp')" />
         </template>
       </OSelect>
+
+      <!-- Kept out of the level list. Advanced is not a kind of thing a team
+           can own, and reading it as one is how somebody picks it by accident
+           looking for a level further down. -->
+      <OButton
+        variant="ghost"
+        size="sm"
+        icon-left="tune"
+        class="mb-0.5"
+        data-test="oncall-scope-mode-advanced"
+        @click="emit('advanced')"
+      >
+        {{ t("oncall.scopeAdvanced") }}
+      </OButton>
     </div>
 
     <!-- What the choice above actually claims, in a sentence. Inheritance is
@@ -146,10 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
-import { dimensionVariant } from "@/lib/core/Badge/badgeGroups";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -255,6 +252,24 @@ const serviceNames = computed(() =>
   ),
 );
 
+/// The levels as select options, each carrying its own colour dot so a level
+/// is recognisable here the same way its chips are everywhere else.
+const levelOptions = computed(() =>
+  levels.value.map((level) => ({ label: raw(level.label), value: level.dimension })),
+);
+
+/// Where a fresh rule starts.
+///
+/// The finest level, which is `service` whenever discovery has named anything.
+/// Not the first: levels are ordered coarsest-first for reading, so "first"
+/// meant whichever platform sorted earliest, and a Kubernetes shop opened the
+/// form on Azure Resource Group. Finest is also the safer default — an
+/// accidental narrow claim pages one team about one service, an accidental
+/// broad one takes an entire cluster.
+function defaultLevel(): string {
+  return levels.value[levels.value.length - 1]?.dimension ?? "";
+}
+
 const mode = ref("");
 const value = ref("");
 const narrowValue = ref("");
@@ -279,7 +294,13 @@ watch(
   (dimensions) => {
     const names = Object.keys(dimensions ?? {});
     if (!names.length) {
-      if (mode.value !== "advanced") mode.value = levels.value[0]?.dimension ?? "";
+      // Only fall back to a default when the current level is not a real one.
+      // Choosing a level publishes an empty claim — the old value belongs to
+      // the old level — so re-deriving the level from those empty dimensions
+      // put it straight back to `levels[0]`, and every level past the first
+      // read as an unclickable tab.
+      const chosen = levels.value.some((level) => level.dimension === mode.value);
+      if (mode.value !== "advanced" && !chosen) mode.value = defaultLevel();
       value.value = "";
       narrowValue.value = "";
       return;
@@ -307,31 +328,6 @@ watch(
 
 function displayOf(name: string): string {
   return props.aliases.find((alias) => alias.id === name)?.display || name;
-}
-
-/// The colour the dimension carries everywhere else, as a filled dot.
-///
-/// Spelled out rather than interpolated: Tailwind scans source text for class
-/// names, so a computed `bg-${tone}` is a class that exists at runtime and not
-/// in the stylesheet — the dot renders, invisibly, in every colour.
-const DOT_CLASSES: Record<string, string> = {
-  "default-soft": "bg-badge-default-soft-text",
-  "primary-soft": "bg-badge-primary-soft-text",
-  "success-soft": "bg-badge-success-soft-text",
-  "warning-soft": "bg-badge-warning-soft-text",
-  "error-soft": "bg-badge-error-soft-text",
-  "amber-soft": "bg-badge-amber-soft-text",
-  "blue-soft": "bg-badge-blue-soft-text",
-  "cyan-soft": "bg-badge-cyan-soft-text",
-  "indigo-soft": "bg-badge-indigo-soft-text",
-  "lime-soft": "bg-badge-lime-soft-text",
-  "orange-soft": "bg-badge-orange-soft-text",
-  "purple-soft": "bg-badge-purple-soft-text",
-  "teal-soft": "bg-badge-teal-soft-text",
-};
-
-function dotClassOf(dimension: string): string {
-  return DOT_CLASSES[String(dimensionVariant(dimension))] ?? DOT_CLASSES["default-soft"];
 }
 
 const valueOptions = computed(() => {
@@ -412,11 +408,6 @@ function publish() {
 }
 
 function selectMode(next: string) {
-  if (next === "advanced") {
-    mode.value = "advanced";
-    emit("advanced");
-    return;
-  }
   mode.value = next;
   // Switching level abandons the old value rather than carrying it across: a
   // cluster name is not a namespace name, and a silently retained value is a
