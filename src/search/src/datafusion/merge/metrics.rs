@@ -20,7 +20,8 @@ use arrow::{
     compute::{max, min},
 };
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileMeta, utils::parquet::new_parquet_writer,
+    FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileMeta,
+    utils::parquet::new_metrics_index_parquet_writer,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -270,7 +271,7 @@ impl ActiveIndexedParquetWriter {
         timestamp_index: usize,
     ) -> Result<Self> {
         let (file, data_path) = new_temp_file()?;
-        let writer = new_parquet_writer(file, schema, bloom_filter_fields, metadata, false, None);
+        let writer = new_metrics_index_parquet_writer(file, schema, bloom_filter_fields, metadata);
         Ok(Self {
             writer,
             data_path,
