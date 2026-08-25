@@ -1,0 +1,33 @@
+{
+  "feature_slug": "dashboard-table-cell-drilldown",
+  "feature_title": "Interactive Dashboard Table — Cell Drilldown (Log Explorer)",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "interactive-dashboard-table.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/interactive-dashboard-table.spec.js",
+  "playwright_group": "Dashboards-Tables",
+  "source_files": [
+    "web/src/components/dashboards/DashboardLogDrawer.vue",
+    "web/src/components/dashboards/panels/TableRenderer.vue",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue",
+    "web/src/components/dashboards/addPanel/PanelFieldList.vue",
+    "web/src/composables/dashboard/usePanelDrilldown.ts",
+    "web/src/composables/dashboard/useDashboardPanel.ts",
+    "web/src/utils/dashboard/convertTableData.ts",
+    "web/src/views/Dashboards/ViewDashboard.vue",
+    "web/src/views/Dashboards/addPanel/AddPanel.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed paths live in OSS-owned locations — web/src/**, src/api/search/**, src/config/src/meta/**, scripts/translations/** and tests/ui-testing/** — with none under enterprise/, o2_enterprise/, or src/enterprise/. No enterprise keywords (SSO/SAML/RBAC/SDR/sensitive-data/logo-management) appear in any changed path or symbol, so this is an OSS change.",
+    "skip": "No skip markers present: trigger_comment.txt and feature_hint.txt are empty and no tests-added label was passed. The change adds a genuine user-facing UI flow, not docs-only or CI-only, so the skip gate does not apply.",
+    "e2e": "The change adds a new user-facing interaction in web/src — a per-cell drilldown search icon in dashboard table panels (TableRenderer.vue) that opens a new DashboardLogDrawer with SQL toggle, Run, Open-in-Logs, and an editable time-range control, and syncs cell_* URL params on open/close. E2E is warranted to verify this drilldown flow end to end.",
+    "area": "The bulk of the UI changes live under web/src/components/dashboards/, web/src/composables/dashboard/, and web/src/views/Dashboards/, and the spec sits in tests/ui-testing/playwright-tests/Dashboards/. Dashboards is the correct area.",
+    "group": "The diff adds interactive-dashboard-table.spec.js to the run_files of the Dashboards-Tables matrix shard (the ci_matrix.json change appends it alongside dashboard-pivot-table.spec.js and dashboard-table-*.spec.js), whose actual_folder is Dashboards. Dashboards-Tables is the matching shard.",
+    "existing_tests": "A new Playwright E2E spec tests/ui-testing/playwright-tests/Dashboards/interactive-dashboard-table.spec.js is added and directly covers the new cell-drilldown drawer flow (7 tests: drilldown icon visibility, drawer open with results, cell_* URL sync, SQL toggle/run, Open-in-Logs control, time-range control, and param cleanup on close). The changed usePanelDrilldown.spec.ts is a Vitest unit test and is NOT E2E coverage; configPanelHelpers.js and dashboard-cell-explorer.js are helpers/page objects, not E2E specs."
+  }
+}

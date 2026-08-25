@@ -1,0 +1,25 @@
+{
+  "feature_slug": "dashboard-table-cell-drilldown",
+  "feature_title": "Interactive Dashboard Table — Cell Drilldown (Log Explorer)",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "interactive-dashboard-table.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/interactive-dashboard-table.spec.js",
+  "playwright_group": "Dashboards-Tables",
+  "source_files": [
+    "web/src/components/dashboards/DashboardLogDrawer.vue",
+    "web/src/components/dashboards/panels/TableRenderer.vue",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue",
+    "web/src/components/dashboards/addPanel/PanelFieldList.vue",
+    "web/src/composables/dashboard/usePanelDrilldown.ts",
+    "web/src/composables/dashboard/useDashboardPanel.ts",
+    "web/src/utils/dashboard/convertTableData.ts",
+    "web/src/views/Dashboards/ViewDashboard.vue",
+    "web/src/views/Dashboards/addPanel/AddPanel.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

@@ -35,6 +35,21 @@ export default class DashboardCellExplorerPage {
     // DateTime renders its `data-test-name` prop as the element's data-test.
     this.dateTime = page.locator('[data-test="dashboard-log-drawer-date-time"]');
     this.eventDetailDrawer = page.locator('[data-test="log-explorer-event-detail-drawer"]');
+
+    // Per-event detail drawer contents (Workflow 5: row click -> event detail)
+    this.resultsRows = this.resultsTable.locator('[data-test^="o2-table-row-"]');
+    this.detailSearch = page.locator('[data-test="log-explorer-detail-search"]');
+    this.detailWrap = page.locator('[data-test="log-explorer-detail-wrap"]');
+    // JSON tab preview — assert the rendered key/value rows via JsonPreview's
+    // stable data-test hooks (scoped to the event-detail drawer) rather than
+    // the `.dld-json-preview` wrapper class. Only the active (JSON) tab panel
+    // is mounted (OTabs keepAlive=false), so this matches the JSON tree's rows.
+    this.jsonPreview = this.eventDetailDrawer
+      .locator('[data-test^="json-preview-key-"]')
+      .first();
+    this.detailDrawerCloseBtn = this.eventDetailDrawer
+      .locator('[data-test="o-drawer-close-btn"]')
+      .first();
   }
 
   /**
@@ -92,8 +107,21 @@ export default class DashboardCellExplorerPage {
   }
 
   async runQuery() {
+    // "Run re-executes the query" must be proven by observing a fresh search
+    // POST — re-asserting the already-visible results table would pass even if
+    // the button did nothing. Register the response waiter BEFORE clicking so
+    // it only catches the run-triggered request (the drawer's mount query and
+    // the dashboard panel query both complete before this point).
+    const searchResponse = this.page.waitForResponse(
+      (resp) =>
+        resp.request().method() === "POST" &&
+        resp.url().includes("/_search?") &&
+        resp.url().includes("type=logs"),
+      { timeout: 30000 }
+    );
     await this.runButton.click();
-    await expect(this.resultsTable).toBeVisible({ timeout: 30000 });
+    const response = await searchResponse;
+    expect(response.ok()).toBe(true);
   }
 
   /** Assert the drilled-in cell state was pushed to the URL as cell_* params. */
@@ -119,5 +147,55 @@ export default class DashboardCellExplorerPage {
         { timeout: 10000 }
       )
       .toBe(false);
+  }
+
+  /**
+   * The dimension column is drillable but the measure (aggregate) column is
+   * not — so a data row carries exactly ONE drilldown search icon.
+   */
+  async expectOneDrillableColumnPerRow() {
+    await expect(
+      this.firstRow.locator('[data-test^="dashboard-table-cell-drilldown-"]')
+    ).toHaveCount(1);
+  }
+
+  /**
+   * Click the first result row in the log-explorer results table. OTable's
+   * @row-click fires openEventDetail, opening the per-event detail drawer.
+   */
+  async openEventDetailFromFirstResult() {
+    await this.resultsRows.first().waitFor({ state: "visible", timeout: 15000 });
+    await this.resultsRows.first().click();
+    await expect(this.eventDetailDrawer).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Click a tab (insights/details/json) in the event-detail drawer. */
+  async clickDetailTab(name) {
+    await this.eventDetailDrawer
+      .locator(`[data-otab-name="${name}"]`)
+      .click();
+  }
+
+  /** The Insights tab is default-active: its "Field Anomaly Profile" header is shown. */
+  async expectInsightsTabActive() {
+    await expect(
+      this.eventDetailDrawer.getByText("Field Anomaly Profile")
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  /** The Details tab shows the field search input and the wrap-value switch. */
+  async expectDetailsTabContent() {
+    await expect(this.detailSearch).toBeVisible({ timeout: 15000 });
+    await expect(this.detailWrap).toBeVisible({ timeout: 15000 });
+  }
+
+  /** The JSON tab shows the JSON preview block. */
+  async expectJsonTabContent() {
+    await expect(this.jsonPreview).toBeVisible({ timeout: 15000 });
+  }
+
+  async closeEventDetailDrawer() {
+    await this.detailDrawerCloseBtn.click();
+    await expect(this.eventDetailDrawer).toBeHidden({ timeout: 15000 });
   }
 }

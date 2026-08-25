@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Dashboards/interactive-dashboard-table.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Dashboards/interactive-dashboard-table.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The core drilldown path is already covered by the 7 existing tests in interactive-dashboard-table.spec.js (icon present, click->drawer+results, cell_* URL sync, SQL toggle+run, Open-in-Logs, date-time, close cleanup). The feature is fully WIRED (no UNWIRED behaviors). Remaining uncovered WIRED behaviors — the event-detail drawer with Insights/Details/JSON tabs (explicitly flagged in the feature doc), the aggregate/measure-column-is-NOT-drillable negative case, and deep-link URL restore — are new scenarios that fit cleanly as additional test() cases in the same spec, reusing its existing buildTableAndView() helper and the dashboard-cell-explorer page object. The spec is already registered under Dashboards-Tables in ci_matrix.json, so no re-registration is needed."
+}

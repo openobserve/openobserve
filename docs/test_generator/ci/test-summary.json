@@ -1,0 +1,17 @@
+[
+  {
+    "title": "the measure (aggregate) column is not drillable — only the dimension column is",
+    "action": "append",
+    "verifies": "the dimension column renders exactly one drilldown icon per row and the aggregate measure column contributes none"
+  },
+  {
+    "title": "row click opens the event-detail drawer with Insights / Details / JSON tabs",
+    "action": "append",
+    "verifies": "clicking a result row opens the per-event detail drawer on the Insights tab, and Details and JSON tabs render their content"
+  },
+  {
+    "title": "deep-link restore re-opens the drawer from cell_* URL params",
+    "action": "append",
+    "verifies": "after closing (which clears cell_* params), re-navigating to the captured cell_* URL restores the drawer and results table"
+  }
+]

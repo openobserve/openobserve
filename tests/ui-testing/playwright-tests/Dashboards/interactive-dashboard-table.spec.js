@@ -153,4 +153,67 @@ test.describe("Interactive Dashboard Table — cell drilldown", { tag: ["@all", 
 
     await cleanupTestDashboard(page, pm, dashboardName);
   });
+
+  test("the measure (aggregate) column is not drillable — only the dimension column is", {
+    tag: ["@functional", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await buildTableAndView(page, pm, dashboardName);
+
+    expect(await pm.dashboardCellExplorer.hasDrillableCell()).toBe(true);
+    await pm.dashboardCellExplorer.expectOneDrillableColumnPerRow();
+    testLogger.info("Dimension column drillable; measure column excluded");
+
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("row click opens the event-detail drawer with Insights / Details / JSON tabs", {
+    tag: ["@functional", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await buildTableAndView(page, pm, dashboardName);
+
+    await pm.dashboardCellExplorer.openDrawerFromFirstDrillableCell();
+    await pm.dashboardCellExplorer.openEventDetailFromFirstResult();
+
+    await pm.dashboardCellExplorer.expectInsightsTabActive();
+
+    await pm.dashboardCellExplorer.clickDetailTab("details");
+    await pm.dashboardCellExplorer.expectDetailsTabContent();
+
+    await pm.dashboardCellExplorer.clickDetailTab("json");
+    await pm.dashboardCellExplorer.expectJsonTabContent();
+    testLogger.info("Event-detail drawer Insights/Details/JSON tabs verified");
+
+    await pm.dashboardCellExplorer.closeEventDetailDrawer();
+    await pm.dashboardCellExplorer.closeDrawer();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("deep-link restore re-opens the drawer from cell_* URL params", {
+    tag: ["@functional", "@P2"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await buildTableAndView(page, pm, dashboardName);
+
+    await pm.dashboardCellExplorer.openDrawerFromFirstDrillableCell();
+    await pm.dashboardCellExplorer.expectCellParamsInUrl();
+    const cellUrl = page.url();
+
+    await pm.dashboardCellExplorer.closeDrawer();
+    await pm.dashboardCellExplorer.expectNoCellParamsInUrl();
+
+    await page.goto(cellUrl);
+    await pm.dashboardCellExplorer.expectDrawerOpen();
+    testLogger.info("Drawer restored from deep-link URL");
+
+    await pm.dashboardCellExplorer.closeDrawer();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
 });
