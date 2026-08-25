@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "Esiste già una variabile con lo stesso nome",
     "pivotTotal": "Totale",
     "pivotOthers": "Altri",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Esplora i log corrispondenti"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "Valore",
     "source": "Fonte",
     "target": "Obiettivo",
-    "value": "Valore"
+    "value": "Valore",
+    "logExplorer": {
+      "title": "Esplora log",
+      "openInLogs": "Apri nei log",
+      "invalidParams": "Parametri di drilldown non validi",
+      "noEvents": "Nessun evento corrisponde a questo filtro",
+      "filterHint": "Clicca per esplorare i log correlati",
+      "timestamp": "Timestamp",
+      "queryMode": "SQL",
+      "runQuery": "Esegui query",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "evento",
+      "events": "eventi",
+      "prevPage": "Precedente",
+      "nextPage": "Successivo",
+      "of": "di",
+      "sqlEditorLabel": "Query SQL",
+      "resetSql": "Azzera",
+      "detail": {
+        "drawerTitle": "Dettaglio evento",
+        "details": "Dettagli",
+        "json": "JSON",
+        "insights": "Approfondimenti",
+        "copyLink": "Copia link",
+        "copy": "Copia",
+        "copyValue": "Copia valore",
+        "insightsHint": "Frequenze dei campi su {n} eventi caricati"
+      },
+      "insights": {
+        "anomalyTitle": "Profilo anomalie dei campi",
+        "anomalyHint": "{n} eventi campionati",
+        "colField": "Campo",
+        "colRarity": "Rarità",
+        "colValue": "Valore",
+        "rarity": {
+          "anomalous": "Anomalo",
+          "rare": "Raro",
+          "uncommon": "Insolito",
+          "common": "Comune"
+        },
+        "timelineTitle": "Cronologia eventi",
+        "timelineHint": "Frequenza nell'intervallo selezionato",
+        "timelineEmpty": "Nessun dato",
+        "patternsTitle": "Pattern dei log",
+        "patternsHint": "Raggruppati per struttura simile",
+        "zScore": "z={value}",
+        "patternsEmpty": "Nessun pattern estratto per questo filtro",
+        "contextTitle": "Eventi circostanti",
+        "contextHint": "Eventi vicini a questo timestamp",
+        "contextTooltip": "Altri eventi da questo stream nei 3 minuti prima e dopo questo evento — mostra cosa altro stava accadendo nello stesso momento.",
+        "contextEmpty": "Nessun evento circostante trovato"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Sezione panoramica avvisi",

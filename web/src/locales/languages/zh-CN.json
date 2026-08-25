@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "已存在同名变量",
     "pivotTotal": "总计",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "探索匹配的日志"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "值",
     "source": "来源",
     "target": "目标",
-    "value": "值"
+    "value": "值",
+    "logExplorer": {
+      "title": "日志浏览器",
+      "openInLogs": "在日志中打开",
+      "invalidParams": "无效的下钻参数",
+      "noEvents": "没有事件匹配此过滤器",
+      "filterHint": "点击探索相关日志",
+      "timestamp": "时间戳",
+      "queryMode": "SQL",
+      "runQuery": "运行查询",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "事件",
+      "events": "事件",
+      "prevPage": "上一个",
+      "nextPage": "下一个",
+      "of": " / ",
+      "sqlEditorLabel": "SQL 查询",
+      "resetSql": "重置",
+      "detail": {
+        "drawerTitle": "事件详情",
+        "details": "详情",
+        "json": "JSON",
+        "insights": "洞察",
+        "copyLink": "复制链接",
+        "copy": "复制",
+        "copyValue": "复制值",
+        "insightsHint": "已加载的 {n} 个事件中的字段频率"
+      },
+      "insights": {
+        "anomalyTitle": "字段异常概览",
+        "anomalyHint": "已采样 {n} 个事件",
+        "colField": "字段",
+        "colRarity": "稀有度",
+        "colValue": "值",
+        "rarity": {
+          "anomalous": "异常",
+          "rare": "稀有",
+          "uncommon": "不常见",
+          "common": "常见"
+        },
+        "timelineTitle": "事件时间线",
+        "timelineHint": "所选范围内的频率",
+        "timelineEmpty": "无数据",
+        "patternsTitle": "日志模式",
+        "patternsHint": "按相似结构分组",
+        "zScore": "z={value}",
+        "patternsEmpty": "未为此过滤器提取到模式",
+        "contextTitle": "周边事件",
+        "contextHint": "此时间戳附近的事件",
+        "contextTooltip": "此事件前后 3 分钟内来自此流的其他事件 — 显示同一时刻还有其他哪些事件发生。",
+        "contextEmpty": "未找到周边事件"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "告警概览部分",

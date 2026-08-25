@@ -5499,7 +5499,8 @@
     "variableNameAlreadyExists": "已存在相同名稱的變數",
     "pivotTotal": "總計",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "探索相符的日誌"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5587,7 +5588,59 @@
     "mapvalue": "值",
     "source": "來源",
     "target": "目標",
-    "value": "值"
+    "value": "值",
+    "logExplorer": {
+      "title": "日誌瀏覽器",
+      "openInLogs": "在日誌中開啟",
+      "invalidParams": "無效的向下鑽取參數",
+      "noEvents": "沒有事件符合此篩選條件",
+      "filterHint": "按一下以探索相關日誌",
+      "timestamp": "時間戳記",
+      "queryMode": "SQL",
+      "runQuery": "執行查詢",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "事件",
+      "events": "事件",
+      "prevPage": "上一頁",
+      "nextPage": "下一頁",
+      "of": " / ",
+      "sqlEditorLabel": "SQL 查詢",
+      "resetSql": "重設",
+      "detail": {
+        "drawerTitle": "事件詳細資料",
+        "details": "詳細資料",
+        "json": "JSON",
+        "insights": "深入解析",
+        "copyLink": "複製連結",
+        "copy": "複製",
+        "copyValue": "複製值",
+        "insightsHint": "已載入 {n} 個事件的欄位頻率"
+      },
+      "insights": {
+        "anomalyTitle": "欄位異常概況",
+        "anomalyHint": "已取樣 {n} 個事件",
+        "colField": "欄位",
+        "colRarity": "稀有度",
+        "colValue": "值",
+        "rarity": {
+          "anomalous": "異常",
+          "rare": "罕見",
+          "uncommon": "不常見",
+          "common": "常見"
+        },
+        "timelineTitle": "事件時間軸",
+        "timelineHint": "所選範圍內的頻率",
+        "timelineEmpty": "無資料",
+        "patternsTitle": "日誌模式",
+        "patternsHint": "以相似結構分組",
+        "zScore": "z={value}",
+        "patternsEmpty": "未從此篩選條件中擷取到任何模式",
+        "contextTitle": "周圍事件",
+        "contextHint": "此時間戳記附近的事件",
+        "contextTooltip": "此資料流中，此事件前後 3 分鐘內的其他事件 — 顯示同一時間點還發生了什麼事。",
+        "contextEmpty": "找不到周圍事件"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "警示概覽區段",

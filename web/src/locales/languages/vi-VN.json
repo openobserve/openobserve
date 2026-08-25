@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "Biến có cùng tên đã tồn tại",
     "pivotTotal": "Tổng",
     "pivotOthers": "Khác",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Khám phá nhật ký khớp"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "Giá trị",
     "source": "Nguồn",
     "target": "Đích",
-    "value": "Giá trị"
+    "value": "Giá trị",
+    "logExplorer": {
+      "title": "Trình khám phá nhật ký",
+      "openInLogs": "Mở trong Nhật ký",
+      "invalidParams": "Tham số drilldown không hợp lệ",
+      "noEvents": "Không có sự kiện nào khớp với bộ lọc này",
+      "filterHint": "Nhấp để khám phá nhật ký liên quan",
+      "timestamp": "Dấu thời gian",
+      "queryMode": "SQL",
+      "runQuery": "Chạy truy vấn",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "sự kiện",
+      "events": "sự kiện",
+      "prevPage": "Trước",
+      "nextPage": "Tiếp theo",
+      "of": "trên",
+      "sqlEditorLabel": "Truy vấn SQL",
+      "resetSql": "Đặt lại",
+      "detail": {
+        "drawerTitle": "Chi tiết sự kiện",
+        "details": "Chi tiết",
+        "json": "JSON",
+        "insights": "Phân tích",
+        "copyLink": "Sao chép liên kết",
+        "copy": "Sao chép",
+        "copyValue": "Sao chép giá trị",
+        "insightsHint": "Tần suất các trường trên {n} sự kiện đã tải"
+      },
+      "insights": {
+        "anomalyTitle": "Hồ sơ bất thường của trường",
+        "anomalyHint": "{n} sự kiện đã lấy mẫu",
+        "colField": "Trường",
+        "colRarity": "Độ hiếm",
+        "colValue": "Giá trị",
+        "rarity": {
+          "anomalous": "Bất thường",
+          "rare": "Hiếm",
+          "uncommon": "Không phổ biến",
+          "common": "Phổ biến"
+        },
+        "timelineTitle": "Dòng thời gian sự kiện",
+        "timelineHint": "Tần suất trong phạm vi đã chọn",
+        "timelineEmpty": "Không có dữ liệu",
+        "patternsTitle": "Mẫu nhật ký",
+        "patternsHint": "Nhóm theo cấu trúc tương tự",
+        "zScore": "z={value}",
+        "patternsEmpty": "Không có mẫu nào được trích xuất cho bộ lọc này",
+        "contextTitle": "Sự kiện xung quanh",
+        "contextHint": "Sự kiện gần dấu thời gian này",
+        "contextTooltip": "Các sự kiện khác từ stream này trong 3 phút trước và sau sự kiện này — cho biết điều gì khác đang diễn ra tại cùng thời điểm.",
+        "contextEmpty": "Không tìm thấy sự kiện xung quanh"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Phần tổng quan cảnh báo",

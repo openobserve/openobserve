@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "Zmienna o tej samej nazwie już istnieje",
     "pivotTotal": "Suma",
     "pivotOthers": "Inne",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Przeglądaj pasujące logi"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "Wartość",
     "source": "Źródło",
     "target": "Cel",
-    "value": "Wartość"
+    "value": "Wartość",
+    "logExplorer": {
+      "title": "Eksplorator logów",
+      "openInLogs": "Otwórz w logach",
+      "invalidParams": "Nieprawidłowe parametry przejścia do szczegółów",
+      "noEvents": "Brak zdarzeń pasujących do tego filtra",
+      "filterHint": "Kliknij, aby przeglądać powiązane logi",
+      "timestamp": "Znacznik czasu",
+      "queryMode": "SQL",
+      "runQuery": "Uruchom zapytanie",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "zdarzenie",
+      "events": "zdarzenia",
+      "prevPage": "Poprzedni",
+      "nextPage": "Następny",
+      "of": "z",
+      "sqlEditorLabel": "Zapytanie SQL",
+      "resetSql": "Resetuj",
+      "detail": {
+        "drawerTitle": "Szczegóły zdarzenia",
+        "details": "Szczegóły",
+        "json": "JSON",
+        "insights": "Wnioski",
+        "copyLink": "Kopiuj link",
+        "copy": "Kopiuj",
+        "copyValue": "Kopiuj wartość",
+        "insightsHint": "Częstotliwości pól wśród {n} załadowanych zdarzeń"
+      },
+      "insights": {
+        "anomalyTitle": "Profil anomalii pól",
+        "anomalyHint": "{n} próbkowanych zdarzeń",
+        "colField": "Pole",
+        "colRarity": "Rzadkość",
+        "colValue": "Wartość",
+        "rarity": {
+          "anomalous": "Anomalny",
+          "rare": "Rzadki",
+          "uncommon": "Niezbyt częsty",
+          "common": "Częsty"
+        },
+        "timelineTitle": "Oś czasu zdarzeń",
+        "timelineHint": "Częstotliwość w wybranym zakresie",
+        "timelineEmpty": "Brak danych",
+        "patternsTitle": "Wzorce logów",
+        "patternsHint": "Grupowane według podobnej struktury",
+        "zScore": "z={value}",
+        "patternsEmpty": "Nie wyodrębniono wzorców dla tego filtra",
+        "contextTitle": "Otaczające zdarzenia",
+        "contextHint": "Zdarzenia w pobliżu tego znacznika czasu",
+        "contextTooltip": "Inne zdarzenia z tego strumienia w ciągu 3 minut przed i po tym zdarzeniu — pokazują, co jeszcze działo się w tym samym czasie.",
+        "contextEmpty": "Nie znaleziono otaczających zdarzeń"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Sekcja przeglądu alertów",

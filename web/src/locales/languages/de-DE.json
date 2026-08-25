@@ -5504,7 +5504,8 @@
     "variableNameAlreadyExists": "Variable mit demselben Namen existiert bereits",
     "pivotTotal": "Gesamt",
     "pivotOthers": "Andere",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Passende Protokolle erkunden"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5592,7 +5593,59 @@
     "mapvalue": "Wert",
     "source": "Quelle",
     "target": "Ziel",
-    "value": "Wert"
+    "value": "Wert",
+    "logExplorer": {
+      "title": "Protokoll-Explorer",
+      "openInLogs": "In Protokollen öffnen",
+      "invalidParams": "Ungültige Drilldown-Parameter",
+      "noEvents": "Keine Ereignisse passen zu diesem Filter",
+      "filterHint": "Klicken, um verwandte Protokolle zu erkunden",
+      "timestamp": "Zeitstempel",
+      "queryMode": "SQL",
+      "runQuery": "Abfrage ausführen",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "Ereignis",
+      "events": "Ereignisse",
+      "prevPage": "Zurück",
+      "nextPage": "Weiter",
+      "of": "von",
+      "sqlEditorLabel": "SQL-Abfrage",
+      "resetSql": "Zurücksetzen",
+      "detail": {
+        "drawerTitle": "Ereignisdetails",
+        "details": "Details",
+        "json": "JSON",
+        "insights": "Einblicke",
+        "copyLink": "Link kopieren",
+        "copy": "Kopieren",
+        "copyValue": "Wert kopieren",
+        "insightsHint": "Feldfrequenzen über {n} geladene Ereignisse"
+      },
+      "insights": {
+        "anomalyTitle": "Feld-Anomalieprofil",
+        "anomalyHint": "{n} Ereignisse untersucht",
+        "colField": "Feld",
+        "colRarity": "Seltenheit",
+        "colValue": "Wert",
+        "rarity": {
+          "anomalous": "Anomal",
+          "rare": "Selten",
+          "uncommon": "Ungewöhnlich",
+          "common": "Häufig"
+        },
+        "timelineTitle": "Ereignis-Zeitachse",
+        "timelineHint": "Häufigkeit im ausgewählten Bereich",
+        "timelineEmpty": "Keine Daten",
+        "patternsTitle": "Protokollmuster",
+        "patternsHint": "Gruppiert nach ähnlicher Struktur",
+        "zScore": "z={value}",
+        "patternsEmpty": "Keine Muster für diesen Filter extrahiert",
+        "contextTitle": "Umgebende Ereignisse",
+        "contextHint": "Ereignisse in der Nähe dieses Zeitstempels",
+        "contextTooltip": "Andere Ereignisse aus diesem Stream in den 3 Minuten vor und nach diesem Ereignis — zeigt, was sonst noch im selben Moment geschah.",
+        "contextEmpty": "Keine umgebenden Ereignisse gefunden"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Alerts-Übersichtsbereich",
