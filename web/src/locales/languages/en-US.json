@@ -10945,6 +10945,10 @@
         "meta": "{count} items · updated {updated}",
         "loadError": "Failed to load dataset",
         "footerTitle": "Items",
+        "tabs": {
+          "items": "Items",
+          "experiments": "Experiments"
+        },
         "searchPlaceholder": "Search Items...",
         "columns": {
           "input": "Input (Purified)",

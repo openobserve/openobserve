@@ -33,15 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <OButton
-        variant="outline"
+        v-if="activeTab === 'experiments'"
+        variant="primary"
         size="sm"
         :disabled="!dataset"
-        data-test="ai-dataset-detail-experiments"
-        @click="openExperiments()"
+        data-test="ai-dataset-detail-new-experiment"
+        @click="openCreateExperiment"
       >
-        {{ t("aiObservability.experiments.viewAll") }}
+        {{ t("aiObservability.experiments.newButton") }}
       </OButton>
       <OButton
+        v-else
         variant="primary"
         size="sm"
         :disabled="!dataset"
@@ -52,136 +54,160 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
-    <div class="bg-card-glass-bg flex h-full min-h-0 flex-col" data-test="ai-dataset-detail-body">
-      <OTable
-        data-test="ai-dataset-detail-items-table"
-        :data="items"
-        :columns="columns"
-        row-key="id"
-        :loading="loading"
-        show-index
-        :footer-title="t('aiObservability.datasets.detail.footerTitle')"
-        :global-filter="search"
-        :show-global-filter="false"
-        pagination="server"
-        :current-page="currentPage"
-        :total-count="totalItems"
-        :page-size="pageSize"
-        :page-size-options="pageSizeOptions"
-        :default-columns="false"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="ai-dataset-items"
-        width="100%"
-        class="h-full w-full"
-        @update:current-page="onPageChange"
-        @update:page-size="onPageSizeChange"
-        @row-click="openItemDetail"
-      >
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="ai-dataset-detail-refresh-btn"
-            @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" />
-          </OButton>
-        </template>
-
-        <template #toolbar>
-          <OSearchInput
-            v-model="search"
-            class="min-w-0 flex-1"
-            :placeholder="t('aiObservability.datasets.detail.searchPlaceholder')"
-            data-test="ai-dataset-detail-search-input"
-            clearable
-          />
-        </template>
-
-        <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              size="hero"
-              preset="no-dataset-items"
-              :filtered="Boolean(search)"
-              data-test="ai-dataset-detail-empty-state"
-              @action="openAddItem"
-            />
-          </div>
-        </template>
-
-        <!-- Show the message CONTENT; the role envelope is kept in the stored
-             value but only adds noise in a two-line cell. -->
-        <template #cell-input="{ row }">
-          <span class="text-text-body line-clamp-2">{{ row.inputPreview }}</span>
-        </template>
-
-        <template #cell-expectedOutput="{ row }">
-          <span class="text-text-body line-clamp-2">{{ row.expectedOutput ?? "—" }}</span>
-        </template>
-
-        <template #cell-source="{ row }">
-          <OTag :variant="sourceVariant(row.source)" shape="rounded" class="shrink-0">
-            {{ t(`aiObservability.datasets.source.${row.source}`) }}
-          </OTag>
-        </template>
-
-        <template #cell-tags="{ row }">
-          <div v-if="row.tags.length" class="flex flex-wrap items-center gap-1">
-            <OTag
-              v-for="tag in row.tags"
-              :key="tag"
-              variant="default-soft"
-              shape="rounded"
-              class="shrink-0"
-            >
-              {{ tag }}
-            </OTag>
-          </div>
-          <span v-else class="text-text-secondary">—</span>
-        </template>
-
-        <template #cell-version="{ row }">
-          <span class="tabular-nums">{{ versionLabel(row.version) }}</span>
-        </template>
-
-        <template #cell-actions="{ row }">
-          <div class="actions-container flex items-center justify-center">
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
-              :data-test="`ai-dataset-detail-item-edit-${row.id}`"
-              @click.stop="openEditItem(row)"
-            >
-              <OTooltip side="bottom" :content="t('common.edit')" />
-            </OButton>
-            <OButton
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete"
-              :data-test="`ai-dataset-detail-item-delete-${row.id}`"
-              @click.stop="removeItem(row)"
-            >
-              <OTooltip side="bottom" :content="t('common.delete')" />
-            </OButton>
-          </div>
-        </template>
-      </OTable>
-      <div v-if="dataset" class="border-border-default max-h-80 overflow-y-auto border-t p-4">
-        <ExperimentBrowser
-          :org-id="orgId"
-          :experiments="experiments"
-          :datasets="dataset ? [dataset] : []"
-          :details="experimentDetails"
-          :fixed-dataset-id="datasetId"
-          compact
-          @open-filtered="openExperiments"
+    <template #subnav>
+      <OTabs v-model="activeTab" data-test="ai-dataset-detail-tabs">
+        <OTab
+          name="items"
+          :label="t('aiObservability.datasets.detail.tabs.items')"
+          data-test="ai-dataset-detail-tab-items"
         />
-      </div>
+        <OTab
+          name="experiments"
+          :label="t('aiObservability.datasets.detail.tabs.experiments')"
+          data-test="ai-dataset-detail-tab-experiments"
+        />
+      </OTabs>
+    </template>
+
+    <div class="bg-card-glass-bg flex h-full min-h-0 flex-col" data-test="ai-dataset-detail-body">
+      <OTabPanels :model-value="activeTab" grow class="flex min-h-0 flex-col">
+        <OTabPanel name="items" layout="flex-col" stretch>
+          <OTable
+            data-test="ai-dataset-detail-items-table"
+            :data="items"
+            :columns="columns"
+            row-key="id"
+            :loading="loading"
+            show-index
+            :footer-title="t('aiObservability.datasets.detail.footerTitle')"
+            :global-filter="search"
+            :show-global-filter="false"
+            pagination="server"
+            :current-page="currentPage"
+            :total-count="totalItems"
+            :page-size="pageSize"
+            :page-size-options="pageSizeOptions"
+            :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="ai-dataset-items"
+            width="100%"
+            class="h-full w-full"
+            @update:current-page="onPageChange"
+            @update:page-size="onPageSizeChange"
+            @row-click="openItemDetail"
+          >
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="loading"
+                data-test="ai-dataset-detail-refresh-btn"
+                @click="refresh"
+              >
+                <OTooltip side="bottom" :content="t('common.refresh')" />
+              </OButton>
+            </template>
+
+            <template #toolbar>
+              <OSearchInput
+                v-model="search"
+                class="min-w-0 flex-1"
+                :placeholder="t('aiObservability.datasets.detail.searchPlaceholder')"
+                data-test="ai-dataset-detail-search-input"
+                clearable
+              />
+            </template>
+
+            <template #empty>
+              <div class="flex items-center justify-center py-8">
+                <OEmptyState
+                  size="hero"
+                  preset="no-dataset-items"
+                  :filtered="Boolean(search)"
+                  data-test="ai-dataset-detail-empty-state"
+                  @action="openAddItem"
+                />
+              </div>
+            </template>
+
+            <!-- Show the message CONTENT; the role envelope is kept in the stored
+             value but only adds noise in a two-line cell. -->
+            <template #cell-input="{ row }">
+              <span class="text-text-body line-clamp-2">{{ row.inputPreview }}</span>
+            </template>
+
+            <template #cell-expectedOutput="{ row }">
+              <span class="text-text-body line-clamp-2">{{ row.expectedOutput ?? "—" }}</span>
+            </template>
+
+            <template #cell-source="{ row }">
+              <OTag :variant="sourceVariant(row.source)" shape="rounded" class="shrink-0">
+                {{ t(`aiObservability.datasets.source.${row.source}`) }}
+              </OTag>
+            </template>
+
+            <template #cell-tags="{ row }">
+              <div v-if="row.tags.length" class="flex flex-wrap items-center gap-1">
+                <OTag
+                  v-for="tag in row.tags"
+                  :key="tag"
+                  variant="default-soft"
+                  shape="rounded"
+                  class="shrink-0"
+                >
+                  {{ tag }}
+                </OTag>
+              </div>
+              <span v-else class="text-text-secondary">—</span>
+            </template>
+
+            <template #cell-version="{ row }">
+              <span class="tabular-nums">{{ versionLabel(row.version) }}</span>
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="actions-container flex items-center justify-center">
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="edit"
+                  :data-test="`ai-dataset-detail-item-edit-${row.id}`"
+                  @click.stop="openEditItem(row)"
+                >
+                  <OTooltip side="bottom" :content="t('common.edit')" />
+                </OButton>
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  icon-left="delete"
+                  :data-test="`ai-dataset-detail-item-delete-${row.id}`"
+                  @click.stop="removeItem(row)"
+                >
+                  <OTooltip side="bottom" :content="t('common.delete')" />
+                </OButton>
+              </div>
+            </template>
+          </OTable>
+        </OTabPanel>
+
+        <OTabPanel name="experiments" layout="flex-col" stretch>
+          <OContent y class="min-h-0 flex-1 overflow-y-auto">
+            <ExperimentBrowser
+              v-if="dataset"
+              :org-id="orgId"
+              :experiments="experiments"
+              :datasets="[dataset]"
+              :details="experimentDetails"
+              :fixed-dataset-id="datasetId"
+              :loading="loading"
+              compact
+              @open-filtered="openExperiments"
+            />
+          </OContent>
+        </OTabPanel>
+      </OTabPanels>
     </div>
 
     <!-- Item detail — the app convention for an entity detail view. Mounted only
@@ -286,6 +312,11 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -308,7 +339,7 @@ import llmExperimentsService, {
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
 import { fetchExperimentDetails } from "./experimentDiscovery";
-import { aiExperimentsRoute } from "./experimentRoutes";
+import { aiExperimentCreateRoute, aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIDatasetDetailPage" });
 
@@ -327,6 +358,7 @@ const experiments = ref<LlmExperiment[]>([]);
 const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const loading = ref(false);
 const search = ref("");
+const activeTab = ref<"items" | "experiments">("items");
 
 // The items endpoint pages server-side (size 1..100), so the table does too.
 const currentPage = ref(1);
@@ -455,6 +487,10 @@ async function refreshExperiments() {
 
 function openExperiments() {
   router.push(aiExperimentsRoute(orgId.value, { datasetId: datasetId.value }));
+}
+
+function openCreateExperiment() {
+  router.push(aiExperimentCreateRoute(orgId.value, { datasetId: datasetId.value }));
 }
 
 function onPageChange(page: number) {
