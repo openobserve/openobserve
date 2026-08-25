@@ -837,6 +837,31 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
+        // Avoid materializing one `rate()` output sample per source series and
+        // evaluation timestamp when the parent immediately sums those values.
+        // Keep this as a narrow AST optimization so the generic evaluator remains
+        // the correctness fallback for every other expression shape.
+        if op.id() == token::T_SUM
+            && let PromExpr::Call(Call { func, args }) = expr
+            && func.name == "rate"
+            && args.len() == 1
+        {
+            let range_arg = args
+                .last()
+                .expect("promql-parser validated the rate argument");
+            let range_input = self.exec_expr(&range_arg).await?;
+            log::info!(
+                "[trace_id: {}] [PromQL Timing] selected fused sum(rate()) evaluator",
+                self.trace_id,
+            );
+            return aggregations::fused_range_sum(
+                modifier,
+                range_input,
+                functions::RateFunc::new(),
+                &self.eval_ctx,
+            );
+        }
+
         let input = self.exec_expr(expr).await?;
 
         let eval_ctx = self.eval_ctx.clone();

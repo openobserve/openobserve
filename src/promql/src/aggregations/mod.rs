@@ -49,7 +49,7 @@ pub(crate) use min::min;
 pub(crate) use quantile::quantile;
 pub(crate) use stddev::stddev;
 pub(crate) use stdvar::stdvar;
-pub(crate) use sum::sum;
+pub(crate) use sum::{fused_range_sum, sum};
 pub(crate) use topk::topk;
 
 /// Series per parallel partial-aggregation chunk when a single group is large.

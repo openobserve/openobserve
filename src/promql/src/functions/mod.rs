@@ -73,7 +73,7 @@ pub(crate) use max_over_time::max_over_time;
 pub(crate) use min_over_time::min_over_time;
 pub(crate) use predict_linear::predict_linear;
 pub(crate) use quantile_over_time::quantile_over_time;
-pub(crate) use rate::rate;
+pub(crate) use rate::{RateFunc, rate};
 pub(crate) use resets::resets;
 pub(crate) use scalar::scalar;
 pub(crate) use stddev_over_time::stddev_over_time;
@@ -221,9 +221,12 @@ where
 
     let data = match data {
         Value::Matrix(v) => {
+            let input_samples = v.iter().map(|series| series.samples.len()).sum::<usize>();
             log::info!(
-                "[trace_id: {trace_id}] [PromQL Timing] eval_range({func_name}) processing {} series",
-                v.len()
+                "[trace_id: {trace_id}] [PromQL Timing] eval_range({func_name}) processing {} series, {} input samples, {} sample payload bytes",
+                v.len(),
+                input_samples,
+                input_samples * std::mem::size_of::<Sample>(),
             );
             v
         }
@@ -293,10 +296,20 @@ where
         })
         .collect();
 
+    let output_samples = results
+        .iter()
+        .map(|series| series.samples.len())
+        .sum::<usize>();
+    let output_capacity_bytes = results
+        .iter()
+        .map(|series| series.samples.capacity() * std::mem::size_of::<Sample>())
+        .sum::<usize>();
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] eval_range({func_name}) completed in {:?}, produced {} series",
+        "[trace_id: {trace_id}] [PromQL Timing] eval_range({func_name}) completed in {:?}, produced {} series, {} samples, {} allocated sample bytes",
         start.elapsed(),
-        results.len()
+        results.len(),
+        output_samples,
+        output_capacity_bytes,
     );
     Ok(Value::Matrix(results))
 }
@@ -305,7 +318,7 @@ where
 /// evaluation windows. This preserves the inclusive `[window_start,
 /// window_end]` bounds previously implemented with two `partition_point`
 /// calls per window.
-fn advance_sample_window<'a>(
+pub(crate) fn advance_sample_window<'a>(
     samples: &'a [Sample],
     window_start: i64,
     window_end: i64,

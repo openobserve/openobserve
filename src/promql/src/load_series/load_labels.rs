@@ -413,6 +413,66 @@ mod tests {
         assert!(metrics[&22].labels.is_empty());
     }
 
+    #[tokio::test]
+    async fn test_hash_run_sample_owners_match_datafusion_label_partitions() {
+        let sample_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new("value", DataType::Float64, false),
+        ]));
+        let sample_batch = RecordBatch::try_new(
+            sample_schema,
+            vec![
+                Arc::new(Int64Array::from(vec![100, 100, 200, 200])),
+                Arc::new(UInt64Array::from(vec![11, 22, 11, 22])),
+                Arc::new(Float64Array::from(vec![1.0, 2.0, 3.0, 4.0])),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new_with_config(
+            SessionConfig::new()
+                .with_target_partitions(4)
+                .with_batch_size(2),
+        );
+        let sample_df = ctx.read_batch(sample_batch).unwrap();
+        let (metrics, _) =
+            load_samples_from_datafusion("test", &DataType::UInt64, sample_df, false, 1, 0)
+                .await
+                .unwrap();
+
+        let label_schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new("instance", DataType::Utf8, false),
+        ]));
+        let label_batch = RecordBatch::try_new(
+            label_schema,
+            vec![
+                Arc::new(UInt64Array::from(vec![11, 22])),
+                Arc::new(StringArray::from(vec!["one", "two"])),
+            ],
+        )
+        .unwrap();
+        let label_df = ctx.read_batch(label_batch).unwrap();
+        let metrics = load_labels(
+            "test",
+            &DataType::UInt64,
+            label_df,
+            false,
+            None,
+            None,
+            metrics,
+        )
+        .await
+        .unwrap();
+        let metrics = metrics
+            .into_iter()
+            .flat_map(HashMap::into_iter)
+            .collect::<HashMap<_, _>>();
+
+        assert_eq!(metrics[&11].labels[0].value, "one");
+        assert_eq!(metrics[&22].labels[0].value, "two");
+    }
+
     #[test]
     fn test_label_interner_disables_low_reuse_columns() {
         let mut unique_interner = LabelInterner::new("instance".to_string());
@@ -503,7 +563,7 @@ mod tests {
         .unwrap();
         let sample_df = ctx.read_batch(sample_batch).unwrap();
         let (metrics, _) =
-            load_samples_from_datafusion("test", &DataType::UInt64, sample_df, false)
+            load_samples_from_datafusion("test", &DataType::UInt64, sample_df, false, 1, 0)
                 .await
                 .unwrap();
         let label_df = ctx.read_batch(label_batch).unwrap();
