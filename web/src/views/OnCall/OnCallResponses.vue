@@ -784,8 +784,12 @@ const ESCALATION_DETAIL_LIMIT = 25;
  * The three states a reader triages by, in the order they matter.
  *
  * These are not the wire's `ResponseState`: "ringing" is an escalating record
- * that nobody has claimed and nothing is snoozing, which is three fields rather
- * than one, and it is the only distinction that changes what somebody does next.
+ * that nobody has claimed, nothing is snoozing, and the ladder has not already
+ * exhausted — four fields rather than one, and it is the only distinction that
+ * changes what somebody does next. The last of those matters because a ladder
+ * with nobody behind it (a priority with no channels) exhausts the instant it
+ * opens, yet the wire state stays `triggered` forever — there is no backend
+ * state for "gave up" — so `state` alone cannot answer "is this still paging".
  */
 const SECTION_ORDER = ["ringing", "snoozed", "handled"] as const;
 
@@ -1182,10 +1186,23 @@ const myShift = computed(() => {
   };
 });
 
-// Only an escalating page can be claimed. A row with nothing left to claim
-// offers no button rather than one that errors.
+/// Whether an escalating record can still reach anybody. The ladder can exhaust
+/// with nobody left to ring — a priority with no channels behind it does this
+/// the instant its page opens — and from then on the wire `state` alone (still
+/// `triggered` forever; there is no backend state for "the ladder gave up")
+/// can no longer be trusted to mean "ringing". Unknown while the ladder detail
+/// has not loaded yet — first paint, or past ESCALATION_DETAIL_LIMIT — defaults
+/// to still-ringing, so a genuinely live page is never hidden for lack of a
+/// fetch.
+function isStillRinging(record: OnCallResponse): boolean {
+  return !(progressById.value[record.id]?.exhausted ?? false);
+}
+
+// Only an escalating page that could still reach somebody can be claimed. One
+// whose ladder already exhausted with nobody left offers no button rather than
+// one that promises to notify somebody it never will.
 function canAcknowledge(row: PageRow): boolean {
-  return row.escalating.length > 0;
+  return row.escalating.some((r) => isStillRinging(r));
 }
 
 /// Anything under the row still open. A group stands for every firing beneath
@@ -1368,7 +1385,9 @@ async function acknowledgeAllRinging() {
 /// group standing for ninety-five firings lands where its live ones do: a group
 /// with anything still ringing is ringing, whatever its latest firing says.
 function rowSection(row: PageRow): SectionKey {
-  if (row.escalating.some((r) => !r.acked_by && !isSnoozed(r))) return "ringing";
+  if (row.escalating.some((r) => !r.acked_by && !isSnoozed(r) && isStillRinging(r))) {
+    return "ringing";
+  }
   if (row.firings.some((r) => isSnoozed(r))) return "snoozed";
   return "handled";
 }
