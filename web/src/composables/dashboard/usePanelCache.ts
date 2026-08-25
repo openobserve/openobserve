@@ -266,6 +266,27 @@ export const usePanelCache = (
  * memory and on disk. Called when the panel itself is deleted: otherwise its
  * payload sits in IndexedDB until the 24 h TTL or the record cap reclaims it.
  */
+/**
+ * Drop every cached panel result under one dashboard, in memory and on disk.
+ * Called when the dashboard itself is deleted — panel-level pruning never runs
+ * for panels that go down with their dashboard, so without this their payloads
+ * sit orphaned in IndexedDB until the 24 h TTL reclaims them.
+ */
+export const dropDashboardPanelCache = async (
+  org: string,
+  folderId: string,
+  dashboardId: string,
+): Promise<void> => {
+  try {
+    const dashboardPrefix = panelKeys.dashboard(org, folderId, dashboardId);
+    queryClient.removeQueries({ queryKey: dashboardPrefix });
+    const hashPrefix = hashKey(dashboardPrefix).replace(/\]$/, ",");
+    await cacheRemoveByPrefix(`${IDB_PREFIX}-${hashPrefix}`);
+  } catch (error) {
+    console.error("Error dropping dashboard panel cache:", error);
+  }
+};
+
 export const dropPanelCache = async (
   org: string,
   folderId: string,

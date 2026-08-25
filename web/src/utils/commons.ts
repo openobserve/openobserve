@@ -21,7 +21,7 @@ import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { folderKeys } from "@/services/common.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
-import { dropPanelCache } from "@/composables/dashboard/usePanelCache";
+import { dropDashboardPanelCache, dropPanelCache } from "@/composables/dashboard/usePanelCache";
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
@@ -748,6 +748,12 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
 
   pruneDashboardQueryCache(store, folderId, [dashboardId]);
 
+  await dropDashboardPanelCache(
+    store.state.selectedOrganization.identifier,
+    folderId,
+    dashboardId,
+  );
+
   const allDashboardData = store.state.organizationData.allDashboardData;
 
   if (allDashboardData[dashboardId]) {
@@ -784,6 +790,9 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
 
   idsByFolder.forEach((ids, folderId) => {
     pruneDashboardQueryCache(store, folderId, ids);
+    for (const id of ids) {
+      void dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, id);
+    }
 
     const cached = next[folderId];
     if (!Array.isArray(cached)) return; // folder never fetched — nothing stale
