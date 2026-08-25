@@ -8,17 +8,22 @@
 /**
  * Playground run contract.
  *
- * `POST /api/{org}/playground/run` does not exist yet. This module owns the
- * shape we are asking backend for AND a deterministic mock adapter, so the UI
- * can be built and tested against the real code path today. Flip
- * `PLAYGROUND_USE_MOCK` when the route ships — nothing upstream changes.
+ * Speaks to `POST /api/{org}/playground/run`, which streams Server-Sent
+ * Events. The server is the source of truth for this shape: it nests the
+ * request under `column`/`row`, discriminates frames on a `type` field inside
+ * the data payload rather than an `event:` line, and passes `tools` and
+ * `responseFormat` through to the provider verbatim — so the wire shaping for
+ * those lives here, keyed on the provider's type.
+ *
+ * The mock adapter below stays for tests and for working offline; flip
+ * `PLAYGROUND_USE_MOCK` to reach it.
  */
 
 import store from "@/stores";
 import { attemptTokenRefresh } from "@/services/http";
 
-/** Flip to `false` once `POST /api/{org}/playground/run` is live. */
-export const PLAYGROUND_USE_MOCK = true;
+/** Set true to run against the deterministic mock instead of the live route. */
+export const PLAYGROUND_USE_MOCK = false;
 
 export type PlaygroundMessageRole = "system" | "user" | "assistant" | "tool";
 
@@ -36,7 +41,13 @@ export interface PlaygroundRequestTool {
 
 export interface PlaygroundRunRequest {
   providerId: string;
+  /** Decides how `tools` and `responseSchema` are shaped for the wire. Absent
+   *  is treated as OpenAI-compatible, which is what every provider kind the
+   *  server does not special-case falls back to. */
+  providerType?: string;
   model: string;
+  /** Already rendered: `{{tokens}}` are substituted client-side, so the server
+   *  binds nothing and `row` is omitted from the request. */
   messages: PlaygroundRequestMessage[];
   params: { temperature?: number; maxTokens?: number };
   /** Definitions only. The Playground never executes a tool — see `toolCall`. */
@@ -86,7 +97,107 @@ export function runPlayground(
   request: PlaygroundRunRequest,
   options: PlaygroundRunOptions,
 ): Promise<PlaygroundRunResult> {
-  return PLAYGROUND_USE_MOCK ? runMock(request, options) : runLive(orgId, request, options);
+  return PLAYGROUND_USE_MOCK
+    ? runPlaygroundMock(request, options)
+    : runLive(orgId, request, options);
+}
+
+// ── wire shaping ──────────────────────────────────────────────────
+
+/** Provider kinds the server does NOT route through its OpenAI-compatible body
+ *  builder. Everything else — OpenAI, DeepSeek, Azure, gateways, the test mock
+ *  — takes the `chat/completions` shape. */
+const ANTHROPIC_KIND = "anthropic";
+
+function providerKind(request: PlaygroundRunRequest): string {
+  return (request.providerType ?? "").trim().toLowerCase();
+}
+
+/**
+ * Tool definitions in the provider's own shape.
+ *
+ * The server merges this straight into the provider request body, so the shape
+ * has to be the provider's, not ours: OpenAI nests under `function`, Anthropic
+ * takes the schema flat as `input_schema`.
+ */
+function wireTools(request: PlaygroundRunRequest): unknown[] | undefined {
+  const tools = request.tools?.filter((tool) => tool.name.trim().length > 0);
+  if (!tools?.length) return undefined;
+
+  if (providerKind(request) === ANTHROPIC_KIND) {
+    return tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.parameters,
+    }));
+  }
+  return tools.map((tool) => ({
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    },
+  }));
+}
+
+/**
+ * The response-format field, or undefined when this provider has none.
+ *
+ * Anthropic has no `response_format`; structured output there is expressed as a
+ * forced tool call, which the Playground has no UI for. Sending the schema
+ * anyway would earn a provider 400, so it is dropped and reported.
+ */
+function wireResponseFormat(request: PlaygroundRunRequest): unknown | undefined {
+  if (!request.responseSchema) return undefined;
+  if (providerKind(request) === ANTHROPIC_KIND) return undefined;
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: "playground_response",
+      schema: request.responseSchema,
+      strict: false,
+    },
+  };
+}
+
+/** True when a response schema was asked for but this provider cannot carry it. */
+export function dropsResponseSchema(request: PlaygroundRunRequest): boolean {
+  return Boolean(request.responseSchema) && providerKind(request) === ANTHROPIC_KIND;
+}
+
+/**
+ * The request body the server accepts.
+ *
+ * `column` rejects unknown fields, so nothing may be added here that the server
+ * does not declare. `row` is omitted entirely: the client has already bound
+ * every `{{token}}`, and handing the server an input to bind again would run
+ * the substitution twice.
+ */
+function wireBody(request: PlaygroundRunRequest): Record<string, unknown> {
+  const column: Record<string, unknown> = {
+    providerId: request.providerId,
+    messages: request.messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
+    params: {
+      temperature: request.params.temperature ?? 0,
+      ...(request.params.maxTokens ? { max_tokens: request.params.maxTokens } : {}),
+    },
+  };
+
+  // An empty model would fail the server's model validation; omitting it lets
+  // the provider's configured default stand in.
+  if (request.model) column.model = request.model;
+
+  const tools = wireTools(request);
+  if (tools) column.tools = tools;
+
+  const responseFormat = wireResponseFormat(request);
+  if (responseFormat) column.responseFormat = responseFormat;
+
+  return { column };
 }
 
 // ── live adapter ──────────────────────────────────────────────────
@@ -106,7 +217,7 @@ async function runLive(
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify(request),
+    body: JSON.stringify(wireBody(request)),
     signal,
   };
 
@@ -115,9 +226,13 @@ async function runLive(
     await attemptTokenRefresh(url);
     response = await fetch(url, fetchOptions);
   }
+
+  // Everything the server can reject before the stream opens arrives as a real
+  // status with a message worth showing — an unresolved template variable, a
+  // provider that is gone, a model the provider will not serve.
   if (!response.ok) {
     throw new PlaygroundRunError(
-      `Playground run failed with status ${response.status}`,
+      await failureMessage(response),
       response.status === 429 || response.status >= 500,
     );
   }
@@ -142,23 +257,42 @@ async function runLive(
     buffer = frames.pop() ?? "";
 
     for (const frame of frames) {
-      const parsed = parseFrame(frame);
-      if (!parsed) continue;
-      if (parsed.event === "delta" && typeof parsed.data.text === "string") {
-        text += parsed.data.text;
-        onDelta(parsed.data.text);
-      } else if (parsed.event === "tool") {
-        toolCall = {
-          name: String(parsed.data.name ?? ""),
-          arguments: String(parsed.data.arguments ?? ""),
-        };
-      } else if (parsed.event === "usage") {
-        usage = normalizeUsage(parsed.data);
-      } else if (parsed.event === "error") {
-        throw new PlaygroundRunError(
-          String(parsed.data.message ?? "Playground run failed"),
-          parsed.data.retryable === true,
-        );
+      const data = parseFrame(frame);
+      if (!data) continue;
+
+      switch (data.type) {
+        case "delta": {
+          const chunk = String(data.content ?? "");
+          if (chunk) {
+            text += chunk;
+            onDelta(chunk);
+          }
+          break;
+        }
+        case "toolCall":
+          // The model may emit several; the cell shows one, so the first wins.
+          if (!toolCall) {
+            toolCall = {
+              name: String(data.name ?? ""),
+              arguments: String(data.arguments ?? ""),
+            };
+          }
+          break;
+        case "done":
+          usage = normalizeUsage(data);
+          break;
+        case "error":
+          // Once the stream is open the server has no status code left, so an
+          // error frame is the only failure channel. Treat it as retryable:
+          // these are provider hiccups mid-call, not rejected requests.
+          throw new PlaygroundRunError(
+            String(data.error ?? "Playground run failed"),
+            true,
+          );
+        // `rendered` carries the prompt exactly as sent. The bench already
+        // renders it locally, so it is accepted and ignored.
+        default:
+          break;
       }
     }
   }
@@ -166,27 +300,54 @@ async function runLive(
   return { text, toolCall, usage: usage ?? emptyUsage() };
 }
 
-function parseFrame(frame: string): { event: string; data: Record<string, unknown> } | null {
-  let event = "message";
+/** The server's error message, falling back to the bare status. */
+async function failureMessage(response: Response): Promise<string> {
+  try {
+    const body = await response.text();
+    const parsed = JSON.parse(body) as { message?: unknown; error?: unknown };
+    const message = parsed.message ?? parsed.error;
+    if (typeof message === "string" && message.trim()) return message;
+  } catch {
+    // Not JSON, or the body was already consumed — fall through.
+  }
+  return `Playground run failed with status ${response.status}`;
+}
+
+/**
+ * Pull the JSON out of one SSE frame.
+ *
+ * The server sends `data:` lines only and puts the discriminator inside the
+ * payload as `type`, so any `event:` line is ignored rather than trusted.
+ */
+function parseFrame(frame: string): Record<string, unknown> | null {
   const dataLines: string[] = [];
   for (const line of frame.split("\n")) {
-    if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
   }
   if (dataLines.length === 0) return null;
+
+  const payload = dataLines.join("\n");
+  if (!payload || payload === "[DONE]") return null;
   try {
-    return { event, data: JSON.parse(dataLines.join("\n")) as Record<string, unknown> };
+    return JSON.parse(payload) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
+/**
+ * Read the `done` frame's accounting.
+ *
+ * `cost` is null whenever the provider withheld token counts or no pricing is
+ * registered for the model, which reads as a zero in the cost strip.
+ */
 function normalizeUsage(data: Record<string, unknown>): PlaygroundRunUsage {
+  const usage = (data.usage ?? {}) as Record<string, unknown>;
   return {
-    promptTokens: Number(data.promptTokens ?? data.prompt_tokens ?? 0),
-    completionTokens: Number(data.completionTokens ?? data.completion_tokens ?? 0),
-    costUsd: Number(data.costUsd ?? data.cost_usd ?? 0),
-    latencyMs: Number(data.latencyMs ?? data.latency_ms ?? 0),
+    promptTokens: Number(usage.promptTokens ?? 0),
+    completionTokens: Number(usage.completionTokens ?? 0),
+    costUsd: Number(usage.cost ?? 0),
+    latencyMs: Number(data.latencyMs ?? 0),
   };
 }
 
@@ -261,7 +422,7 @@ function mockBody(request: PlaygroundRunRequest, random: () => number): string {
  * completion, a terminal tool call, and a retryable provider failure. Timers
  * are plain `setTimeout`, so a test drives it with fake timers.
  */
-function runMock(
+export function runPlaygroundMock(
   request: PlaygroundRunRequest,
   { onDelta, signal }: PlaygroundRunOptions,
 ): Promise<PlaygroundRunResult> {

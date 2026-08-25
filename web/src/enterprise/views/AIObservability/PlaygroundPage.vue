@@ -527,12 +527,16 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
   const messages = renderedMessages(variant, vars)
     .filter((message) => message.content.trim().length > 0)
     .map((message) => ({ role: message.role, content: message.content }));
+  // The provider's type decides how tools and the response schema are shaped
+  // for the wire — the server forwards both to the provider untouched.
+  const provider = providers.value.find((candidate) => candidate.id === variant.providerId);
 
   try {
     const result = await runPlayground(
       orgId.value,
       {
         providerId: variant.providerId,
+        providerType: provider?.providerType ?? provider?.provider_type,
         model: variant.model,
         messages,
         params: { temperature: Number(variant.temperature) || 0 },
