@@ -399,9 +399,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("oncall.liaisonTag") }}
             </OTag>
-            <OTag v-if="row.latest.incident_id" variant="amber-soft" size="sm">
-              {{ raw(row.latest.incident_id) }}
-            </OTag>
+            <router-link
+              v-if="row.latest.incident_id"
+              :to="{
+                name: 'incidentDetail',
+                params: { id: row.latest.incident_id },
+                query: { org_identifier: orgId },
+              }"
+              :data-test="`oncall-row-incident-${row.rowKey}`"
+              @click.stop
+            >
+              <ODimensionChip
+                dim-key="incident"
+                :key-label="String(t('oncall.incident'))"
+                :value="row.latest.incident_id"
+                tooltip
+              />
+            </router-link>
           </span>
         </span>
       </template>
@@ -701,6 +715,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
