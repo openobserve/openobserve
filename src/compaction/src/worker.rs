@@ -19,6 +19,7 @@ use config::{
     cluster::is_offline,
     meta::stream::{FileKey, StreamType},
 };
+use search::datafusion::merge::MergeMode;
 use tokio::sync::{Mutex, mpsc};
 
 #[derive(Clone)]
@@ -29,6 +30,8 @@ pub struct MergeBatch {
     pub stream_name: String,
     pub prefix: String,
     pub files: Vec<FileKey>,
+    /// What the merge produces; decided by the scheduler, read by the worker.
+    pub mode: MergeMode,
 }
 
 pub struct MergeResult {
@@ -212,6 +215,7 @@ impl MergeWorker {
                                 &msg.stream_name,
                                 &msg.prefix,
                                 &msg.files,
+                                &msg.mode,
                             )
                             .await
                             {

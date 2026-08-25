@@ -188,7 +188,11 @@ const specificFields = computed<Record<string, unknown>>(() => {
 // is clear (these nest into the same `meta`, after the common ones) without
 // repeating the common block. Kept valid JSON so the editor never flags it.
 const specificText = computed(() =>
-  JSON.stringify({ meta: { "...": "common fields above", ...specificFields.value } }, null, 2),
+  JSON.stringify(
+    { meta: { "...": t("workflow.commonFieldsAbove"), ...specificFields.value } },
+    null,
+    2,
+  ),
 );
 const hasSpecific = computed(() => Object.keys(specificFields.value).length > 0);
 

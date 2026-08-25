@@ -88,7 +88,10 @@ import PrivateLocationDetail from "./PrivateLocationDetail.vue";
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OTable: {
-    template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
+    // `emptyMessage` is surfaced as an attribute so tests can assert on the
+    // message a table would show for no rows.
+    template:
+      '<div :data-test="$attrs[\'data-test\']" :data-empty-message="emptyMessage"><slot /></div>',
     props: [
       "data",
       "columns",
@@ -112,6 +115,10 @@ const baseStubs = {
   OTag: {
     template: '<span class="otag-stub"><slot /></span>',
     props: ["size", "shape", "variant"],
+  },
+  OTooltip: {
+    template: '<span class="otooltip-stub" :data-content="content"><slot /></span>',
+    props: ["content"],
   },
   OIcon: {
     template: "<span />",
@@ -233,6 +240,75 @@ describe("PrivateLocationDetail", () => {
       await flushPromises();
 
       expect(wrapper.text()).toContain("US West Private");
+    });
+  });
+
+  /**
+   * Agents register with one region and their rows never replicate, so this
+   * page can load a location whose agents are alive in another region. It used
+   * to render "Pending · 2/3 agents · no agents registered" from local data it
+   * simply does not have.
+   */
+  describe("live status this region cannot see", () => {
+    beforeEach(() => {
+      mockServiceGetLocation.mockResolvedValue({
+        data: {
+          ...defaultDetail.data,
+          status: "pending",
+          live_status_unknown: true,
+          live_agents: 0,
+          agents_total: 0,
+        },
+      });
+    });
+
+    it("should badge the location unknown, with the reason attached", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      const tooltip = wrapper.find(".otooltip-stub");
+      expect(tooltip.text()).toBe("synthetics.privateLocations.status.unknown");
+      expect(tooltip.attributes("data-content")).toBe(
+        "synthetics.privateLocations.status.unknownHint",
+      );
+    });
+
+    it("should withhold the agent count instead of reporting zero", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(wrapper.text()).not.toContain("0/0");
+      expect(wrapper.text()).toContain("—");
+    });
+
+    it("should not tell the user no agent has ever registered", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      const agentsTable = wrapper.find('[data-test="synthetics-private-location-agents-table"]');
+      expect(agentsTable.attributes("data-empty-message")).toBe(
+        "synthetics.privateLocations.detail.agentsUnavailable",
+      );
+    });
+
+    /** A server without super cluster never sends the flag. */
+    it("should be unchanged when the flag is absent", async () => {
+      mockServiceGetLocation.mockResolvedValue({
+        data: { ...defaultDetail.data, status: "pending", live_agents: 0, agents_total: 0 },
+      });
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(wrapper.find(".otooltip-stub").exists()).toBe(false);
+      expect(wrapper.find(".obadge-stub").text()).toBe(
+        "synthetics.privateLocations.status.pending",
+      );
+      expect(wrapper.text()).toContain("0/0");
+      expect(
+        wrapper
+          .find('[data-test="synthetics-private-location-agents-table"]')
+          .attributes("data-empty-message"),
+      ).toBe("synthetics.privateLocations.detail.noAgents");
     });
   });
 

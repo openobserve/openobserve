@@ -64,9 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageHeader>
 
     <div class="flex min-h-0 flex-1 gap-2 px-2 pt-3">
-      <!-- Read-only canvas (per-node run status overlay). -->
+      <!-- Read-only canvas (per-node run status overlay). The SAME results dock as
+           the editor docks the step Input/Output below the canvas once a run is
+           loaded (read-only here) — instead of the old overlay drawer. -->
       <div class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden">
-        <WorkflowCanvas />
+        <WorkflowResultsDock>
+          <WorkflowCanvas />
+        </WorkflowResultsDock>
       </div>
 
       <!-- Persistent runs list (master-detail). -->
@@ -85,12 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Test input popup — a fresh dry-run of the current graph, launched from the
          header. Results paint on the read-only canvas (switching it out of the
-         selected historical run). -->
+         selected historical run) and open in the results dock above. -->
     <WorkflowTestDialog v-if="workflowObj.testRun.show" />
-
-    <!-- Per-step Input/Output result drawer — opened by clicking a node's badge.
-         Read-only for a historical run; editable + replayable for a live test. -->
-    <WorkflowStepResultDrawer v-if="workflowObj.testRun.resultDrawer.show" />
   </div>
 </template>
 
@@ -106,7 +106,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
-import WorkflowStepResultDrawer from "./WorkflowStepResultDrawer.vue";
+import WorkflowResultsDock from "./WorkflowResultsDock.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowRunsPanel from "./WorkflowRunsPanel.vue";
 import useWorkflowCanvas, {

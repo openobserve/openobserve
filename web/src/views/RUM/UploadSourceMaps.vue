@@ -169,7 +169,8 @@ const uploadSourceMaps = async (value: UploadSourceMapsForm) => {
     console.error("Error uploading source maps:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.message || error?.message || "Failed to upload source maps",
+      message:
+        error?.response?.data?.message || error?.message || t("rum.failedToUploadSourceMaps"),
     });
   }
 };

@@ -15,7 +15,8 @@
 
 import { toZonedTime } from "date-fns-tz";
 import { PromQLResponse, ProcessedPromQLData, AggregationFunction } from "./types";
-import { getPromqlLegendName } from "./legendBuilder";
+import { buildPromqlSeriesNames } from "./legendBuilder";
+import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 
 /**
  * Preprocess PromQL responses into a common format for chart converters
@@ -36,6 +37,20 @@ export async function processPromQLData(
   const seriesLimit = panelSchema.config?.promql_series_limit || 100;
   const limitedData = applySeriesLimit(searchQueryData, seriesLimit);
 
+  // Named through the same builder the line/bar path uses, so a panel flipped
+  // from Line to Stacked keeps its legend, its tooltip and its per-series colour
+  // keys instead of reverting to the raw label set.
+  const seriesNames = buildPromqlSeriesNames(
+    limitedData.map((queryData: any, index: number) => ({
+      metrics: ((queryData?.data?.result || queryData?.result) ?? [])
+        .map((metric: any) => metric?.metric)
+        .filter(Boolean),
+      template: panelSchema.queries?.[index]?.config?.promql_legend,
+      fallback: panelSchema.queries?.[index]?.config?.promql_legend_fallback,
+    })),
+    getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
+  );
+
   // Collect all unique timestamps across all queries
   const allTimestamps = collectAllTimestamps(limitedData);
 
@@ -52,11 +67,7 @@ export async function processPromQLData(
     }
 
     const series = resultData.map((metric: any) => {
-      // Generate series name using legend template
-      const seriesName = getPromqlLegendName(
-        metric.metric,
-        panelSchema.queries[index]?.config?.promql_legend,
-      );
+      const seriesName = seriesNames.get(metric.metric) ?? "";
 
       // Extract values (matrix has values[], vector has value)
       const values = metric.values || (metric.value ? [metric.value] : []);

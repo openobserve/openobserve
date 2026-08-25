@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+import { gt } from "@/types/i18n";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
@@ -170,7 +171,7 @@ export function useLLMStreamQuery() {
               body.error ||
               body.error_detail ||
               response?.message ||
-              "Failed to fetch query data";
+              gt("traces.failedToFetchQueryData");
             const err: any = new Error(message);
             err.status = body.status ?? response?.status;
             err.code = body.code ?? response?.code;

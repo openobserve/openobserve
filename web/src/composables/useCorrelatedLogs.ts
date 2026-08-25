@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nText } from "@/types/i18n";
+import type { I18nText, TranslateFn } from "@/types/i18n";
 
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useStore } from "vuex";
@@ -85,7 +85,7 @@ export interface SearchResponse {
  * - Handle filter updates and refetching
  * - Cancel in-flight requests on component unmount
  */
-export function useCorrelatedLogs(props: CorrelatedLogsProps) {
+export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
   const store = useStore();
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
     useHttpStreamingSearch();
@@ -208,7 +208,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     // Validate that we have log streams
     if (!props.logStreams || props.logStreams.length === 0) {
       console.error("[useCorrelatedLogs] No log streams available");
-      error.value = "No log stream available for correlation";
+      error.value = t("traces.noLogStreamForCorrelation");
       return;
     }
 
@@ -288,7 +288,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
           },
           error: (_data: any, response: any) => {
             console.error("[useCorrelatedLogs] Stream error:", response);
-            error.value = response.content?.message || "Failed to fetch correlated logs";
+            error.value = response.content?.message || t("traces.failedToFetchCorrelatedLogs");
             loading.value = false;
             searchResults.value = [];
             totalHits.value = 0;
@@ -312,7 +312,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
         response: e?.response?.data,
         status: e?.response?.status,
       });
-      error.value = e?.response?.data?.message || e.message || "Failed to fetch correlated logs";
+      error.value =
+        e?.response?.data?.message || e.message || t("traces.failedToFetchCorrelatedLogs");
 
       // Clear results on error
       searchResults.value = [];

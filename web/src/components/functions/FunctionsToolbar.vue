@@ -105,7 +105,7 @@
                     <template #content>
                       <div class="flex flex-col">
                         <div class="mb-1 font-semibold">
-                          {{ t("function.javascript") }} {{ t("function.tipLabel") }}
+                          {{ raw("JavaScript") }} {{ t("function.tipLabel") }}
                         </div>
                         <div>{{ t("function.jsFunctionHint") }}</div>
                       </div>
@@ -129,7 +129,7 @@
               <template #content>
                 <div class="flex flex-col">
                   <div class="mb-1 font-semibold">
-                    {{ transTypeValue === "1" ? t("function.javascript") : t("function.vrl") }}
+                    {{ transTypeValue === "1" ? raw("JavaScript") : t("function.vrl") }}
                     {{ t("function.tipLabel") }}
                   </div>
                   <div>
@@ -157,7 +157,7 @@
         size="icon-sm"
         @click="emit('open:chat', !store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
-        class="rounded-default transition-[background,box-shadow] duration-300 ease-in-out ![background:var(--color-gradient-ai-subtle)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] hover:![background:var(--color-gradient-ai)]"
+        class="rounded-default hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-in-out ![background:var(--color-gradient-ai-subtle)] hover:shadow-md hover:![background:var(--color-gradient-ai)]"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         :disabled="isSubmitting"
         @mouseenter="isHovered = true"

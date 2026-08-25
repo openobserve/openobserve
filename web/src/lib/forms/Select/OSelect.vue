@@ -1111,7 +1111,7 @@ const fieldWidthClass = computed(() => {
                     /* Keep the red error border on focus; focus border color applies only when there's no error. */
                     'focus:outline-none',
                     'transition-[color,background-color,border-color,box-shadow] duration-150',
-                    'disabled:bg-select-disabled-bg disabled:cursor-not-allowed disabled:border-dashed',
+                    'disabled:bg-select-disabled-bg disabled:border-select-disabled-border disabled:cursor-not-allowed disabled:border-dashed',
                     labelPosition === 'inside' && label
                       ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
                       : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
@@ -1289,7 +1289,7 @@ const fieldWidthClass = computed(() => {
               <!-- Single bordered container wrapping search + list -->
               <div
                 :class="[
-                  'rounded-default border-input-border overflow-hidden border',
+                  'rounded-default border-dropdown-border overflow-hidden border',
                   'bg-select-content-bg flex min-h-0 flex-1 flex-col',
                 ]"
               >
@@ -1301,7 +1301,7 @@ const fieldWidthClass = computed(() => {
                   :class="[
                     'text-input-text w-full shrink-0 bg-transparent px-3',
                     'placeholder:text-input-placeholder outline-none',
-                    'border-input-border border-b',
+                    'border-dropdown-border border-b',
                     heightClasses[size ?? 'md'],
                   ]"
                   :placeholder="resolvedSearchPlaceholder"
@@ -1547,8 +1547,13 @@ const fieldWidthClass = computed(() => {
                           >
                             <div class="flex w-full flex-col gap-1 overflow-hidden">
                               <span class="flex w-full items-center gap-1.5 leading-snug">
+                                <!-- The weight is what separates a label from the
+                                     sub-label under it. With no sub-label there is
+                                     nothing to separate from, and every option in
+                                     the list reading bold emphasises nothing. -->
                                 <span
-                                  class="truncate font-medium"
+                                  class="truncate"
+                                  :class="filteredOptions[vRow.index].subLabel ? 'font-medium' : ''"
                                   :title="
                                     optionTooltip ? filteredOptions[vRow.index].label : undefined
                                   "
@@ -1556,7 +1561,7 @@ const fieldWidthClass = computed(() => {
                                 >
                                 <span
                                   v-if="filteredOptions[vRow.index].badge"
-                                  class="rounded-default shrink-0 border border-solid"
+                                  class="rounded-default text-status-positive border-status-positive shrink-0 border border-solid"
                                   :class="[
                                     filteredOptions[vRow.index].badgeTitle
                                       ? 'cursor-help'
@@ -1566,12 +1571,7 @@ const fieldWidthClass = computed(() => {
                                       : 'text-3xs px-1 py-px leading-tight font-medium',
                                   ]"
                                   :title="filteredOptions[vRow.index].badgeTitle"
-                                  :style="
-                                    filteredOptions[vRow.index].badgeStyle ?? {
-                                      color: 'var(--color-status-positive)',
-                                      borderColor: 'var(--color-status-positive)',
-                                    }
-                                  "
+                                  :style="filteredOptions[vRow.index].badgeStyle"
                                   >{{ filteredOptions[vRow.index].badge }}</span
                                 >
                               </span>
@@ -1716,7 +1716,7 @@ const fieldWidthClass = computed(() => {
                   /* Keep the red error border on focus; focus border color applies only when there's no error. */
                   'focus:outline-none',
                   'transition-[color,background-color,border-color,box-shadow] duration-150',
-                  'data-disabled:bg-select-disabled-bg data-disabled:cursor-not-allowed data-disabled:border-dashed',
+                  'data-disabled:bg-select-disabled-bg data-disabled:border-select-disabled-border data-disabled:cursor-not-allowed data-disabled:border-dashed',
                   labelPosition === 'inside' && label
                     ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
                     : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],

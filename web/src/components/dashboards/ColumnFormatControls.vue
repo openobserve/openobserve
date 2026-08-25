@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="divide-y divide-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)]">
+  <div class="divide-border-strong/8 divide-y">
     <!-- Field type -->
     <div class="px-3 py-2">
       <div
@@ -106,9 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="button"
         class="rounded-default hover:border-accent mt-3 inline-flex cursor-pointer items-center gap-2 border px-2.5 py-1.5 text-left transition-colors"
         :class="
-          col.autoColor
-            ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_7%,transparent)]'
-            : 'border-[color-mix(in_srgb,var(--color-grey-500)_28%,transparent)] bg-transparent'
+          col.autoColor ? 'border-accent bg-accent/7' : 'border-border-strong/28 bg-transparent'
         "
         :data-test="`o2-format-unique-color-${col.field}`"
         @click="colModel.autoColor = !colModel.autoColor"
@@ -134,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="rounded-default mb-1.5 flex flex-col gap-2 border border-[color-mix(in_srgb,var(--color-grey-500)_10%,transparent)] bg-[color-mix(in_srgb,var(--color-grey-500)_4%,transparent)] px-2.5 py-2"
+        class="rounded-default border-border-strong/10 bg-border-strong/4 mb-1.5 flex flex-col gap-2 border px-2.5 py-2"
       >
         <div class="flex flex-wrap items-center gap-2">
           <span

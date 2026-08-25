@@ -25,7 +25,10 @@ use config::{
     utils::time::now_micros,
 };
 use db::authz::{remove_ownership, set_ownership};
-use infra::{db::ORM_CLIENT, table::anomaly_detection::config as anomaly_config_table};
+use infra::{
+    db::ORM_CLIENT,
+    table::{anomaly_detection::config as anomaly_config_table, get_lock},
+};
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use search_service as search;
 use serde::{Deserialize, Serialize};
@@ -153,6 +156,7 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
             folder_id: DEFAULT_FOLDER.to_owned(),
             name: "default".to_owned(),
             description: "default".to_owned(),
+            icon: None,
         };
         if crate::folders::save_folder(org_id, folder, FolderType::Alerts, true)
             .await
@@ -692,7 +696,11 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     let updated = active_model.update(db).await?;
+    // released before the retrain/scheduler follow-ups below, which take this lock themselves
+    drop(_lock);
 
     // Evict any cached model for this config — training params may have changed,
     // so the next detection run should load a fresh model from S3.
@@ -1078,7 +1086,10 @@ async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<(
     active.status = Set(0i32);
     active.is_trained = Set(false);
     active.updated_at = Set(Utc::now().timestamp_micros());
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     active.update(db).await?;
+    drop(_lock);
 
     // Nudge the training scheduler so the retrain fires promptly rather than on its next
     // periodic sweep.
@@ -1111,6 +1122,8 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     active.training_started_at = Set(None);
     active.last_error = Set(Some("Training cancelled by user.".to_string()));
     active.updated_at = Set(Utc::now().timestamp_micros());
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     active.update(db).await?;
 
     log::info!("[anomaly_detection {anomaly_id}] training cancelled by user");

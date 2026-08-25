@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Reset Button -->
               <div
-                class="group/resetChip border-border-default hover:border-error-400 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 hover:-translate-y-px hover:rotate-180 hover:border-solid hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:opacity-100"
+                class="group/resetChip border-border-default hover:border-error-400 hover:bg-error-500/10 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 hover:-translate-y-px hover:rotate-180 hover:border-solid hover:opacity-100"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
@@ -1021,9 +1021,11 @@ export default defineComponent({
                 }),
               });
 
-              await configService.get_config().then((res: any) => {
-                store.dispatch("setConfig", res.data);
-              });
+              await configService
+                .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
+                .then((res: any) => {
+                  store.dispatch("setConfig", res.data);
+                });
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1080,9 +1082,11 @@ export default defineComponent({
               }),
             });
 
-            await configService.get_config().then((res: any) => {
-              store.dispatch("setConfig", res.data);
-            });
+            await configService
+              .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
+              .then((res: any) => {
+                store.dispatch("setConfig", res.data);
+              });
           } else {
             toast({
               variant: "error",

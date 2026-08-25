@@ -1202,9 +1202,12 @@ export class AlertsPage {
 
     /**
      * Assert an alert with the given name is visible on the list table.
+     * The table paginates at 20 rows, so a freshly created alert is often on a
+     * later page — narrow the list to it first, exactly as clickAlertUpdateButton does.
      * @param {string} name
      */
     async expectAlertVisibleInList(name) {
+        await this.searchAlert(name);
         const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
         await expect(row).toBeVisible({ timeout: 15000 });
         testLogger.info('Alert visible on list', { name });
@@ -1421,13 +1424,25 @@ export class AlertsPage {
         ).first();
         const tabVisible = await folderTab.isVisible({ timeout: 10000 }).catch(() => false);
         if (tabVisible) {
-            // Force-click past the reflow, retrying, until the tab reports data-state="active".
-            // Re-clicking each iteration self-heals a click that landed mid-animation; the
-            // active-state assertion is the real completion signal (activeFolderId switched).
+            // Force-click past the reflow until data-state="active". But data-state flips
+            // before activeFolderId (AlertList.vue) settles, and the "New alert" route reads
+            // activeFolderId — so a createAlert() right after can create in the stale "default"
+            // folder. Also gate on the folder-scoped list refetch (GET .../alerts?...folder=<id>,
+            // id != "default"), which only fires once activeFolderId has actually flipped.
             await expect(async () => {
                 if ((await folderTab.getAttribute('data-state')) !== 'active') {
                     await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                    const scopedListSettled = folderName === 'default'
+                        ? Promise.resolve()
+                        : this.page.waitForResponse(
+                            resp => resp.request().method() === 'GET'
+                                && resp.url().includes('/alerts?')
+                                && /[?&]folder=/.test(resp.url())
+                                && !/[?&]folder=default(?:&|$)/.test(resp.url()),
+                            { timeout: 8000 }
+                          ).catch(() => {});
                     await folderTab.click({ force: true, timeout: 5000 });
+                    await scopedListSettled;
                 }
                 await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
             }).toPass({ timeout: 30000 });
@@ -2764,6 +2779,16 @@ export class AlertsPage {
             await expect(exportBtn).toBeEnabled({ timeout: 3000 });
         }).toPass({ timeout: 30000 });
         await exportBtn.click();
+
+        // Export no longer downloads on click: it opens a dialog offering the same
+        // definition as JSON or as a Terraform resource, and the file is written
+        // when Download is pressed there. The dialog opens on JSON, which is the
+        // format this test reads back, so no tab switch is needed.
+        const exportDialog = this.page.locator('[data-test="alert-export-dialog"]');
+        await expect(exportDialog).toBeVisible({ timeout: 15000 });
+        testLogger.info('Export dialog opened');
+        await exportDialog.locator('[data-test="o-dialog-primary-btn"]').click();
+
         await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 

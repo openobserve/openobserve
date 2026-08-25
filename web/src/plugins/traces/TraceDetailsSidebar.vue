@@ -392,13 +392,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel v-if="canPreviewSpan" name="preview" class="llm-preview-panel p-3">
           <div class="llm-preview-container h-full! w-full overflow-hidden overflow-x-auto">
             <!-- Input and Output Side by Side -->
-            <div class="io-container flex h-full! w-full!" ref="ioContainerRef">
+            <div
+              class="io-container flex h-full! w-full!"
+              :class="isFullscreen ? 'bg-surface-panel' : ''"
+              ref="ioContainerRef"
+            >
               <!-- Input Section -->
               <div
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pr-2"
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
                   <div class="flex items-center gap-1">
@@ -471,6 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
                   <div class="flex items-center gap-1">
@@ -707,7 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <OTabPanel name="database" class="h-full p-0">
-          <DbSpanDetails :span="span" />
+          <DbSpanDetails :span="span" :stream="streamName" />
         </OTabPanel>
 
         <OTabPanel name="links">
@@ -722,6 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(col, index) in linkColumns"
                     :key="'result_' + index"
                     :data-test="`trace-events-table-th-${col.label}`"
+                    class="bg-border-default"
                   >
                     {{ col.label }}
                   </th>
@@ -865,7 +872,7 @@ import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
@@ -1034,7 +1041,10 @@ export default defineComponent({
       events: [],
     });
 
-    const { hasSpanError, hasExceptionEvents } = useTraceDetails(computed(() => props.span));
+    const { hasSpanError, hasExceptionEvents } = useTraceDetails(
+      computed(() => props.span),
+      t,
+    );
 
     const spanHttpResendCount = computed(() => {
       const attrs = props.span;
@@ -1205,14 +1215,14 @@ export default defineComponent({
     const tagColumns = [
       {
         name: "field",
-        label: "Field",
+        label: t("traces.traceDetailsSidebar.field"),
         field: "field",
         align: "left" as const,
         headerClasses: "text-left!",
       },
       {
         name: "value",
-        label: "Value",
+        label: t("traces.traceDetailsSidebar.value"),
         field: "value",
         align: "left" as const,
         headerClasses: "text-left!",
@@ -1293,7 +1303,7 @@ export default defineComponent({
             store.state.timezone,
             HUMAN_TZ_FORMAT,
           ),
-        label: "Timestamp",
+        label: t("traces.traceDetailsSidebar.timestamp"),
         align: "left" as const,
         sortable: true,
       },
@@ -1385,14 +1395,14 @@ export default defineComponent({
       {
         name: "traceId",
         prop: (row: any) => (row.context ? row?.context?.traceId : ""),
-        label: "TraceId",
+        label: raw("TraceId"),
         align: "left",
         sortable: true,
       },
       {
         name: "spanId",
         prop: (row: any) => (row.context ? row?.context?.spanId : ""),
-        label: "spanId",
+        label: raw("spanId"),
         align: "left",
         sortable: true,
       },
@@ -2006,7 +2016,7 @@ export default defineComponent({
 
     // Format model parameters for display
     const formatModelParams = (params: any) => {
-      return formatModelParameters(params);
+      return formatModelParameters(params, t);
     };
 
     const serviceIconUrl = computed(() =>
@@ -2162,7 +2172,6 @@ export default defineComponent({
   }
 
   th {
-    background-color: var(--color-surface-panel);
   }
 
   th:first-child,
@@ -2238,7 +2247,6 @@ export default defineComponent({
 /* complex-state — :fullscreen chains on the LLM input/output panes */
 .llm-preview-container {
   .io-container:fullscreen {
-    background-color: var(--color-surface-panel);
     padding: 0.75rem;
     height: 100vh;
     max-height: 100vh;
@@ -2252,7 +2260,6 @@ export default defineComponent({
       flex-direction: column;
 
       .section-label {
-        background: var(--color-surface-panel);
         border-radius: var(--radius-default);
       }
 
@@ -2304,7 +2311,6 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: var(--color-grey-200);
 }
 
 .thead-sticky tr:last-child > * {

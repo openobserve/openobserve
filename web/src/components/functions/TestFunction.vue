@@ -355,7 +355,7 @@ const outputEventsErrorMsg = ref<string>("");
 // JavaScript function failed as VRL. Reactive so flipping the toggle re-labels
 // an error already on screen.
 const functionLanguage = computed(() =>
-  isJsFunction(props.vrlFunction) ? t("function.javascript") : t("function.vrl"),
+  isJsFunction(props.vrlFunction) ? raw("JavaScript") : t("function.vrl"),
 );
 
 const loading = ref({
@@ -418,6 +418,7 @@ const { placeholder: queryEditorPlaceholder } = useQueryPlaceholder(
   ref({}),
   isSqlMode,
   noStream,
+  t,
   { noStreamText: t("pipeline.queryEditorPlaceholder") },
 );
 
@@ -596,7 +597,7 @@ const getResults = async () => {
     .catch((err: any) => {
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
-        : "Invalid SQL Query";
+        : t("functions.invalidSqlQuery");
 
       // Locate the offending token in the SQL and squiggle it in the editor.
       rangesFromServerError({
@@ -628,7 +629,7 @@ const isInputValid = () => {
     JSON.parse(inputEvents.value);
     return true;
   } catch (e: any) {
-    eventsErrorMsg.value = `Invalid events: ${e?.message}`;
+    eventsErrorMsg.value = t("functions.invalidEvents", { error: e?.message });
     toast({
       variant: "error",
       message: raw(eventsErrorMsg.value),
@@ -664,7 +665,7 @@ const processTestResults = async (results: any) => {
 };
 
 const handleTestError = (err: any) => {
-  const rawErrMsg = err.response?.data?.message || "Error in testing function";
+  const rawErrMsg = err.response?.data?.message || t("functions.testFunctionError");
 
   // Display the raw error message from the backend without modification
   // The backend now extracts detailed error information from rquickjs

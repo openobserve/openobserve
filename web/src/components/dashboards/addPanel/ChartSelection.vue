@@ -40,7 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="mx-auto my-2 h-6 w-6"
+              class="mx-auto my-2 scheme-light dark:scheme-dark"
+              :class="item.id === 'maps' ? 'h-6 w-8' : 'h-6 w-6'"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
             <OTooltip class="text-center" :content="item.title" />
@@ -70,87 +71,87 @@ export default defineComponent({
     // array of charts
     const chartsArray = ref([
       {
-        image: "img:" + getImageURL("images/dashboard/charts/area.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/area.svg"),
         title: t("dashboard.areaLabel"),
         id: "area",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/area-graph.svg"),
         title: t("dashboard.areaStackedLabel"),
         id: "area-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/bar-chart.svg"),
         title: t("dashboard.barLabel"),
         id: "bar",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/bar-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/bar-graph.svg"),
         title: t("dashboard.horizontalLabel"),
         id: "h-bar",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/line-chart.svg"),
         title: t("dashboard.lineLabel"),
         id: "line",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/scatter-graph.svg"),
         title: t("dashboard.scatterLabel"),
         id: "scatter",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/stacked.svg"),
         title: t("dashboard.stackedLabel"),
         id: "stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.svg"),
         title: t("dashboard.hstackedLabel"),
         id: "h-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/geomap.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/geomap.svg"),
         title: t("dashboard.geomapLabel"),
         id: "geomap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/world-map.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/world-map.svg"),
         title: t("dashboard.worldmapLabel"),
         id: "maps",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/pie-chart.svg"),
         title: t("dashboard.pieLabel"),
         id: "pie",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.svg"),
         title: t("dashboard.donutLabel"),
         id: "donut",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/heatmap.svg"),
         title: t("dashboard.heatmapLabel"),
         id: "heatmap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/table.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/table.svg"),
         title: t("dashboard.tableLabel"),
         id: "table",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/123.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/123.svg"),
         title: t("dashboard.metricTextLabel"),
         id: "metric",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/Gauge.svg"),
         title: t("dashboard.chartSelection.gauge"),
         id: "gauge",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/HTML.svg"),
         title: t("dashboard.chartSelection.html"),
         id: "html",
       },
@@ -165,7 +166,7 @@ export default defineComponent({
         id: "sankey",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/chart.svg"),
         title: t("dashboard.chartSelection.customChart"),
         id: "custom_chart",
       },

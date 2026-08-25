@@ -33,6 +33,14 @@ export type BadgeVariant =
   | "primary-soft"
   | "success-soft"
   | "warning-soft"
+  /**
+   * Attention that is COMMON. Reads as amber in light, where the warning
+   * ramp is pale-on-deep and stays tasteful at a dozen per screen; goes
+   * neutral in dark, where the same ramp is full-chroma against near-black
+   * and a dozen of them become the page background. Tint the icon separately
+   * when the state still needs a colour in both themes.
+   */
+  | "warning-quiet"
   | "error-soft"
   // Extended color families for correlation dimensions.
   | "teal"

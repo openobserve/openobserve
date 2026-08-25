@@ -405,59 +405,21 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
   // ============================================================================
 
   /**
-   * Email Destination Tests - SKIPPED
+   * Email destination coverage lives in dl-email-destinations.spec.js.
    *
-   * NOTE: These tests are currently skipped because:
-   * 1. SMTP is not configured in the test environment
-   * 2. Email destinations require a working mail server to validate
-   * 3. The test environment does not have email infrastructure set up
+   * Two email tests used to sit here, skipped for "the test environment does not
+   * have email infrastructure set up". That over-stated the dependency: creating,
+   * editing, deleting and validating an email destination needs SMTP switched on,
+   * not a readable mailbox. They are now active there, asserting stored state via
+   * the API rather than only the UI:
    *
-   * To enable these tests:
-   * - Configure SMTP settings in the test environment
-   * - Set up a test email server or use a mock SMTP service
-   * - Update environment variables: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD
+   *   create with a single recipient ....... D-01 (also asserts it appears in the list)
+   *   edit to ADD recipients ............... D-07
+   *   edit to REMOVE recipients ............ ML-08
+   *   delete the destination ............... UI-12
+   *   validate email address format ........ UI-02
    *
-   * Test coverage when enabled:
-   * - Create email destination with single recipient
-   * - Create email destination with multiple recipients
-   * - Edit email destination - add/remove recipients
-   * - Validate email address format
-   * - Verify multiple recipients are preserved in edit mode
+   * That spec also tiers its cases, so only true delivery assertions need a mail
+   * sink; everything above runs anywhere SMTP is enabled.
    */
-  test.skip("Email - Create and edit destination (SMTP not configured)", {
-    tag: ['@prebuiltDestinations', '@email', '@P1', '@skip']
-  }, async ({ page }) => {
-    testLogger.info('===== EMAIL TEST: SKIPPED - SMTP not configured =====');
-
-    const destinationName = `auto_dest_email_${sharedRandomValue}`;
-    const recipients = process.env["ZO_ROOT_USER_EMAIL"];
-    const additionalRecipients = `${process.env["ZO_ROOT_USER_EMAIL"]}, test@example.com`;
-
-    // Create Email destination
-    await pm.alertDestinationsPage.createEmailDestination(destinationName, recipients);
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-    testLogger.info('✓ Email destination created');
-
-    // Edit and add recipients
-    await pm.alertDestinationsPage.editEmailDestination(destinationName, additionalRecipients);
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-    testLogger.info('✓ Email destination recipients updated');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-    testLogger.info('✓ Email destination deleted');
-  });
-
-  test.skip("Email - Validate email address format (SMTP not configured)", {
-    tag: ['@prebuiltDestinations', '@email', '@validation', '@P1', '@skip']
-  }, async ({ page }) => {
-    testLogger.info('===== EMAIL VALIDATION TEST: SKIPPED - SMTP not configured =====');
-
-    await pm.alertDestinationsPage.clickNewDestination();
-    await pm.alertDestinationsPage.selectDestinationType('email');
-    await pm.alertDestinationsPage.fillEmailRecipients('invalid-email-format');
-    await pm.alertDestinationsPage.expectValidationError();
-    testLogger.info('✓ Email validation working');
-    await pm.alertDestinationsPage.clickCancel();
-  });
 });

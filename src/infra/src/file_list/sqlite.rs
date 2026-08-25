@@ -440,6 +440,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         stream_type: StreamType,
         stream_name: &str,
         date_range: (String, String),
+        max_original_size: i64,
     ) -> Result<Vec<FileKey>> {
         let (date_start, date_end) = date_range;
         if date_start.is_empty() && date_end.is_empty() {
@@ -447,8 +448,6 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         }
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let cfg = get_config();
-        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
@@ -460,7 +459,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
-            .bind(max_size)
+            .bind(max_original_size)
             .fetch_all(&pool)
             .await;
         Ok(ret?.iter().map(|r| r.into()).collect())
@@ -1613,11 +1612,31 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             return Ok(());
         }
 
+        // Ensure partitions exist for all distinct date keys before batch INSERT
+        let add_items = files
+            .iter()
+            .filter(|v| {
+                if v.deleted {
+                    false
+                } else if v.meta.min_ts == 0 || v.meta.max_ts == 0 {
+                    log::warn!("[SQLITE] min_ts or max_ts is 0 for file: {}", v.key);
+                    false
+                } else {
+                    match parse_file_key_columns(&v.key) {
+                        Ok(_) => true,
+                        Err(_) => {
+                            log::error!("[SQLITE] parse file key failed for file: {}", v.key);
+                            false
+                        }
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
 
-        let add_items = files.iter().filter(|f| !f.deleted).collect::<Vec<_>>();
         if !add_items.is_empty() {
             let chunks = add_items.chunks(100);
             for files in chunks {
@@ -1627,16 +1646,9 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
-                    let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
-                    else {
-                        log::error!("[SQLITE] parse file key failed for file: {}", item.key);
-                        return;
-                    };
+                    let (stream_key, date_key, file_name) =
+                        parse_file_key_columns(&item.key).unwrap();
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                    if item.meta.min_ts == 0 || item.meta.max_ts == 0 {
-                        log::warn!("[SQLITE] min_ts or max_ts is 0 for file: {}", item.key);
-                        return;
-                    }
                     b.push_bind(id)
                         .push_bind(&item.account)
                         .push_bind(org_id)
@@ -2167,12 +2179,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_batch_add_with_id_unimplemented() {
+    async fn test_batch_add_with_id_skips_invalid_file_key() {
         let sqlite_list = SqliteFileList::new();
         let files = vec![create_test_file_key("account1", "test/key", false)];
 
         let result = sqlite_list.batch_add_with_id(&files).await;
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     #[tokio::test]

@@ -49,6 +49,14 @@ export interface CodeBlockProps {
    */
   maxLines?: number;
   /**
+   * Show a line-number gutter, for code the reader needs to talk about or scan
+   * by position — a config file, a diff, an error pointing at a line.
+   *
+   * Ignored when `wrap` is set: a wrapped line occupies more rows than its
+   * number accounts for, so the two columns would drift apart.
+   */
+  lineNumbers?: boolean;
+  /**
    * data-test prefix for the toolbar buttons, e.g. "ai-code" yields
    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
    */

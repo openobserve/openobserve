@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="row.created_at"
               unit="us"
               :timezone="store.state.timezone"
-              :empty-label="t('pipeline.notAvailable')"
+              :empty-label="raw('N/A')"
             />
           </template>
 
@@ -325,7 +325,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -346,8 +346,9 @@ const errorDialogData = ref<BackfillJob | null>(null);
 // Confirm dialog
 const confirmDialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   onConfirm: () => {},
 });
 
@@ -536,8 +537,9 @@ const canDeleteJob = (status: string) => {
 const resetConfirmDialog = () => {
   confirmDialog.value = {
     show: false,
-    title: "",
-    message: "",
+    // raw("") resets the fields to the empty placeholder.
+    title: raw(""),
+    message: raw(""),
     onConfirm: () => {},
   };
 };
@@ -545,8 +547,10 @@ const resetConfirmDialog = () => {
 const confirmPauseJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Backfill Job",
-    message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
+    title: t("pipeline.backfillJobTitle"),
+    message: t("pipeline.confirmPauseBackfillJob", {
+      name: job.pipeline_name || job.pipeline_id,
+    }),
     onConfirm: () => pauseJob(job.pipeline_id, job.job_id),
   };
 };
@@ -554,8 +558,10 @@ const confirmPauseJob = (job: BackfillJob) => {
 const confirmResumeJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Resume Backfill Job",
-    message: `Are you sure you want to resume the backfill job for "${job.pipeline_name || job.pipeline_id}"?`,
+    title: t("pipeline.resumeBackfillJobTitle"),
+    message: t("pipeline.confirmResumeBackfillJob", {
+      name: job.pipeline_name || job.pipeline_id,
+    }),
     onConfirm: () => resumeJob(job.pipeline_id, job.job_id),
   };
 };
@@ -563,8 +569,10 @@ const confirmResumeJob = (job: BackfillJob) => {
 const confirmDeleteJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Delete Backfill Job",
-    message: `Are you sure you want to delete the backfill job for "${job.pipeline_name || job.pipeline_id}"? This will remove the job from the list but will not affect the backfilled data.`,
+    title: t("pipeline.deleteBackfillJobTitle"),
+    message: t("pipeline.confirmDeleteBackfillJob", {
+      name: job.pipeline_name || job.pipeline_id,
+    }),
     onConfirm: () => deleteJob(job.pipeline_id, job.job_id),
   };
 };
@@ -588,7 +596,7 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
     console.error("Error pausing backfill job:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.error || "Failed to pause backfill job",
+      message: error?.response?.data?.error || t("pipeline.pauseBackfillJobFailed"),
       timeout: 5000,
     });
   }
@@ -613,7 +621,7 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
     console.error("Error resuming backfill job:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.error || "Failed to resume backfill job",
+      message: error?.response?.data?.error || t("pipeline.resumeBackfillJobFailed"),
       timeout: 5000,
     });
   }
@@ -637,7 +645,7 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
     console.error("Error deleting backfill job:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.error || "Failed to delete backfill job",
+      message: error?.response?.data?.error || t("pipeline.deleteBackfillJobFailed"),
       timeout: 5000,
     });
   }

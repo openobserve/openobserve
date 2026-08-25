@@ -15,7 +15,7 @@
 
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -76,7 +76,7 @@ export const usePagination = () => {
   ) => {
     return new Promise((resolve, reject) => {
       if (searchObj.data.isOperationCancelled) {
-        notificationMsg.value = "Search operation is cancelled.";
+        notificationMsg.value = t("search.searchOperationCancelled");
 
         searchObj.loading = false;
         searchObj.data.isOperationCancelled = false;
@@ -406,7 +406,7 @@ export const usePagination = () => {
 
           let trace_id = "";
           searchObj.data.errorMsg =
-            typeof err == "string" && err ? err : "Error while processing histogram request.";
+            typeof err == "string" && err ? err : t("search.errorWhileProcessingHistogramRequest");
           if (err.response != undefined) {
             searchObj.data.errorMsg =
               err.response?.data?.error || err.response?.data?.message || "";
@@ -441,7 +441,7 @@ export const usePagination = () => {
           if (trace_id) {
             searchObj.data.errorMsg +=
               " <br><span class='text-subtitle1'>TraceID:" + trace_id + "</span>";
-            notificationMsg.value += " TraceID:" + trace_id;
+            notificationMsg.value += raw(" TraceID:") + trace_id;
             trace_id = "";
           }
 
@@ -642,7 +642,7 @@ export const usePagination = () => {
       }
     } catch (e: any) {
       console.log("Error while refreshing partition pagination", e);
-      notificationMsg.value = "Error while refreshing partition pagination.";
+      notificationMsg.value = t("search.errorWhileRefreshingPartitionPagination");
       return false;
     }
     return;
@@ -766,7 +766,7 @@ export const usePagination = () => {
       // console.log("searchObj.data.queryResults.pagination", searchObj.data.queryResults.pagination);
     } catch (e: any) {
       console.log("Error while refreshing pagination", e);
-      notificationMsg.value = "Error while refreshing pagination.";
+      notificationMsg.value = t("search.errorWhileRefreshingPagination");
       return false;
     }
     return;

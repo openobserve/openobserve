@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon :name="tab.icon" :size="tab.iconSize" class="shrink-0" />
                 </template>
-                {{ t(tab.labelKey) }}
+                {{ "label" in tab ? raw(tab.label) : t(tab.labelKey) }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
-              class="unified-search-group rounded-default mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
+              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <!-- Search Results Navigation -->
               <div
-                class="rounded-default border-input-border dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
+                class="rounded-default border-border-default dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
               >
                 <div
                   class="flex items-center gap-[0.0625rem] px-1 text-xs font-medium select-none"
@@ -797,15 +797,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Map View with Pattern/Span Toggle -->
             <div v-if="activeTab === 'map'" class="flex h-full min-h-0 w-full flex-1 flex-col">
               <!-- Chart Container -->
-              <div class="flex min-h-0 flex-1 items-center justify-center">
-                <div class="h-full w-full p-2.5 text-center">
-                  <ChartRenderer
-                    ref="chartRendererRef"
-                    data-test="trace-details-service-map-chart"
-                    :data="traceServiceMapChartOptions"
-                    class="trace-chart-height h-50! min-h-50! w-full!"
-                  />
-                </div>
+              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
+                <ChartRenderer
+                  ref="chartRendererRef"
+                  data-test="trace-details-service-map-chart"
+                  :data="traceServiceMapChartOptions"
+                  class="h-full"
+                />
               </div>
             </div>
           </div>
@@ -996,7 +994,9 @@ const TRACE_TAB_DEFS = [
   { value: "waterfall", labelKey: "traces.waterfall", icon: "align-left", iconSize: "sm" },
   { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
   { value: "map", labelKey: "traces.traceGraph", icon: "account-tree", iconSize: "sm" },
-  { value: "dag", labelKey: "traces.dag", icon: "git-branch", iconSize: "sm" },
+  // `label` overrides `labelKey`: DAG is an acronym, and translating it produced
+  // "DÍA"/"JOUR"/"GIORNO" (day) in shipped locales.
+  { value: "dag", label: "DAG", icon: "git-branch", iconSize: "sm" },
   { value: "thread", labelKey: "traces.thread", icon: "chat", iconSize: "xs" },
 ] as const;
 
@@ -3060,14 +3060,5 @@ export default defineComponent({
 :global(body:has(.trace-details)),
 :global(html:has(.trace-details)) {
   overflow: hidden !important;
-}
-
-.dark .unified-search-group {
-  background-color: var(--color-surface-base);
-}
-
-.dark .unified-search-group:hover,
-.dark .unified-search-group:focus-within {
-  border-color: var(--color-theme-accent);
 }
 </style>

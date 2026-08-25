@@ -61,9 +61,27 @@
   --color-surface-chrome: color-mix(in srgb, var(--color-primary-50) 55%, var(--color-grey-50));
   --color-surface-chrome-deeper: var(--color-primary-100);
 
-  /* Borders */
-  --color-border-default: var(--color-grey-200);
+  /* Borders — three steps, chosen against WCAG 2.1 SC 1.4.11 (Non-text
+     Contrast), which asks for 3:1 on the visual boundary of a UI COMPONENT.
+     That bar applies to a boundary the user must perceive to operate the thing
+     (an input's edge is the only signal it is an input); it does not apply to a
+     decorative grouping line, so the three steps are held to different bars.
+
+     Contrast against a white surface:
+       subtle  #ededed  1.17:1   grouping only, never a control edge
+       default #d4d4d4  1.48:1   card / table / rail edges
+       control #949494  3.02:1   inputs, checkboxes, anything operable
+       strong  #a3a3a3  2.52:1   emphasis, not an accessibility guarantee
+
+     `default` was grey-200 (1.26:1) and read as barely-there on a white card;
+     grey-300 firms it without turning every card into a box. Controls get
+     their own token rather than borrowing `strong`, which does NOT reach 3:1
+     and would have quietly implied it did. */
+  --color-border-default: var(--color-grey-300);
   --color-border-strong: var(--color-grey-400);
+  /* The only border step that clears 3:1 in light mode. Use for the edge of
+     anything the user operates — input, select, checkbox, radio, textarea. */
+  --color-border-control: #949494;
   /* Soft divider — lighter than the structural border. Use for in-list row
      dividers and intra-card section splits. */
   --color-border-subtle: var(--color-grey-150);
@@ -128,12 +146,13 @@
   --color-surface-chrome: var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
-  /* Borders — only `default` is registered as an app-facing utility.
-     `strong` and `subtle` stay library-internal: defined in :root above and
-     consumed by component tokens (checkbox, file, datepicker, …) and via
-     `var(--color-border-strong)` in scoped CSS, but NOT registered here, so no
-     `border-border-strong` / `border-border-subtle` utility exists. */
+  /* Borders. `strong`/`subtle` were library-internal; reachable only as a raw
+     var() is the bypass the design guard blocks, and both flip in dark, so
+     nothing else substitutes. Registering makes them usable in a template. */
   --color-border-default: var(--color-border-default);
+  --color-border-strong: var(--color-border-strong);
+  --color-border-control: var(--color-border-control);
+  --color-border-subtle: var(--color-border-subtle);
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);
@@ -209,6 +228,9 @@
   /* Warning (re-exports from base.css) */
   --color-warning-50: var(--color-warning-50);
   --color-warning-100: var(--color-warning-100);
+  /* Warning banners' border step, paired with a warning-50 fill. The warning
+     ramp is semantic, so `border-warning-300` is sanctioned, not a bypass. */
+  --color-warning-300: var(--color-warning-300);
   --color-warning-400: var(--color-warning-400);
   --color-warning-500: var(--color-warning-500);
   --color-warning-600: var(--color-warning-600);
@@ -222,7 +244,26 @@
   --radius-full: var(--radius-full);
   --radius-checkbox: var(--radius-checkbox);
 
+  /* --- Shadows: the ONLY shadows the app has — geometry here, colour separate.
+     Templates compose the two: `shadow-md shadow-ai-accent/35`. Stylesheets
+     can't use a utility, so roles also publish a colourless `*-geom` half:
+         box-shadow: var(--shadow-glow-md-geom) color-mix(...);
+         { boxShadow: `var(--shadow-rail-geom) ${c}` }
+
+     Three rules, each learned from a shipped bug:
+     1. Never write `var(--glow-color, <fallback>)` here. A custom property is
+        substituted against :root, where --glow-color is unset, so the fallback
+        wins and inherits down — a descendant's override can never apply.
+     2. A bare `shadow-<colour>` applies in BOTH themes; a dark-only tint needs
+        `dark:shadow-<colour>`.
+     3. The -c colour tokens are per-theme — a new step needs a dark.css value
+        or it renders invisible there.
+
+     NOT shadows, though once written as one:
+         focus / selection ring   ->  ring-2 ring-<token>/40
+         1px bottom hairline      ->  border-b border-<token>              */
   /* eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom */
+  --shadow-xs: 0 1px 3px var(--shadow-xs-c);
   --shadow-sm: 0 2px 8px -2px var(--shadow-sm-c1), 0 1px 3px -1px var(--shadow-sm-c2);
   --shadow-md: 0 4px 12px -2px var(--shadow-md-c1), 0 2px 6px -2px var(--shadow-md-c2);
   --shadow-lg: 0 12px 24px -4px var(--shadow-lg-c1), 0 4px 8px -4px var(--shadow-lg-c2);
@@ -231,6 +272,49 @@
   --shadow-scroll-both:
     inset 0 8px 6px -6px var(--shadow-scroll-c), inset 0 -8px 6px -6px var(--shadow-scroll-c);
   --shadow-glow: 0 0 4px var(--shadow-glow-c);
+  /* Directional / inset roles — not points on the elevation scale, so they
+     cannot be expressed as one. */
+  --shadow-sticky-left-geom: 2px 0 4px -2px;
+  --shadow-sticky-right-geom: -2px 0 4px -2px;
+  --shadow-sticky-footer-geom: 0 -0.25rem 0.4375rem 0;
+  --shadow-rail-geom: inset 0.25rem 0 0 0;
+  --shadow-rail-thin-geom: inset 0.125rem 0 0 0;
+  --shadow-ring-hairline-geom: 0 0 0 0.0625rem;
+  --shadow-ring-hairline-inset-geom: inset 0 0 0 0.0625rem;
+  /* Pivot total column: an inner edge, plus an outer cast when it is also sticky. */
+  --shadow-pivot-edge-geom: inset 0.25rem 0 0.375rem -0.125rem;
+  --shadow-pivot-cast-geom: 0.25rem 0 0.5rem;
+  --shadow-sticky-left: var(--shadow-sticky-left-geom) var(--color-border-default);
+  --shadow-sticky-right: var(--shadow-sticky-right-geom) var(--color-border-default);
+  --shadow-sticky-footer: var(--shadow-sticky-footer-geom) var(--color-border-subtle);
+  --shadow-rail: var(--shadow-rail-geom) var(--color-border-default);
+  --shadow-ring-hairline: var(--shadow-ring-hairline-geom) var(--color-border-default);
+  /* Coloured glows at the elevation steps, for the three states the pipeline
+     canvas has to tell apart: resting, hovered, selected. */
+  --shadow-glow-sm-geom: 0 2px 8px;
+  --shadow-glow-md-geom: 0 4px 12px;
+  --shadow-glow-lg-geom: 0 6px 16px;
+  /* AI send button only — under-lit at the lg/sm steps. */
+  --shadow-glow-xl-geom: 0 6px 20px;
+  --shadow-glow-press-geom: 0 2px 10px;
+  /* Flattest step (trace pills) and the drag step (dashboard panels). */
+  --shadow-glow-2xs-geom: 0 1px 2px;
+  --shadow-glow-drag-geom: 0 8px 24px;
+  --shadow-glow-sm: var(--shadow-glow-sm-geom) color-mix(in srgb, rgb(0 0 0) 10%, transparent);
+  --shadow-glow-md: var(--shadow-glow-md-geom) color-mix(in srgb, rgb(0 0 0) 20%, transparent);
+  --shadow-glow-lg: var(--shadow-glow-lg-geom) color-mix(in srgb, rgb(0 0 0) 20%, transparent);
+  /* AI composer focus glow — three stacked layers (hairline, lift, accent
+     bloom). Dark gets its own values in dark.css: on a dark canvas the neutral
+     layers need far more alpha and the bloom needs more spread to read. */
+  --shadow-ai-focus:
+    0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
+    0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
+    0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent);
+  /* Same composer at rest — dimmer bloom, same three layers, same dark rule. */
+  --shadow-ai-composer:
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 6%, transparent),
+    0 0.5rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 12%, transparent),
+    0 1.125rem 2.75rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 30%, transparent);
   /* eslint-enable local/no-hardcoded-px */
 
   /* Code-syntax family. Registered so bg-syntax-bg / text-syntax-keyword etc.

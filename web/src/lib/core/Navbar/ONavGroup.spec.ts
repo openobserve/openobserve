@@ -42,7 +42,7 @@ const store = createStore({
 const i18n = createI18n({
   locale: "en",
   legacy: false,
-  messages: { en: {} },
+  messages: { en: { menu: { alerts: "Alerts" } } },
   missingWarn: false,
   fallbackWarn: false,
 });
@@ -114,6 +114,88 @@ describe("ONavGroup", () => {
     expect(flyout().exists()).toBe(true);
   });
 
+  // The Infra tile holds ONE child (Database Monitoring) behind the
+  // `databaseMonitoring` runtime gate. Rendering the tile regardless of its
+  // children would leave a dead "Infra" entry on every build with the feature
+  // off — it would open nothing, and clicking it would land on a page the route
+  // guard bounces straight back. The tile must not exist at all.
+  describe("a group whose children are all filtered out", () => {
+    // A store whose zoConfig can be set per test, unlike the shared one above.
+    function makeGatedStore(databaseMonitoringEnabled: boolean) {
+      return createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { database_monitoring_enabled: databaseMonitoringEnabled },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+    }
+
+    // Infra's real shape: one gated child, routes registered (they always are —
+    // the guard, not the router, is what turns the feature off).
+    function mountInfra(databaseMonitoringEnabled: boolean) {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          {
+            path: "/traces/databases",
+            name: "dbmDatabases",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children: [
+            {
+              titleKey: "menu.databases",
+              icon: "database",
+              name: "dbmDatabases",
+              gate: "databaseMonitoring",
+            },
+          ] as SubnavChild[],
+          parentItem: {
+            link: "/traces/databases",
+            title: "Infra",
+            icon: "dns",
+            name: "infra",
+          },
+        },
+        global: {
+          plugins: [router, makeGatedStore(databaseMonitoringEnabled), i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    it("renders the Infra tile when the databaseMonitoring gate passes", () => {
+      wrapper = mountInfra(true);
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="tile"]').exists()).toBe(true);
+    });
+
+    it("renders NO Infra tile when the databaseMonitoring gate fails", () => {
+      wrapper = mountInfra(false);
+      // The whole wrapper element is gone — not merely an empty flyout.
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="tile"]').exists()).toBe(false);
+    });
+
+    it("renders no tile when every child's route is missing from the build", async () => {
+      // The other half of the filter: `router.hasRoute` rather than `gate`.
+      wrapper = mountGroup();
+      await wrapper.setProps({
+        children: [{ titleKey: "menu.ghost", icon: "x", name: "notARoute" }] as SubnavChild[],
+      });
+      expect(wrapper.find('[data-test="nav-group-data"]').exists()).toBe(false);
+    });
+  });
+
   it("renders only children whose routes are registered", async () => {
     wrapper = mountGroup();
     await wrapper.setProps({
@@ -124,6 +206,139 @@ describe("ONavGroup", () => {
     expect(flyout().find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
     expect(flyout().find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
     expect(flyout().find('[data-test="nav-group-item-notARoute"]').exists()).toBe(false);
+  });
+
+  it("heads a run of children sharing a categoryKey, and TRANSLATES the header", async () => {
+    // The header was the one string in the rail rendered from a raw literal, so
+    // it would have stayed English in all 15 locales. It takes an i18n key like
+    // every other label here.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    const header = flyout().find('[data-test^="nav-group-section-label-"]');
+    expect(header.exists()).toBe(true);
+    expect(header.text()).toBe("Alerts");
+
+    // The run is a real group to assistive tech, named by that heading. A bare
+    // heading div is not a valid child of role="menu" — AT drops it, and the
+    // grouping this exists to convey is silent.
+    const group = flyout().find('[role="group"]');
+    expect(group.exists()).toBe(true);
+    expect(group.attributes("aria-labelledby")).toBe(header.attributes("id"));
+    expect(header.attributes("role")).toBe("presentation");
+    expect(group.findAll('[role="menuitem"]')).toHaveLength(2);
+  });
+
+  it("sizes the three levels by depth, not against it", async () => {
+    // It ran 11px → 11px → 14px: the group title and its section headers were
+    // the same size, and the ITEMS — the deepest level — were the largest text
+    // in the flyout. Group (base) > section (sm, secondary) > item (sm, plain).
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+      ],
+    });
+    await hoverOpen();
+
+    const classesOf = (sel: string) => flyout().find(sel).classes().join(" ");
+    const groupTitle = flyout().element.firstElementChild?.className ?? "";
+    // Group and items share body size; the group outranks them by weight. It is
+    // NOT a step above — 16px read as a page title inside a 217px menu.
+    expect(groupTitle).toContain("text-sm");
+    expect(groupTitle).toContain("font-semibold");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).toContain("text-sm");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).not.toContain("font-semibold");
+    // The section header is the one label that steps DOWN, in the secondary
+    // colour — it names a run, it is not a thing you click.
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-xs");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("font-semibold");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-text-secondary");
+  });
+
+  it("heads the run once, not once per child", async () => {
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    expect(flyout().findAll('[data-test^="nav-group-section-label-"]')).toHaveLength(1);
+  });
+
+  it("leaves uncategorised children unheaded, so they are not filed under it", async () => {
+    // Reliability's SLOs/Incidents sit outside the Alerts header exactly this
+    // way: a trailing child with no key must not inherit the previous header.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        { titleKey: "menu.pipeline", icon: "graph-2", name: "pipelines" },
+      ],
+    });
+    await hoverOpen();
+
+    const rows = flyout().findAll(
+      '[data-test^="nav-group-section-label-"], [data-test^="nav-group-item-"]',
+    );
+    expect(rows.map((r) => r.attributes("data-test"))).toEqual([
+      "nav-group-section-label-h-menu.alerts-0",
+      "nav-group-item-logstreams",
+      "nav-group-item-pipelines",
+    ]);
+    // Outside the group element, not merely after the heading.
+    expect(
+      flyout().find('[role="group"]').find('[data-test="nav-group-item-pipelines"]').exists(),
+    ).toBe(false);
+    // And it is visibly outside: a header owns everything below it until
+    // something says otherwise, and at the same indent nothing else does.
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).toContain("mt-3");
+  });
+
+  it("does not break the run it is still inside", async () => {
+    // The gap marks LEAVING a headed run. Putting it on a member would split
+    // the run into two groups under one header.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
+  });
+
+  it("adds no gap when nothing is categorised at all", async () => {
+    // The Data group has no headers; it must stay one flat list.
+    wrapper = mountGroup();
+    await hoverOpen();
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
   });
 
   // Regression: clicking the tile used to close() the flyout while the pointer
@@ -295,23 +510,32 @@ describe("ONavGroup", () => {
     });
   });
 
-  // Traces: Service Graph / Service Catalog are standalone routes, but the same
-  // views also render in-page on /traces?tab=… — `activeOnTab` makes the flyout
-  // highlight follow what the user is looking at on either path.
-  describe("tab-alias active state (activeOnTab)", () => {
+  describe("query-tab navigation and active state", () => {
     const tracesChildren: SubnavChild[] = [
-      { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
+      {
+        titleKey: "traces.spansTab",
+        icon: "layers",
+        name: "traces",
+        tab: "spans",
+      },
+      {
+        titleKey: "menu.traces",
+        icon: "account-tree",
+        name: "traces",
+        tab: "traces",
+        defaultForRoute: true,
+      },
       {
         titleKey: "menu.serviceGraph",
         icon: "share",
-        name: "serviceGraph",
-        activeOnTab: { name: "traces", tab: "service-graph" },
+        name: "traces",
+        tab: "service-graph",
       },
       {
         titleKey: "menu.services",
         icon: "menu-book",
-        name: "servicesCatalog",
-        activeOnTab: { name: "traces", tab: "services-catalog" },
+        name: "traces",
+        tab: "services-catalog",
       },
     ];
 
@@ -321,16 +545,6 @@ describe("ONavGroup", () => {
         routes: [
           { path: "/", name: "home", component: { template: "<div />" } },
           { path: "/traces", name: "traces", component: { template: "<div />" } },
-          {
-            path: "/traces/service-graph",
-            name: "serviceGraph",
-            component: { template: "<div />" },
-          },
-          {
-            path: "/traces/services",
-            name: "servicesCatalog",
-            component: { template: "<div />" },
-          },
         ],
       });
     }
@@ -363,36 +577,69 @@ describe("ONavGroup", () => {
       return w;
     }
 
-    function activeNames(w: VueWrapper): string[] {
+    function activeTabs(w: VueWrapper): string[] {
       return w
         .findAll('[data-test^="nav-group-item-"]')
         .filter((el) => el.attributes("aria-current") === "page")
-        .map((el) => el.attributes("data-test")!.replace("nav-group-item-", ""));
+        .map((el) => el.attributes("data-test")!.replace("nav-group-item-traces-", ""));
     }
 
     it("marks Traces on plain /traces", async () => {
       wrapper = await mountAt("/traces");
-      expect(activeNames(wrapper)).toEqual(["traces"]);
+      expect(activeTabs(wrapper)).toEqual(["traces"]);
+    });
+
+    it("marks Traces on /traces?tab=traces", async () => {
+      wrapper = await mountAt("/traces?tab=traces");
+      expect(activeTabs(wrapper)).toEqual(["traces"]);
     });
 
     it("marks Service Graph, not Traces, on /traces?tab=service-graph", async () => {
       wrapper = await mountAt("/traces?tab=service-graph");
-      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
+      expect(activeTabs(wrapper)).toEqual(["service-graph"]);
     });
 
     it("marks Service Catalog, not Traces, on /traces?tab=services-catalog", async () => {
       wrapper = await mountAt("/traces?tab=services-catalog");
-      expect(activeNames(wrapper)).toEqual(["servicesCatalog"]);
+      expect(activeTabs(wrapper)).toEqual(["services-catalog"]);
     });
 
-    it("marks Traces on the in-page granularity tabs (?tab=spans)", async () => {
+    it("marks Spans on /traces?tab=spans", async () => {
       wrapper = await mountAt("/traces?tab=spans");
-      expect(activeNames(wrapper)).toEqual(["traces"]);
+      expect(activeTabs(wrapper)).toEqual(["spans"]);
     });
 
-    it("marks Service Graph on its standalone route", async () => {
-      wrapper = await mountAt("/traces/service-graph");
-      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
+    it("builds canonical Traces URLs for every flyout item", async () => {
+      wrapper = await mountAt("/traces");
+
+      expect(wrapper.get('[data-test="nav-group-item-traces-traces"]').attributes("href")).toBe(
+        "/traces?org_identifier=default&tab=traces",
+      );
+      expect(wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href")).toBe(
+        "/traces?org_identifier=default&tab=spans",
+      );
+      expect(
+        wrapper.get('[data-test="nav-group-item-traces-service-graph"]').attributes("href"),
+      ).toBe("/traces?org_identifier=default&tab=service-graph");
+      expect(
+        wrapper.get('[data-test="nav-group-item-traces-services-catalog"]').attributes("href"),
+      ).toBe("/traces?org_identifier=default&tab=services-catalog");
+    });
+
+    it("preserves the current Traces query when switching tabs", async () => {
+      wrapper = await mountAt(
+        "/traces?org_identifier=default&tab=traces&search_mode=spans&stream=default&period=15m&query=c2VydmljZQ%3D%3D",
+      );
+
+      const href = wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href");
+      const query = new URL(href, "http://localhost").searchParams;
+
+      expect(query.get("org_identifier")).toBe("default");
+      expect(query.get("tab")).toBe("spans");
+      expect(query.has("search_mode")).toBe(false);
+      expect(query.get("stream")).toBe("default");
+      expect(query.get("period")).toBe("15m");
+      expect(query.get("query")).toBe("c2VydmljZQ==");
     });
   });
 });

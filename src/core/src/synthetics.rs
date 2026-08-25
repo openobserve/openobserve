@@ -410,10 +410,46 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+// ── Org provisioning ──────────────────────────────────────────────────────────
+
+/// Mints the org's default `o2syn_` probe token and, in a super cluster,
+/// replicates it to every other region.
+///
+/// Org creation itself replicates, but the super-cluster org consumer only
+/// inserts the org row — it does not re-run any of the provisioning that
+/// follows a local create. So without this publish, a super cluster ends up with
+/// the org in every region and its probe token in exactly one, and an agent
+/// configured with that token 401s everywhere else (`find_global` reads the
+/// local meta DB and is not region-aware).
+///
+/// The publish lives here rather than inside `infra::table` deliberately:
+/// `infra` cannot reach the enterprise crate, and that missing edge is what
+/// stops the super-cluster consumer — which applies through `infra` — from
+/// re-broadcasting what it just applied. Same shape as
+/// `db::org_ingestion_tokens::add`, which replicates the `o2oi_` token the same
+/// way at the same point in org creation.
+pub async fn create_default_probe_token(
+    org_id: &str,
+    created_by: &str,
+) -> Result<(), anyhow::Error> {
+    let _record = infra::table::synthetics_probe_tokens::create_for_org(org_id, created_by).await?;
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        o2_enterprise::enterprise::super_cluster::queue::synthetics_probe_token_create(
+            (&_record).into(),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 // ── Private-location staleness watcher ────────────────────────────────────────
 
 /// Ticks every 60s on scheduler nodes. A private location whose registered
-/// agents have ALL gone stale (`O2_SYNTHETICS_AGENT_STALE_SECS`) while
+/// agents have ALL gone stale (`ZO_SYNTHETICS_AGENT_STALE_SECS`) while
 /// synthetics are assigned to it gets one "location down" notification, sent to
 /// the union of those synthetics' alert destinations. One-shot per down
 /// transition — cleared when any agent comes back (or the location empties).
@@ -430,11 +466,7 @@ pub async fn location_staleness_watcher() {
                 continue;
             }
         };
-        let window_us = o2_enterprise::enterprise::common::config::get_config()
-            .synthetics
-            .agent_stale_secs
-            .max(1)
-            * 1_000_000;
+        let window_us = config::get_config().synthetics.agent_stale_secs.max(1) * 1_000_000;
         let now = config::utils::time::now_micros();
 
         for loc in rows {

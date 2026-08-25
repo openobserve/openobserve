@@ -157,8 +157,8 @@ function getRowForItem(item: any): Row<any> {
     tag="tbody"
     handle="[data-test='o2-table-row-drag-handle']"
     :animation="200"
-    ghost-class="o2-table-drag-ghost"
-    drag-class="o2-table-drag-dragging"
+    ghost-class="table-drag-ghost"
+    drag-class="table-drag-dragging"
     data-test="o2-table-body"
     @start="onDragStart"
     @end="onDragEnd"
@@ -331,20 +331,3 @@ function getRowForItem(item: any): Row<any> {
     </tr>
   </tbody>
 </template>
-
-<style scoped>
-/* keep(third-party): VueDraggableNext applies these classes to row clones at
-   RUNTIME (ghost / dragging); no template ever writes them, so they cannot be
-   utilities. Scoped still matches — the clones keep the row's data-v attr. */
-.o2-table-drag-ghost {
-  opacity: 0.3;
-  background: var(--color-primary-50);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel dashed drag-ghost border must not scale with text or it smears at fractional zoom */
-  border: 1px dashed var(--color-accent);
-  border-radius: 0.375rem;
-}
-.o2-table-drag-dragging {
-  opacity: 0.5;
-  box-shadow: var(--shadow-lg);
-}
-</style>

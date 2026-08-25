@@ -14,24 +14,26 @@ beforeAll(() => {
 // measurement wiring never renders — stub it with a fixed window of rows.
 const measureSpy = vi.fn();
 const measureElementSpy = vi.fn();
+const virtualizerMock = {
+  getVirtualItems: () =>
+    Array.from({ length: 5 }, (_, i) => ({
+      index: i,
+      key: i,
+      start: i * 20,
+      end: (i + 1) * 20,
+      size: 20,
+      lane: 0,
+    })),
+  getTotalSize: () => 100,
+  measure: measureSpy,
+  measureElement: measureElementSpy,
+  scrollToIndex: vi.fn(),
+  shouldAdjustScrollPositionOnItemSizeChange: undefined as
+    ((...args: any[]) => boolean) | undefined,
+};
 
 vi.mock("@tanstack/vue-virtual", () => ({
-  useVirtualizer: () =>
-    ref({
-      getVirtualItems: () =>
-        Array.from({ length: 5 }, (_, i) => ({
-          index: i,
-          key: i,
-          start: i * 20,
-          end: (i + 1) * 20,
-          size: 20,
-          lane: 0,
-        })),
-      getTotalSize: () => 100,
-      measure: measureSpy,
-      measureElement: measureElementSpy,
-      scrollToIndex: vi.fn(),
-    }),
+  useVirtualizer: () => ref(virtualizerMock),
 }));
 
 import OTable from "./OTable.vue";
@@ -69,6 +71,7 @@ describe("OTable virtual measurement", () => {
   beforeEach(() => {
     measureSpy.mockClear();
     measureElementSpy.mockClear();
+    virtualizerMock.shouldAdjustScrollPositionOnItemSizeChange = undefined;
   });
 
   afterEach(() => {
@@ -102,5 +105,24 @@ describe("OTable virtual measurement", () => {
   it("should not call the global measure() for fixed-height rows", () => {
     wrapper = mountTable({ wrap: false, expansion: "none" });
     expect(measureSpy).not.toHaveBeenCalled();
+  });
+
+  it("should keep a delegated scroller stable after wrap is enabled", async () => {
+    wrapper = mountTable({
+      wrap: false,
+      scrollEl: document.createElement("div"),
+    });
+    expect(virtualizerMock.shouldAdjustScrollPositionOnItemSizeChange).toBeUndefined();
+
+    await wrapper.setProps({ wrap: true });
+
+    const shouldAdjust = virtualizerMock.shouldAdjustScrollPositionOnItemSizeChange;
+    expect(shouldAdjust).toBeTypeOf("function");
+    expect(shouldAdjust?.()).toBe(false);
+  });
+
+  it("should retain the virtualizer's default anchoring for an internal scroller", () => {
+    wrapper = mountTable({ wrap: true });
+    expect(virtualizerMock.shouldAdjustScrollPositionOnItemSizeChange).toBeUndefined();
   });
 });

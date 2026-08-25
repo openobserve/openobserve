@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] text-[var(--color-theme-accent)]! shadow-md transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
+                class="rounded-default! text-theme-accent! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] shadow-md transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 <!-- eslint-enable local/no-hardcoded-px -->
                 {{ dialogConfig.primaryButtonText }}
@@ -220,8 +220,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+                class="rounded-default bg-theme-accent/10 text-theme-accent dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
               >
                 <OIcon :name="feature.icon" size="sm" />
               </div>
@@ -263,8 +263,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+                class="rounded-default bg-theme-accent/10 text-theme-accent dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
               >
                 <OIcon :name="feature.icon" size="sm" />
               </div>
@@ -318,8 +318,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+                class="rounded-default bg-theme-accent/10 text-theme-accent dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
               >
                 <OIcon :name="feature.icon" size="sm" />
               </div>
@@ -382,7 +382,7 @@ import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -609,7 +609,7 @@ export default defineComponent({
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces,
       },
       {
-        name: t("about.enterprise_offer.core_features.rum.name"),
+        name: raw("RUM"),
         note: t("about.enterprise_offer.core_features.rum.note"),
         icon: "visibility",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rum,
@@ -634,7 +634,9 @@ export default defineComponent({
       },
       {
         name: t("about.enterprise_offer.core_features.vrl_functions.name"),
-        note: t("about.enterprise_offer.core_features.vrl_functions.note"),
+        note: t("about.enterprise_offer.core_features.vrl_functions.note", {
+          product: raw("Vector Remap Language"),
+        }),
         icon: "functions",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.vrl_functions,
       },
@@ -845,8 +847,9 @@ export default defineComponent({
     };
 
     const navigateToLicense = () => {
-      // Get meta org identifier
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+      // Get meta org identifier; "_meta" fallback covers the window before the
+      // authenticated full config (which carries meta_org) has loaded.
+      const metaOrgIdentifier = store.state.zoConfig.meta_org || "_meta";
 
       // Find the meta org from the organizations list
       const metaOrg = store.state.organizations?.find(
@@ -1149,13 +1152,17 @@ export default defineComponent({
                   return date.getDate() === parseInt(dayNum);
                 });
 
+                // The <br/> stays in code — each line is a whole translated
+                // sentence, so the markup never has to live in a message.
+                const usageLine = t("about.usageChartUsage", { value: formattedValue });
                 if (matchingEntry) {
                   const fullDate = new Date(matchingEntry.ts);
                   const monthName = fullDate.toLocaleString("default", { month: "short" });
-                  return `${monthName} ${dayNum}<br/>Usage: ${formattedValue}`;
+                  const dateLine = t("about.usageChartDate", { month: monthName, day: dayNum });
+                  return `${dateLine}<br/>${usageLine}`;
                 }
 
-                return `Day ${dayNum}<br/>Usage: ${formattedValue}`;
+                return `${t("about.usageChartDay", { day: dayNum })}<br/>${usageLine}`;
               },
             },
             animation: true,

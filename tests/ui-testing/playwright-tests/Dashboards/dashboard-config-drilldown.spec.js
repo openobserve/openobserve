@@ -381,9 +381,15 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     const drilldownMenu = await pm.dashboardDrilldown.triggerDrilldownFromTable();
     await expect(drilldownMenu).toBeVisible({ timeout: 5000 });
 
+    // Capture the source url BEFORE the click: the drilldown navigates from one
+    // /dashboards/view to another, so only a change of `dashboard` id proves it moved.
+    const sourceUrl = page.url();
     await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
-    await page.waitForURL(/\/dashboards\/view/, { timeout: 15000 });
+    await pm.dashboardDrilldown.waitForSameTabDashboardNavigation(sourceUrl);
     testLogger.info(`Navigated to destination dashboard (Default tab) in same tab: ${page.url()}`);
+    await expect(
+      page.locator('[data-test="dashboard-tab-list"]').getByRole("tab", { selected: true })
+    ).toHaveText(/Default/, { timeout: 10000 });
 
     await pm.dashboardList.menuItem("dashboards-item");
     await deleteDashboard(page, mainDashName);
@@ -419,9 +425,17 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     const drilldownMenu = await pm.dashboardDrilldown.triggerDrilldownFromTable();
     await expect(drilldownMenu).toBeVisible({ timeout: 5000 });
 
+    // Capture the source url BEFORE the click: the drilldown navigates from one
+    // /dashboards/view to another, so only a change of `dashboard` id proves it moved.
+    const sourceUrl = page.url();
     await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
-    await page.waitForURL(/\/dashboards\/view/, { timeout: 15000 });
+    await pm.dashboardDrilldown.waitForSameTabDashboardNavigation(sourceUrl);
     testLogger.info(`Navigated to destination dashboard in same tab: ${page.url()}`);
+    // The drilldown was configured for "Tab Two" — assert it actually opened there,
+    // so a tab selection that got reset back to "Default" is a failure, not a pass.
+    await expect(
+      page.locator('[data-test="dashboard-tab-list"]').getByRole("tab", { selected: true })
+    ).toHaveText(/Tab Two/, { timeout: 10000 });
 
     // Now on destination dashboard — go to list and delete both
     await pm.dashboardList.menuItem("dashboards-item");

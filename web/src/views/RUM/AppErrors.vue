@@ -345,6 +345,7 @@ const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   computed(() => ({})),
   _sqlMode,
   _noStream,
+  t,
 );
 const { errorTrackingState } = useErrorTracking();
 const {

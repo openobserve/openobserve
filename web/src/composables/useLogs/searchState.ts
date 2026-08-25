@@ -16,7 +16,7 @@
 import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { raw, type I18nText } from "@/types/i18n";
+import { gt, raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
@@ -378,7 +378,7 @@ export const searchState = () => {
    */
   const resetSearchObj = (): void => {
     // Reset error message and stream data
-    searchObj.data.errorMsg = "No stream found in selected organization!";
+    searchObj.data.errorMsg = gt("search.noStreamFoundInOrganization");
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];

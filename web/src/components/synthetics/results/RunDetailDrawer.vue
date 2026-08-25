@@ -79,7 +79,7 @@ watch(
       }
       expandedSteps.value = new Set(expandedSteps.value);
     } catch (e: any) {
-      queryError.value = e?.message ?? "Query failed";
+      queryError.value = e?.message ?? t("synthetics.queryFailed");
     } finally {
       loading.value = false;
     }
@@ -166,19 +166,19 @@ function toggleSteps(executionId: string) {
       <!-- ── Loading skeleton ── -->
       <div v-if="loading" class="flex flex-col gap-3 p-5">
         <div class="mb-2 flex gap-6">
-          <div class="rounded-default h-10 w-28 animate-pulse bg-[var(--color-border-default)]" />
-          <div class="rounded-default h-10 w-20 animate-pulse bg-[var(--color-border-default)]" />
-          <div class="rounded-default h-10 w-40 animate-pulse bg-[var(--color-border-default)]" />
+          <div class="rounded-default bg-border-default h-10 w-28 animate-pulse" />
+          <div class="rounded-default bg-border-default h-10 w-20 animate-pulse" />
+          <div class="rounded-default bg-border-default h-10 w-40 animate-pulse" />
         </div>
         <div
           v-for="i in 2"
           :key="i"
           class="rounded-default border-border-default overflow-hidden border"
         >
-          <div class="h-11 w-full animate-pulse bg-[var(--color-border-default)]" />
+          <div class="bg-border-default h-11 w-full animate-pulse" />
           <div class="flex flex-col gap-2 p-4">
-            <div class="rounded-default h-4 w-2/3 animate-pulse bg-[var(--color-border-default)]" />
-            <div class="rounded-default h-4 w-1/2 animate-pulse bg-[var(--color-border-default)]" />
+            <div class="rounded-default bg-border-default h-4 w-2/3 animate-pulse" />
+            <div class="rounded-default bg-border-default h-4 w-1/2 animate-pulse" />
           </div>
         </div>
       </div>
@@ -278,7 +278,7 @@ function toggleSteps(executionId: string) {
                   {{ t("synthetics.results.error") }}
                 </p>
                 <pre
-                  class="text-text-secondary bg-status-error-bg rounded-default border border-[var(--color-status-error-text)] px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap"
+                  class="text-text-secondary bg-status-error-bg rounded-default border-status-error-text border px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap"
                   >{{ loc.error }}</pre>
               </div>
 
@@ -317,11 +317,7 @@ function toggleSteps(executionId: string) {
                   >
                     <span
                       class="text-3xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold text-white"
-                      :class="
-                        step.status === 'ok'
-                          ? 'bg-[var(--color-success-600)]'
-                          : 'bg-[var(--color-error-500)]'
-                      "
+                      :class="step.status === 'ok' ? 'bg-success-600' : 'bg-error-500'"
                       >{{ idx + 1 }}</span
                     >
                     <div class="min-w-0 flex-1">
@@ -359,11 +355,7 @@ function toggleSteps(executionId: string) {
                     <div class="border-border-default flex items-center gap-1.5 border-b px-2 py-1">
                       <span
                         class="h-2 w-2 shrink-0 rounded-full"
-                        :class="
-                          step.status === 'ok'
-                            ? 'bg-[var(--color-success-500)]'
-                            : 'bg-[var(--color-error-500)]'
-                        "
+                        :class="step.status === 'ok' ? 'bg-success-500' : 'bg-error-500'"
                       />
                       <span class="text-3xs text-text-muted truncate font-mono">{{
                         step.stepId

@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
                     <div class="text-compact text-text-body leading-[1.55]">
                       <template v-if="isCloud">
-                        {{ t("storage_settings.awsStsCloudInfo") }}
+                        {{ t("storage_settings.awsStsCloudInfo", { product: raw("OpenObserve") }) }}
                       </template>
                       <template v-else>
                         {{ t("storage_settings.awsStsSelfHostedInfo") }}
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 
 defineOptions({ name: "OrgStorageEditor" });
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";

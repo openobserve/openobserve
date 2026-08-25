@@ -89,6 +89,7 @@ const OTableStub = {
       <slot name="toolbar-trailing" />
       <slot v-if="!data.length" name="empty" />
       <template v-for="row in data" :key="row.id">
+        <slot name="cell-name" :row="row" />
         <slot name="cell-trigger" :row="row" />
         <slot name="cell-actions" :row="row" />
       </template>
@@ -508,6 +509,64 @@ describe("WorkflowsList", () => {
 
   // ── enable / disable ───────────────────────────────────────────────────────
 
+  describe("drafts", () => {
+    const draftTag = (w: any) => w.find('[data-test="workflow-list-draft-tag"]');
+    const pauseBtn = (w: any, name: string) =>
+      w.find(`[data-test="workflow-list-${name}-pause-start-action"]`);
+
+    it("renders a Draft tag for a draft row", async () => {
+      listWorkflows.mockResolvedValue({ data: [makeWorkflow(1, { is_draft: true })] });
+      wrapper = mountList();
+      await flushPromises();
+
+      expect(draftTag(wrapper).exists()).toBe(true);
+      expect(draftTag(wrapper).text()).toBe(t("workflow.draft"));
+    });
+
+    it("does not render a Draft tag for a published row", async () => {
+      listWorkflows.mockResolvedValue({ data: [makeWorkflow(1, { is_draft: false })] });
+      wrapper = mountList();
+      await flushPromises();
+
+      expect(draftTag(wrapper).exists()).toBe(false);
+    });
+
+    it("hides the pause/resume action for a draft (drafts aren't runnable)", async () => {
+      listWorkflows.mockResolvedValue({ data: [makeWorkflow(1, { is_draft: true })] });
+      wrapper = mountList();
+      await flushPromises();
+
+      expect(pauseBtn(wrapper, "workflow-1").exists()).toBe(false);
+      // the other row actions remain
+      expect(wrapper.find('[data-test="workflow-list-workflow-1-edit"]').exists()).toBe(true);
+    });
+
+    it("keeps the pause/resume action for a published workflow", async () => {
+      listWorkflows.mockResolvedValue({ data: [makeWorkflow(1, { is_draft: false })] });
+      wrapper = mountList();
+      await flushPromises();
+
+      expect(pauseBtn(wrapper, "workflow-1").exists()).toBe(true);
+    });
+
+    it("passes draft:true when deleting a draft row", async () => {
+      listWorkflows.mockResolvedValue({ data: [makeWorkflow(1, { is_draft: true })] });
+      wrapper = mountList();
+      await flushPromises();
+
+      await wrapper.find('[data-test="workflow-list-workflow-1-delete"]').trigger("click");
+      await nextTick();
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(deleteWorkflow).toHaveBeenCalledWith({
+        org_identifier: "default",
+        id: "wf-1",
+        draft: true,
+      });
+    });
+  });
+
   describe("pause / resume", () => {
     const pauseBtn = (w: any, name: string) =>
       w.find(`[data-test="workflow-list-${name}-pause-start-action"]`);
@@ -622,6 +681,7 @@ describe("WorkflowsList", () => {
       expect(deleteWorkflow).toHaveBeenCalledWith({
         org_identifier: "default",
         id: "wf-1",
+        draft: false,
       });
       expect(mockToast).toHaveBeenCalledWith({
         message: t("workflow.deleteSuccess"),

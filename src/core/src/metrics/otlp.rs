@@ -706,10 +706,10 @@ pub async fn handle_otlp_request(
         .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .inc();
 
-    // only one trigger per request
+    // only one trigger per request; notification/db work must not block ingestion
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
-            evaluate_trigger(entry).await;
+            tokio::spawn(evaluate_trigger(entry));
         }
     }
 
@@ -774,7 +774,7 @@ fn process_gauge(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, get_exclude_labels());
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
@@ -803,7 +803,7 @@ fn process_sum(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, get_exclude_labels());
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
@@ -829,7 +829,7 @@ fn process_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -855,7 +855,7 @@ fn process_exponential_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -881,7 +881,7 @@ fn process_summary(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }

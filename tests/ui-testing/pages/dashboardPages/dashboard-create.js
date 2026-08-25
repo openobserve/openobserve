@@ -1,5 +1,7 @@
 // methods: createDashboard, searchDashboard, AddPanel, applyButton
 
+import testLogger from "../../playwright-tests/utils/test-logger.js";
+
 export default class DashboardCreate {
   /**
    * Constructor for the DashboardCreate object
@@ -57,20 +59,104 @@ export default class DashboardCreate {
     await this.defaultFolderTab.waitFor({ state: "visible" });
   }
 
-  // Wait for dashboard UI to be fully stable before any interaction
+  /**
+   * A one-line snapshot of what the dashboards list actually rendered, for failure
+   * messages. A bare `locator.waitFor` timeout says only "the search box never
+   * showed" — this says what was on screen instead.
+   */
+  async describeDashboardList() {
+    const state = await this.page
+      .evaluate(() => ({
+        url: location.href,
+        table: !!document.querySelector('[data-test="dashboard-table"]'),
+        importBtn: !!document.querySelector('[data-test="dashboard-import"]'),
+        createBtn: !!document.querySelector('[data-test="dashboard-new"]'),
+        rows: document.querySelectorAll('[data-test^="dashboard-name-cell-"]').length,
+        toast:
+          document.querySelector("[data-test-variant]")?.getAttribute("data-test-message") ?? null,
+      }))
+      .catch((e) => ({ evaluateFailed: e.message }));
+    return JSON.stringify(state);
+  }
+
+  /**
+   * Wait for the dashboards list to be fully interactive.
+   *
+   * `dashboard-search` lives in the toolbar slot of the dashboard TABLE, so this is
+   * really a wait for the list data to have loaded. When that load fails on the
+   * shared alpha deployment (a transient on a busy environment) the table never
+   * mounts and no amount of extra waiting helps — waitForDashboardPage() upstream
+   * only warns and continues when the URL looks right, so a failed load reaches
+   * here and then dies on an opaque 30s timeout. That accounted for every failure
+   * in a 21-run baseline of the axis spec: 10 of them, all at this one line.
+   *
+   * Re-navigating re-runs the list fetch and clears it. Fail with what was actually
+   * on screen if it still doesn't come up.
+   */
   async waitForDashboardUIStable() {
-    // Wait for search input to be stable
-    await this.searchDash.waitFor({ state: "visible", timeout: 30000 });
-    await this.searchDash.waitFor({ state: "attached", timeout: 5000 });
+    try {
+      await this.#waitForDashboardListControls(30000);
+      return;
+    } catch {
+      // A billing redirect is an environment/account state, not a transient — the
+      // app bounces EVERY route to /billings/plans, so re-navigating just lands
+      // there again and doubles the wait. Fail immediately and name the cause,
+      // rather than reporting it as a dashboards-list timeout.
+      this.#assertNotRedirectedToBilling();
+      testLogger.warn("Dashboards list did not become interactive, re-opening it", {
+        state: await this.describeDashboardList(),
+      });
+    }
 
-    // Wait for "New Dashboard" button to be stable
-    await this.dashCreateBtn.waitFor({ state: "visible", timeout: 30000 });
-    await this.dashCreateBtn.waitFor({ state: "attached", timeout: 5000 });
+    const orgId =
+      process.env["ORGNAME"] ?? this.page.url().match(/org_identifier=([^&]+)/)?.[1];
+    // Dashboards.vue expects a `folder` query param — without it the list can fail
+    // to render (same reasoning as the goto fallback in dashboardList.menuItem).
+    await this.page
+      .goto(
+        `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${orgId}&folder=default`,
+        { waitUntil: "domcontentloaded" }
+      )
+      .catch(() => {});
 
-    // Wait for the import button to also be stable (confirms full header is loaded)
+    try {
+      await this.#waitForDashboardListControls(30000);
+      testLogger.info("Dashboards list became interactive after re-opening it");
+    } catch {
+      this.#assertNotRedirectedToBilling();
+      throw new Error(
+        `waitForDashboardUIStable: the dashboards list never became interactive, even after ` +
+          `re-opening it. Dashboards list state: ${await this.describeDashboardList()}`
+      );
+    }
+  }
+
+  /**
+   * Throw a self-explanatory error when the app has bounced us to the billing page.
+   *
+   * On cloud deployments an expired trial / lapsed subscription redirects every
+   * route to /billings/plans. Every dashboard test then fails somewhere deep in
+   * setup on an unrelated-looking selector timeout, which reads as flakiness and
+   * sends you hunting through the specs. It is neither flaky nor a test bug — the
+   * environment needs its plan renewed.
+   */
+  #assertNotRedirectedToBilling() {
+    const url = this.page.url();
+    if (!/\/billings?\//.test(url)) return;
+    throw new Error(
+      `The app redirected to the billing page (${url}). This is an environment/account ` +
+        `state, not a test failure: the org's trial or subscription has lapsed, so every ` +
+        `route bounces to /billings/plans and no dashboard test can run. Renew the plan ` +
+        `for org "${process.env["ORGNAME"] ?? "(unset)"}" or point ORGNAME at an active org.`
+    );
+  }
+
+  /** The three controls that together mean "the list is loaded and interactive". */
+  async #waitForDashboardListControls(timeout) {
+    await this.searchDash.waitFor({ state: "visible", timeout });
+    await this.dashCreateBtn.waitFor({ state: "visible", timeout });
     const importBtn = this.page.locator('[data-test="dashboard-import"]');
     await importBtn.waitFor({ state: "visible", timeout: 10000 });
-    await importBtn.waitFor({ state: "attached", timeout: 5000 });
   }
 
   //Create Dashboard

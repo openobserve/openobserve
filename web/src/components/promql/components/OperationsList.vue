@@ -83,7 +83,7 @@
                         v-if="param.type === 'number'"
                         v-model.number="element.params[paramIndex] as number"
                         type="number"
-                        :label="raw(param.name)"
+                        :label="param.name"
                         class="showLabelOnTop mb-1.5"
                         :data-test="`promql-operation-param-${paramIndex}`"
                       />
@@ -92,7 +92,7 @@
                       <OInput
                         v-else-if="param.type === 'string'"
                         v-model="element.params[paramIndex] as string"
-                        :label="raw(param.name)"
+                        :label="param.name"
                         :placeholder="paramPlaceholder(param)"
                         class="showLabelOnTop mb-1.5"
                         :data-test="`promql-operation-param-${paramIndex}`"
@@ -103,7 +103,7 @@
                         v-else-if="param.type === 'select'"
                         v-model="element.params[paramIndex] as string[]"
                         :options="availableLabels"
-                        :label="raw(param.name)"
+                        :label="param.name"
                         multiple
                         searchable
                         class="operation-label-selector showLabelOnTop no-case mb-1.5"

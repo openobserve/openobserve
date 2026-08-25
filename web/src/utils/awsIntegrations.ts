@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { type I18nKey } from "@/types/i18n";
+import { gt, raw, type I18nKey } from "@/types/i18n";
 
 export interface CloudFormationTemplate {
   name: string;
@@ -47,8 +47,8 @@ export interface AWSIntegration {
 export const awsIntegrations: AWSIntegration[] = [
   {
     id: "cloudtrail",
-    name: "CloudTrail",
-    displayName: "AWS CloudTrail",
+    name: raw("CloudTrail"),
+    displayName: raw("AWS CloudTrail"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.cloudtrail.description",
     cloudFormationTemplate:
@@ -65,7 +65,7 @@ export const awsIntegrations: AWSIntegration[] = [
   {
     id: "waf",
     name: "WAF",
-    displayName: "AWS WAF",
+    displayName: raw("AWS WAF"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.waf.description",
     cloudFormationTemplate:
@@ -81,7 +81,7 @@ export const awsIntegrations: AWSIntegration[] = [
   {
     id: "alb",
     name: "ALB",
-    displayName: "Application Load Balancer",
+    displayName: raw("Application Load Balancer"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.alb.description",
     cloudFormationTemplate:
@@ -96,8 +96,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "cloudwatch-logs",
-    name: "CloudWatch Logs",
-    displayName: "CloudWatch Logs",
+    name: raw("CloudWatch Logs"),
+    displayName: raw("CloudWatch Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
     cloudFormationTemplate:
@@ -109,8 +109,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "cloudwatch-metrics",
-    name: "CloudWatch Metrics",
-    displayName: "CloudWatch Metrics",
+    name: raw("CloudWatch Metrics"),
+    displayName: raw("CloudWatch Metrics"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.cloudwatch-metrics.description",
     cloudFormationTemplate:
@@ -122,19 +122,19 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "vpc-flow-logs",
-    name: "VPC Flow Logs",
-    displayName: "VPC Flow Logs",
+    name: raw("VPC Flow Logs"),
+    displayName: raw("VPC Flow Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.vpc-flow-logs.description",
     cloudFormationTemplate: "",
     cloudFormationTemplates: [
       {
-        name: "CloudWatch Integration",
+        name: raw("CloudWatch Integration"),
         descriptionKey: "ingestion.integrations.aws.vpc-flow-logs.cloudwatchIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/vpc-flowlogs-to-openobserve-cloudwatch.yaml",
       },
       {
-        name: "Firehose Integration",
+        name: raw("Firehose Integration"),
         descriptionKey: "ingestion.integrations.aws.vpc-flow-logs.firehoseIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/vpc-flowlogs-to-openobserve-firehose.yaml",
       },
@@ -149,30 +149,36 @@ export const awsIntegrations: AWSIntegration[] = [
   {
     id: "ec2",
     name: "EC2",
-    displayName: "EC2 Instance Logs",
+    displayName: raw("EC2 Instance Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.ec2.description",
     cloudFormationTemplate: "",
     cloudFormationTemplates: [
       {
-        name: "CloudWatch via SSM",
+        name: raw("CloudWatch via SSM"),
         descriptionKey: "ingestion.integrations.aws.ec2.cloudwatchViaSsmDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/ec2-cloudwatch-via-ssm.yaml",
       },
       {
-        name: "OpenTelemetry via SSM",
+        name: raw("OpenTelemetry via SSM"),
         descriptionKey: "ingestion.integrations.aws.ec2.opentelemetryViaSsmDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/ec2-otel-via-ssm.yaml",
       },
     ],
     componentOptions: [
       {
-        name: "Windows (Manual Install)",
+        // Lazy: this array is module scope, so a resolved string would freeze
+        // at the boot locale. The getter runs when the option is rendered.
+        get name() {
+          return gt("ingestion.windowsManualInstall");
+        },
         descriptionKey: "ingestion.integrations.aws.ec2.windowsManualInstallDescription",
         component: "WindowsConfig",
       },
       {
-        name: "Linux/Unix/MacOS (Manual Install)",
+        get name() {
+          return gt("ingestion.linuxUnixMacosManualInstall");
+        },
         descriptionKey: "ingestion.integrations.aws.ec2.linuxUnixMacosManualInstallDescription",
         component: "LinuxConfig",
       },
@@ -185,7 +191,7 @@ export const awsIntegrations: AWSIntegration[] = [
   {
     id: "rds",
     name: "RDS",
-    displayName: "RDS Logs",
+    displayName: raw("RDS Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.rds.description",
     cloudFormationTemplate:
@@ -199,8 +205,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "s3",
-    name: "S3",
-    displayName: "S3 Access Logs",
+    name: raw("S3"),
+    displayName: raw("S3 Access Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.s3.description",
     cloudFormationTemplate:
@@ -212,8 +218,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "lambda",
-    name: "Lambda",
-    displayName: "Lambda Logs",
+    name: raw("Lambda"),
+    displayName: raw("Lambda Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.lambda.description",
     cloudFormationTemplate: "",
@@ -224,8 +230,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "api-gateway",
-    name: "API Gateway",
-    displayName: "API Gateway Logs",
+    name: raw("API Gateway"),
+    displayName: raw("API Gateway Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.api-gateway.description",
     cloudFormationTemplate:
@@ -239,8 +245,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "cognito",
-    name: "Cognito",
-    displayName: "Cognito",
+    name: raw("Cognito"),
+    displayName: raw("Cognito"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.cognito.description",
     cloudFormationTemplate:
@@ -252,19 +258,21 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "dynamodb",
-    name: "DynamoDB",
-    displayName: "DynamoDB Logs",
+    name: raw("DynamoDB"),
+    displayName: raw("DynamoDB Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.dynamodb.description",
     cloudFormationTemplate: "",
     cloudFormationTemplates: [
       {
-        name: "Lambda Integration",
+        name: raw("Lambda Integration"),
         descriptionKey: "ingestion.integrations.aws.dynamodb.lambdaIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/dynamodb-streams-to-openobserve-lambda.yaml",
       },
       {
-        name: "Direct Integration",
+        get name() {
+          return gt("ingestion.directIntegration");
+        },
         descriptionKey: "ingestion.integrations.aws.dynamodb.directIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/dynamodb-streams-to-openobserve.yaml",
       },
@@ -276,19 +284,21 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "cloudfront",
-    name: "CloudFront",
-    displayName: "CloudFront Logs",
+    name: raw("CloudFront"),
+    displayName: raw("CloudFront Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.cloudfront.description",
     cloudFormationTemplate: "", // Keep empty when using cloudFormationTemplates
     cloudFormationTemplates: [
       {
-        name: "Direct Integration",
+        get name() {
+          return gt("ingestion.directIntegration");
+        },
         descriptionKey: "ingestion.integrations.aws.cloudfront.directIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudfront-to-openobserve.yaml",
       },
       {
-        name: "S3 Integration",
+        name: raw("S3 Integration"),
         descriptionKey: "ingestion.integrations.aws.cloudfront.s3IntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudfront-to-openobserve-s3.yaml",
       },
@@ -302,8 +312,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "route53",
-    name: "Route53",
-    displayName: "Route53 Query Logs",
+    name: raw("Route53"),
+    displayName: raw("Route53 Query Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.route53.description",
     cloudFormationTemplate:
@@ -317,8 +327,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "eventbridge",
-    name: "EventBridge",
-    displayName: "EventBridge Events",
+    name: raw("EventBridge"),
+    displayName: raw("EventBridge Events"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.eventbridge.description",
     cloudFormationTemplate:
@@ -330,8 +340,8 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "cost-cur",
-    name: "Cost and Usage Reports",
-    displayName: "AWS Cost & Usage Reports",
+    name: raw("Cost and Usage Reports"),
+    displayName: raw("AWS Cost & Usage Reports"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.cost-cur.description",
     cloudFormationTemplate:
@@ -345,19 +355,19 @@ export const awsIntegrations: AWSIntegration[] = [
   },
   {
     id: "kinesis",
-    name: "Kinesis",
-    displayName: "Kinesis Streams",
+    name: raw("Kinesis"),
+    displayName: raw("Kinesis Streams"),
     icon: "",
     descriptionKey: "ingestion.integrations.aws.kinesis.description",
     cloudFormationTemplate: "",
     cloudFormationTemplates: [
       {
-        name: "Lambda Integration",
+        name: raw("Lambda Integration"),
         descriptionKey: "ingestion.integrations.aws.kinesis.lambdaIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/kinesis-to-openobserve-lambda.yaml",
       },
       {
-        name: "Firehose Integration",
+        name: raw("Firehose Integration"),
         descriptionKey: "ingestion.integrations.aws.kinesis.firehoseIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/kinesis-to-openobserve-firehose.yaml",
       },
@@ -370,56 +380,56 @@ export const awsIntegrations: AWSIntegration[] = [
 ];
 
 export const AWS_REGIONS = [
-  { value: "us-east-1", label: "US East (N. Virginia)" },
-  { value: "us-east-2", label: "US East (Ohio)" },
-  { value: "us-west-1", label: "US West (N. California)" },
-  { value: "us-west-2", label: "US West (Oregon)" },
-  { value: "ca-central-1", label: "Canada (Central)" },
-  { value: "ca-west-1", label: "Canada West (Calgary)" },
-  { value: "eu-west-1", label: "Europe (Ireland)" },
-  { value: "eu-west-2", label: "Europe (London)" },
-  { value: "eu-west-3", label: "Europe (Paris)" },
-  { value: "eu-central-1", label: "Europe (Frankfurt)" },
-  { value: "eu-central-2", label: "Europe (Zurich)" },
-  { value: "eu-north-1", label: "Europe (Stockholm)" },
-  { value: "eu-south-1", label: "Europe (Milan)" },
-  { value: "eu-south-2", label: "Europe (Spain)" },
-  { value: "ap-east-1", label: "Asia Pacific (Hong Kong)" },
-  { value: "ap-south-1", label: "Asia Pacific (Mumbai)" },
-  { value: "ap-south-2", label: "Asia Pacific (Hyderabad)" },
-  { value: "ap-southeast-1", label: "Asia Pacific (Singapore)" },
-  { value: "ap-southeast-2", label: "Asia Pacific (Sydney)" },
-  { value: "ap-southeast-3", label: "Asia Pacific (Jakarta)" },
-  { value: "ap-southeast-4", label: "Asia Pacific (Melbourne)" },
-  { value: "ap-northeast-1", label: "Asia Pacific (Tokyo)" },
-  { value: "ap-northeast-2", label: "Asia Pacific (Seoul)" },
-  { value: "ap-northeast-3", label: "Asia Pacific (Osaka)" },
-  { value: "sa-east-1", label: "South America (São Paulo)" },
-  { value: "me-south-1", label: "Middle East (Bahrain)" },
-  { value: "me-central-1", label: "Middle East (UAE)" },
-  { value: "il-central-1", label: "Israel (Tel Aviv)" },
-  { value: "af-south-1", label: "Africa (Cape Town)" },
-  { value: "us-gov-east-1", label: "AWS GovCloud (US-East)" },
-  { value: "us-gov-west-1", label: "AWS GovCloud (US-West)" },
+  { value: "us-east-1", label: raw("US East (N. Virginia)") },
+  { value: "us-east-2", label: raw("US East (Ohio)") },
+  { value: "us-west-1", label: raw("US West (N. California)") },
+  { value: "us-west-2", label: raw("US West (Oregon)") },
+  { value: "ca-central-1", label: raw("Canada (Central)") },
+  { value: "ca-west-1", label: raw("Canada West (Calgary)") },
+  { value: "eu-west-1", label: raw("Europe (Ireland)") },
+  { value: "eu-west-2", label: raw("Europe (London)") },
+  { value: "eu-west-3", label: raw("Europe (Paris)") },
+  { value: "eu-central-1", label: raw("Europe (Frankfurt)") },
+  { value: "eu-central-2", label: raw("Europe (Zurich)") },
+  { value: "eu-north-1", label: raw("Europe (Stockholm)") },
+  { value: "eu-south-1", label: raw("Europe (Milan)") },
+  { value: "eu-south-2", label: raw("Europe (Spain)") },
+  { value: "ap-east-1", label: raw("Asia Pacific (Hong Kong)") },
+  { value: "ap-south-1", label: raw("Asia Pacific (Mumbai)") },
+  { value: "ap-south-2", label: raw("Asia Pacific (Hyderabad)") },
+  { value: "ap-southeast-1", label: raw("Asia Pacific (Singapore)") },
+  { value: "ap-southeast-2", label: raw("Asia Pacific (Sydney)") },
+  { value: "ap-southeast-3", label: raw("Asia Pacific (Jakarta)") },
+  { value: "ap-southeast-4", label: raw("Asia Pacific (Melbourne)") },
+  { value: "ap-northeast-1", label: raw("Asia Pacific (Tokyo)") },
+  { value: "ap-northeast-2", label: raw("Asia Pacific (Seoul)") },
+  { value: "ap-northeast-3", label: raw("Asia Pacific (Osaka)") },
+  { value: "sa-east-1", label: raw("South America (São Paulo)") },
+  { value: "me-south-1", label: raw("Middle East (Bahrain)") },
+  { value: "me-central-1", label: raw("Middle East (UAE)") },
+  { value: "il-central-1", label: raw("Israel (Tel Aviv)") },
+  { value: "af-south-1", label: raw("Africa (Cape Town)") },
+  { value: "us-gov-east-1", label: raw("AWS GovCloud (US-East)") },
+  { value: "us-gov-west-1", label: raw("AWS GovCloud (US-West)") },
 ];
 
 export const QUICK_SETUP_SERVICES: { label: string; flag: string }[] = [
-  { label: "CloudTrail", flag: "EnableCloudTrail" },
-  { label: "CloudWatch Logs", flag: "EnableCloudWatchLogs" },
-  { label: "CloudWatch Metrics", flag: "EnableCloudWatchMetrics" },
-  { label: "VPC Flow Logs", flag: "EnableVPCFlowLogs" },
+  { label: raw("CloudTrail"), flag: "EnableCloudTrail" },
+  { label: raw("CloudWatch Logs"), flag: "EnableCloudWatchLogs" },
+  { label: raw("CloudWatch Metrics"), flag: "EnableCloudWatchMetrics" },
+  { label: raw("VPC Flow Logs"), flag: "EnableVPCFlowLogs" },
   { label: "WAF", flag: "EnableWAF" },
   { label: "ALB", flag: "EnableALB" },
-  { label: "API Gateway", flag: "EnableApiGateway" },
+  { label: raw("API Gateway"), flag: "EnableApiGateway" },
   { label: "RDS", flag: "EnableRDS" },
-  { label: "S3 Access Logs", flag: "EnableS3AccessLogs" },
-  { label: "CloudFront", flag: "EnableCloudFront" },
-  { label: "Route53", flag: "EnableRoute53" },
-  { label: "DynamoDB", flag: "EnableDynamoDB" },
+  { label: raw("S3 Access Logs"), flag: "EnableS3AccessLogs" },
+  { label: raw("CloudFront"), flag: "EnableCloudFront" },
+  { label: raw("Route53"), flag: "EnableRoute53" },
+  { label: raw("DynamoDB"), flag: "EnableDynamoDB" },
   { label: "EC2", flag: "EnableEC2" },
-  { label: "EventBridge", flag: "EnableEventBridge" },
-  { label: "Kinesis", flag: "EnableKinesisStream" },
-  { label: "Cognito", flag: "EnableCognito" },
+  { label: raw("EventBridge"), flag: "EnableEventBridge" },
+  { label: raw("Kinesis"), flag: "EnableKinesisStream" },
+  { label: raw("Cognito"), flag: "EnableCognito" },
 ];
 
 /**

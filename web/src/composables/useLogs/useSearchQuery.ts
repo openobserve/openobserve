@@ -29,7 +29,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
-import { raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 // Walk the WHERE clause AST and replace column references whose name matches
 // a key in the fieldMapping (original field → stream-specific field).
@@ -62,7 +62,7 @@ const replaceColumnRefsInWhere = (node: any, fieldMapping: Record<string, string
   if (node.expr) replaceColumnRefsInWhere(node.expr, fieldMapping);
 };
 
-export const useSearchQuery = () => {
+export const useSearchQuery = (t: TranslateFn) => {
   const store = useStore();
   const router = useRouter();
   const {
@@ -125,7 +125,7 @@ export const useSearchQuery = () => {
     if (queryReq === null) {
       searchObj.loading = false;
       if (!notificationMsg.value) {
-        notificationMsg.value = "Search query is empty or invalid.";
+        notificationMsg.value = t("search.searchQueryEmptyOrInvalid");
       } else {
         searchObj.data.errorMsg = notificationMsg.value;
       }
@@ -134,9 +134,7 @@ export const useSearchQuery = () => {
 
     if (!queryReq) {
       searchObj.loading = false;
-      throw new Error(
-        notificationMsg.value || "Something went wrong while creating Search Request.",
-      );
+      throw new Error(notificationMsg.value || t("search.somethingWentWrongCreatingSearchRequest"));
     }
 
     // get function definition
@@ -279,7 +277,11 @@ export const useSearchQuery = () => {
             const line = loc?.line ?? 1;
             const col = loc?.column ?? 1;
             const msg = buildContextualSqlMessage(query, syntaxErr);
-            searchObj.data.errorMsg = `SQL syntax error at line ${line}, column ${col}: ${msg}`;
+            searchObj.data.errorMsg = t("search.sqlSyntaxErrorDetail", {
+              line,
+              column: col,
+              message: msg,
+            });
             searchObj.data.sqlSyntaxErrorRanges = [
               // msg is string|null; `!` is compile-time only (null passes through unchanged).
               { startLine: line, endLine: line, column: col, error: msg! },
@@ -365,7 +367,7 @@ export const useSearchQuery = () => {
 
       if (timestamps.startTime != "Invalid Date" && timestamps.endTime != "Invalid Date") {
         if (timestamps.startTime > timestamps.endTime) {
-          notificationMsg.value = "Start time cannot be greater than end time";
+          notificationMsg.value = t("search.startTimeGreaterThanEndTime");
           return null;
         }
 
@@ -383,12 +385,11 @@ export const useSearchQuery = () => {
         }
       } else {
         if (timestamps.startTime == "Invalid Date") {
-          notificationMsg.value =
-            "The selected start time is  invalid. Please choose a valid time.";
+          notificationMsg.value = t("search.selectedStartTimeInvalid");
         } else if (timestamps.endTime == "Invalid Date") {
-          notificationMsg.value = "The selected end time is  invalid. Please choose a valid time.";
+          notificationMsg.value = t("search.selectedEndTimeInvalid");
         } else {
-          notificationMsg.value = "Invalid date format.";
+          notificationMsg.value = t("search.invalidDateFormat");
         }
         return null;
       }
@@ -399,7 +400,7 @@ export const useSearchQuery = () => {
         return handleNonSqlMode(query, req);
       }
     } catch (e: any) {
-      notificationMsg.value = "An error occurred while constructing the search query.";
+      notificationMsg.value = t("search.errorConstructingSearchQuery");
       return null;
     }
   };
@@ -448,18 +449,20 @@ export const useSearchQuery = () => {
 
     if (parsedSQL != undefined) {
       if (!checkTimestampAlias(searchObj.data.query)) {
-        const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
+        const errorMsg = t("search.aliasNotAllowed", {
+          alias: store.state.zoConfig.timestamp_column || "_timestamp",
+        });
         notificationMsg.value = errorMsg;
         return null;
       }
 
       if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
-        notificationMsg.value = "SQL query is missing or invalid.";
+        notificationMsg.value = t("search.sqlQueryMissingOrInvalid");
         return null;
       }
 
       if (!parsedSQL?.columns?.length && !searchObj.meta.sqlMode) {
-        notificationMsg.value = "No column found in selected stream.";
+        notificationMsg.value = t("search.noColumnFoundInStream");
         return null;
       }
 
@@ -699,7 +702,9 @@ export const useSearchQuery = () => {
           (field: any) => field.streams.length === streamsCount,
         );
         if (!allStreamsEqual) {
-          searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
+          searchObj.data.filterErrMsg += t("search.fieldStreamCountMismatch", {
+            field: fieldName,
+          });
         }
       }
 
@@ -749,16 +754,18 @@ export const useSearchQuery = () => {
           filteredFields.length === 0 &&
           missingStreamsForField.length === searchObj.data.stream.selectedStream.length
         ) {
-          searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
+          searchObj.data.filterErrMsg += t("search.fieldMissingInStreams", {
+            field: fieldName,
+          });
         }
       }
 
       searchObj.data.stream.missingStreamMultiStreamFilter = missingStreamsForField;
 
       if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
-        searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(
-          ", ",
-        )}", hence no search is performed in the mentioned stream.\n`;
+        searchObj.data.missingStreamMessage = t("search.missingStreamFilterFields", {
+          streams: searchObj.data.stream.missingStreamMultiStreamFilter.join(", "),
+        });
       }
     }
 

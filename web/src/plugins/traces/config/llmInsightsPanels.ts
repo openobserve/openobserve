@@ -64,8 +64,12 @@ export interface LLMPanelQuery {
   seriesField?: string;
   /** Hit field used for the y-value (or bar length). */
   valueField?: string;
-  /** Legend label used when seriesField is not set. */
-  seriesLabel?: string;
+  /**
+   * i18n KEY for the legend label used when seriesField is not set. Resolved by
+   * `buildLLMPanelSchema` — see {@link LLMTableColumn.labelKey} for why this
+   * module stores a key rather than a translated string.
+   */
+  seriesLabelKey?: I18nKey;
   /**
    * Hint to the renderer for axis / tooltip formatting.
    * - "cost": prefix with `$` and use 2-decimal precision in tooltips.
@@ -275,7 +279,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       `,
       timeField: "ts",
       valueField: "count",
-      seriesLabel: "errors",
+      seriesLabelKey: "traces.lLMInsightsDashboard.errorsSeries",
     },
   },
   {

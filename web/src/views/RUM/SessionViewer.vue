@@ -293,8 +293,8 @@ const getSessionDetails = () => {
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
     user_email: sessionState.data.selectedSession?.user_email || t("common.unknownUser"),
-    city: sessionState.data.selectedSession?.city || "Unknown",
-    country: sessionState.data.selectedSession?.country || "Unknown",
+    city: sessionState.data.selectedSession?.city || t("common.unknown"),
+    country: sessionState.data.selectedSession?.country || t("common.unknown"),
     id: sessionState.data.selectedSession?.session_id,
   };
 };
@@ -453,7 +453,10 @@ const getSessionEvents = () => {
     .then((res) => {
       const events = ["action", "view", "error"];
 
-      if (!sessionDetails.value.user_email || sessionDetails.value.user_email === "Unknown User")
+      // Test the SOURCE field, not the rendered value: user_email is filled with
+      // t("common.unknownUser") when absent, so comparing it to the English
+      // literal stopped this backfill firing in every non-English locale.
+      if (!sessionState.data.selectedSession?.user_email)
         sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
 
       segmentEvents.value = res.data.hits.filter((hit: any) => {
@@ -555,7 +558,11 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
+  _event.name =
+    t("rum.actionOnTarget", {
+      action: event?.action_type,
+      target: event?.action_target_name,
+    }) || "--";
 
   // Add frustration information if present
   if (event?.action_frustration_type) {

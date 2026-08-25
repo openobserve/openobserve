@@ -132,10 +132,10 @@ pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
         .and_then(|_| refresh_openfga_config())
 }
 
+/// Authenticated full UI configuration (`GET /api/{org_id}/config`).
 #[derive(Serialize)]
 struct ConfigResponse<'a> {
     version: String,
-    instance: String,
     commit_hash: String,
     build_date: String,
     build_type: String,
@@ -211,10 +211,26 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    /// Whether private locations — pools served by long-running agents deployed
+    /// inside the customer's network — are available. Enterprise only, so the
+    /// UI hides the private-locations views, the agent-setup drawer and the
+    /// public/private selector on this rather than on `synthetics_enabled`.
+    synthetics_private_locations_enabled: bool,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
-    /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
+    /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
     synthetics_recorder_extension_url: String,
+    /// Database Monitoring (`ZO_DB_MONITORING_ENABLED`). Plain OSS flag — no
+    /// enterprise gating (design §8): menu/route gating in the UI checks this
+    /// flag alone, without an `isEnterprise` conjunct.
+    ///
+    /// The ONLY DBM field on this payload, by product decision: DBM is a single
+    /// switch — enabled means every signal is canonicalized and served,
+    /// disabled means none is. The per-signal flags (instance metrics,
+    /// activity, top query) were removed together with their config knobs, so
+    /// the UI never has to distinguish "feed switched off here" from "collector
+    /// not reporting".
+    database_monitoring_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -229,6 +245,30 @@ struct ConfigResponse<'a> {
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
+}
+
+/// Unauthenticated bootstrap configuration (`GET /config`).
+///
+/// Served without auth so the login page can render, which makes every field a
+/// disclosure to anonymous clients. Keep it to what the login page actually
+/// consumes; everything else belongs in [`ConfigResponse`] behind auth. The
+/// exact-key-set test on this response enforces that.
+#[derive(Serialize)]
+struct ConfigBootstrapResponse {
+    /// `enterprise` / `cloud` / `opensource`. Not sensitive, and the o2 CLI and
+    /// o2-operator read it from this unauthenticated endpoint to gate their
+    /// enterprise-only commands, so it must stay on the bootstrap.
+    build_type: String,
+    /// The UI's stale-build checker compares it across deploys.
+    commit_hash: String,
+    telemetry_enabled: bool,
+    sso_enabled: bool,
+    native_login_enabled: bool,
+    custom_logo_text: String,
+    custom_logo_img: Option<String>,
+    custom_logo_dark_img: Option<String>,
+    custom_hide_self_logo: bool,
+    rum: Rum,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -331,6 +371,53 @@ pub async fn schedulez() -> impl IntoResponse {
     )
 }
 
+/// Unauthenticated login-page bootstrap; the full config is served
+/// authenticated by [`zo_config`].
+pub async fn zo_config_bootstrap() -> impl IntoResponse {
+    let cfg = get_config();
+    #[cfg(feature = "enterprise")]
+    let o2cfg = get_o2_config();
+    #[cfg(feature = "enterprise")]
+    let dex_cfg = get_dex_config();
+
+    #[cfg(feature = "enterprise")]
+    let block_features = block_feature_for_report_failure().await;
+
+    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
+    let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
+    let custom_logo_text = enterprise_value!(
+        "".to_string(),
+        get_logo_text()
+            .await
+            .unwrap_or_else(|| o2cfg.common.custom_logo_text.clone())
+    );
+    let custom_logo_img = enterprise_value!(None, get_logo().await);
+    let custom_logo_dark_img = enterprise_value!(None, get_logo_dark().await);
+    let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
+
+    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
+    let build_type = "cloud";
+    #[cfg(feature = "enterprise")]
+    let build_type = "enterprise";
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    let build_type = "opensource";
+
+    axum::Json(ConfigBootstrapResponse {
+        build_type: build_type.to_string(),
+        commit_hash: config::COMMIT_HASH.to_string(),
+        telemetry_enabled: cfg.common.telemetry_enabled,
+        sso_enabled,
+        native_login_enabled,
+        custom_logo_text,
+        custom_logo_img,
+        custom_logo_dark_img,
+        custom_hide_self_logo,
+        rum: Rum::from_cfg(cfg.clone()),
+    })
+}
+
+/// Full UI configuration; org-scoped so auth applies, though the payload is
+/// instance-level.
 pub async fn zo_config() -> impl IntoResponse {
     let cfg = get_config();
     #[cfg(feature = "enterprise")]
@@ -379,9 +466,15 @@ pub async fn zo_config() -> impl IntoResponse {
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
-    let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
-    let synthetics_recorder_extension_url =
-        enterprise_value!("", &o2cfg.synthetics.recorder_extension_url);
+    // Read straight from the config in every build: synthetics is OSS now, and
+    // reporting `false` here is what hid the whole feature from the UI.
+    let synthetics_enabled = cfg.synthetics.enabled;
+    // The private-agent path is the part that stays enterprise, so it gets its
+    // own flag. Gating the UI on this rather than on `synthetics_enabled` is
+    // what lets an OSS build show synthetics without offering a location it
+    // cannot serve.
+    let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
+    let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -418,7 +511,6 @@ pub async fn zo_config() -> impl IntoResponse {
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
-        instance: get_instance_id(),
         commit_hash: config::COMMIT_HASH.to_string(),
         build_date: config::BUILD_DATE.to_string(),
         build_type: build_type.to_string(),
@@ -497,7 +589,9 @@ pub async fn zo_config() -> impl IntoResponse {
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
+        database_monitoring_enabled: cfg.db_monitoring.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,

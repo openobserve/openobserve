@@ -85,6 +85,10 @@ const store = createStore({
     regionInfo: [],
     zoConfig: {
       service_account_enabled: true,
+      // Enterprise-shaped by default, which is what the synthetics specs were
+      // written against. The specs that cover the OSS shape set it to false
+      // themselves.
+      synthetics_private_locations_enabled: true,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",
@@ -183,6 +187,15 @@ const store = createStore({
       lastFetched: null as number | null,
       cacheExpiry: 300000,
       dashboardJsonCache: {} as Record<string, any>,
+    },
+    // Mirrors the real store's alertLibrary block. Present here so that any
+    // component reading the library cache gets a defined shape in unit tests
+    // instead of dereferencing undefined.
+    alertLibrary: {
+      manifest: null as any,
+      lastFetched: null as number | null,
+      cacheExpiry: 10 * 60 * 1000,
+      fileCache: {} as Record<string, any>,
     },
   },
   mutations: {
@@ -343,6 +356,19 @@ const store = createStore({
     },
     setAlertListFilters(state, payload) {
       state.alertListFilters = { ...state.alertListFilters, ...payload };
+    },
+    setAlertLibraryManifest(state, payload) {
+      state.alertLibrary.manifest = payload;
+      state.alertLibrary.lastFetched = Date.now();
+    },
+    setAlertLibraryFile(state, payload) {
+      state.alertLibrary.fileCache[payload.id] = payload.file;
+    },
+    // In place, leaving cacheExpiry alone — same contract as the real store.
+    clearAlertLibrary(state) {
+      state.alertLibrary.manifest = null;
+      state.alertLibrary.lastFetched = null;
+      state.alertLibrary.fileCache = {};
     },
     setGithubDashboardGallery(state, payload) {
       state.githubDashboardGallery = {

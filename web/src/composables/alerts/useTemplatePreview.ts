@@ -6,6 +6,8 @@
 // {rows:N}, {var:N}, {...rows} spread — is rendered as an opaque chip and
 // never faked, because a confident-but-wrong preview is worse than none.
 
+import { raw } from "@/types/i18n";
+
 export type SegmentClass = "text" | "live" | "sample" | "opaque";
 
 export interface PreviewSegment {
@@ -97,7 +99,7 @@ const MOCK_SAMPLE: Record<string, string> = {
   alert_trigger_time: "2026-06-28T10:30:00Z",
   alert_trigger_time_millis: "1782303000000",
   alert_trigger_time_seconds: "1782303000",
-  alert_trigger_time_str: "Jun 28, 2026 10:30:00",
+  alert_trigger_time_str: raw("Jun 28, 2026 10:30:00"),
 };
 
 export function buildPreviewContext(

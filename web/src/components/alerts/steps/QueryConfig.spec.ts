@@ -1396,6 +1396,57 @@ describe("QueryConfig.vue", () => {
     });
   });
 
+  // A prefill (alert library, dashboard panel, logs search) seeds the WHOLE
+  // form at once, and stream_type lands before query_condition.type does. The
+  // metrics defaults treated that as "the user just picked a metrics stream on
+  // a blank alert" and wrote `avg` + a `having` threshold over an alert that
+  // already had one — inventing a second threshold beside the real
+  // promql_condition, on 1224 of the library's 1242 alerts.
+  describe("logs → metrics as part of a PREFILL, not a user gesture", () => {
+    it("does not default to avg + aggregation while a prefill is seeding", async () => {
+      await setQCProps({ streamType: "logs", isSeeding: true });
+      await nextTick();
+
+      wrapper.emitted("update:isAggregationEnabled")?.splice(0);
+      await setQCProps({ streamType: "metrics" });
+      await nextTick();
+
+      expect(wrapper.vm.selectedFunction).toBe("total_events");
+      expect(wrapper.vm.localIsAggregationEnabled).toBe(false);
+      const emits = wrapper.emitted("update:isAggregationEnabled");
+      expect(emits![emits!.length - 1][0]).toBe(false);
+    });
+
+    it("does not default to avg + aggregation for an alert that is already PromQL", async () => {
+      // Seeding has finished, but the form says promql: a PromQL alert has no
+      // aggregation — its threshold IS promql_condition.
+      const { h, props } = mountHost(
+        { streamType: "logs" },
+        { query_condition: { ...hostDefaults().query_condition, type: "promql", promql: "up" } },
+      );
+      const qc = h.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+
+      props.streamType = "metrics";
+      await nextTick();
+
+      expect(qc.vm.selectedFunction).toBe("total_events");
+      expect(qc.vm.localIsAggregationEnabled).toBe(false);
+      h.unmount();
+    });
+
+    it("STILL defaults to avg when a user picks a metrics stream on a blank alert", async () => {
+      // The guard must not swallow the real gesture it was built around.
+      await setQCProps({ streamType: "logs", isSeeding: false });
+      await nextTick();
+
+      await setQCProps({ streamType: "metrics" });
+      await nextTick();
+
+      expect(wrapper.vm.selectedFunction).toBe("avg");
+      expect(wrapper.vm.localIsAggregationEnabled).toBe(true);
+    });
+  });
+
   describe("Issue #5: PromQL → Builder on non-metrics stream switch", () => {
     it("should switch from promql to custom when stream changes to logs", async () => {
       // Mount with metrics to access promql tab

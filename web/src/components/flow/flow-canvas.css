@@ -40,7 +40,7 @@
   width: auto;
   min-height: 2.75rem;
   border-radius: 0.75rem;
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 8%, transparent);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-black) 8%, transparent);
   cursor: grab;
   display: flex;
   align-items: center;
@@ -64,7 +64,43 @@
 }
 
 .o2vf_node .vue-flow__node.selected {
-  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-indigo-500) 22%, transparent);
+  /* A selection RING, not elevation — kept as box-shadow because a global
+     stylesheet cannot use the ring-* utilities a template would. */
+  --glow-color: var(--color-indigo-500);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--glow-color) 22%, transparent);
+}
+
+/* Active result node — the step whose Input/Output is showing in the results dock
+   (WorkflowNode marks its card `wf-result-active`). The ring uses the node's TYPE
+   colour (blue trigger / amber logic / green action) so it reads as an emphasis of
+   that node, not a foreign highlight. `!important` so it wins over the type hover
+   shadow while a node is being inspected. */
+.o2vf_node .vue-flow__node-input:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-blue-500) 60%, transparent) !important;
+}
+.o2vf_node .vue-flow__node-default:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-amber-500) 65%, transparent) !important;
+}
+.o2vf_node .vue-flow__node-output:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-success-500) 60%, transparent) !important;
+}
+
+/* Disabled/muted node — the step is toggled off (WorkflowNode marks its card
+   `wf-node-disabled`). The FRAME loses its type colour and shadow (neutral grey);
+   the icon + label are desaturated SEPARATELY (below) rather than filtering the
+   whole node, so the hover action buttons keep their own colours (a CSS `filter`
+   on the wrapper would grey the buttons too — they can't opt out). */
+.o2vf_node .vue-flow__node:has(.wf-node-disabled) {
+  background: color-mix(in srgb, var(--color-grey-500) 8%, var(--color-surface-base)) !important;
+  border-color: var(--color-border-default) !important;
+  box-shadow: none !important;
+}
+/* Desaturate + dim ONLY the type icon (a colour image) and the label — not the
+   action buttons (they sit in a sibling slot, outside these two containers). */
+.o2vf_node .wf-node-disabled .flow-node__icon,
+.o2vf_node .wf-node-disabled .flow-node__container {
+  filter: grayscale(1);
+  opacity: 0.55;
 }
 
 /* ── Per-type colour: input = blue, default = amber, output = green ──────── */
@@ -74,7 +110,7 @@
   color: var(--color-grey-800);
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--color-blue-50) 80%, transparent);
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-blue-500) 10%, transparent);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-blue-500) 10%, transparent);
 }
 
 .o2vf_node .vue-flow__node-default {
@@ -83,7 +119,7 @@
   color: var(--color-grey-800);
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--color-amber-50) 80%, transparent);
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-amber-500) 10%, transparent);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-amber-500) 10%, transparent);
 }
 
 .o2vf_node .vue-flow__node-output {
@@ -92,26 +128,28 @@
   color: var(--color-grey-800);
   border-radius: 0.75rem;
   background: var(--color-success-50);
-  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-success-500) 10%, transparent);
+  box-shadow: var(--shadow-glow-sm-geom)
+    color-mix(in srgb, var(--color-success-500) 10%, transparent);
 }
 
 /* ── Hover glow, same three roles ────────────────────────────────────────── */
 .o2vf_node .vue-flow__node-input:hover {
   background: var(--color-blue-50);
   border-color: color-mix(in srgb, var(--color-blue-400) 90%, transparent);
-  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-blue-500) 20%, transparent);
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-blue-500) 20%, transparent);
 }
 
 .o2vf_node .vue-flow__node-default:hover {
   background: color-mix(in srgb, var(--color-amber-50) 95%, transparent);
   border-color: var(--color-amber-500);
-  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-amber-600) 20%, transparent);
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-amber-600) 20%, transparent);
 }
 
 .o2vf_node .vue-flow__node-output:hover {
   background: var(--color-success-50);
   border-color: color-mix(in srgb, var(--color-success-400) 80%, transparent);
-  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-success-500) 20%, transparent);
+  box-shadow: var(--shadow-glow-lg-geom)
+    color-mix(in srgb, var(--color-success-500) 20%, transparent);
 }
 
 /* ── Handles — a coloured ring with a darker inner dot (the `::before`) ──── */
@@ -121,7 +159,7 @@
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
   background: var(--color-grey-500);
-  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
+  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-black) 15%, transparent);
   transition: all 0.3s ease;
 }
 
@@ -170,7 +208,7 @@
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
 .dark .o2vf_node .vue-flow__node {
   background: color-mix(in srgb, var(--color-surface-base) 90%, transparent) !important;
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 35%, transparent);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-black) 35%, transparent);
 }
 
 .dark .o2vf_node .vue-flow__node-input {
@@ -194,19 +232,41 @@
 .dark .o2vf_node .vue-flow__node-input:hover {
   background: color-mix(in srgb, var(--color-blue-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-blue-400) 50%, transparent) !important;
-  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-blue-500) 20%, transparent) !important;
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-blue-500) 20%, transparent) !important;
 }
 
 .dark .o2vf_node .vue-flow__node-default:hover {
   background: color-mix(in srgb, var(--color-warning-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-orange-400) 50%, transparent) !important;
-  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-amber-500) 20%, transparent) !important;
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-amber-500) 20%, transparent) !important;
 }
 
 .dark .o2vf_node .vue-flow__node-output:hover {
   background: color-mix(in srgb, var(--color-success-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-success-400) 50%, transparent) !important;
-  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-success-500) 20%, transparent) !important;
+  box-shadow: var(--shadow-glow-lg-geom)
+    color-mix(in srgb, var(--color-success-500) 20%, transparent) !important;
+}
+
+/* Active result ring in DARK mode — per node TYPE colour. Higher specificity than
+   the dark per-type rules above (and !important to beat their hover shadows) so
+   the ring shows; lighter tints that read on the dark canvas. */
+.dark .o2vf_node .vue-flow__node-input:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-blue-400) 75%, transparent) !important;
+}
+.dark .o2vf_node .vue-flow__node-default:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-orange-400) 80%, transparent) !important;
+}
+.dark .o2vf_node .vue-flow__node-output:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-success-400) 75%, transparent) !important;
+}
+
+/* Disabled node neutral frame in DARK mode (higher specificity than the dark
+   per-type rules above, which would otherwise re-apply the type colour). */
+.dark .o2vf_node .vue-flow__node:has(.wf-node-disabled) {
+  background: color-mix(in srgb, var(--color-white) 5%, var(--color-surface-base)) !important;
+  border-color: var(--color-border-default) !important;
+  box-shadow: none !important;
 }
 
 /* ── Drag-lag suppression (moved out of PipelineEditor.vue's unscoped <style>) ─

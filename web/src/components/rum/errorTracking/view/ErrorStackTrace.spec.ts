@@ -216,14 +216,12 @@ describe("ErrorStackTrace Component", () => {
 
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
-    const firstStyle = stackLines[0].attributes("style");
-    expect(firstStyle).toContain("border-top: 1px solid var(--color-border-default)");
+    // The top border is a `border-t` utility (the colour comes from the
+    // element's own `border-border-default`); only the first line carries it.
+    expect(stackLines[0].classes()).toContain("border-t");
 
     for (let i = 1; i < stackLines.length; i++) {
-      const style = stackLines[i].attributes("style");
-      if (style) {
-        expect(style).not.toContain("border-top: 1px solid var(--color-border-default)");
-      }
+      expect(stackLines[i].classes()).not.toContain("border-t");
     }
   });
 
@@ -254,8 +252,8 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(stackLines).toHaveLength(1);
+    expect(stackLines[0].classes()).toContain("border-t");
     const style = stackLines[0].attributes("style");
-    expect(style).toContain("border-top: 1px solid var(--color-border-default)");
     expect(style).toContain("border-radius: 0 0 0.25rem 0.25rem");
   });
 

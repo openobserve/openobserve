@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         relativePeriod == period.value &&
                         relativeValue == item
                           ? 'bg-button-primary! text-button-primary-foreground!'
-                          : `bg-[color-mix(in_srgb,var(--color-text-heading)_7%,transparent)]! ${relativePeriod}`
+                          : `bg-text-heading/7! ${relativePeriod}`
                       "
                       variant="ghost"
                       size="xs"
@@ -315,7 +315,7 @@ import {
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 interface ConsumableDateTime {
@@ -427,7 +427,8 @@ export default defineComponent({
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
       return tz;
     });
-    const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const browserTime = raw("Browser Time (" + browserTz + ")");
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
@@ -466,7 +467,11 @@ export default defineComponent({
     const isTimezoneSelectOpen = ref(false);
 
     const timezoneSelectOptions = computed(() =>
-      timezoneOptions.map((tz: string) => ({ label: raw(tz), value: tz })),
+      timezoneOptions.map((tz: string) =>
+        tz === browserTime
+          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+          : { label: raw(tz), value: tz },
+      ),
     );
 
     let relativePeriods = [
@@ -575,6 +580,10 @@ export default defineComponent({
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
+        // NOTE: the emit below is already stamped programmatic — `setAbsoluteTime`
+        // above calls `markProgrammaticDateChange()`, and its nextTick reset has
+        // not run yet. Consumers must therefore treat `userChangedValue === false`
+        // as "do not fetch": the parent's own `onMounted` covers the first load.
         saveDate(initialType);
       } catch (e) {
         console.log(e);
@@ -800,16 +809,43 @@ export default defineComponent({
         resetTime(selectedTime.value.startTime, selectedTime.value.endTime);
     };
 
-    const getPeriodLabel = computed(() => {
-      const periodMapping: Record<string, string> = {
-        s: "Seconds",
-        m: "Minutes",
-        h: "Hours",
-        d: "Days",
-        w: "Weeks",
-        M: "Months",
+    // Arithmetic unit consumed by getConsumableDateTime's `subtractObject` —
+    // a code token, never rendered, so it must stay English regardless of locale.
+    const PERIOD_ARITHMETIC_UNIT: Record<string, string> = {
+      s: "seconds",
+      m: "minutes",
+      h: "hours",
+      d: "days",
+      w: "weeks",
+      M: "months",
+    };
+
+    const periodLabelKey = computed<I18nKey>(() => {
+      const keys: Record<string, I18nKey> = {
+        s: "common.seconds",
+        m: "common.minutes",
+        h: "common.hours",
+        d: "common.days",
+        w: "common.weeks",
+        M: "common.months",
       };
-      return periodMapping[relativePeriod.value];
+      return keys[relativePeriod.value];
+    });
+    const getPeriodLabel = computed(() => t(periodLabelKey.value));
+
+    // "Past 15 Minutes" — one whole-sentence pipe-plural key per unit rather than
+    // gluing the period noun onto a translated "Past" fragment (word order is
+    // per-language, and so is the number of plural forms).
+    const pastPeriodKey = computed<I18nKey>(() => {
+      const keys: Record<string, I18nKey> = {
+        s: "common.pastSecond",
+        m: "common.pastMinute",
+        h: "common.pastHour",
+        d: "common.pastDay",
+        w: "common.pastWeek",
+        M: "common.pastMonth",
+      };
+      return keys[relativePeriod.value];
     });
 
     function isValidDateTimeString(dateStr: string, timeStr: string): boolean {
@@ -818,7 +854,7 @@ export default defineComponent({
 
     const getConsumableDateTime = (): ConsumableDateTime => {
       if (selectedType.value == "relative") {
-        let period = getPeriodLabel.value.toLowerCase();
+        let period = PERIOD_ARITHMETIC_UNIT[relativePeriod.value];
         let periodValue = relativeValue.value;
 
         // arithmetic on weeks is not supported; convert to days.
@@ -948,7 +984,7 @@ export default defineComponent({
 
     const getDisplayValue = computed(() => {
       if (!props.disableRelative && selectedType.value === "relative") {
-        return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
+        return t(pastPeriodKey.value, { count: relativeValue.value });
       } else {
         if (selectedDate.value != null) {
           // Here as if multiple dates is selected we get object with from and to keys

@@ -57,8 +57,7 @@ export function useStickyColumns(props: any, store: any) {
       left: `${leftOffset}px`,
       "z-index": 2,
       "background-color": chartColor("--color-surface-base"),
-      // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-      "box-shadow": "4px 0 8px rgba(0, 0, 0, 0.15)",
+      "box-shadow": "var(--shadow-sticky-left)",
     };
   };
 
@@ -82,10 +81,8 @@ export function useStickyColumns(props: any, store: any) {
     const scope = `.my-sticky-virtscroll-table[data-sticky-id="${tableId}"]`;
 
     // Shadow constants — right-sticky uses inset shadow to match TableRenderer scoped style
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-    const shadowRight = "4px 0 8px rgba(0, 0, 0, 0.15)";
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-    const shadowLeft = "inset 4px 0 6px -2px rgba(0, 0, 0, 0.15)";
+    const shadowRight = "var(--shadow-sticky-left)";
+    const shadowLeft = "var(--shadow-sticky-right)";
     const shadowBoth = `${shadowRight}, ${shadowLeft}`;
 
     // Generate CSS rules for each column position
@@ -127,37 +124,42 @@ export function useStickyColumns(props: any, store: any) {
     });
 
     // Add base styling for all sticky columns
-    /* eslint-disable local/no-hardcoded-px -- box-shadow offsets/blurs below are optical effects, not layout — scaling them with text makes elevation bloom */
     css =
       `
       /* Left-sticky body cells: shadow on right */
       ${scope} tbody td.sticky-column {
         position: sticky !important;
         z-index: 2 !important;
-        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: var(--shadow-sticky-left) !important;
       }
 
-      /* Right-sticky total column body cells: inset shadow on left */
+      /* Right-sticky total column body cells: shadow on the left edge. The
+         original drew an INSET shadow inside the column; the token casts
+         outward onto the scrolling cells instead. Same boundary, opposite
+         side, and it matches what OTable's sticky cells already do. */
       ${scope} tbody td.pivot-total-col {
         position: sticky !important;
         z-index: 2 !important;
         background-color: ${bgColor} !important;
-        box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: var(--shadow-sticky-right) !important;
       }
 
-      /* Middle sticky body cells (left + right): outward right + inset left */
+      /* Middle sticky body cells: outward on both edges */
       ${scope} tbody td.sticky-column.pivot-total-col {
-        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15), inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: var(--shadow-sticky-left), var(--shadow-sticky-right) !important;
       }
 
-      /* Sticky total row (bottom sticky) */
+      /* Sticky total row (bottom sticky). --shadow-sticky-footer, NOT
+         --shadow-scroll-bottom: a pinned footer casts OUTWARD and UPWARD onto
+         the rows it overlaps. scroll-bottom is an INSET bottom-edge gradient
+         meaning "content continues below" — a different affordance entirely. */
       ${scope}.pivot-sticky-totals .pivot-sticky-total-row td {
         position: sticky !important;
         bottom: 0 !important;
         z-index: 2 !important;
         background-color: ${bgColor} !important;
         font-weight: bold !important;
-        box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1) !important;
+        box-shadow: var(--shadow-sticky-footer) !important;
       }
 
       /* Corner: sticky total row + sticky total column intersection */
@@ -167,7 +169,6 @@ export function useStickyColumns(props: any, store: any) {
 
       /* Column-specific positions for headers and body cells */
     ` + css;
-    /* eslint-enable local/no-hardcoded-px */
 
     styleElement.textContent = css;
     document.head.appendChild(styleElement);

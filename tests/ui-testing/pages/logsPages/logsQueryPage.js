@@ -199,7 +199,10 @@ export class LogsQueryPage {
     if (this._autoQueryEnabledCache !== undefined) return this._autoQueryEnabledCache;
     this._autoQueryEnabledCache = await this.page.evaluate(async () => {
       try {
-        const res = await fetch('/config', { credentials: 'include' });
+        // auto_query_enabled lives on the AUTHENTICATED per-org config; the
+        // unauthenticated /config bootstrap no longer carries flags.
+        const org = new URLSearchParams(location.search).get('org_identifier') || 'default';
+        const res = await fetch(`/api/${org}/config`, { credentials: 'include' });
         if (!res.ok) return false;
         const cfg = await res.json();
         return cfg?.auto_query_enabled === true;
