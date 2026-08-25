@@ -107,8 +107,9 @@ export const queryClient = new QueryClient({
       staleTime: DEFAULT_STALE_TIME,
       retry: (failureCount: number, err: any) => {
         const status = err?.response?.status;
-        // 4xx are the caller's fault; retrying just multiplies the error toast.
-        if (status === 400 || status === 401 || status === 403 || status === 404) return false;
+        // 4xx are the caller's fault; 501 is a disabled feature — both permanent.
+        if (status === 400 || status === 401 || status === 403 || status === 404 || status === 501)
+          return false;
         return failureCount < 2;
       },
       // Off by default: this console is often left open on a wall display and

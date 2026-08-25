@@ -469,7 +469,7 @@ const store = useStore();
 // The org/folder a read is *currently* aimed at. `load()` may be handed a
 // folder the route refs have not caught up with yet, so the key tracks these
 // rather than `activeFolderId` directly.
-const readOrg = ref<string>("");
+const readOrg = ref<string>(store.state.selectedOrganization?.identifier ?? "");
 const readFolder = ref<string | undefined>(undefined);
 
 const slosList = useQuery(() =>
