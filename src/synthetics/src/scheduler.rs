@@ -32,10 +32,18 @@ use config::{
 };
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
-    table::{synthetics_checks, synthetics_jobs, synthetics_locations, synthetics_runs},
+    table::{
+        org_ingestion_tokens, synthetics_checks, synthetics_jobs, synthetics_locations,
+        synthetics_runs,
+    },
 };
 use serde::Serialize;
 use svix_ksuid::KsuidLike as _;
+
+/// The org every dead letter is copied to, so a platform operator sees them
+/// without holding every customer org. Same constant and same reason as
+/// `reaper::META_ORG`.
+const META_ORG: &str = "_meta";
 
 const TICK: Duration = Duration::from_secs(5);
 /// Max synthetics to pull per tick.
@@ -125,6 +133,108 @@ struct LogCooldown {
 /// job rather than the fate of one, and it is the only value that means the
 /// customer's own account state stopped the check.
 pub const ERROR_SOURCE_TRIAL: &str = "trial";
+
+/// `error_source` for a slot the free step pool denied — SPEC §7.3, item **2.4**.
+///
+/// Like [`ERROR_SOURCE_TRIAL`] it describes the *absence* of a job rather than
+/// the fate of one, and like it, it says the customer's own account state
+/// stopped the check rather than anything about the target. Separable from
+/// `trial` because the response differs: a lapsed trial does not un-lapse, while
+/// an exhausted grant re-opens the moment the org subscribes or an operator
+/// raises the limit (§6.2, E17).
+pub const ERROR_SOURCE_QUOTA: &str = "quota";
+
+/// SPEC §7.3's exhaustion policy, re-derived locally.
+///
+/// The authority is `o2_enterprise::enterprise::cloud::ai_credits::
+/// resolve_ai_credit_exhaustion_policy`, whose `(subscription_type, provider)`
+/// table is §7.3's table arm for arm. It is named for AI credits because it was
+/// written for them, but nothing in it is AI-specific — it answers *"this org's
+/// included quota is gone; may it keep going, must it subscribe, or must it call
+/// its account manager?"*, which is exactly §7.3's question. Reusing it is what
+/// keeps the two pools' exhaustion behaviour from drifting apart.
+///
+/// Mirrored into a local enum for the same reason [`BillingSubscription`] is:
+/// the decision below is then pure and testable in every build shape, including
+/// one with no `cloud` feature and no enterprise crate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PoolExhaustionPolicy {
+    /// Rate or Enterprise on Stripe or Azure — run it and bill the overage
+    /// (E16/T31).
+    MeteredOverage,
+    /// Free — and, today, Rate/Enterprise on AWS Marketplace. Skip the slot
+    /// (E15/T30).
+    ///
+    /// ⚠️ SPEC §7.3 marks the AWS half **MUST fix**: `metering/aws.rs` has no
+    /// synthetics dimension arm, so an AWS Marketplace org that could be charged
+    /// is blocked instead. That is SPEC item **1.8**, in o2-enterprise, and is
+    /// deliberately not fixed here.
+    SubscriptionRequired,
+    /// ExternalContract — *"notify, never block, never pool-gate"* (E18/T36).
+    AdditionalCreditsRequired,
+}
+
+/// Gate 3 of §7.1 — what happens to ONE location slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PoolGate {
+    /// Enqueue it. Either the grant paid for it, or no grant was consulted —
+    /// a private venue, or a node that does not meter. How many steps were
+    /// actually reserved is [`reserve_for_slot`]'s second return value, and
+    /// only a non-zero one has anything to refund.
+    Run,
+    /// The grant is spent and the org can be charged for the overage. Enqueue
+    /// with NO reservation, so the ack meters it as `SyntheticsSteps` (E16/T31).
+    RunAsOverage,
+    /// An ExternalContract org. Enqueue with no reservation and tell someone —
+    /// **never** block (E18/T36).
+    RunAndNotify,
+    /// Skip THIS SLOT. Dead-letter it and write a result row carrying
+    /// [`ERROR_SOURCE_QUOTA`].
+    ///
+    /// **The check stays ENABLED.** SPEC §7.3: *"MUST NOT disable the check. A
+    /// billing system making destructive changes to customer config is
+    /// unacceptable. Skipping is reversible the moment they subscribe."*
+    /// (E15/T30). `the_quota_gate_never_disables_a_check` pins it.
+    Skip,
+}
+
+/// Whether this org's plan lets the free pool be consulted for a slot at all.
+///
+/// False for **ExternalContract** only: §7.3 says those are *"notify, never
+/// block, never pool-gate"*, and §7.4 needs their acks to carry the BILLABLE
+/// `SyntheticsSteps` so the NoOp provider can advance a step-denominated
+/// true-up. Reserving from their grant would emit `SyntheticsFreeSteps` instead
+/// and silently shorten that true-up by up to a whole grant (E18/T36).
+pub fn pool_reserves(policy: PoolExhaustionPolicy) -> bool {
+    !matches!(policy, PoolExhaustionPolicy::AdditionalCreditsRequired)
+}
+
+/// Gate 3 of §7.1 plus §7.3's exhaustion table, as one pure decision.
+///
+/// `reserved` is whether the caller's deduct SUCCEEDED — the caller performs it,
+/// because a pure function cannot, and hands the outcome back in. It is `false`
+/// whenever [`pool_reserves`] said not to try.
+///
+/// Total over both inputs on purpose. The `AdditionalCreditsRequired` arm cannot
+/// be reached with `reserved = true` from `run` (the caller never reserves for
+/// one), but writing it as an unreachable arm would make it a branch no test can
+/// pin — and an unreachable branch on a billing path is how a revenue rule dies
+/// silently. The answer is the same for both, so both are stated.
+pub fn pool_gate_decision(policy: PoolExhaustionPolicy, reserved: bool) -> PoolGate {
+    match (policy, reserved) {
+        (PoolExhaustionPolicy::AdditionalCreditsRequired, _) => PoolGate::RunAndNotify,
+        (_, true) => PoolGate::Run,
+        (PoolExhaustionPolicy::MeteredOverage, false) => PoolGate::RunAsOverage,
+        (PoolExhaustionPolicy::SubscriptionRequired, false) => PoolGate::Skip,
+    }
+}
+
+/// The pool gate's own log throttle — same shape and the same reason as
+/// [`TRIAL_GATE_LOG`]. An exhausted free org denies every slot of every check on
+/// every tick, forever, until it subscribes.
+#[cfg(feature = "cloud")]
+static POOL_GATE_LOG: std::sync::LazyLock<LogCooldown> =
+    std::sync::LazyLock::new(|| LogCooldown::new(TRIAL_GATE_LOG_COOLDOWN_US));
 
 /// The trial gate's own log throttle. Process-wide because the flood it bounds
 /// is process-wide; per-node like `reaper::orphan`'s map, for the same reason.
@@ -454,8 +564,7 @@ pub async fn run() {
             let valid_until = now_us + synthetic.frequency.interval_secs() * 1_000_000;
 
             // One job per location; browser_devices JSON carries per-device execution_ids.
-            let job_count = synthetic.locations.len() as i32;
-            if job_count == 0 {
+            if synthetic.locations.is_empty() {
                 tracing::warn!(
                     synthetics_id = %synthetic.id,
                     "[synthetics scheduler] synthetic has no locations — skipping"
@@ -463,7 +572,127 @@ pub async fn run() {
                 continue;
             }
 
+            // ---- Gate 3 of §7.1 — the FREE STEP POOL, item 2.3 -----------------
+            //
+            // Resolved ONCE per due check and hoisted above the location loop,
+            // exactly like the trial gate above: an org's plan is an org's plan,
+            // and asking per location would issue N identical `customer_billings`
+            // reads per tick. The DEDUCT itself stays per location — §7.1 puts it
+            // after the venue check, and a private agent must never deduct (§8.2,
+            // E13).
+            //
+            // `None` means DO NOT GATE. Four ways to get there, and every one of
+            // them is a deliberate fail-open (see `crate::pool`'s module doc):
+            // a build without `cloud`; `O2_SYNTHETICS_BILLING_ENABLED` off, which
+            // is the default and the whole of §9D's runtime rollback; no pool
+            // installed by `init`; and a billing read that failed. Every gate here
+            // can only ever STOP a customer's monitoring, so none of them may
+            // stop it by accident.
+            #[cfg(feature = "cloud")]
+            let pool_gate = resolve_pool_gate(&synthetic.org_id).await;
+            #[cfg(not(feature = "cloud"))]
+            let pool_gate: Option<(crate::pool::StepPoolHooks, PoolExhaustionPolicy)> = None;
+
+            // ---- Pass 1: venue, then gate, then plan -------------------------
+            //
+            // Both passes exist because `insert_run` stamps `job_count` and a run
+            // is complete when that many jobs have acked. A slot the pool denies
+            // produces no job and therefore no ack, so counting it would leave the
+            // run permanently short: never complete, never alerted on, never
+            // recovered from. `job_count` is the number of slots that will
+            // actually be enqueued, which is only knowable after the gate has run.
+            let mut planned: Vec<PlannedSlot> = Vec::with_capacity(synthetic.locations.len());
+            let mut denied: Vec<String> = Vec::new();
+
+            for location in &synthetic.locations {
+                // ---- Gate 2 of §7.1 — the VENUE ------------------------------
+                //
+                // One registry read per location, already needed to pick the
+                // agent pool. Its answer is also the venue: a `KIND_PRIVATE` row
+                // is the customer's own hardware, which §7.1 gives "no gate, no
+                // deduct, no bill".
+                let venue = synthetics_locations::get(location).await;
+                let is_private = matches!(
+                    &venue,
+                    Ok(Some(l)) if l.kind == synthetics_locations::KIND_PRIVATE
+                );
+
+                let (pool, browser_devices_json) = if synthetic.check_type == SyntheticType::Browser
+                {
+                    let entries: Vec<BrowserDeviceEntry> = synthetic
+                        .browser_devices
+                        .iter()
+                        .map(|bd| BrowserDeviceEntry {
+                            execution_id: svix_ksuid::Ksuid::new(None, None).to_string(),
+                            engine: &bd.browser,
+                            device: &bd.device,
+                        })
+                        .collect();
+                    let json = match serde_json::to_string(&entries) {
+                        Ok(j) => j,
+                        Err(e) => {
+                            tracing::error!(
+                                synthetics_id = %synthetic.id,
+                                location = %location,
+                                "[synthetics scheduler] browser_devices serialize: {e}"
+                            );
+                            continue;
+                        }
+                    };
+                    // Private browser locations are served by a self-hosted
+                    // browser agent leasing their own private-* pool; public
+                    // browser locations use the aws-browser Lambda venue.
+                    let pool = match venue {
+                        Ok(Some(l)) if l.kind == synthetics_locations::KIND_PRIVATE => l.pool,
+                        _ => "aws-browser".to_string(),
+                    };
+                    (pool, Some(json))
+                } else {
+                    // Protocol types route to the location's pool from the
+                    // registry (net-<region> for public rows, private-* for
+                    // private locations); "aws" is the legacy fallback for
+                    // locations not yet in the table.
+                    let pool = match venue {
+                        Ok(Some(l)) => l.pool,
+                        _ => "aws".to_string(),
+                    };
+                    (pool, None)
+                };
+
+                // ---- Gate 3 — DEDUCT ----------------------------------------
+                let combos = (synthetic.check_type == SyntheticType::Browser)
+                    .then(|| synthetic.browser_devices.len().max(1) as u32);
+                let (verdict, reserved) = reserve_for_slot(
+                    pool_gate,
+                    &synthetic.org_id,
+                    synthetic.steps_configured,
+                    combos,
+                    is_private,
+                );
+                #[cfg(feature = "cloud")]
+                log_pool_gate(&synthetic.id, &synthetic.org_id, location, verdict, now_us);
+                if verdict == PoolGate::Skip {
+                    denied.push(location.clone());
+                    continue;
+                }
+
+                planned.push(PlannedSlot {
+                    location: location.clone(),
+                    pool,
+                    browser_devices: browser_devices_json,
+                    reserved,
+                });
+            }
+
+            // Every slot denied: no run row, no jobs, no Lambda — the same shape
+            // the trial gate produces, and for the same reason.
+            if planned.is_empty() {
+                report_quota_skips(&synthetic, &denied, scheduled_ts, now_us).await;
+                continue;
+            }
+
             // Pre-generate run_id and insert the runs row before any jobs.
+            let job_count = planned.len() as i32;
             let run_id = svix_ksuid::Ksuid::new(None, None).to_string();
             tracing::info!(
                 synthetics_id = %synthetic.id,
@@ -491,6 +720,9 @@ pub async fn run() {
                     run_id = %run_id,
                     "[synthetics scheduler] insert_run: {e}"
                 );
+                // The reservations this check took are for jobs that will never
+                // exist. Same refund as an enqueue that did not land (E10/E11).
+                refund_planned(pool_gate, &synthetic.org_id, &planned);
                 continue;
             }
 
@@ -503,60 +735,18 @@ pub async fn run() {
             })
             .unwrap_or_else(|_| "{}".to_string());
 
-            for location in &synthetic.locations {
-                let (pool, browser_devices_json) = if synthetic.check_type == SyntheticType::Browser
-                {
-                    let entries: Vec<BrowserDeviceEntry> = synthetic
-                        .browser_devices
-                        .iter()
-                        .map(|bd| BrowserDeviceEntry {
-                            execution_id: svix_ksuid::Ksuid::new(None, None).to_string(),
-                            engine: &bd.browser,
-                            device: &bd.device,
-                        })
-                        .collect();
-                    let json = match serde_json::to_string(&entries) {
-                        Ok(j) => j,
-                        Err(e) => {
-                            tracing::error!(
-                                synthetics_id = %synthetic.id,
-                                run_id = %run_id,
-                                location = %location,
-                                "[synthetics scheduler] browser_devices serialize: {e}"
-                            );
-                            continue;
-                        }
-                    };
-                    // Private browser locations are served by a self-hosted
-                    // browser agent leasing their own private-* pool; public
-                    // browser locations use the aws-browser Lambda venue.
-                    let pool = match synthetics_locations::get(location).await {
-                        Ok(Some(l)) if l.kind == synthetics_locations::KIND_PRIVATE => l.pool,
-                        _ => "aws-browser".to_string(),
-                    };
-                    (pool, Some(json))
-                } else {
-                    // Protocol types route to the location's pool from the
-                    // registry (net-<region> for public rows, private-* for
-                    // private locations); "aws" is the legacy fallback for
-                    // locations not yet in the table.
-                    let pool = match synthetics_locations::get(location).await {
-                        Ok(Some(l)) => l.pool,
-                        _ => "aws".to_string(),
-                    };
-                    (pool, None)
-                };
-
+            // ---- Pass 2: gate 4 of §7.1 — ENQUEUE ---------------------------
+            for slot in &planned {
                 let p = synthetics_jobs::EnqueueParams {
                     synthetics_id: &synthetic.id,
                     synthetics_name: &synthetic.name,
                     org_id: &synthetic.org_id,
-                    location,
-                    pool: &pool,
+                    location: &slot.location,
+                    pool: &slot.pool,
                     scheduled_ts,
                     valid_until,
                     run_id: &run_id,
-                    browser_devices: browser_devices_json.as_deref(),
+                    browser_devices: slot.browser_devices.as_deref(),
                     // Frozen here, not read at ack time: the ack's clamp
                     // ceiling is `steps_configured x (retries + 1)`, and a
                     // journey edited while these jobs are in flight must not
@@ -570,21 +760,421 @@ pub async fn run() {
                             synthetics_id = %synthetic.id,
                             run_id = %run_id,
                             job_id = %job_id,
-                            location = %location,
+                            location = %slot.location,
                             "[synthetics scheduler] job enqueued"
                         );
                     }
-                    Ok(_) => {} // ON CONFLICT DO NOTHING — already scheduled
+                    // `ON CONFLICT DO NOTHING` — another node already holds this
+                    // slot. §7.1 gate 4, E10/T29: THE DEDUCT MUST BE REFUNDED.
+                    // The unique index `(synthetics_id, location, scheduled_ts)`
+                    // is what makes the enqueue idempotent, and this is the
+                    // matching half — without it the losing node's reservation
+                    // is held against a grant for work it will never do, and no
+                    // ack will ever come to reconcile it.
+                    Ok(_) => refund_slot(pool_gate, &synthetic.org_id, slot),
                     Err(e) => {
                         tracing::error!(
                             synthetics_id = %synthetic.id,
                             run_id = %run_id,
-                            location = %location,
+                            location = %slot.location,
                             "[synthetics scheduler] enqueue: {e}"
                         );
+                        refund_slot(pool_gate, &synthetic.org_id, slot);
                     }
                 }
             }
+
+            // The denied slots of a check that partly ran still get their record.
+            report_quota_skips(&synthetic, &denied, scheduled_ts, now_us).await;
+        }
+    }
+}
+
+/// One location slot that survived gates 2 and 3 and is about to be enqueued.
+///
+/// Built in pass 1 of the fan-out and consumed in pass 2 — see the comment on
+/// `planned` for why the two passes exist.
+struct PlannedSlot {
+    location: String,
+    /// The agent pool the registry routed this location to.
+    pool: String,
+    /// Frozen `browser_devices` JSON, `None` for a protocol check.
+    browser_devices: Option<String>,
+    /// What gate 3 took out of the free grant for this slot. 0 when nothing was
+    /// taken — a private venue, an unmetered build, an exhausted paid org, or a
+    /// contract org. Refunding 0 is a no-op, so this is also the only thing the
+    /// refund path needs to look at.
+    reserved: u32,
+}
+
+/// Gate 3 of §7.1 for ONE location slot: consult the pool, and say what happens.
+///
+/// Returns the verdict and how many steps came out of the grant — 0 whenever
+/// nothing did. The deduct is performed HERE rather than in
+/// [`pool_gate_decision`] because a pure function cannot perform one; everything
+/// downstream of the deduct's yes/no is still that pure function's.
+///
+/// Order is §7.1's, and each skip has its own reason:
+///
+/// ```text
+///   no gate resolved   run, unmetered (see the call site's four cases)
+///   a PRIVATE venue    run, no gate, no deduct, no bill (§8.2, E13/T17)
+///   an ExternalContract  run, no deduct, notify (§7.3, E18/T36)
+///   otherwise          reserve `configured x combos`, and let §7.3 decide what
+///                      an exhausted grant means for this org
+/// ```
+pub(crate) fn reserve_for_slot(
+    gate: Option<(crate::pool::StepPoolHooks, PoolExhaustionPolicy)>,
+    org_id: &str,
+    steps_configured: i32,
+    combos: Option<u32>,
+    is_private: bool,
+) -> (PoolGate, u32) {
+    // Not metered on this node, or the customer's own hardware ran it. Either
+    // way there is no reservation and no verdict to reach — a private venue is
+    // NOT "funded", it is "not billed at all", and calling it funded would make
+    // the ack emit `SyntheticsFreeSteps` for work we never paid for.
+    let Some((hooks, policy)) = gate.filter(|_| !is_private) else {
+        return (PoolGate::Run, 0);
+    };
+
+    let want = crate::job_api::enqueue_reservation(steps_configured, combos);
+    // §7.3: an ExternalContract org is never pool-gated, so its slots never even
+    // attempt a reservation. `&&` short-circuits, which is what makes that true
+    // rather than merely stated.
+    let took = pool_reserves(policy) && (hooks.try_deduct)(org_id, u64::from(want));
+    let verdict = pool_gate_decision(policy, took);
+    // Only a funded slot holds anything, so only a funded slot has anything to
+    // refund if the enqueue then fails to land.
+    let reserved = if verdict == PoolGate::Run { want } else { 0 };
+    (verdict, reserved)
+}
+
+/// One throttled line per gate-3 verdict that is not the happy path.
+///
+/// Throttled for the reason [`TRIAL_GATE_LOG`] is: an exhausted free org denies
+/// every slot of every check on every 5s tick, forever, until it subscribes.
+#[cfg(feature = "cloud")]
+fn log_pool_gate(
+    synthetics_id: &str,
+    org_id: &str,
+    location: &str,
+    verdict: PoolGate,
+    now_us: i64,
+) {
+    match verdict {
+        PoolGate::Run => {}
+        PoolGate::RunAsOverage => {
+            if POOL_GATE_LOG.allow(synthetics_id, "overage", now_us) {
+                tracing::info!(
+                    synthetics_id = %synthetics_id,
+                    org_id = %org_id,
+                    "[synthetics scheduler] free step pool exhausted — running and metering as \
+                     overage (logged at most hourly per check)"
+                );
+            }
+        }
+        PoolGate::RunAndNotify => {
+            if POOL_GATE_LOG.allow(synthetics_id, "contract", now_us) {
+                tracing::warn!(
+                    synthetics_id = %synthetics_id,
+                    org_id = %org_id,
+                    "[synthetics scheduler] contract org: synthetics steps are never pool-gated \
+                     — running, and this is the notification §7.3 asks for (logged at most \
+                     hourly per check)"
+                );
+            }
+        }
+        PoolGate::Skip => {
+            if POOL_GATE_LOG.allow(synthetics_id, ERROR_SOURCE_QUOTA, now_us) {
+                tracing::warn!(
+                    synthetics_id = %synthetics_id,
+                    org_id = %org_id,
+                    location = %location,
+                    error_source = %ERROR_SOURCE_QUOTA,
+                    "[synthetics scheduler] free step pool exhausted — skipping this slot; the \
+                     check STAYS ENABLED and resumes the moment the org subscribes or the limit \
+                     is raised (logged at most hourly per check)"
+                );
+            }
+        }
+    }
+}
+
+/// Give one slot's reservation back — SPEC §7.1 gate 4, E10/E11, T29.
+///
+/// Takes the resolved gate rather than reaching for the pool itself, so a build
+/// or node with no pool cannot refund into one. Silent for an unreserved slot:
+/// the common case is that nothing was taken.
+fn refund_slot(
+    gate: Option<(crate::pool::StepPoolHooks, PoolExhaustionPolicy)>,
+    org_id: &str,
+    slot: &PlannedSlot,
+) {
+    if slot.reserved == 0 {
+        return;
+    }
+    let Some((hooks, _)) = gate else {
+        return;
+    };
+    tracing::info!(
+        org_id = %org_id,
+        location = %slot.location,
+        steps = slot.reserved,
+        "[synthetics scheduler] enqueue did not land — refunding the free-pool reservation"
+    );
+    (hooks.refund)(org_id, u64::from(slot.reserved));
+}
+
+/// Give back every reservation this check took. Used when the run row itself
+/// could not be written, so none of the slots will ever produce a job.
+fn refund_planned(
+    gate: Option<(crate::pool::StepPoolHooks, PoolExhaustionPolicy)>,
+    org_id: &str,
+    planned: &[PlannedSlot],
+) {
+    for slot in planned {
+        refund_slot(gate, org_id, slot);
+    }
+}
+
+/// Resolve gate 3 for one due check: the installed pool, and the org's §7.3
+/// exhaustion policy.
+///
+/// `None` means DO NOT GATE — see the call site for the four ways to get there.
+/// The billing read FAILS OPEN for the same reason the trial gate's does: this
+/// decision can only ever stop a customer's monitoring, so a flaky query must
+/// not be able to stop it.
+///
+/// `pub(crate)` because the REAPER resolves the same gate: a job it terminates
+/// never acks, so nothing else will ever give its reservation back (E10), and
+/// the decision of whether one was taken at all has to be read the same way it
+/// was written. A second, parallel resolution would be free to drift.
+#[cfg(feature = "cloud")]
+pub(crate) async fn resolve_pool_gate(
+    org_id: &str,
+) -> Option<(crate::pool::StepPoolHooks, PoolExhaustionPolicy)> {
+    // §9A / §9D: the master switch gates ENFORCEMENT here exactly as it gates
+    // the emit at the ack. Off — the default — means no read, no deduct, no
+    // gate, which is the state Phase 1 ships in.
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .cloud
+        .synthetics_billing_enabled
+    {
+        return None;
+    }
+    // No pool installed on this node. Fail open — `init` is handed the pool as
+    // an argument precisely so this cannot happen silently, and if it somehow
+    // does, an unmetered fleet is recoverable where dark monitoring is not.
+    let hooks = crate::pool::hooks()?;
+
+    let policy =
+        o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(org_id)
+            .await;
+    let policy = match policy {
+        o2_enterprise::enterprise::cloud::ai_credits::AiCreditExhaustionPolicy::MeteredOverage => {
+            PoolExhaustionPolicy::MeteredOverage
+        }
+        o2_enterprise::enterprise::cloud::ai_credits::AiCreditExhaustionPolicy::AdditionalCreditsRequired => {
+            PoolExhaustionPolicy::AdditionalCreditsRequired
+        }
+        o2_enterprise::enterprise::cloud::ai_credits::AiCreditExhaustionPolicy::SubscriptionRequired => {
+            PoolExhaustionPolicy::SubscriptionRequired
+        }
+    };
+    Some((hooks, policy))
+}
+
+/// SPEC §7.3's dead letter for a quota-denied slot — item **2.4**.
+///
+/// *"skip slot, dead-letter, result row `error_source="quota"`"*, and **MUST
+/// NOT disable the check**.
+///
+/// Deliberately the same shape and the same transport as the reaper's dead
+/// letter (`reaper::write_results_stream` / `write_triggers_stream`) and as the
+/// orphan report: a row in the org's `synthetics_results` stream so the check's
+/// own detail page shows why it stopped, and a row in the org's and `_meta`'s
+/// `triggers` stream so an alert rule can fire on it. No new stream, no new
+/// schema, no new plumbing.
+///
+/// Silent no-op when nothing was denied, which is every tick of every healthy
+/// org.
+async fn report_quota_skips(
+    synthetic: &synthetics_checks::DueCheck,
+    denied: &[String],
+    scheduled_ts: i64,
+    now_us: i64,
+) {
+    if denied.is_empty() {
+        return;
+    }
+    // One token lookup per denied CHECK, not per denied slot.
+    let ingest_token = match org_ingestion_tokens::find_default_enabled(&synthetic.org_id).await {
+        Ok(Some(t)) => t.token,
+        Ok(None) => {
+            tracing::warn!(
+                org_id = %synthetic.org_id,
+                "[synthetics scheduler] no enabled ingest token — quota skip not recorded"
+            );
+            return;
+        }
+        Err(e) => {
+            tracing::error!(
+                org_id = %synthetic.org_id,
+                "[synthetics scheduler] ingest token lookup failed, quota skip not recorded: {e}"
+            );
+            return;
+        }
+    };
+    // The `_meta` copy authenticates as `_meta`: ingest resolves a token against
+    // the URL's org, so the org's own token posted to `/api/_meta/...` 401s.
+    let meta_token = match org_ingestion_tokens::find_default_enabled(META_ORG).await {
+        Ok(Some(t)) => Some(t.token),
+        Ok(None) | Err(_) => None,
+    };
+
+    let api_endpoint = config::meta::synthetics::api_endpoint();
+    let client = reqwest::Client::new();
+    for location in denied {
+        let result = quota_result_record(synthetic, location, scheduled_ts, now_us);
+        post_json(
+            &client,
+            &format!(
+                "{api_endpoint}/api/{}/synthetics_results/_json",
+                synthetic.org_id
+            ),
+            &ingest_token,
+            &result,
+            &synthetic.id,
+        )
+        .await;
+
+        let trigger = quota_trigger_record(synthetic, location, now_us);
+        post_json(
+            &client,
+            &format!("{api_endpoint}/api/{}/triggers/_json", synthetic.org_id),
+            &ingest_token,
+            &trigger,
+            &synthetic.id,
+        )
+        .await;
+        if let Some(meta_token) = meta_token.as_deref() {
+            post_json(
+                &client,
+                &format!("{api_endpoint}/api/{META_ORG}/triggers/_json"),
+                meta_token,
+                &trigger,
+                &synthetic.id,
+            )
+            .await;
+        }
+    }
+}
+
+/// The `synthetics_results` row a quota-denied slot leaves behind.
+///
+/// Pure, so §7.3's two hard requirements are assertable without an ingest
+/// endpoint: the row carries `error_source = "quota"`, and it says nothing about
+/// the check's `enabled` state — because nothing here may change it.
+///
+/// `execution_id == job_id == ""`: there IS no job. The reaper's dead letter can
+/// echo a real job id because its slot got as far as a row; this one did not,
+/// and inventing an id would put a row in the results stream that the run-detail
+/// drawer would then fail to open.
+fn quota_result_record(
+    synthetic: &synthetics_checks::DueCheck,
+    location: &str,
+    scheduled_ts: i64,
+    now_us: i64,
+) -> serde_json::Value {
+    serde_json::json!([{
+        "_timestamp": now_us,
+        "job_id": "",
+        "run_id": "",
+        "execution_id": "",
+        "synthetics_id": synthetic.id,
+        "synthetics_name": synthetic.name,
+        "tags": synthetic.tags,
+        "org_id": synthetic.org_id,
+        "location": location,
+        "scheduled_ts": scheduled_ts,
+        "status": "error",
+        "error_source": ERROR_SOURCE_QUOTA,
+        "error": "the organization's included synthetics steps are exhausted, so this run was \
+                  skipped. The check is still enabled and resumes automatically once the \
+                  organization subscribes or its step limit is raised.",
+        "response_time_ms": 0,
+        "dispatch_attempt": 0
+    }])
+}
+
+/// The `triggers` row a quota-denied slot leaves behind — the half an alert rule
+/// reads.
+fn quota_trigger_record(
+    synthetic: &synthetics_checks::DueCheck,
+    location: &str,
+    now_us: i64,
+) -> serde_json::Value {
+    serde_json::json!([{
+        "_timestamp": now_us,
+        "org": synthetic.org_id,
+        "module": "synthetics",
+        "key": format!("{}/{}", synthetic.name, synthetic.id),
+        "next_run_at": synthetic.next_run_at,
+        "is_realtime": false,
+        "is_silenced": false,
+        "status": "failed",
+        "start_time": now_us,
+        "end_time": now_us,
+        "location": location,
+        // The stable field an alert rule filters on. `orphan`, `dispatch` and
+        // `quota` all write this stream with the same `status`, and they need
+        // different responses — this one is answered by subscribing, not by
+        // paging anybody.
+        "error_source": ERROR_SOURCE_QUOTA,
+        "error": "synthetics step quota exhausted — runs skipped until the organization \
+                  subscribes or its step limit is raised"
+    }])
+}
+
+/// Posts one record and logs what ingest said.
+///
+/// A non-2xx is checked explicitly for the reason `reaper::orphan::post_trigger`
+/// gives: `send()` resolves to `Ok` for a 401 as readily as for a 200, so
+/// treating the transport error as the only failure drops every record from a
+/// mis-scoped token and logs nothing.
+async fn post_json(
+    client: &reqwest::Client,
+    url: &str,
+    token: &str,
+    body: &serde_json::Value,
+    synthetics_id: &str,
+) {
+    match client
+        .post(url)
+        .basic_auth("ingest", Some(token))
+        .json(body)
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {}
+        Ok(resp) => {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            tracing::error!(
+                synthetics_id = %synthetics_id,
+                url = %url,
+                %status,
+                "[synthetics scheduler] quota dead-letter write rejected: {}",
+                body.chars().take(512).collect::<String>()
+            );
+        }
+        Err(e) => {
+            tracing::error!(
+                synthetics_id = %synthetics_id,
+                url = %url,
+                "[synthetics scheduler] quota dead-letter write failed: {e}"
+            );
         }
     }
 }
@@ -2056,6 +2646,508 @@ mod trial_gate_tests {
 /// (`src/jobs/src/lib.rs`, `src/api/management/src/lib.rs`): a silently-absent
 /// `cfg` cannot be caught at runtime, because the code that would have reported
 /// it is the code that vanished.
+/// SPEC §6 / §7.3 — the free step pool gate, items **2.3** and **2.4**.
+#[cfg(test)]
+mod pool_gate_tests {
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    };
+
+    use config::meta::synthetics::{SyntheticFrequency, SyntheticFrequencyType};
+    use infra::table::synthetics_checks::DueCheck;
+
+    use super::{
+        ERROR_SOURCE_QUOTA, PlannedSlot, PoolExhaustionPolicy, PoolGate, pool_gate_decision,
+        pool_reserves, quota_result_record, quota_trigger_record, refund_planned, refund_slot,
+        reserve_for_slot,
+    };
+    use crate::pool::StepPoolHooks;
+
+    /// The fake pool is process-global, because a `fn` pointer cannot capture.
+    /// Every test that touches it takes this first. Poisoning is ignored so one
+    /// failure does not cascade.
+    static FAKE_LOCK: Mutex<()> = Mutex::new(());
+    static DEDUCTED: AtomicU64 = AtomicU64::new(0);
+    static REFUNDED: AtomicU64 = AtomicU64::new(0);
+    static GRANT_HAS_ROOM: AtomicBool = AtomicBool::new(true);
+
+    fn fake_try_deduct(_org_id: &str, steps: u64) -> bool {
+        if !GRANT_HAS_ROOM.load(Ordering::Relaxed) {
+            return false;
+        }
+        DEDUCTED.fetch_add(steps, Ordering::Relaxed);
+        true
+    }
+
+    fn fake_refund(_org_id: &str, steps: u64) {
+        REFUNDED.fetch_add(steps, Ordering::Relaxed);
+    }
+
+    /// The enqueue path never reads either of these — they exist for the
+    /// REAPER's refund (SPEC §6.3 / E10). Unreachable rather than stubbed, so
+    /// an enqueue that grew a dependency on the pool's balance, or that started
+    /// issuing keyed refunds, fails loudly here instead of quietly passing.
+    fn fake_remaining(_org_id: &str) -> u64 {
+        unreachable!("gate 3 asks `try_deduct`, never the balance")
+    }
+
+    fn fake_dead_letter_refund(_org_id: &str, _steps: u64, _key: &str) -> bool {
+        unreachable!("the keyed refund belongs to the reaper, not to the enqueue")
+    }
+
+    const FAKE: StepPoolHooks = StepPoolHooks {
+        try_deduct: fake_try_deduct,
+        refund: fake_refund,
+        remaining: fake_remaining,
+        dead_letter_refund: fake_dead_letter_refund,
+    };
+
+    /// Resets the fake and returns the guard that keeps it ours.
+    fn fake_pool(has_room: bool) -> std::sync::MutexGuard<'static, ()> {
+        let guard = FAKE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        DEDUCTED.store(0, Ordering::Relaxed);
+        REFUNDED.store(0, Ordering::Relaxed);
+        GRANT_HAS_ROOM.store(has_room, Ordering::Relaxed);
+        guard
+    }
+
+    fn gate(policy: PoolExhaustionPolicy) -> Option<(StepPoolHooks, PoolExhaustionPolicy)> {
+        Some((FAKE, policy))
+    }
+
+    fn slot(reserved: u32) -> PlannedSlot {
+        PlannedSlot {
+            location: "us-east-1".to_string(),
+            pool: "aws-browser".to_string(),
+            browser_devices: None,
+            reserved,
+        }
+    }
+
+    fn due_check() -> DueCheck {
+        DueCheck {
+            id: "chk_1".to_string(),
+            name: "checkout journey".to_string(),
+            org_id: "acme".to_string(),
+            check_type: config::meta::synthetics::SyntheticType::Browser,
+            locations: vec!["us-east-1".to_string()],
+            frequency: SyntheticFrequency {
+                frequency_type: SyntheticFrequencyType::Minutes,
+                interval: 5,
+                cron: String::new(),
+                timezone: None,
+            },
+            tz_offset: 0,
+            next_run_at: 1_787_665_631_000_000,
+            browser_devices: Vec::new(),
+            steps_configured: 14,
+            tags: vec!["checkout".to_string()],
+        }
+    }
+
+    // ── §7.3's table, as a pure decision ────────────────────────────────────
+
+    /// **T30 / E15, T31 / E16, T36 / E18** — §7.3 arm for arm, both values of
+    /// `reserved`. Every arm is reachable, which is the point of writing the
+    /// match over the pair rather than hiding an unreachable branch.
+    #[test]
+    fn the_exhaustion_table_is_spec_7_3() {
+        use PoolExhaustionPolicy::*;
+        // A reservation succeeded: run it, whatever the plan.
+        assert_eq!(pool_gate_decision(MeteredOverage, true), PoolGate::Run);
+        assert_eq!(
+            pool_gate_decision(SubscriptionRequired, true),
+            PoolGate::Run
+        );
+        // The grant is spent.
+        assert_eq!(
+            pool_gate_decision(MeteredOverage, false),
+            PoolGate::RunAsOverage,
+            "T31/E16: Rate or Enterprise on Stripe or Azure runs and bills the overage",
+        );
+        assert_eq!(
+            pool_gate_decision(SubscriptionRequired, false),
+            PoolGate::Skip,
+            "T30/E15: a Free org's slot is skipped",
+        );
+        // ExternalContract, either way: never blocked, never pool-gated.
+        assert_eq!(
+            pool_gate_decision(AdditionalCreditsRequired, false),
+            PoolGate::RunAndNotify,
+        );
+        assert_eq!(
+            pool_gate_decision(AdditionalCreditsRequired, true),
+            PoolGate::RunAndNotify,
+        );
+    }
+
+    /// **T36 / E18** — *"never pool-gate"* is a statement about the DEDUCT, not
+    /// only about the verdict.
+    #[test]
+    fn only_a_contract_org_declines_to_reserve() {
+        assert!(!pool_reserves(
+            PoolExhaustionPolicy::AdditionalCreditsRequired
+        ));
+        assert!(pool_reserves(PoolExhaustionPolicy::MeteredOverage));
+        assert!(pool_reserves(PoolExhaustionPolicy::SubscriptionRequired));
+    }
+
+    // ── gate 3 for one slot ─────────────────────────────────────────────────
+
+    /// The reservation is `configured x combos`, taken once, before the enqueue.
+    #[test]
+    fn a_funded_slot_reserves_configured_times_combos() {
+        let _guard = fake_pool(true);
+        let (verdict, reserved) = reserve_for_slot(
+            gate(PoolExhaustionPolicy::SubscriptionRequired),
+            "acme",
+            14,
+            Some(2),
+            false,
+        );
+        assert_eq!(verdict, PoolGate::Run);
+        assert_eq!(reserved, 28);
+        assert_eq!(DEDUCTED.load(Ordering::Relaxed), 28);
+    }
+
+    /// **T30 / E15.** A Free org whose grant is spent: the slot is skipped and
+    /// NOTHING was taken. A gate that deducted and then skipped would spend the
+    /// grant on runs that never happen.
+    #[test]
+    fn t30_a_free_org_with_a_spent_grant_has_its_slot_skipped() {
+        let _guard = fake_pool(false);
+        let (verdict, reserved) = reserve_for_slot(
+            gate(PoolExhaustionPolicy::SubscriptionRequired),
+            "acme",
+            14,
+            Some(1),
+            false,
+        );
+        assert_eq!(verdict, PoolGate::Skip);
+        assert_eq!(reserved, 0);
+        assert_eq!(DEDUCTED.load(Ordering::Relaxed), 0);
+    }
+
+    /// **T31 / E16.** A Rate org whose grant is spent runs anyway, holding
+    /// nothing — its ack then meters the steps as billable overage.
+    #[test]
+    fn t31_a_rate_org_with_a_spent_grant_runs_as_overage() {
+        let _guard = fake_pool(false);
+        let (verdict, reserved) = reserve_for_slot(
+            gate(PoolExhaustionPolicy::MeteredOverage),
+            "acme",
+            14,
+            Some(1),
+            false,
+        );
+        assert_eq!(verdict, PoolGate::RunAsOverage);
+        assert_eq!(
+            reserved, 0,
+            "an overage run holds nothing against the grant"
+        );
+    }
+
+    /// **T36 / E18.** A contract org with a grant that WOULD have covered the
+    /// run: it is still not touched. `pool_reserves` short-circuits before the
+    /// deduct, which is what makes "never pool-gate" true rather than stated.
+    #[test]
+    fn t36_a_contract_org_never_attempts_a_reservation() {
+        let _guard = fake_pool(true);
+        let (verdict, reserved) = reserve_for_slot(
+            gate(PoolExhaustionPolicy::AdditionalCreditsRequired),
+            "acme",
+            14,
+            Some(1),
+            false,
+        );
+        assert_eq!(verdict, PoolGate::RunAndNotify);
+        assert_eq!(reserved, 0);
+        assert_eq!(
+            DEDUCTED.load(Ordering::Relaxed),
+            0,
+            "E18: a contract org's grant is never touched, even when it has room",
+        );
+    }
+
+    /// **T17 / E13.** A private agent is the customer's own hardware. §7.1 gate
+    /// 2: no gate, no deduct, no bill — and the check still runs.
+    #[test]
+    fn a_private_venue_runs_without_touching_the_grant() {
+        let _guard = fake_pool(true);
+        let (verdict, reserved) = reserve_for_slot(
+            gate(PoolExhaustionPolicy::SubscriptionRequired),
+            "acme",
+            14,
+            Some(2),
+            true,
+        );
+        assert_eq!(verdict, PoolGate::Run);
+        assert_eq!(reserved, 0);
+        assert_eq!(DEDUCTED.load(Ordering::Relaxed), 0);
+    }
+
+    /// FAIL OPEN. No pool resolved — an OSS build, the master switch off, a
+    /// missing installation, or a failed billing read — must never stop a
+    /// customer's monitoring.
+    #[test]
+    fn no_pool_means_no_gate() {
+        let _guard = fake_pool(false);
+        let (verdict, reserved) = reserve_for_slot(None, "acme", 14, Some(2), false);
+        assert_eq!(verdict, PoolGate::Run);
+        assert_eq!(reserved, 0);
+        assert_eq!(DEDUCTED.load(Ordering::Relaxed), 0);
+    }
+
+    // ── gate 4 — the refund ─────────────────────────────────────────────────
+
+    /// **T29 / E10.** `enqueue` returned `Ok("")` — another node holds this slot
+    /// — so the FULL reservation goes back. Without this the losing node's
+    /// reservation is held against a grant for work it will never do, and no ack
+    /// will ever arrive to reconcile it.
+    #[test]
+    fn t29_a_slot_whose_enqueue_did_not_land_is_refunded_in_full() {
+        let _guard = fake_pool(true);
+        refund_slot(
+            gate(PoolExhaustionPolicy::SubscriptionRequired),
+            "acme",
+            &slot(28),
+        );
+        assert_eq!(REFUNDED.load(Ordering::Relaxed), 28);
+    }
+
+    /// A slot that reserved nothing has nothing to give back — a private venue,
+    /// an overage run, a contract org. Refunding here would credit a grant the
+    /// org never spent.
+    #[test]
+    fn an_unreserved_slot_refunds_nothing() {
+        let _guard = fake_pool(true);
+        refund_slot(
+            gate(PoolExhaustionPolicy::SubscriptionRequired),
+            "acme",
+            &slot(0),
+        );
+        assert_eq!(REFUNDED.load(Ordering::Relaxed), 0);
+    }
+
+    /// And with no pool there is nothing to refund INTO.
+    #[test]
+    fn a_refund_without_a_pool_is_a_no_op() {
+        let _guard = fake_pool(true);
+        refund_slot(None, "acme", &slot(28));
+        assert_eq!(REFUNDED.load(Ordering::Relaxed), 0);
+    }
+
+    /// The run row could not be written, so none of this check's slots will ever
+    /// produce a job. Every reservation goes back, not just the first.
+    #[test]
+    fn every_reservation_of_a_failed_run_is_refunded() {
+        let _guard = fake_pool(true);
+        refund_planned(
+            gate(PoolExhaustionPolicy::SubscriptionRequired),
+            "acme",
+            &[slot(28), slot(28), slot(0)],
+        );
+        assert_eq!(REFUNDED.load(Ordering::Relaxed), 56);
+    }
+
+    // ── 2.4 — the dead letter ───────────────────────────────────────────────
+
+    /// **T30 / E15 / §7.3.** The record a denied slot leaves behind. Without it
+    /// the customer sees a check that simply stopped producing results, with no
+    /// row a user, a saved query or an alert rule can find.
+    #[test]
+    fn the_quota_dead_letter_carries_the_quota_error_source() {
+        let record = quota_result_record(&due_check(), "us-east-1", 1_787_665_631_000_000, 42);
+        let row = &record[0];
+        assert_eq!(row["error_source"], ERROR_SOURCE_QUOTA);
+        assert_eq!(row["status"], "error");
+        assert_eq!(row["synthetics_id"], "chk_1");
+        assert_eq!(row["location"], "us-east-1");
+        assert_eq!(row["org_id"], "acme");
+        assert_eq!(row["_timestamp"], 42);
+        // There IS no job: inventing an id would put a row in the results stream
+        // that the run-detail drawer then cannot open.
+        assert_eq!(row["job_id"], "");
+        assert_eq!(row["run_id"], "");
+        assert_eq!(row["execution_id"], "");
+    }
+
+    /// The alert-rule half, in the same stream the reaper's dead letter and the
+    /// orphan report use — no new stream, no new schema.
+    #[test]
+    fn the_quota_trigger_row_is_separable_from_the_other_error_sources() {
+        let record = quota_trigger_record(&due_check(), "us-east-1", 42);
+        let row = &record[0];
+        assert_eq!(row["error_source"], ERROR_SOURCE_QUOTA);
+        assert_eq!(row["module"], "synthetics");
+        assert_eq!(row["status"], "failed");
+        assert_eq!(row["key"], "checkout journey/chk_1");
+        assert_eq!(row["org"], "acme");
+        // Separable from the vocabulary's other absent-job value.
+        assert_ne!(row["error_source"], super::ERROR_SOURCE_TRIAL);
+    }
+
+    /// **T30 / E15 — the hard requirement.** *"MUST NOT disable the check. A
+    /// billing system making destructive changes to customer config is
+    /// unacceptable."*
+    ///
+    /// Asserted over the source, because the property is the ABSENCE of a call:
+    /// no test of the gate's return value can prove that nothing, anywhere in
+    /// this file, ever flips `enabled`. `synthetics_checks::set_enabled` is the
+    /// only way to, and the scheduler must never reach for it.
+    #[test]
+    fn the_quota_gate_never_disables_a_check() {
+        // Assembled at runtime so this test cannot match its own text.
+        let disable = ["set", "enabled("].join("_");
+        let source = include_str!("scheduler.rs");
+        assert!(
+            !source.contains(&disable),
+            "SPEC §7.3: skipping is reversible the moment the org subscribes — disabling is not",
+        );
+    }
+
+    /// **§7.1's order: trial -> venue -> deduct -> enqueue.**
+    ///
+    /// Structural, so it is asserted structurally. Each of these has to be true
+    /// for a different reason, and none of them is visible in a return value:
+    ///
+    ///   * the DEDUCT after the TRIAL gate — §7.1's MUST: *"an expired org must not burn a one-time
+    ///     grant it can never use"*;
+    ///   * the DEDUCT after the VENUE read — a private agent must never deduct (§8.2, E13);
+    ///   * the ENQUEUE after the DEDUCT — the reservation has to exist before the row does, or a
+    ///     job runs that the grant never paid for.
+    #[test]
+    fn the_deduct_sits_between_the_venue_check_and_the_enqueue() {
+        let trial = ["trial_gate", "_decision("].concat();
+        let venue = ["let venue = synthetics_locations", "::get(location)"].concat();
+        let deduct = ["let (verdict, reserved) = reserve", "_for_slot("].concat();
+        let enqueue = ["match synthetics_jobs", "::enqueue(db, p)"].concat();
+
+        let whole = include_str!("scheduler.rs");
+        let src = &whole[..whole
+            .find("\n#[cfg(test)]")
+            .expect("scheduler.rs must still end in test modules")];
+        // From the START OF `run` — the fan-out itself, not the file. Every one
+        // of these names also appears at its own definition site, and a
+        // definition can sit anywhere; only the ORDER OF THE CALLS is §7.1.
+        let src = &src[src
+            .find("pub async fn run() {")
+            .expect("the scheduler loop must still be `run`")..];
+
+        let at = |needle: &str| {
+            src.find(needle)
+                .unwrap_or_else(|| panic!("§7.1's gate order needs this to exist: {needle}"))
+        };
+        assert!(at(&trial) < at(&venue), "trial must precede the venue read");
+        assert!(
+            at(&venue) < at(&deduct),
+            "the venue read must precede the deduct"
+        );
+        assert!(
+            at(&deduct) < at(&enqueue),
+            "the deduct must precede the enqueue"
+        );
+    }
+
+    /// **T29 / E10 — every enqueue that does not land refunds its reservation.**
+    ///
+    /// The refund is a CALL SITE, and a call site that is deleted still returns
+    /// the right answer from every function around it: `reserve_for_slot` still
+    /// reserves, `refund_slot` still refunds when called, and every unit test
+    /// above still passes. What breaks is invisible — the losing node of a
+    /// dedup race holds a reservation against a one-time grant for work it will
+    /// never do, and no ack ever arrives to reconcile it.
+    ///
+    /// So the sites are counted. There are exactly three ways an enqueue fails
+    /// to produce a job, and each one has to give the steps back:
+    /// `ON CONFLICT DO NOTHING`, an enqueue error, and a run row that could not
+    /// be written at all.
+    #[test]
+    fn every_enqueue_that_does_not_land_refunds_its_reservation() {
+        let whole = include_str!("scheduler.rs");
+        let src = &whole[..whole
+            .find("\n#[cfg(test)]")
+            .expect("scheduler.rs must still end in test modules")];
+
+        assert_eq!(
+            src.matches(&["refund", "_slot("].concat()).count(),
+            4,
+            "one definition and three call sites: the ON CONFLICT arm, the enqueue error arm, \
+             and `refund_planned`'s loop",
+        );
+        assert_eq!(
+            src.matches(&["refund", "_planned("].concat()).count(),
+            2,
+            "one definition and one call site: the run row that could not be written",
+        );
+        // The pool is reached through exactly one call each way. A second
+        // deduct site would double-charge; a lost refund site is a permanent
+        // hold on a one-time grant.
+        assert_eq!(src.matches("(hooks.try_deduct)(").count(), 1);
+        assert_eq!(src.matches("(hooks.refund)(").count(), 1);
+        // And gate 3 is resolved exactly once per due check, hoisted above the
+        // fan-out for the reason `trial_gate_is_hoisted_out_of_the_location_loop`
+        // gives: it is a `customer_billings` read, and per-location it would
+        // issue N of them per tick.
+        assert_eq!(
+            src.matches(&["resolve_pool", "_gate("].concat()).count(),
+            2,
+            "one definition and exactly one call site — deleting the call is an ungated fleet",
+        );
+    }
+
+    /// **T30 / E15 — a denied slot is RECORDED and never enqueued.**
+    ///
+    /// Also a call site: drop the `continue` and the denied slot is enqueued
+    /// anyway, unfunded and unmetered; drop `report_quota_skips` and the
+    /// customer's monitoring goes dark with no row anywhere saying why — which
+    /// is precisely the gap §7.3 adds the dead letter to close.
+    #[test]
+    fn a_denied_slot_is_recorded_and_never_enqueued() {
+        let whole = include_str!("scheduler.rs");
+        let src = &whole[..whole.find("\n#[cfg(test)]").unwrap()];
+
+        let skip_guard = ["if verdict == PoolGate", "::Skip {"].concat();
+        let at = src
+            .find(&skip_guard)
+            .expect("the denied slot must be skipped at the call site, not merely logged");
+        let arm = &src[at..(at + 400).min(src.len())];
+        assert!(
+            arm.contains("denied.push("),
+            "a denied slot must be recorded so `report_quota_skips` can dead-letter it",
+        );
+        assert!(
+            arm.contains("continue;"),
+            "a denied slot must not fall through into the enqueue",
+        );
+
+        assert_eq!(
+            src.matches(&["report_quota", "_skips("].concat()).count(),
+            3,
+            "one definition and two call sites: the all-denied check, and the partly-denied one",
+        );
+    }
+
+    /// The run row's `job_count` is what a run needs to reach before it is
+    /// complete, so it MUST be the number of slots that will actually be
+    /// enqueued. Counting denied slots would leave every partly-denied run
+    /// permanently incomplete: never finished, never alerted on, never recovered.
+    #[test]
+    fn the_run_row_counts_planned_slots_and_not_configured_locations() {
+        let whole = include_str!("scheduler.rs");
+        let src = &whole[..whole.find("\n#[cfg(test)]").unwrap()];
+        assert!(
+            src.contains(&["let job_count = planned", ".len() as i32;"].concat()),
+            "job_count must come from the slots that survived gates 2 and 3",
+        );
+        assert!(
+            !src.contains(&["let job_count = synthetic", ".locations.len() as i32;"].concat()),
+            "counting configured locations orphans the run row for every denied slot",
+        );
+    }
+}
+
 #[cfg(test)]
 mod cloud_feature_tests {
     /// `BUILT_WITH_CLOUD` must reflect the compiling crate's own feature set,

@@ -78,12 +78,21 @@ pub async fn load_all() -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr>
     trial_quota_usage::Entity::find().all(db).await
 }
 
-/// Get total usage across all features for an org (sum of usage_count).
+/// Get total usage for an org across the given pool's feature rows.
+///
+/// `features` scopes the sum to ONE pool (`TrialQuotaPool::feature_keys`) — see
+/// `openobserve-core::trial_quota`, item 2.1. Summing every row of the org, what
+/// this did before, reported synthetics step consumption as AI credits used.
+///
 /// Note: PostgreSQL SUM(bigint) returns NUMERIC, so we cast to BIGINT for Rust i64 compat.
-pub async fn get_total_usage_for_org(org_id: &str) -> Result<i64, sea_orm::DbErr> {
+pub async fn get_total_usage_for_org(
+    org_id: &str,
+    features: &[&str],
+) -> Result<i64, sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let result: Option<Option<i64>> = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .select_only()
         .column_as(
             Expr::expr(Func::cast_as(
@@ -112,33 +121,48 @@ pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_or
     Ok(result.flatten())
 }
 
-pub async fn load_all_usage_limits() -> Result<Vec<(String, i64)>, sea_orm::DbErr> {
+/// Every explicit `(org_id, feature, usage_limit)` triple.
+///
+/// Returns the FEATURE, not a per-org maximum: the caller folds these into pools
+/// (item 2.1). Collapsing to `MAX(usage_limit) GROUP BY org_id` here — what this
+/// did before — meant raising an org's AI credit limit silently raised its
+/// one-time synthetics grant by the same amount.
+pub async fn load_all_usage_limits() -> Result<Vec<(String, String, i64)>, sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let results: Vec<(String, Option<i64>)> = trial_quota_usage::Entity::find()
+    let results: Vec<(String, String, Option<i64>)> = trial_quota_usage::Entity::find()
         .select_only()
         .column(trial_quota_usage::Column::OrgId)
-        .column_as(trial_quota_usage::Column::UsageLimit.max(), "usage_limit")
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::UsageLimit)
         .filter(trial_quota_usage::Column::UsageLimit.is_not_null())
-        .group_by(trial_quota_usage::Column::OrgId)
         .into_tuple()
         .all(db)
         .await?;
     Ok(results
         .into_iter()
-        .filter_map(|(org_id, limit)| limit.map(|limit| (org_id, limit)))
+        .filter_map(|(org_id, feature, limit)| limit.map(|limit| (org_id, feature, limit)))
         .collect())
 }
 
-/// Set one shared limit on every feature row for an organization. The AI chat
-/// row is upserted first so organizations without prior usage can be configured.
-pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(), sea_orm::DbErr> {
+/// Set one limit on every feature row of ONE POOL for an organization.
+///
+/// `seed_feature` is upserted first so organizations without prior usage in that
+/// pool can still be configured; `features` bounds the `UPDATE` to the pool's
+/// own rows. Without that bound, raising the AI credit limit also raised the
+/// synthetics grant and vice versa (item 2.1).
+pub async fn set_usage_limit_for_org(
+    org_id: &str,
+    seed_feature: &str,
+    features: &[&str],
+    usage_limit: i64,
+) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = super::get_lock().await;
     let txn = db.begin().await?;
     let now = config::utils::time::now_micros();
     let active_model = trial_quota_usage::ActiveModel {
         org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
-        feature: sea_orm::ActiveValue::Set("ai_chat".to_string()),
+        feature: sea_orm::ActiveValue::Set(seed_feature.to_string()),
         usage_count: sea_orm::ActiveValue::Set(0),
         usage_limit: sea_orm::ActiveValue::Set(Some(usage_limit)),
         updated_at: sea_orm::ActiveValue::Set(now),
@@ -163,6 +187,7 @@ pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(
 
     trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .col_expr(
             trial_quota_usage::Column::UsageLimit,
             Expr::value(usage_limit),

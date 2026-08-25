@@ -88,6 +88,7 @@ pub const BUILT_WITH_CLOUD: bool = cfg!(feature = "cloud");
 pub mod alerting;
 pub mod dispatcher;
 pub mod job_api;
+pub mod pool;
 pub mod reaper;
 pub mod scheduler;
 pub mod service;
@@ -156,10 +157,26 @@ const JOB_CLUSTER_POLL: std::time::Duration = std::time::Duration::from_secs(10)
 /// poll also earns its keep on the other side: when the claim moves (spec §6, a
 /// scheduler relocated between regions) the new region starts synthetics
 /// without a restart.
-pub async fn init() {
+/// `step_pool` is SPEC §6's free step pool, item **2.3** — the scheduler's
+/// gate 3.
+///
+/// A REQUIRED argument, and `Option` rather than a `OnceCell` the caller may or
+/// may not have set: the pool lives in `openobserve-core`, this crate has no
+/// edge to it, and the only defence against §11 **F6** — a wiring mistake that
+/// produces no error and no log, just an unmetered fleet — is making the wiring
+/// impossible to omit. `None` is a valid answer (an OSS build has no pool), and
+/// it means the scheduler does not gate. See [`pool`] for the fail-open
+/// reasoning.
+pub async fn init(step_pool: Option<pool::StepPoolHooks>) {
     if !config::get_config().synthetics.enabled {
         tracing::info!("[synthetics] disabled via ZO_SYNTHETICS_ENABLED — workers not started");
         return;
+    }
+
+    // Before any worker is spawned, so `scheduler::run` cannot observe a
+    // half-installed pool on its first tick.
+    if let Some(step_pool) = step_pool {
+        pool::install(step_pool);
     }
 
     // Single cluster, or an OSS build where there is no such thing: start
@@ -393,6 +410,26 @@ mod tests {
     /// the ones that have moved here, with the same allowance table. A file
     /// arriving in this crate must be added to one list or the other, never
     /// dropped from both.
+    /// **SPEC §6, item 2.3 — `init` must INSTALL the pool it was handed.**
+    ///
+    /// A call site, and the one whose loss is completely silent: `init` still
+    /// starts every worker, the scheduler still runs every check, and every
+    /// test in `pool_gate_tests` still passes — the pool is simply never there,
+    /// so `resolve_pool_gate` returns `None` forever and the fleet is unmetered
+    /// and ungated. That is SPEC §11 **F6**'s exact shape, one layer down from
+    /// the `cfg` it names.
+    #[test]
+    fn init_installs_the_step_pool_it_was_handed() {
+        let source = include_str!("lib.rs");
+        assert_eq!(
+            source
+                .matches(&["pool::install", "(step_pool)"].concat())
+                .count(),
+            1,
+            "the pool handed to `init` must be installed before any worker is spawned"
+        );
+    }
+
     #[test]
     fn nothing_on_the_run_path_publishes() {
         let prefix = publish_prefix();
@@ -406,6 +443,7 @@ mod tests {
             ("job_api", include_str!("job_api.rs")),
             ("reaper", include_str!("reaper/mod.rs")),
             ("reaper::orphan", include_str!("reaper/orphan.rs")),
+            ("pool", include_str!("pool.rs")),
             ("scheduler", include_str!("scheduler.rs")),
         ];
         for (name, source) in files {

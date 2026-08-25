@@ -999,6 +999,129 @@ fn report_step_usage(usage: Vec<config::meta::self_reporting::usage::UsageData>)
     usage_reporting::report_usage(usage);
 }
 
+/// The org's one-time free step grant, as it stands right now — SPEC §6.1,
+/// item 2.3. Handed to `job_api::ack`, which decides §4.2's free/billable split
+/// with it and reconciles §6.3 against it.
+///
+/// # Why the billing read is behind the pool read, and not the other way round
+///
+/// `NotApplicable` has to cover **ExternalContract** orgs (§7.3: *"notify, never
+/// block, never pool-gate"*; §7.4 needs their acks billable so the NoOp provider
+/// advances a step-denominated true-up), and the only way to know an org is one
+/// is a `customer_billings` read. That read is not free and this runs on every
+/// ack, so it is issued ONLY while the org still has grant left — which is the
+/// window in which the answer can change anything. Once the grant is spent, and
+/// for every established paying org, this costs one in-memory counter read.
+#[cfg(feature = "cloud")]
+async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolView {
+    // The §9A / §9D master switch. Off — the default — means no pool is
+    // consulted anywhere, which is the Phase 1 state, and no counter is read.
+    let billing_enabled = o2_enterprise::enterprise::common::config::get_config()
+        .cloud
+        .synthetics_billing_enabled;
+    let remaining = if billing_enabled {
+        openobserve_core::trial_quota::synthetics_steps_remaining(org_id)
+    } else {
+        0
+    };
+    // The one DB read, issued only while it can still change the answer.
+    let is_contract = needs_plan_read(billing_enabled, remaining)
+        && o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+            org_id,
+        )
+        .await
+        .requires_additional_credits();
+    step_pool_view(billing_enabled, remaining, is_contract)
+}
+
+/// Whether the org's PLAN still has to be read to answer [`step_pool_view`].
+///
+/// False once the answer cannot change: nothing is metered on this node, or the
+/// grant is already spent and the ack is billable either way. That is what keeps
+/// [`resolve_step_pool`] to one in-memory counter read for every org past its
+/// evaluation budget, which is every established paying org.
+fn needs_plan_read(billing_enabled: bool, remaining: u64) -> bool {
+    billing_enabled && remaining > 0
+}
+
+/// SPEC §6.1 / §7.3 — the whole free/billable decision for one ack, as pure
+/// arithmetic over the three facts that decide it.
+fn step_pool_view(
+    billing_enabled: bool,
+    remaining: u64,
+    is_contract: bool,
+) -> openobserve_synthetics::job_api::StepPoolView {
+    use openobserve_synthetics::job_api::StepPoolView;
+
+    if !billing_enabled {
+        return StepPoolView::NotApplicable;
+    }
+    if remaining == 0 {
+        // §7.3, E16/T31 — the grant is gone. A plan that can be charged runs as
+        // metered overage; a Free org never got here, because its slot was
+        // skipped at the enqueue.
+        return StepPoolView::Spent;
+    }
+    if is_contract {
+        // §7.3, E18/T36 — *"never pool-gate"*. §7.4 needs the ack billable so
+        // the NoOp provider advances a step-denominated true-up.
+        return StepPoolView::NotApplicable;
+    }
+    StepPoolView::Funded
+}
+
+/// §8.1: a build without `cloud` has no pool, so every ack is `NotApplicable`.
+#[cfg(not(feature = "cloud"))]
+async fn resolve_step_pool(_org_id: &str) -> openobserve_synthetics::job_api::StepPoolView {
+    openobserve_synthetics::job_api::StepPoolView::NotApplicable
+}
+
+/// Applies the free-pool movement one ack owes — SPEC §6.3, item 2.3.
+///
+/// Idempotent on `(synthetics_id, location, scheduled_ts, job_id)`, which
+/// `job_api` built into `idempotency_key`. A refund is saturating and a top-up
+/// is NEVER refused (E14): *"if a top-up would exhaust the pool mid-run,
+/// complete the run and record it"* — enforcement belongs at the next enqueue.
+#[cfg(feature = "cloud")]
+fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
+    let Some(adjustment) = resp.pool_adjustment.as_ref() else {
+        return;
+    };
+    openobserve_core::trial_quota::synthetics_steps_adjust(
+        &adjustment.org_id,
+        core_movement(adjustment.movement),
+        &adjustment.idempotency_key,
+    );
+}
+
+/// Translate `openobserve-synthetics`'s movement into the pool's own.
+///
+/// Two crates that never see each other's types describe the same two
+/// directions, and the compiler cannot check that this maps them the right way
+/// round. Inverting it turns every refund into a second charge — the org loses
+/// twice what the run cost, silently, against a grant it can never get back.
+#[cfg(feature = "cloud")]
+fn core_movement(
+    movement: openobserve_synthetics::job_api::PoolMovement,
+) -> openobserve_core::trial_quota::PoolAdjustment {
+    use openobserve_synthetics::job_api::StepPoolDirection;
+
+    match movement.direction {
+        StepPoolDirection::Refund => {
+            openobserve_core::trial_quota::PoolAdjustment::Refund(movement.steps)
+        }
+        StepPoolDirection::TopUp => {
+            openobserve_core::trial_quota::PoolAdjustment::TopUp(movement.steps)
+        }
+    }
+}
+
+/// §8.1: no pool on this build, so nothing to apply.
+#[cfg(not(feature = "cloud"))]
+fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
+    let _ = resp;
+}
+
 /// Runs one job ack through the enterprise service plus the per-ack side
 /// effects (telemetry, run-complete notification). Shared by the single and
 /// batch forms of `job_ack`.
@@ -1011,7 +1134,17 @@ async fn process_ack(
     let error = req.error.clone();
     let checked_at = config::utils::time::now_micros();
 
-    let resp = openobserve_synthetics::job_api::ack(req, token_org).await?;
+    let resp =
+        openobserve_synthetics::job_api::ack(req, token_org, resolve_step_pool(token_org).await)
+            .await?;
+
+    // SPEC §4.1 step 3h / §6.3, item 2.3 — the free-pool reconcile.
+    //
+    // `ack` computes it and returns it as data for exactly the reason
+    // `report_step_usage` explains for the usage rows: the pool is
+    // `openobserve_core::trial_quota`, `openobserve-synthetics` has no edge to
+    // it, and this crate depends on both.
+    apply_pool_adjustment(&resp);
 
     // Emit trigger usage record for synthetics telemetry.
     usage_reporting::publish_triggers_usage(config::meta::self_reporting::usage::TriggerData {
@@ -1677,6 +1810,7 @@ mod tests {
             failing_locations: Vec::new(),
             passing_locations: Vec::new(),
             usage_events,
+            pool_adjustment: None,
         }
     }
 
@@ -1767,6 +1901,129 @@ mod tests {
                 .count(),
             1,
             "the hand-off to the usage queue is gone; nothing is metered"
+        );
+    }
+
+    /// SPEC §6.1 / §7.3 — every state of the org's grant maps to exactly one
+    /// answer, and the wrong answer is invisible: `Funded` where the grant is
+    /// gone is free service, `Spent`/`NotApplicable` where it is not is a grant
+    /// that never burns down and an invoice for work §6.1 gave away.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn the_step_pool_view_is_spec_6_1_and_7_3() {
+        use openobserve_synthetics::job_api::StepPoolView;
+
+        use super::step_pool_view;
+
+        // §9A/§9D master switch off — the Phase 1 state. Nothing is consulted,
+        // so nothing is free and nothing is reconciled.
+        assert_eq!(
+            step_pool_view(false, 10_000, false),
+            StepPoolView::NotApplicable,
+        );
+        assert_eq!(step_pool_view(false, 0, true), StepPoolView::NotApplicable);
+
+        // The grant still has room.
+        assert_eq!(step_pool_view(true, 1, false), StepPoolView::Funded);
+        assert_eq!(step_pool_view(true, 10_000, false), StepPoolView::Funded);
+
+        // Spent ⇒ metered overage (E16/T31).
+        assert_eq!(step_pool_view(true, 0, false), StepPoolView::Spent);
+
+        // A contract org is never pool-gated (E18/T36), so it never reads as
+        // funded even with a grant sitting there untouched.
+        assert_eq!(
+            step_pool_view(true, 10_000, true),
+            StepPoolView::NotApplicable,
+        );
+    }
+
+    /// The plan read is one `customer_billings` query and this runs on EVERY
+    /// ack, so it is issued only while its answer can still change anything.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn the_plan_is_read_only_while_the_grant_can_still_fund_an_ack() {
+        use super::needs_plan_read;
+
+        assert!(needs_plan_read(true, 1));
+        assert!(
+            !needs_plan_read(true, 0),
+            "a spent grant is billable whatever the plan says",
+        );
+        assert!(
+            !needs_plan_read(false, 10_000),
+            "nothing is metered on this node",
+        );
+    }
+
+    /// The two crates describe the same two directions and no compiler checks
+    /// that this maps them the right way round. Inverted, every refund becomes a
+    /// second charge against a grant the org can never get back.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn a_refund_stays_a_refund_across_the_crate_boundary() {
+        use openobserve_synthetics::job_api::{PoolMovement, StepPoolDirection};
+
+        use super::core_movement;
+
+        assert_eq!(
+            core_movement(PoolMovement {
+                direction: StepPoolDirection::Refund,
+                steps: 10,
+            }),
+            openobserve_core::trial_quota::PoolAdjustment::Refund(10),
+        );
+        assert_eq!(
+            core_movement(PoolMovement {
+                direction: StepPoolDirection::TopUp,
+                steps: 4,
+            }),
+            openobserve_core::trial_quota::PoolAdjustment::TopUp(4),
+        );
+    }
+
+    /// The same guarantee for the OTHER half of an ack — SPEC §4.1 step 3h,
+    /// §6.3, item 2.3.
+    ///
+    /// `job_api::ack` computes the free-pool movement and returns it; if this
+    /// crate never applies it, every reconcile is silently dropped. Under a
+    /// ONE-TIME grant (§6.1) a dropped refund is a step the org never gets back
+    /// and a dropped top-up is a step it never pays for — and neither produces
+    /// an error, a log or a failing test anywhere else, because the ack still
+    /// returns 200 and the usage row is still written.
+    ///
+    /// Two of the three steps below are unreachable from a unit test (they read
+    /// process-global config and the process-global pool), which is exactly why
+    /// they are pinned here.
+    #[test]
+    fn every_ack_path_applies_the_pool_reconcile_it_computed() {
+        let source = include_str!("mod.rs");
+        // Two `cfg`-split definitions plus one call, for each half.
+        for (needle, what) in [
+            (
+                ["resolve_step", "_pool("].concat(),
+                "resolves the org's grant before the ack",
+            ),
+            (
+                ["apply_pool", "_adjustment("].concat(),
+                "applies the movement the ack returned",
+            ),
+        ] {
+            assert_eq!(
+                source.matches(&needle).count(),
+                3,
+                "one `cloud` definition, one non-`cloud` definition and exactly one call site                  are expected for the step that {what}"
+            );
+        }
+
+        // The hand-off to the pool itself. Emptying this function's body is a
+        // silent "never reconcile anything".
+        assert_eq!(
+            source
+                .matches(&["trial_quota::synthetics_steps", "_adjust("].concat())
+                .count(),
+            1,
+            "the hand-off to the free step pool is gone; no reconcile is ever applied"
         );
     }
 }
