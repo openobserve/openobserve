@@ -854,14 +854,15 @@ accumulate one per visit.
 | --- | --- |
 | §2.1a new-deploy detection | needs a live redeploy of pentest |
 | §2.3 field-value residue across users (§24-6) | needs a second, RBAC-restricted user |
-| §6.8/6.9 dependency graph / anomaly | no multi-dependency or anomaly data (§6.5 history now tested in `_meta` — see failure #6) |
+| ~~§6.8 dependency graph~~ | **now verified on the latest-main env — PASS**: one `include_dependencies=true` read shared by the Destinations and Templates tabs (28 Used-by cells, zero extra reads) and the impact dialog opens with no request. §6.9 anomaly still has no data |
 | §6.7 External alert sources | not present in nav on this build |
 | §7 SLO happy paths | SLOs disabled server-side (see failure #1) |
 | §9 pipeline editor flows / history | no pipelines on the org; editor too heavy to script safely |
 | ~~§10.2 Enrichment tables~~ | ~~org has none~~ **now verified in `_meta` — PASS** |
-| §16 Trace DAG cache | pentest: no `/traces/{id}/details` endpoint (404 for ALL traces). o2latestmain: endpoint works and trace details render (Waterfall/Flame/Trace Graph tabs, no re-query on the client-built graph) — but the DAG tab needs spans with flattened `gen_ai_*` columns, and this backend stores custom span attributes in `_all` only, so `hasLLMSpans` is false even for an ingested gen_ai trace. Needs a genuinely LLM-instrumented env |
+| §16 Trace DAG cache | pentest: no `/traces/{id}/details` endpoint. o2latestmain: details works, but `/traces/{id}/dag` itself 404s for every trace (driven directly through `traceDagQuery` — the component's own path), and no org holds spans with populated `gen_ai_*` columns, so the DAG tab cannot appear. Verified meanwhile: the 404 is not cached and not retried (one call per fetch). Needs a backend with the /dag endpoint and LLM-instrumented traces |
 | §21 RUM, §22.3a LLM Insights, §22.4 Billing | no RUM/LLM/billing data on either env (RUM page loads clean on o2latestmain, zero sessions). ~~§22.1 Online Evals~~ **tested on o2latestmain — PASS**: cold visit fetches score_configs+scorers+eval_jobs+providers once; scorers/jobs tab revisits fire zero requests |
-| §11 Synthetics, §13 Actions, §15.2 Nodes | still disabled/gated on o2latestmain too (`synthetics_enabled=false`; Actions blank; Nodes redirects to General even in `_meta`) |
+| §11 Synthetics, §13 Actions | server flags off on every reachable env: synthetics routes redirect to Home by guard; the Actions page renders via direct URL but `getAllActions` correctly returns `[]` without a request while `actions_enabled` is unset — no caching to exercise, and no wasted traffic |
+| ~~§15.2 Nodes~~ | **now verified — PASS** (the page needs the `_meta` org selected, not just the URL param): cold 1 request/7 nodes, revisit 0, `r` forces 1, the node filter survives refresh with its filtered rows, and no `o2q-` key is written (memory-only by design) |
 | §23 offline / quota-full / multi-tab | not reproducible in the in-app browser harness |
 | Pagination/prefetch checks (§3, §6.5, §9.3) | no surface had >1 page of data |
 
