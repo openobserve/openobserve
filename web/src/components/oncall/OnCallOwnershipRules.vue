@@ -76,14 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-caught="{ row }">
-        <span :class="row.pages_caught ? 'text-text-body' : 'text-text-muted'">
+        <span class="text-text-body">
           {{ t("oncall.rulePagesCaught", { count: row.pages_caught }, row.pages_caught) }}
         </span>
       </template>
 
       <template #cell-last="{ row }">
         <OTimeCell v-if="row.last_matched_at" :value="row.last_matched_at" unit="us" />
-        <span v-else class="text-text-muted">{{ t("oncall.ruleNeverMatched") }}</span>
+        <span v-else class="text-text-body">{{ t("oncall.ruleNeverMatched") }}</span>
       </template>
 
       <!-- The server's own verdict, never a recomputed one. "Shadowed" in
