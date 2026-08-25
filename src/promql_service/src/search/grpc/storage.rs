@@ -194,7 +194,6 @@ pub(crate) async fn create_context(
     // physical rows are attached to each FileKey before the metrics table is
     // built. Files of any other layout (legacy or not yet finalized hours) are
     // scanned in full; the PromQL matchers are always applied by the query.
-    let mut keep_filters = true;
     match metrics_index::search(
         trace_id,
         &mut files,
@@ -204,11 +203,8 @@ pub(crate) async fn create_context(
     )
     .await
     {
-        Ok(outcome) => {
-            if let Some(outcome) = outcome {
-                scan_stats.idx_took = outcome.took_ms as i64;
-                keep_filters = !outcome.exact;
-            }
+        Ok(took) => {
+            scan_stats.idx_took = took.unwrap_or_default() as i64;
         }
         Err(error) => {
             log::warn!(
@@ -234,10 +230,9 @@ pub(crate) async fn create_context(
 
     let ctx = register_metrics_table(&session, schema.clone(), stream_name, files).await?;
 
-    // Exact sidecar coverage makes the selected row ranges equivalent to the
-    // final label predicates. Mixed layouts, missing labels, and any sidecar
-    // failure conservatively retain all final-scan matchers.
-    Ok(Some((ctx, schema, scan_stats, keep_filters)))
+    // the matchers are always applied by the query: sidecar selections are
+    // exact at series-run granularity only, and other files are scanned in full
+    Ok(Some((ctx, schema, scan_stats, true)))
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]

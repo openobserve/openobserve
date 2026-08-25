@@ -20,9 +20,9 @@ use std::{
 
 use arrow::datatypes::Schema;
 use config::{
-    PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
+    PARQUET_MAX_ROW_GROUP_SIZE,
     meta::{
-        promql::{NAME_LABEL, VALUE_LABEL, is_metrics_hash_excluded_label},
+        promql::is_metrics_hash_excluded_label,
         stream::{FileKey, FileSelection},
     },
 };
@@ -37,23 +37,10 @@ use futures::{StreamExt, stream};
 use promql_parser::label::Matchers;
 
 use crate::{
-    cache::{METRICS_INDEX_SELECTION_CACHE, MetricsIndexSelection},
+    cache::METRICS_INDEX_SELECTION_CACHE,
     layout::MetricsFileLayout,
     reader::{evaluate_metrics_index, load_metrics_index_file},
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MetricsIndexSearchOutcome {
-    pub took_ms: usize,
-    /// Every final-scan matcher was evaluated by every selected sidecar and no
-    /// file needed a conservative full-scan fallback.
-    pub exact: bool,
-}
-
-pub(super) struct MatcherLabelPlan {
-    pub(super) labels: Vec<String>,
-    pub(super) exact_candidate: bool,
-}
 
 /// Apply the `.midx` metrics indexes of indexed metrics files in `files` before
 /// registering the metrics table.
@@ -70,12 +57,11 @@ pub async fn search(
     table_schema: &Schema,
     matchers: &Matchers,
     target_partitions: usize,
-) -> Result<Option<MetricsIndexSearchOutcome>> {
-    let Some(matcher_plan) = matcher_label_plan(table_schema, matchers) else {
+) -> Result<Option<usize>> {
+    let Some(matcher_labels) = metrics_index_labels(table_schema, matchers) else {
         return Ok(None);
     };
-    let matcher_labels = Arc::new(matcher_plan.labels);
-    let exact_candidate = matcher_plan.exact_candidate;
+    let matcher_labels = Arc::new(matcher_labels);
     if files.is_empty() {
         return Ok(None);
     }
@@ -132,8 +118,8 @@ pub async fn search(
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         for (data_path, (account, sidecar_path, cache_key, expected_rows)) in index_files {
-            if let Some(selection) = cache.get(&cache_key) {
-                evaluated.push((data_path, selection));
+            if let Some(ranges) = cache.get(&cache_key) {
+                evaluated.push((data_path, ranges));
             } else {
                 misses.push((data_path, account, sidecar_path, cache_key, expected_rows));
             }
@@ -148,18 +134,12 @@ pub async fn search(
             let matchers = Arc::clone(&matchers);
             async move {
                 let result = async {
-                    let data =
-                        load_metrics_index_file(&account, &sidecar_path, Arc::clone(&labels))
-                            .await?;
-                    let exact = exact_candidate
-                        && labels
-                            .iter()
-                            .all(|label| data.schema.field_with_name(label).is_ok());
+                    let data = load_metrics_index_file(&account, &sidecar_path, labels).await?;
                     tokio::task::spawn_blocking(move || {
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
-                            .map(|ranges| (cache_key, ranges, exact))
+                            .map(|ranges| (cache_key, ranges))
                     })
                     .await
                     .map_err(|error| DataFusionError::External(Box::new(error)))?
@@ -177,16 +157,13 @@ pub async fn search(
     let mut failed_files = 0usize;
     while let Some((data_path, result)) = evaluations.next().await {
         match result {
-            Ok((cache_key, ranges, exact)) => {
-                let selection = MetricsIndexSelection {
-                    ranges: Arc::new(ranges),
-                    exact,
-                };
+            Ok((cache_key, ranges)) => {
+                let ranges = Arc::new(ranges);
                 METRICS_INDEX_SELECTION_CACHE
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .insert(cache_key, selection.clone());
-                evaluated.push((data_path, selection));
+                    .insert(cache_key, Arc::clone(&ranges));
+                evaluated.push((data_path, ranges));
             }
             Err(error) => {
                 failed_files += 1;
@@ -200,28 +177,24 @@ pub async fn search(
 
     let selected_files = evaluated
         .iter()
-        .filter(|(_, selection)| !selection.ranges.is_empty())
+        .filter(|(_, ranges)| !ranges.is_empty())
         .count();
     let selected_ranges = evaluated
         .iter()
-        .map(|(_, selection)| selection.ranges.len())
+        .map(|(_, ranges)| ranges.len())
         .sum::<usize>();
     let indexed_file_count = evaluated.len() + failed_files;
-    let exact = exact_candidate
-        && other_files == 0
-        && failed_files == 0
-        && evaluated.iter().all(|(_, selection)| selection.exact);
     let mut selections = evaluated.into_iter().collect::<HashMap<_, _>>();
     files.retain_mut(|file| {
-        let Some(selection) = selections.remove(&file.key) else {
+        let Some(ranges) = selections.remove(&file.key) else {
             // not indexed metrics: untouched, the caller decides how to scan it
             return true;
         };
-        if selection.ranges.is_empty() {
+        if ranges.is_empty() {
             return false;
         }
         file.with_selection(
-            FileSelection::RowRanges(selection.ranges),
+            FileSelection::RowRanges(ranges),
             Some(PARQUET_MAX_ROW_GROUP_SIZE as u32),
         );
         true
@@ -229,55 +202,31 @@ pub async fn search(
 
     let took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {failed_files} sidecars failed and were left for a full scan, {other_files} files without a usable sidecar left for a full scan, selection cache hits: {cache_hits}, exact final matcher coverage: {exact}, took: {took} ms",
+        "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {failed_files} sidecars failed and were left for a full scan, {other_files} files without a usable sidecar left for a full scan, selection cache hits: {cache_hits}, took: {took} ms",
         trace_id,
         indexed_file_count,
     );
-    Ok(Some(MetricsIndexSearchOutcome {
-        took_ms: took,
-        exact,
-    }))
+    Ok(Some(took))
 }
 
 /// Labels referenced by the matchers that the sidecar can answer. `None`
 /// when no matcher can be evaluated on the metrics index.
-#[cfg(test)]
 pub(super) fn metrics_index_labels(
     table_schema: &Schema,
     matchers: &Matchers,
 ) -> Option<Vec<String>> {
-    matcher_label_plan(table_schema, matchers).map(|plan| plan.labels)
-}
-
-pub(super) fn matcher_label_plan(
-    table_schema: &Schema,
-    matchers: &Matchers,
-) -> Option<MatcherLabelPlan> {
     let mut labels: Vec<String> = Vec::new();
-    let mut exact_candidate = matchers.or_matchers.is_empty();
     for matcher in &matchers.matchers {
-        // These matchers are deliberately not evaluated by the final scan.
-        if matcher.name == TIMESTAMP_COL_NAME
-            || matcher.name == VALUE_LABEL
-            || matcher.name == NAME_LABEL
+        if is_metrics_hash_excluded_label(&matcher.name)
             || table_schema.field_with_name(&matcher.name).is_err()
         {
-            continue;
-        }
-        if is_metrics_hash_excluded_label(&matcher.name) {
-            // This matcher is evaluated against physical sample rows but is not
-            // stable within a hash run, so the sidecar cannot replace it.
-            exact_candidate = false;
             continue;
         }
         if !labels.contains(&matcher.name) {
             labels.push(matcher.name.clone());
         }
     }
-    (!labels.is_empty()).then_some(MatcherLabelPlan {
-        labels,
-        exact_candidate,
-    })
+    (!labels.is_empty()).then_some(labels)
 }
 
 /// Physical filter over the sidecar columns. `None` when none of the matchers
