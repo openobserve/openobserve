@@ -36,16 +36,13 @@ use datafusion::{
     arrow::{
         array::{ArrayRef, Float64Array, Int64Array, StringArray, UInt64Array},
         datatypes::{DataType, Schema},
+        record_batch::RecordBatch,
     },
-    common::hash_utils::HashValue,
     error::{DataFusionError, Result},
     logical_expr::utils::disjunction,
     physical_plan::{
-        Partitioning,
-        display::DisplayableExecutionPlan,
-        execute_stream_partitioned,
-        expressions::Column,
-        repartition::{REPARTITION_RANDOM_STATE, RepartitionExec},
+        Partitioning, display::DisplayableExecutionPlan, execute_stream_partitioned,
+        expressions::Column, repartition::RepartitionExec,
     },
     prelude::{DataFrame, Expr, SessionContext, col, lit},
 };
@@ -89,7 +86,6 @@ type SampleTokioResult =
 #[derive(Clone, Copy)]
 struct RoutedHashRun {
     hash: u64,
-    owner: usize,
     start: usize,
     end: usize,
 }
@@ -98,6 +94,12 @@ struct RoutedSampleBatch {
     timestamps: ArrayRef,
     values: ArrayRef,
     runs: Vec<RoutedHashRun>,
+}
+
+struct RoutedOwnerBatch {
+    batch: Arc<RoutedSampleBatch>,
+    run_start: usize,
+    run_end: usize,
 }
 
 #[derive(Default)]
@@ -117,8 +119,9 @@ type HashRunWorkerResult =
     tokio::task::JoinHandle<Result<(HashMap<u64, RangeValue>, HashSet<i64>, SamplePartitionStats)>>;
 
 #[inline]
-fn hash_partition_owner(hash: u64, target_partitions: usize) -> usize {
-    (hash.hash_one(REPARTITION_RANDOM_STATE.random_state()) % target_partitions as u64) as usize
+fn hash_range_owner(hash: u64, target_partitions: usize) -> usize {
+    debug_assert!(target_partitions > 0);
+    (((hash as u128) * (target_partitions as u128)) >> u64::BITS) as usize
 }
 
 const STORAGE_HOUR_MICROS: i64 = 60 * 60 * 1_000_000;
@@ -546,13 +549,14 @@ pub(super) async fn load_samples_from_datafusion(
     Ok((metrics, all_unique_timestamps))
 }
 
-/// Repartition TSID-major UInt64 samples at hash-run granularity.
+/// Repartition TSID-major UInt64 samples into contiguous raw-hash ranges.
 ///
 /// Each scan partition identifies contiguous hash runs and routes shared Arrow
 /// batches to bounded owner channels. Owner workers build the final series map
-/// directly, preserving the same-owner property of
-/// `RepartitionExec(Hash(__hash__))` without hashing and copying every physical
-/// sample row into exchange output arrays.
+/// directly. Hash-sorted batches normally produce one contiguous slice per
+/// owner instead of broadcasting every batch to nearly every randomized hash
+/// owner. The same hash always has the same range owner, including when a
+/// series spans batches, files, or hours.
 async fn load_hash_sorted_samples(
     trace_id: &str,
     plan: Arc<dyn datafusion::physical_plan::ExecutionPlan>,
@@ -568,17 +572,18 @@ async fn load_hash_sorted_samples(
     let mut senders = Vec::with_capacity(target_partitions);
     let mut worker_tasks = Vec::with_capacity(target_partitions);
 
-    for owner in 0..target_partitions {
+    for _owner in 0..target_partitions {
         let (sender, mut receiver) =
-            tokio::sync::mpsc::channel::<Arc<RoutedSampleBatch>>(channel_capacity);
+            tokio::sync::mpsc::channel::<RoutedOwnerBatch>(channel_capacity);
         senders.push(sender);
         let task: HashRunWorkerResult =
             tokio::task::spawn(async move {
                 let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
                 let mut stats = SamplePartitionStats::default();
 
-                while let Some(batch) = receiver.recv().await {
+                while let Some(message) = receiver.recv().await {
                     let builder_start = std::time::Instant::now();
+                    let batch = message.batch;
                     let time_values = batch
                         .timestamps
                         .as_any()
@@ -591,7 +596,7 @@ async fn load_hash_sorted_samples(
                         .unwrap();
 
                     stats.batches += 1;
-                    for run in batch.runs.iter().filter(|run| run.owner == owner) {
+                    for run in &batch.runs[message.run_start..message.run_end] {
                         let run_len = run.end - run.start;
                         let entry = match metrics.entry(run.hash) {
                             hashbrown::hash_map::Entry::Occupied(entry) => entry.into_mut(),
@@ -659,8 +664,10 @@ async fn load_hash_sorted_samples(
                     .as_any()
                     .downcast_ref::<UInt64Array>()
                     .unwrap();
-                let mut active_owners = vec![false; target_partitions];
                 let mut runs = Vec::new();
+                let mut owner_segments = Vec::new();
+                let mut segment_owner = None;
+                let mut segment_start = 0;
                 let mut run_start = 0;
                 while run_start < batch.num_rows() {
                     let hash = hash_values.value(run_start);
@@ -668,15 +675,23 @@ async fn load_hash_sorted_samples(
                     while run_end < batch.num_rows() && hash_values.value(run_end) == hash {
                         run_end += 1;
                     }
-                    let owner = hash_partition_owner(hash, target_partitions);
-                    active_owners[owner] = true;
+                    let owner = hash_range_owner(hash, target_partitions);
+                    if segment_owner != Some(owner) {
+                        if let Some(previous_owner) = segment_owner {
+                            owner_segments.push((previous_owner, segment_start, runs.len()));
+                        }
+                        segment_owner = Some(owner);
+                        segment_start = runs.len();
+                    }
                     runs.push(RoutedHashRun {
                         hash,
-                        owner,
                         start: run_start,
                         end: run_end,
                     });
                     run_start = run_end;
+                }
+                if let Some(owner) = segment_owner {
+                    owner_segments.push((owner, segment_start, runs.len()));
                 }
                 stats.hash_runs += runs.len();
                 let routed_batch = Arc::new(RoutedSampleBatch {
@@ -686,16 +701,21 @@ async fn load_hash_sorted_samples(
                 });
                 stats.routing_cpu += routing_start.elapsed();
 
-                for (owner, sender) in senders.iter().enumerate() {
-                    if !active_owners[owner] {
-                        continue;
-                    }
+                for (owner, run_start, run_end) in owner_segments {
                     let send_start = std::time::Instant::now();
-                    sender.send(Arc::clone(&routed_batch)).await.map_err(|_| {
-                        DataFusionError::Execution(
-                            "hash-run owner worker closed before routing completed".to_string(),
-                        )
-                    })?;
+                    senders[owner]
+                        .send(RoutedOwnerBatch {
+                            batch: Arc::clone(&routed_batch),
+                            run_start,
+                            run_end,
+                        })
+                        .await
+                        .map_err(|_| {
+                            DataFusionError::Execution(
+                                "hash-range owner worker closed before routing completed"
+                                    .to_string(),
+                            )
+                        })?;
                     stats.send_wait += send_start.elapsed();
                     stats.routed_messages += 1;
                 }
@@ -743,7 +763,7 @@ async fn load_hash_sorted_samples(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] promql->load-series: hash-run repartition input partitions: {input_partitions}, output owners: {target_partitions}, input batches: {}, rows: {}, Arrow array bytes: {}, source hash runs: {}, rows per routing decision: {:.2}, routed owner messages: {}, routing CPU: {:?}, max router CPU: {:?}, channel send wait: {:?}, owner messages: {}, owner hash runs: {}, builder CPU: {:?}, max owner builder CPU: {:?}, series created: {}, capacity fragment hint: {series_fragment_hint}, capacity query duration micros: {series_query_duration}, initial preallocated slots: {}, additional vector growths: {}",
+        "[trace_id: {trace_id}] promql->load-series: hash-range repartition input partitions: {input_partitions}, output owners: {target_partitions}, input batches: {}, rows: {}, Arrow array bytes: {}, source hash runs: {}, rows per routing decision: {:.2}, routed owner messages: {}, routing CPU: {:?}, max router CPU: {:?}, channel send wait: {:?}, owner messages: {}, owner hash runs: {}, builder CPU: {:?}, max owner builder CPU: {:?}, series created: {}, capacity fragment hint: {series_fragment_hint}, capacity query duration micros: {series_query_duration}, initial preallocated slots: {}, additional vector growths: {}",
         router_stats.batches,
         router_stats.rows,
         router_stats.arrow_bytes,
@@ -784,6 +804,16 @@ async fn load_exemplars_from_datafusion(
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
         .create_physical_plan()
         .await?;
+    if hash_field_type == &DataType::UInt64 {
+        return load_hash_range_exemplars(
+            trace_id,
+            plan,
+            ctx,
+            target_partitions,
+            collect_timestamps,
+        )
+        .await;
+    }
     let schema = plan.schema();
     let plan = Arc::new(RepartitionExec::try_new(
         plan,
@@ -904,6 +934,150 @@ async fn load_exemplars_from_datafusion(
     Ok((metrics, all_unique_timestamps))
 }
 
+struct RoutedExemplarBatch {
+    batch: Arc<RecordBatch>,
+    start: usize,
+    end: usize,
+}
+
+async fn load_hash_range_exemplars(
+    trace_id: &str,
+    plan: Arc<dyn datafusion::physical_plan::ExecutionPlan>,
+    ctx: Arc<datafusion::execution::TaskContext>,
+    target_partitions: usize,
+    collect_timestamps: bool,
+) -> Result<(PartitionedMetrics, HashSet<i64>)> {
+    let streams = execute_stream_partitioned(Arc::clone(&plan), ctx)?;
+    let input_partitions = streams.len();
+    let channel_capacity = input_partitions.max(2);
+    let mut senders = Vec::with_capacity(target_partitions);
+    let mut worker_tasks = Vec::with_capacity(target_partitions);
+
+    for _owner in 0..target_partitions {
+        let (sender, mut receiver) =
+            tokio::sync::mpsc::channel::<RoutedExemplarBatch>(channel_capacity);
+        senders.push(sender);
+        worker_tasks.push(tokio::task::spawn(async move {
+            let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
+            while let Some(message) = receiver.recv().await {
+                let hash_values = message
+                    .batch
+                    .column_by_name(HASH_LABEL)
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .unwrap();
+                let exemplar_values = message
+                    .batch
+                    .column_by_name(EXEMPLARS_LABEL)
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap();
+                for row in message.start..message.end {
+                    let hash = hash_values.value(row);
+                    let exemplar = exemplar_values.value(row);
+                    if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar) {
+                        let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
+                            labels: vec![],
+                            samples: vec![],
+                            exemplars: Some(vec![]),
+                            time_window: None,
+                        });
+                        let entry = entry.exemplars.as_mut().unwrap();
+                        for exemplar in exemplars {
+                            if let Some(exemplar) = exemplar.as_object() {
+                                entry.push(Arc::new(Exemplar::from(exemplar)));
+                            }
+                        }
+                    }
+                }
+            }
+            let mut unique_timestamps = HashSet::new();
+            if collect_timestamps {
+                for metric in metrics.values() {
+                    if let Some(max_timestamp) = metric.exemplars.as_ref().and_then(|exemplars| {
+                        exemplars.iter().map(|exemplar| exemplar.timestamp).max()
+                    }) {
+                        unique_timestamps.insert(max_timestamp);
+                    }
+                }
+            }
+            Ok::<_, DataFusionError>((metrics, unique_timestamps))
+        }));
+    }
+
+    let mut router_tasks = Vec::with_capacity(input_partitions);
+    for mut stream in streams {
+        let senders = senders.clone();
+        router_tasks.push(tokio::task::spawn(async move {
+            let mut messages = 0_usize;
+            while let Some(batch) = stream.try_next().await? {
+                if batch.num_rows() == 0 {
+                    continue;
+                }
+                let hash_values = batch
+                    .column_by_name(HASH_LABEL)
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .unwrap();
+                let mut segments = Vec::new();
+                let mut segment_start = 0;
+                let mut segment_owner = hash_range_owner(hash_values.value(0), target_partitions);
+                for row in 1..batch.num_rows() {
+                    let owner = hash_range_owner(hash_values.value(row), target_partitions);
+                    if owner != segment_owner {
+                        segments.push((segment_owner, segment_start, row));
+                        segment_owner = owner;
+                        segment_start = row;
+                    }
+                }
+                segments.push((segment_owner, segment_start, batch.num_rows()));
+                let batch = Arc::new(batch);
+                for (owner, start, end) in segments {
+                    senders[owner]
+                        .send(RoutedExemplarBatch {
+                            batch: Arc::clone(&batch),
+                            start,
+                            end,
+                        })
+                        .await
+                        .map_err(|_| {
+                            DataFusionError::Execution(
+                                "hash-range exemplar owner closed before routing completed"
+                                    .to_string(),
+                            )
+                        })?;
+                    messages += 1;
+                }
+            }
+            Ok::<_, DataFusionError>(messages)
+        }));
+    }
+    drop(senders);
+
+    let mut routed_messages = 0;
+    for task in router_tasks {
+        routed_messages += task
+            .await
+            .map_err(|error| DataFusionError::Execution(error.to_string()))??;
+    }
+    let mut metrics = Vec::with_capacity(target_partitions);
+    let mut all_unique_timestamps = HashSet::new();
+    for task in worker_tasks {
+        let (owner_metrics, timestamps) = task
+            .await
+            .map_err(|error| DataFusionError::Execution(error.to_string()))??;
+        metrics.push(owner_metrics);
+        all_unique_timestamps.extend(timestamps);
+    }
+    log::info!(
+        "[trace_id: {trace_id}] promql->load-exemplars: hash-range input partitions: {input_partitions}, output owners: {target_partitions}, routed owner messages: {routed_messages}",
+    );
+    Ok((metrics, all_unique_timestamps))
+}
+
 fn merge_partitioned_metrics(partitions: PartitionedMetrics) -> HashMap<u64, RangeValue> {
     let metrics_count = partitions.iter().map(HashMap::len).sum();
     let mut metrics = HashMap::with_capacity(metrics_count);
@@ -936,6 +1110,15 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_hash_range_owner_uses_contiguous_unsigned_ranges() {
+        assert_eq!(hash_range_owner(0, 4), 0);
+        assert_eq!(hash_range_owner((1_u64 << 62) - 1, 4), 0);
+        assert_eq!(hash_range_owner(1_u64 << 62, 4), 1);
+        assert_eq!(hash_range_owner(1_u64 << 63, 4), 2);
+        assert_eq!(hash_range_owner(u64::MAX, 4), 3);
+    }
 
     #[test]
     fn test_series_fragment_and_capacity_hints_are_bounded() {
@@ -1014,7 +1197,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_hash_run_repartition_merges_cross_batch_fragments_into_one_owner() {
+    async fn test_hash_range_repartition_merges_cross_batch_fragments_into_one_owner() {
         let schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new(HASH_LABEL, DataType::UInt64, false),
@@ -1049,7 +1232,7 @@ mod tests {
 
         assert_eq!(partitions.len(), 4);
         assert_eq!(
-            partitions[hash_partition_owner(11, partitions.len())][&11]
+            partitions[hash_range_owner(11, partitions.len())][&11]
                 .samples
                 .iter()
                 .map(|sample| sample.timestamp)
@@ -1057,7 +1240,7 @@ mod tests {
             vec![100, 200, 300],
         );
         assert_eq!(
-            partitions[hash_partition_owner(22, partitions.len())][&22]
+            partitions[hash_range_owner(22, partitions.len())][&22]
                 .samples
                 .iter()
                 .map(|sample| sample.timestamp)
@@ -1069,6 +1252,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_exemplars_returns_max_timestamp_per_series() {
+        let high_hash = 1_u64 << 63;
         let schema = Arc::new(Schema::new(vec![
             Field::new(HASH_LABEL, DataType::UInt64, false),
             Field::new(EXEMPLARS_LABEL, DataType::Utf8, false),
@@ -1076,7 +1260,7 @@ mod tests {
         let batch = RecordBatch::try_new(
             schema,
             vec![
-                Arc::new(UInt64Array::from(vec![11, 11, 22])),
+                Arc::new(UInt64Array::from(vec![11, 11, high_hash])),
                 Arc::new(StringArray::from(vec![
                     r#"[{"_timestamp":100,"value":1.0}]"#,
                     r#"[{"_timestamp":200,"value":2.0}]"#,
@@ -1094,6 +1278,10 @@ mod tests {
                 .unwrap();
         assert!(skipped_timestamps.is_empty());
         assert_eq!(metrics_without_timestamps.len(), 4);
+        assert!(metrics_without_timestamps[hash_range_owner(11, 4)].contains_key(&11));
+        assert!(
+            metrics_without_timestamps[hash_range_owner(high_hash, 4)].contains_key(&high_hash)
+        );
         let metrics_without_timestamps = merge_partitioned_metrics(metrics_without_timestamps);
         assert_eq!(
             metrics_without_timestamps[&11]
@@ -1112,6 +1300,6 @@ mod tests {
 
         assert_eq!(timestamps, HashSet::from([150, 200]));
         assert_eq!(metrics[&11].exemplars.as_ref().unwrap().len(), 2);
-        assert_eq!(metrics[&22].exemplars.as_ref().unwrap().len(), 1);
+        assert_eq!(metrics[&high_hash].exemplars.as_ref().unwrap().len(), 1);
     }
 }
