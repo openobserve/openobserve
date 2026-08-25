@@ -36,6 +36,7 @@ use super::stream::StreamType;
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
+const MAX_WHERE_SQL_BYTES: usize = 128 * 1024;
 
 pub static SQL_RESERVED_KEYWORDS: LazyLock<Vec<String>> = LazyLock::new(|| {
     ALL_KEYWORDS
@@ -133,6 +134,10 @@ pub struct WhereInfo {
 /// and the per-stream join WHERE. "" / empty for no-WHERE / unparseable.
 pub fn extract_where(sql: &str) -> WhereInfo {
     let mut info = WhereInfo::default();
+    // Reject pathologically large input before any recursive traversal (parse, Display, visitors).
+    if sql.len() > MAX_WHERE_SQL_BYTES {
+        return info;
+    }
     let dialect = PostgreSqlDialect {};
     let Ok(statements) = Parser::parse_sql(&dialect, sql) else {
         return info;
@@ -230,24 +235,27 @@ fn from_streams(from: &[TableWithJoins]) -> (HashMap<String, String>, Vec<String
     (map, streams)
 }
 
-/// Flatten a WHERE's top-level AND chain (through `Nested`) into conjuncts.
 fn split_and(expr: &Expr) -> Vec<&Expr> {
-    fn walk<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
+    const MAX_CONJUNCTS: usize = 1024;
+    let mut out: Vec<&Expr> = Vec::new();
+    let mut stack: Vec<&Expr> = vec![expr];
+    while let Some(e) = stack.pop() {
+        if out.len() >= MAX_CONJUNCTS {
+            break;
+        }
         match e {
             Expr::BinaryOp {
                 left,
                 op: BinaryOperator::And,
                 right,
             } => {
-                walk(left, out);
-                walk(right, out);
+                stack.push(right);
+                stack.push(left);
             }
-            Expr::Nested(inner) => walk(inner, out),
+            Expr::Nested(inner) => stack.push(inner),
             other => out.push(other),
         }
     }
-    let mut out = Vec::new();
-    walk(expr, &mut out);
     out
 }
 
@@ -423,6 +431,40 @@ mod tests {
 
         // Unparseable → empty, never a panic.
         assert!(wbs("not a query").is_empty());
+    }
+
+    #[test]
+    fn test_extract_where_rejects_oversized_input() {
+        let mut sql = String::from("SELECT * FROM logs WHERE ");
+        sql.push_str(&"a = 1 AND ".repeat(30_000));
+        sql.push_str("a = 1");
+        assert!(sql.len() > MAX_WHERE_SQL_BYTES);
+        let info = extract_where(&sql);
+        assert_eq!(info.where_clause, "");
+        assert!(info.where_by_stream.is_empty());
+    }
+
+    #[test]
+    fn test_split_and_is_capped_and_iterative() {
+        // A deep AND chain (parsed iteratively by sqlparser) is flattened by an iterative walk and
+        // capped, so it can neither overflow the stack nor return an unbounded conjunct list.
+        let mut sql = String::from("SELECT x FROM t WHERE ");
+        sql.push_str(&"a = 1 AND ".repeat(3000));
+        sql.push_str("a = 1");
+        let dialect = PostgreSqlDialect {};
+        let stmts = Parser::parse_sql(&dialect, &sql).unwrap();
+        let Statement::Query(q) = &stmts[0] else {
+            panic!("expected query");
+        };
+        let selection = outer_select(q.body.as_ref())
+            .and_then(|s| s.selection.as_ref())
+            .expect("selection");
+        let conjuncts = split_and(selection);
+        assert_eq!(
+            conjuncts.len(),
+            1024,
+            "conjuncts must be capped at MAX_CONJUNCTS"
+        );
     }
 
     #[test]
