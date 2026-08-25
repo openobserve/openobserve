@@ -699,15 +699,11 @@ onNodesInitialized(() => {
   centered = true;
 });
 
-// Whenever a run produces a result (the dock opens / re-runs), frame all nodes so
-// the reduced canvas still shows the whole graph. Guarded on !readOnly so the Runs
-// inspection canvas isn't reframed on every history load.
-watch(
-  () => !!workflowObj.testRun.result,
-  (has) => {
-    if (has && !readOnly.value) nextTick(() => fitView({ padding: 0.2 }));
-  },
-);
+// NOTE: a run result no longer reframes the canvas. That reframe existed for the old
+// results DOCK, which shrank the canvas when it opened; the NDV redesign removed the
+// dock, so running a Test / Run Step leaves the canvas size unchanged — auto-fitting
+// there just yanked the user's view (an unwanted zoom on every run). The view now stays
+// exactly where the user left it when a result arrives.
 
 // Publish validation flags incomplete (dummy) nodes → frame just those and thicken
 // their border in the node's own type colour (WorkflowNode adds `wf-needs-setup`).
