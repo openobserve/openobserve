@@ -163,6 +163,33 @@ pub static INGEST_PARQUET_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static INGEST_WAL_SEARCHING_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_wal_searching_files",
+            "Number of wal files locked by in-flight searches on the ingester.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static INGEST_WAL_PENDING_DELETE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_wal_pending_delete_files",
+            "Number of uploaded wal files on the ingester still awaiting local deletion."
+                .to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static INGEST_WAL_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1847,6 +1874,12 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(INGEST_PARQUET_FILES.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(INGEST_WAL_SEARCHING_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_WAL_PENDING_DELETE_FILES.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(INGEST_WAL_WRITE_BYTES.clone()))
         .expect("Metric registered");
     registry
@@ -2397,6 +2430,8 @@ mod tests {
         let _ = INGEST_ERRORS.clone();
         let _ = INGEST_WAL_USED_BYTES.clone();
         let _ = INGEST_PARQUET_FILES.clone();
+        let _ = INGEST_WAL_SEARCHING_FILES.clone();
+        let _ = INGEST_WAL_PENDING_DELETE_FILES.clone();
         let _ = INGEST_WAL_WRITE_BYTES.clone();
         let _ = INGEST_WAL_READ_BYTES.clone();
         let _ = INGEST_MEMTABLE_BYTES.clone();

@@ -27,7 +27,11 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{handler::grpc::flight::clear_session_data, service::search::work_group::DeferredLock};
+use crate::{handler::grpc::flight::SessionGuard, service::search::work_group::DeferredLock};
+
+/// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
+/// which is what the receiving channel accepts.
+pub(crate) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
 
 pub struct FlightEncoderStreamBuilder {
     encoder: FlightDataEncoder,
@@ -37,11 +41,16 @@ pub struct FlightEncoderStreamBuilder {
     trace_id: String,
     is_super: bool,
     defer_lock: Option<DeferredLock>,
+    session_guard: Option<SessionGuard>,
     start: std::time::Instant,
 }
 
 impl FlightEncoderStreamBuilder {
-    pub fn new(options: IpcWriteOptions, max_flight_data_size: usize) -> Self {
+    pub(crate) fn new(
+        options: IpcWriteOptions,
+        max_flight_data_size: usize,
+        session_guard: SessionGuard,
+    ) -> Self {
         Self {
             encoder: FlightDataEncoder::new(options, max_flight_data_size),
             queue: VecDeque::new(),
@@ -49,6 +58,7 @@ impl FlightEncoderStreamBuilder {
             trace_id: String::new(),
             is_super: false,
             defer_lock: None,
+            session_guard: Some(session_guard),
             start: std::time::Instant::now(),
         }
     }
@@ -94,6 +104,7 @@ impl FlightEncoderStreamBuilder {
             trace_id: self.trace_id,
             is_super: self.is_super,
             defer_lock: self.defer_lock,
+            session_guard: self.session_guard,
             start: self.start,
             first_batch: true,
             span,
@@ -116,6 +127,8 @@ pub struct FlightEncoderStream {
     trace_id: String,
     is_super: bool,
     defer_lock: Option<DeferredLock>,
+    /// releases the wal locks and the datafusion file list of this request.
+    session_guard: Option<SessionGuard>,
     start: std::time::Instant,
     span: tracing::Span,
     child_span: tracing::Span,
@@ -289,15 +302,11 @@ impl Drop for FlightEncoderStream {
             log::info!("[trace_id {trace_id}] flight->search: releasing slot");
         }
 
-        // defer is only set for super cluster follower leader
-        if let Some(defer) = self.defer_lock.take() {
-            drop(defer);
-        } else {
-            // clear session data
-            clear_session_data(&self.trace_id);
-            log::info!(
-                "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
-            );
-        }
+        // the defer only covers the work group slot, so it never gates the session release
+        drop(self.defer_lock.take());
+        drop(self.session_guard.take());
+        log::info!(
+            "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
+        );
     }
 }
