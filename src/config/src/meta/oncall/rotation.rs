@@ -88,6 +88,9 @@ pub const MICROS_PER_WEEK: i64 = 7 * MICROS_PER_DAY;
 /// catch-all; weekday/weekend is two. The window is expressed in local wall
 /// time because that is how people describe their hours — "I cover 09:00 to
 /// 17:00" means their 09:00, not UTC's.
+/// Minutes in a day — the exclusive upper bound `end_minute` allows.
+pub const MINUTES_PER_DAY: u32 = 1440;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct TimeWindow {
     /// 0 = Monday … 6 = Sunday. Empty means every day.
@@ -216,6 +219,14 @@ pub enum ShiftRuleError {
     /// A validity window that ends before it starts is in effect at no instant
     /// at all, so the rule would silently never apply.
     EmptyValidityWindow { starts_at: i64, ends_at: i64 },
+    /// A restriction's `start_minute`/`end_minute` names a minute past the
+    /// end of the day it's allowed to reach.
+    RestrictionMinuteOutOfRange { field: String, got: u32, max: u32 },
+    /// A restriction starts and ends at the same minute, so it covers no
+    /// instant of the day at all. This is the trap `end_minute: 0` sets for
+    /// someone who means "all day": the rule looks configured but never
+    /// wins.
+    EmptyRestriction { field: String, minute: u32 },
 }
 
 impl std::fmt::Display for ShiftRuleError {
@@ -230,6 +241,14 @@ impl std::fmt::Display for ShiftRuleError {
             Self::EmptyValidityWindow { starts_at, ends_at } => write!(
                 f,
                 "shift rule ends at {ends_at} but starts at {starts_at}, so it applies at no instant"
+            ),
+            Self::RestrictionMinuteOutOfRange { field, got, max } => write!(
+                f,
+                "`{field}` is {got}; minutes past midnight must be between 0 and {max}"
+            ),
+            Self::EmptyRestriction { field, minute } => write!(
+                f,
+                "`{field}` starts and ends at minute {minute}, so it would apply at no instant at all"
             ),
         }
     }
@@ -344,6 +363,28 @@ impl ShiftRule {
             && ends_at <= starts_at
         {
             return Err(ShiftRuleError::EmptyValidityWindow { starts_at, ends_at });
+        }
+        for (index, window) in self.restrictions.iter().enumerate() {
+            if window.start_minute >= MINUTES_PER_DAY {
+                return Err(ShiftRuleError::RestrictionMinuteOutOfRange {
+                    field: format!("restrictions[{index}].start_minute"),
+                    got: window.start_minute,
+                    max: MINUTES_PER_DAY - 1,
+                });
+            }
+            if window.end_minute > MINUTES_PER_DAY {
+                return Err(ShiftRuleError::RestrictionMinuteOutOfRange {
+                    field: format!("restrictions[{index}].end_minute"),
+                    got: window.end_minute,
+                    max: MINUTES_PER_DAY,
+                });
+            }
+            if window.start_minute == window.end_minute {
+                return Err(ShiftRuleError::EmptyRestriction {
+                    field: format!("restrictions[{index}]"),
+                    minute: window.start_minute,
+                });
+            }
         }
         Ok(())
     }
@@ -2213,6 +2254,60 @@ mod tests {
         r.starts_at = None;
         r.ends_at = Some(ANCHOR);
         r.validate().unwrap();
+    }
+
+    /// `end_minute: 0` is the trap an operator falls into when they mean "all
+    /// day": `covers_local` reads `start == end` as zero minutes, not 1440, so
+    /// the layer would save, look configured, and never win. Refuse it up
+    /// front instead.
+    #[test]
+    fn test_a_restriction_with_equal_start_and_end_minute_is_refused() {
+        let mut r = weekly(&["ana@o2.ai"]);
+        r.restrictions = vec![TimeWindow {
+            days: vec![],
+            start_minute: 0,
+            end_minute: 0,
+        }];
+        assert_eq!(
+            r.validate(),
+            Err(ShiftRuleError::EmptyRestriction {
+                field: "restrictions[0]".into(),
+                minute: 0,
+            })
+        );
+
+        // The correct way to say "all day" is start 0, end 1440.
+        r.restrictions[0].end_minute = MINUTES_PER_DAY;
+        r.validate().unwrap();
+    }
+
+    #[test]
+    fn test_a_restriction_minute_past_the_end_of_day_is_refused() {
+        let mut r = weekly(&["ana@o2.ai"]);
+        r.restrictions = vec![TimeWindow {
+            days: vec![],
+            start_minute: 0,
+            end_minute: MINUTES_PER_DAY + 1,
+        }];
+        assert_eq!(
+            r.validate(),
+            Err(ShiftRuleError::RestrictionMinuteOutOfRange {
+                field: "restrictions[0].end_minute".into(),
+                got: MINUTES_PER_DAY + 1,
+                max: MINUTES_PER_DAY,
+            })
+        );
+
+        r.restrictions[0].end_minute = MINUTES_PER_DAY;
+        r.restrictions[0].start_minute = MINUTES_PER_DAY;
+        assert_eq!(
+            r.validate(),
+            Err(ShiftRuleError::RestrictionMinuteOutOfRange {
+                field: "restrictions[0].start_minute".into(),
+                got: MINUTES_PER_DAY,
+                max: MINUTES_PER_DAY - 1,
+            })
+        );
     }
 
     #[test]
