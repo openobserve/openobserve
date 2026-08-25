@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { queryOptions } from "@tanstack/vue-query";
+import { quantizeRange } from "@/composables/query/queryClient";
 import alerts from "./alerts";
 import type { AlertHistoryQuery } from "./alerts";
 import { alertKeys } from "./alerts.querykeys";
@@ -75,9 +76,20 @@ export const alertDetailQuery = (org: string, id: string) =>
     queryFn: async () => (await alerts.get_by_alert_id(org, id)).data,
   });
 
-export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) =>
-  queryOptions({
-    queryKey: alertKeys.history(org, query),
-    queryFn: async () => (await alerts.getHistory(org, query)).data ?? {},
+export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
+  // Callers anchor start/end to a raw `now`, so without quantizing, every open
+  // mints a new key and the cache never hits.
+  const start = Number(query.start_time);
+  const end = Number(query.end_time);
+  const q: AlertHistoryQuery = { ...query };
+  if (Number.isFinite(start) && Number.isFinite(end)) {
+    const bucketed = quantizeRange(start, end);
+    q.start_time = bucketed.start;
+    q.end_time = bucketed.end;
+  }
+  return queryOptions({
+    queryKey: alertKeys.history(org, q),
+    queryFn: async () => (await alerts.getHistory(org, q)).data ?? {},
     refetchOnWindowFocus: true,
   });
+};
