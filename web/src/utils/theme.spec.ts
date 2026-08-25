@@ -84,3 +84,32 @@ describe("applyThemeColors with semanticColors", () => {
     );
   });
 });
+
+describe("applyThemeColors button-primary-foreground contrast", () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute("style");
+    document.body.removeAttribute("style");
+  });
+
+  it("switches to dark text when the theme color is too light for white text (O2 Signature dark, #8B8DF0 vs white = 2.93:1)", () => {
+    applyThemeColors("#8B8DF0", "dark", false);
+    expect(
+      document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
+    ).toBe("#171717");
+  });
+
+  it("keeps white text when the theme color is dark enough (O2 Pulse, #3F7994 vs white = 4.8:1)", () => {
+    applyThemeColors("#3F7994", "dark", false);
+    expect(
+      document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
+    ).toBe("#FFFFFF");
+  });
+
+  it("clears the override for the default theme so the stylesheet value applies", () => {
+    applyThemeColors("#8B8DF0", "dark", false);
+    applyThemeColors("#8B8DF0", "dark", true);
+    expect(
+      document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
+    ).toBe("");
+  });
+});
