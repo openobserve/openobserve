@@ -1458,6 +1458,11 @@ export default defineComponent({
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
       last_error: anomaly.last_error || null,
+      // Anomaly rows share the alerts table, so they share its On-call team
+      // column. This branch returns before the mapping below, so anything the
+      // column needs has to be listed here as well or the row renders as
+      // unbound whatever the API sent.
+      oncall_team: anomaly.oncall_team ?? null,
       selected: false,
       type: "anomaly",
       folder_name: {
@@ -1583,6 +1588,12 @@ export default defineComponent({
             // what the API returns.
             priority: data.priority ?? null,
             tags: data.tags ?? [],
+            // The team this alert names, for the On-call team column. Same
+            // reason as the two above: the column, the name resolver and the
+            // team fetch all existed, and the field was carried by neither the
+            // API nor this mapping — so every alert rendered "From ownership",
+            // including ones deliberately pinned to a team.
+            oncall_team: data.oncall_team ?? null,
             // Severity axis (alerts_2.md Feature 1) — independent of outcome.
             level: data.level ?? null,
             level_since: data.level_since ?? null,
