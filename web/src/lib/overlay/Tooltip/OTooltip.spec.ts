@@ -110,6 +110,44 @@ describe("OTooltip", () => {
 
       wrapper.unmount();
     });
+
+    // A kept-alive page deactivates without unmounting, and a detached trigger
+    // never fires `mouseleave` — so a tooltip open at the moment of a tab
+    // switch survived it. Observable on RETURN: without the onDeactivated
+    // close, the bubble re-rendered open with no hover at all.
+    it("closes an open child-mode tooltip when its page is deactivated", async () => {
+      const Page = {
+        name: "TooltipPage",
+        render: () =>
+          h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello", delay: 10 })]),
+      };
+      const Other = { name: "OtherPage", render: () => h("div", "elsewhere") };
+      const wrapper = mount(
+        {
+          components: { Page, Other },
+          data: () => ({ active: "Page" }),
+          template: `<KeepAlive><component :is="active" /></KeepAlive>`,
+        },
+        { attachTo: document.body },
+      );
+
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      trigger.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+      expect(document.body.textContent).toContain("Hello");
+
+      // Switch away (deactivate) and back (reactivate) — no hover in between.
+      (wrapper.vm as any).active = "Other";
+      await nextTick();
+      (wrapper.vm as any).active = "Page";
+      await nextTick();
+      await nextTick();
+
+      expect(document.body.textContent).not.toContain("Hello");
+
+      wrapper.unmount();
+    });
   });
 
   // ── Content wrapper layout ─────────────────────────────────────────────────

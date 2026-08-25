@@ -156,6 +156,7 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
             folder_id: DEFAULT_FOLDER.to_owned(),
             name: "default".to_owned(),
             description: "default".to_owned(),
+            icon: None,
         };
         if crate::folders::save_folder(org_id, folder, FolderType::Alerts, true)
             .await

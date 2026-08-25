@@ -1,0 +1,1435 @@
+[
+  {
+    "id": "cap-s01-python-pg-legacy-pct-s",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.name": "dbm",
+        "db.statement": "SELECT id, name, price FROM dbm_items WHERE id = %s",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-python-pg-dup-both-vocab",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.system.name": "postgresql",
+        "db.name": "dbm",
+        "db.namespace": "dbm",
+        "db.statement": "SELECT id, name, price FROM dbm_items WHERE id = %s",
+        "db.query.text": "SELECT id, name, price FROM dbm_items WHERE id = %s",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-dup.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-python-pg-new-vocab",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "db.query.text": "SELECT id, name, price FROM dbm_items WHERE id = %s",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-new.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-node-pg-era-legacy-dollar",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.name": "dbm",
+        "db.connection_string": "postgresql://postgres:5432/dbm",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432,
+        "db.statement": "SELECT id, name, price FROM dbm_items WHERE id = $1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-pg-era-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-node-pg-cur-new-vocab",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "server.port": 5432,
+        "db.query.text": "SELECT id, name, price FROM dbm_items WHERE id = $1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-pg-cur-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-java-legacy-jdbc-qmark",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.name": "dbm",
+        "db.sql.table": "dbm_items",
+        "db.operation": "SELECT",
+        "db.statement": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+        "db.system": "postgresql",
+        "server.address": "postgres",
+        "db.connection_string": "postgresql://postgres:5432",
+        "db.user": "dbm",
+        "server.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-java-new-jdbc-namespace-composite",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+        "db.namespace": "dbm|dbm",
+        "db.query.summary": "SELECT dbm_items",
+        "server.port": 5432,
+        "db.system.name": "postgresql",
+        "server.address": "postgres"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm|dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-new.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-dotnet-pg9-npgsql-at-p1",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.statement": "SELECT id, name, price FROM dbm_items WHERE id = @p1",
+        "db.system": "postgresql",
+        "db.connection_string": "Host=postgres;Port=5432;Username=dbm;Database=dbm",
+        "db.user": "dbm",
+        "db.name": "dbm",
+        "db.connection_id": 4909,
+        "net.transport": "ip_tcp",
+        "net.peer.ip": "172.21.0.5",
+        "net.peer.name": "postgres"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-pg9-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-dotnet-pg10-new-vocab",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "SELECT id, name, price FROM dbm_items WHERE id = @p1",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "db.npgsql.data_source": "Host=postgres;Port=5432;Username=dbm;Database=dbm",
+        "db.npgsql.connection_id": 5010
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-pg10-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s01-node-mysql-cur",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.namespace": "dbm",
+        "server.address": "mysql",
+        "server.port": 3306,
+        "db.system.name": "mysql",
+        "db.query.text": "SELECT id, name, price FROM dbm_items WHERE id = ?"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mysql-cur-legacy.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s01-dotnet-mysql-dup",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mysql",
+        "db.system.name": "mysql",
+        "db.connection_string": "Server=mysql;Port=3306;User ID=dbm;Database=dbm",
+        "db.user": "dbm",
+        "db.name": "dbm",
+        "db.namespace": "dbm",
+        "net.transport": "ip_tcp",
+        "net.peer.ip": "172.21.0.2",
+        "net.peer.name": "mysql",
+        "server.address": "mysql",
+        "network.peer.address": "172.21.0.2",
+        "network.peer.port": 3306,
+        "db.connection_id": "431",
+        "db.statement": "SELECT id, name, price FROM dbm_items WHERE id = @p1",
+        "db.query.text": "SELECT id, name, price FROM dbm_items WHERE id = @p1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name, price FROM dbm_items WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S01",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-mysql-dup.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s02-python-pg-dup",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.system.name": "postgresql",
+        "db.name": "dbm",
+        "db.namespace": "dbm",
+        "db.statement": "SELECT id, name FROM dbm_items WHERE price > %s AND category = %s",
+        "db.query.text": "SELECT id, name FROM dbm_items WHERE price > %s AND category = %s",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name FROM dbm_items WHERE price > ? AND category = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S02",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-dup.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s02-node-pg-cur",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "server.port": 5432,
+        "db.query.text": "SELECT id, name FROM dbm_items WHERE price > $1 AND category = $2"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name FROM dbm_items WHERE price > ? AND category = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S02",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-pg-cur-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s02-dotnet-pg10",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "SELECT id, name FROM dbm_items WHERE price > @p1 AND category = @p2",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "db.npgsql.data_source": "Host=postgres;Port=5432;Username=dbm;Database=dbm",
+        "db.npgsql.connection_id": 5010
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name FROM dbm_items WHERE price > ? AND category = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S02",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-pg10-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s03-python-pg-arity3",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.name": "dbm",
+        "db.statement": "SELECT id, name FROM dbm_items WHERE id IN (%s, %s, %s)",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name FROM dbm_items WHERE id IN (?)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S03-inlist",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s03-node-pg-cur-arity3",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "server.port": 5432,
+        "db.query.text": "SELECT id, name FROM dbm_items WHERE id IN ($1, $2, $3)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name FROM dbm_items WHERE id IN (?)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S03-inlist",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-pg-cur-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s03-java-legacy-agent-precollapsed",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.name": "dbm",
+        "db.sql.table": "dbm_items",
+        "db.operation": "SELECT",
+        "db.statement": "SELECT id, name FROM dbm_items WHERE id IN (?)",
+        "db.system": "postgresql",
+        "server.address": "postgres",
+        "db.connection_string": "postgresql://postgres:5432",
+        "db.user": "dbm",
+        "server.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name FROM dbm_items WHERE id IN (?)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S03-inlist",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s05-dotnet-pg9-arity20",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.statement": "SELECT id, name FROM dbm_items WHERE id IN (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20)",
+        "db.system": "postgresql",
+        "db.connection_string": "Host=postgres;Port=5432;Username=dbm;Database=dbm",
+        "db.user": "dbm",
+        "db.name": "dbm",
+        "db.connection_id": 4909,
+        "net.transport": "ip_tcp",
+        "net.peer.ip": "172.21.0.5",
+        "net.peer.name": "postgres"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT id, name FROM dbm_items WHERE id IN (?)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S03-inlist",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-pg9-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s07-python-pg-new-multirow",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "db.query.text": "INSERT INTO dbm_items (id, name, price, category) VALUES (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s)",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO dbm_items (id, name, price, category) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S06-insert",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-new.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s07-node-pg-era-multirow",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.name": "dbm",
+        "db.connection_string": "postgresql://postgres:5432/dbm",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432,
+        "db.statement": "INSERT INTO dbm_items (id, name, price, category) VALUES ($1, $2, $3, $4), ($5, $6, $7, $8), ($9, $10, $11, $12), ($13, $14, $15, $16), ($17, $18, $19, $20)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO dbm_items (id, name, price, category) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S06-insert",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-pg-era-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s07-java-dup-pg-multirow",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.name": "dbm",
+        "server.port": 5432,
+        "db.system.name": "postgresql",
+        "db.system": "postgresql",
+        "server.address": "postgres",
+        "db.user": "dbm",
+        "db.query.text": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)",
+        "db.namespace": "dbm|dbm",
+        "db.query.summary": "INSERT dbm_items",
+        "db.sql.table": "dbm_items",
+        "db.operation": "INSERT",
+        "db.statement": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)",
+        "db.connection_string": "postgresql://postgres:5432"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO dbm_items (id, name, price, category) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm|dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S06-insert",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-dup.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s06-java-legacy-mysql-single",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.name": "dbm",
+        "db.sql.table": "dbm_items",
+        "db.operation": "INSERT",
+        "db.statement": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)",
+        "db.system": "mysql",
+        "server.address": "mysql",
+        "db.connection_string": "mysql://mysql:3306",
+        "db.user": "dbm",
+        "server.port": 3306
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO dbm_items (id, name, price, category) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S06-insert",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s06-dotnet-mysql-new-single",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "mysql",
+        "db.namespace": "dbm",
+        "server.address": "mysql",
+        "network.peer.address": "172.21.0.2",
+        "network.peer.port": 3306,
+        "db.connection_id": "434",
+        "db.query.text": "INSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO dbm_items (id, name, price, category) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S06-insert",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-mysql-new.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s08-dotnet-pg10-multistatement-batch",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "INSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4)",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "db.npgsql.data_source": "Host=postgres;Port=5432;Username=dbm;Database=dbm",
+        "db.npgsql.connection_id": 5010
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO dbm_items (id, name, price, category) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": 10
+    },
+    "fingerprint_class": "sql-S06-insert",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-pg10-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s09-java-dup-pg-update100",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.name": "dbm",
+        "server.port": 5432,
+        "db.system.name": "postgresql",
+        "db.system": "postgresql",
+        "server.address": "postgres",
+        "db.user": "dbm",
+        "db.query.text": "UPDATE dbm_items SET price = price + 100 WHERE id = ?",
+        "db.namespace": "dbm|dbm",
+        "db.query.summary": "UPDATE dbm_items",
+        "db.sql.table": "dbm_items",
+        "db.operation": "UPDATE",
+        "db.statement": "UPDATE dbm_items SET price = price + ? WHERE id = ?",
+        "db.connection_string": "postgresql://postgres:5432"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "UPDATE dbm_items SET price = price + ? WHERE id = ?",
+      "operation": "UPDATE",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm|dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S09-update",
+    "literals": [
+      "100"
+    ],
+    "source": "tests/dbm-capture/fixtures/java-dup.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s09-java-legacy-pg-premasked",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.name": "dbm",
+        "db.sql.table": "dbm_items",
+        "db.operation": "UPDATE",
+        "db.statement": "UPDATE dbm_items SET price = price + ? WHERE id = ?",
+        "db.system": "postgresql",
+        "server.address": "postgres",
+        "db.connection_string": "postgresql://postgres:5432",
+        "db.user": "dbm",
+        "server.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "UPDATE dbm_items SET price = price + ? WHERE id = ?",
+      "operation": "UPDATE",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S09-update",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s09-python-pg-new-update100",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "db.query.text": "UPDATE dbm_items SET price = price + 100 WHERE id = %s",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "UPDATE dbm_items SET price = price + ? WHERE id = ?",
+      "operation": "UPDATE",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S09-update",
+    "literals": [
+      "100"
+    ],
+    "source": "tests/dbm-capture/fixtures/python-pg-new.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s09-python-pg-savepoint",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.name": "dbm",
+        "db.statement": "SAVEPOINT sp1",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SAVEPOINT sp1",
+      "operation": "SAVEPOINT",
+      "stmt_class": "transaction-control",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S09-savepoint",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s09-java-dup-mysql-savepoint",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "SAVEPOINT sp1",
+        "db.namespace": "dbm",
+        "db.name": "dbm",
+        "server.port": 3306,
+        "db.system.name": "mysql",
+        "db.statement": "SAVEPOINT sp1",
+        "db.system": "mysql",
+        "server.address": "mysql",
+        "db.connection_string": "mysql://mysql:3306",
+        "db.user": "dbm"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SAVEPOINT sp1",
+      "operation": "SAVEPOINT",
+      "stmt_class": "transaction-control",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S09-savepoint",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-dup.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s09-python-pg-rollback-sp",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.name": "dbm",
+        "db.statement": "ROLLBACK TO SAVEPOINT sp1",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "ROLLBACK TO SAVEPOINT sp1",
+      "operation": "ROLLBACK",
+      "stmt_class": "transaction-control",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S09-rollback-sp",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s09-node-mysql-cur-rollback-sp",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.namespace": "dbm",
+        "server.address": "mysql",
+        "server.port": 3306,
+        "db.system.name": "mysql",
+        "db.query.text": "ROLLBACK TO SAVEPOINT sp1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "ROLLBACK TO SAVEPOINT sp1",
+      "operation": "ROLLBACK",
+      "stmt_class": "transaction-control",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S09-rollback-sp",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mysql-cur-legacy.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s09-node-pg-cur-commit",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "server.port": 5432,
+        "db.query.text": "COMMIT"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "COMMIT",
+      "operation": "COMMIT",
+      "stmt_class": "transaction-control",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_tcl_commit",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-pg-cur-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s09-node-mysql-cur-start-transaction",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.namespace": "dbm",
+        "server.address": "mysql",
+        "server.port": 3306,
+        "db.system.name": "mysql",
+        "db.query.text": "START TRANSACTION"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "START TRANSACTION",
+      "operation": "START",
+      "stmt_class": "transaction-control",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S09-start-transaction",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mysql-cur-legacy.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s10-python-pg-dup-select1",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.system.name": "postgresql",
+        "db.name": "dbm",
+        "db.namespace": "dbm",
+        "db.statement": "SELECT 1",
+        "db.query.text": "SELECT 1",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT ?",
+      "operation": "SELECT",
+      "stmt_class": "ping",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_ping",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-dup.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s10-java-new-pg-premasked",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "SELECT ?",
+        "db.namespace": "dbm|dbm",
+        "db.query.summary": "SELECT",
+        "server.port": 5432,
+        "db.system.name": "postgresql",
+        "server.address": "postgres"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT ?",
+      "operation": "SELECT",
+      "stmt_class": "ping",
+      "system": "postgresql",
+      "namespace": "dbm|dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_ping",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-new.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s10-node-mysql-cur-select1",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.namespace": "dbm",
+        "server.address": "mysql",
+        "server.port": 3306,
+        "db.system.name": "mysql",
+        "db.query.text": "SELECT 1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT ?",
+      "operation": "SELECT",
+      "stmt_class": "ping",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_ping",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-mysql-cur-legacy.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s10-dotnet-pg9-select1",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.statement": "SELECT 1",
+        "db.system": "postgresql",
+        "db.connection_string": "Host=postgres;Port=5432;Username=dbm;Database=dbm",
+        "db.user": "dbm",
+        "db.name": "dbm",
+        "db.connection_id": 4909,
+        "net.transport": "ip_tcp",
+        "net.peer.ip": "172.21.0.5",
+        "net.peer.name": "postgres"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT ?",
+      "operation": "SELECT",
+      "stmt_class": "ping",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_ping",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-pg9-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s11-python-pg-legacy",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql",
+        "db.name": "dbm",
+        "db.statement": "SELECT no_such_column FROM dbm_items",
+        "db.user": "dbm",
+        "net.peer.name": "postgres",
+        "net.peer.port": 5432
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT no_such_column FROM dbm_items",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S11-error",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/python-pg-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s11-node-pg-cur",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "server.port": 5432,
+        "db.query.text": "SELECT no_such_column FROM dbm_items"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT no_such_column FROM dbm_items",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S11-error",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/node-pg-cur-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s11-java-legacy-mysql",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.name": "dbm",
+        "db.sql.table": "dbm_items",
+        "db.operation": "SELECT",
+        "db.statement": "SELECT no_such_column FROM dbm_items",
+        "db.system": "mysql",
+        "server.address": "mysql",
+        "db.connection_string": "mysql://mysql:3306",
+        "db.user": "dbm",
+        "server.port": 3306
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT no_such_column FROM dbm_items",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S11-error",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s11-dotnet-pg10-status-42703",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "SELECT no_such_column FROM dbm_items",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "db.npgsql.data_source": "Host=postgres;Port=5432;Username=dbm;Database=dbm",
+        "db.npgsql.connection_id": 5010,
+        "db.response.status_code": "42703",
+        "error.type": "42703"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT no_such_column FROM dbm_items",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": "42703",
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S11-error",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-pg10-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-s11-dotnet-mysql-dup-status-1054",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "mysql",
+        "db.system.name": "mysql",
+        "db.connection_string": "Server=mysql;Port=3306;User ID=dbm;Database=dbm",
+        "db.user": "dbm",
+        "db.name": "dbm",
+        "db.namespace": "dbm",
+        "net.transport": "ip_tcp",
+        "net.peer.ip": "172.21.0.2",
+        "net.peer.name": "mysql",
+        "server.address": "mysql",
+        "network.peer.address": "172.21.0.2",
+        "network.peer.port": 3306,
+        "db.connection_id": "431",
+        "db.statement": "SELECT no_such_column FROM dbm_items",
+        "db.query.text": "SELECT no_such_column FROM dbm_items",
+        "db.response.status_code": "1054",
+        "error.type": "1054"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT no_such_column FROM dbm_items",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": "mysql",
+      "env": "capture-env-a",
+      "status_code": "1054",
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S11-error",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-mysql-dup.json",
+    "dialect": "mysql"
+  },
+  {
+    "id": "cap-s12-dotnet-pg10-victim-40p01",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.query.text": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1",
+        "db.system.name": "postgresql",
+        "db.namespace": "dbm",
+        "server.address": "postgres",
+        "db.npgsql.data_source": "Host=postgres;Port=5432;Username=dbm;Database=dbm",
+        "db.npgsql.connection_id": 5010,
+        "db.response.status_code": "40P01",
+        "error.type": "40P01"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "UPDATE deadlock_t SET v = v + ? WHERE id = ?",
+      "operation": "UPDATE",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": "dbm",
+      "instance": "postgres",
+      "env": "capture-env-a",
+      "status_code": "40P01",
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "sql-S12-deadlock",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/dotnet-pg10-legacy.json",
+    "dialect": "postgresql"
+  },
+  {
+    "id": "cap-connectorj-masked-select",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.name": "dbm",
+        "db.operation": "SELECT",
+        "db.statement": "SELECT (...)",
+        "db.system": "mysql",
+        "db.user": "dbm"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT (...)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": "dbm",
+      "instance": null,
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": "dbm",
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mysql-S01-connectorj-masked",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/java-legacy.json",
+    "dialect": "mysql"
+  }
+]

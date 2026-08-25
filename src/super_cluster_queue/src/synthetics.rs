@@ -136,6 +136,7 @@ async fn create_default_folder(org_id: &str) -> Result<String> {
             folder_id: DEFAULT_FOLDER.to_owned(),
             name: "default".to_owned(),
             description: "default".to_owned(),
+            icon: None,
         },
         FolderType::Synthetics,
     )

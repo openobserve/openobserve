@@ -447,6 +447,7 @@ pub async fn move_synthetics(
                 folder_id: DEFAULT_FOLDER.to_owned(),
                 name: "default".to_owned(),
                 description: "default".to_owned(),
+                icon: None,
             };
             folders::put(org_id, None, folder, FolderType::Synthetics)
                 .await

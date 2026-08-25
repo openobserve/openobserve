@@ -1074,6 +1074,7 @@ mod tests {
             name: Set("default".to_string()),
             description: Set(None),
             r#type: Set(0),
+            icon: Set(None),
         }
         .insert(conn)
         .await

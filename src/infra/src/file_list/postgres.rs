@@ -2005,17 +2005,31 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
         let pool = CLIENT_RW.clone();
 
         // Ensure partitions exist for all distinct date keys before batch INSERT
-        let add_items = files.iter().filter(|v| !v.deleted).collect::<Vec<_>>();
-        if !add_items.is_empty() {
-            let mut date_keys = HashSet::new();
-            for item in &add_items {
-                if let Ok((_, date_key, _)) = parse_file_key_columns(&item.key) {
-                    date_keys.insert(date_key);
+        let mut date_keys = HashSet::new();
+        let add_items = files
+            .iter()
+            .filter(|v| {
+                if v.deleted {
+                    false
+                } else if v.meta.min_ts == 0 || v.meta.max_ts == 0 {
+                    log::warn!("[POSTGRES] min_ts or max_ts is 0 for file: {}", v.key);
+                    false
+                } else {
+                    match parse_file_key_columns(&v.key) {
+                        Ok((_, date_key, _)) => {
+                            date_keys.insert(date_key);
+                            true
+                        }
+                        Err(_) => {
+                            log::error!("[POSTGRES] parse file key failed for file: {}", v.key);
+                            false
+                        }
+                    }
                 }
-            }
-            for date_key in date_keys.iter() {
-                ensure_file_list_partition(&pool, table, date_key).await?;
-            }
+            })
+            .collect::<Vec<_>>();
+        for date_key in date_keys.iter() {
+            ensure_file_list_partition(&pool, table, date_key).await?;
         }
 
         let mut tx = pool.begin().await?;
@@ -2028,16 +2042,9 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                 format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
-                    let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
-                    else {
-                        log::error!("[POSTGRES] parse file key failed for file: {}", item.key);
-                        return;
-                    };
+                    let (stream_key, date_key, file_name) =
+                        parse_file_key_columns(&item.key).unwrap();
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                    if item.meta.min_ts == 0 || item.meta.max_ts == 0 {
-                        log::warn!("[POSTGRES] min_ts or max_ts is 0 for file: {}", item.key);
-                        return;
-                    }
                     b.push_bind(&item.account)
                         .push_bind(org_id)
                         .push_bind(stream_key)
