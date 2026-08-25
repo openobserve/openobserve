@@ -180,7 +180,6 @@ pub async fn get<C: ConnectionTrait>(
     org_id: &str,
     id: &str,
 ) -> Result<Option<Synthetic>, errors::Error> {
-    let _lock = super::get_lock().await;
     let maybe = get_model(conn, org_id, id).await?;
     maybe.map(Synthetic::try_from).transpose()
 }
@@ -259,7 +258,6 @@ pub async fn list<C: ConnectionTrait>(
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> Result<Vec<Synthetic>, errors::Error> {
-    let _lock = super::get_lock().await;
     let models = list_models(conn, org_id, params).await?;
     // A single unreadable row used to 500 the whole org's list — the UI renders
     // that as "no checks yet", so a total outage looked like an empty state.
@@ -276,7 +274,6 @@ pub async fn count<C: ConnectionTrait>(
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> Result<u64, errors::Error> {
-    let _lock = super::get_lock().await;
     let q = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .apply_filters(params);
@@ -315,7 +312,6 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     org_id: &str,
     location_id: &str,
 ) -> Result<Vec<Synthetic>, errors::Error> {
-    let _lock = super::get_lock().await;
     let models = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .all(conn)
@@ -354,7 +350,6 @@ pub async fn create<C: TransactionTrait>(
     check: Synthetic,
     use_given_id: bool,
 ) -> Result<Synthetic, errors::Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
     let id = new_check_id(&check, use_given_id);
@@ -372,11 +367,6 @@ pub async fn create<C: TransactionTrait>(
     let model = am.insert(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
     txn.commit().await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -387,7 +377,6 @@ pub async fn update<C: TransactionTrait>(
     id: &str,
     check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let Some(m) = get_model(&txn, org_id, id).await? else {
@@ -401,11 +390,6 @@ pub async fn update<C: TransactionTrait>(
     let model = am.update(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
     txn.commit().await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -415,7 +399,6 @@ pub async fn put<C: TransactionTrait>(
     org_id: &str,
     check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
 
@@ -441,11 +424,6 @@ pub async fn put<C: TransactionTrait>(
     };
 
     txn.commit().await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -455,17 +433,11 @@ pub async fn delete<C: ConnectionTrait>(
     org_id: &str,
     id: &str,
 ) -> Result<bool, errors::Error> {
-    let _lock = super::get_lock().await;
     let res = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish_delete(org_id, id).await;
     Ok(res.rows_affected > 0)
 }
@@ -477,7 +449,6 @@ pub async fn move_to_folder<C: ConnectionTrait>(
     ids: &[String],
     dst_folder_id: &str,
 ) -> Result<u64, errors::Error> {
-    let _lock = super::get_lock().await;
     if ids.is_empty() {
         return Ok(0);
     }
@@ -491,11 +462,6 @@ pub async fn move_to_folder<C: ConnectionTrait>(
         .filter(Column::Id.is_in(ids.to_vec()))
         .exec(conn)
         .await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     for id in ids {
         invalidate_and_publish(org_id, id).await;
     }
@@ -509,7 +475,6 @@ pub async fn set_enabled<C: ConnectionTrait>(
     id: &str,
     enabled: bool,
 ) -> Result<bool, errors::Error> {
-    let _lock = super::get_lock().await;
     let res = Entity::update_many()
         .col_expr(Column::Enabled, Expr::value(enabled))
         .col_expr(
@@ -520,11 +485,6 @@ pub async fn set_enabled<C: ConnectionTrait>(
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(org_id, id).await;
     Ok(res.rows_affected > 0)
 }
@@ -621,7 +581,6 @@ pub async fn fetch_due<C: ConnectionTrait>(
     now_us: i64,
     limit: u64,
 ) -> Result<Vec<DueCheck>, errors::Error> {
-    let _lock = super::get_lock().await;
     let models = due_checks_query(now_us, limit).all(conn).await?;
 
     let (due, _skipped) = convert_batch(models, "fetch_due");
@@ -698,7 +657,6 @@ pub async fn fetch_overdue<C: ConnectionTrait>(
     now_us: i64,
     limit: u64,
 ) -> Result<Vec<OrphanCandidate>, errors::Error> {
-    let _lock = super::get_lock().await;
     let rows = due_checks_query(now_us, limit)
         .select_only()
         .column(Column::Id)
@@ -754,7 +712,6 @@ pub async fn claim_due<C>(
 where
     C: ConnectionTrait + TransactionTrait,
 {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let mut query = due_checks_query(now_us, limit);
@@ -800,7 +757,6 @@ pub async fn advance_schedule<C: ConnectionTrait>(
     last_triggered_at: i64,
     next_run_at: i64,
 ) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
     Entity::update_many()
         .col_expr(Column::LastTriggeredAt, Expr::value(last_triggered_at))
         .col_expr(Column::NextRunAt, Expr::value(next_run_at))
@@ -830,7 +786,6 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     id: &str,
     status: i32,
 ) -> Result<bool, errors::Error> {
-    let _lock = super::get_lock().await;
     let res = Entity::update_many()
         .col_expr(Column::LastCheckStatus, Expr::value(status))
         .filter(Column::Id.eq(id))
@@ -907,7 +862,6 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
     expected: AlertState,
     state: AlertState,
 ) -> Result<bool, errors::Error> {
-    let _lock = super::get_lock().await;
     let res = Entity::update_many()
         .col_expr(
             Column::ConsecutiveFailures,
