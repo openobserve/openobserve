@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       :subtitle="t('alerts.incidents.incident')"
       title-overflow="visible"
+      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,
@@ -118,49 +119,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
+      <template #header-tabs>
+        <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
+          <OTab
+            name="overview"
+            :label="t('alerts.insights.tabs.overview')"
+            data-test="incident-overview-tab"
+          />
+          <OTab
+            name="activity"
+            :label="t('alerts.incidents.activityTab')"
+            data-test="incident-activity-tab"
+          />
+          <OTab
+            name="incidentAnalysis"
+            :label="t('alerts.incidents.incidentAnalysis')"
+            data-test="incident-analysis-tab"
+          />
+          <OTab
+            name="serviceGraph"
+            :label="t('alerts.incidents.alertGraph')"
+            data-test="incident-alert-graph-tab"
+          />
+          <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
+            <template #default>
+              <div class="flex items-center gap-1.5">
+                <span>{{ t("alerts.incidents.alertTriggers") }}</span>
+                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+              </div>
+            </template>
+          </OTab>
+
+          <!-- Telemetry tabs always inline -->
+          <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
+          <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
+          <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
+        </OTabs>
+      </template>
+
       <!-- Content -->
       <div
         v-if="!loading && incidentDetails"
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div class="px-page-edge border-border-default flex-shrink-0 border-b">
-          <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
-            <OTab
-              name="overview"
-              :label="t('alerts.insights.tabs.overview')"
-              data-test="incident-overview-tab"
-            />
-            <OTab
-              name="activity"
-              :label="t('alerts.incidents.activityTab')"
-              data-test="incident-activity-tab"
-            />
-            <OTab
-              name="incidentAnalysis"
-              :label="t('alerts.incidents.incidentAnalysis')"
-              data-test="incident-analysis-tab"
-            />
-            <OTab
-              name="serviceGraph"
-              :label="t('alerts.incidents.alertGraph')"
-              data-test="incident-alert-graph-tab"
-            />
-            <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
-              <template #default>
-                <div class="flex items-center gap-1.5">
-                  <span>{{ t("alerts.incidents.alertTriggers") }}</span>
-                  <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
-                </div>
-              </template>
-            </OTab>
-
-            <!-- Telemetry tabs always inline -->
-            <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
-            <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
-            <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
-          </OTabs>
-        </div>
-
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
