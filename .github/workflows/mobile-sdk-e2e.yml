@@ -620,7 +620,7 @@ jobs:
       # The iOS app builds (CocoaPods + Xcode Release compile of React Native) are the long pole of
       # this job (~20min cold). Cache the pods and the Xcode build products so warm runs are minutes.
       - name: Cache CocoaPods
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/Library/Caches/CocoaPods
@@ -629,7 +629,7 @@ jobs:
           key: pods-${{ runner.os }}-${{ hashFiles('tests/mobile-testing/apps/o2-rum-tester/ios/Podfile.lock') }}
           restore-keys: pods-${{ runner.os }}-
       - name: Cache Xcode DerivedData (iOS app builds)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             tests/mobile-testing/apps/o2-rum-tester/ios/build
