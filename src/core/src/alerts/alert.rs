@@ -722,6 +722,12 @@ async fn prepare_alert(
             && alert.query_condition.query_type == QueryType::SQL
             && agg.multi_alert
         {
+            // FE has a gate, this is mostly API check
+            if agg.having.column.is_empty() {
+                return Err(AlertError::MultiAlertGroupingError(format!(
+                    "group by column must not be empty for sql multi alert having field"
+                )));
+            }
             let query = SearchQuery {
                 sql: sql.to_owned(),
                 ..Default::default()
@@ -732,6 +738,21 @@ async fn prepare_alert(
             let schema = get_result_schema(sql, false, true)
                 .await
                 .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+
+            // this is mostly API check, FE already has a restriction
+            if !schema.projections.contains(&agg.having.column) {
+                return Err(AlertError::MultiAlertGroupingError(format!(
+                    "SQL Multi alert query having column must be in the group by clause, '{}' column not in group by fields",
+                    agg.having.column
+                )));
+            }
+
+            if schema.group_by.is_empty() {
+                return Err(AlertError::MultiAlertGroupingError(format!(
+                    "SQL Multi alert query Must have at least one group by field",
+                )));
+            }
+
             for group in &schema.group_by {
                 if !schema.projections.contains(group) {
                     return Err(AlertError::MultiAlertGroupingError(format!(
