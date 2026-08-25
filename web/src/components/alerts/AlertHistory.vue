@@ -470,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { AlertHistoryQuery } from "@/services/alerts";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
-import { alertHistoryQuery } from "@/services/alerts.queries";
+import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, onMounted, watch , nextTick } from "vue";
 import { useRouter } from "vue-router";
@@ -481,7 +481,6 @@ import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -698,28 +697,18 @@ const fetchAlertsList = async () => {
   try {
     const org = store.state.selectedOrganization.identifier;
 
-    // Fetch all alerts for the organization
-    const res = await alertsService.listByFolderId(
-      1,
-      1000,
-      "name",
-      false,
-      "",
-      org,
-      "", // all folders
-      "", // no query filter
-    );
+    // All folders ("") — through the cached list read, so revisits share the
+    // entry instead of re-downloading every alert for the name filter.
+    const list = await queryClient.fetchQuery(alertsListQuery(org, ""));
 
-    if (res.data && res.data.list) {
-      // Store complete alert objects and sort by name
-      allAlerts.value = res.data.list
-        .map((alert: any) => ({
-          label: alert.name,
-          value: alert.alert_id,
-        }))
-        .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
-      filteredAlertOptions.value = [...allAlerts.value];
-    }
+    // Store complete alert objects and sort by name
+    allAlerts.value = (list ?? [])
+      .map((alert: any) => ({
+        label: alert.name,
+        value: alert.alert_id,
+      }))
+      .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
+    filteredAlertOptions.value = [...allAlerts.value];
   } catch (error: any) {
     console.error("Error fetching alerts list:", error);
     // Silently fail - user can still type alert names manually
