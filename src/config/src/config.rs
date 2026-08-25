@@ -1654,12 +1654,6 @@ pub struct Common {
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(
-        name = "ZO_METRICS_INDEX_PARQUET_PAGE_ROW_COUNT",
-        default = 20000,
-        help = "Maximum rows per Parquet data page for Metrics Indexed compaction output. Smaller pages can improve selective .midx row-range scans at the cost of metadata and compression overhead."
-    )]
-    pub metrics_index_parquet_page_row_count: usize,
-    #[env_config(
         name = "ZO_TIMESTAMP_COMPRESSION_DISABLED",
         default = false,
         help = "Disable timestamp field compression"

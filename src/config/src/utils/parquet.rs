@@ -82,50 +82,6 @@ pub fn new_parquet_writer<W: AsyncFileWriter>(
     write_metadata: bool,
     compression: Option<&str>,
 ) -> AsyncArrowWriter<W> {
-    new_parquet_writer_with_page_row_limit(
-        buf,
-        schema,
-        bloom_filter_fields,
-        metadata,
-        write_metadata,
-        compression,
-        None,
-    )
-}
-
-/// Create a Parquet writer for an Indexed Metrics file whose sparse `.midx`
-/// selections can use the page offset index to skip compressed pages.
-pub fn new_metrics_index_parquet_writer<W: AsyncFileWriter>(
-    buf: W,
-    schema: &Arc<Schema>,
-    bloom_filter_fields: &[String],
-    metadata: &FileMeta,
-) -> AsyncArrowWriter<W> {
-    let page_row_limit = get_config()
-        .common
-        .metrics_index_parquet_page_row_count
-        .max(1);
-    new_parquet_writer_with_page_row_limit(
-        buf,
-        schema,
-        bloom_filter_fields,
-        metadata,
-        false,
-        None,
-        Some(page_row_limit),
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn new_parquet_writer_with_page_row_limit<W: AsyncFileWriter>(
-    buf: W,
-    schema: &Arc<Schema>,
-    bloom_filter_fields: &[String],
-    metadata: &FileMeta,
-    write_metadata: bool,
-    compression: Option<&str>,
-    data_page_row_count_limit: Option<usize>,
-) -> AsyncArrowWriter<W> {
     let cfg = get_config();
     let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()
@@ -140,9 +96,6 @@ fn new_parquet_writer_with_page_row_limit<W: AsyncFileWriter>(
             TIMESTAMP_COL_NAME.into(),
             Encoding::DELTA_BINARY_PACKED,
         );
-    if let Some(limit) = data_page_row_count_limit {
-        writer_props = writer_props.set_data_page_row_count_limit(limit);
-    }
     if cfg.common.timestamp_compression_disabled {
         writer_props = writer_props
             .set_column_compression(TIMESTAMP_COL_NAME.into(), Compression::UNCOMPRESSED);
