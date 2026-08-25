@@ -345,6 +345,7 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
         description: "default".to_owned(),
+        icon: None,
     };
     folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
         .await

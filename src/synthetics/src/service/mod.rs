@@ -120,6 +120,7 @@ async fn create_default_synthetics_folder(org_id: &str) -> anyhow::Result<()> {
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
         description: "default".to_owned(),
+        icon: None,
     };
     folders::put(org_id, None, folder, FolderType::Synthetics)
         .await

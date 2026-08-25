@@ -103,6 +103,7 @@
     "@cypress/webpack-dev-server": "^5.6.2",
     "@eslint/css": "^1.4.0",
     "@eslint/css-tree": "^4.0.5",
+    "@iconify-json/logos": "^1.2.12",
     "@iconify-json/majesticons": "^1.2.5",
     "@iconify-json/material-symbols": "^1.2.88",
     "@iconify-json/mdi": "^1.2.3",

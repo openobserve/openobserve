@@ -119,7 +119,7 @@ jobs:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2.85.10
+      - uses: taiki-e/install-action@v2.86.5
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -179,7 +179,7 @@ jobs:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2.85.10
+      - uses: taiki-e/install-action@v2.86.5
         with:
           tool: nextest,cargo-llvm-cov
 

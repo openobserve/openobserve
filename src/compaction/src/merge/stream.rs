@@ -179,7 +179,7 @@ pub async fn merge_by_stream(
                     MetricsIndexMergeScope::Skip => return Ok(vec![]),
                     MetricsIndexMergeScope::LateFilesOnly => {
                         files_with_size.retain(|f| {
-                            MetricsFileLayout::of(&f.key) != MetricsFileLayout::Indexed
+                            MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed)
                         });
                         log::debug!(
                             "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed late merge of {} files, indexed files untouched",

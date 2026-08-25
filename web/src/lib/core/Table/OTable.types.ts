@@ -92,6 +92,14 @@ export interface OTableColumnMeta {
   align?: "left" | "center" | "right" | (string & {});
   /** Additional class applied to the <th> */
   headerClass?: string;
+  /**
+   * A second, smaller line under the header label — for the technical name of a
+   * column whose label is plain English ("Slow calls" / `p95`). Non-translatable
+   * identifiers go through `raw()`.
+   */
+  headerSubLabel?: I18nText;
+  /** Hover tooltip on the header, explaining what the column measures. */
+  headerTooltip?: I18nText;
   /** Additional class applied to the <td> */
   cellClass?: string;
   /**

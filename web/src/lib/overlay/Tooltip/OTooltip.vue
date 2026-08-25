@@ -8,7 +8,7 @@ import {
   TooltipContent,
   TooltipArrow,
 } from "reka-ui";
-import { ref, computed, onMounted, onUnmounted, useAttrs, useSlots } from "vue";
+import { ref, computed, onMounted, onUnmounted, onDeactivated, useAttrs, useSlots } from "vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 
 // Both modes render a fragment (provider + portalled content, or the child-mode
@@ -160,6 +160,23 @@ onUnmounted(() => {
   if (childShowTimer) clearTimeout(childShowTimer);
   if (childHideTimer) clearTimeout(childHideTimer);
   cleanupFn?.();
+});
+
+// A kept-alive page deactivates WITHOUT unmounting, and a detached trigger
+// never fires `mouseleave` — so a tooltip open at the moment of a tab switch
+// stayed open forever: its portalled bubble lives in <body>, its anchor's rect
+// collapses to all-zeros, and floating-ui parks the orphan at the viewport's
+// top-left next to the new page's own, correct copy of the same tooltip.
+onDeactivated(() => {
+  if (childShowTimer) {
+    clearTimeout(childShowTimer);
+    childShowTimer = null;
+  }
+  if (childHideTimer) {
+    clearTimeout(childHideTimer);
+    childHideTimer = null;
+  }
+  childOpen.value = false;
 });
 
 const effectiveSideOffset = computed(() => props.sideOffset);
