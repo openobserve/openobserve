@@ -162,6 +162,9 @@ mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
 mod m20260804_000001_create_workflow_drafts_table;
 mod m20260809_000001_create_alert_eval_intervals_table;
 mod m20260812_000001_create_composite_alerts;
+mod m20260824_000001_add_password_policy_columns_to_users;
+mod m20260824_000002_create_user_password_history_table;
+mod m20260824_000003_create_user_auth_state_table;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -398,6 +401,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260804_000001_create_workflow_drafts_table::Migration),
             Box::new(m20260809_000001_create_alert_eval_intervals_table::Migration),
             Box::new(m20260812_000001_create_composite_alerts::Migration),
+            Box::new(m20260824_000001_add_password_policy_columns_to_users::Migration),
+            Box::new(m20260824_000002_create_user_password_history_table::Migration),
+            Box::new(m20260824_000003_create_user_auth_state_table::Migration),
         ]
     }
 }
@@ -424,21 +430,22 @@ mod tests {
     }
 
     #[test]
-    fn composite_alert_migration_is_registered_after_existing_migrations() {
+    fn auth_policy_migrations_are_registered_after_existing_migrations() {
         let names: Vec<String> = Migrator::migrations()
             .into_iter()
             .map(|migration| migration.name().to_string())
             .collect();
         assert_eq!(
             names.last().map(String::as_str),
-            Some("m20260812_000001_create_composite_alerts")
+            Some("m20260824_000003_create_user_auth_state_table")
         );
-        assert_eq!(
-            names
-                .iter()
-                .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
-                .count(),
-            1
-        );
+        for name in [
+            "m20260812_000001_create_composite_alerts",
+            "m20260824_000001_add_password_policy_columns_to_users",
+            "m20260824_000002_create_user_password_history_table",
+            "m20260824_000003_create_user_auth_state_table",
+        ] {
+            assert_eq!(names.iter().filter(|n| n.as_str() == name).count(), 1);
+        }
     }
 }
