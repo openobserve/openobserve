@@ -42,6 +42,7 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalUserInfo: vi.fn(),
   useLocalCurrentUser: vi.fn(),
   invalidateLoginData: vi.fn(),
+  getPath: vi.fn(() => "/"),
 }));
 
 // ---------------------------------------------------------------------------
