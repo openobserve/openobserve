@@ -30,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-escalation-ladder">
     <!-- Every priority, including the ones that wake nobody. A priority absent
-         from this strip is one nobody would think to check. -->
+         from this strip is one nobody would think to check. The edit button
+         rides along on the same row rather than a title above it — this
+         strip already says what is being edited. -->
     <span class="flex flex-wrap items-center gap-2">
       <OButton
         v-for="group in groups"
@@ -42,6 +44,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ group.label }}
         <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
+      </OButton>
+      <OButton
+        variant="outline"
+        size="xs"
+        class="ms-auto"
+        data-test="oncall-policy-edit"
+        @click="emit('edit')"
+      >
+        {{ t("oncall.edit") }}
       </OButton>
     </span>
 

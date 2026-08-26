@@ -309,19 +309,6 @@
              says whether a page would land only where one would not. -->
         <OTabPanel name="policy">
           <OContent y class="flex flex-col gap-5">
-            <span class="flex flex-wrap items-baseline gap-x-2">
-              <OText variant="panel-title">{{ t("oncall.escalationReadTitle") }}</OText>
-              <OButton
-                variant="outline"
-                size="xs"
-                class="ms-auto"
-                data-test="oncall-policy-edit"
-                @click="editingPolicy = true"
-              >
-                {{ t("oncall.edit") }}
-              </OButton>
-            </span>
-
             <OnCallEscalationLadder
               v-model:selected="selectedPriority"
               :priorities="overview?.rungs ?? []"
