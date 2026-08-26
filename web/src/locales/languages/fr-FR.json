@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "Étiquette de nom de lieu",
     "mapsMapType": "Type de carte",
     "tableAggregations": "Agrégations de tableaux",
+    "tableCellDrilldownTooltip": "Explorer les journaux correspondants",
     "promqlTableMode": "Mode Tableau ProMQL",
     "visibleColumns": "Colonnes visibles",
     "hiddenColumns": "Colonnes masquées",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "Une variable portant le même nom existe déjà",
     "pivotTotal": "Total",
     "pivotOthers": "Autres",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Explorer les journaux correspondants"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "Champs de ligne",
     "valueFields": "Champs de valeur",
     "noData": "Aucune donnée",
-    "addJoin": "Ajouter Rejoindre",
-    "removeJoin": "Supprimer Rejoindre",
-    "leftJoin": "Rejoindre à gauche",
-    "innerJoin": "Jointure intérieure",
-    "rightJoin": "Adhérez à droite",
-    "removeClause": "Supprimer la clause",
-    "SQL": "SQL",
-    "builder": "Constructeur",
-    "custom": "Personnalisé",
-    "discard": "Jeter",
-    "apply": "Appliquer",
-    "collapseFields": "Réduire les champs",
-    "fields": "Champs",
-    "layout": "Mise en page",
-    "promQL": "PromQL",
-    "latitude": "Latitude",
-    "longitude": "Longitude",
-    "weight": "Poids",
-    "mapname": "Nom",
-    "mapvalue": "Valeur",
-    "source": "Source",
-    "target": "Cible",
-    "value": "Valeur",
     "logExplorer": {
       "title": "Explorateur de journaux",
       "openInLogs": "Ouvrir dans les journaux",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "Autres événements de ce flux dans les 3 minutes avant et après cet événement — montre ce qui se passait d'autre au même moment.",
         "contextEmpty": "Aucun événement environnant trouvé"
       }
-    }
+    },
+    "addJoin": "Ajouter Rejoindre",
+    "removeJoin": "Supprimer Rejoindre",
+    "leftJoin": "Rejoindre à gauche",
+    "innerJoin": "Jointure intérieure",
+    "rightJoin": "Adhérez à droite",
+    "removeClause": "Supprimer la clause",
+    "SQL": "SQL",
+    "builder": "Constructeur",
+    "custom": "Personnalisé",
+    "discard": "Jeter",
+    "apply": "Appliquer",
+    "collapseFields": "Réduire les champs",
+    "fields": "Champs",
+    "layout": "Mise en page",
+    "promQL": "PromQL",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "weight": "Poids",
+    "mapname": "Nom",
+    "mapvalue": "Valeur",
+    "source": "Source",
+    "target": "Cible",
+    "value": "Valeur"
   },
   "home": {
     "alertsOverviewSection": "Section d'aperçu des alertes",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99 :",
       "averageOfTrace": "{avg} ms ({percent}% de la trace)",
       "requestCount": "{count} req"
-    }
+    },
+    "spanEventTimeline": "Chronologie des événements de span",
+    "eventClusterTooltip": "{count} événements",
+    "spanEventCount": "{count} événement",
+    "spanEventCountPlural": "{count} événements",
+    "spanEventCountWithErrors": "{count} · {errors} erreur",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} erreurs",
+    "spanEventErrorCount": "{errors} erreur",
+    "spanEventErrorCountPlural": "{errors} erreurs",
+    "eventClusterAriaLabel": "{count} événements, {errors} erreur",
+    "eventClusterAriaLabelPlural": "{count} événements, {errors} erreurs",
+    "eventMarkerTooltip": "Événement : {name}",
+    "exceptionMarkerTooltip": "Exception : {type}",
+    "spanEventFallback": "événement de span"
   },
   "actions": {
     "realTime": "Temps réel",
@@ -11016,6 +11029,10 @@
         "meta": "{count} éléments · mis à jour {updated}",
         "loadError": "Échec du chargement du jeu de données",
         "footerTitle": "Éléments",
+        "tabs": {
+          "items": "Éléments",
+          "experiments": "Expériences"
+        },
         "searchPlaceholder": "Rechercher des éléments...",
         "columns": {
           "input": "Entrée (purifiée)",

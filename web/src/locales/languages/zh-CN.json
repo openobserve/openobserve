@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "地点名称标签",
     "mapsMapType": "地图类型",
     "tableAggregations": "表格聚合",
+    "tableCellDrilldownTooltip": "探索匹配的日志",
     "promqlTableMode": "PromQL 表格模式",
     "visibleColumns": "可见列",
     "hiddenColumns": "隐藏列",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "已存在同名变量",
     "pivotTotal": "总计",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "探索匹配的日志"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "行字段",
     "valueFields": "值字段",
     "noData": "无数据",
-    "addJoin": "添加连接",
-    "removeJoin": "移除连接",
-    "leftJoin": "左连接",
-    "innerJoin": "内连接",
-    "rightJoin": "右连接",
-    "removeClause": "移除条件",
-    "SQL": "SQL",
-    "builder": "生成器",
-    "custom": "自定义",
-    "discard": "放弃",
-    "apply": "应用",
-    "collapseFields": "折叠字段",
-    "fields": "字段",
-    "layout": "布局",
-    "promQL": "PromQL",
-    "latitude": "纬度",
-    "longitude": "经度",
-    "weight": "权重",
-    "mapname": "名称",
-    "mapvalue": "值",
-    "source": "来源",
-    "target": "目标",
-    "value": "值",
     "logExplorer": {
       "title": "日志浏览器",
       "openInLogs": "在日志中打开",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "此事件前后 3 分钟内来自此流的其他事件 — 显示同一时刻还有其他哪些事件发生。",
         "contextEmpty": "未找到周边事件"
       }
-    }
+    },
+    "addJoin": "添加连接",
+    "removeJoin": "移除连接",
+    "leftJoin": "左连接",
+    "innerJoin": "内连接",
+    "rightJoin": "右连接",
+    "removeClause": "移除条件",
+    "SQL": "SQL",
+    "builder": "生成器",
+    "custom": "自定义",
+    "discard": "放弃",
+    "apply": "应用",
+    "collapseFields": "折叠字段",
+    "fields": "字段",
+    "layout": "布局",
+    "promQL": "PromQL",
+    "latitude": "纬度",
+    "longitude": "经度",
+    "weight": "权重",
+    "mapname": "名称",
+    "mapvalue": "值",
+    "source": "来源",
+    "target": "目标",
+    "value": "值"
   },
   "home": {
     "alertsOverviewSection": "告警概览部分",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99：",
       "averageOfTrace": "{avg}毫秒（占追踪的{percent}%）",
       "requestCount": "{count}请求"
-    }
+    },
+    "spanEventTimeline": "Span 事件时间线",
+    "eventClusterTooltip": "{count} 个事件",
+    "spanEventCount": "{count} 个事件",
+    "spanEventCountPlural": "{count} 个事件",
+    "spanEventCountWithErrors": "{count} · {errors} 个错误",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} 个错误",
+    "spanEventErrorCount": "{errors} 个错误",
+    "spanEventErrorCountPlural": "{errors} 个错误",
+    "eventClusterAriaLabel": "{count} 个事件，{errors} 个错误",
+    "eventClusterAriaLabelPlural": "{count} 个事件，{errors} 个错误",
+    "eventMarkerTooltip": "事件：{name}",
+    "exceptionMarkerTooltip": "异常：{type}",
+    "spanEventFallback": "Span 事件"
   },
   "actions": {
     "realTime": "实时",
@@ -11016,6 +11029,10 @@
         "meta": "{count} 个条目 · 更新于 {updated}",
         "loadError": "加载数据集失败",
         "footerTitle": "条目",
+        "tabs": {
+          "items": "项目",
+          "experiments": "实验"
+        },
         "searchPlaceholder": "搜索条目...",
         "columns": {
           "input": "输入（已净化）",

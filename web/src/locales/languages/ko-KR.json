@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "위치 이름 라벨",
     "mapsMapType": "맵 유형",
     "tableAggregations": "테이블 어그리게이션",
+    "tableCellDrilldownTooltip": "일치하는 로그 탐색",
     "promqlTableMode": "ProMQL 테이블 모드",
     "visibleColumns": "보이는 컬럼",
     "hiddenColumns": "히든 컬럼",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "같은 이름의 변수가 이미 존재합니다.",
     "pivotTotal": "총계",
     "pivotOthers": "기타",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "일치하는 로그 탐색"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "행 필드",
     "valueFields": "값 필드",
     "noData": "데이터 없음",
-    "addJoin": "조인 추가",
-    "removeJoin": "제거 조인",
-    "leftJoin": "왼쪽 조인",
-    "innerJoin": "내부 조인",
-    "rightJoin": "오른쪽 조인",
-    "removeClause": "조항 제거",
-    "SQL": "SQL",
-    "builder": "건축업자",
-    "custom": "사용자 지정",
-    "discard": "폐기",
-    "apply": "적용하기",
-    "collapseFields": "필드 접기",
-    "fields": "필드",
-    "layout": "레이아웃",
-    "promQL": "PromQL",
-    "latitude": "위도",
-    "longitude": "경도",
-    "weight": "무게",
-    "mapname": "이름",
-    "mapvalue": "가치",
-    "source": "소스",
-    "target": "타깃",
-    "value": "가치",
     "logExplorer": {
       "title": "로그 탐색기",
       "openInLogs": "로그에서 열기",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "이 이벤트 전후 3분 동안 이 스트림의 다른 이벤트 — 같은 순간에 어떤 일이 일어났는지 보여줍니다.",
         "contextEmpty": "주변 이벤트를 찾을 수 없습니다"
       }
-    }
+    },
+    "addJoin": "조인 추가",
+    "removeJoin": "제거 조인",
+    "leftJoin": "왼쪽 조인",
+    "innerJoin": "내부 조인",
+    "rightJoin": "오른쪽 조인",
+    "removeClause": "조항 제거",
+    "SQL": "SQL",
+    "builder": "건축업자",
+    "custom": "사용자 지정",
+    "discard": "폐기",
+    "apply": "적용하기",
+    "collapseFields": "필드 접기",
+    "fields": "필드",
+    "layout": "레이아웃",
+    "promQL": "PromQL",
+    "latitude": "위도",
+    "longitude": "경도",
+    "weight": "무게",
+    "mapname": "이름",
+    "mapvalue": "가치",
+    "source": "소스",
+    "target": "타깃",
+    "value": "가치"
   },
   "home": {
     "alertsOverviewSection": "알림 개요 섹션",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms (트레이스의 {percent}%)",
       "requestCount": "{count}건"
-    }
+    },
+    "spanEventTimeline": "Span 이벤트 타임라인",
+    "eventClusterTooltip": "{count} 이벤트",
+    "spanEventCount": "{count} 이벤트",
+    "spanEventCountPlural": "{count} 이벤트",
+    "spanEventCountWithErrors": "{count} · {errors} 오류",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} 오류",
+    "spanEventErrorCount": "{errors} 오류",
+    "spanEventErrorCountPlural": "{errors} 오류",
+    "eventClusterAriaLabel": "{count} 이벤트, {errors} 오류",
+    "eventClusterAriaLabelPlural": "{count} 이벤트, {errors} 오류",
+    "eventMarkerTooltip": "이벤트: {name}",
+    "exceptionMarkerTooltip": "예외: {type}",
+    "spanEventFallback": "span 이벤트"
   },
   "actions": {
     "realTime": "실시간",
@@ -11016,6 +11029,10 @@
         "meta": "{count}개 항목 · 업데이트됨 {updated}",
         "loadError": "데이터셋을 불러오지 못했습니다",
         "footerTitle": "항목",
+        "tabs": {
+          "items": "항목",
+          "experiments": "실험"
+        },
         "searchPlaceholder": "항목 검색...",
         "columns": {
           "input": "입력 (정제됨)",

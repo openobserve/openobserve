@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "Etykieta nazwy lokalizacji",
     "mapsMapType": "Typ mapy",
     "tableAggregations": "Agregacje tabeli",
+    "tableCellDrilldownTooltip": "Przeglądaj pasujące logi",
     "promqlTableMode": "Tryb tabeli PromQL",
     "visibleColumns": "Widoczne kolumny",
     "hiddenColumns": "Ukryte kolumny",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "Zmienna o tej samej nazwie już istnieje",
     "pivotTotal": "Suma",
     "pivotOthers": "Inne",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Przeglądaj pasujące logi"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "Pola wierszy",
     "valueFields": "Pola wartości",
     "noData": "Brak danych",
-    "addJoin": "Dodaj złączenie",
-    "removeJoin": "Usuń złączenie",
-    "leftJoin": "Left Join",
-    "innerJoin": "Inner Join",
-    "rightJoin": "Right Join",
-    "removeClause": "Usuń klauzulę",
-    "SQL": "SQL",
-    "builder": "Kreator",
-    "custom": "Niestandardowy",
-    "discard": "Odrzuć",
-    "apply": "Zastosuj",
-    "collapseFields": "Zwiń pola",
-    "fields": "Pola",
-    "layout": "Układ",
-    "promQL": "PromQL",
-    "latitude": "Szerokość geograficzna",
-    "longitude": "Długość geograficzna",
-    "weight": "Waga",
-    "mapname": "Nazwa",
-    "mapvalue": "Wartość",
-    "source": "Źródło",
-    "target": "Cel",
-    "value": "Wartość",
     "logExplorer": {
       "title": "Eksplorator logów",
       "openInLogs": "Otwórz w logach",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "Inne zdarzenia z tego strumienia w ciągu 3 minut przed i po tym zdarzeniu — pokazują, co jeszcze działo się w tym samym czasie.",
         "contextEmpty": "Nie znaleziono otaczających zdarzeń"
       }
-    }
+    },
+    "addJoin": "Dodaj złączenie",
+    "removeJoin": "Usuń złączenie",
+    "leftJoin": "Left Join",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Right Join",
+    "removeClause": "Usuń klauzulę",
+    "SQL": "SQL",
+    "builder": "Kreator",
+    "custom": "Niestandardowy",
+    "discard": "Odrzuć",
+    "apply": "Zastosuj",
+    "collapseFields": "Zwiń pola",
+    "fields": "Pola",
+    "layout": "Układ",
+    "promQL": "PromQL",
+    "latitude": "Szerokość geograficzna",
+    "longitude": "Długość geograficzna",
+    "weight": "Waga",
+    "mapname": "Nazwa",
+    "mapvalue": "Wartość",
+    "source": "Źródło",
+    "target": "Cel",
+    "value": "Wartość"
   },
   "home": {
     "alertsOverviewSection": "Sekcja przeglądu alertów",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% śladu)",
       "requestCount": "{count} req"
-    }
+    },
+    "spanEventTimeline": "Oś czasu zdarzeń span",
+    "eventClusterTooltip": "{count} zdarzeń",
+    "spanEventCount": "{count} zdarzenie",
+    "spanEventCountPlural": "{count} zdarzeń",
+    "spanEventCountWithErrors": "{count} · {errors} błąd",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} błędów",
+    "spanEventErrorCount": "{errors} błąd",
+    "spanEventErrorCountPlural": "{errors} błędów",
+    "eventClusterAriaLabel": "{count} zdarzeń, {errors} błąd",
+    "eventClusterAriaLabelPlural": "{count} zdarzeń, {errors} błędów",
+    "eventMarkerTooltip": "Zdarzenie: {name}",
+    "exceptionMarkerTooltip": "Wyjątek: {type}",
+    "spanEventFallback": "zdarzenie span"
   },
   "actions": {
     "realTime": "Czas rzeczywisty",
@@ -11016,6 +11029,10 @@
         "meta": "{count} elementów · zaktualizowano {updated}",
         "loadError": "Nie udało się załadować zbioru danych",
         "footerTitle": "Elementy",
+        "tabs": {
+          "items": "Elementy",
+          "experiments": "Eksperymenty"
+        },
         "searchPlaceholder": "Szukaj elementów...",
         "columns": {
           "input": "Wejście (oczyszczone)",
