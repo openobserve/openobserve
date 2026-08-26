@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <article
-    class="rounded-surface border-border-default bg-surface-base hover:border-border-strong focus-visible:ring-accent/40 flex h-full cursor-pointer flex-col gap-2 border p-3 outline-none focus-visible:ring-2"
+    class="rounded-default border-border-default bg-surface-base hover:border-border-strong focus-visible:ring-accent/40 flex h-full cursor-pointer flex-col gap-2 border p-3 outline-none focus-visible:ring-2"
     role="button"
     tabindex="0"
     :aria-label="t('alert_library.openDetails', { title: entry.title })"

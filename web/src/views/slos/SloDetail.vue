@@ -113,7 +113,7 @@
     <!-- No `mt-*`: OContent's bottom inset above already separates the strip
          from the tabs, and no horizontal padding either — a tab strip's first
          label self-aligns to the page-edge grid. -->
-    <OTabs v-if="!notFound" v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
+    <OTabs v-if="!notFound" v-model="tab" bordered class="shrink-0" data-test="slos-slodetail-tabs">
       <OTab
         name="trend"
         :label="t('slos.tab.trend')"
