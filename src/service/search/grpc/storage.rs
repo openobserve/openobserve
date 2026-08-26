@@ -263,7 +263,6 @@ pub async fn search(
         file_stat_cache,
         index_condition,
         fst_fields,
-        || {},
     )
     .await?;
 

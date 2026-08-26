@@ -45,7 +45,7 @@ use crate::{
     handler::grpc::{
         MetadataMap,
         flight::{
-            stream::FlightEncoderStreamBuilder,
+            stream::{FlightEncoderStreamBuilder, MAX_FLIGHT_DATA_SIZE},
             visitor::{
                 get_cluster_metrics, get_partial_err, get_peak_memory, get_peak_memory_from_ctx,
                 get_scan_stats,
@@ -64,6 +64,12 @@ pub mod visitor;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
+
+/// Releases the wal locks and datafusion file list registered under this trace id on drop, so
+/// a request cancelled before it can produce a response stream cannot leave them pinned.
+pub(crate) struct SessionGuard {
+    trace_id: String,
+}
 
 #[tonic::async_trait]
 impl FlightService for FlightServiceImpl {
@@ -100,6 +106,7 @@ impl FlightService for FlightServiceImpl {
             "{}-{}",
             req.query_identifier.trace_id, req.query_identifier.job_id
         );
+        let session_guard = SessionGuard::new(trace_id.clone());
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
         let timeout = req.search_info.timeout as u64;
         log::info!("[trace_id {trace_id}] flight->search: do_get, timeout: {timeout}s",);
@@ -154,7 +161,6 @@ impl FlightService for FlightServiceImpl {
         let (ctx, physical_plan, lock, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
-                clear_session_data(&trace_id);
                 #[cfg(feature = "enterprise")]
                 if get_o2_config().work_group.max_nodes_per_query > 0 {
                     o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
@@ -184,8 +190,6 @@ impl FlightService for FlightServiceImpl {
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
             .try_with_compression(Some(CompressionType::ZSTD))
             .map_err(|e| {
-                // clear session data
-                clear_session_data(&trace_id);
                 log::error!(
                     "[trace_id {trace_id}] flight->search: do_get create IPC write options error: {e:?}",
                 );
@@ -210,7 +214,6 @@ impl FlightService for FlightServiceImpl {
         let partial_err_ref = get_partial_err(&physical_plan);
 
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
-            clear_session_data(&trace_id);
             #[cfg(feature = "enterprise")]
             if get_o2_config().work_group.max_nodes_per_query > 0 {
                 o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
@@ -221,22 +224,23 @@ impl FlightService for FlightServiceImpl {
             Status::internal(e.to_string())
         })?;
 
-        let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
-            .with_trace_id(trace_id.to_string())
-            .with_is_super(is_super_cluster)
-            .with_defer_lock(lock)
-            .with_start(start)
-            .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
-            .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
-            .with_custom_message(PreCustomMessage::Metrics(metrics))
-            .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
-            .with_custom_message(PreCustomMessage::PeakMemoryRef(Some(peak_memory)))
-            .with_custom_message(PreCustomMessage::PeakMemoryRef(peak_memory_ref))
-            .with_custom_message(PreCustomMessage::PartialErrRefEarly(
-                partial_err_ref.clone(),
-            ))
-            .with_custom_message(PreCustomMessage::PartialErrRef(partial_err_ref))
-            .build(stream, span);
+        let mut stream =
+            FlightEncoderStreamBuilder::new(write_options, MAX_FLIGHT_DATA_SIZE, session_guard)
+                .with_trace_id(trace_id.to_string())
+                .with_is_super(is_super_cluster)
+                .with_defer_lock(lock)
+                .with_start(start)
+                .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
+                .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
+                .with_custom_message(PreCustomMessage::Metrics(metrics))
+                .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
+                .with_custom_message(PreCustomMessage::PeakMemoryRef(Some(peak_memory)))
+                .with_custom_message(PreCustomMessage::PeakMemoryRef(peak_memory_ref))
+                .with_custom_message(PreCustomMessage::PartialErrRefEarly(
+                    partial_err_ref.clone(),
+                ))
+                .with_custom_message(PreCustomMessage::PartialErrRef(partial_err_ref))
+                .build(stream, span);
 
         let stream = async_stream::stream! {
             let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
@@ -322,6 +326,18 @@ impl FlightService for FlightServiceImpl {
         _request: Request<Streaming<FlightData>>,
     ) -> Result<Response<Self::DoExchangeStream>, Status> {
         Err(Status::unimplemented("Implement do_exchange"))
+    }
+}
+
+impl SessionGuard {
+    fn new(trace_id: String) -> Self {
+        Self { trace_id }
+    }
+}
+
+impl Drop for SessionGuard {
+    fn drop(&mut self) {
+        clear_session_data(&self.trace_id);
     }
 }
 
