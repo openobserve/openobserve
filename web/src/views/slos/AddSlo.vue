@@ -412,39 +412,39 @@
           <!-- OToggleGroup renders OToggleGroupItem children; it has no
                  `options` prop. Passing one rendered an empty bar, which left
                  S-3's rolling window and S-4's slice interval unreachable. -->
-          <OToggleGroup
-            v-model="form.window_secs"
-            :label="t('slos.field.window')"
-            class="mt-3"
-            data-test="slos-addslo-window"
-          >
-            <OToggleGroupItem
-              v-for="opt in windowOptions"
-              :key="opt.value"
-              :value="opt.value"
-              size="sm"
-              :data-test="`slos-addslo-window-${opt.value}`"
+          <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <OToggleGroup
+              v-model="form.window_secs"
+              :label="t('slos.field.window')"
+              data-test="slos-addslo-window"
             >
-              {{ opt.label }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <OToggleGroup
-            v-model="form.slice_interval_secs"
-            :label="t('slos.field.sliceInterval')"
-            class="mt-3"
-            data-test="slos-addslo-slice"
-          >
-            <OToggleGroupItem
-              v-for="opt in sliceOptions"
-              :key="opt.value"
-              :value="opt.value"
-              :disabled="opt.disable"
-              size="sm"
-              :data-test="`slos-addslo-slice-${opt.value}`"
+              <OToggleGroupItem
+                v-for="opt in windowOptions"
+                :key="opt.value"
+                :value="opt.value"
+                size="sm"
+                :data-test="`slos-addslo-window-${opt.value}`"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OToggleGroup
+              v-model="form.slice_interval_secs"
+              :label="t('slos.field.sliceInterval')"
+              data-test="slos-addslo-slice"
             >
-              {{ opt.label }}
-            </OToggleGroupItem>
-          </OToggleGroup>
+              <OToggleGroupItem
+                v-for="opt in sliceOptions"
+                :key="opt.value"
+                :value="opt.value"
+                :disabled="opt.disable"
+                size="sm"
+                :data-test="`slos-addslo-slice-${opt.value}`"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+          </div>
           <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
             {{ t("slos.groupedSliceNote") }}
           </p>
