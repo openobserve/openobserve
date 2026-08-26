@@ -106,7 +106,7 @@ export class ModelPricingPage {
         // ============================================================
         this.testMatchDialog    = page.locator('[data-test="test-model-match-dialog"]');
         this.testMatchInput     = page.locator('[data-test="test-match-model-input"]');
-        this.testMatchClearBtn  = page.locator('[data-test="test-match-clear-btn"]');
+        this.testMatchClearBtn  = page.locator('[data-test="test-match-model-input-clear"]');
         this.testMatchEmpty     = page.locator('[data-test="test-match-empty"]');
         this.testMatchWaiting   = page.locator('[data-test="test-match-waiting"]');
         this.testMatchNoResult  = page.locator('[data-test="test-match-no-result"]');

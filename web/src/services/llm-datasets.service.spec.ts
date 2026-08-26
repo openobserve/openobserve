@@ -92,6 +92,17 @@ describe("llmDatasetsService.listItems", () => {
     });
   });
 
+  it("preserves a missing expected output as absence", async () => {
+    mockGet.mockResolvedValue({
+      data: { list: [itemRow({ expectedOutput: null })] },
+    });
+
+    const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
+
+    expect(item.expectedOutput).toBeNull();
+    expect(item.rawExpectedOutput).toBeNull();
+  });
+
   it("flattens a structured input for display but keeps the original value", async () => {
     const input = [{ role: "user", content: "hello" }];
     mockGet.mockResolvedValue({ data: { list: [itemRow({ input })] } });
@@ -192,6 +203,24 @@ describe("llmDatasetsService item writes", () => {
     expect(item.id).toBe("item-1");
   });
 
+  it("omits expectedOutput when adding a reference-free item", async () => {
+    mockPost.mockResolvedValue({
+      data: { created: true, item: itemRow({ expectedOutput: null }) },
+    });
+
+    const item = await llmDatasetsService.addItem("acme", "dataset-1", {
+      input: "question",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/datasets/dataset-1/items", {
+      entryPoint: "manual",
+      input: "question",
+      metadata: null,
+      tags: [],
+    });
+    expect(item.expectedOutput).toBeNull();
+  });
+
   it("updates an item by its LOGICAL id and sends tags", async () => {
     mockPut.mockResolvedValue({ data: itemRow({ globalVersion: 8 }) });
 
@@ -250,6 +279,45 @@ describe("llmDatasetsService.getItemVersions", () => {
       { rowId: "row-v1", id: "item-1", version: 1 },
       { rowId: "row-v2", id: "item-1", version: 3 },
     ]);
+  });
+});
+
+describe("llmDatasetsService.list", () => {
+  it("carries the server-derived aggregates through onto each row", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        list: [
+          {
+            id: "dataset-1",
+            orgId: "acme",
+            name: "Goldens",
+            description: null,
+            tags: ["rag"],
+            // 46 stored revisions collapse to 29 live items server-side, so the
+            // count is deliberately unrelated to the version.
+            globalVersion: 46,
+            itemCount: 29,
+            sources: { trace: 4, annotation: 5, manual: 20 },
+          },
+        ],
+      },
+    });
+
+    const [dataset] = await llmDatasetsService.list("acme");
+
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/datasets");
+    expect(dataset.itemCount).toBe(29);
+    expect(dataset.sources).toEqual({ trace: 4, annotation: 5, manual: 20 });
+    expect(dataset.globalVersion).toBe(46);
+  });
+
+  it("shows zeroes rather than blanks when a row omits the aggregates", async () => {
+    mockGet.mockResolvedValue({ data: { list: [{ id: "dataset-1", name: "Goldens" }] } });
+
+    const [dataset] = await llmDatasetsService.list("acme");
+
+    expect(dataset.itemCount).toBe(0);
+    expect(dataset.sources).toEqual({ trace: 0, annotation: 0, manual: 0 });
   });
 });
 
