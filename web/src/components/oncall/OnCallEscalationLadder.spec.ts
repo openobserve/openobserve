@@ -361,6 +361,65 @@ describe("OnCallEscalationLadder", () => {
     expect(wrapper.text()).toContain("1 of 2 unreachable");
   });
 
+  /// A ladder that pages the same unreachable people at every level is one
+  /// finding, not four identical blocks a reader has to compare by eye.
+  it("folds consecutive rungs that resolve to the same people into one row", () => {
+    const stale = (afterMicros: number) => ({
+      after_micros: afterMicros,
+      targets: ["the whole team"],
+      recipients: [
+        person({ user_email: "a@o2.ai", would_a_page_land: false, deliverable_channels: [] }),
+        person({ user_email: "b@o2.ai", would_a_page_land: false, deliverable_channels: [] }),
+        person({ user_email: "c@o2.ai", would_a_page_land: false, deliverable_channels: [] }),
+      ],
+      resolves_to_nobody: false,
+    });
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          stale(0),
+          stale(5 * MICROS_PER_MINUTE),
+          stale(15 * MICROS_PER_MINUTE),
+          stale(30 * MICROS_PER_MINUTE),
+        ],
+      }),
+    });
+
+    // One folded row plus the ending — not four rows saying the same thing.
+    expect(wrapper.findAllComponents({ name: "OTimelineItem" })).toHaveLength(2);
+    const row = wrapper.find('[data-test="oncall-ladder-rung-0"]');
+    expect(row.text()).toContain("0m–30m");
+    expect(row.text()).toContain("3 of 3 unreachable");
+    expect(row.text()).toContain("4 rungs");
+  });
+
+  /// A rung that differs from its neighbour — even by one person's
+  /// reachability — must not be swallowed into the run around it.
+  it("does not fold a rung whose verdict differs from its neighbours", () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 0,
+            targets: ["the whole team"],
+            recipients: [person({ user_email: "a@o2.ai" })],
+            resolves_to_nobody: false,
+          },
+          {
+            after_micros: 5 * MICROS_PER_MINUTE,
+            targets: ["the whole team"],
+            recipients: [
+              person({ user_email: "a@o2.ai", would_a_page_land: false, deliverable_channels: [] }),
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      }),
+    });
+
+    expect(wrapper.findAllComponents({ name: "OTimelineItem" })).toHaveLength(3);
+  });
+
   /// A rung that fires and reaches nobody is worse than a slow one: the ladder
   /// moves on and the page stays unanswered.
   it("calls out a rung that resolves to nobody", () => {

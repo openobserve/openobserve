@@ -81,30 +81,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
 
       <OTimeline v-else data-test="oncall-ladder-rungs">
+        <!-- Consecutive rungs aiming at the same people, with the same
+           verdict, fold into one row: four identical "whole team, 3 of 3
+           unreachable" blocks are one finding, not four events to read one
+           by one. Mirrors the fold OnCallEscalation.vue does for the fired
+           ladder — the shape repeats because the underlying question does. -->
         <OTimelineItem
-          v-for="rung in preview.rungs"
-          :key="rung.after_micros"
-          :label="delayLabel(rung.after_micros)"
-          :title="raw(saidTargets(rung.targets))"
-          :subtitle="resolvesTo(rung)"
+          v-for="group in rungGroups"
+          :key="group.key"
+          :label="rungLabel(group)"
+          :title="raw(saidTargets(group.rung.targets))"
+          :subtitle="subtitleFor(group)"
           variant="muted"
-          :data-test="`oncall-ladder-rung-${rung.after_micros}`"
+          :data-test="`oncall-ladder-rung-${group.firstMicros}`"
         >
           <!-- Only when something is wrong, and as a badge: the server's reason
              is a full sentence, which is a paragraph on a rail. The sentence
              itself is one hover away, so nothing is hidden. -->
           <OTag
-            v-if="problems[rung.after_micros]"
+            v-if="problems[group.firstMicros]"
             variant="error-soft"
             size="sm"
             class="mt-1"
-            :data-test="`oncall-ladder-rung-problem-${rung.after_micros}`"
+            :data-test="`oncall-ladder-rung-problem-${group.firstMicros}`"
           >
-            {{ problems[rung.after_micros]?.label }}
+            {{ problems[group.firstMicros]?.label }}
             <OTooltip
-              v-if="problems[rung.after_micros]?.tip"
+              v-if="problems[group.firstMicros]?.tip"
               side="bottom"
-              :content="problems[rung.after_micros]?.tip ?? undefined"
+              :content="problems[group.firstMicros]?.tip ?? undefined"
             />
           </OTag>
         </OTimelineItem>
@@ -278,6 +283,71 @@ function summaryFor(entry: TeamRungSummary, folded: number): I18nText {
 /// "immediately", which the design also uses and which lines the rungs up.
 function delayLabel(afterMicros: number): I18nText {
   return afterMicros === 0 ? raw("0m") : raw(`+${formatMicrosDuration(afterMicros)}`);
+}
+
+interface RungGroup {
+  key: string;
+  /** The first rung in the run — every rung it absorbs reads identically. */
+  rung: PreviewRung;
+  count: number;
+  firstMicros: number;
+  lastMicros: number;
+}
+
+/// What makes two rungs the same finding: who they aim at, who that resolves
+/// to, and whether each of those people is reachable. Delay is deliberately
+/// absent — that is the axis being folded, not part of the match.
+function rungSignature(rung: PreviewRung): string {
+  const people = rung.recipients
+    .map((one) => `${one.user_email}:${one.would_a_page_land}:${one.why_not ?? ""}`)
+    .join(",");
+  return JSON.stringify([rung.targets, people, rung.resolves_to_nobody]);
+}
+
+/// Consecutive rungs sharing a signature fold into one row. A ladder that
+/// pages the same unreachable people every 5 minutes for half an hour is one
+/// fact — "still nobody" — not six rows saying it again.
+const rungGroups = computed<RungGroup[]>(() => {
+  const rungs = preview.value?.rungs ?? [];
+  const out: RungGroup[] = [];
+  let previousSignature: string | null = null;
+
+  for (const rung of rungs) {
+    const signature = rungSignature(rung);
+    const last = out[out.length - 1];
+    if (last && signature === previousSignature) {
+      last.count += 1;
+      last.lastMicros = rung.after_micros;
+    } else {
+      out.push({
+        key: `${rung.after_micros}`,
+        rung,
+        count: 1,
+        firstMicros: rung.after_micros,
+        lastMicros: rung.after_micros,
+      });
+    }
+    previousSignature = signature;
+  }
+  return out;
+});
+
+/// A single rung keeps its own delay; a folded run reads as the span it
+/// covers — "0m–30m" rather than four timestamps a reader would add up
+/// themselves.
+function rungLabel(group: RungGroup): I18nText {
+  if (group.count === 1) return delayLabel(group.firstMicros);
+  return raw(`${delayLabel(group.firstMicros)}–${formatMicrosDuration(group.lastMicros)}`);
+}
+
+/// Who it resolves to, plus — only once there is more than one rung to
+/// account for — how many rungs said the same thing, reusing the count
+/// phrasing the priority strip already uses for "3 rungs".
+function subtitleFor(group: RungGroup): I18nText | undefined {
+  const base = resolvesTo(group.rung);
+  if (group.count <= 1) return base;
+  const times = t("oncall.reachRungs", { count: group.count }, group.count);
+  return raw(base ? `${base} · ${times}` : `${times}`);
 }
 
 /// Who the rung resolves to this instant — the line the whole preview exists
