@@ -16,7 +16,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 
-import type { DbmRange } from "@/composables/dbm/useDbmScope";
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import i18n from "@/locales";
@@ -31,22 +30,7 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn(() => Promise.resolve()) }),
 }));
 
-const range: DbmRange = {
-  type: "relative",
-  relativeTimePeriod: "6h",
-  startTime: 1_000,
-  endTime: 2_000,
-};
-
 const tabCounts: DbmTabCountProps = { queryCount: 12, databaseCount: 3 };
-
-/** Named, so the emit test can find it; the real picker needs a store and a DOM. */
-const dateTimeStub = {
-  name: "DateTime",
-  props: ["defaultType", "defaultAbsoluteTime", "defaultRelativeTime", "dataTestName"],
-  emits: ["on:date-change"],
-  template: "<div data-test='date-time-stub' />",
-};
 
 const mountChrome = (props: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
   mount(DbmPageChrome, {
@@ -54,15 +38,13 @@ const mountChrome = (props: Record<string, unknown> = {}, slots: Record<string, 
       title: raw("Deadlocks"),
       subtitle: raw("Query pairs that deadlocked"),
       titleDataTest: "dbm-deadlocks-title",
-      dateTimeDataTest: "dbm-deadlocks-date-time",
       tabCounts,
-      range,
       ...props,
     },
     slots,
     global: {
       plugins: [i18n],
-      stubs: { DateTime: dateTimeStub, RouterLink: true },
+      stubs: { RouterLink: true },
     },
   });
 
@@ -98,40 +80,6 @@ describe("DbmPageChrome", () => {
       queryCount: 12,
       databaseCount: 3,
     });
-  });
-
-  /** The picker opens on the page's window, not on its own default. */
-  it("opens the picker on the page's window", () => {
-    const picker = mountChrome().findComponent({ name: "DateTime" });
-
-    expect(picker.props("defaultType")).toBe("relative");
-    expect(picker.props("defaultRelativeTime")).toBe("6h");
-    expect(picker.props("defaultAbsoluteTime")).toEqual({ startTime: 1_000, endTime: 2_000 });
-    expect(picker.props("dataTestName")).toBe("dbm-deadlocks-date-time");
-  });
-
-  /** A pick has to reach the page — that is what reloads the table. */
-  it("reports a pick to the page", async () => {
-    const wrapper = mountChrome();
-    wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
-      relativeTimePeriod: "1d",
-      userChangedValue: true,
-    });
-    await wrapper.vm.$nextTick();
-
-    expect(wrapper.emitted("dateChange")).toEqual([
-      [{ relativeTimePeriod: "1d", userChangedValue: true }],
-    ]);
-  });
-
-  /**
-   * Query detail is not one of these pages, but two list pages DO add a control
-   * beside the picker; the slot keeps that possible without a second header.
-   */
-  it("lets a page add its own action beside the picker", () => {
-    const wrapper = mountChrome({}, { "actions-extra": '<button data-test="extra" />' });
-
-    expect(wrapper.find('[data-test="extra"]').exists()).toBe(true);
   });
 
   it("renders the page's body", () => {

@@ -43,28 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DbmSectionTabs v-bind="tabCounts" />
     </template>
 
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        :data-test-name="dateTimeDataTest"
-        class="h-8"
-        @on:date-change="emit('dateChange', $event)"
-      />
-      <slot name="actions-extra" />
-    </template>
-
     <slot />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import DateTime from "@/components/DateTime.vue";
 import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
-import type { DbmDateChange, DbmRange } from "@/composables/dbm/useDbmScope";
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { I18nText } from "@/types/i18n";
@@ -73,12 +57,7 @@ defineProps<{
   title: I18nText;
   subtitle: I18nText;
   titleDataTest: string;
-  dateTimeDataTest: string;
   /** What the tab strip paints — the shell's fan-out with this page's own count substituted. */
   tabCounts: DbmTabCountProps;
-  /** The window the picker opens on. */
-  range: DbmRange;
 }>();
-
-const emit = defineEmits<{ dateChange: [value: DbmDateChange] }>();
 </script>

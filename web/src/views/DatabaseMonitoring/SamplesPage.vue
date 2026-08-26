@@ -45,10 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('dbm.samples.title')"
     :subtitle="t(serverListShown ? 'dbm.samples.subtitleServer' : 'dbm.samples.subtitle')"
     title-data-test="dbm-samples-title"
-    date-time-data-test="dbm-samples-date-time"
     :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
   >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Scope lives ABOVE both tables, not inside either one's toolbar. It
@@ -75,8 +72,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
         <DbmRefreshButton
+          mode="status"
           :loading="loading"
           :last-run-at="lastRunAt"
+          data-test="dbm-samples-refresh"
+        />
+        <DateTime
+          auto-apply
+          menu-align="end"
+          :default-type="range.type"
+          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+          :default-relative-time="range.relativeTimePeriod ?? undefined"
+          data-test-name="dbm-samples-date-time"
+          class="h-8"
+          @on:date-change="onDateChange"
+        />
+        <DbmRefreshButton
+          mode="button"
+          :loading="loading"
           data-test="dbm-samples-refresh"
           @refresh="onRefresh"
         />
@@ -88,8 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            own toolbar (same search/refresh bindings), and its subtitle states
            why the usual list is empty. -->
       <OTable
-        :enable-column-resize="true"
         v-if="!serverListShown"
+        :enable-column-resize="true"
         :data="rows"
         :columns="columns"
         row-key="rowKey"
@@ -320,6 +333,7 @@ import { useStore } from "vuex";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";

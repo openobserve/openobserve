@@ -55,10 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('dbm.databases.title')"
     :subtitle="t('dbm.databases.subtitle')"
     title-data-test="dbm-databases-title"
-    date-time-data-test="dbm-databases-date-time"
     :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
   >
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
@@ -102,12 +99,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            :last-run-at="lastRunAt"
-            data-test="dbm-databases-refresh"
-            @refresh="onRefresh"
-          />
+          <div class="flex items-center gap-1.5">
+            <DbmRefreshButton
+              mode="status"
+              :loading="loading"
+              :last-run-at="lastRunAt"
+              data-test="dbm-databases-refresh"
+            />
+            <DateTime
+              auto-apply
+              menu-align="end"
+              :default-type="range.type"
+              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+              :default-relative-time="range.relativeTimePeriod ?? undefined"
+              data-test-name="dbm-databases-date-time"
+              class="h-8"
+              @on:date-change="onDateChange"
+            />
+            <DbmRefreshButton
+              mode="button"
+              :loading="loading"
+              data-test="dbm-databases-refresh"
+              @refresh="onRefresh"
+            />
+          </div>
         </template>
 
         <template #subheader>
@@ -429,6 +444,7 @@ import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";

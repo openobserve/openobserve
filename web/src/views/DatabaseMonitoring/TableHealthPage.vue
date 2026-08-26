@@ -46,10 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('dbm.tableHealth.title')"
     :subtitle="t('dbm.tableHealth.subtitle')"
     title-data-test="dbm-table-health-title"
-    date-time-data-test="dbm-table-health-date-time"
     :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
   >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- W11 · Recommendations. Deterministic checks, each showing the
@@ -223,12 +220,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            :last-run-at="lastRunAt"
-            data-test="dbm-table-health-refresh"
-            @refresh="onRefresh"
-          />
+          <div class="flex items-center gap-1.5">
+            <DbmRefreshButton
+              mode="status"
+              :loading="loading"
+              :last-run-at="lastRunAt"
+              data-test="dbm-table-health-refresh"
+            />
+            <DateTime
+              auto-apply
+              menu-align="end"
+              :default-type="range.type"
+              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+              :default-relative-time="range.relativeTimePeriod ?? undefined"
+              data-test-name="dbm-table-health-date-time"
+              class="h-8"
+              @on:date-change="onDateChange"
+            />
+            <DbmRefreshButton
+              mode="button"
+              :loading="loading"
+              data-test="dbm-table-health-refresh"
+              @refresh="onRefresh"
+            />
+          </div>
         </template>
 
         <!-- The disclosures live here, always visible, never behind a hover.
@@ -305,6 +320,7 @@ import { useRoute, useRouter } from "vue-router";
 import DbmDisclosureLine from "@/components/dbm/DbmDisclosureLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

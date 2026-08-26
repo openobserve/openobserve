@@ -52,10 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('dbm.queries.title')"
     :subtitle="t(serverListShown ? 'dbm.queries.subtitleServer' : 'dbm.queries.subtitle')"
     title-data-test="dbm-queries-title"
-    date-time-data-test="dbm-queries-date-time"
     :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
   >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Blocked queries emit no span until they finish, so a lock storm makes
@@ -145,8 +142,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
 
         <DbmRefreshButton
+          mode="status"
           :loading="loading"
           :last-run-at="lastRunAt"
+          data-test="dbm-queries-refresh"
+        />
+        <DateTime
+          auto-apply
+          menu-align="end"
+          :default-type="range.type"
+          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+          :default-relative-time="range.relativeTimePeriod ?? undefined"
+          data-test-name="dbm-queries-date-time"
+          class="h-8"
+          @on:date-change="onDateChange"
+        />
+        <DbmRefreshButton
+          mode="button"
+          :loading="loading"
           data-test="dbm-queries-refresh"
           @refresh="onRefresh"
         />
@@ -285,25 +298,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              server figure it would qualify a number drawn from a different
              population. -->
         <template #cell-calls="{ row }">
-          <div class="flex flex-col items-end leading-tight">
-            <!-- The fold's own numbers are muted: it is a control, and a bold
-                 call count on it competes with the queries either side for the
-                 same "how big is this?" read. The share it carries is stated in
-                 words on the row itself. -->
-            <DbmOverlapValue
-              :value="row.overlapCalls.value === null ? null : formatCount(row.overlapCalls.value)"
-              :source="row.overlapCalls.source"
-              :qualifier-key="row.overlapCalls.qualifierKey"
-              :engine="row.db_system"
-              data-test="dbm-queries-calls"
-            />
-            <DbmDeltaCell
-              v-if="!row.isOther && !row.isFold && row.overlapCalls.source === 'client'"
-              :delta="row.callsDelta"
-              variant="words"
-              data-test="dbm-queries-calls-delta"
-            />
-          </div>
+          <!-- Two rows, like Database time: the count on top, its qualifier and
+               the window-over-window delta together on the line below. -->
+          <DbmOverlapValue
+            :value="row.overlapCalls.value === null ? null : formatCount(row.overlapCalls.value)"
+            :source="row.overlapCalls.source"
+            :qualifier-key="row.overlapCalls.qualifierKey"
+            :engine="row.db_system"
+            data-test="dbm-queries-calls"
+          >
+            <template #trailing>
+              <DbmDeltaCell
+                v-if="!row.isOther && !row.isFold && row.overlapCalls.source === 'client'"
+                :delta="row.callsDelta"
+                variant="words"
+                data-test="dbm-queries-calls-delta"
+              />
+            </template>
+          </DbmOverlapValue>
         </template>
 
         <!-- The slow tail, and what it was before. p95 is NOT the typical
@@ -565,6 +577,7 @@ import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
