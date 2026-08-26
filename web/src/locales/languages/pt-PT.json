@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "Etiqueta do nome do local",
     "mapsMapType": "Tipo de mapa",
     "tableAggregations": "Agregações de tabelas",
+    "tableCellDrilldownTooltip": "Explorar logs correspondentes",
     "promqlTableMode": "Modo de tabela ProMQL",
     "visibleColumns": "Colunas visíveis",
     "hiddenColumns": "Colunas ocultas",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "Já existe uma variável com o mesmo nome",
     "pivotTotal": "Total",
     "pivotOthers": "Outros",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Explorar logs correspondentes"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "Campos de linha",
     "valueFields": "Campos de valor",
     "noData": "Sem dados",
-    "addJoin": "Adicionar junção",
-    "removeJoin": "Remover junção",
-    "leftJoin": "Junção à esquerda",
-    "innerJoin": "Junção interna",
-    "rightJoin": "Junção correta",
-    "removeClause": "Remover cláusula",
-    "SQL": "SQL",
-    "builder": "Construtor",
-    "custom": "Personalizado",
-    "discard": "Descartar",
-    "apply": "Aplique",
-    "collapseFields": "Recolher Campos",
-    "fields": "Campos",
-    "layout": "Layout",
-    "promQL": "PromQL",
-    "latitude": "Latitude",
-    "longitude": "Longitude",
-    "weight": "Peso",
-    "mapname": "Nome",
-    "mapvalue": "Valor",
-    "source": "Fonte",
-    "target": "Alvo",
-    "value": "Valor",
     "logExplorer": {
       "title": "Explorador de Logs",
       "openInLogs": "Abrir em Logs",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "Outros eventos deste stream nos 3 minutos antes e depois deste evento — mostra o que mais estava acontecendo no mesmo momento.",
         "contextEmpty": "Nenhum evento ao redor encontrado"
       }
-    }
+    },
+    "addJoin": "Adicionar junção",
+    "removeJoin": "Remover junção",
+    "leftJoin": "Junção à esquerda",
+    "innerJoin": "Junção interna",
+    "rightJoin": "Junção correta",
+    "removeClause": "Remover cláusula",
+    "SQL": "SQL",
+    "builder": "Construtor",
+    "custom": "Personalizado",
+    "discard": "Descartar",
+    "apply": "Aplique",
+    "collapseFields": "Recolher Campos",
+    "fields": "Campos",
+    "layout": "Layout",
+    "promQL": "PromQL",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "weight": "Peso",
+    "mapname": "Nome",
+    "mapvalue": "Valor",
+    "source": "Fonte",
+    "target": "Alvo",
+    "value": "Valor"
   },
   "home": {
     "alertsOverviewSection": "Seção de visão geral de alertas",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% do trace)",
       "requestCount": "{count} req"
-    }
+    },
+    "spanEventTimeline": "Linha do tempo de eventos do span",
+    "eventClusterTooltip": "{count} eventos",
+    "spanEventCount": "{count} evento",
+    "spanEventCountPlural": "{count} eventos",
+    "spanEventCountWithErrors": "{count} · {errors} erro",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} erros",
+    "spanEventErrorCount": "{errors} erro",
+    "spanEventErrorCountPlural": "{errors} erros",
+    "eventClusterAriaLabel": "{count} eventos, {errors} erro",
+    "eventClusterAriaLabelPlural": "{count} eventos, {errors} erros",
+    "eventMarkerTooltip": "Evento: {name}",
+    "exceptionMarkerTooltip": "Exceção: {type}",
+    "spanEventFallback": "evento de span"
   },
   "actions": {
     "realTime": "Tempo real",
@@ -11016,6 +11029,10 @@
         "meta": "{count} itens · atualizado em {updated}",
         "loadError": "Falha ao carregar dataset",
         "footerTitle": "Itens",
+        "tabs": {
+          "items": "Itens",
+          "experiments": "Experimentos"
+        },
         "searchPlaceholder": "Pesquisar Itens...",
         "columns": {
           "input": "Entrada (Purificada)",

@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "Nhãn tên vị trí",
     "mapsMapType": "Loại bản đồ",
     "tableAggregations": "Tổng hợp bảng",
+    "tableCellDrilldownTooltip": "Khám phá nhật ký khớp",
     "promqlTableMode": "Chế độ bảng PromQL",
     "visibleColumns": "Các cột hiển thị",
     "hiddenColumns": "Các cột ẩn",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "Biến có cùng tên đã tồn tại",
     "pivotTotal": "Tổng",
     "pivotOthers": "Khác",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Khám phá nhật ký khớp"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "Trường hàng",
     "valueFields": "Trường giá trị",
     "noData": "Không có dữ liệu",
-    "addJoin": "Thêm kết nối",
-    "removeJoin": "Xóa kết nối",
-    "leftJoin": "Kết nối trái",
-    "innerJoin": "Kết nối trong",
-    "rightJoin": "Kết nối phải",
-    "removeClause": "Xóa mệnh đề",
-    "SQL": "SQL",
-    "builder": "Trình xây dựng",
-    "custom": "Tùy chỉnh",
-    "discard": "Hủy bỏ",
-    "apply": "Áp dụng",
-    "collapseFields": "Thu gọn trường",
-    "fields": "Trường",
-    "layout": "Bố cục",
-    "promQL": "PromQL",
-    "latitude": "Vĩ độ",
-    "longitude": "Kinh độ",
-    "weight": "Trọng số",
-    "mapname": "Tên",
-    "mapvalue": "Giá trị",
-    "source": "Nguồn",
-    "target": "Đích",
-    "value": "Giá trị",
     "logExplorer": {
       "title": "Trình khám phá nhật ký",
       "openInLogs": "Mở trong Nhật ký",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "Các sự kiện khác từ stream này trong 3 phút trước và sau sự kiện này — cho biết điều gì khác đang diễn ra tại cùng thời điểm.",
         "contextEmpty": "Không tìm thấy sự kiện xung quanh"
       }
-    }
+    },
+    "addJoin": "Thêm kết nối",
+    "removeJoin": "Xóa kết nối",
+    "leftJoin": "Kết nối trái",
+    "innerJoin": "Kết nối trong",
+    "rightJoin": "Kết nối phải",
+    "removeClause": "Xóa mệnh đề",
+    "SQL": "SQL",
+    "builder": "Trình xây dựng",
+    "custom": "Tùy chỉnh",
+    "discard": "Hủy bỏ",
+    "apply": "Áp dụng",
+    "collapseFields": "Thu gọn trường",
+    "fields": "Trường",
+    "layout": "Bố cục",
+    "promQL": "PromQL",
+    "latitude": "Vĩ độ",
+    "longitude": "Kinh độ",
+    "weight": "Trọng số",
+    "mapname": "Tên",
+    "mapvalue": "Giá trị",
+    "source": "Nguồn",
+    "target": "Đích",
+    "value": "Giá trị"
   },
   "home": {
     "alertsOverviewSection": "Phần tổng quan cảnh báo",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% của trace)",
       "requestCount": "{count} yêu cầu"
-    }
+    },
+    "spanEventTimeline": "Dòng thời gian sự kiện Span",
+    "eventClusterTooltip": "{count} sự kiện",
+    "spanEventCount": "{count} sự kiện",
+    "spanEventCountPlural": "{count} sự kiện",
+    "spanEventCountWithErrors": "{count} · {errors} lỗi",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} lỗi",
+    "spanEventErrorCount": "{errors} lỗi",
+    "spanEventErrorCountPlural": "{errors} lỗi",
+    "eventClusterAriaLabel": "{count} sự kiện, {errors} lỗi",
+    "eventClusterAriaLabelPlural": "{count} sự kiện, {errors} lỗi",
+    "eventMarkerTooltip": "Sự kiện: {name}",
+    "exceptionMarkerTooltip": "Ngoại lệ: {type}",
+    "spanEventFallback": "sự kiện span"
   },
   "actions": {
     "realTime": "Thời gian thực",
@@ -11016,6 +11029,10 @@
         "meta": "{count} mục · đã cập nhật {updated}",
         "loadError": "Không thể tải tập dữ liệu",
         "footerTitle": "Các mục",
+        "tabs": {
+          "items": "Mục",
+          "experiments": "Thử nghiệm"
+        },
         "searchPlaceholder": "Tìm kiếm các mục...",
         "columns": {
           "input": "Đầu vào (Đã làm sạch)",
