@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-add-alert-btn"
           variant="primary"
           size="sm"
+          icon-left="add"
           :disabled="!destinations.length || !templates.length"
           :title="!destinations.length ? t('alerts.noDestinations') : ''"
           @click="
