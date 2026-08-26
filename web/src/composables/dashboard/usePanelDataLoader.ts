@@ -29,19 +29,12 @@ import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
-import { acquirePanelLoadSlot, releasePanelLoadSlot } from "./usePanelLoadQueue";
 import { parseSearchError } from "@/utils/query/searchError";
 
 /**
  * debounce time in milliseconds for panel data loader
  */
 const PANEL_DATA_LOADER_DEBOUNCE_TIME = 50;
-
-/**
- * Longest a single panel may hold a load slot, so one wedged stream cannot
- * keep a slot for the rest of the session.
- */
-const PANEL_LOAD_SLOT_MAX_HOLD_TIME = 30000;
 
 export const usePanelDataLoader = (
   panelSchema: any,
@@ -296,36 +289,6 @@ export const usePanelDataLoader = (
     });
   };
 
-  // Resolves once this panel's load has settled. Never rejects — the caller
-  // must always reach its finally to release the load slot.
-  const waitForPanelLoadToSettle = (signal: AbortSignal) => {
-    return new Promise<void>((resolve) => {
-      if (!state.loading) {
-        resolve();
-        return;
-      }
-
-      let stopWatching: (() => void) | null = null;
-      let timeoutId: any = null;
-
-      const settle = () => {
-        if (timeoutId !== null) clearTimeout(timeoutId);
-        stopWatching?.();
-        signal.removeEventListener("abort", settle);
-        resolve();
-      };
-
-      stopWatching = watch(
-        () => state.loading,
-        (loading) => {
-          if (!loading) settle();
-        },
-      );
-      timeoutId = setTimeout(settle, PANEL_LOAD_SLOT_MAX_HOLD_TIME);
-      signal.addEventListener("abort", settle);
-    });
-  };
-
   const cancelQueryAbort = () => {
     // Only set isPartialData to true if the panel was still loading
     if (state.loading) {
@@ -472,29 +435,14 @@ export const usePanelDataLoader = (
         code: "",
       };
 
-      // Cap how many panels load at once (a dashboard has no panel limit).
-      try {
-        await acquirePanelLoadSlot(abortController.signal);
-      } catch (slotError) {
-        // Superseded while queued — give up the place, clear the spinner.
-        state.loading = false;
-        throw slotError;
-      }
-      try {
-        // Check if the query type is "promql"
-        if (panelSchema.value.queryType == "promql") {
-          await executePromQL(startISOTimestamp, endISOTimestamp, abortController);
-        } else if (panelSchema.value.queries.length > 1) {
-          const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
-          await executeMultiSQL(startISOTimestamp, endISOTimestamp, abortController, pageType);
-        } else {
-          await executeSQL(startISOTimestamp, endISOTimestamp, abortController);
-        }
-
-        // Executors return at dispatch time; hold the slot until data lands.
-        await waitForPanelLoadToSettle(abortController.signal);
-      } finally {
-        releasePanelLoadSlot();
+      // Check if the query type is "promql"
+      if (panelSchema.value.queryType == "promql") {
+        await executePromQL(startISOTimestamp, endISOTimestamp, abortController);
+      } else if (panelSchema.value.queries.length > 1) {
+        const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
+        await executeMultiSQL(startISOTimestamp, endISOTimestamp, abortController, pageType);
+      } else {
+        await executeSQL(startISOTimestamp, endISOTimestamp, abortController);
       }
     } catch (error: any) {
       if (error.name === "AbortError" || error.message === "Aborted waiting for loading") {
