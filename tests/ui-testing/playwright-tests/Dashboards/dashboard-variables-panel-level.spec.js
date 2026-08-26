@@ -132,7 +132,9 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
       await pm.dashboardPanelActions.addPanelName(`DummyPanel${i + 1}`);
       await pm.dashboardPanelActions.savePanel();
-      await scopedVars.getPanelContainer(i).waitFor({ state: "visible", timeout: 10000 });
+      // Grid slot, not panel container: panels far below the fold only render
+      // a lazy placeholder until scrolled near the viewport.
+      await scopedVars.getGridStackItem(i).waitFor({ state: "attached", timeout: 10000 });
       await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     }
 
@@ -145,8 +147,10 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be added and rendered
-    await scopedVars.getPanelContainer(6).waitFor({ state: "visible", timeout: 15000 });
+    // Wait for the panel's grid slot to be added. Panel1 sits below the fold,
+    // and off-screen panels only render a lazy placeholder — the full panel
+    // container mounts when the panel is scrolled near the viewport.
+    await scopedVars.getGridStackItem(6).waitFor({ state: "attached", timeout: 15000 });
     await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
 
@@ -187,12 +191,16 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     // Scroll to Panel1 to make it visible and trigger variable loading
     await page.evaluate(() => {
-      const panels = Array.from(document.querySelectorAll('[data-test*="dashboard-panel-"]'));
-      const targetPanel = panels[6]; // Panel1 is the 7th panel (index 6)
+      const items = Array.from(document.querySelectorAll(".grid-stack-item"));
+      const targetPanel = items[6]; // Panel1 is the 7th panel (index 6)
       if (targetPanel) {
         targetPanel.scrollIntoView({ behavior: 'auto', block: 'center' }); // Use 'auto' for immediate scroll
       }
     });
+
+    // Scrolling near the viewport mounts the lazy panel — its full container
+    // appearing is the visibility signal that triggers variable loading.
+    await scopedVars.getPanelContainer(6).waitFor({ state: "visible", timeout: 15000 });
 
     // Wait for panel to be in viewport and API calls to complete
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
