@@ -106,12 +106,16 @@ async function buildPanel(page, pm, dashboardName, {
   panelName = "Test Panel",
   yField = "kubernetes_container_hash",
   breakdownField = null,
+  xField = null,
 }) {
   await setupTestDashboard(page, pm, dashboardName);
   await pm.dashboardCreate.addPanel();
   await pm.chartTypeSelector.selectChartType(chartType);
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream("e2e_automate");
+  if (xField) {
+    await pm.chartTypeSelector.searchAndAddField(xField, "x");
+  }
   // remove the auto-seeded default y-axis before adding this panel's measure
   await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField(yField, "y");
@@ -192,6 +196,28 @@ export async function setupTablePanelWithConfig(page, pm, dashboardName, panelNa
   await buildPanel(page, pm, dashboardName, { chartType: "table", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Table panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Table chart panel WITH a plain group-by dimension column (x-axis) plus a
+ * measure (y-axis). The dimension column is a non-aggregate field, which is
+ * what makes a cell drillable via the interactive-table "explore in logs"
+ * search icon. Config sidebar NOT opened. Leaves the panel APPLIED in the
+ * add_panel preview; caller decides whether to save + view the dashboard.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} pm
+ * @param {string} dashboardName
+ * @param {string} [panelName]
+ */
+export async function setupTablePanelWithDimension(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, {
+    chartType: "table",
+    panelName,
+    xField: "kubernetes_namespace_name",
+    yField: "kubernetes_container_hash",
+  });
+  testLogger.info("Table panel with drillable dimension ready", { dashboardName, panelName });
 }
 
 /**

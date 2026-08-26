@@ -1262,6 +1262,20 @@ export const BADGE_GROUPS = {
 
   // ── Anomaly detection ─────────────────────────────────────────────────────
 
+  // Field-value rarity (log-explorer anomaly profile): rarer = hotter colour.
+  fieldRarity: {
+    mode: "plain",
+    shape: "pill",
+    size: "sm",
+    values: {
+      anomalous: { variant: "error-soft" },
+      rare: { variant: "error-soft" },
+      uncommon: { variant: "warning-soft" },
+      common: { variant: "default-soft" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Anomaly-detection job status — dot (soft variants for table density).
   anomalyStatus: {
     mode: "dot",

@@ -28,7 +28,11 @@ use tokio::{sync::mpsc, task::JoinSet};
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::handler::grpc::flight::{clear_session_data, partition_encoder::PartitionEncoderStream};
+use crate::handler::grpc::flight::{SessionGuard, partition_encoder::PartitionEncoderStream};
+
+/// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
+/// which is what the receiving channel accepts.
+pub(crate) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
 
 pub struct FlightEncoderStreamBuilder {
     options: IpcWriteOptions,
@@ -38,11 +42,16 @@ pub struct FlightEncoderStreamBuilder {
     trace_id: String,
     is_super: bool,
     defer_lock: Option<DeferredLock>,
+    session_guard: Option<SessionGuard>,
     start: std::time::Instant,
 }
 
 impl FlightEncoderStreamBuilder {
-    pub fn new(options: IpcWriteOptions, max_flight_data_size: usize) -> Self {
+    pub(crate) fn new(
+        options: IpcWriteOptions,
+        max_flight_data_size: usize,
+        session_guard: SessionGuard,
+    ) -> Self {
         Self {
             options,
             max_flight_data_size,
@@ -50,6 +59,7 @@ impl FlightEncoderStreamBuilder {
             trace_id: String::new(),
             is_super: false,
             defer_lock: None,
+            session_guard: Some(session_guard),
             start: std::time::Instant::now(),
         }
     }
@@ -139,6 +149,7 @@ impl FlightEncoderStreamBuilder {
                 child_span,
                 tasks,
                 defer_lock: self.defer_lock,
+                session_guard: self.session_guard,
             },
             log: EventLog::new(config::get_config().common.print_key_event),
         }
@@ -177,6 +188,8 @@ struct StreamContext {
     tasks: JoinSet<()>,
     /// set only for super cluster follower leader.
     defer_lock: Option<DeferredLock>,
+    /// releases the wal locks and the datafusion file list of this request.
+    session_guard: Option<SessionGuard>,
 }
 
 struct EventLog {
@@ -380,16 +393,12 @@ impl Drop for FlightEncoderStream {
             log::info!("[trace_id {trace_id}] flight->search: releasing slot");
         }
 
-        // defer is only set for super cluster follower leader
-        if let Some(defer) = ctx.defer_lock.take() {
-            drop(defer);
-        } else {
-            // clear session data
-            clear_session_data(&ctx.trace_id);
-            log::info!(
-                "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
-            );
-        }
+        // the defer only covers the work group slot, so it never gates the session release
+        drop(ctx.defer_lock.take());
+        drop(ctx.session_guard.take());
+        log::info!(
+            "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
+        );
     }
 }
 
@@ -410,7 +419,11 @@ mod tests {
     use super::*;
 
     fn make_builder() -> FlightEncoderStreamBuilder {
-        FlightEncoderStreamBuilder::new(IpcWriteOptions::default(), 4096)
+        FlightEncoderStreamBuilder::new(
+            IpcWriteOptions::default(),
+            4096,
+            SessionGuard::new("test-trace".to_string()),
+        )
     }
 
     #[test]
@@ -419,6 +432,7 @@ mod tests {
         assert_eq!(b.trace_id, "");
         assert!(!b.is_super);
         assert!(b.defer_lock.is_none());
+        assert!(b.session_guard.is_some());
         assert!(b.custom_messages.is_empty());
     }
 
@@ -501,8 +515,12 @@ mod tests {
         let options = IpcWriteOptions::default()
             .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
             .unwrap();
-        let stream = FlightEncoderStreamBuilder::new(options, 33554432)
-            .build(partitions, tracing::Span::none());
+        let stream = FlightEncoderStreamBuilder::new(
+            options,
+            MAX_FLIGHT_DATA_SIZE,
+            SessionGuard::new("test-trace".to_string()),
+        )
+        .build(partitions, tracing::Span::none());
 
         let fds: Vec<FlightData> = stream.try_collect().await.unwrap();
 
@@ -552,8 +570,12 @@ mod tests {
             ),
         ));
 
-        let stream = FlightEncoderStreamBuilder::new(IpcWriteOptions::default(), 33554432)
-            .build(vec![ok_partition, panic_partition], tracing::Span::none());
+        let stream = FlightEncoderStreamBuilder::new(
+            IpcWriteOptions::default(),
+            MAX_FLIGHT_DATA_SIZE,
+            SessionGuard::new("test-trace".to_string()),
+        )
+        .build(vec![ok_partition, panic_partition], tracing::Span::none());
 
         let result: Result<Vec<FlightData>, tonic::Status> = stream.try_collect().await;
         let err = result.expect_err("panicked partition task must fail the stream");
@@ -666,8 +688,12 @@ mod tests {
         let options = IpcWriteOptions::default()
             .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
             .unwrap();
-        let stream = FlightEncoderStreamBuilder::new(options, 33554432)
-            .build(partitions, tracing::Span::none());
+        let stream = FlightEncoderStreamBuilder::new(
+            options,
+            MAX_FLIGHT_DATA_SIZE,
+            SessionGuard::new("test-trace".to_string()),
+        )
+        .build(partitions, tracing::Span::none());
         let fds: Vec<FlightData> = stream.try_collect().await.unwrap();
 
         let decoded = decode_in_order(&fds, schema.clone());
@@ -735,8 +761,12 @@ mod tests {
         let options = IpcWriteOptions::default()
             .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
             .unwrap();
-        let stream = FlightEncoderStreamBuilder::new(options, 33554432)
-            .build(vec![inner], tracing::Span::none());
+        let stream = FlightEncoderStreamBuilder::new(
+            options,
+            MAX_FLIGHT_DATA_SIZE,
+            SessionGuard::new("test-trace".to_string()),
+        )
+        .build(vec![inner], tracing::Span::none());
 
         // one partition -> inline source, no tasks
         assert!(matches!(stream.source, FlightSource::Inline(_)));

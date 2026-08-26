@@ -22,6 +22,11 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  // Mirror of the production organizationObj — see src/stores/index.ts.
+  correlatedTracesStreams: {
+    byTraceId: {} as Record<string, string>,
+    knownStreams: [] as string[],
+  },
   quotaThresholdMsg: "",
   functions: [],
   streams: {},
@@ -238,6 +243,12 @@ const store = createStore({
     },
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
+    },
+    setCorrelatedTracesStream(state, payload: { traceId: string; stream: string }) {
+      const cache = state.organizationData.correlatedTracesStreams;
+      if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
+      cache.byTraceId[payload.traceId] = payload.stream;
+      if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
     },
     // setAllCurrentDashboards(state, payload) {
     //   state.allCurrentDashboards = payload;
