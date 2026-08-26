@@ -237,11 +237,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :label="t('statusPages.fields.showTimelineBars')"
                   />
                   <OFormSwitch
-                    name="show_response_time"
-                    :label="t('statusPages.fields.showResponseTime')"
-                    :help-text="t('statusPages.fields.showResponseTimeHelp')"
-                  />
-                  <OFormSwitch
                     name="noindex"
                     :label="t('statusPages.fields.noindex')"
                     :help-text="t('statusPages.fields.noindexHelp')"

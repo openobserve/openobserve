@@ -102,7 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="pendingRecords[d.id]"
             class="bg-bg-subtle rounded-default border-border-subtle border p-2 text-xs break-all"
           >
-            TXT _o2-verify.{{ d.domain }} → {{ pendingRecords[d.id] }}
+            {{
+              t("statusPages.domains.recordValue", {
+                domain: d.domain,
+                value: pendingRecords[d.id],
+              })
+            }}
           </code>
           <p
             v-if="d.verification_state === 2 && d.verification_failure_reason !== null"

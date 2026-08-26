@@ -14304,6 +14304,7 @@
       "addButton": "Add",
       "addFailed": "Failed to add domain",
       "recordInstructions": "Create this DNS TXT record, then verify:",
+      "recordValue": "TXT _o2-verify.{domain} → {value}",
       "verifyNow": "Verify now",
       "verifying": "Verifying...",
       "verifyFailed": "Verification failed",
