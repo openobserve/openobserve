@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          no staleness to report, and a grey dot on first paint would read as a
          verdict rather than as the absence of one. -->
     <span
-      v-if="hasRun"
+      v-if="hasRun && mode !== 'button'"
       class="size-2 shrink-0 rounded-full transition-colors duration-700"
       :class="dotClass"
       :data-test="`${dataTest}-dot`"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          clock time stays on the dot's hover). Shown only once a load has landed,
          for the same reason the dot is. -->
     <span
-      v-if="hasRun"
+      v-if="hasRun && mode !== 'button'"
       class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
       :data-test="`${dataTest}-age`"
     >
@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <OButton
+      v-if="mode !== 'status'"
       variant="outline"
       size="icon-sm"
       icon-left="refresh"
@@ -108,8 +109,15 @@ const props = withDefaults(
      * adopting the timestamp is per-page rather than a flag day.
      */
     lastRunAt?: number | null;
+    /**
+     * Which halves to render. `full` (default) is the dot + age + button in one
+     * row. `status` is just the dot + age, `button` is just the reload control —
+     * so a caller can split them across a picker (last-refreshed, then the range
+     * picker, then the reload).
+     */
+    mode?: "full" | "status" | "button";
   }>(),
-  { loading: false, shrink: true, lastRunAt: null },
+  { loading: false, shrink: true, lastRunAt: null, mode: "full" },
 );
 
 const emit = defineEmits<{ refresh: [] }>();

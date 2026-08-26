@@ -49,9 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The marker names the MEASUREMENT, and its tooltip spells the whole
            sentence out — the short form fits the column, the long form is what
            settles an argument about which number is being quoted. -->
-      <span class="text-text-secondary text-3xs" data-test="dbm-overlap-qualifier">
-        <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
-        {{ qualifierLabel }}
+      <!-- The qualifier and any trailing content (a delta, say) share ONE line
+           so the cell stays two rows — the value on top, its context beside the
+           marker below — instead of a third stacked line. -->
+      <span class="flex items-center gap-1.5">
+        <span class="text-text-secondary text-3xs" data-test="dbm-overlap-qualifier">
+          <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
+          {{ qualifierLabel }}
+        </span>
+        <slot name="trailing" />
       </span>
     </template>
     <!-- Absent, or unqualifiable. Never `0`: that is an all-clear nobody

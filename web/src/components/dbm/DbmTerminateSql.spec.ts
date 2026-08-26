@@ -43,21 +43,25 @@ describe("DbmTerminateSql", () => {
     expect(mountWith({ pid: null }).find("[data-test='dbm-terminate-sql']").exists()).toBe(false);
   });
 
+  // The statement carries its own tooltip now, so the hint is the copy button's
+  // (the `side="left"` one) rather than the first OTooltip in tree order.
+  const hintContent = (wrapper: ReturnType<typeof mountWith>) =>
+    wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((t) => t.props("side") === "left")
+      ?.props("content") as string;
+
   it("names the instance in the hint, so the operator knows where to run it", () => {
     // The hint lives on OTooltip, which only renders its content on hover — so
     // the assertion reads the prop rather than the DOM.
-    const content = mountWith({ instance: "dbmlab" })
-      .findComponent({ name: "OTooltip" })
-      .props("content") as string;
+    const content = hintContent(mountWith({ instance: "dbmlab" }));
     expect(content).toContain("dbmlab");
     // It must also say plainly that O2 will not run it.
     expect(content).toContain("never run it for you");
   });
 
   it("still offers the statement when the instance is unknown", () => {
-    const content = mountWith({ instance: null })
-      .findComponent({ name: "OTooltip" })
-      .props("content") as string;
+    const content = hintContent(mountWith({ instance: null }));
     expect(content).toContain("never run it for you");
   });
 });

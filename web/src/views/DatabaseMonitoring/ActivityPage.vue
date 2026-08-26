@@ -43,10 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('dbm.activity.title')"
     :subtitle="t(isLiveWindow ? 'dbm.activity.subtitle' : 'dbm.activity.subtitlePast')"
     title-data-test="dbm-activity-title"
-    date-time-data-test="dbm-activity-date-time"
     :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
   >
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
@@ -82,12 +79,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            :last-run-at="lastRunAt"
-            data-test="dbm-activity-refresh"
-            @refresh="onRefresh"
-          />
+          <div class="flex items-center gap-1.5">
+            <DbmRefreshButton
+              mode="status"
+              :loading="loading"
+              :last-run-at="lastRunAt"
+              data-test="dbm-activity-refresh"
+            />
+            <DateTime
+              auto-apply
+              menu-align="end"
+              :default-type="range.type"
+              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+              :default-relative-time="range.relativeTimePeriod ?? undefined"
+              data-test-name="dbm-activity-date-time"
+              class="h-8"
+              @on:date-change="onDateChange"
+            />
+            <DbmRefreshButton
+              mode="button"
+              :loading="loading"
+              data-test="dbm-activity-refresh"
+              @refresh="onRefresh"
+            />
+          </div>
         </template>
 
         <template #subheader>
@@ -321,6 +336,7 @@ import { useRoute, useRouter } from "vue-router";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";

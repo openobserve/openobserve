@@ -34,15 +34,20 @@ describe("useDbmChartTheme", () => {
 
   /**
    * ECharts draws on a canvas and cannot read a CSS custom property, so every
-   * token has to arrive as a resolved literal. The four are the scatter's whole
-   * palette — both callers draw the same chart and must not drift apart.
+   * token has to arrive as a resolved literal. These are the scatter's whole
+   * palette — series, axis, the dashed gridline and the dashboard tooltip's own
+   * surface — both callers draw the same chart and must not drift apart.
    */
-  it("resolves the scatter's four tokens to literals", () => {
+  it("resolves the scatter's tokens to literals", () => {
     expect(useDbmChartTheme().value).toEqual({
       calls: "light:--color-chart-series-1",
       errors: "light:--color-severity-error-color",
       axisLabel: "light:--color-text-secondary",
-      splitLine: "light:--color-border-default",
+      splitLine: "light:--color-chart-gridline",
+      tooltipBg: "light:--color-tooltip-bg",
+      tooltipBorder: "light:--color-tooltip-border",
+      tooltipText: "light:--color-tooltip-text",
+      crosshairBg: "light:--color-chart-crosshair-bg",
     });
   });
 
@@ -66,6 +71,6 @@ describe("useDbmChartTheme", () => {
     void theme.value;
     void theme.value;
 
-    expect(chartColor).toHaveBeenCalledTimes(4);
+    expect(chartColor).toHaveBeenCalledTimes(8);
   });
 });
