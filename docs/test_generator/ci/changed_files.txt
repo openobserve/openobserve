@@ -1,0 +1,10 @@
+tests/ui-testing/pages/dashboardPages/dashboard-selectors.js
+tests/ui-testing/pages/dashboardPages/dashboard-variables-scoped.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-panel-level.spec.js
+web/src/components/dashboards/PanelSchemaRenderer.vue
+web/src/composables/dashboard/usePanelDataLoader.spec.ts
+web/src/composables/dashboard/usePanelDataLoader.ts
+web/src/composables/useLogs/logsUtils.spec.ts
+web/src/composables/useLogs/logsUtils.ts
+web/src/composables/useStreamingSearch.ts
+web/src/views/Dashboards/RenderDashboardCharts.vue

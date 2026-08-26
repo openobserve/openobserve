@@ -1,0 +1,21 @@
+{
+  "feature_slug": "dashboard-lazy-panel-mounting",
+  "feature_title": "Dashboard Lazy Panel Mounting",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-lazy-panel-mounting.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-lazy-panel-mounting.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/views/Dashboards/RenderDashboardCharts.vue",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue",
+    "web/src/composables/dashboard/usePanelDataLoader.ts",
+    "web/src/composables/useStreamingSearch.ts",
+    "web/src/composables/useLogs/logsUtils.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

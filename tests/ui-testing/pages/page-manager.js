@@ -9,6 +9,7 @@ import DashboardPanel from "./dashboardPages/dashboard-panel-edit";
 import DashboardSetting from "./dashboardPages/dashboard-settings";
 import DashboardVariables from "./dashboardPages/dashboard-variables";
 import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scoped.js";
+import DashboardLazyMounting from "./dashboardPages/dashboard-lazy-mounting.js";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardSqlAutocomplete from "./dashboardPages/dashboard-sql-autocomplete";
 import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
@@ -138,6 +139,7 @@ class PageManager {
     this.dashboardSetting = new DashboardSetting(page);
     this.dashboardVariables = new DashboardVariables(page);
     this.dashboardVariablesScoped = new DashboardVariablesScoped(page);
+    this.dashboardLazyMounting = new DashboardLazyMounting(page);
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardSqlAutocomplete = new DashboardSqlAutocomplete(page);
     this.dashboardPromQLEditor = new DashboardPromQLEditor(page);

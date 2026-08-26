@@ -1,0 +1,491 @@
+===== COMPLETE LIST OF CHANGED FILES (10 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/pages/dashboardPages/dashboard-selectors.js
+tests/ui-testing/pages/dashboardPages/dashboard-variables-scoped.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-panel-level.spec.js
+web/src/components/dashboards/PanelSchemaRenderer.vue
+web/src/composables/dashboard/usePanelDataLoader.spec.ts
+web/src/composables/dashboard/usePanelDataLoader.ts
+web/src/composables/useLogs/logsUtils.spec.ts
+web/src/composables/useLogs/logsUtils.ts
+web/src/composables/useStreamingSearch.ts
+web/src/views/Dashboards/RenderDashboardCharts.vue
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-selectors.js b/tests/ui-testing/pages/dashboardPages/dashboard-selectors.js
+index 27b43b856b9..fb916d4e89e 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-selectors.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-selectors.js
+@@ -89,6 +89,7 @@ const DASHBOARD = {
+   PANEL_CONTAINER: '[data-test="dashboard-panel-container"]',
+   PANEL_REFRESH_BTN: '[data-test="dashboard-panel-refresh-panel-btn"]',
+   PANEL_ANY: '[data-test*="dashboard-panel-"]', // Wildcard match for any panel
++  GRID_STACK_ITEM: ".grid-stack-item", // Grid slot of a panel; exists even while the panel itself is lazy-unmounted
+ 
+   // Common autocomplete
+   AUTO_COMPLETE: '[data-test="common-auto-complete"]',
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-variables-scoped.js b/tests/ui-testing/pages/dashboardPages/dashboard-variables-scoped.js
+index 18976aabe71..212dde5549a 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-variables-scoped.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-variables-scoped.js
+@@ -381,6 +381,16 @@ export default class DashboardVariablesScoped {
+     return this.page.locator(SELECTORS.PANEL_ANY).nth(index);
+   }
+ 
++  /**
++   * Get a panel's grid slot by index. Present for every panel, including
++   * off-screen ones that only render a lazy placeholder.
++   * @param {number} index - 0-based index
++   * @returns {import('@playwright/test').Locator}
++   */
++  getGridStackItem(index = 0) {
++    return this.page.locator(SELECTORS.GRID_STACK_ITEM).nth(index);
++  }
++
+   // ==========================================
+   // Locator getters (behavior-preserving relocation of raw spec selectors)
+   // ==========================================
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-panel-level.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-panel-level.spec.js
+index d51ceecf97d..c73a0104ecd 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-panel-level.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-panel-level.spec.js
+@@ -132,7 +132,9 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
+       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+       await pm.dashboardPanelActions.addPanelName(`DummyPanel${i + 1}`);
+       await pm.dashboardPanelActions.savePanel();
+-      await scopedVars.getPanelContainer(i).waitFor({ state: "visible", timeout: 10000 });
++      // Grid slot, not panel container: panels far below the fold only render
++      // a lazy placeholder until scrolled near the viewport.
++      await scopedVars.getGridStackItem(i).waitFor({ state: "attached", timeout: 10000 });
+       await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
+     }
+ 
+@@ -145,8 +147,10 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
+     await pm.dashboardPanelActions.addPanelName("Panel1");
+     await pm.dashboardPanelActions.savePanel();
+ 
+-    // Wait for panel to be added and rendered
+-    await scopedVars.getPanelContainer(6).waitFor({ state: "visible", timeout: 15000 });
++    // Wait for the panel's grid slot to be added. Panel1 sits below the fold,
++    // and off-screen panels only render a lazy placeholder — the full panel
++    // container mounts when the panel is scrolled near the viewport.
++    await scopedVars.getGridStackItem(6).waitFor({ state: "attached", timeout: 15000 });
+     await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
+     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
+ 
+@@ -177,23 +181,31 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
+     await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
+     await pm.dashboardSetting.closeSettingWindow();
+ 
+-    // Wait for variable to appear on dashboard
+-    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
+     await safeWaitForNetworkIdle(page, { timeout: 3000 });
+ 
+-    // Panel1 should be out of viewport, so variable should not be loaded yet
++    // The variable is panel-scoped: its selector renders inside Panel1, which
++    // is below the fold and lazily unmounted — so it must not be on the page yet.
++    await expect(scopedVars.getVariableSelectorLocator(variableName)).not.toBeVisible();
++
+     // Monitor API calls when we scroll to Panel1
+     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
+ 
+     // Scroll to Panel1 to make it visible and trigger variable loading
+     await page.evaluate(() => {
+-      const panels = Array.from(document.querySelectorAll('[data-test*="dashboard-panel-"]'));
+-      const targetPanel = panels[6]; // Panel1 is the 7th panel (index 6)
++      const items = Array.from(document.querySelectorAll(".grid-stack-item"));
++      const targetPanel = items[6]; // Panel1 is the 7th panel (index 6)
+       if (targetPanel) {
+         targetPanel.scrollIntoView({ behavior: 'auto', block: 'center' }); // Use 'auto' for immediate scroll
+       }
+     });
+ 
++    // Scrolling near the viewport mounts the lazy panel — its full container
++    // appearing is the visibility signal that triggers variable loading.
++    await scopedVars.getPanelContainer(6).waitFor({ state: "visible", timeout: 15000 });
++
++    // The panel-scoped variable selector appears together with its panel
++    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
++
+     // Wait for panel to be in viewport and API calls to complete
+     await safeWaitForNetworkIdle(page, { timeout: 5000 });
+ 
+diff --git a/web/src/components/dashboards/PanelSchemaRenderer.vue b/web/src/components/dashboards/PanelSchemaRenderer.vue
+index 5c8093e7a8a..7a5e6831d82 100644
+--- a/web/src/components/dashboards/PanelSchemaRenderer.vue
++++ b/web/src/components/dashboards/PanelSchemaRenderer.vue
+@@ -1396,13 +1396,11 @@ export default defineComponent({
+       }
+     });
+ 
+-    watch(
+-      panelData,
+-      () => {
+-        emit("series-data-update", panelData.value);
+-      },
+-      { deep: true },
+-    );
++    // panelData is a shallowRef replaced wholesale, so no deep watch needed —
++    // deep would traverse every data point of the chart options per update.
++    watch(panelData, () => {
++      emit("series-data-update", panelData.value);
++    });
+ 
+     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
+     watch(
+diff --git a/web/src/composables/dashboard/usePanelDataLoader.spec.ts b/web/src/composables/dashboard/usePanelDataLoader.spec.ts
+index c22955cfd4f..076e7c5e73e 100644
+--- a/web/src/composables/dashboard/usePanelDataLoader.spec.ts
++++ b/web/src/composables/dashboard/usePanelDataLoader.spec.ts
+@@ -1,7 +1,20 @@
+ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+-import { ref } from "vue";
++import { onMounted, ref } from "vue";
+ import { usePanelDataLoader } from "./usePanelDataLoader";
+ 
++/**
++ * Lets the NEXT usePanelDataLoader() install its visibility observer.
++ *
++ * onMounted is stubbed to a no-op for this whole file, which leaves a loader
++ * permanently invisible — and every load, cache restore included, is gated on
++ * visibility. The composable registers the observer hook before the one that
++ * auto-loads, so running only the first keeps the "no automatic loadData"
++ * property these tests rely on.
++ */
++const allowPanelToBecomeVisible = () => {
++  vi.mocked(onMounted).mockImplementationOnce((cb: any) => cb());
++};
++
+ // Mock all dependencies with enhanced functionality
+ let mockSearchResults: any = [];
+ let mockPartitionResults: any = {
+@@ -280,15 +293,18 @@ describe("usePanelDataLoader", () => {
+       .spyOn(window, "removeEventListener")
+       .mockImplementation(() => {});
+ 
+-    // Mock IntersectionObserver for visibility detection
+-    global.IntersectionObserver = vi.fn().mockImplementation((callback) => ({
+-      observe: vi.fn().mockImplementation(() => {
++    // Mock IntersectionObserver for visibility detection.
++    // Must be a real (constructible) function — an arrow implementation throws
++    // "is not a constructor" at `new IntersectionObserver(...)`, which would
++    // leave every panel permanently invisible.
++    global.IntersectionObserver = vi.fn(function (this: any, callback: any) {
++      this.observe = vi.fn(() => {
+         // Immediately trigger visibility
+         callback([{ isIntersecting: true }]);
+-      }),
+-      unobserve: vi.fn(),
+-      disconnect: vi.fn(),
+-    }));
++      });
++      this.unobserve = vi.fn();
++      this.disconnect = vi.fn();
++    }) as any;
+ 
+     // Mock setTimeout to work with promise-based async flows
+     vi.spyOn(global, "setTimeout").mockImplementation((fn: any) => {
+@@ -1517,6 +1533,8 @@ describe("usePanelDataLoader", () => {
+           },
+         };
+ 
++        allowPanelToBecomeVisible();
++
+         const loader = usePanelDataLoader(
+           panelSchema,
+           selectedTimeObj,
+@@ -1573,6 +1591,8 @@ describe("usePanelDataLoader", () => {
+           },
+         };
+ 
++        allowPanelToBecomeVisible();
++
+         const loader = usePanelDataLoader(
+           panelSchema,
+           selectedTimeObj,
+@@ -1680,6 +1700,8 @@ describe("usePanelDataLoader", () => {
+           },
+         };
+ 
++        allowPanelToBecomeVisible();
++
+         const loader = usePanelDataLoader(
+           panelSchema,
+           selectedTimeObj,
+@@ -1697,13 +1719,15 @@ describe("usePanelDataLoader", () => {
+           ref(false), // is_ui_histogram
+         );
+ 
+-        // Start loadData without waiting (it will be pending due to visibility check after cache attempt)
++        // Start loadData without waiting (the cache read happens once the panel
++        // is reported visible)
+         loader.loadData();
+ 
+-        // Give it a moment to attempt cache restore (happens before visibility wait)
+-        await new Promise((resolve) => setTimeout(resolve, 100));
++        // Give it a moment to attempt cache restore. setTimeout is stubbed to a
++        // microtask here, so drain a few rather than waiting on the clock.
++        for (let i = 0; i < 20; i++) await Promise.resolve();
+ 
+-        // With forceLoad=false and runCount=0, cache restore is attempted (line 803)
++        // With forceLoad=false and runCount=0, cache restore is attempted
+         // Cache operation count should be > 0 because getPanelCache was called
+         expect(cacheOperationCount).toBeGreaterThan(0);
+ 
+diff --git a/web/src/composables/dashboard/usePanelDataLoader.ts b/web/src/composables/dashboard/usePanelDataLoader.ts
+index e125229d0ec..b96c3f36716 100644
+--- a/web/src/composables/dashboard/usePanelDataLoader.ts
++++ b/web/src/composables/dashboard/usePanelDataLoader.ts
+@@ -380,6 +380,10 @@ export const usePanelDataLoader = (
+ 
+       state.lastTriggeredAt = new Date().getTime();
+ 
++      // Wait for visibility BEFORE the cache restore below — restoring first
++      // rendered every cached panel on mount, visible or not.
++      await waitForThePanelToBecomeVisible(abortController.signal);
++
+       // if force load is true, skip restoring from cache
+       if (runCount == 0 && forceLoad?.value != true) {
+         log("loadData: panelcache: run count is 0");
+@@ -395,9 +399,6 @@ export const usePanelDataLoader = (
+         }
+       }
+ 
+-      // Wait for isVisible to become true
+-      await waitForThePanelToBecomeVisible(abortController.signal);
+-
+       log("loadData: now waiting for the variables to load");
+ 
+       // Wait for variables to load
+diff --git a/web/src/composables/useLogs/logsUtils.spec.ts b/web/src/composables/useLogs/logsUtils.spec.ts
+index 3c61c2cf1d9..2f4b44897fb 100644
+--- a/web/src/composables/useLogs/logsUtils.spec.ts
++++ b/web/src/composables/useLogs/logsUtils.spec.ts
+@@ -564,6 +564,26 @@ describe("logsUtils", () => {
+       mockParserInstance.astify.mockReturnValue({ columns: null });
+       expect(utils.checkTimestampAlias("SELECT * FROM logs")).toBe(true);
+     });
++
++    it("should return false for AS `_timestamp` (backtick) pattern in query", () => {
++      expect(utils.checkTimestampAlias("SELECT field1 AS `_timestamp` FROM logs")).toBe(false);
++    });
++
++    it("returns true and never parses when _timestamp appears only in the WHERE clause", () => {
++      mockParserInstance.astify.mockClear();
++      expect(utils.checkTimestampAlias("SELECT field1 FROM logs WHERE _timestamp > 0")).toBe(true);
++      expect(mockParserInstance.astify).not.toHaveBeenCalled();
++    });
++
++    it("never calls astify() regardless of query size (regex-only, no main-thread block)", () => {
++      mockParserInstance.astify.mockClear();
++      const bigWhere = Array.from({ length: 150 }, (_, i) => `column_name_${i} = ${i}`).join(
++        " AND ",
++      );
++      const largeQuery = `SELECT field1 AS '_timestamp' FROM logs WHERE ${bigWhere}`;
++      expect(utils.checkTimestampAlias(largeQuery)).toBe(false);
++      expect(mockParserInstance.astify).not.toHaveBeenCalled();
++    });
+   });
+ 
+   describe("isNonAggregatedSQLMode", () => {
+diff --git a/web/src/composables/useLogs/logsUtils.ts b/web/src/composables/useLogs/logsUtils.ts
+index 110b7e406d7..fe20e58a43a 100644
+--- a/web/src/composables/useLogs/logsUtils.ts
++++ b/web/src/composables/useLogs/logsUtils.ts
+@@ -573,34 +573,27 @@ export const logsUtils = () => {
+     return false;
+   }
+ 
+-  // validate if timestamp column alias is used for any field
++  // Reject a query that aliases a column as the reserved timestamp column.
++  // A regex over the `AS <ts>` forms is enough and, unlike astify(), stays cheap
++  // on large nested queries (parsing per visible panel froze the dashboard).
+   const checkTimestampAlias = (query: string): boolean => {
+     const tsCol = timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
+-    const parsedSQL = fnParsedSQL(query);
+ 
+-    const columns = parsedSQL?.columns;
+-    if (Array.isArray(columns)) {
+-      const invalid = columns.some((field: any) => field.as === tsCol);
+-      if (invalid) {
+-        return false;
+-      }
++    // A query that never mentions the timestamp column cannot alias it.
++    if (!query || !query.toLowerCase().includes(tsCol.toLowerCase())) {
++      return true;
+     }
+ 
+-    // Escape special regex characters in timestamp column name
+     const escapedTimestamp = tsCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+ 
+-    // Patterns for alias check
+-    const patterns = [
++    const aliasPatterns = [
+       new RegExp(`\\bas\\s*'${escapedTimestamp}'`, "i"), // AS '_timestamp'
+       new RegExp(`\\bas\\s*"${escapedTimestamp}"`, "i"), // AS "_timestamp"
++      new RegExp(`\\bas\\s*\`${escapedTimestamp}\``, "i"), // AS `_timestamp`
+       new RegExp(`\\bas\\s+${escapedTimestamp}\\b`, "i"), // AS _timestamp (unquoted)
+     ];
+ 
+-    if (patterns.some((p) => p.test(query))) {
+-      return false;
+-    }
+-
+-    return true;
++    return !aliasPatterns.some((p) => p.test(query));
+   };
+ 
+   return {
+diff --git a/web/src/composables/useStreamingSearch.ts b/web/src/composables/useStreamingSearch.ts
+index 2cb4c0ab91a..9bf49ab4bbe 100644
+--- a/web/src/composables/useStreamingSearch.ts
++++ b/web/src/composables/useStreamingSearch.ts
+@@ -488,6 +488,11 @@ const useHttpStreaming = () => {
+     if (traceMap.value[traceId]) {
+       delete traceMap.value[traceId];
+     }
++    // Also release the controller: leaving it here after a normal completion
++    // leaked it (and the panel state its abort listeners hold) for the session.
++    if (abortControllers.value[traceId]) {
++      delete abortControllers.value[traceId];
++    }
+   };
+ 
+   const closeStreamWithError = () => {
+diff --git a/web/src/views/Dashboards/RenderDashboardCharts.vue b/web/src/views/Dashboards/RenderDashboardCharts.vue
+index c9baa03d7e2..c06ed20b122 100644
+--- a/web/src/views/Dashboards/RenderDashboardCharts.vue
++++ b/web/src/views/Dashboards/RenderDashboardCharts.vue
+@@ -158,6 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                      is an anonymous flex item and never picks up the ellipsis. -->
+                 <span class="truncate">{{ item.title }}</span>
+               </h2>
++              <!-- Off-screen panels render this lightweight placeholder; the
++                   real panel mounts only when it comes near the viewport.
++                   Mounting everything up front froze large dashboards. -->
++              <div
++                v-else-if="!shouldMountPanel(item.id)"
++                class="flex h-full flex-col p-2"
++                :data-test="`dashboard-panel-placeholder-${item.id}`"
++              >
++                <span class="text-text-secondary truncate text-sm" :title="item.title">
++                  {{ item.title }}
++                </span>
++                <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
++              </div>
+               <!-- Panel with Panel-Level Variables -->
+               <div v-else class="panel-with-variables flex h-full flex-col">
+                 <!-- Original Panel Container -->
+@@ -419,6 +432,20 @@ export default defineComponent({
+     // Store IntersectionObserver for cleanup
+     const panelObserver = ref<IntersectionObserver | null>(null);
+ 
++    // Panels whose full component tree is mounted; the rest are placeholders.
++    // One-way: scrolling away never unmounts, so queries are never cancelled
++    // by scrolling and scrolling back never refetches.
++    const mountedPanelIds = reactive(new Set<string>());
++
++    // Mounts panels one viewport before they scroll into view.
++    let panelMountObserver: IntersectionObserver | null = null;
++
++    // Print/forceLoad needs every panel; they are fed into mountedPanelIds in
++    // batches (watcher below panels) instead of mounting all in one flush.
++    const mountAllPanels = computed(() => props.forceLoad || store.state.printMode);
++
++    const shouldMountPanel = (panelId: string) => mountedPanelIds.has(panelId);
++
+     // inject selected tab, default will be default tab
+     const selectedTabId = inject("selectedTabId", ref("default"));
+ 
+@@ -458,6 +485,30 @@ export default defineComponent({
+ 
+       // Store observer for cleanup
+       panelObserver.value = observer;
++
++      panelMountObserver?.disconnect();
++      panelMountObserver = new IntersectionObserver(
++        (entries) => {
++          entries.forEach((entry) => {
++            const panelId = entry.target.getAttribute("gs-id");
++            if (panelId && entry.isIntersecting) {
++              mountedPanelIds.add(panelId);
++              // Mounted for good — stop watching this panel.
++              panelMountObserver?.unobserve(entry.target);
++            }
++          });
++        },
++        {
++          // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
++          rootMargin: "100% 0px 100% 0px",
++          threshold: 0,
++        },
++      );
++      panelElements?.forEach((el: Element) => {
++        const panelId = el.getAttribute("gs-id");
++        if (panelId && mountedPanelIds.has(panelId)) return;
++        panelMountObserver?.observe(el);
++      });
+     };
+ 
+     // Create our own variables manager instead of injecting from parent
+@@ -540,6 +591,42 @@ export default defineComponent({
+         : [];
+     });
+ 
++    // Print/forceLoad: mount remaining panels a batch per tick. Print capture
++    // waits on the all-panels-loaded flag, so this never truncates a report.
++    let mountAllTimer: any = null;
++    const mountRemainingPanelsInBatches = () => {
++      if (mountAllTimer !== null) return;
++      const BATCH_SIZE = 8;
++      const step = () => {
++        mountAllTimer = null;
++        if (!mountAllPanels.value) return;
++        const pending = panels.value
++          .map((p: any) => p.id)
++          .filter((id: string) => id && !mountedPanelIds.has(id));
++        pending.slice(0, BATCH_SIZE).forEach((id: string) => mountedPanelIds.add(id));
++        if (pending.length > BATCH_SIZE) {
++          mountAllTimer = setTimeout(step, 50);
++        }
++      };
++      step();
++    };
++
++    watch(
++      // re-fill when print mode turns on or the panel list changes
++      () => [mountAllPanels.value, panels.value],
++      () => {
++        if (mountAllPanels.value) mountRemainingPanelsInBatches();
++      },
++      { immediate: true },
++    );
++
++    onBeforeUnmount(() => {
++      if (mountAllTimer !== null) {
++        clearTimeout(mountAllTimer);
++        mountAllTimer = null;
++      }
++    });
++
+     const {
+       showPositiveNotification,
+       showErrorNotification,
+@@ -1173,6 +1260,8 @@ export default defineComponent({
+         panelObserver.value.disconnect();
+         panelObserver.value = null;
+       }
++      panelMountObserver?.disconnect();
++      panelMountObserver = null;
+ 
+       // Clean up GridStack instance
+       if (gridStackInstance) {
+@@ -1595,6 +1684,7 @@ export default defineComponent({
+       addPanelData,
+       t,
+       getPanelLayout,
++      shouldMountPanel,
+       getMinimumHeight,
+       getMinimumWidth,
+       isSectionHeader,

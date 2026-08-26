@@ -1,0 +1,29 @@
+{
+  "feature_slug": "dashboard-lazy-panel-mounting",
+  "feature_title": "Dashboard Lazy Panel Mounting",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-lazy-panel-mounting.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-lazy-panel-mounting.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/views/Dashboards/RenderDashboardCharts.vue",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue",
+    "web/src/composables/dashboard/usePanelDataLoader.ts",
+    "web/src/composables/useStreamingSearch.ts",
+    "web/src/composables/useLogs/logsUtils.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 10 changed paths are under web/src/ (Vue components/composables) and tests/ui-testing/ (Playwright specs + page objects) — open-source repo locations with no enterprise/, o2_enterprise/, or src/enterprise/ paths and no ENT keywords (cipher/SSO/SAML/RBAC/SDR) in paths or symbols, so this is an OSS change.",
+    "skip": "No skip marker present: the trigger comment and feature hint are both empty and no tests-added label was passed. The change alters user-facing dashboard rendering (off-screen panels now lazy-mount), so it is not docs/CI-only and is not skipped.",
+    "e2e": "E2E is warranted: RenderDashboardCharts.vue now renders a lightweight placeholder for off-screen panels and mounts the real panel only when it nears the viewport, changing scroll/visibility behavior, panel-level variable loading, and print/forceLoad mounting — a user-facing UI flow that needs verification.",
+    "area": "The bulk of UI changes live in web/src/views/Dashboards/, web/src/components/dashboards/, and web/src/composables/dashboard/, and the changed E2E spec sits in tests/ui-testing/playwright-tests/Dashboards/, so Dashboards is the correct area.",
+    "group": "The changed spec dashboard-variables-panel-level.spec.js already belongs to the Dashboards-Variables shard, but lazy panel mounting is a core rendering behavior affecting every panel (not just variables), so the new spec joins Dashboards-Core, which holds general dashboard behavior specs such as dashboard.spec.js and dashboard2.spec.js.",
+    "existing_tests": "One E2E spec under tests/ui-testing/playwright-tests/Dashboards/ is changed in the diff: dashboard-variables-panel-level.spec.js. It was adapted to the new lazy-mounting behavior (grid-stack-item locators) but only covers panel-level variables, not the broader off-screen-placeholder / scroll-to-mount / print-mode behavior. The .spec.ts changes are Vitest unit tests and do not count as E2E coverage."
+  }
+}

@@ -90,6 +90,10 @@ const DASHBOARD = {
   PANEL_REFRESH_BTN: '[data-test="dashboard-panel-refresh-panel-btn"]',
   PANEL_ANY: '[data-test*="dashboard-panel-"]', // Wildcard match for any panel
   GRID_STACK_ITEM: ".grid-stack-item", // Grid slot of a panel; exists even while the panel itself is lazy-unmounted
+  // Data/table/chart renderers that only exist inside a *mounted* panel's
+  // PanelSchemaRenderer — never inside a lazy placeholder.
+  PANEL_RENDERERS:
+    '[data-test="chart-renderer"], [data-test="dashboard-panel-table"], [data-test="no-data"]',
 
   // Common autocomplete
   AUTO_COMPLETE: '[data-test="common-auto-complete"]',
@@ -200,6 +204,33 @@ function getPanelById(panelId) {
 }
 
 /**
+ * Get the lazy-mount placeholder card for a panel by ID
+ * @param {string} panelId - Panel ID
+ * @returns {string} Selector string
+ */
+function getPanelPlaceholder(panelId) {
+  return `[data-test="dashboard-panel-placeholder-${panelId}"]`;
+}
+
+/**
+ * Get the mounted panel container by ID (both data-test and data-test-panel-id)
+ * @param {string} panelId - Panel ID
+ * @returns {string} Selector string
+ */
+function getPanelContainerById(panelId) {
+  return `[data-test="dashboard-panel-container"][data-test-panel-id="${panelId}"]`;
+}
+
+/**
+ * Get the section-header heading by panel ID (o2SectionHeader === true panels)
+ * @param {string} panelId - Panel ID
+ * @returns {string} Selector string
+ */
+function getSectionHeaderById(panelId) {
+  return `[data-test="dashboard-section-header-${panelId}"]`;
+}
+
+/**
  * Get panel refresh button by panel ID
  * @param {string} panelId - Panel ID
  * @returns {string} Selector string
@@ -288,6 +319,9 @@ module.exports = {
   getDeleteVariableBtn,
   getVariableLoadingIndicator,
   getPanelById,
+  getPanelPlaceholder,
+  getPanelContainerById,
+  getSectionHeaderById,
   getPanelRefreshBtn,
   getMenuItemByText,
   getDialogByText,

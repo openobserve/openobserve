@@ -1,0 +1,6 @@
+[
+  { "title": "should mount on-screen panels and render a placeholder for off-screen panels", "action": "new", "verifies": "opening a large dashboard mounts near-fold panels as full containers while a far-down panel renders only a lightweight placeholder" },
+  { "title": "should mount a placeholder panel on scroll and keep it mounted when scrolling away", "action": "new", "verifies": "scrolling a placeholder panel into view replaces it with a PanelContainer, and scrolling back away does not un-mount it (one-way)" },
+  { "title": "should render the placeholder with the panel title but no chart or table body", "action": "new", "verifies": "the placeholder shows the panel title but renders no chart/table/no-data renderer (no async renderer chunk fetched)" },
+  { "title": "should not fetch panel data until the placeholder panel is scrolled into view", "action": "new", "verifies": "panel data is not fetched while the panel is a placeholder, and a renderer appears only after the panel is scrolled into view" }
+]
