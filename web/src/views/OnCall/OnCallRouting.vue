@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="oncall-routing-page"
     :title="t('oncall.routingTitle')"
     :subtitle="t('oncall.routingSubtitle')"
-    icon="account-tree"
+    icon="alt-route"
     :back="{
       label: t('oncall.backToResponses'),
       to: { name: 'onCallResponses', query: { org_identifier: orgId } },

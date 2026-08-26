@@ -127,7 +127,7 @@
           </OTag>
         </OTab>
         <OTab name="ownership" data-test="oncall-team-tab-ownership">
-          <OIcon name="account-tree" size="sm" class="shrink-0" />
+          <OIcon name="alt-route" size="sm" class="shrink-0" />
           <span>{{ t("oncall.routing") }}</span>
           <OTag
             v-if="ruleCount"
