@@ -19,7 +19,7 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
     sync::{
-        LazyLock as Lazy,
+        LazyLock as Lazy, OnceLock,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::SystemTime,
@@ -105,6 +105,8 @@ pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
 
 pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
+
+static METRICS_RESULT_CACHE_EVICT_HOOK: OnceLock<fn(Vec<String>)> = OnceLock::new();
 
 pub static LOADING_FROM_DISK_NUM: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
@@ -206,12 +208,14 @@ impl FileData {
         }
     }
 
+    /// Returns the evicted `metrics_results/...` keys when the write triggered a gc.
     async fn set(
         &mut self,
         file: &str,
         tmp_file: &str,
         data_size: usize,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<Vec<String>, anyhow::Error> {
+        let mut evicted_metrics_files = Vec::new();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
                 "[CacheType:{}] File disk cache is full, can't cache extra {data_size} bytes",
@@ -222,7 +226,7 @@ impl FileData {
                 self.max_size,
                 max(get_config().disk_cache.release_size, data_size * 100),
             );
-            self.gc(need_release_size).await?;
+            evicted_metrics_files = self.gc(need_release_size).await?;
         }
 
         // rename tmp file to real file
@@ -244,7 +248,8 @@ impl FileData {
         }
 
         // set size
-        self.set_size(file, data_size).await
+        self.set_size(file, data_size).await?;
+        Ok(evicted_metrics_files)
     }
 
     async fn set_size(&mut self, file: &str, data_size: usize) -> Result<(), anyhow::Error> {
@@ -276,7 +281,9 @@ impl FileData {
         Ok(())
     }
 
-    async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
+    /// Returns the evicted `metrics_results/...` keys; the caller invokes the metrics evict
+    /// hook after releasing the bucket lock.
+    async fn gc(&mut self, need_release_size: usize) -> Result<Vec<String>, anyhow::Error> {
         let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
@@ -287,6 +294,7 @@ impl FileData {
         );
         let mut release_size = 0;
         let mut remove_result_files = vec![];
+        let mut remove_metrics_files = vec![];
         loop {
             let item = self.data.remove();
             if item.is_none() {
@@ -320,6 +328,7 @@ impl FileData {
             }
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
+            let is_metrics_key = columns[0] == "metrics_results";
             if columns[0] == "files" {
                 metrics::QUERY_DISK_CACHE_FILES
                     .with_label_values(&[columns[1], columns[2]])
@@ -339,6 +348,9 @@ impl FileData {
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                     .with_label_values(&[columns[1], columns[2], "aggregations"])
                     .sub(data_size as i64);
+            }
+            if is_metrics_key {
+                remove_metrics_files.push(key);
             }
 
             release_size += data_size;
@@ -361,7 +373,7 @@ impl FileData {
             start.elapsed().as_millis()
         );
 
-        Ok(())
+        Ok(remove_metrics_files)
     }
 
     async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
@@ -704,13 +716,15 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         return Ok(());
     }
     let ret = files.set(&file, &tmp_file, data_size).await;
+    drop(files);
 
     let set_took = start.elapsed().as_millis() as usize;
     if set_took > 100 {
         log::info!("disk->cache: set file {file} took: {set_took} ms");
     }
 
-    ret
+    notify_metrics_evicted(ret?);
+    Ok(())
 }
 
 #[inline]
@@ -754,6 +768,24 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
         RESULT_FILES[idx].write().await
     };
     files.remove(file).await
+}
+
+/// Register the callback invoked with the `metrics_results/...` keys evicted by the disk
+/// cache gc, so the metrics result cache index can drop the matching entries. The hook is
+/// invoked after all disk cache locks are released.
+pub fn set_metrics_result_cache_evict_hook(hook: fn(Vec<String>)) {
+    if METRICS_RESULT_CACHE_EVICT_HOOK.set(hook).is_err() {
+        log::warn!("metrics result cache evict hook is already registered");
+    }
+}
+
+fn notify_metrics_evicted(files: Vec<String>) {
+    if files.is_empty() {
+        return;
+    }
+    if let Some(hook) = METRICS_RESULT_CACHE_EVICT_HOOK.get() {
+        hook(files);
+    }
 }
 
 #[async_recursion]
@@ -941,8 +973,9 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        let evicted_metrics_files = w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
+        notify_metrics_evicted(evicted_metrics_files);
     }
     let scale_factor = std::cmp::max(
         1,

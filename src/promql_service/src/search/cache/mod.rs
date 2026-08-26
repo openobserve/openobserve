@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::VecDeque,
-    sync::{
-        Arc, LazyLock as Lazy,
-        atomic::{AtomicI64, Ordering},
-    },
+use std::sync::{
+    Arc, LazyLock as Lazy,
+    atomic::{AtomicI64, Ordering},
 };
 
 use config::{
@@ -29,24 +26,28 @@ use config::{
         time::{HourFormat, get_ymdh_from_micros, now_micros, second_micros},
     },
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::errors::{Error, Result};
 use prost::Message;
 use tokio::sync::RwLock;
 
-const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
-const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // 10% of the items will be removed
+const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // gc releases 10% of the memory budget
 const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 100;
 const METRICS_INDEX_CACHE_BUCKETS: usize = 100;
+// Arc control block (strong + weak counts) + the Vec's pointer slot + the item itself
+const METRICS_INDEX_ITEM_OVERHEAD: usize = 16
+    + std::mem::size_of::<Arc<MetricsIndexCacheItem>>()
+    + std::mem::size_of::<MetricsIndexCacheItem>();
 
 static CACHE_KEY_SUFFIX: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(now_micros()));
 
 static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
-    let cfg = get_config();
+    // metrics_cache_max_size is resolved to bytes in check_config
+    let max_bytes = get_config().limit.metrics_cache_max_size;
     let mut metrics = Vec::with_capacity(METRICS_INDEX_CACHE_BUCKETS);
     for _ in 0..METRICS_INDEX_CACHE_BUCKETS {
         metrics.push(RwLock::new(MetricsIndex::new(
-            cfg.limit.metrics_cache_max_entries / METRICS_INDEX_CACHE_BUCKETS,
+            max_bytes / METRICS_INDEX_CACHE_BUCKETS,
         )));
     }
     metrics
@@ -66,6 +67,11 @@ pub async fn get_cache_stats() -> (usize, usize, usize) {
 }
 
 pub async fn init() -> Result<()> {
+    // drop index entries whose disk files get evicted by the disk cache gc
+    infra::cache::file_data::disk::set_metrics_result_cache_evict_hook(|files| {
+        tokio::spawn(remove_evicted_files(files));
+    });
+
     let cfg = get_config();
     if !cfg.common.result_cache_enabled {
         return Ok(());
@@ -121,6 +127,7 @@ pub async fn get(
         );
         return Ok(None);
     }
+    index.touch();
 
     // get the best key
     let mut best_key = String::new();
@@ -147,9 +154,7 @@ pub async fn get(
     let Some(data) = infra::cache::file_data::disk::get(&best_key, None).await else {
         // need to drop the key from index
         let mut w = GLOBAL_CACHE[bucket_id].write().await;
-        if let Some(index) = w.data.get_mut(&key) {
-            index.entries.retain(|entry| entry.key != best_key);
-        }
+        w.remove_files(&key, &HashSet::from_iter([best_key]));
         drop(w);
         return Ok(None);
     };
@@ -268,12 +273,7 @@ pub async fn set(
             return Ok(());
         }
     }
-    let need_gc = r.cacher.len() >= r.max_entries - METRICS_INDEX_CACHE_GC_TRIGGER_NUM;
     drop(r);
-
-    if need_gc && let Err(e) = gc(bucket_id).await {
-        log::error!("[trace_id {trace_id}] promql->search->cache: gc err: {e}");
-    }
 
     // filter the samples
     if end >= max_ts {
@@ -348,15 +348,10 @@ pub async fn set(
 
     // store the cache item
     let cache_item = MetricsIndexCacheItem::new(&cache_key, start, new_end);
-    let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    w.cacher.push_back(key.to_string());
-    let index = w.data.entry(key).or_insert(MetricsIndexCache::new(query));
-    if index.entries.len() >= METRICS_INDEX_CACHE_MAX_ITEMS {
-        // remove the first half items
-        index.entries.drain(0..METRICS_INDEX_CACHE_MAX_ITEMS / 2);
+    let evicted = insert_index(bucket_id, key, query, cache_item).await;
+    if evicted > 0 {
+        log::debug!("[trace_id {trace_id}] promql->search->cache: evicted {evicted} index entries");
     }
-    index.entries.push(Arc::new(cache_item));
-    drop(w);
 
     Ok(())
 }
@@ -372,28 +367,61 @@ pub async fn load(cache_key: &str) -> Result<()> {
     };
     let bucket_id = get_bucket_id(&key);
     let cache_item = MetricsIndexCacheItem::new(cache_key, start, end);
-    let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    w.cacher.push_back(key.to_string());
-    let index = w.data.entry(key).or_insert(MetricsIndexCache::new(""));
-    index.entries.push(Arc::new(cache_item));
-    drop(w);
+    insert_index(bucket_id, key, "", cache_item).await;
 
     Ok(())
 }
 
-async fn gc(bucket_id: usize) -> Result<()> {
-    log::warn!("MetricsIndexCache is full, releasing 10% of the cache");
+/// Insert into the bucket index and delete the disk files of any evicted entries,
+/// so budget enforcement and file cleanup cannot be separated. Returns the evicted count.
+async fn insert_index(
+    bucket_id: usize,
+    key: String,
+    query: &str,
+    item: MetricsIndexCacheItem,
+) -> usize {
     let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    for _ in 0..(w.max_entries / METRICS_INDEX_CACHE_GC_PERCENT) {
-        if let Some(key) = w.cacher.pop_front() {
-            w.data.remove(&key);
-        } else {
-            break;
+    let evicted = w.insert(key, query, item);
+    drop(w);
+    let evicted_len = evicted.len();
+    if !evicted.is_empty() {
+        // detached: the cleanup has no ordering dependency on the caller
+        tokio::spawn(remove_disk_files(evicted));
+    }
+    evicted_len
+}
+
+/// drop the index entries whose disk files were evicted by the disk cache gc
+async fn remove_evicted_files(files: Vec<String>) {
+    // group by bucket and key so each bucket lock is taken once
+    let mut buckets: HashMap<usize, HashMap<String, HashSet<String>>> = HashMap::new();
+    for file in files {
+        let Some((key, ..)) = parse_cache_item_key(&file) else {
+            continue;
+        };
+        buckets
+            .entry(get_bucket_id(&key))
+            .or_default()
+            .entry(key)
+            .or_default()
+            .insert(file);
+    }
+    for (bucket_id, keys) in buckets {
+        let mut w = GLOBAL_CACHE[bucket_id].write().await;
+        for (key, file_keys) in keys {
+            w.remove_files(&key, &file_keys);
+        }
+        drop(w);
+    }
+}
+
+/// delete the disk files of entries evicted from the index
+async fn remove_disk_files(evicted: Vec<Arc<MetricsIndexCacheItem>>) {
+    for item in evicted {
+        if let Err(e) = infra::cache::file_data::disk::remove(&item.key).await {
+            log::warn!("Remove evicted metrics cache file {} error: {e}", item.key);
         }
     }
-    drop(w);
-
-    Ok(())
 }
 
 fn get_hash_key(query: &str, step: i64) -> String {
@@ -442,36 +470,112 @@ fn get_bucket_id(key: &str) -> usize {
 
 struct MetricsIndex {
     data: HashMap<String, MetricsIndexCache>,
-    cacher: VecDeque<String>,
-    max_entries: usize,
+    max_size: usize, // memory budget in bytes for this bucket
+    cur_size: usize, // accounted bytes of keys, queries and entries
 }
 
 impl MetricsIndex {
-    fn new(max_entries: usize) -> Self {
+    fn new(max_size: usize) -> Self {
         Self {
             data: HashMap::new(),
-            cacher: VecDeque::new(),
-            max_entries,
+            max_size,
+            cur_size: 0,
         }
+    }
+
+    /// Insert the item under the key, enforcing the per-key item cap and the memory budget.
+    /// Returns the evicted items so the caller can delete their disk files.
+    fn insert(
+        &mut self,
+        key: String,
+        query: &str,
+        item: MetricsIndexCacheItem,
+    ) -> Vec<Arc<MetricsIndexCacheItem>> {
+        let base_size = index_base_size(&key, query);
+        let cur_size = &mut self.cur_size;
+        let index = self.data.entry(key).or_insert_with(|| {
+            *cur_size += base_size;
+            MetricsIndexCache::new(query)
+        });
+        index.touch();
+        let mut evicted = Vec::new();
+        if index.entries.len() >= METRICS_INDEX_CACHE_MAX_ITEMS {
+            // remove the first half items
+            evicted.extend(index.entries.drain(0..METRICS_INDEX_CACHE_MAX_ITEMS / 2));
+            self.cur_size -= evicted.iter().map(|v| item_size(v)).sum::<usize>();
+        }
+        self.cur_size += item_size(&item);
+        index.entries.push(Arc::new(item));
+        evicted.extend(self.gc());
+        evicted
+    }
+
+    /// Remove entries by their disk file keys; drops the key when its entry list becomes empty.
+    fn remove_files(&mut self, key: &str, file_keys: &HashSet<String>) {
+        let Some(index) = self.data.get_mut(key) else {
+            return;
+        };
+        let mut freed = 0;
+        index.entries.retain(|entry| {
+            if file_keys.contains(entry.key.as_str()) {
+                freed += item_size(entry);
+                false
+            } else {
+                true
+            }
+        });
+        self.cur_size -= freed;
+        if !index.entries.is_empty() {
+            return;
+        }
+        if let Some(index) = self.data.remove(key) {
+            self.cur_size -= index_base_size(key, &index.query);
+        }
+    }
+
+    /// When over budget, evict the least recently used keys until
+    /// METRICS_INDEX_CACHE_GC_PERCENT of the budget is free.
+    fn gc(&mut self) -> Vec<Arc<MetricsIndexCacheItem>> {
+        if self.cur_size <= self.max_size {
+            return Vec::new();
+        }
+        log::warn!("MetricsIndex is over its memory budget, releasing the coldest keys");
+        let target = self.max_size - self.max_size * METRICS_INDEX_CACHE_GC_PERCENT / 100;
+        let mut keys = self
+            .data
+            .iter()
+            .map(|(k, v)| (k.clone(), v.last_used.load(Ordering::Relaxed)))
+            .collect::<Vec<_>>();
+        keys.sort_unstable_by_key(|(_, last_used)| *last_used);
+        let mut evicted = Vec::new();
+        for (key, _) in keys {
+            if self.cur_size <= target {
+                break;
+            }
+            let Some(index) = self.data.remove(&key) else {
+                continue;
+            };
+            self.cur_size -= key_size(&key, &index);
+            evicted.extend(index.entries);
+        }
+        evicted
     }
 
     fn stats(&self) -> (usize, usize, usize) {
         let mut total_len = 0;
         let mut total_cap = 0;
-        let mut total_mem = 0;
-        for (k, v) in self.data.iter() {
-            let (len, cap, mem_size) = v.stats();
-            total_len += len;
-            total_cap += cap;
-            total_mem += mem_size + k.len();
+        for v in self.data.values() {
+            total_len += v.entries.len();
+            total_cap += v.entries.capacity();
         }
-        (total_len, total_cap, total_mem)
+        (total_len, total_cap, self.cur_size)
     }
 }
 
 struct MetricsIndexCache {
     query: String,
     entries: Vec<Arc<MetricsIndexCacheItem>>,
+    last_used: AtomicI64,
 }
 
 impl MetricsIndexCache {
@@ -479,14 +583,12 @@ impl MetricsIndexCache {
         Self {
             query: query.to_string(),
             entries: Vec::new(),
+            last_used: AtomicI64::new(now_micros()),
         }
     }
 
-    fn stats(&self) -> (usize, usize, usize) {
-        let len = self.entries.len();
-        let cap = self.entries.capacity();
-        let mem_size = std::mem::size_of::<MetricsIndexCacheItem>() * len + self.query.len();
-        (len, cap, mem_size)
+    fn touch(&self) {
+        self.last_used.store(now_micros(), Ordering::Relaxed);
     }
 }
 
@@ -504,6 +606,18 @@ impl MetricsIndexCacheItem {
             end,
         }
     }
+}
+
+fn index_base_size(key: &str, query: &str) -> usize {
+    key.len() + query.len() + std::mem::size_of::<MetricsIndexCache>()
+}
+
+fn item_size(item: &MetricsIndexCacheItem) -> usize {
+    METRICS_INDEX_ITEM_OVERHEAD + item.key.len()
+}
+
+fn key_size(key: &str, index: &MetricsIndexCache) -> usize {
+    index_base_size(key, &index.query) + index.entries.iter().map(|v| item_size(v)).sum::<usize>()
 }
 
 #[cfg(test)]
@@ -746,47 +860,84 @@ mod tests {
         assert_eq!(total_mem, manual_mem);
     }
 
-    #[tokio::test]
-    async fn test_metrics_index_stats() {
-        // Test the MetricsIndex::stats() method directly
-        let mut metrics = MetricsIndex::new(100);
-
-        // Initial stats should be zero
+    #[test]
+    fn test_metrics_index_size_accounting() {
+        let mut metrics = MetricsIndex::new(1024 * 1024);
         let (len, _cap, mem) = metrics.stats();
         assert_eq!(len, 0);
         assert_eq!(mem, 0);
 
-        // Add an entry
-        let cache = MetricsIndexCache::new("test_query");
-        metrics.data.insert("test_key".to_string(), cache);
+        metrics.insert(
+            "acct_key".to_string(),
+            "acct_query",
+            MetricsIndexCacheItem::new("metrics_results/org/acct1.pb", 100, 200),
+        );
+        metrics.insert(
+            "acct_key".to_string(),
+            "acct_query",
+            MetricsIndexCacheItem::new("metrics_results/org/acct2.pb", 200, 300),
+        );
+        let (len, _cap, mem) = metrics.stats();
+        assert_eq!(len, 2);
+        assert_eq!(
+            mem,
+            index_base_size("acct_key", "acct_query")
+                + item_size(&MetricsIndexCacheItem::new(
+                    "metrics_results/org/acct1.pb",
+                    100,
+                    200
+                ))
+                + item_size(&MetricsIndexCacheItem::new(
+                    "metrics_results/org/acct2.pb",
+                    200,
+                    300
+                ))
+        );
 
-        // Stats should reflect the added entry
-        let (len, cap, mem) = metrics.stats();
-        assert_eq!(len, 0); // No entries in the cache itself yet
-        assert_eq!(cap, 0);
-        assert!(mem > 0); // Should have memory for the key and query
+        // removing one file frees its bytes; removing the last one drops the key
+        metrics.remove_files(
+            "acct_key",
+            &HashSet::from_iter(["metrics_results/org/acct1.pb".to_string()]),
+        );
+        let (len, _cap, mem_after) = metrics.stats();
+        assert_eq!(len, 1);
+        assert!(mem_after < mem);
+        metrics.remove_files(
+            "acct_key",
+            &HashSet::from_iter(["metrics_results/org/acct2.pb".to_string()]),
+        );
+        assert!(metrics.data.is_empty());
+        assert_eq!(metrics.cur_size, 0);
     }
 
-    #[tokio::test]
-    async fn test_metrics_index_cache_stats() {
-        // Test the MetricsIndexCache::stats() method directly
-        let mut cache = MetricsIndexCache::new("test_query");
+    #[test]
+    fn test_metrics_index_gc_evicts_coldest_keys() {
+        let mut metrics = MetricsIndex::new(1024 * 1024);
+        for i in 0..3 {
+            metrics.insert(
+                format!("gc_key_{i}"),
+                "q",
+                MetricsIndexCacheItem::new(&format!("metrics_results/org/gc{i}.pb"), 0, 1),
+            );
+        }
+        for i in 0..3i64 {
+            metrics
+                .data
+                .get(&format!("gc_key_{i}"))
+                .unwrap()
+                .last_used
+                .store(i, Ordering::Relaxed);
+        }
 
-        // Initial stats
-        let (len, cap, mem) = cache.stats();
-        assert_eq!(len, 0);
-        assert_eq!(cap, 0);
-        assert!(mem > 0); // Should have memory for the query string
-
-        // Add an entry
-        let item = Arc::new(MetricsIndexCacheItem::new("test_key", 100, 200));
-        cache.entries.push(item);
-
-        // Stats should reflect the added entry
-        let (len, cap, mem) = cache.stats();
-        assert_eq!(len, 1);
-        assert!(cap >= 1);
-        assert!(mem > "test_query".len()); // Should include query + entry size
+        // shrink the budget below the current size and gc: only the coldest key goes
+        metrics.max_size = metrics.cur_size - 1;
+        let evicted = metrics.gc();
+        assert_eq!(evicted.len(), 1);
+        assert_eq!(evicted[0].key, "metrics_results/org/gc0.pb");
+        assert!(!metrics.data.contains_key("gc_key_0"));
+        assert!(metrics.data.contains_key("gc_key_1"));
+        assert!(metrics.data.contains_key("gc_key_2"));
+        assert!(metrics.cur_size <= metrics.max_size);
     }
 
     #[tokio::test]
