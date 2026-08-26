@@ -158,6 +158,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      is an anonymous flex item and never picks up the ellipsis. -->
                 <span class="truncate">{{ item.title }}</span>
               </h2>
+              <!-- Off-screen panels render this placeholder instead of their
+                   component tree: the grid item keeps its size (so layout and
+                   scrollbar are correct) while the container, renderer, chart
+                   instance and watchers exist only for panels near the
+                   viewport. Mounting everything up front froze large
+                   dashboards for seconds before any query could fire. -->
+              <div
+                v-else-if="!shouldMountPanel(item.id)"
+                class="flex h-full flex-col p-2"
+                :data-test="`dashboard-panel-placeholder-${item.id}`"
+              >
+                <span class="text-text-secondary truncate text-sm" :title="item.title">
+                  {{ item.title }}
+                </span>
+                <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
+              </div>
               <!-- Panel with Panel-Level Variables -->
               <div v-else class="panel-with-variables flex h-full flex-col">
                 <!-- Original Panel Container -->
@@ -419,6 +435,30 @@ export default defineComponent({
     // Store IntersectionObserver for cleanup
     const panelObserver = ref<IntersectionObserver | null>(null);
 
+    // Panel ids whose full component tree is mounted. Everything else renders
+    // as a lightweight placeholder: a dashboard has no cap on panel count, and
+    // mounting every panel's container + renderer + chart instance on entry
+    // froze the page for seconds before a single query could even fire.
+    // Mounting is one-way — a panel that scrolls out of view stays mounted, so
+    // its in-flight query is never cancelled by scrolling and scrolling back
+    // never refetches.
+    const mountedPanelIds = reactive(new Set<string>());
+
+    // Drives mounting, separate from panelObserver (whose exact-viewport
+    // threshold feeds variable lazy-loading). The one-viewport margin mounts
+    // panels just before they scroll into view.
+    let panelMountObserver: IntersectionObserver | null = null;
+
+    // Print/report rendering waits for every panel to load, and forceLoad
+    // callers expect all panels live regardless of scroll position. They are
+    // fed through mountedPanelIds in batches (see the watcher below panels)
+    // rather than bypassing it: flipping a computed would mount every
+    // placeholder in one synchronous flush — the exact freeze the lazy
+    // mounting exists to prevent.
+    const mountAllPanels = computed(() => props.forceLoad || store.state.printMode);
+
+    const shouldMountPanel = (panelId: string) => mountedPanelIds.has(panelId);
+
     // inject selected tab, default will be default tab
     const selectedTabId = inject("selectedTabId", ref("default"));
 
@@ -458,6 +498,30 @@ export default defineComponent({
 
       // Store observer for cleanup
       panelObserver.value = observer;
+
+      panelMountObserver?.disconnect();
+      panelMountObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const panelId = entry.target.getAttribute("gs-id");
+            if (panelId && entry.isIntersecting) {
+              mountedPanelIds.add(panelId);
+              // Mounted for good — stop watching this panel.
+              panelMountObserver?.unobserve(entry.target);
+            }
+          });
+        },
+        {
+          // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
+          rootMargin: "100% 0px 100% 0px",
+          threshold: 0,
+        },
+      );
+      panelElements?.forEach((el: Element) => {
+        const panelId = el.getAttribute("gs-id");
+        if (panelId && mountedPanelIds.has(panelId)) return;
+        panelMountObserver?.observe(el);
+      });
     };
 
     // Create our own variables manager instead of injecting from parent
@@ -538,6 +602,45 @@ export default defineComponent({
         ? (props.dashboardData?.tabs?.find((it: any) => it.tabId === selectedTabId.value)?.panels ??
             [])
         : [];
+    });
+
+    // Print/forceLoad: mount every remaining panel, a small batch per tick, so
+    // entering print mode on a large dashboard ramps up over ~a second instead
+    // of freezing on one giant mount flush. Print capture waits on the
+    // all-panels-loaded flag, so the staggering never truncates a report.
+    let mountAllTimer: any = null;
+    const mountRemainingPanelsInBatches = () => {
+      if (mountAllTimer !== null) return;
+      const BATCH_SIZE = 8;
+      const step = () => {
+        mountAllTimer = null;
+        if (!mountAllPanels.value) return;
+        const pending = panels.value
+          .map((p: any) => p.id)
+          .filter((id: string) => id && !mountedPanelIds.has(id));
+        pending.slice(0, BATCH_SIZE).forEach((id: string) => mountedPanelIds.add(id));
+        if (pending.length > BATCH_SIZE) {
+          mountAllTimer = setTimeout(step, 50);
+        }
+      };
+      step();
+    };
+
+    watch(
+      // re-fill when print mode turns on and when the panel list changes
+      // (tab switch while printing) — panels.value identity is enough
+      () => [mountAllPanels.value, panels.value],
+      () => {
+        if (mountAllPanels.value) mountRemainingPanelsInBatches();
+      },
+      { immediate: true },
+    );
+
+    onBeforeUnmount(() => {
+      if (mountAllTimer !== null) {
+        clearTimeout(mountAllTimer);
+        mountAllTimer = null;
+      }
     });
 
     const {
@@ -1173,6 +1276,8 @@ export default defineComponent({
         panelObserver.value.disconnect();
         panelObserver.value = null;
       }
+      panelMountObserver?.disconnect();
+      panelMountObserver = null;
 
       // Clean up GridStack instance
       if (gridStackInstance) {
@@ -1595,6 +1700,7 @@ export default defineComponent({
       addPanelData,
       t,
       getPanelLayout,
+      shouldMountPanel,
       getMinimumHeight,
       getMinimumWidth,
       isSectionHeader,
