@@ -29,12 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   reach them in tab order and screen readers announce them.
 -->
 <template>
-  <div class="flex items-center justify-end gap-1" :data-test="dataTest">
+  <div class="flex items-center justify-end gap-0.5" :data-test="dataTest">
     <OButton
       v-for="action in actions"
       :key="action.id"
       variant="ghost"
-      size="icon-sm"
+      size="icon-xs-sq"
       :icon-left="action.icon"
       :data-test="`${dataTest}-${action.id}`"
       @click.stop="emit('action', action.id)"

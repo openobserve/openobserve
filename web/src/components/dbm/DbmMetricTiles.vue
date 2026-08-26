@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   it would change the page's DOM wholesale, which is the opposite of what a
   dedup is for.
 
-  Two containers, one tile. `standalone` is the client block — a `rounded-surface`
-  card with a border all round. `attached` is the server block, which sits INSIDE a
+  Two containers, one tile. `standalone` is a `rounded-surface` card with a
+  border all round. `attached` is the server block, which sits INSIDE a
   `DbmSection` under its heading, so it carries only the rule that separates it
   from that heading.
 -->
@@ -66,7 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ item.value }}
       </div>
-      <div v-if="withSubLabels" class="text-text-secondary text-3xs">{{ item.detail }}</div>
+      <div v-if="withSubLabels" class="text-3xs" :class="item.detailTone ?? 'text-text-secondary'">
+        {{ item.detail }}
+      </div>
     </div>
   </div>
 </template>
@@ -74,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nText } from "@/types/i18n";
 
 /** One figure: what it is, what it reads, and what it is worth. */
@@ -87,6 +90,14 @@ export interface DbmMetricTile {
   detail?: I18nText;
   /** A colour class, applied only where the page's own threshold fired. */
   tone?: string;
+  /**
+   * A colour class for the caption line — used to tint a signed delta by its
+   * direction (a rise in a cost metric red, a fall green). Defaults to the
+   * quiet secondary when unset, so a non-delta caption stays neutral.
+   */
+  detailTone?: string;
+  /** Corner icon (OIcon name) for the KPI-card rendering of this figure. */
+  icon?: IconName;
 }
 
 const props = withDefaults(

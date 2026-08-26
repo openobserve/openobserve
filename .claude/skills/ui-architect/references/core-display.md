@@ -51,6 +51,21 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Import:** `@/lib/core/Badge/OTag.vue`
 **Use when:** This is THE badge for application code. Use it for any status pill, type chip, or label — either semantic (pass `type` + `value` to resolve colour/icon/dot/label from the badge registry) or manual (pass `variant`/slots like OBadge).
 **Don't use for:** Two-segment `key=value` dimension chips — use `ODimensionChip`. Don't reach past it to `OBadge`.
+
+> **Rule (strict) — styling lives in the registry, never at the call site.**
+> A semantic `<OTag>` in application code carries **only `type` + `value`** (plus
+> `label`/`count`/`#default` for genuinely dynamic *content* the registry cannot
+> enumerate — a version string, an instance name, a live count). Every VISUAL
+> decision — `variant`, `size`, `shape`, `icon`, `dot` — belongs in the group's
+> entry in `badgeGroups.ts`, **not** as a per-call prop, so one edit restyles
+> every use and the look cannot drift between call sites. The style-override props
+> listed below exist for the low-level library and one-off *manual* passthrough
+> badges (no `type`) only — do not use them to re-style a typed badge.
+>
+> A badge that must look different **in a different context** gets its own
+> registry **group** (e.g. a distinct `type`), not a call-site override. If you
+> find yourself writing `<OTag type="x" value="y" size="md" shape="pill">`, the
+> size/shape belong in group `x` (or a new group), not on the tag.
 **Key props:**
 - `type` (`BadgeGroupName | string` — registry group e.g. `"alertType"`; omit for a manual badge)
 - `value` (unknown — raw value resolved against the group)

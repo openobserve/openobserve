@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
+        :enable-column-resize="true"
         :data="rows"
         :columns="columns"
         row-key="rowKey"

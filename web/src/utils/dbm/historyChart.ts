@@ -39,6 +39,10 @@ export interface DbmChartTheme {
   errors: string;
   axisLabel: string;
   splitLine: string;
+  tooltipBg: string;
+  tooltipBorder: string;
+  tooltipText: string;
+  crosshairBg: string;
 }
 
 /**
@@ -54,32 +58,80 @@ export const buildSamplesOption = (
   samples: { timestamp: number; durationNs: number; isError: boolean }[],
   theme: DbmChartTheme,
   formatNs: (value: number | null | undefined) => string,
-  formatTime: (micros: number) => string,
   names: { ok: string; error: string },
 ): Record<string, unknown> => {
+  // Sample timestamps are MICROSECONDS; a `time` axis wants epoch milliseconds.
+  // Converting here lets ECharts format the x-axis NATIVELY — adaptive hour/day
+  // ticks, the same as the dashboard panels — instead of a hand-written label.
   const toPoint = (sample: { timestamp: number; durationNs: number }) => [
-    sample.timestamp,
+    Math.floor(sample.timestamp / 1000),
     sample.durationNs,
   ];
 
+  // The dashboard panels' tooltip datetime, `YYYY-MM-DD HH:mm:ss` in the local
+  // zone (mirrors `dateTimeUtils.formatDate`), so a hovered dot reads the same
+  // full timestamp a hovered bar does.
+  const formatDateTime = (ms: number): string => {
+    const date = new Date(ms);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  };
+
   return {
-    grid: { left: 8, right: 8, top: 24, bottom: 8, containLabel: true },
-    legend: { top: 0, textStyle: { color: theme.axisLabel }, icon: "circle" },
+    // Legend at the BOTTOM, matching the dashboard trend panels on this page —
+    // so the grid tops out tight and reserves its floor for the legend row.
+    grid: { left: 8, right: 8, top: 16, bottom: 28, containLabel: true },
+    // Bottom-LEFT with a rounded-rect CHIP marker, matching the bar panels'
+    // legend on this page (a solid rounded swatch, not a line+dot).
+    legend: {
+      bottom: 0,
+      left: 0,
+      icon: "roundRect",
+      itemWidth: 24,
+      itemHeight: 14,
+      textStyle: { color: theme.axisLabel },
+    },
     tooltip: {
-      trigger: "item",
-      formatter: (params: { value: [number, number] }) =>
-        `${formatTime(params.value[0])}<br/>${formatNs(params.value[1])}`,
+      trigger: "axis",
+      axisPointer: {
+        type: "cross",
+        label: {
+          fontSize: 12,
+          backgroundColor: theme.crosshairBg,
+          formatter: (params: { value: number; axisDimension: string }) =>
+            params.axisDimension === "y" ? formatNs(params.value) : formatDateTime(params.value),
+        },
+      },
+      appendToBody: true,
+      className: "o2-echarts-tooltip",
+      backgroundColor: theme.tooltipBg,
+      borderColor: theme.tooltipBorder,
+      borderWidth: 1,
+      padding: [8, 12],
+      textStyle: { color: theme.tooltipText, fontSize: 12 },
+      extraCssText:
+        // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
+        "border-radius: 8px !important; box-shadow: var(--shadow-md) !important;",
+      formatter: (params: { value: [number, number]; marker?: string }[]) => {
+        const points = Array.isArray(params) ? params : [params];
+        if (!points.length) return "";
+        const rows = points
+          .map((point) => `${point.marker ?? ""}${formatNs(point.value[1])}`)
+          .join("<br/>");
+        return `${formatDateTime(points[0].value[0])}<br/>${rows}`;
+      },
     },
     xAxis: {
       type: "time",
-      axisLabel: { hideOverlap: true, color: theme.axisLabel, formatter: formatTime },
-      splitLine: { show: false },
+      axisLabel: { hideOverlap: true, color: theme.axisLabel },
+      // Vertical gridlines too — DASHED, matching the dashboard panels' grid.
+      splitLine: { show: true, lineStyle: { type: "dashed", width: 1, color: theme.splitLine } },
     },
     yAxis: {
       type: "value",
       splitNumber: 3,
       axisLabel: { color: theme.axisLabel, formatter: (v: number) => formatNs(v) },
-      splitLine: { lineStyle: { color: theme.splitLine } },
+      splitLine: { lineStyle: { type: "dashed", width: 1, color: theme.splitLine } },
     },
     series: [
       {

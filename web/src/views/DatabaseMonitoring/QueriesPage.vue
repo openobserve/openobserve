@@ -453,6 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
         </div>
         <OTable
+          :enable-column-resize="true"
           :data="filteredServerRows"
           :columns="serverColumns"
           row-key="fingerprint"

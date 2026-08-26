@@ -113,7 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Identity: the statement, then the dimensions that locate it. -->
-      <section v-if="hasQuery" class="px-page-edge flex flex-col gap-2" data-test="dbm-detail-identity">
+      <section
+        v-if="hasQuery"
+        class="px-page-edge flex flex-col gap-2"
+        data-test="dbm-detail-identity"
+      >
         <div class="flex flex-wrap items-center gap-1.5">
           <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" size="md" />
           <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="md" />
@@ -233,11 +237,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            in a second branch: one copy of each section, one source of truth for
            its states, and the trace-led order restored the moment traces
            return. -->
-          <!-- The provenance caption belongs TO the tiles, so it rides with them
-               as one group (tight gap-1.5) rather than floating a full section
-               gap above a bordered card. The group keeps the order-2 swap so a
+          <!-- The headline figures as KPI cards — the same icon-chip + value
+               chrome the AI Insights strip uses, so the two products read as one
+               design. While the read is in flight the value + caption skeleton
+               in place rather than flashing an em dash. The provenance caption
+               rides above the row and stays CONDITIONAL: "instrumented callers
+               only" describes the trace-derived tiles, so over the two
+               server-sourced figures it renders nothing rather than
+               misattributing them. The group keeps the order-2 swap so a
                zero-trace fleet still hoists the server block above it. -->
-          <div class="flex flex-col gap-1.5" :class="traceVantage ? '' : 'order-2'">
+          <div
+            class="flex flex-col gap-2"
+            :class="traceVantage ? '' : 'order-2'"
+            data-test="dbm-detail-stats"
+          >
             <div
               v-if="traceVantage"
               class="text-text-secondary text-xs"
@@ -245,12 +258,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
             </div>
-            <DbmMetricTiles
-              :items="visibleHeadlineStats"
-              with-sub-labels
-              tile-data-test="dbm-detail-stat"
-              data-test="dbm-detail-stats"
-            />
+            <KpiCardRow>
+              <KpiCard
+                v-for="tile in summaryCards"
+                :key="tile.id"
+                :icon="tile.icon"
+                :data-test="`dbm-detail-stat-${tile.id}`"
+              >
+                <template #label>
+                  {{ tile.label
+                  }}<span v-if="tile.sub" class="ml-1 font-normal opacity-70">{{ tile.sub }}</span>
+                </template>
+                <template #value>
+                  <OSkeleton v-if="loading" type="text" class="h-6 w-16" />
+                  <template v-else>
+                    <span
+                      class="text-2xl leading-none font-bold tabular-nums"
+                      :class="tile.tone || 'text-text-heading'"
+                      >{{ tile.num }}</span
+                    >
+                    <span v-if="tile.unit" class="text-compact text-text-secondary font-semibold">{{
+                      tile.unit
+                    }}</span>
+                  </template>
+                </template>
+                <template v-if="loading || tile.detail" #trend>
+                  <OSkeleton v-if="loading" type="text" class="h-3 w-20" />
+                  <span v-else :class="tile.detailTone ?? 'text-text-secondary'">{{
+                    tile.detail
+                  }}</span>
+                </template>
+              </KpiCard>
+            </KpiCardRow>
           </div>
 
           <!-- Plan drift, promoted. "It got slow because the plan changed" is the
@@ -596,6 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dbm.detail.whereItRuns.emptyFiltered") }}
             </div>
             <OTable
+              :enable-column-resize="true"
               v-else
               :data="whereRows"
               :columns="whereColumns"
@@ -980,6 +1020,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs">{{ t("dbm.detail.endpointsHint") }}</span>
             </template>
             <OTable
+              :enable-column-resize="true"
               :data="endpoints"
               :columns="endpointColumns"
               row-key="rowKey"
@@ -1058,6 +1099,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <OTable
+              :enable-column-resize="true"
               :data="samples"
               :columns="sampleColumns"
               row-key="rowKey"
@@ -1148,6 +1190,9 @@ import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
 import DbmMetricTiles, { type DbmMetricTile } from "@/components/dbm/DbmMetricTiles.vue";
+import KpiCard from "@/components/common/KpiCard.vue";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmSection from "@/components/dbm/DbmSection.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
@@ -1930,7 +1975,7 @@ const volumeInjectedData = computed(() => {
 const chartTheme = useDbmChartTheme();
 
 const samplesOption = computed(() =>
-  buildSamplesOption(samples.value, chartTheme.value, formatNs, formatClock, {
+  buildSamplesOption(samples.value, chartTheme.value, formatNs, {
     ok: t("dbm.detail.sampleOk"),
     error: t("dbm.detail.sampleError"),
   }),
@@ -2053,7 +2098,19 @@ const visibleHeadlineStats = computed(() =>
     : headlineStats.value.filter((tile) => tile.id === "load" || tile.id === "calls"),
 );
 
-const headlineStats = computed(() => {
+// The KPI cards want the number and its unit set separately, so the value can be
+// large and bold while its unit rides small beside it (52.05 · ms). The split is
+// on the FORMATTED string — a leading number then the rest — so "none" and "—"
+// pass through as their own "number" with no unit.
+const summaryCards = computed(() =>
+  visibleHeadlineStats.value.map((tile) => {
+    const formatted = String(tile.value ?? "");
+    const match = formatted.match(/^(-?[\d.,]+)(.*)$/);
+    return { ...tile, num: match ? match[1] : formatted, unit: match ? match[2].trim() : "" };
+  }),
+);
+
+const headlineStats = computed<DbmMetricTile[]>(() => {
   const current = row.value;
   const share = scopeTotalNs.value > 0 ? (current?.total_time_ns ?? 0) / scopeTotalNs.value : 0;
   // ABSENT stays absent. With no client row these tiles have no measurement to
@@ -2077,6 +2134,16 @@ const headlineStats = computed(() => {
         ratio: factor >= DELTA_PHRASING.roundFrom ? Math.round(factor) : factor.toFixed(1),
       });
     return raw(formatSignedPercent(delta.ratio));
+  };
+
+  // Colour a signed delta by its ACTIONABLE direction — a rise in a cost metric
+  // (latency, calls) is the one worth reddening; a fall is good news and stays
+  // green. Below the deadband there is no change to colour, so the caption keeps
+  // its quiet secondary. Same tone rule the delta COLUMN uses, so the two agree.
+  const deltaTone = (delta: ReturnType<typeof deltaFor>): string | undefined => {
+    if (delta.state !== "changed" || delta.ratio === undefined) return undefined;
+    if (Math.abs(delta.ratio) < DELTA_PHRASING.deadband) return undefined;
+    return delta.ratio > 0 ? "text-status-error-text" : "text-status-success-text";
   };
 
   // On a seeded first paint the VALUES are the clicked row's and correct, but
@@ -2112,6 +2179,7 @@ const headlineStats = computed(() => {
   return [
     {
       id: "load",
+      icon: "query-stats",
       label: t("dbm.detail.stats.load"),
       sub: undefined,
       value: raw(formatNs(databaseTime.value.value ?? undefined)),
@@ -2130,6 +2198,7 @@ const headlineStats = computed(() => {
     },
     {
       id: "calls",
+      icon: "bar-chart",
       label: t("dbm.detail.stats.calls"),
       sub: undefined,
       value: raw(formatCount(callCount.value.value ?? undefined)),
@@ -2144,10 +2213,13 @@ const headlineStats = computed(() => {
                 : raw(""),
             )
           : overlapDetail(callCount.value.qualifierKey),
+      // Only the client delta is signed; the server overlap caption is not.
+      detailTone: callCount.value.source === "client" ? deltaTone(callsChange) : undefined,
       tone: "",
     },
     {
       id: "p50",
+      icon: "access-time",
       label: t("dbm.detail.stats.p50"),
       sub: raw("p50"),
       value: raw(formatNs(current?.p50_ns)),
@@ -2159,16 +2231,19 @@ const headlineStats = computed(() => {
     },
     {
       id: "p95",
+      icon: "hourglass-empty",
       label: t("dbm.detail.stats.p95"),
       sub: raw("p95"),
       value: raw(formatNs(current?.p95_ns)),
       detail: captionFor(current?.p95_ns, () =>
         rowStatsReady.value ? changeWords(latencyChange) : raw(""),
       ),
+      detailTone: deltaTone(latencyChange),
       tone: "",
     },
     {
       id: "max",
+      icon: "trending-up",
       label: t("dbm.detail.stats.max"),
       sub: raw("max"),
       value: raw(formatNs(current?.max_ns)),
@@ -2178,6 +2253,7 @@ const headlineStats = computed(() => {
     },
     {
       id: "errors",
+      icon: "error-outline",
       label: t("dbm.detail.stats.errors"),
       sub: undefined,
       // No row, no error count: "none" would be an all-clear nobody measured.
@@ -3004,8 +3080,10 @@ const openEndpointTraces = (endpoint: EndpointCallerRow) => {
 const onSampleClick = (params: unknown) => {
   const value = (params as { value?: [number, number] })?.value;
   if (!value) return;
+  // The scatter plots epoch-MS (a `time` axis wants ms, samples carry micros),
+  // so match the datum's ms back to the sample's micros; duration disambiguates.
   const sample = samples.value.find(
-    (entry) => entry.timestamp === value[0] && entry.durationNs === value[1],
+    (entry) => Math.floor(entry.timestamp / 1000) === value[0] && entry.durationNs === value[1],
   );
   if (sample) openSampleTrace(sample);
 };

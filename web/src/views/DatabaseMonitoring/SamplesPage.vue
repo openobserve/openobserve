@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            own toolbar (same search/refresh bindings), and its subtitle states
            why the usual list is empty. -->
       <OTable
+        :enable-column-resize="true"
         v-if="!serverListShown"
         :data="rows"
         :columns="columns"
@@ -192,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div class="flex-1"></div>
             <span class="text-text-secondary flex shrink-0 items-center gap-1">
-              <OIcon name="info-outline" class="size-3 shrink-0" />
+              <OIcon name="info-outline" class="shrink-0" size="sm" />
               {{ t("dbm.samples.disclosureShort") }}
               <OTooltip side="top" :content="t('dbm.samples.disclosureDetail')" />
             </span>
@@ -254,6 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
         </div>
         <OTable
+          :enable-column-resize="true"
           :data="filteredServerRows"
           :columns="serverColumns"
           row-key="rowKey"
@@ -699,7 +701,7 @@ const scatterSamples = computed(() =>
 );
 
 const samplesOption = computed(() =>
-  buildSamplesOption(scatterSamples.value, chartTheme.value, formatNs, formatWhen, {
+  buildSamplesOption(scatterSamples.value, chartTheme.value, formatNs, {
     ok: t("dbm.samples.scatterOk"),
     error: t("dbm.samples.failed"),
   }),
@@ -711,8 +713,10 @@ const scatterData = computed(() => ({ options: samplesOption.value }));
 const onScatterClick = (params: unknown) => {
   const value = (params as { value?: [number, number] })?.value;
   if (!value) return;
+  // The scatter plots epoch-MS (a `time` axis wants ms, the rows carry micros),
+  // so match the datum's ms back to the row's micros; the duration disambiguates.
   const sample = rows.value.find(
-    (row) => row.timestamp === value[0] && row.durationNs === value[1],
+    (row) => Math.floor(row.timestamp / 1000) === value[0] && row.durationNs === value[1],
   );
   if (sample) openSampleTrace(sample);
 };

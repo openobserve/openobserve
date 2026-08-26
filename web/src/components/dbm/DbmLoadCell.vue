@@ -63,15 +63,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ formatPercent(share, 0) }}
         </span>
       </span>
-      <!-- What this duration IS, when it came from the database: execution
-           time on Postgres, WAIT time on MySQL/MariaDB. The column heading is
-           the generic "Database time" and this list mixes engines, so the
-           distinction can only be stated per row. -->
-      <span v-if="qualifier" class="text-text-secondary text-3xs" data-test="dbm-overlap-qualifier">
-        <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
-        {{ qualifier }}
+      <span v-if="showsShare || qualifier" class="flex items-center gap-1.5">
+        <OProgressBar
+          v-if="showsShare"
+          :value="share"
+          :variant="barVariant"
+          size="xs"
+          class="w-14"
+        />
+        <span
+          v-if="qualifier"
+          class="text-text-secondary text-3xs"
+          data-test="dbm-overlap-qualifier"
+        >
+          <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
+          {{ qualifier }}
+        </span>
       </span>
-      <OProgressBar v-if="showsShare" :value="share" :variant="barVariant" size="xs" class="w-18" />
     </div>
   </div>
 </template>
