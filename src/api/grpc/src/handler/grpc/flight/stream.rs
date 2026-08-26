@@ -21,8 +21,6 @@ use config::metrics;
 use datafusion::execution::SendableRecordBatchStream;
 use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use search_service::work_group::DeferredLock;
 use tokio::{sync::mpsc, task::JoinSet};
 use tracing::info_span;
@@ -385,13 +383,6 @@ impl Drop for FlightEncoderStream {
         metrics::GRPC_INCOMING_REQUESTS
             .with_label_values(&["/search/flight/do_get", "200", "", "", "", ""])
             .inc();
-
-        // Release the node-level slot reservation for this Follow node.
-        #[cfg(feature = "enterprise")]
-        if get_o2_config().work_group.max_nodes_per_query > 0 {
-            o2_enterprise::enterprise::search::admission::ledger::release(trace_id);
-            log::info!("[trace_id {trace_id}] flight->search: releasing slot");
-        }
 
         // the defer only covers the work group slot, so it never gates the session release
         drop(ctx.defer_lock.take());
