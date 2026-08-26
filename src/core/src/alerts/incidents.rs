@@ -677,25 +677,27 @@ pub async fn correlate_alert_to_incident(
     } = &outcome
         && o2_enterprise::enterprise::oncall::is_enabled()
     {
-        let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
+        // Single-sourced with the alert path in `scheduler::handlers`: the row,
+        // then the alert's own conditions for whatever the row left blank.
+        let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
             &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            &alert.query_condition,
             result_row,
         );
-        // Fall back to what correlation already worked out.
+        // Last resort: what correlation already worked out.
         //
-        // Routing reads the alert's **first result row**, which is right for an
-        // ordinary alert and useless for a custom SQL one: `SELECT count(*)`
-        // with no `GROUP BY` returns a row with an aggregate and no identity
-        // fields at all, so no ownership rule can match and the page lands on
-        // the default team or the unrouted queue — for an alert whose service
-        // this very function has *already identified*.
+        // Reached only when neither the row nor the alert's conditions named
+        // anything — a `SELECT count(*)` whose threshold lives in an
+        // inequality, with no equality anywhere to identify it. Nothing static
+        // can route that alert, but correlation can: it has already queried the
+        // service-discovery registry, and re-deriving from the row here and
+        // ignoring that answer was throwing away the better of the two.
         //
-        // Correlation resolves the service a strictly better way than a row
-        // scan can: it queries the service-discovery registry first and only
-        // falls back to extracting from the row. Re-deriving from the row here
-        // and ignoring that answer was throwing away the better of the two.
+        // Only this path can offer it — correlation does not run when
+        // `creates_incident` is off — which is why the two paths agree on the
+        // sources above and diverge here rather than earlier.
         //
-        // Only when the row yielded nothing. A row that carries its own
+        // Additive like those sources. A row that carries its own
         // identity keeps routing on it, so no existing alert changes team —
         // this can only add a route where there was none.
         if dimensions.is_empty() && !service_name.trim().is_empty() {

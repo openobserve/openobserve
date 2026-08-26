@@ -2009,8 +2009,13 @@ async fn handle_alert_triggers(
             } else {
                 let semantic_groups =
                     crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
-                let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
+                // Row first, alert conditions for whatever the row left blank.
+                // An aggregating alert returns no identity columns at all, so
+                // without the conditions this path routes on an empty map and
+                // pages the catch-all.
+                let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
                     &semantic_groups,
+                    &alert.query_condition,
                     first_row,
                 );
                 // Single-sourced with the incident path: the same alert must

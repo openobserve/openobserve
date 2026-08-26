@@ -16,7 +16,6 @@
 //! On-call teams, schedules and escalation policies.
 
 use axum::{
-    Json,
     extract::{Path, Query},
     response::Response,
 };

@@ -67,6 +67,38 @@ pub fn snooze_until(now: i64, minutes: i64) -> Option<i64> {
         .and_then(|micros| now.checked_add(micros))
 }
 
+/// Where the ladder's clock sits after a snooze.
+///
+/// Rungs are measured from the anchor, so pausing the ladder means pushing the
+/// anchor forward by the length of the pause — the rungs then resume in order
+/// instead of all firing the instant the quiet lapses.
+///
+/// The push is measured from **where the quiet already reaches**, not from
+/// `from`. Adding the whole duration to an already-pushed clock is what made a
+/// second snooze silence a page for the sum of both: two 60-minute snoozes a
+/// minute apart left `snoozed_until` at +62m and the anchor at +120m, so the
+/// record read as awake at 62 minutes and did not page until 130. The banner
+/// said one thing and the pager did another, and extending a snooze is the
+/// ordinary gesture — the durations are a menu somebody can press twice.
+///
+/// Never moves backwards. Shortening a snooze must not drag a rung in front of
+/// the moment the ladder already promised it, and `escalate_now` cancels by
+/// calling with `from == until`, which lands here as a no-op on the anchor.
+///
+/// Pure, and separated from the row update on purpose: this arithmetic was
+/// wrong for as long as it lived inside a database call, where no test could
+/// reach it.
+pub fn snoozed_ladder_anchor(
+    existing_anchor: Option<i64>,
+    opened_at: i64,
+    already_quiet_until: Option<i64>,
+    from: i64,
+    until: i64,
+) -> i64 {
+    let quiet_reaches = already_quiet_until.unwrap_or(from).max(from);
+    existing_anchor.unwrap_or(opened_at) + (until - quiet_reaches).max(0)
+}
+
 /// Lifecycle of a response record.
 ///
 /// `triggered → triaged → acknowledged → resolved`, where `triaged` is
@@ -1501,6 +1533,79 @@ mod tests {
         assert_eq!(snooze_until(1_000, 1), Some(1_000 + 60_000_000));
         assert_eq!(snooze_until(1_000, 5), Some(1_000 + 300_000_000));
         assert!(snooze_until(1_000, MAX_SNOOZE_MINUTES).is_some());
+    }
+
+    mod snooze_anchor {
+        use super::*;
+
+        const MIN: i64 = 60 * 1_000_000;
+
+        /// The first snooze on a fresh record: the clock moves by exactly the
+        /// pause, so a rung due at +10m becomes due 10m after the quiet ends.
+        #[test]
+        fn test_a_first_snooze_moves_the_clock_by_its_own_length() {
+            let anchor = snoozed_ladder_anchor(None, 0, None, 1 * MIN, 61 * MIN);
+            assert_eq!(anchor, 60 * MIN);
+        }
+
+        /// The defect. Pressing snooze again during a snooze used to add the
+        /// whole second duration to an already-pushed clock, so the record
+        /// reported itself awake at 62m and stayed silent until 130m — the
+        /// banner and the pager disagreeing by more than an hour.
+        #[test]
+        fn test_a_second_snooze_does_not_add_to_the_quiet_it_overlaps() {
+            let first = snoozed_ladder_anchor(None, 0, None, 1 * MIN, 61 * MIN);
+            let second = snoozed_ladder_anchor(Some(first), 0, Some(61 * MIN), 2 * MIN, 62 * MIN);
+
+            assert_eq!(
+                second,
+                61 * MIN,
+                "the clock reaches exactly as far as the quiet does, not 120m",
+            );
+            // The property that actually matters: when the record reads as
+            // awake, the ladder is awake too.
+            let quiet_ends = 62 * MIN;
+            assert!(
+                second <= quiet_ends,
+                "a record that is no longer snoozed must not still be waiting on its own clock",
+            );
+        }
+
+        /// Snoozing again *after* the first has lapsed is two separate pauses
+        /// and does add up — the overlap is what must not.
+        #[test]
+        fn test_consecutive_snoozes_do_accumulate() {
+            let first = snoozed_ladder_anchor(None, 0, None, 1 * MIN, 61 * MIN);
+            let second =
+                snoozed_ladder_anchor(Some(first), 0, Some(61 * MIN), 90 * MIN, 150 * MIN);
+            assert_eq!(second, 60 * MIN + 60 * MIN);
+        }
+
+        /// Shortening must not drag a rung in front of the moment the ladder
+        /// already promised it.
+        #[test]
+        fn test_shortening_a_snooze_never_moves_the_clock_backwards() {
+            let long = snoozed_ladder_anchor(None, 0, None, 0, 120 * MIN);
+            let shortened = snoozed_ladder_anchor(Some(long), 0, Some(120 * MIN), 1 * MIN, 5 * MIN);
+            assert_eq!(shortened, long);
+        }
+
+        /// `escalate_now` cancels a snooze by calling with `from == until`.
+        /// That has to leave the clock alone.
+        #[test]
+        fn test_cancelling_is_a_no_op_on_the_clock() {
+            let snoozed = snoozed_ladder_anchor(None, 0, None, 0, 60 * MIN);
+            let cancelled =
+                snoozed_ladder_anchor(Some(snoozed), 0, Some(60 * MIN), 10 * MIN, 10 * MIN);
+            assert_eq!(cancelled, snoozed);
+        }
+
+        /// A record snoozed before its ladder ever had an anchor measures from
+        /// when it opened.
+        #[test]
+        fn test_an_unanchored_record_measures_from_when_it_opened() {
+            assert_eq!(snoozed_ladder_anchor(None, 7 * MIN, None, 8 * MIN, 18 * MIN), 17 * MIN);
+        }
     }
 
     #[test]

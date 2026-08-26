@@ -102,6 +102,18 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<u8>, example = 3)]
     pub priority: Option<u8>,
+    /// The on-call team this alert names, when it names one.
+    ///
+    /// Routing's highest-precedence tier (`alerts.oncall_team`), and the only
+    /// tier a list row can report: every other one resolves from the identity
+    /// dimensions of the row that fires, which an alert definition does not
+    /// carry. Absent means "resolved at fire time", not "pages nobody".
+    ///
+    /// The list has always had a column for this and never had the field, so
+    /// the UI's `v-if="row.oncall_team"` could not be true and **every** alert
+    /// read as unbound — including ones deliberately pinned to a team.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oncall_team: Option<String>,
     /// Normalized selection tags (PT-6). Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
@@ -295,6 +307,10 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             level: None,
             level_since: None,
             priority: alert.priority.map(|p| p.to_i32() as u8),
+            // Blank is the same as unset here: the field is validated at save,
+            // so an empty string is a value nothing wrote deliberately, and
+            // sending it would render an empty team chip.
+            oncall_team: alert.oncall_team.filter(|t| !t.trim().is_empty()),
             tags: alert.tags,
             // Filled from the rollup state row by `enrich_with_run_state`,
             // alongside the other run-state fields above.
@@ -391,6 +407,14 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .and_then(|p| p.as_u64())
             .and_then(|p| u8::try_from(p).ok())
             .filter(|p| (1..=5).contains(p)),
+        // Read the same way as the alert path, so an anomaly config pinned to
+        // a team reads as pinned in the same column rather than falling to
+        // "resolved at fire time" purely because it took the other branch.
+        oncall_team: v
+            .get("oncall_team")
+            .and_then(|t| t.as_str())
+            .filter(|t| !t.trim().is_empty())
+            .map(String::from),
         tags: v
             .get("tags")
             .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
@@ -479,6 +503,7 @@ mod tests {
             level: None,
             level_since: None,
             priority: None,
+            oncall_team: None,
             tags: vec![],
             groups_observed: None,
             groups_firing: None,
@@ -499,6 +524,10 @@ mod tests {
         assert!(!obj.contains_key("groups_firing"));
         assert!(!obj.contains_key("groups_observed_is_lower_bound"));
         assert!(!obj.contains_key("groups_firing_is_lower_bound"));
+        // Absent means "resolved at fire time", which the list renders as its
+        // own label. A `null` would be a third state the column has no words
+        // for.
+        assert!(!obj.contains_key("oncall_team"));
     }
 
     #[test]
@@ -618,6 +647,59 @@ mod tests {
         let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
         assert_eq!(item.alert_type, "realtime");
         assert!(item.is_real_time);
+    }
+
+    /// The defect this field was added for. The list column reads the alert's
+    /// bound team, and the field was never on the item — so a deliberately
+    /// pinned alert was indistinguishable from an unbound one, and every row
+    /// read "From ownership".
+    #[test]
+    fn test_a_bound_alert_reports_the_team_it_names() {
+        let mut alert = meta_alerts::Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.oncall_team = Some("team_payments".to_string());
+
+        let item =
+            ListAlertsResponseBodyItem::try_from((meta_folders::Folder::default(), alert, None))
+                .unwrap();
+
+        assert_eq!(item.oncall_team.as_deref(), Some("team_payments"));
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(json.get("oncall_team").and_then(|t| t.as_str()), Some("team_payments"));
+    }
+
+    /// Unbound is the absence of the field, not an empty string — the column
+    /// renders "resolved at fire time" from absence, and a blank value would
+    /// draw an empty team chip instead.
+    #[test]
+    fn test_an_unbound_alert_omits_the_field_entirely() {
+        let mut blank = meta_alerts::Alert::default();
+        blank.id = Some(svix_ksuid::Ksuid::new(None, None));
+        blank.oncall_team = Some("   ".to_string());
+
+        let item =
+            ListAlertsResponseBodyItem::try_from((meta_folders::Folder::default(), blank, None))
+                .unwrap();
+
+        assert!(item.oncall_team.is_none(), "whitespace is not a team");
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("oncall_team"));
+    }
+
+    /// An anomaly config takes the other construction path. It carried the same
+    /// column and would otherwise have kept the bug after the alert path lost it.
+    #[test]
+    fn test_an_anomaly_config_reports_its_team_too() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({
+            "anomaly_id": id,
+            "name": "x",
+            "oncall_team": "team_search",
+        });
+
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+
+        assert_eq!(item.oncall_team.as_deref(), Some("team_search"));
     }
 
     #[test]

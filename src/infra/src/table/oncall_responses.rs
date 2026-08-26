@@ -504,11 +504,19 @@ pub async fn snooze(
     else {
         return Ok(None);
     };
-    let (existing_anchor, opened_at) = (existing.ladder_anchor, existing.opened_at);
+    let (existing_anchor, opened_at, already_quiet_until) = (
+        existing.ladder_anchor,
+        existing.opened_at,
+        existing.snoozed_until,
+    );
     let mut model: oncall_responses::ActiveModel = existing.into();
-    // Push the ladder's clock by the pause so the rungs resume in order
-    // instead of all firing the moment the snooze lapses.
-    let anchor = existing_anchor.unwrap_or(opened_at) + (until - from);
+    let anchor = config::meta::oncall::response::snoozed_ladder_anchor(
+        existing_anchor,
+        opened_at,
+        already_quiet_until,
+        from,
+        until,
+    );
     model.snoozed_until = Set(Some(until));
     model.ladder_anchor = Set(Some(anchor));
     Ok(to_response(model.update(client).await?))
