@@ -571,15 +571,15 @@ describe("logsUtils", () => {
 
     it("returns true and never parses when _timestamp appears only in the WHERE clause", () => {
       mockParserInstance.astify.mockClear();
-      expect(
-        utils.checkTimestampAlias("SELECT field1 FROM logs WHERE _timestamp > 0"),
-      ).toBe(true);
+      expect(utils.checkTimestampAlias("SELECT field1 FROM logs WHERE _timestamp > 0")).toBe(true);
       expect(mockParserInstance.astify).not.toHaveBeenCalled();
     });
 
     it("never calls astify() regardless of query size (regex-only, no main-thread block)", () => {
       mockParserInstance.astify.mockClear();
-      const bigWhere = Array.from({ length: 150 }, (_, i) => `column_name_${i} = ${i}`).join(" AND ");
+      const bigWhere = Array.from({ length: 150 }, (_, i) => `column_name_${i} = ${i}`).join(
+        " AND ",
+      );
       const largeQuery = `SELECT field1 AS '_timestamp' FROM logs WHERE ${bigWhere}`;
       expect(utils.checkTimestampAlias(largeQuery)).toBe(false);
       expect(mockParserInstance.astify).not.toHaveBeenCalled();
