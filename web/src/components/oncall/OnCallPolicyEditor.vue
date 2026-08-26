@@ -161,14 +161,25 @@
                      skips it in silence, which `config-risks` reports as
                      `level_names_a_rotation_that_does_not_exist`. Asking here
                      is how it never gets written. -->
-                <span v-if="pendingRotation?.step === step" class="w-52">
-                  <OSelect
-                    :model-value="''"
-                    :options="rotationOptions"
+                <span v-if="pendingRotation?.step === step" class="flex items-center gap-2">
+                  <span class="w-52">
+                    <OSelect
+                      :model-value="''"
+                      :options="rotationOptions"
+                      size="sm"
+                      :placeholder="t('oncall.targetPickRotation')"
+                      :data-test="`oncall-policy-pick-rotation-${current.priority}-${stepIndex}`"
+                      @update:model-value="(v: any) => addRotation(String(v))"
+                    />
+                  </span>
+                  <!-- On by default. A rotation is a position on the team, and
+                       one that exists at P1 but not P2 is a decision almost
+                       nobody means to make. -->
+                  <OCheckbox
+                    v-model="applyToAllPriorities"
                     size="sm"
-                    :placeholder="t('oncall.targetPickRotation')"
-                    :data-test="`oncall-policy-pick-rotation-${current.priority}-${stepIndex}`"
-                    @update:model-value="(v: any) => addRotation(String(v))"
+                    :label="t('oncall.targetAllPriorities')"
+                    data-test="oncall-policy-rotation-all-priorities"
                   />
                 </span>
 
@@ -619,6 +630,11 @@ const pendingUserStep = ref<LadderStep | null>(null);
 /// person on call in it or everyone on it, and which was asked for decides
 /// what the picked rotation MEANS.
 const pendingRotation = ref<{ step: LadderStep; mode: RotationMode } | null>(null);
+/// Whether the next rotation lands on every priority at once. Sticky for the
+/// life of the dialog: somebody adding a position to the ladder is doing it for
+/// the ladder, not for one priority, and re-ticking per priority would be the
+/// same chore in a different shape.
+const applyToAllPriorities = ref(true);
 const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 const teamMembers = computed(() => memberOptions.value.map((m) => m.value));
 /// The rotation in force, so the preview names people rather than target
@@ -893,11 +909,42 @@ function addRotation(rotationId: string) {
     (x) => x.kind === "rotation" && x.rotation_id === rotationId && (x.mode ?? "on_call") === mode,
   );
   if (already) return;
-  step.targets.push(
-    mode === "all"
-      ? { kind: "rotation", rotation_id: rotationId, mode }
-      : { kind: "rotation", rotation_id: rotationId },
-  );
+
+  // Adding a rotation ONE priority at a time is the wrong unit of work. A new
+  // rotation is a position on the team, and a position that exists for P1 and
+  // not for P2 is a decision almost nobody means to make — but making it the
+  // same way five times was the only way to say the ordinary thing.
+  //
+  // Same step index rather than same delay: what the reader pointed at is
+  // "the first level", "the second level", and the waits legitimately differ
+  // per priority. Priorities with no step at that index are skipped rather
+  // than grown — a P4 that pages nobody by design stays that way.
+  const targets = applyToAllPriorities.value ? sameStepEverywhere(step) : [step];
+  for (const target of targets) {
+    const duplicate = target.targets.some(
+      (x) =>
+        x.kind === "rotation" && x.rotation_id === rotationId && (x.mode ?? "on_call") === mode,
+    );
+    if (duplicate) continue;
+    target.targets.push(
+      mode === "all"
+        ? { kind: "rotation", rotation_id: rotationId, mode }
+        : { kind: "rotation", rotation_id: rotationId },
+    );
+  }
+}
+
+/// The step at the same index in every priority that has one.
+///
+/// Includes the step passed in, so the caller writes one loop either way.
+function sameStepEverywhere(step: LadderStep): LadderStep[] {
+  const index = draft.value
+    .flatMap((rung) => rung.steps.map((candidate, at) => ({ candidate, at })))
+    .find((entry) => entry.candidate === step)?.at;
+  if (index === undefined) return [step];
+  return draft.value
+    .map((rung) => rung.steps[index])
+    .filter((candidate): candidate is LadderStep => !!candidate);
 }
 
 /// The wait between two steps — what the connector edits. The data model
