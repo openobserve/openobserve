@@ -62,3 +62,29 @@ export type AiCreditsForm = z.infer<ReturnType<typeof makeAiCreditsSchema>>;
 export const aiCreditsDefaults = (creditsLimit = 0): AiCreditsForm => ({
   creditsLimit,
 });
+
+// ── Synthetics step allowance dialog ─────────────────────────────────────────
+// Same shape and same validation as the AI dialog — both set a lifetime pool
+// ceiling — but a separate schema and field name so the two dialogs cannot
+// share form state, and so the error copy can say "steps" rather than
+// "credits". The pools are separate allowances in different units.
+export const makeSyntheticsStepsSchema = (t: TranslateFn) =>
+  z.object({
+    stepsLimit: z.preprocess(
+      (value) =>
+        value === "" || value === null || value === undefined ? Number.NaN : Number(value),
+      z
+        .number()
+        .int({ error: () => t("settings.syntheticsStepsWholeNumber") })
+        .min(0, { error: () => t("settings.syntheticsStepsNegative") })
+        .max(Number.MAX_SAFE_INTEGER, {
+          error: () => t("settings.syntheticsStepsMax"),
+        }),
+    ),
+  });
+
+export type SyntheticsStepsForm = z.infer<ReturnType<typeof makeSyntheticsStepsSchema>>;
+
+export const syntheticsStepsDefaults = (stepsLimit = 0): SyntheticsStepsForm => ({
+  stepsLimit,
+});

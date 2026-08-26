@@ -1311,21 +1311,45 @@ pub struct AiUsageResponse {
     pub requires_additional_credits: bool,
 }
 
-/// Get AI usage info for an org (for the usage API endpoint).
-/// Reports the single shared pool across all AI features.
-/// Uses the greater of persisted and in-memory usage to include pending flushes.
+/// One pool's usage for an org, in that pool's own unit.
+///
+/// The unit is named by `pool` rather than baked into the field names: AI
+/// counts credits, synthetics counts steps, and a `credits_used` field
+/// reporting a step count is the kind of thing a support engineer reads
+/// literally. [`AiUsageResponse`] keeps the old names for the AI-only route
+/// that already ships them.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct PoolUsageResponse {
+    /// Stable pool identifier — `"ai_credits"` or `"synthetics_steps"`.
+    pub pool: String,
+    /// `"free"` | `"pay_as_you_go"` | `"exhausted"`.
+    pub mode: String,
+    pub used: u64,
+    pub limit: u64,
+    pub remaining: u64,
+    pub requires_additional_credits: bool,
+}
+
+/// Get one pool's usage for an org.
+///
+/// Uses the greater of persisted and in-memory usage so a pending flush is
+/// never reported as unspent.
 ///
 /// Mode is derived from actual state:
-/// - `"free"`: credits remaining in pool
-/// - `"pay_as_you_go"`: credits exhausted + active subscription
-/// - `"exhausted"`: credits exhausted + no subscription
-pub async fn get_usage(org_id: &str) -> AiUsageResponse {
-    let pool = TrialQuotaPool::AiCredits;
+/// - `"free"`: allowance remaining in the pool
+/// - `"pay_as_you_go"`: allowance exhausted + active subscription
+/// - `"exhausted"`: allowance exhausted + no subscription
+///
+/// The exhaustion policy is resolved from `(subscription_type, provider)`, which
+/// is a property of the org's billing and not of the pool — so the AI-named
+/// resolver is correct for every pool. The synthetics scheduler mirrors the same
+/// mapping in its own `PoolExhaustionPolicy`.
+pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResponse {
     let limit = get_pool_limit(org_id, pool);
     let in_memory_used = get_pool_used(org_id, pool);
 
-    // Read from DB for accuracy. Scoped to the AI pool's feature rows (item
-    // 2.1): summing every row of the org would report an org's synthetics step
+    // Read from DB for accuracy, scoped to THIS pool's feature rows (item 2.1):
+    // summing every row of the org would report an org's synthetics step
     // consumption as AI credits used, and drive the AI usage UI to "exhausted"
     // for an org that never opened the chat.
     let db_used = match infra::table::trial_quota_usage::get_total_usage_for_org(
@@ -1336,8 +1360,9 @@ pub async fn get_usage(org_id: &str) -> AiUsageResponse {
     {
         Ok(total) => {
             log::info!(
-                "[TRIAL_QUOTA] get_usage: org={} db_total={} in_memory_total={} pool_limit={}",
+                "[TRIAL_QUOTA] get_pool_usage: org={} pool={} db_total={} in_memory_total={} pool_limit={}",
                 org_id,
+                pool.key(),
                 total,
                 in_memory_used,
                 limit,
@@ -1345,13 +1370,14 @@ pub async fn get_usage(org_id: &str) -> AiUsageResponse {
             // Clamped: a refund is flushed as a NEGATIVE delta (§6.3), and no
             // portable SQL floor exists across the three backends, so a row can
             // sit at or below zero. `as u64` on a negative would read as an org
-            // that has used 18 quintillion credits and can never run again.
+            // that has used 18 quintillion units and can never run again.
             total.max(0) as u64
         }
         Err(e) => {
             log::warn!(
-                "[TRIAL_QUOTA] get_usage: org={} DB read failed (falling back to cache={}): {e}",
+                "[TRIAL_QUOTA] get_pool_usage: org={} pool={} DB read failed (falling back to cache={}): {e}",
                 org_id,
+                pool.key(),
                 in_memory_used,
             );
             in_memory_used
@@ -1379,12 +1405,29 @@ pub async fn get_usage(org_id: &str) -> AiUsageResponse {
         Some(_) => "exhausted",
     };
 
-    AiUsageResponse {
+    PoolUsageResponse {
+        pool: pool.key().to_string(),
         mode: mode.to_string(),
-        credits_used: used,
-        credits_limit: limit,
-        credits_remaining: remaining,
+        used,
+        limit,
+        remaining,
         requires_additional_credits,
+    }
+}
+
+/// Get AI usage info for an org (for the AI usage API endpoint).
+///
+/// Thin wrapper over [`get_pool_usage`] that keeps the `credits_*` field names
+/// the existing AI route and UI already consume. New callers should prefer
+/// `get_pool_usage`.
+pub async fn get_usage(org_id: &str) -> AiUsageResponse {
+    let usage = get_pool_usage(org_id, TrialQuotaPool::AiCredits).await;
+    AiUsageResponse {
+        mode: usage.mode,
+        credits_used: usage.used,
+        credits_limit: usage.limit,
+        credits_remaining: usage.remaining,
+        requires_additional_credits: usage.requires_additional_credits,
     }
 }
 

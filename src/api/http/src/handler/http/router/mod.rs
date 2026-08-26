@@ -1512,6 +1512,12 @@ pub fn service_routes() -> Router {
                 "/{org_id}/ai/usage_limit",
                 put(organization::org::set_ai_usage_limit),
             )
+            // Pool-generic successor to `/ai/usage_limit`, which is kept so the
+            // shipped AI UI kept working across this change.
+            .route(
+                "/{org_id}/quota/{pool}/usage_limit",
+                put(organization::org::set_quota_usage_limit),
+            )
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
                 get(cloud::org_usage::get_org_usage),

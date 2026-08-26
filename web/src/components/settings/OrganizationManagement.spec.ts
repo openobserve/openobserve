@@ -65,6 +65,7 @@ vi.mock("@/services/organizations", () => ({
     extend_external_contract: vi.fn(),
     revoke_external_contract: vi.fn(),
     set_ai_usage_limit: vi.fn(),
+    set_quota_usage_limit: vi.fn(),
   },
 }));
 
@@ -191,6 +192,7 @@ describe("OrganizationManagement.vue", () => {
   let mockExtendExternalContract: any;
   let mockRevokeExternalContract: any;
   let mockSetAiUsageLimit: any;
+  let mockSetQuotaUsageLimit: any;
 
   // Global setup to ensure consistent timestamp behavior across environments
   beforeAll(() => {
@@ -214,6 +216,7 @@ describe("OrganizationManagement.vue", () => {
     mockExtendExternalContract = (mockedOrgService as any).extend_external_contract;
     mockRevokeExternalContract = (mockedOrgService as any).revoke_external_contract;
     mockSetAiUsageLimit = (mockedOrgService as any).set_ai_usage_limit;
+    mockSetQuotaUsageLimit = (mockedOrgService as any).set_quota_usage_limit;
 
     // Setup default mock responses
     mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
@@ -221,6 +224,9 @@ describe("OrganizationManagement.vue", () => {
     mockCreateExternalContract?.mockResolvedValue?.({ data: true });
     mockExtendExternalContract?.mockResolvedValue?.({ data: true });
     mockRevokeExternalContract?.mockResolvedValue?.({ data: true });
+    mockSetQuotaUsageLimit?.mockResolvedValue?.({
+      data: { pool: "synthetics_steps", mode: "free", used: 0, limit: 0, remaining: 0 },
+    });
     mockSetAiUsageLimit?.mockResolvedValue?.({
       data: { credits_used: 0, credits_limit: 1000 },
     });
@@ -300,17 +306,19 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(10);
+      expect(columns).toHaveLength(12);
       expect(columns[0].id).toBe("name");
       expect(columns[1].id).toBe("identifier");
       expect(columns[2].id).toBe("subscription_status");
       expect(columns[3].id).toBe("billing_provider");
       expect(columns[4].id).toBe("ai_credits_used");
       expect(columns[5].id).toBe("ai_credits_total");
-      expect(columns[6].id).toBe("created_on");
-      expect(columns[7].id).toBe("trial_expiry");
-      expect(columns[8].id).toBe("contract_end_date");
-      expect(columns[9].id).toBe("actions");
+      expect(columns[6].id).toBe("synthetics_steps_used");
+      expect(columns[7].id).toBe("synthetics_steps_total");
+      expect(columns[8].id).toBe("created_on");
+      expect(columns[9].id).toBe("trial_expiry");
+      expect(columns[10].id).toBe("contract_end_date");
+      expect(columns[11].id).toBe("actions");
     });
 
     it("should have subscription plans mapping", () => {
@@ -456,6 +464,8 @@ describe("OrganizationManagement.vue", () => {
         billing_provider: "-",
         credits_used: 125,
         credits_limit: 5000,
+        steps_used: 0,
+        steps_limit: 0,
         created_at: "2023-12-01",
         trial_expires_at: "2023-12-01",
         contract_end_date: 0,
@@ -1221,6 +1231,94 @@ describe("OrganizationManagement.vue", () => {
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "error",
         message: "limit update failed",
+        timeout: 5000,
+      });
+    });
+  });
+
+  describe("synthetics step allowance dialog", () => {
+    it("opens with the selected organization's current step limit", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleSyntheticsStepsDialog({
+        name: "Acme",
+        identifier: "acme",
+        steps_used: 400,
+        steps_limit: 10000,
+      });
+      await nextTick();
+
+      expect(wrapper.vm.syntheticsStepsPrompt).toBe(true);
+      expect(wrapper.vm.syntheticsStepsFormDefaults).toEqual({ stepsLimit: 10000 });
+      const dialog = wrapper
+        .findAll('[data-test="o-dialog-stub"]')
+        .find((item: any) =>
+          (item.attributes("data-title") || "").startsWith("Set Synthetics Steps"),
+        );
+      expect(dialog?.attributes("data-title")).toBe("Set Synthetics Steps for Acme");
+      expect(dialog?.attributes("data-primary-label")).toBe("Save Steps");
+    });
+
+    it("targets the synthetics_steps pool and updates the row from the response", async () => {
+      mockSetQuotaUsageLimit.mockResolvedValue({
+        data: { pool: "synthetics_steps", mode: "free", used: 400, limit: 25000, remaining: 24600 },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleSyntheticsStepsDialog({
+        name: "Acme",
+        identifier: "acme",
+        steps_used: 400,
+        steps_limit: 10000,
+      });
+
+      await wrapper.vm.submitSyntheticsSteps({ stepsLimit: "25000" } as any);
+
+      // The pool is an explicit argument, not implied by the route: sending
+      // this to the AI pool would credit the wrong allowance silently.
+      expect(mockSetQuotaUsageLimit).toHaveBeenCalledWith("default", "synthetics_steps", {
+        org_id: "acme",
+        limit: 25000,
+      });
+      // Neutral response field names — `credits_*` would be the wrong noun.
+      expect(wrapper.vm.syntheticsStepsDataRow.steps_used).toBe(400);
+      expect(wrapper.vm.syntheticsStepsDataRow.steps_limit).toBe(25000);
+      expect(wrapper.vm.syntheticsStepsPrompt).toBe(false);
+      expect(mockToastFn).toHaveBeenCalledWith({
+        variant: "success",
+        message: "Synthetics steps updated successfully.",
+      });
+    });
+
+    it("does not touch the AI pool", async () => {
+      mockSetQuotaUsageLimit.mockResolvedValue({
+        data: { pool: "synthetics_steps", mode: "free", used: 0, limit: 25000, remaining: 25000 },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleSyntheticsStepsDialog({ name: "Acme", identifier: "acme" });
+
+      await wrapper.vm.submitSyntheticsSteps({ stepsLimit: 25000 } as any);
+
+      expect(mockSetAiUsageLimit).not.toHaveBeenCalled();
+    });
+
+    it("keeps the dialog open and reports an API error", async () => {
+      mockSetQuotaUsageLimit.mockRejectedValue({
+        response: { data: { message: "step limit update failed" } },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleSyntheticsStepsDialog({
+        name: "Acme",
+        identifier: "acme",
+        steps_used: 400,
+        steps_limit: 10000,
+      });
+
+      await wrapper.vm.submitSyntheticsSteps({ stepsLimit: 25000 } as any);
+
+      expect(wrapper.vm.syntheticsStepsPrompt).toBe(true);
+      expect(wrapper.vm.loading).toBe(false);
+      expect(mockToastFn).toHaveBeenCalledWith({
+        variant: "error",
+        message: "step limit update failed",
         timeout: 5000,
       });
     });

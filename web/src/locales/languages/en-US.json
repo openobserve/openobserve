@@ -8739,6 +8739,13 @@
       "aiCreditsTotal": "AI Credits Total",
       "currentlyUsedLabel": "Currently used:",
       "credits": "credits",
+      "setSyntheticsSteps": "Set Synthetics Steps",
+      "setSyntheticsStepsSubtitle": "Set the organization's lifetime synthetics step allowance.",
+      "saveSteps": "Save Steps",
+      "totalSyntheticsSteps": "Total Synthetics Steps",
+      "syntheticsStepsUsed": "Steps Used",
+      "syntheticsStepsTotal": "Steps Total",
+      "steps": "steps",
       "revoke": "Revoke",
       "enableStorage": "Enable Storage",
       "storageEnabled": "Storage Enabled",
@@ -8908,6 +8915,7 @@
       "errorBulkDeleting": "Error while deleting regex patterns"
     },
     "setAiCreditsFor": "Set AI Credits for {name}",
+    "setSyntheticsStepsFor": "Set Synthetics Steps for {name}",
     "limitExceeded": "Limit Exceeded",
     "contractEndDateRequired": "End date is required.",
     "contractNewEndDateRequired": "New end date is required.",
@@ -8916,6 +8924,10 @@
     "aiCreditsNegative": "AI credits cannot be negative.",
     "aiCreditsMax": "AI credits exceed the supported maximum.",
     "updateAiCreditsFailed": "Failed to update AI credits.",
+    "syntheticsStepsWholeNumber": "Synthetics steps must be a whole number.",
+    "syntheticsStepsNegative": "Synthetics steps cannot be negative.",
+    "syntheticsStepsMax": "Synthetics steps exceed the supported maximum.",
+    "updateSyntheticsStepsFailed": "Failed to update synthetics steps.",
     "listConjunctionAnd": "{list}, and {last}",
     "runsIn": "Runs in",
     "recommendedByFieldCoverage": "Recommended based on field coverage in your streams.",
@@ -14559,7 +14571,9 @@
     "settings": {
       "message": "{prefix}: {message}",
       "aiCreditsUpdatedSuccessfully": "AI credits updated successfully.",
-      "updatingAiCredits": "Updating AI credits..."
+      "syntheticsStepsUpdatedSuccessfully": "Synthetics steps updated successfully.",
+      "updatingAiCredits": "Updating AI credits...",
+      "updatingSyntheticsSteps": "Updating synthetics steps..."
     },
     "dashboard": {
       "clickOnTheChartDataOr": "Click on the chart data or select a range to add an annotation",
