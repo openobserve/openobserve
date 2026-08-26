@@ -157,18 +157,9 @@
           <!-- Two blocks in one column. The demo read as a wall: five sortable
                columns of history beside a rail restating reach and readiness that
                the Escalation and Members tabs already own. What is left is the
-               pair of questions this tab exists for — has this team been
-               answering, and is anybody there to answer next. -->
+               pair of questions this tab exists for — is anybody there to answer
+               next, and has this team been answering. -->
           <OContent y class="flex flex-col gap-5">
-            <OnCallRecentPages
-              :pages="recentPages"
-              :policy="policy"
-              :window-days="ACTIVITY_WINDOW_DAYS"
-              :loading="pagesLoading"
-              @open="openPage"
-              @view-all="openOnCallList"
-            />
-
             <!-- Gaps are the only thing worth looking at here, so they are the
                  only bands that get an alarming colour. -->
             <div
@@ -196,6 +187,15 @@
                 :days="COVERAGE_DAYS"
               />
             </div>
+
+            <OnCallRecentPages
+              :pages="recentPages"
+              :policy="policy"
+              :window-days="ACTIVITY_WINDOW_DAYS"
+              :loading="pagesLoading"
+              @open="openPage"
+              @view-all="openOnCallList"
+            />
           </OContent>
         </OTabPanel>
 

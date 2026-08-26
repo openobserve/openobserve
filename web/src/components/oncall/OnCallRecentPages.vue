@@ -15,13 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  The last few pages this team was woken by.
-
-  A short list, not a table: the team page is opened to learn whether the team is
-  answering, and five sortable columns made a reader parse a grid to find out.
-  Each row keeps the two facts that carry that answer — who picked it up and how
-  long it took — and says nothing when the answer is the unremarkable one. The
-  full history, with its columns and its filters, is one click away in On-Call.
+  The last few pages this team was woken by, in the same OTable every other
+  on-call list uses — capped to `limit` and static (no sort/filter/pagination
+  chrome), since the full sortable history is one click away in On-Call.
 -->
 <template>
   <div
@@ -46,47 +42,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <div v-if="loading" class="flex flex-col" data-test="oncall-recent-pages-loading">
-      <div v-for="row in limit" :key="row" class="border-border-subtle border-t px-4 py-3">
-        <OSkeleton type="text" class="w-1/3" />
-      </div>
-    </div>
-
-    <div
-      v-else-if="!rows.length"
-      class="border-border-subtle border-t"
-      data-test="oncall-recent-pages-empty"
+    <OTable
+      :data="rows"
+      :columns="columns"
+      row-key="id"
+      :frame="false"
+      :loading="loading"
+      pagination="none"
+      :show-global-filter="false"
+      table-id="oncall-recent-pages"
+      data-test="oncall-recent-pages-table"
+      @row-click="(row: OnCallResponse) => emit('open', row)"
     >
-      <OEmptyState preset="no-oncall-responses" hide-action />
-    </div>
+      <template #cell-subject="{ row }">
+        <span class="flex min-w-0 items-center gap-2">
+          <OCodeCell :value="row.title || row.subject.source_id" :copy="false" />
+          <!-- Only the two outcomes worth a second look are labelled: a page
+               answered by the first person it woke is the norm, and tagging the
+               norm is what made this list unreadable. -->
+          <OTag v-if="!row.acked_by" variant="error-soft" size="sm">
+            {{ t("oncall.teamNeverAcked") }}
+          </OTag>
+          <OTag v-else-if="isEscalated(row)" variant="amber-soft" size="sm">
+            {{ t("oncall.escalate") }}
+          </OTag>
+        </span>
+      </template>
 
-    <button
-      v-for="row in rows"
-      v-else
-      :key="row.page.id"
-      type="button"
-      class="border-border-subtle hover:bg-surface-subtle flex w-full flex-wrap items-center gap-x-3 gap-y-1 border-t px-4 py-2.5 text-start"
-      :data-test="`oncall-recent-pages-row-${row.page.id}`"
-      @click="emit('open', row.page)"
-    >
-      <span class="flex min-w-0 shrink items-center gap-2">
-        <OCodeCell :value="row.title" :copy="false" />
-        <!-- Only the two outcomes worth a second look are labelled: a page
-             answered by the first person it woke is the norm, and tagging the
-             norm is what made this list unreadable. -->
-        <OTag v-if="row.neverAcked" variant="error-soft" size="sm">
-          {{ t("oncall.teamNeverAcked") }}
-        </OTag>
-        <OTag v-else-if="row.escalated" variant="amber-soft" size="sm">
-          {{ t("oncall.escalate") }}
-        </OTag>
-      </span>
+      <template #cell-responder="{ row }">
+        <span v-if="row.acked_by && row.acked_at" class="text-text-secondary text-sm">
+          {{
+            t("oncall.teamAckedByIn", {
+              who: raw(row.acked_by),
+              took: raw(formatMicrosDuration(row.acked_at - row.opened_at)),
+            })
+          }}
+        </span>
+        <span v-else class="text-text-secondary text-sm">{{ t("oncall.neverAcknowledged") }}</span>
+      </template>
 
-      <span class="ms-auto flex shrink-0 items-center gap-3">
-        <span v-if="row.answered" class="text-text-secondary text-xs">{{ row.answered }}</span>
-        <OTimeCell :value="row.page.opened_at" unit="us" />
-      </span>
-    </button>
+      <template #cell-opened_at="{ value }">
+        <OTimeCell :value="value" unit="us" />
+      </template>
+
+      <template #empty>
+        <OEmptyState preset="no-oncall-responses" size="inline" hide-action />
+      </template>
+    </OTable>
   </div>
 </template>
 
@@ -96,10 +98,11 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -133,37 +136,36 @@ function secondRungDelay(page: OnCallResponse): number | null {
   return [...steps].sort((a, b) => a.after_micros - b.after_micros)[1].after_micros;
 }
 
-interface Row {
-  page: OnCallResponse;
-  title: string;
-  neverAcked: boolean;
-  escalated: boolean;
-  /** "acked by mei.tanaka · 7m", or empty when nobody answered. */
-  answered: I18nText | "";
+function isEscalated(page: OnCallResponse): boolean {
+  if (!page.acked_by || !page.acked_at) return false;
+  const after = secondRungDelay(page);
+  return after !== null && page.acked_at - page.opened_at >= after;
 }
 
-const rows = computed<Row[]>(() =>
-  [...props.pages]
-    .sort((a, b) => b.opened_at - a.opened_at)
-    .slice(0, props.limit)
-    .map((page) => {
-      const took = page.acked_at ? page.acked_at - page.opened_at : null;
-      const after = secondRungDelay(page);
-      return {
-        page,
-        title: page.title || page.subject.source_id,
-        neverAcked: !page.acked_by,
-        escalated: took !== null && after !== null && took >= after,
-        answered:
-          page.acked_by && took !== null
-            ? t("oncall.teamAckedByIn", {
-                who: raw(page.acked_by),
-                took: raw(formatMicrosDuration(took)),
-              })
-            : "",
-      };
-    }),
+const rows = computed<OnCallResponse[]>(() =>
+  [...props.pages].sort((a, b) => b.opened_at - a.opened_at).slice(0, props.limit),
 );
+
+const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
+  {
+    id: "subject",
+    header: t("oncall.subjectColumn"),
+    accessorFn: (page: OnCallResponse) => page.title || page.subject.source_id,
+    meta: { isName: true, flex: true },
+  },
+  {
+    id: "responder",
+    header: t("oncall.responder"),
+    accessorFn: (page: OnCallResponse) => page.acked_by ?? "",
+    size: 260,
+  },
+  {
+    id: "opened_at",
+    header: t("oncall.openedAt"),
+    accessorKey: "opened_at",
+    size: 160,
+  },
+]);
 
 /// "3 of 6 in the last 7 days" — a truncated list that does not say it is
 /// truncated reads as the whole history of the team.
