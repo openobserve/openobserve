@@ -84,9 +84,7 @@ describe("RemoteTaskFormPage — registering", () => {
     });
     await flushPromises();
     expect(errors).toEqual([]);
-    expect(wrapper.get('[data-test="ai-remote-task-form-title"]').text()).toBe(
-      "Register Remote Task",
-    );
+    expect(wrapper.get('[data-test="ai-remote-task-form-title"]').text()).toBe("New Remote Task");
   });
 
   // Registering is two calls: POST /tasks produces an unverified draft, and only

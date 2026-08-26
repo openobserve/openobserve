@@ -12,24 +12,6 @@
     class="border-border-default flex flex-wrap items-start gap-2.5 border-b px-4 py-2.5"
     data-test="ai-playground-variable-bar"
   >
-    <p v-if="!promptVars.length" class="text-text-secondary m-0 self-center text-xs">
-      {{ t("aiObservability.playground.noVariables", { token: variableToken }) }}
-    </p>
-
-    <div v-for="name in promptVars" :key="name" class="flex items-center gap-1.5">
-      <span class="text-accent text-2xs shrink-0 font-mono font-semibold">
-        {{ tokenFor(name) }}
-      </span>
-      <OInput
-        class="w-60"
-        :model-value="vars[name] ?? ''"
-        :placeholder="t('aiObservability.playground.variablePlaceholder', { name })"
-        size="sm"
-        :data-test="`ai-playground-var-input-${name}`"
-        @update:model-value="(value: string | number) => emit('set-var', name, String(value))"
-      />
-    </div>
-
     <OButton
       v-if="!showExpected"
       variant="ghost-primary"
@@ -74,22 +56,61 @@
       data-test="ai-playground-provenance"
     />
 
+    <!-- The walker is what replaces the row table: spot-check the neighbouring
+         items by stepping, without the page changing out from under you. -->
+    <template v-if="sample">
+      <span class="text-text-secondary text-xs" data-test="ai-playground-sample-position">
+        {{
+          t("aiObservability.playground.samplePosition", {
+            dataset: sample.datasetName,
+            index: sample.index + 1,
+            total: sample.total,
+          })
+        }}
+      </span>
+      <div class="inline-flex items-stretch">
+        <OButton
+          variant="outline"
+          size="icon-xs-sq"
+          icon-left="chevron-left"
+          class="rounded-s-default! rounded-e-none!"
+          :disabled="stepping || sample.index <= 0"
+          :title="t('aiObservability.playground.samplePrev')"
+          data-test="ai-playground-sample-prev"
+          @click="emit('step-sample', -1)"
+        />
+        <OButton
+          variant="outline"
+          size="icon-xs-sq"
+          icon-left="chevron-right"
+          class="rounded-e-default! rounded-s-none! border-s-0"
+          :disabled="stepping || sample.index >= sample.total - 1"
+          :title="t('aiObservability.playground.sampleNext')"
+          data-test="ai-playground-sample-next"
+          @click="emit('step-sample', 1)"
+        />
+      </div>
+      <OButton
+        variant="ghost-muted"
+        size="icon-xs-sq"
+        icon-left="close"
+        :title="t('aiObservability.playground.sampleClear')"
+        data-test="ai-playground-sample-clear"
+        @click="emit('clear-sample')"
+      />
+    </template>
+
     <OButton
       variant="outline"
       size="xs"
       data-test="ai-playground-sample-btn"
       @click="emit('sample')"
     >
-      {{ t("aiObservability.playground.sampleFromDataset") }}
-    </OButton>
-    <OButton
-      variant="outline"
-      size="xs"
-      icon-left="add"
-      data-test="ai-playground-add-row-btn"
-      @click="emit('add-row')"
-    >
-      {{ t("aiObservability.playground.addRow") }}
+      {{
+        sample
+          ? t("aiObservability.playground.sampleAgain")
+          : t("aiObservability.playground.sampleFromDataset")
+      }}
     </OButton>
 
     <p
@@ -111,6 +132,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import {
   EXPECTED_OUTPUT_TOKEN,
   type PlaygroundProvenance,
+  type PlaygroundSample,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 
 const props = defineProps<{
@@ -118,25 +140,20 @@ const props = defineProps<{
   vars: Record<string, string>;
   expected: string | null;
   provenance: PlaygroundProvenance | null;
+  sample: PlaygroundSample | null;
+  stepping?: boolean;
 }>();
 
 const emit = defineEmits<{
-  "set-var": [name: string, value: string];
   "set-expected": [value: string | null];
   sample: [];
-  "add-row": [];
+  "step-sample": [delta: number];
+  "clear-sample": [];
 }>();
 
 const { t } = useI18nTyped();
 
-const variableToken = "{{variables}}";
 const expectedToken = `{{${EXPECTED_OUTPUT_TOKEN}}}`;
-
-function tokenFor(name: string) {
-  return `{{${name}}}`;
-}
-
-const promptVars = computed(() => props.varNames.filter((name) => name !== EXPECTED_OUTPUT_TOKEN));
 
 const usesExpectedToken = computed(() => props.varNames.includes(EXPECTED_OUTPUT_TOKEN));
 

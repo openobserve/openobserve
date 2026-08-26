@@ -1,176 +1,206 @@
 <!-- Copyright 2026 OpenObserve Inc.
 
-  The identity strip for one variant — letter, model, temperature, staleness,
-  Run, and the overflow menu. Shared by the bench card and the compare-table
-  column header so the two never drift.
+  The identity strip for one variant: which model it runs, its parameters, and
+  the actions that operate on the column.
 
-  In `compact` mode the whole strip is a button that opens the variant config.
-  It carries a visible pencil rather than relying on a coach mark: an affordance
-  that has to be explained is one that has not been designed.
+  Provider and model are ONE control. Picking a model is how the work actually
+  starts — you know you want gemini-3.6-flash, not which of your providers
+  happens to carry it — so the list is model-first and each row names its
+  provider. Two selects made that two decisions and two clicks.
 -->
 <template>
   <div
-    class="flex min-w-0 gap-1.5"
-    :class="compact ? 'flex-col items-start' : 'items-center'"
+    class="flex min-w-0 items-center gap-1.5"
     :data-test="`ai-playground-variant-header-${label}`"
   >
-    <div class="flex w-full min-w-0 items-center gap-1.5">
-      <component
-        :is="compact ? 'button' : 'div'"
-        :type="compact ? 'button' : undefined"
-        class="flex min-w-0 items-center gap-1.5"
-        :class="
-          compact
-            ? 'rounded-default hover:border-border-strong hover:bg-surface-base -mx-1.5 cursor-pointer border border-transparent px-1.5 py-0.5 text-left'
-            : ''
-        "
-        :title="compact ? t('aiObservability.playground.editVariant') : undefined"
-        :data-test="`ai-playground-variant-open-${label}`"
-        @click="compact && emit('open-config')"
-      >
-        <span
-          class="border-border-default bg-surface-secondary text-text-secondary rounded-default text-2xs inline-flex h-5 w-5 shrink-0 items-center justify-center border font-mono font-bold"
-        >
-          {{ label }}
-        </span>
-        <span class="text-text-heading truncate font-mono text-xs font-semibold">
-          {{ variant.model || t("aiObservability.playground.modelPlaceholder") }}
-        </span>
-        <span class="text-text-secondary text-2xs shrink-0 font-mono">
-          {{ temperatureLabel }}
-        </span>
-        <OBadge
-          v-if="variant.stale"
-          variant="warning"
-          size="sm"
-          :label="t('aiObservability.playground.stale')"
-          :title="t('aiObservability.playground.staleTooltip')"
-          :data-test="`ai-playground-variant-stale-${label}`"
-        />
-        <OIcon v-if="compact" name="edit" size="xs" class="text-text-secondary shrink-0" />
-      </component>
+    <!-- One grower, not two. A bare spacer beside a `flex-1` select splits the
+         free space between them, which stalled the select at half the room it
+         could have used and showed the other half as a gap. -->
+    <div class="flex min-w-0 flex-1 items-center gap-1.5">
+      <!-- Flexible with a ceiling, not a fixed width: four benches share the
+           strip, and a rigid 12.5rem plus the actions overflows a column at its
+           min-width. It grows to the same size when there is room. -->
+      <OSelect
+        class="max-w-50 min-w-0 flex-1"
+        :model-value="selectedKey"
+        :options="modelOptions"
+        :placeholder="t('aiObservability.playground.modelPlaceholder')"
+        size="sm"
+        searchable
+        creatable
+        :data-test="`ai-playground-model-${variant.id}`"
+        @update:model-value="onPick"
+        @create="onCreate"
+      />
 
-      <div class="grow" />
-
-      <OButton
-        v-if="!compact"
-        variant="outline"
-        size="xs"
-        :icon-left="running ? undefined : 'play-arrow'"
-        :loading="running"
-        :disabled="runDisabled"
-        :title="t('aiObservability.playground.runVariant')"
-        :data-test="`ai-playground-variant-run-${label}`"
-        @click="emit('run')"
-      >
-        {{ t("aiObservability.playground.runVariant") }}
-      </OButton>
-
+      <!-- Parameters live behind the gear, not in the column: they are set once
+           and read never, while the messages below are edited constantly. -->
       <ODropdown align="end">
         <template #trigger>
           <OButton
             variant="ghost-muted"
             size="icon-xs"
-            icon-left="more-vert"
-            :data-test="`ai-playground-variant-menu-${label}`"
+            icon-left="settings"
+            class="shrink-0"
+            :title="t('aiObservability.playground.variantSettings')"
+            :data-test="`ai-playground-variant-settings-${label}`"
           />
         </template>
-        <ODropdownItem
-          icon-left="play-arrow"
-          :disabled="runDisabled"
-          :data-test="`ai-playground-variant-menu-run-${label}`"
-          @select="emit('run')"
-        >
-          {{ t("aiObservability.playground.runVariant") }}
-        </ODropdownItem>
-        <ODropdownItem
-          icon-left="content-copy"
-          :disabled="!canDuplicate"
-          :title="
-            canDuplicate
-              ? undefined
-              : t('aiObservability.playground.variantLimit', { max: maxVariants })
-          "
-          :data-test="`ai-playground-variant-menu-duplicate-${label}`"
-          @select="canDuplicate && emit('duplicate')"
-        >
-          {{ t("aiObservability.playground.duplicateVariant") }}
-        </ODropdownItem>
-        <ODropdownItem
-          icon-left="science"
-          :data-test="`ai-playground-variant-menu-experiment-${label}`"
-          @select="emit('create-experiment')"
-        >
-          {{ t("aiObservability.playground.createExperiment") }}
-        </ODropdownItem>
-        <ODropdownSeparator />
-        <ODropdownItem
-          variant="destructive"
-          icon-left="delete"
-          :disabled="!canRemove"
-          :data-test="`ai-playground-variant-menu-remove-${label}`"
-          @select="canRemove && emit('remove')"
-        >
-          {{ t("aiObservability.playground.removeVariant") }}
-        </ODropdownItem>
+        <div class="flex w-56 flex-col gap-1 p-2">
+          <span class="text-text-heading text-xs font-semibold">
+            {{ t("aiObservability.playground.variantSettings") }}
+          </span>
+          <OInput
+            :model-value="variant.temperature"
+            type="number"
+            min="0"
+            max="2"
+            step="0.1"
+            :label="t('aiObservability.playground.temperature')"
+            size="sm"
+            :data-test="`ai-playground-temperature-${variant.id}`"
+            @update:model-value="(value: string | number) => patch({ temperature: String(value) })"
+          />
+        </div>
       </ODropdown>
     </div>
 
-    <!-- Two variants can share a model; the opening prompt line is what tells
-         them apart at a glance. -->
-    <span
-      v-if="compact && summary.promptLine"
-      class="text-text-secondary text-2xs w-full truncate font-mono"
-      :title="summary.promptLine"
-      :data-test="`ai-playground-variant-prompt-${label}`"
-    >
-      {{ summary.promptLine }}
-    </span>
+    <!-- One button, not two: a blank column is almost never what someone wants
+         next to a variant they have just tuned, so plus clones this one. -->
+    <OButton
+      variant="ghost-muted"
+      size="icon-xs"
+      class="shrink-0"
+      icon-left="add"
+      :disabled="!canDuplicate"
+      :title="
+        canDuplicate
+          ? t('aiObservability.playground.duplicateVariant')
+          : t('aiObservability.playground.variantLimit', { max: maxVariants })
+      "
+      :data-test="`ai-playground-variant-split-${label}`"
+      @click="canDuplicate && emit('duplicate')"
+    />
+    <OButton
+      variant="ghost-muted"
+      size="icon-xs"
+      class="shrink-0"
+      icon-left="science"
+      :title="t('aiObservability.playground.createExperiment')"
+      :data-test="`ai-playground-variant-experiment-${label}`"
+      @click="emit('create-experiment')"
+    />
+    <OButton
+      variant="ghost-muted"
+      size="icon-xs"
+      class="shrink-0"
+      icon-left="close"
+      :disabled="!canRemove"
+      :title="t('aiObservability.playground.removeVariant')"
+      :data-test="`ai-playground-variant-close-${label}`"
+      @click="canRemove && emit('remove')"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
   MAX_VARIANTS,
-  variantSummary,
   type PlaygroundVariant,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
+import type { Provider } from "@/services/online-evals.service";
+
+/** Provider id and model travel as one select value but stay two fields on the
+ *  variant — the run request, the experiment handoff and the draft titles all
+ *  read them separately. */
+const KEY_SEPARATOR = "::";
 
 const props = withDefaults(
   defineProps<{
     variant: PlaygroundVariant;
     label: string;
-    running?: boolean;
-    runDisabled?: boolean;
+    providers: Provider[];
     canRemove?: boolean;
     canDuplicate?: boolean;
-    /** Table-header rendering: the strip itself opens the config dialog. */
-    compact?: boolean;
   }>(),
-  { running: false, runDisabled: false, canRemove: true, canDuplicate: true, compact: false },
+  {
+    canRemove: true,
+    canDuplicate: true,
+  },
 );
 
 const emit = defineEmits<{
-  run: [];
+  change: [variant: PlaygroundVariant];
   duplicate: [];
   remove: [];
   "create-experiment": [];
-  "open-config": [];
 }>();
 
 const { t } = useI18nTyped();
 
 const maxVariants = MAX_VARIANTS;
 
-const temperatureLabel = computed(() => raw(`t=${props.variant.temperature}`));
+const selectedKey = computed(() =>
+  props.variant.providerId ? keyFor(props.variant.providerId, props.variant.model) : "",
+);
 
-const summary = computed(() => variantSummary(props.variant));
+const modelOptions = computed<SelectOption[]>(() => {
+  const options: SelectOption[] = [];
+  for (const provider of props.providers) {
+    const models = provider.availableModels ?? provider.available_models ?? [];
+    for (const model of models) {
+      options.push({
+        label: raw(`${provider.name}: ${model}`),
+        value: keyFor(provider.id, model),
+      });
+    }
+  }
+  // A hand-typed model is not in any provider's list, so the trigger would fall
+  // back to the placeholder and read as "nothing selected".
+  if (props.variant.model && !options.some((option) => option.value === selectedKey.value)) {
+    options.unshift({ label: raw(currentLabel.value), value: selectedKey.value });
+  }
+  return options;
+});
+
+const currentLabel = computed(() => {
+  const provider = props.providers.find((candidate) => candidate.id === props.variant.providerId);
+  return provider ? `${provider.name}: ${props.variant.model}` : props.variant.model;
+});
+
+function keyFor(providerId: string, model: string): string {
+  return `${providerId}${KEY_SEPARATOR}${model}`;
+}
+
+function patch(changes: Partial<PlaygroundVariant>) {
+  emit("change", { ...props.variant, ...changes });
+}
+
+function onPick(value: unknown) {
+  const key = String(value ?? "");
+  const at = key.indexOf(KEY_SEPARATOR);
+  if (at === -1) return;
+  patch({ providerId: key.slice(0, at), model: key.slice(at + KEY_SEPARATOR.length) });
+}
+
+/**
+ * A typed model has no provider of its own, so it inherits one: the variant's
+ * current provider first, then the org default. Without a fallback the name
+ * would be unrunnable, and the failure would only surface at run time.
+ */
+function onCreate(model: string) {
+  const fallback =
+    props.providers.find((candidate) => candidate.isDefault ?? candidate.is_default) ??
+    props.providers[0];
+  const providerId = props.variant.providerId || fallback?.id || "";
+  if (!providerId) return;
+  patch({ providerId, model });
+}
 </script>

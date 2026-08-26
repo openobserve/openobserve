@@ -1,18 +1,22 @@
 <!-- Copyright 2026 OpenObserve Inc.
 
-  Tool definitions for one variant. The Playground never executes a tool — when
-  the model issues a call, the call itself is the output and the run stops. That
-  is stated in the dialog because it is the surprising part, and it is a product
-  decision rather than a gap.
+  ONE tool at a time — either a new one or an existing one opened from the
+  Tools menu. The Playground never executes a tool: when the model issues a
+  call, the call itself is the output and the run stops there, which is stated
+  in the dialog because it is the surprising part.
+
+  There is no list and no add button here. The Tools button means "add one",
+  the menu beside it means "look at that one", so the dialog never has to ask
+  which tool is being edited.
 -->
 <template>
   <ODialog
     :open="open"
     size="md"
-    :title="t('aiObservability.playground.toolsTitle')"
+    :title="title"
     :primary-button-label="t('common.apply')"
     :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="!!invalidIndex"
+    :primary-button-disabled="invalid"
     data-test="ai-playground-tools-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="apply"
@@ -23,72 +27,45 @@
         {{ t("aiObservability.playground.toolsIntro") }}
       </p>
 
-      <p
-        v-if="!draft.length"
-        class="border-border-default rounded-default text-text-secondary m-0 border border-dashed px-3 py-4 text-center text-xs"
-      >
-        {{ t("aiObservability.playground.toolsEmpty") }}
-      </p>
-
-      <div
-        v-for="(tool, index) in draft"
-        :key="index"
-        class="border-border-default rounded-default flex flex-col gap-2 border px-3 py-2.5"
-        :data-test="`ai-playground-tool-${index}`"
-      >
-        <div class="flex items-end gap-2">
-          <OInput
-            class="min-w-0 flex-1"
-            :model-value="tool.name"
-            :label="t('aiObservability.playground.toolName')"
-            :placeholder="t('aiObservability.playground.toolNamePlaceholder')"
-            size="sm"
-            :data-test="`ai-playground-tool-name-${index}`"
-            @update:model-value="(value: string | number) => set(index, { name: String(value) })"
-          />
-          <OButton
-            variant="ghost-destructive"
-            size="icon-md"
-            icon-left="delete"
-            :title="t('aiObservability.playground.removeTool')"
-            :data-test="`ai-playground-tool-remove-${index}`"
-            @click="remove(index)"
-          />
-        </div>
-        <OInput
-          :model-value="tool.description"
-          :label="t('aiObservability.playground.toolDescription')"
-          :placeholder="t('aiObservability.playground.toolDescriptionPlaceholder')"
-          size="sm"
-          :data-test="`ai-playground-tool-description-${index}`"
-          @update:model-value="
-            (value: string | number) => set(index, { description: String(value) })
-          "
-        />
-        <OTextarea
-          :model-value="tool.parameters"
-          :label="t('aiObservability.playground.toolParameters')"
-          :help-text="t('aiObservability.playground.toolParametersHelp')"
-          :placeholder="t('aiObservability.playground.toolParametersPlaceholder')"
-          :rows="4"
-          size="sm"
-          fill
-          :error="invalidIndex === index + 1"
-          :error-message="t('aiObservability.playground.toolInvalidJson')"
-          :data-test="`ai-playground-tool-parameters-${index}`"
-          @update:model-value="(value: string) => set(index, { parameters: value })"
-        />
-      </div>
+      <OInput
+        :model-value="current.name"
+        :label="t('aiObservability.playground.toolName')"
+        :placeholder="t('aiObservability.playground.toolNamePlaceholder')"
+        size="sm"
+        data-test="ai-playground-tool-name"
+        @update:model-value="(value: string | number) => set({ name: String(value) })"
+      />
+      <OInput
+        :model-value="current.description"
+        :label="t('aiObservability.playground.toolDescription')"
+        :placeholder="t('aiObservability.playground.toolDescriptionPlaceholder')"
+        size="sm"
+        data-test="ai-playground-tool-description"
+        @update:model-value="(value: string | number) => set({ description: String(value) })"
+      />
+      <OTextarea
+        :model-value="current.parameters"
+        :label="t('aiObservability.playground.toolParameters')"
+        :help-text="t('aiObservability.playground.toolParametersHelp')"
+        :placeholder="parametersPlaceholder"
+        :rows="4"
+        size="sm"
+        :error="invalid"
+        :error-message="t('aiObservability.playground.toolInvalidJson')"
+        data-test="ai-playground-tool-parameters"
+        @update:model-value="(value: string) => set({ parameters: value })"
+      />
 
       <OButton
-        variant="outline"
+        v-if="index !== null"
+        variant="ghost-destructive"
         size="sm"
-        icon-left="add"
+        icon-left="delete"
         class="self-start"
-        data-test="ai-playground-tool-add"
-        @click="add"
+        data-test="ai-playground-tool-remove"
+        @click="remove"
       >
-        {{ t("aiObservability.playground.addTool") }}
+        {{ t("aiObservability.playground.removeTool") }}
       </OButton>
     </div>
   </ODialog>
@@ -96,14 +73,24 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import type { PlaygroundTool } from "@/enterprise/views/AIObservability/playgroundDraft";
 
-const props = defineProps<{ open: boolean; tools: PlaygroundTool[] }>();
+/** A JSON sample, not prose — and vue-i18n reads `{ … }` in a message as
+ *  placeholder syntax, so holding it in the catalogue made the form throw at
+ *  message-compile time. */
+const parametersPlaceholder = raw('{ "type": "object", "properties": { … } }');
+
+const props = defineProps<{
+  open: boolean;
+  tools: PlaygroundTool[];
+  /** Position of the tool being edited, or null to define a new one. */
+  index: number | null;
+}>();
 
 const emit = defineEmits<{
   "update:open": [value: boolean];
@@ -112,51 +99,65 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-const draft = ref<PlaygroundTool[]>([]);
+const current = ref<PlaygroundTool>(blankTool());
 
 // Edits are local until Apply, so Cancel really discards.
 watch(
-  () => props.open,
-  (isOpen) => {
-    if (isOpen) draft.value = props.tools.map((tool) => ({ ...tool }));
+  () => [props.open, props.index] as const,
+  ([isOpen, index]) => {
+    if (!isOpen) return;
+    const existing = index === null ? null : props.tools[index];
+    current.value = existing ? { ...existing } : blankTool();
   },
   { immediate: true },
 );
 
-/** 1-based index of the first tool with unparseable parameters, or 0. */
-const invalidIndex = computed(() => {
-  for (let index = 0; index < draft.value.length; index += 1) {
-    const parameters = draft.value[index].parameters.trim();
-    if (!parameters) continue;
-    try {
-      JSON.parse(parameters);
-    } catch {
-      return index + 1;
-    }
+const title = computed(() =>
+  props.index === null
+    ? t("aiObservability.playground.addTool")
+    : raw(props.tools[props.index]?.name) || t("aiObservability.playground.toolUnnamed"),
+);
+
+const invalid = computed(() => {
+  const parameters = current.value.parameters.trim();
+  if (!parameters) return false;
+  try {
+    JSON.parse(parameters);
+    return false;
+  } catch {
+    return true;
   }
-  return 0;
 });
 
-function set(index: number, changes: Partial<PlaygroundTool>) {
-  draft.value = draft.value.map((tool, position) =>
-    position === index ? { ...tool, ...changes } : tool,
-  );
+function blankTool(): PlaygroundTool {
+  return { name: "", description: "", parameters: "" };
 }
 
-function add() {
-  draft.value = [...draft.value, { name: "", description: "", parameters: "" }];
+function set(changes: Partial<PlaygroundTool>) {
+  current.value = { ...current.value, ...changes };
 }
 
-function remove(index: number) {
-  draft.value = draft.value.filter((_, position) => position !== index);
+function commit(tools: PlaygroundTool[]) {
+  emit("apply", tools);
+  emit("update:open", false);
 }
 
 function apply() {
-  // An unnamed tool cannot be called, so it is not a tool.
-  emit(
-    "apply",
-    draft.value.filter((tool) => tool.name.trim().length > 0),
+  // An unnamed tool cannot be called, so it is not a tool. Applying one that
+  // was never named is a cancel, and applying over an existing name clears it.
+  const named = current.value.name.trim().length > 0;
+  if (props.index === null) {
+    commit(named ? [...props.tools, current.value] : [...props.tools]);
+    return;
+  }
+  commit(
+    props.tools.flatMap((tool, position) =>
+      position === props.index ? (named ? [current.value] : []) : [tool],
+    ),
   );
-  emit("update:open", false);
+}
+
+function remove() {
+  commit(props.tools.filter((_, position) => position !== props.index));
 }
 </script>

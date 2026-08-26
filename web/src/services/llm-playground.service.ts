@@ -6,7 +6,7 @@
 // (at your option) any later version.
 
 /**
- * Playground run contract.
+ * Playground run and score contract.
  *
  * Speaks to `POST /api/{org}/playground/run`, which streams Server-Sent
  * Events. The server is the source of truth for this shape: it nests the
@@ -20,7 +20,7 @@
  */
 
 import store from "@/stores";
-import { attemptTokenRefresh } from "@/services/http";
+import http, { attemptTokenRefresh } from "@/services/http";
 
 /** Set true to run against the deterministic mock instead of the live route. */
 export const PLAYGROUND_USE_MOCK = false;
@@ -100,6 +100,65 @@ export function runPlayground(
   return PLAYGROUND_USE_MOCK
     ? runPlaygroundMock(request, options)
     : runLive(orgId, request, options);
+}
+
+// ── scoring ───────────────────────────────────────────────────────
+
+export interface PlaygroundScoreRequest {
+  /** Resolved at their latest version — a draft never pins one. */
+  scorerIds: string[];
+  input?: unknown;
+  output: string;
+  expectedOutput?: unknown;
+  metadata?: unknown;
+}
+
+/** One scorer's verdict. A scorer that could not run says why rather than
+ *  vanishing from the response, so the caller can show the reason. */
+export interface PlaygroundScoreResult {
+  scorerId: string;
+  scorerName: string;
+  scorerVersion: number;
+  status: "scored" | "skipped" | "failed";
+  numeric: number | null;
+  categorical: string | null;
+  boolean: boolean | null;
+  reasoning: string | null;
+  /** `skipped` only. */
+  reason: "no_reference" | "requires_trace" | null;
+  /** `failed` only. */
+  error: string | null;
+}
+
+/**
+ * Judge one output. Records nothing: a draft verdict must not reach the score
+ * stream the analytics are built on.
+ */
+export async function scorePlayground(
+  orgId: string,
+  request: PlaygroundScoreRequest,
+): Promise<PlaygroundScoreResult[]> {
+  const response = await http().post(`/api/${orgId}/playground/score`, request);
+  const results = Array.isArray(response.data?.results) ? response.data.results : [];
+  return results.map(normalizeScore);
+}
+
+function normalizeScore(row: any): PlaygroundScoreResult {
+  // `status` and the value fields arrive flattened onto one object, so a
+  // `scored` row and a `failed` row are told apart only by this field.
+  const status = row?.status === "skipped" || row?.status === "failed" ? row.status : "scored";
+  return {
+    scorerId: String(row?.scorerId ?? row?.scorer_id ?? ""),
+    scorerName: String(row?.scorerName ?? row?.scorer_name ?? ""),
+    scorerVersion: Number(row?.scorerVersion ?? row?.scorer_version ?? 0),
+    status,
+    numeric: typeof row?.numeric === "number" ? row.numeric : null,
+    categorical: typeof row?.categorical === "string" ? row.categorical : null,
+    boolean: typeof row?.boolean === "boolean" ? row.boolean : null,
+    reasoning: typeof row?.reasoning === "string" ? row.reasoning : null,
+    reason: row?.reason === "no_reference" || row?.reason === "requires_trace" ? row.reason : null,
+    error: typeof row?.error === "string" ? row.error : null,
+  };
 }
 
 // ── wire shaping ──────────────────────────────────────────────────

@@ -9,6 +9,7 @@
  */
 
 import type { I18nText } from "@/types/i18n";
+import type { PlaygroundScoreResult } from "@/services/llm-playground.service";
 
 /** Golden answers feed scorers only. Binding one into a task prompt would leak
  *  the answer into the question, so this token is never substituted. */
@@ -17,9 +18,6 @@ export const EXPECTED_OUTPUT_TOKEN = "expected_output";
 /** A bench holds at most four variants — past that the columns stop being
  *  comparable at a glance, which is the only reason to put them side by side. */
 export const MAX_VARIANTS = 4;
-
-/** Diagnostic scale. Conclusions over a full dataset are an experiment's job. */
-export const MAX_ROWS = 10;
 
 /** The row key used in editor-bench mode, where there is no row table. */
 export const SINGLE_ROW_KEY = "single";
@@ -32,6 +30,12 @@ export interface PlaygroundMessage {
   content: string;
   /** Carried in from a source trace — removable, never editable. */
   readonly?: boolean;
+  /**
+   * `tool` role only: which of the variant's tools this response answers.
+   * Draft-side only — the run request carries `role` + `content` and nothing
+   * else, so this labels the message for the author, not for the provider.
+   */
+  toolName?: string;
 }
 
 export interface PlaygroundTool {
@@ -50,23 +54,17 @@ export interface PlaygroundVariant {
   messages: PlaygroundMessage[];
   tools: PlaygroundTool[];
   responseSchema: string | null;
-  /** Config changed since the last run, so the outputs on screen no longer
-   *  describe the config on screen. */
-  stale: boolean;
 }
 
-export interface PlaygroundRowSource {
+/** Where the loaded `vars` came from, and where it sits in the dataset so the
+ *  bench can walk to the neighbouring item without a picker. */
+export interface PlaygroundSample {
   datasetId: string;
   datasetName: string;
   itemId: string;
-}
-
-export interface PlaygroundRow {
-  id: string;
-  input: string;
-  expectedOutput: string | null;
-  /** Sampled by value — a later dataset edit never changes a sampled row. */
-  source: PlaygroundRowSource | null;
+  /** Zero-based position in the dataset, for Prev/Next. */
+  index: number;
+  total: number;
 }
 
 export interface PlaygroundProvenance {
@@ -76,12 +74,17 @@ export interface PlaygroundProvenance {
 
 export interface PlaygroundDraft {
   variants: PlaygroundVariant[];
-  /** null ⇒ editor bench. A non-empty array ⇒ compare table. */
-  rows: PlaygroundRow[] | null;
-  /** Editor bench only: the values bound to `{{tokens}}` in the messages. */
+  /** The values bound to `{{tokens}}` in the messages. */
   vars: Record<string, string>;
   expectedSingle: string | null;
+  /** The dataset item currently loaded into `vars`, if any. */
+  sample: PlaygroundSample | null;
   provenance: PlaygroundProvenance | null;
+  /** Scorers to judge the outputs with, at their latest version. Pinning a
+   *  version belongs to an Experiment, not to a draft. */
+  scorerIds: string[];
+  /** Score every output as soon as its run finishes. */
+  autoScore: boolean;
 }
 
 export interface PlaygroundUsage {
@@ -96,6 +99,10 @@ export interface PlaygroundToolCall {
   arguments: string;
 }
 
+/** One scorer's verdict on one output — the endpoint's result, kept as the
+ *  bench's own model so there is one definition of a score, not two. */
+export type PlaygroundScore = PlaygroundScoreResult;
+
 export interface PlaygroundCellError {
   message: string;
   retryable: boolean;
@@ -107,6 +114,12 @@ export interface PlaygroundCell {
   toolCall: PlaygroundToolCall | null;
   usage: PlaygroundUsage | null;
   error: PlaygroundCellError | null;
+  /** Verdicts on this output. Absent until it has been scored. */
+  scores?: PlaygroundScore[];
+  scoring?: boolean;
+  /** The output and scorer set these verdicts belong to. An output that has
+   *  not changed is never re-scored, and a judge call is not free. */
+  scoredKey?: string;
 }
 
 /** `{ [variantId]: { [rowKey]: cell } }` — kept beside the draft rather than
@@ -166,54 +179,12 @@ export function renderTemplate(text: string, vars: Record<string, string>): stri
   });
 }
 
-/** The variables a row exposes. A plain-text row exposes exactly `input`. */
-export function rowVars(row: PlaygroundRow): Record<string, string> {
-  return { input: row.input };
-}
-
-/** Field names the current rows expose, usable as `{{tokens}}`. */
-export function rowFieldsFor(rows: PlaygroundRow[] | null): string[] {
-  if (!rows || rows.length === 0) return [];
-  return ["input"];
-}
-
-/**
- * True when the rows expose fields and not one variant references any of them —
- * every row would then produce identical output while still costing
- * `rows × variants` model calls.
- */
-export function hasZeroFieldReference(
-  variants: PlaygroundVariant[],
-  rows: PlaygroundRow[] | null,
-): boolean {
-  const fields = rowFieldsFor(rows);
-  if (fields.length === 0) return false;
-  const used = extractVars(variants);
-  return !used.some((name) => fields.includes(name));
-}
-
 // ── labels ────────────────────────────────────────────────────────
 
 const VARIANT_LETTERS = ["A", "B", "C", "D"];
 
 export function variantLabel(index: number): string {
   return VARIANT_LETTERS[index] ?? String(index + 1);
-}
-
-export interface PlaygroundVariantSummary {
-  model: string;
-  temperature: string;
-  /** First non-empty message, collapsed to one line for a table header. */
-  promptLine: string;
-}
-
-export function variantSummary(variant: PlaygroundVariant): PlaygroundVariantSummary {
-  const first = variant.messages.find((message) => message.content.trim().length > 0);
-  return {
-    model: variant.model,
-    temperature: variant.temperature,
-    promptLine: first ? first.content.replace(/\s+/g, " ").trim() : "",
-  };
 }
 
 // ── draft construction and mutation ───────────────────────────────
@@ -230,29 +201,28 @@ export function emptyVariant(providerId = "", model = ""): PlaygroundVariant {
     ],
     tools: [],
     responseSchema: null,
-    stale: false,
   };
 }
 
 export function starterDraft(providerId = "", model = ""): PlaygroundDraft {
   return {
     variants: [emptyVariant(providerId, model)],
-    rows: null,
     vars: {},
     expectedSingle: null,
+    sample: null,
     provenance: null,
+    scorerIds: [],
+    autoScore: false,
   };
 }
 
-/** Deep copy with fresh ids. The clone has never run, so it is not stale and
- *  carries none of the source's results. */
+/** Deep copy with fresh ids. The clone carries none of the source's results. */
 export function cloneVariant(variant: PlaygroundVariant): PlaygroundVariant {
   return {
     ...variant,
     id: playgroundId("variant"),
     messages: variant.messages.map((message) => ({ ...message, id: playgroundId("msg") })),
     tools: variant.tools.map((tool) => ({ ...tool })),
-    stale: false,
   };
 }
 
@@ -272,7 +242,6 @@ export function withFieldInserted(variant: PlaygroundVariant, field: string): Pl
 
   return {
     ...variant,
-    stale: true,
     messages: variant.messages.map((message) =>
       message.id === target.id
         ? {
@@ -304,12 +273,6 @@ export function insertTokenAt(
 
 // ── run keys and cells ────────────────────────────────────────────
 
-/** The row keys a run fans out over: the row ids, or the single-input key. */
-export function rowKeysFor(draft: PlaygroundDraft): string[] {
-  if (!draft.rows || draft.rows.length === 0) return [SINGLE_ROW_KEY];
-  return draft.rows.map((row) => row.id);
-}
-
 export function idleCell(): PlaygroundCell {
   return { status: "idle", text: "", toolCall: null, usage: null, error: null };
 }
@@ -322,22 +285,6 @@ export function cellAt(
   return results[variantId]?.[rowKey];
 }
 
-/**
- * The variables in play for one run: the row's fields in table mode, or the
- * hand-entered values in editor-bench mode.
- */
-export function varsForRow(draft: PlaygroundDraft, rowKey: string): Record<string, string> {
-  if (rowKey === SINGLE_ROW_KEY || !draft.rows) return { ...draft.vars };
-  const row = draft.rows.find((candidate) => candidate.id === rowKey);
-  return row ? rowVars(row) : {};
-}
-
-/** The reference answer for a run, if the row carries one. */
-export function expectedForRow(draft: PlaygroundDraft, rowKey: string): string | null {
-  if (rowKey === SINGLE_ROW_KEY || !draft.rows) return draft.expectedSingle;
-  return draft.rows.find((candidate) => candidate.id === rowKey)?.expectedOutput ?? null;
-}
-
 /** The messages actually sent for one row — what the drawer's rendered prompt
  *  shows, and what the run builder passes to the service. */
 export function renderedMessages(
@@ -348,4 +295,142 @@ export function renderedMessages(
     ...message,
     content: renderTemplate(message.content, vars),
   }));
+}
+
+/**
+ * The role a new message should take.
+ *
+ * A conversation alternates, so the next turn is the opposite of the last real
+ * one. System and tool messages are skipped when looking back: they are context
+ * around the exchange, not a turn in it, so a system-only prompt is still
+ * waiting for its first user message.
+ */
+export function nextMessageRole(messages: PlaygroundMessage[]): PlaygroundRole {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const role = messages[index].role;
+    if (role === "user") return "assistant";
+    if (role === "assistant") return "user";
+  }
+  return "user";
+}
+
+// ── scorers ───────────────────────────────────────────────────────
+
+/** What a scorer's template demands of the thing it judges. */
+export interface ScorerEvidence {
+  expectedOutput: boolean;
+  trace: boolean;
+}
+
+/**
+ * Read a scorer's evidence requirements out of its template.
+ *
+ * Deliberately the same rule the server applies before it runs one: the root of
+ * every `{{token}}`, so `{{spans.0.name}}` counts as a trace reference. Doing it
+ * client-side is what lets the picker say up front that a scorer cannot judge
+ * this bench, instead of showing the answer as a skip after a round trip.
+ */
+export function scorerEvidence(template: string): ScorerEvidence {
+  const evidence: ScorerEvidence = { expectedOutput: false, trace: false };
+  for (const match of template.matchAll(/\{\{([^}]*)\}\}/g)) {
+    const root = match[1].trim().split(".")[0];
+    if (root === EXPECTED_OUTPUT_TOKEN) evidence.expectedOutput = true;
+    else if (root === "spans" || root === "steps") evidence.trace = true;
+  }
+  return evidence;
+}
+
+/** The bench has a reference to compare against. Matches the server's rule: an
+ *  empty or blank expected output is no reference at all. */
+export function hasReference(expected: string | null): boolean {
+  return Boolean(expected && expected.trim());
+}
+
+// ── snapshots ─────────────────────────────────────────────────────
+
+/** Bumped only when an older payload can no longer be read as-is. */
+export const PLAYGROUND_SNAPSHOT_VERSION = 1;
+
+/**
+ * What a shared snapshot carries.
+ *
+ * `columns` and `rows` are the only parts the server reads — it counts them
+ * against the workbench limits and diffs a snapshot against its parent — so
+ * they are written in ITS vocabulary and duplicate what the draft already says.
+ * Everything the bench needs to rebuild itself travels beside them in `draft`
+ * and `results`, which the server stores verbatim and never interprets.
+ */
+export interface PlaygroundSnapshotPayload {
+  version: number;
+  columns: {
+    providerId: string;
+    model: string;
+    params: { temperature: number };
+    messages: { role: PlaygroundRole; content: string }[];
+  }[];
+  rows: { vars: Record<string, string>; expected: string | null }[];
+  draft: PlaygroundDraft;
+  results: PlaygroundResults;
+}
+
+export function snapshotPayload(
+  draft: PlaygroundDraft,
+  results: PlaygroundResults,
+): PlaygroundSnapshotPayload {
+  return {
+    version: PLAYGROUND_SNAPSHOT_VERSION,
+    columns: draft.variants.map((variant) => ({
+      providerId: variant.providerId,
+      model: variant.model,
+      params: { temperature: Number(variant.temperature) || 0 },
+      messages: variant.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+    })),
+    // One row: the bench binds a single set of values at a time.
+    rows: [{ vars: { ...draft.vars }, expected: draft.expectedSingle }],
+    draft: JSON.parse(JSON.stringify(draft)) as PlaygroundDraft,
+    results: settledResults(results),
+  };
+}
+
+/** Only outcomes travel. A cell caught mid-stream would restore as a run that
+ *  is forever in flight, and an idle one carries nothing to show. */
+function settledResults(results: PlaygroundResults): PlaygroundResults {
+  const settled: PlaygroundResults = {};
+  for (const [variantId, byRow] of Object.entries(results)) {
+    for (const [rowKey, cell] of Object.entries(byRow)) {
+      if (cell.status !== "done" && cell.status !== "error") continue;
+      (settled[variantId] ??= {})[rowKey] = { ...cell };
+    }
+  }
+  return settled;
+}
+
+/**
+ * Read a stored payload back into a bench, or null when it carries no draft.
+ *
+ * A snapshot written by a newer client is still opened: the server stores it
+ * verbatim, so anything this build does not know about is simply not shown,
+ * which beats refusing a link someone shared.
+ */
+export function draftFromSnapshot(
+  payload: unknown,
+): { draft: PlaygroundDraft; results: PlaygroundResults } | null {
+  const stored = payload as Partial<PlaygroundSnapshotPayload> | null;
+  const draft = stored?.draft;
+  if (!draft || !Array.isArray(draft.variants) || !draft.variants.length) return null;
+  return {
+    draft: {
+      variants: draft.variants,
+      vars: draft.vars ?? {},
+      expectedSingle: draft.expectedSingle ?? null,
+      sample: draft.sample ?? null,
+      provenance: draft.provenance ?? null,
+      scorerIds: draft.scorerIds ?? [],
+      autoScore: draft.autoScore ?? false,
+    },
+    results: (stored?.results ?? {}) as PlaygroundResults,
+  };
 }

@@ -44,8 +44,7 @@ const AIRemoteTaskFormPage = () =>
   import("@/enterprise/components/AIObservability/RemoteTaskFormPage.vue");
 const AIExperimentCreatePage = () =>
   import("@/enterprise/components/AIObservability/ExperimentForm.vue");
-const AIPlaygroundPage = () =>
-  import("@/enterprise/views/AIObservability/PlaygroundPage.vue");
+const AIPlaygroundPage = () => import("@/enterprise/views/AIObservability/PlaygroundPage.vue");
 const AIDiscoveryPage = () => import("@/enterprise/views/AIObservability/DiscoveryPage.vue");
 const AIQueuesPage = () => import("@/enterprise/views/AIObservability/QueuesPage.vue");
 const AIQueueDetailPage = () => import("@/enterprise/views/AIObservability/QueueDetailPage.vue");
@@ -206,7 +205,7 @@ const useEnvRoutes = () => {
           path: "remote-tasks/new",
           name: "aiRemoteTaskCreate",
           component: AIRemoteTaskFormPage,
-          meta: { title: "Register Remote Task", keepAlive: false },
+          meta: { title: "New Remote Task", keepAlive: false },
         },
         {
           path: "remote-tasks/:id/edit",

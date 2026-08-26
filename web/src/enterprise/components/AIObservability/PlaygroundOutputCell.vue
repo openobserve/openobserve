@@ -4,9 +4,9 @@
   tool-call variant, where the call itself IS the output and the run ended
   there.
 
-  Nothing here is tinted by quality. With n ≤ 10 and no scoring, any red or
-  green would be a verdict the bench cannot support; the only colour is run
-  state.
+  Nothing here is tinted by quality. With n ≤ 10 a red or green score chip
+  would read as a verdict the bench cannot support, so colour marks run state
+  and nothing else — a score that failed to run is the one exception.
 -->
 <template>
   <div class="flex flex-col gap-2" :data-test="dataTest">
@@ -68,7 +68,7 @@
     <template v-else>
       <div
         class="text-text-body font-mono text-xs leading-relaxed wrap-break-word whitespace-pre-wrap"
-        :class="[stale ? 'opacity-40' : '', compact ? 'line-clamp-3' : '']"
+        :class="compact ? 'line-clamp-3' : ''"
         data-test="ai-playground-output-text"
       >
         {{ cell.text
@@ -95,6 +95,40 @@
         }}
       </span>
       <span>{{ t("aiObservability.playground.usageCost", { cost: costLabel }) }}</span>
+    </div>
+
+    <!-- Verdicts, under the answer they judge. A scorer that could not run is
+         listed with its reason rather than dropped: a missing row would read as
+         a scorer that was never asked. -->
+    <div
+      v-if="cell?.scoring || cell?.scores?.length"
+      class="flex flex-col gap-1"
+      data-test="ai-playground-output-scores"
+    >
+      <span v-if="cell.scoring" class="text-text-secondary text-2xs italic">
+        {{ t("aiObservability.playground.scoring") }}
+      </span>
+      <div
+        v-for="score in cell.scores ?? []"
+        :key="score.scorerId"
+        class="flex items-start gap-1.5"
+        :data-test="`ai-playground-score-${score.scorerId}`"
+      >
+        <OTag :variant="scoreVariant(score)" size="sm" :label="raw(scoreLabel(score))" />
+        <span
+          v-if="score.status !== 'scored'"
+          class="text-text-secondary text-2xs min-w-0 flex-1 italic"
+        >
+          {{ scoreNote(score) }}
+        </span>
+        <span
+          v-else-if="score.reasoning"
+          class="text-text-secondary text-2xs min-w-0 flex-1 line-clamp-2"
+          :title="score.reasoning"
+        >
+          {{ raw(score.reasoning) }}
+        </span>
+      </div>
     </div>
 
     <div v-if="showActions && cell?.status === 'done'" class="flex flex-wrap gap-1.5">
@@ -136,19 +170,25 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { PlaygroundCell } from "@/enterprise/views/AIObservability/playgroundDraft";
+import type {
+  PlaygroundCell,
+  PlaygroundScore,
+} from "@/enterprise/views/AIObservability/playgroundDraft";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 const props = withDefaults(
   defineProps<{
     cell: PlaygroundCell | undefined;
-    /** Config changed since this ran, so the text no longer describes the config. */
-    stale?: boolean;
     /** Table-cell rendering: clamped text, terser empty copy, no action row. */
     compact?: boolean;
     showActions?: boolean;
     dataTest?: string;
   }>(),
-  { stale: false, compact: false, showActions: false, dataTest: "ai-playground-output" },
+  {
+    compact: false,
+    showActions: false,
+    dataTest: "ai-playground-output",
+  },
 );
 
 const emit = defineEmits<{
@@ -159,6 +199,38 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+/** Name and value in one chip: with four columns side by side, the scorer and
+ *  its verdict have to be readable as a single token. */
+function scoreLabel(score: PlaygroundScore): string {
+  if (score.status !== "scored") return score.scorerName;
+  const value =
+    score.numeric !== null
+      ? String(Number(score.numeric.toFixed(2)))
+      : score.categorical !== null
+        ? score.categorical
+        : score.boolean !== null
+          ? score.boolean
+            ? t("common.yes")
+            : t("common.no")
+          : "";
+  return value ? `${score.scorerName}: ${value}` : score.scorerName;
+}
+
+/** Never tinted by quality — a pass/fail colour on n ≤ 10 would read as a
+ *  verdict the bench cannot support. Colour marks run state only. */
+function scoreVariant(score: PlaygroundScore): BadgeVariant {
+  if (score.status === "failed") return "error-soft";
+  if (score.status === "skipped") return "default-soft";
+  return "primary-soft";
+}
+
+function scoreNote(score: PlaygroundScore) {
+  if (score.status === "failed") return raw(score.error ?? "");
+  return score.reason === "requires_trace"
+    ? t("aiObservability.playground.scorerNeedsTrace")
+    : t("aiObservability.playground.scorerNeedsReference");
+}
 
 const latencySeconds = computed(() => ((props.cell?.usage?.latencyMs ?? 0) / 1000).toFixed(1));
 const costLabel = computed(() => (props.cell?.usage?.costUsd ?? 0).toFixed(4));

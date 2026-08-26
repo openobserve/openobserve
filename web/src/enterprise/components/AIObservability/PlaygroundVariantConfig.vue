@@ -9,72 +9,62 @@
 -->
 <template>
   <div class="flex flex-col gap-3">
-    <div class="flex flex-wrap items-start gap-2">
-      <OSelect
-        class="min-w-0 flex-1"
-        :model-value="variant.providerId"
-        :options="providerOptions"
-        :label="t('aiObservability.playground.provider')"
-        :placeholder="t('aiObservability.playground.providerPlaceholder')"
-        size="sm"
-        searchable
-        :data-test="`ai-playground-provider-${variant.id}`"
-        @update:model-value="(value: unknown) => patch({ providerId: String(value ?? '') })"
-      />
-      <OSelect
-        class="min-w-0 flex-1"
-        :model-value="variant.model"
-        :options="modelOptions"
-        :label="t('aiObservability.playground.model')"
-        :placeholder="t('aiObservability.playground.modelPlaceholder')"
-        :help-text="t('aiObservability.playground.modelHelp')"
-        size="sm"
-        searchable
-        creatable
-        clearable
-        :data-test="`ai-playground-model-${variant.id}`"
-        @update:model-value="(value: unknown) => patch({ model: String(value ?? '') })"
-      />
-      <OInput
-        class="w-20 shrink-0"
-        :model-value="variant.temperature"
-        type="number"
-        min="0"
-        max="2"
-        step="0.1"
-        :label="t('aiObservability.playground.temperature')"
-        size="sm"
-        :data-test="`ai-playground-temperature-${variant.id}`"
-        @update:model-value="(value: string | number) => patch({ temperature: String(value) })"
-      />
-    </div>
-
-    <PlaygroundVariableChips :variant="variant" :fields="fields" @insert="onInsertToken" />
-
-    <PlaygroundMessageList
-      :variant="variant"
-      @update="onMessageUpdate"
-      @remove="onMessageRemove"
-      @add="onMessageAdd"
-      @focus="onMessageFocus"
-    />
-
-    <div class="flex flex-wrap gap-1.5">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <!-- Split button, same shape as SearchBar's Run Query. Two differences,
+           both because these halves are OUTLINE rather than ghost: the divider
+           is the shared border (an OSeparator between them would be a third
+           line), and the right half drops its own with `border-s-0`. The `!` is
+           load-bearing — OButton's `rounded-default` would otherwise win over
+           the flattened inner edge. -->
+      <div class="inline-flex items-stretch">
+        <OButton
+          variant="outline"
+          size="xs"
+          icon-left="function"
+          class="rounded-s-default! rounded-e-none!"
+          :data-test="`ai-playground-tools-btn-${variant.id}`"
+          @click="openTool(null)"
+        >
+          {{
+            variant.tools.length
+              ? t("aiObservability.playground.toolsCount", { count: variant.tools.length })
+              : t("aiObservability.playground.tools")
+          }}
+        </OButton>
+        <ODropdown align="start" side="bottom">
+          <template #trigger>
+            <OButton
+              variant="outline"
+              size="icon-xs-sq"
+              class="rounded-e-default! rounded-s-none! border-s-0"
+              :aria-label="t('aiObservability.playground.tools')"
+              :data-test="`ai-playground-tools-menu-${variant.id}`"
+            >
+              <OIcon name="arrow-drop-down" size="sm" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-for="(tool, index) in variant.tools"
+            :key="index"
+            icon-left="function"
+            :data-test="`ai-playground-tool-item-${index}`"
+            @select="openTool(index)"
+          >
+            {{ raw(tool.name) || t("aiObservability.playground.toolUnnamed") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!variant.tools.length"
+            disabled
+            :data-test="`ai-playground-tools-none-${variant.id}`"
+          >
+            {{ t("aiObservability.playground.toolsEmpty") }}
+          </ODropdownItem>
+        </ODropdown>
+      </div>
       <OButton
         variant="outline"
         size="xs"
-        :data-test="`ai-playground-tools-btn-${variant.id}`"
-        @click="toolsOpen = true"
-      >
-        {{
-          variant.tools.length
-            ? t("aiObservability.playground.toolsCount", { count: variant.tools.length })
-            : t("aiObservability.playground.tools")
-        }}
-      </OButton>
-      <OButton
-        variant="outline"
-        size="xs"
+        icon-left="data-object"
         :data-test="`ai-playground-schema-btn-${variant.id}`"
         @click="schemaOpen = true"
       >
@@ -84,15 +74,30 @@
             : t("aiObservability.playground.schema")
         }}
       </OButton>
+      <PlaygroundVariablesMenu
+        :variant="variant"
+        :var-names="varNames"
+        :vars="vars"
+        @set-var="(name, value) => emit('set-var', name, value)"
+        @remove-var="(name) => emit('remove-var', name)"
+        @insert="onInsertToken"
+      />
     </div>
 
-    <p v-if="variant.stale" class="text-text-secondary m-0 text-xs">
-      {{ t("aiObservability.playground.staleNote") }}
-    </p>
+    <PlaygroundMessageList
+      :variant="variant"
+      :var-names="varNames"
+      @update="onMessageUpdate"
+      @remove="onMessageRemove"
+      @add="onMessageAdd"
+      @focus="onMessageFocus"
+      @set-tool="onMessageToolChange"
+    />
 
     <PlaygroundToolsDialog
       v-model:open="toolsOpen"
       :tools="variant.tools"
+      :index="toolIndex"
       @apply="(tools) => patch({ tools })"
     />
     <PlaygroundSchemaDialog
@@ -104,15 +109,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import PlaygroundMessageList from "./PlaygroundMessageList.vue";
 import PlaygroundSchemaDialog from "./PlaygroundSchemaDialog.vue";
 import PlaygroundToolsDialog from "./PlaygroundToolsDialog.vue";
-import PlaygroundVariableChips from "./PlaygroundVariableChips.vue";
+import PlaygroundVariablesMenu from "./PlaygroundVariablesMenu.vue";
 import {
   insertTokenAt,
   playgroundId,
@@ -124,35 +130,43 @@ import type { Provider } from "@/services/online-evals.service";
 const props = defineProps<{
   variant: PlaygroundVariant;
   providers: Provider[];
-  /** Row fields in table mode; null in editor-bench mode. */
-  fields: string[] | null;
+  /** Every `{{variable}}` on the bench, and the values they are bound to. */
+  varNames: string[];
+  vars: Record<string, string>;
 }>();
 
-const emit = defineEmits<{ change: [variant: PlaygroundVariant] }>();
+const emit = defineEmits<{
+  change: [variant: PlaygroundVariant];
+  "set-var": [name: string, value: string];
+  "remove-var": [name: string];
+}>();
 
 const { t } = useI18nTyped();
 
 const toolsOpen = ref(false);
+const toolIndex = ref<number | null>(null);
+
+/** null defines a new tool; an index opens that one for viewing. */
+function openTool(index: number | null) {
+  toolIndex.value = index;
+  toolsOpen.value = true;
+}
 const schemaOpen = ref(false);
 
 /** The textarea the caret is in, so a chip inserts where the user is looking. */
 const focused = ref<{ messageId: string; element: HTMLTextAreaElement } | null>(null);
 
-/** Every config change marks the variant stale — the output on screen stops
- *  describing the config on screen the moment either one moves. */
 function patch(changes: Partial<PlaygroundVariant>) {
-  emit("change", { ...props.variant, ...changes, stale: true });
+  emit("change", { ...props.variant, ...changes });
 }
 
-const providerOptions = computed(() =>
-  props.providers.map((provider) => ({ label: raw(provider.name), value: provider.id })),
-);
-
-const modelOptions = computed(() => {
-  const provider = props.providers.find((candidate) => candidate.id === props.variant.providerId);
-  const models = provider?.availableModels ?? provider?.available_models ?? [];
-  return models.map((model) => ({ label: raw(model), value: model }));
-});
+function onMessageToolChange(messageId: string, toolName: string) {
+  patch({
+    messages: props.variant.messages.map((message) =>
+      message.id === messageId ? { ...message, toolName } : message,
+    ),
+  });
+}
 
 function onMessageUpdate(messageId: string, content: string) {
   patch({

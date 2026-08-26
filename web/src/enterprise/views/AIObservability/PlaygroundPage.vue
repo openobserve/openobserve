@@ -17,7 +17,7 @@
     </template>
 
     <template #actions>
-      <ODropdown v-if="recentDrafts.length" align="end">
+      <ODropdown v-if="recentDrafts.length" align="end" content-class="w-100">
         <template #trigger>
           <OButton
             variant="outline"
@@ -37,7 +37,11 @@
           :data-test="`ai-playground-recent-${entry.id}`"
           @select="restoreDraft(entry)"
         >
-          {{ raw(entry.summary) }}
+          <!-- min-w-0 is what lets truncate win against the item's own w-full. -->
+          <span class="flex min-w-0 flex-1 flex-col">
+            <span class="truncate">{{ raw(entry.summary) }}</span>
+            <span class="text-text-secondary text-2xs truncate">{{ raw(draftMeta(entry)) }}</span>
+          </span>
         </ODropdownItem>
       </ODropdown>
 
@@ -52,9 +56,45 @@
         {{ t("aiObservability.playground.stop") }}
       </OButton>
       <OButton
+        variant="outline"
+        size="sm-action"
+        :disabled="running"
+        data-test="ai-playground-reset-btn"
+        @click="resetPlayground"
+      >
+        {{ t("aiObservability.playground.reset") }}
+      </OButton>
+      <span class="text-text-secondary text-xs" data-test="ai-playground-window-count">
+        {{
+          t("aiObservability.playground.windowCount", {
+            count: draft.variants.length,
+            max: MAX_VARIANTS,
+          })
+        }}
+      </span>
+      <PlaygroundScorersMenu
+        :scorers="scorers"
+        :selected-ids="draft.scorerIds"
+        :auto-score="draft.autoScore"
+        :has-reference="hasReference"
+        :can-score="scorableVariants.length > 0"
+        :scoring="scoring"
+        @update:selected-ids="(ids: string[]) => (draft.scorerIds = ids)"
+        @update:auto-score="(value: boolean) => (draft.autoScore = value)"
+        @score="scoreAll"
+      />
+      <OButton
+        variant="outline"
+        size="sm-action"
+        :loading="sharing"
+        data-test="ai-playground-share-btn"
+        @click="onShare"
+      >
+        {{ t("aiObservability.playground.share") }}
+      </OButton>
+      <OButton
         variant="primary"
         size="sm-action"
-        :icon-left="running ? undefined : 'play-arrow'"
         :loading="running"
         :disabled="runDisabled"
         :title="t('aiObservability.playground.runAllTooltip')"
@@ -103,21 +143,85 @@
         data-test="ai-playground-mock-banner"
       />
 
-      <!-- editor bench -->
-      <template v-if="!isTable">
-        <PlaygroundVariableBar
-          class="shrink-0"
-          :var-names="varNames"
-          :vars="draft.vars"
-          :expected="draft.expectedSingle"
-          :provenance="draft.provenance"
-          @set-var="setVar"
-          @set-expected="(value) => (draft.expectedSingle = value)"
-          @sample="sampleOpen = true"
-          @add-row="addRowOpen = true"
-        />
+      <!-- A snapshot is a copy someone sent you, so the page says so until you
+           take it over. Editing is never blocked: the edits are local and the
+           link they arrived on cannot change. -->
+      <OBanner
+        v-if="sharedSnapshot"
+        variant="info"
+        icon="visibility"
+        inline-actions
+        class="mx-4 mt-3 shrink-0"
+        data-test="ai-playground-shared-banner"
+      >
+        <div class="flex flex-col gap-0.5">
+          <span class="font-semibold">{{ t("aiObservability.playground.sharedTitle") }}</span>
+          <span class="text-xs">
+            {{
+              sharedSnapshot.createdBy
+                ? t("aiObservability.playground.sharedBodyBy", { user: sharedSnapshot.createdBy })
+                : t("aiObservability.playground.sharedBody")
+            }}
+          </span>
+        </div>
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="ai-playground-shared-continue-btn"
+            @click="continueFromSnapshot"
+          >
+            {{ t("aiObservability.playground.sharedContinue") }}
+          </OButton>
+        </template>
+      </OBanner>
 
-        <div class="flex min-h-0 flex-1 items-stretch gap-3 overflow-x-auto px-4 py-3">
+      <PlaygroundVariableBar
+        class="shrink-0"
+        :var-names="varNames"
+        :vars="draft.vars"
+        :expected="draft.expectedSingle"
+        :provenance="draft.provenance"
+        :sample="draft.sample"
+        :stepping="sampleStepping"
+        @set-expected="(value) => (draft.expectedSingle = value)"
+        @sample="sampleOpen = true"
+        @step-sample="stepSample"
+        @clear-sample="clearSample"
+      />
+
+      <!-- The arrows float OVER the strip rather than reserving space beside
+             it: at four variants every column is already tight, and a pair of
+             gutters would come out of the outputs. -->
+      <div class="relative flex min-h-0 flex-1">
+        <!-- Positioning goes on the wrapper: OButton's root sets `relative`
+               on itself, so an `absolute` handed to the button loses. -->
+        <div v-if="canScrollLeft" class="absolute start-1.5 top-1/2 z-1 -translate-y-1/2">
+          <OButton
+            variant="outline"
+            size="icon-circle-sm"
+            icon-left="chevron-left"
+            class="bg-surface-base shadow-md"
+            :aria-label="t('aiObservability.playground.scrollLeft')"
+            data-test="ai-playground-scroll-left"
+            @click="scrollByStep(-1)"
+          />
+        </div>
+        <div v-if="canScrollRight" class="absolute end-1.5 top-1/2 z-1 -translate-y-1/2">
+          <OButton
+            variant="outline"
+            size="icon-circle-sm"
+            icon-left="chevron-right"
+            class="bg-surface-base shadow-md"
+            :aria-label="t('aiObservability.playground.scrollRight')"
+            data-test="ai-playground-scroll-right"
+            @click="scrollByStep(1)"
+          />
+        </div>
+        <div
+          ref="benchStripRef"
+          class="flex min-h-0 flex-1 snap-x snap-mandatory scroll-px-4 items-stretch gap-3 overflow-x-auto px-4 py-3"
+        >
           <PlaygroundVariantColumn
             v-for="(variant, index) in draft.variants"
             :key="variant.id"
@@ -125,12 +229,16 @@
             :label="variantLabel(index)"
             :cell="cellFor(variant.id, SINGLE_ROW_KEY)"
             :providers="providers"
-            :fields="null"
+            :var-names="varNames"
+            :vars="draft.vars"
+            :solo="draft.variants.length === 1"
             :running="isVariantRunning(variant.id)"
             :run-disabled="runDisabled"
             :can-remove="draft.variants.length > 1"
             :can-duplicate="draft.variants.length < MAX_VARIANTS"
             @change="updateVariant"
+            @set-var="setVar"
+            @remove-var="removeVar"
             @run="runVariant(variant.id)"
             @duplicate="duplicate(variant.id)"
             @remove="removeVariant(variant.id)"
@@ -138,156 +246,22 @@
             @add-to-messages="addOutputToMessages(variant.id)"
             @create-experiment="createExperiment(variant.id)"
           />
-
-          <OButton
-            v-if="draft.variants.length < MAX_VARIANTS"
-            variant="outline"
-            class="rounded-surface h-auto w-40 shrink-0 border-dashed"
-            :disabled="running"
-            data-test="ai-playground-add-variant-btn"
-            @click="addVariant"
-          >
-            <span class="flex flex-col items-center gap-1">
-              <OIcon name="add" size="md" />
-              <span>{{ t("aiObservability.playground.addVariant") }}</span>
-              <span class="text-text-secondary text-2xs font-mono">
-                {{
-                  t("aiObservability.playground.variantCount", {
-                    count: draft.variants.length,
-                    max: MAX_VARIANTS,
-                  })
-                }}
-              </span>
-            </span>
-          </OButton>
         </div>
-      </template>
-
-      <!-- compare table -->
-      <template v-else>
-        <div
-          class="border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5"
-        >
-          <span class="text-text-secondary text-xs">
-            {{ t("aiObservability.playground.rowsSampled", { count: draft.rows!.length }) }}
-          </span>
-          <OTag
-            v-if="draft.provenance"
-            variant="default"
-            size="sm"
-            :label="draft.provenance.label"
-            data-test="ai-playground-provenance"
-          />
-          <div class="grow" />
-          <OButton
-            variant="outline"
-            size="xs"
-            data-test="ai-playground-sample-btn"
-            @click="sampleOpen = true"
-          >
-            {{ t("aiObservability.playground.sampleFromDataset") }}
-          </OButton>
-          <OButton
-            variant="outline"
-            size="xs"
-            icon-left="add"
-            data-test="ai-playground-add-row-btn"
-            @click="addRowOpen = true"
-          >
-            {{ t("aiObservability.playground.addRow") }}
-          </OButton>
-        </div>
-
-        <PlaygroundCompareTable
-          class="min-h-0 flex-1"
-          :draft="draft"
-          :results="results"
-          :running="running"
-          :run-disabled="runDisabled"
-          :streaming-variants="streamingVariants"
-          @open-config="(id) => (configVariantId = id)"
-          @open-row="(index) => (drawerRowIndex = index)"
-          @remove-row="removeRow"
-          @add-variant="addVariant"
-          @run-variant="runVariant"
-          @duplicate-variant="duplicate"
-          @remove-variant="removeVariant"
-          @create-experiment="createExperiment"
-          @insert-field="insertFieldEverywhere"
-        />
-      </template>
+      </div>
     </div>
 
     <PlaygroundSampleDialog
       v-model:open="sampleOpen"
       :datasets="datasets"
       :initial-dataset-id="initialDatasetId"
-      :current-rows="draft.rows?.length ?? 0"
-      :template-vars="varNames"
       @sample="applySample"
     />
 
-    <PlaygroundAddRowDialog v-model:open="addRowOpen" @add="addRow" />
-
-    <ODialog
-      :open="!!configVariantId"
-      size="lg"
-      :title="t('aiObservability.playground.variantConfig')"
-      :primary-button-label="t('common.close')"
-      data-test="ai-playground-variant-config-dialog"
-      @update:open="(value) => !value && (configVariantId = null)"
-      @click:primary="configVariantId = null"
-    >
-      <div v-if="configVariant" class="flex flex-col gap-3">
-        <p class="text-text-secondary m-0 text-xs">
-          {{
-            t("aiObservability.playground.variantConfigScope", {
-              label: variantLabel(draft.variants.findIndex((v) => v.id === configVariant!.id)),
-              count: draft.rows?.length ?? 0,
-            })
-          }}
-        </p>
-        <PlaygroundVariantConfig
-          :variant="configVariant"
-          :providers="providers"
-          :fields="rowFields"
-          @change="updateVariant"
-        />
-      </div>
-    </ODialog>
-
-    <PlaygroundRowDrawer
-      :open="drawerRowIndex !== null"
-      :draft="draft"
-      :results="results"
-      :row-index="drawerRowIndex ?? 0"
-      @update:open="(value) => !value && (drawerRowIndex = null)"
-      @navigate="navigateRow"
+    <PlaygroundShareDialog
+      v-model:open="shareOpen"
+      :creating="sharing"
+      @confirm="onShareConfirmed"
     />
-
-    <!-- Not ConfirmDialog: here the SAFE choice must be the primary button.
-         Going back and fixing the prompt is what the user almost always wants;
-         "Run anyway" is the deliberate, secondary act. -->
-    <ODialog
-      :open="runGateOpen"
-      size="sm"
-      :title="t('aiObservability.playground.runGateTitle')"
-      :primary-button-label="t('aiObservability.playground.runGateCancel')"
-      :secondary-button-label="t('aiObservability.playground.runGateConfirm')"
-      data-test="ai-playground-run-gate"
-      @update:open="(value: boolean) => (runGateOpen = value)"
-      @click:primary="runGateOpen = false"
-      @click:secondary="confirmRunGate"
-    >
-      <p class="text-text-body m-0 text-sm leading-relaxed">
-        {{
-          t("aiObservability.playground.runGateMessage", {
-            rows: draft.rows?.length ?? 0,
-            calls: totalCells,
-          })
-        }}
-      </p>
-    </ODialog>
   </OPageLayout>
 </template>
 
@@ -295,59 +269,60 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import PlaygroundAddRowDialog from "@/enterprise/components/AIObservability/PlaygroundAddRowDialog.vue";
-import PlaygroundCompareTable from "@/enterprise/components/AIObservability/PlaygroundCompareTable.vue";
-import PlaygroundRowDrawer from "@/enterprise/components/AIObservability/PlaygroundRowDrawer.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import PlaygroundSampleDialog from "@/enterprise/components/AIObservability/PlaygroundSampleDialog.vue";
+import PlaygroundScorersMenu from "@/enterprise/components/AIObservability/PlaygroundScorersMenu.vue";
+import PlaygroundShareDialog from "@/enterprise/components/AIObservability/PlaygroundShareDialog.vue";
 import PlaygroundVariableBar from "@/enterprise/components/AIObservability/PlaygroundVariableBar.vue";
 import PlaygroundVariantColumn from "@/enterprise/components/AIObservability/PlaygroundVariantColumn.vue";
-import PlaygroundVariantConfig from "@/enterprise/components/AIObservability/PlaygroundVariantConfig.vue";
-import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
-import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
+import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
+import llmDatasetsService, {
+  type LlmDataset,
+  type LlmDatasetItem,
+} from "@/services/llm-datasets.service";
 import {
   PLAYGROUND_USE_MOCK,
   PlaygroundRunError,
   runPlayground,
+  scorePlayground,
 } from "@/services/llm-playground.service";
+import llmPlaygroundSnapshotsService from "@/services/llm-playground-snapshots.service";
 import {
-  MAX_ROWS,
   MAX_VARIANTS,
   SINGLE_ROW_KEY,
+  type PlaygroundSample,
   cellAt,
   cloneVariant,
-  emptyVariant,
+  draftFromSnapshot,
   extractVars,
-  hasZeroFieldReference,
+  hasReference as benchHasReference,
   idleCell,
   playgroundId,
   renderedMessages,
-  rowFieldsFor,
-  rowKeysFor,
+  renderTemplate,
+  snapshotPayload,
   starterDraft,
   variantLabel,
-  varsForRow,
-  withFieldInserted,
   type PlaygroundCell,
   type PlaygroundDraft,
   type PlaygroundResults,
-  type PlaygroundRow,
   type PlaygroundVariant,
 } from "./playgroundDraft";
 import { aiExperimentCreateRoute } from "./experimentRoutes";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useHorizontalOverflow } from "@/composables/useHorizontalOverflow";
 
 defineOptions({ name: "AIPlaygroundPage" });
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -363,34 +338,40 @@ const results = reactive<PlaygroundResults>({});
 
 const providers = ref<Provider[]>([]);
 const loadingProviders = ref(true);
+const scorers = ref<Scorer[]>([]);
+const scoring = ref(false);
 const datasets = ref<LlmDataset[]>([]);
 
 const sampleOpen = ref(false);
-const addRowOpen = ref(false);
-const runGateOpen = ref(false);
-const configVariantId = ref<string | null>(null);
-const drawerRowIndex = ref<number | null>(null);
+const sampleStepping = ref(false);
+const shareOpen = ref(false);
+const sharing = ref(false);
+
+/** The snapshot this bench descends from — the link it was opened on, or the
+ *  last one shared from it. Sent as the parent so lineage forms a chain. */
+const parentSnapshotId = ref<string | null>(null);
+
+/** Set only while a shared link is being viewed; cleared by Continue From This. */
+const sharedSnapshot = ref<{ id: string; createdBy: string } | null>(null);
 
 /** One controller per in-flight cell, so a re-run or unmount cancels precisely. */
 const controllers = new Map<string, AbortController>();
 
 const initialDatasetId = ref<string>(String(route.query.dataset ?? ""));
 
-const isTable = computed(() => Array.isArray(draft.rows) && draft.rows.length > 0);
-const varNames = computed(() => extractVars(draft.variants));
-const rowFields = computed(() => (isTable.value ? rowFieldsFor(draft.rows) : null));
-const rowKeys = computed(() => rowKeysFor(draft));
-const totalCells = computed(() => draft.variants.length * rowKeys.value.length);
-
-const configVariant = computed(
-  () => draft.variants.find((variant) => variant.id === configVariantId.value) ?? null,
-);
+/** Declared OR referenced. `draft.vars` is the declaration: a variable can be
+ *  defined before any message uses it, which is why adding one does not have to
+ *  write into a prompt. */
+const varNames = computed(() => {
+  const names = extractVars(draft.variants);
+  for (const name of Object.keys(draft.vars)) if (!names.includes(name)) names.push(name);
+  return names;
+});
+const totalCells = computed(() => draft.variants.length);
 
 const streamingVariants = computed(() =>
   draft.variants
-    .filter((variant) =>
-      rowKeys.value.some((key) => cellAt(results, variant.id, key)?.status === "streaming"),
-    )
+    .filter((variant) => cellAt(results, variant.id, SINGLE_ROW_KEY)?.status === "streaming")
     .map((variant) => variant.id),
 );
 
@@ -399,10 +380,8 @@ const running = computed(() => streamingVariants.value.length > 0);
 const completedCount = computed(() => {
   let done = 0;
   for (const variant of draft.variants) {
-    for (const key of rowKeys.value) {
-      const status = cellAt(results, variant.id, key)?.status;
-      if (status === "done" || status === "error") done += 1;
-    }
+    const status = cellAt(results, variant.id, SINGLE_ROW_KEY)?.status;
+    if (status === "done" || status === "error") done += 1;
   }
   return done;
 });
@@ -411,6 +390,28 @@ const completedCount = computed(() => {
 const runDisabled = computed(
   () => running.value || !providers.value.length || !draft.variants.length,
 );
+
+/**
+ * Back to an empty bench. Confirmed because the draft is the only copy of the
+ * work — it is deliberately never saved, so there is nothing to recover it
+ * from except the recent-drafts list, which only holds what was already run.
+ */
+const benchStripRef = ref<HTMLElement | null>(null);
+const { canScrollLeft, canScrollRight, scrollByStep } = useHorizontalOverflow(benchStripRef);
+
+async function resetPlayground() {
+  const ok = await confirm({
+    title: t("aiObservability.playground.resetTitle"),
+    message: t("aiObservability.playground.resetMessage"),
+    confirmLabel: t("aiObservability.playground.reset"),
+    cancelLabel: t("common.cancel"),
+  });
+  if (!ok) return;
+  stopAll();
+  const provider = providers.value[0];
+  Object.assign(draft, starterDraft(provider?.id ?? "", ""));
+  for (const key of Object.keys(results)) delete results[key];
+}
 
 function isVariantRunning(variantId: string) {
   return streamingVariants.value.includes(variantId);
@@ -423,9 +424,11 @@ function cellFor(variantId: string, rowKey: string): PlaygroundCell | undefined 
 // ── loading ───────────────────────────────────────────────────────
 
 onMounted(async () => {
-  await Promise.all([loadProviders(), loadDatasets()]);
+  await Promise.all([loadProviders(), loadDatasets(), loadScorers()]);
   applyEntryParams();
   loadRecentDrafts();
+  const snapshotId = String(route.query.snapshot ?? "");
+  if (snapshotId) await openSharedSnapshot(snapshotId);
   if (initialDatasetId.value) sampleOpen.value = true;
   window.addEventListener("keydown", onKeydown);
 });
@@ -444,6 +447,15 @@ async function loadProviders() {
     toast({ variant: "error", message: t("aiObservability.playground.providerLoadError") });
   } finally {
     loadingProviders.value = false;
+  }
+}
+
+/** A failure here costs scoring, not the bench — the menu simply lists none. */
+async function loadScorers() {
+  try {
+    scorers.value = await onlineEvalsService.scorers.list(orgId.value);
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.playground.scorerLoadError") });
   }
 }
 
@@ -486,27 +498,16 @@ function setCell(variantId: string, rowKey: string, changes: Partial<PlaygroundC
   byRow[rowKey] = { ...(byRow[rowKey] ?? idleCell()), ...changes };
 }
 
-function onRunAll(force = false) {
+function onRunAll() {
   if (runDisabled.value) return;
-  // The gate lives on Run because that is where money is spent: a template that
-  // references no row field bills rows × variants for one distinct answer.
-  if (!force && isTable.value && hasZeroFieldReference(draft.variants, draft.rows)) {
-    runGateOpen.value = true;
-    return;
-  }
   for (const variant of draft.variants) runVariant(variant.id, true);
-}
-
-function confirmRunGate() {
-  runGateOpen.value = false;
-  onRunAll(true);
 }
 
 function runVariant(variantId: string, skipGate = false) {
   if (!skipGate && runDisabled.value) return;
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;
-  for (const rowKey of rowKeys.value) runCell(variant, rowKey);
+  runCell(variant, SINGLE_ROW_KEY);
 }
 
 async function runCell(variant: PlaygroundVariant, rowKey: string) {
@@ -521,9 +522,12 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
     toolCall: null,
     usage: null,
     error: null,
+    // The verdicts belonged to the answer being replaced.
+    scores: undefined,
+    scoredKey: undefined,
   });
 
-  const vars = varsForRow(draft, rowKey);
+  const vars = { ...draft.vars };
   const messages = renderedMessages(variant, vars)
     .filter((message) => message.content.trim().length > 0)
     .map((message) => ({ role: message.role, content: message.content }));
@@ -562,10 +566,8 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
       toolCall: result.toolCall,
       usage: result.usage,
     });
-    // Clears staleness only if this is still the live variant object. Editing
-    // the config mid-run replaces it, and that replacement stays stale — which
-    // is right: the answer just produced describes the OLD config.
-    variant.stale = false;
+
+    if (draft.autoScore) void scoreVariant(variant);
   } catch (error) {
     // An abort is a user action, not a failure — leave the cell as it was.
     if (error instanceof DOMException && error.name === "AbortError") return;
@@ -588,10 +590,8 @@ function stopAll() {
   for (const controller of controllers.values()) controller.abort();
   controllers.clear();
   for (const variant of draft.variants) {
-    for (const rowKey of rowKeys.value) {
-      if (cellAt(results, variant.id, rowKey)?.status === "streaming") {
-        setCell(variant.id, rowKey, { status: "idle" });
-      }
+    if (cellAt(results, variant.id, SINGLE_ROW_KEY)?.status === "streaming") {
+      setCell(variant.id, SINGLE_ROW_KEY, { status: "idle" });
     }
   }
 }
@@ -611,21 +611,95 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+// ── scoring ───────────────────────────────────────────────────────
+
+const hasReference = computed(() => benchHasReference(draft.expectedSingle));
+
+/** Outputs worth judging. A tool call is not text a scorer can read, and an
+ *  empty answer would only ever be judged as one. */
+const scorableVariants = computed(() =>
+  draft.variants.filter((variant) => {
+    const cell = cellAt(results, variant.id, SINGLE_ROW_KEY);
+    return cell?.status === "done" && Boolean(cell.text.trim());
+  }),
+);
+
+async function scoreAll() {
+  if (scoring.value || !draft.scorerIds.length) return;
+  scoring.value = true;
+  try {
+    await Promise.all(scorableVariants.value.map((variant) => scoreVariant(variant)));
+  } finally {
+    scoring.value = false;
+  }
+}
+
+/**
+ * Judge one output.
+ *
+ * An output that has not changed since it was last judged by this same set of
+ * scorers is left alone: a judge call costs a model call, and re-running one
+ * over identical text can only produce noise around the answer already shown.
+ */
+async function scoreVariant(variant: PlaygroundVariant) {
+  const cell = cellAt(results, variant.id, SINGLE_ROW_KEY);
+  if (!cell || cell.status !== "done" || !cell.text.trim()) return;
+  if (!draft.scorerIds.length) return;
+
+  const key = scoreKey(cell.text, draft.scorerIds);
+  if (cell.scoredKey === key) return;
+
+  setCell(variant.id, SINGLE_ROW_KEY, { scoring: true });
+  try {
+    const scores = await scorePlayground(orgId.value, {
+      scorerIds: [...draft.scorerIds],
+      input: scoreInput(variant),
+      output: cell.text,
+      expectedOutput: draft.expectedSingle ?? undefined,
+      metadata: {
+        model: variant.model,
+        providerId: variant.providerId,
+        temperature: Number(variant.temperature) || 0,
+      },
+    });
+    setCell(variant.id, SINGLE_ROW_KEY, { scores, scoredKey: key, scoring: false });
+  } catch {
+    setCell(variant.id, SINGLE_ROW_KEY, { scoring: false });
+    toast({ variant: "error", message: t("aiObservability.playground.scoreFailed") });
+  }
+}
+
+/** What the judge is told the model was asked — rendered, so `{{input}}` shows
+ *  the question that was actually sent rather than the template. */
+function scoreInput(variant: PlaygroundVariant): string {
+  const asked = [...variant.messages]
+    .reverse()
+    .find((message) => message.role === "user" && message.content.trim());
+  return asked ? renderTemplate(asked.content, draft.vars) : "";
+}
+
+/** Identifies a verdict set: the answer it judged and the scorers that judged
+ *  it. Either changing is what makes the old verdicts stale. */
+function scoreKey(text: string, scorerIds: string[]): string {
+  return `${[...scorerIds].sort().join(",")}::${text}`;
+}
+
 // ── draft mutations ───────────────────────────────────────────────
 
 function setVar(name: string, value: string) {
   draft.vars[name] = value;
 }
 
-function updateVariant(next: PlaygroundVariant) {
-  const index = draft.variants.findIndex((variant) => variant.id === next.id);
-  if (index !== -1) draft.variants[index] = next;
+/** Only forgets the binding. A name a message still references comes straight
+ *  back on the next render, which is correct — the prompt is asking for it. */
+function removeVar(name: string) {
+  delete draft.vars[name];
 }
 
-function addVariant() {
-  if (draft.variants.length >= MAX_VARIANTS) return;
-  const source = draft.variants[draft.variants.length - 1];
-  draft.variants.push(source ? cloneVariant(source) : emptyVariant());
+function updateVariant(next: PlaygroundVariant) {
+  const index = draft.variants.findIndex((variant) => variant.id === next.id);
+  if (index === -1) return;
+  draft.variants[index] = next;
 }
 
 function duplicate(variantId: string) {
@@ -639,50 +713,41 @@ function removeVariant(variantId: string) {
   if (draft.variants.length <= 1) return;
   draft.variants = draft.variants.filter((variant) => variant.id !== variantId);
   delete results[variantId];
-  if (configVariantId.value === variantId) configVariantId.value = null;
 }
 
-function addRow(input: string, expectedOutput: string | null) {
-  const rows = draft.rows ?? [];
-  if (rows.length >= MAX_ROWS) return;
-  draft.rows = [...rows, { id: playgroundId("row"), input, expectedOutput, source: null }];
+function applySample(sample: PlaygroundSample, item: LlmDatasetItem) {
+  draft.sample = sample;
+  draft.vars = { ...draft.vars, input: item.inputPreview || item.input };
+  draft.expectedSingle = item.expectedOutput;
+  // New question ⇒ the answers on screen are answers to the old one.
+  for (const key of Object.keys(results)) delete results[key];
 }
 
-function removeRow(rowId: string) {
-  if (!draft.rows) return;
-  const remaining = draft.rows.filter((row) => row.id !== rowId);
-  draft.rows = remaining.length ? remaining : null;
-  if (drawerRowIndex.value !== null && drawerRowIndex.value >= remaining.length) {
-    drawerRowIndex.value = remaining.length ? remaining.length - 1 : null;
+/** Walk to a neighbouring dataset item without leaving the bench — this is what
+ *  stands in for the row table: spot-check by cycling, not by fanning out. */
+async function stepSample(delta: number) {
+  const sample = draft.sample;
+  if (!sample || sampleStepping.value) return;
+  const index = sample.index + delta;
+  if (index < 0 || index >= sample.total) return;
+  sampleStepping.value = true;
+  try {
+    const page = await llmDatasetsService.listItems(orgId.value, sample.datasetId, {
+      from: index,
+      size: 1,
+    });
+    const item = page.items[0];
+    if (!item) return;
+    applySample({ ...sample, itemId: item.id, index, total: page.total }, item);
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.playground.sampleLoadError") });
+  } finally {
+    sampleStepping.value = false;
   }
 }
 
-function applySample(rows: PlaygroundRow[], mode: "replace" | "add") {
-  if (mode === "add" && draft.rows) {
-    draft.rows = [...draft.rows, ...rows].slice(0, MAX_ROWS);
-  } else {
-    draft.rows = rows.slice(0, MAX_ROWS);
-    // Replacing the inputs invalidates every output, so drop them rather than
-    // leaving answers to questions that are no longer being asked.
-    for (const key of Object.keys(results)) delete results[key];
-  }
-}
-
-/** Fix the zero-reference case across every variant at once — that is the whole
- *  point of the warning bar; fixing one variant would still leave the others. */
-function insertFieldEverywhere(field: string) {
-  draft.variants = draft.variants.map((variant) => withFieldInserted(variant, field));
-  toast({
-    variant: "info",
-    message: t("aiObservability.playground.zeroRefInserted", { token: `{{${field}}}` }),
-  });
-}
-
-function navigateRow(delta: number) {
-  if (drawerRowIndex.value === null || !draft.rows) return;
-  const next = drawerRowIndex.value + delta;
-  if (next < 0 || next >= draft.rows.length) return;
-  drawerRowIndex.value = next;
+function clearSample() {
+  draft.sample = null;
 }
 
 async function copyOutput(variantId: string, rowKey: string) {
@@ -709,6 +774,111 @@ function addOutputToMessages(variantId: string) {
   toast({ variant: "info", message: t("aiObservability.playground.addedToMessages") });
 }
 
+// ── sharing ───────────────────────────────────────────────────────
+
+/** Per browser, not per organization: it records that this person has read what
+ *  a snapshot is, which does not change with the org they are in. */
+const SHARE_INTRO_KEY = "o2-playground-share-intro-read";
+
+function shareIntroRead(): boolean {
+  try {
+    return localStorage.getItem(SHARE_INTRO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** The explanation is worth one reading. After that Share is a single click. */
+function onShare() {
+  if (shareIntroRead()) return void shareSnapshot();
+  shareOpen.value = true;
+}
+
+function onShareConfirmed(skipIntro: boolean) {
+  try {
+    if (skipIntro) localStorage.setItem(SHARE_INTRO_KEY, "1");
+  } catch {
+    // A disabled localStorage costs the preference, never the share.
+  }
+  shareSnapshot();
+}
+
+/** Create the snapshot and put its link on the clipboard. Nothing is shown to
+ *  copy by hand: the link is only ever wanted somewhere else. */
+async function shareSnapshot() {
+  if (sharing.value) return;
+  sharing.value = true;
+  try {
+    const snapshot = await llmPlaygroundSnapshotsService.share(
+      orgId.value,
+      // Results included: a link with the prompts but not the answers loses the
+      // reason it was sent.
+      snapshotPayload(draft, results),
+      parentSnapshotId.value,
+    );
+    parentSnapshotId.value = snapshot.id;
+    shareOpen.value = false;
+    await copyToClipboard(snapshotLink(snapshot.id), t, {
+      successMessage: t("aiObservability.playground.shareCopied"),
+      errorMessage: t("aiObservability.playground.shareCopyFailed"),
+    });
+  } catch (error) {
+    toast({ variant: "error", message: shareError(error) });
+  } finally {
+    sharing.value = false;
+  }
+}
+
+/** The server's reason when it has one — a bench over the workbench limits is
+ *  something the author can act on, "failed" is not. */
+function shareError(error: unknown): I18nText {
+  const message = (error as { response?: { data?: { message?: unknown } } })?.response?.data
+    ?.message;
+  return typeof message === "string" && message.trim()
+    ? raw(message)
+    : t("aiObservability.playground.shareFailed");
+}
+
+function snapshotLink(snapshotId: string): string {
+  const { href } = router.resolve({
+    name: "aiPlayground",
+    query: { org_identifier: orgId.value, snapshot: snapshotId },
+  });
+  return new URL(href, window.location.origin).toString();
+}
+
+/** Load a shared snapshot over the bench. It becomes the local draft — the
+ *  stored one is immutable, so there is nothing here to write back to. */
+async function openSharedSnapshot(snapshotId: string) {
+  try {
+    const snapshot = await llmPlaygroundSnapshotsService.get(orgId.value, snapshotId);
+    const restored = draftFromSnapshot(snapshot.payload);
+    if (!restored) throw new Error("snapshot carries no bench");
+    stopAll();
+    Object.assign(draft, restored.draft);
+    for (const key of Object.keys(results)) delete results[key];
+    Object.assign(results, restored.results);
+    // A new session id, so opening a link never overwrites the recent draft the
+    // reader was working on before it.
+    draftSessionId.value = playgroundId("draft");
+    parentSnapshotId.value = snapshot.id;
+    sharedSnapshot.value = { id: snapshot.id, createdBy: snapshot.createdBy };
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.playground.sharedLoadError") });
+  }
+}
+
+/** Take the snapshot over as your own work: the banner goes, the address stops
+ *  claiming to be the shared link, and the lineage pointer stays so the next
+ *  share records where this came from. */
+function continueFromSnapshot() {
+  sharedSnapshot.value = null;
+  const query = { ...route.query };
+  delete query.snapshot;
+  router.replace({ name: "aiPlayground", query });
+  toast({ variant: "info", message: t("aiObservability.playground.sharedContinued") });
+}
+
 // ── exits ─────────────────────────────────────────────────────────
 
 function goToProviders() {
@@ -720,10 +890,8 @@ function goToProviders() {
 function createExperiment(variantId: string) {
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;
-  const datasetRow = draft.rows?.find((row) => row.source);
-
   const target = aiExperimentCreateRoute(orgId.value, {
-    datasetId: datasetRow?.source?.datasetId,
+    datasetId: draft.sample?.datasetId,
     query: {
       provider: variant.providerId,
       model: variant.model,
@@ -738,14 +906,43 @@ function createExperiment(variantId: string) {
 
 // ── recent drafts (this browser only) ─────────────────────────────
 
+/** Largest unit that still reads as a whole number, so "2m ago" beats "138s ago". */
+const TIME_DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUnit }[] = [
+  { amount: 60, unit: "second" },
+  { amount: 60, unit: "minute" },
+  { amount: 24, unit: "hour" },
+  { amount: 7, unit: "day" },
+  { amount: 4.34524, unit: "week" },
+  { amount: 12, unit: "month" },
+  { amount: Number.POSITIVE_INFINITY, unit: "year" },
+];
+
+function timeAgo(at: number): string {
+  const formatter = new Intl.RelativeTimeFormat(locale.value, { numeric: "auto" });
+  let duration = (at - Date.now()) / 1000;
+  for (const division of TIME_DIVISIONS) {
+    if (Math.abs(duration) < division.amount) {
+      return formatter.format(Math.round(duration), division.unit);
+    }
+    duration /= division.amount;
+  }
+  return "";
+}
+
 interface RecentDraftEntry {
   id: string;
+  /** What the draft is about — the line the operator scans for. */
   summary: string;
+  /** Which models it ran. Secondary: it narrows a match, it does not make one. */
+  models?: string;
   savedAt: number;
   draft: PlaygroundDraft;
 }
 
 const recentDrafts = ref<RecentDraftEntry[]>([]);
+
+/** Identifies the draft being worked on now; a new one starts on Reset. */
+const draftSessionId = ref(playgroundId("draft"));
 
 const storageKey = computed(() => `o2-playground-drafts:${orgId.value}`);
 
@@ -758,11 +955,48 @@ function loadRecentDrafts() {
   }
 }
 
+/** What the draft is about. Empty until there is something to say: a bare model
+ *  name is the page's own default, not a draft the operator authored. */
 function draftSummary(current: PlaygroundDraft): string {
-  const first = current.variants[0];
-  const message = first?.messages.find((entry) => entry.content.trim().length > 0);
-  const text = message ? message.content.replace(/\s+/g, " ").trim().slice(0, 60) : "";
-  return text || first?.model || "";
+  return draftContext(current);
+}
+
+/** The dimmed second line: which models, and how long ago. */
+function draftMeta(entry: RecentDraftEntry): string {
+  return [entry.models, timeAgo(entry.savedAt)].filter(Boolean).join(" \u00b7 ");
+}
+
+function draftModels(current: PlaygroundDraft): string {
+  const counts = new Map<string, number>();
+  for (const variant of current.variants) {
+    const name = variant.model.trim() || variant.providerId.trim();
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  if (!counts.size) return "";
+  const names = [...counts].map(([name, count]) => (count > 1 ? `${name} \u00d7${count}` : name));
+  // "vs" claims a head-to-head, which stops being true the moment a model
+  // repeats — two gpt-4o columns are a mix, not a comparison.
+  const joiner = [...counts.values()].every((count) => count === 1)
+    ? ` ${t("aiObservability.playground.draftVersus")} `
+    : " + ";
+  return names.join(joiner);
+}
+
+/** What the run was about, in the order the operator would recognise it. */
+function draftContext(current: PlaygroundDraft): string {
+  if (current.sample) {
+    return t("aiObservability.playground.draftDatasetSample", {
+      dataset: current.sample.datasetName,
+    });
+  }
+  if (current.provenance) return current.provenance.label;
+  const messages = current.variants[0]?.messages ?? [];
+  const prompt =
+    messages.find((message) => message.role === "user" && message.content.trim()) ??
+    messages.find((message) => message.content.trim());
+  if (!prompt) return "";
+  const text = prompt.content.replace(/\s+/g, " ").trim();
+  return text.length > 40 ? `${text.slice(0, 40)}\u2026` : text;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -779,13 +1013,15 @@ function persistDraft() {
   const summary = draftSummary(draft);
   if (!summary) return;
   const entry: RecentDraftEntry = {
-    id: playgroundId("draft"),
+    id: draftSessionId.value,
     summary,
+    models: draftModels(draft),
     savedAt: Date.now(),
     draft: JSON.parse(JSON.stringify(draft)) as PlaygroundDraft,
   };
-  // Same opening line ⇒ the same working draft, so replace rather than pile up.
-  const others = recentDrafts.value.filter((candidate) => candidate.summary !== summary);
+  // One entry per working session, not per keystroke. Keying on the text meant
+  // every edit forked a near-duplicate and buried the drafts worth returning to.
+  const others = recentDrafts.value.filter((candidate) => candidate.id !== entry.id);
   recentDrafts.value = [entry, ...others].slice(0, 10);
   try {
     localStorage.setItem(storageKey.value, JSON.stringify(recentDrafts.value));
@@ -796,6 +1032,9 @@ function persistDraft() {
 
 function restoreDraft(entry: RecentDraftEntry) {
   stopAll();
+  // Carrying the id over means picking a draft back up updates it in place
+  // rather than cloning it into a second entry.
+  draftSessionId.value = entry.id;
   Object.assign(draft, JSON.parse(JSON.stringify(entry.draft)) as PlaygroundDraft);
   for (const key of Object.keys(results)) delete results[key];
   toast({ variant: "info", message: t("aiObservability.playground.draftRestored") });
