@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           variant="default-soft"
           size="xs"
-          :label="queryTypeLabel"
+          :label="queryTypeLabelText"
           data-test="alert-library-card-query-type"
         />
 
@@ -129,9 +129,9 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-import { severityBadgeValue, severityLabel } from "./libraryFacets";
+import { queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
 
 const props = defineProps<{
   entry: AlertLibraryEntry;
@@ -146,5 +146,5 @@ const { t } = useI18nTyped();
 const severityValue = computed(() => severityBadgeValue(props.entry.severity));
 const severityText = computed(() => severityLabel(t, props.entry.severity));
 // A query language, not prose — one correct form worldwide.
-const queryTypeLabel = computed(() => raw(String(props.entry.query_type ?? "").toUpperCase()));
+const queryTypeLabelText = computed(() => queryTypeLabel(props.entry.query_type));
 </script>

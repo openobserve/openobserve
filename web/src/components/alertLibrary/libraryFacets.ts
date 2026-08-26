@@ -81,6 +81,14 @@ const PACK_LABELS: Record<string, string> = {
   openobserve: "OpenObserve",
 };
 
+const QUERY_TYPE_LABELS: Record<string, string> = { promql: "PromQL", sql: "SQL" };
+
+// Product names, not shouted acronyms — toUpperCase() rendered "PROMQL".
+export const queryTypeLabel = (queryType: string | null | undefined): I18nText => {
+  const key = String(queryType ?? "").toLowerCase();
+  return raw(QUERY_TYPE_LABELS[key] ?? key.toUpperCase());
+};
+
 export const packLabel = (id: string): I18nText =>
   raw(typeof id === "string" && Object.hasOwn(PACK_LABELS, id) ? PACK_LABELS[id] : id);
 

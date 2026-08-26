@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           variant="default-soft"
           size="xs"
-          :label="queryTypeLabel"
+          :label="queryTypeLabelText"
           data-test="alert-library-drawer-query-type"
         />
         <OTag
@@ -215,7 +215,13 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
 
-import { categoryLabel, packLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
+import {
+  categoryLabel,
+  packLabel,
+  queryTypeLabel,
+  severityBadgeValue,
+  severityLabel,
+} from "./libraryFacets";
 import { readTunables, applyTunables } from "./libraryTunables";
 
 const props = defineProps<{
@@ -307,7 +313,7 @@ const drawerSubtitle = computed(() => {
 const severityValue = computed(() => severityBadgeValue(props.entry?.severity ?? ""));
 const severityText = computed(() => severityLabel(t, props.entry?.severity ?? ""));
 // A query language, not prose — one correct form worldwide.
-const queryTypeLabel = computed(() => raw(String(props.entry?.query_type ?? "").toUpperCase()));
+const queryTypeLabelText = computed(() => queryTypeLabel(props.entry?.query_type));
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
