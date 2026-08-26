@@ -29,7 +29,11 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Key props:**
 - `variant` (default `"default"`) — one of: `default`, `primary`, `success`, `warning`, `error`, `default-outline`, `primary-outline`, `success-outline`, `warning-outline`, `error-outline`, `info-outline`, `purple-outline`, `default-soft`, `primary-soft`, `success-soft`, `warning-soft`, `error-soft`, `teal`, `teal-outline`, `teal-soft`, `orange`, `orange-outline`, `orange-soft`, `lime`, `lime-outline`, `lime-soft`, `amber`, `amber-outline`, `amber-soft`, `cyan`, `cyan-outline`, `cyan-soft`, `blue`, `blue-outline`, `blue-soft`, `purple`, `purple-soft`, `indigo`, `indigo-outline`, `indigo-soft`
 - `size` (`xs` | `sm` | `md` — default `md`)
-- `shape` (`pill` | `rounded` | `square` — default `pill`)
+- `shape` (`pill` | `rounded` | `square` — default `pill`).
+  **Strict: badges are `pill` by default and STAY pill.** Do not pass `rounded`
+  or `square` — never pick a badge shape by eye. Only set another shape when a
+  design explicitly calls for it, and for a typed `OTag` that shape lives in the
+  badge-registry group (`badgeGroups.ts`), never as a call-site prop.
 - `icon` (string — Material icon or OIcon registry name; overridden by `#icon` slot)
 - `count` (number — trailing segment; `0` still renders unless `hideZeroCount`)
 - `hideZeroCount` (boolean — suppress trailing segment when count is 0)
@@ -70,7 +74,10 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - `type` (`BadgeGroupName | string` — registry group e.g. `"alertType"`; omit for a manual badge)
 - `value` (unknown — raw value resolved against the group)
 - `size` (`xs` | `sm` | `md` — precedence: prop → registry → `sm`)
-- `shape` (`pill` | `rounded` | `square` — precedence: prop → registry → `pill`)
+- `shape` (`pill` | `rounded` | `square` — precedence: prop → registry → `pill`).
+  Default is `pill` and stays pill; a group sets `rounded`/`square` in
+  `badgeGroups.ts` only when a design explicitly calls for it — never a call-site
+  shape override.
 - `label` (string — override resolved label)
 - `variant` (`BadgeVariant` — override resolved colour; same enum as OBadge)
 - `icon` (string — override resolved OIcon name; `""` suppresses)

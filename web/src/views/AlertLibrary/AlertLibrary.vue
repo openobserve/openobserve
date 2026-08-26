@@ -36,8 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="t('alerts.subtitle')"
       tabs-below
     >
-      <!-- Section-level title and subtitle, identical on all four alerting
-           pages — see AlertList.vue. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>

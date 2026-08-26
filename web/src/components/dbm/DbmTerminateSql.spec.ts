@@ -43,8 +43,7 @@ describe("DbmTerminateSql", () => {
     expect(mountWith({ pid: null }).find("[data-test='dbm-terminate-sql']").exists()).toBe(false);
   });
 
-  // The statement carries its own tooltip now, so the hint is the copy button's
-  // (the `side="left"` one) rather than the first OTooltip in tree order.
+  // Hint is the copy button's tooltip (side="left"), not the statement's own first-in-tree OTooltip.
   const hintContent = (wrapper: ReturnType<typeof mountWith>) =>
     wrapper
       .findAllComponents({ name: "OTooltip" })

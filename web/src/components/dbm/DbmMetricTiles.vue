@@ -90,11 +90,7 @@ export interface DbmMetricTile {
   detail?: I18nText;
   /** A colour class, applied only where the page's own threshold fired. */
   tone?: string;
-  /**
-   * A colour class for the caption line — used to tint a signed delta by its
-   * direction (a rise in a cost metric red, a fall green). Defaults to the
-   * quiet secondary when unset, so a non-delta caption stays neutral.
-   */
+  /** Colour class for the caption, to tint a signed delta by direction (rise red, fall green); neutral when unset. */
   detailTone?: string;
   /** Corner icon (OIcon name) for the KPI-card rendering of this figure. */
   icon?: IconName;

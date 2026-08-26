@@ -25,8 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="t('alerts.subtitle')"
       tabs-below
     >
-      <!-- Section-level title and subtitle, identical on all four alerting
-           pages — see AlertList.vue. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
@@ -70,8 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <!-- Type filter sits with the search box, not in the header: the
-               header carries page actions only. -->
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
               <OToggleGroup

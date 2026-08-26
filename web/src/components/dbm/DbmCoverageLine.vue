@@ -46,8 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="toneSurface"
       data-test="dbm-coverage-line"
     >
-      <!-- Left: the one status sentence with its optional coverage bar. Allowed
-           to truncate so the counting clock on the right stays whole. -->
       <div class="flex min-w-0 items-center gap-2">
         <span class="size-1.5 shrink-0 rounded-full" :class="dotTone" aria-hidden="true"></span>
 
@@ -69,10 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- Right: how far the counting has reached, pinned to the trailing edge
-           with a clock so it reads as a timestamp rather than more sentence. The
-           values (clock time, minutes behind) are bolded via slots so they read
-           at a glance without the surrounding prose competing for weight. -->
       <div
         v-if="countedTo"
         class="text-text-muted flex shrink-0 items-center gap-1.5"
@@ -300,16 +294,7 @@ const dotTone = computed(() => {
 
 const showBar = computed(() => !degraded.value && coverage.value !== null);
 
-/**
- * Wall-clock time our counting reaches, split into parts so the template can
- * bold the values (`time`, `behind`). `behind` is set only past
- * {@link BEHIND_NOTE_MINUTES}: "the last half-minute is still coming in" is true
- * only while the counting really is current — under the stale threshold but past
- * ordinary rollup delay that sentence asserts a freshness the data does not
- * support (at 25 minutes behind it is simply false), so the line states the real
- * lag instead. It stays the quiet grey trailer either way: a correction to a
- * claim, not a promotion to a warning.
- */
+/** Wall-clock time the counting reaches; `behind` is set only past {@link BEHIND_NOTE_MINUTES}, where the "still coming in" phrasing would assert a freshness the lag no longer supports. */
 const countedTo = computed<{ time: string; behind: number | null } | null>(() => {
   if (degraded.value) return null;
   const through = props.freshness?.data_through ?? 0;

@@ -150,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTab>
 
-          <!-- Telemetry tabs always inline -->
           <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
           <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
           <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />

@@ -57,8 +57,7 @@ describe("DbmHistoryPanel", () => {
   it("renders the card and its heading", () => {
     const wrapper = mountPanel();
 
-    // The card is LLMPanelCard now — its glass panel chrome, a div, so both
-    // history charts wear the same shell as the dashboard panels beside them.
+    // Card is LLMPanelCard (a div) so both history charts share the dashboard panels' shell.
     expect(wrapper.element.tagName).toBe("DIV");
     expect(wrapper.classes()).toEqual(
       expect.arrayContaining([

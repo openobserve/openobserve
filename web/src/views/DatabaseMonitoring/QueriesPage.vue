@@ -98,10 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @clear="clearScope"
           @clear-insight="activeInsightId = null"
         />
-        <!-- Off = real SQL only; on ADDS the driver's connection bookkeeping. A
-             checkbox rather than a two-option switch, because the choice is a
-             single "also include" and the second toggle half only ever restated
-             the first plus that addition. -->
+        <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
         <span
           class="border-border-default rounded-default inline-flex shrink-0 items-center border px-2.5 py-2"
           data-test="dbm-queries-stmt-class"
@@ -294,8 +291,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              server figure it would qualify a number drawn from a different
              population. -->
         <template #cell-calls="{ row }">
-          <!-- Two rows, like Database time: the count on top, its qualifier and
-               the window-over-window delta together on the line below. -->
           <DbmOverlapValue
             :value="row.overlapCalls.value === null ? null : formatCount(row.overlapCalls.value)"
             :source="row.overlapCalls.source"

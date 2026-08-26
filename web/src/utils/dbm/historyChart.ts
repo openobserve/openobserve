@@ -60,17 +60,12 @@ export const buildSamplesOption = (
   formatNs: (value: number | null | undefined) => string,
   names: { ok: string; error: string },
 ): Record<string, unknown> => {
-  // Sample timestamps are MICROSECONDS; a `time` axis wants epoch milliseconds.
-  // Converting here lets ECharts format the x-axis NATIVELY — adaptive hour/day
-  // ticks, the same as the dashboard panels — instead of a hand-written label.
+  // Sample timestamps are microseconds; a `time` axis wants epoch milliseconds.
   const toPoint = (sample: { timestamp: number; durationNs: number }) => [
     Math.floor(sample.timestamp / 1000),
     sample.durationNs,
   ];
 
-  // The dashboard panels' tooltip datetime, `YYYY-MM-DD HH:mm:ss` in the local
-  // zone (mirrors `dateTimeUtils.formatDate`), so a hovered dot reads the same
-  // full timestamp a hovered bar does.
   const formatDateTime = (ms: number): string => {
     const date = new Date(ms);
     const pad = (value: number) => String(value).padStart(2, "0");
@@ -78,11 +73,7 @@ export const buildSamplesOption = (
   };
 
   return {
-    // Legend at the BOTTOM, matching the dashboard trend panels on this page —
-    // so the grid tops out tight and reserves its floor for the legend row.
     grid: { left: 8, right: 8, top: 16, bottom: 28, containLabel: true },
-    // Bottom-LEFT with a rounded-rect CHIP marker, matching the bar panels'
-    // legend on this page (a solid rounded swatch, not a line+dot).
     legend: {
       bottom: 0,
       left: 0,
@@ -124,7 +115,6 @@ export const buildSamplesOption = (
     xAxis: {
       type: "time",
       axisLabel: { hideOverlap: true, color: theme.axisLabel },
-      // Vertical gridlines too — DASHED, matching the dashboard panels' grid.
       splitLine: { show: true, lineStyle: { type: "dashed", width: 1, color: theme.splitLine } },
     },
     yAxis: {

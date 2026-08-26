@@ -724,8 +724,7 @@ const scatterData = computed(() => ({ options: samplesOption.value }));
 const onScatterClick = (params: unknown) => {
   const value = (params as { value?: [number, number] })?.value;
   if (!value) return;
-  // The scatter plots epoch-MS (a `time` axis wants ms, the rows carry micros),
-  // so match the datum's ms back to the row's micros; the duration disambiguates.
+  // Scatter plots epoch-ms but rows carry micros, so match ms back to micros; duration disambiguates.
   const sample = rows.value.find(
     (row) => Math.floor(row.timestamp / 1000) === value[0] && row.durationNs === value[1],
   );

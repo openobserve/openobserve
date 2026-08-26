@@ -19,11 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   All seven list pages opened with the same twenty lines: an OPageLayout with the
   database icon, tabs on a second row, a bleeding body and the shared tab strip
-  in `#header-tabs`. The title and subtitle are ONE constant "Databases" header
-  for the whole section rather than a per-tab pair: the tab strip already names
-  the view, so a title that changed on every tab only made the section read as
-  seven unrelated screens. Only the title's data-test still differs per page, for
-  the e2e selectors that address each tab by it.
+  in `#header-tabs`. Title and subtitle are one constant "Databases" header for
+  the whole section — the tab strip already names the view. Only the title's
+  data-test differs per page, for the e2e selectors that key off it.
 
   Two things deliberately stay in the page. The tab strip's markup lives HERE
   rather than in `DbmShell` for the reason `dbmTabCounts.ts` documents — it

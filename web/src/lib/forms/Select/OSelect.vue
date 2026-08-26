@@ -1869,8 +1869,6 @@ const fieldWidthClass = computed(() => {
               />
             </template>
 
-            <!-- Empty state, matching the listbox path: an opened select with no
-                 options must say so, not render a blank strip. -->
             <div v-else-if="!slots.default" class="text-select-placeholder px-3 py-2 text-sm">
               <slot name="empty">{{ t("components.select.noOptionsFound") }}</slot>
             </div>

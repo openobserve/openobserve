@@ -169,11 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            is, why it is slow, who ran it. Same primitives as the L2 strip in
            DbmSectionTabs, one level down — OTabs/OTab with a hint tooltip, and
            the Callers tab locked with the same lock+tooltip treatment when the
-           vantage that fills it reported nothing.
-
-           `px-page-edge` insets the labels to the page-edge grid (lining up with
-           the statement above) while `bordered` draws a full-bleed bottom divider
-           across the padded strip — matching the header's own border. -->
+           vantage that fills it reported nothing. -->
       <OTabs
         v-if="hasQuery"
         :model-value="activeTab"
@@ -237,15 +233,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            in a second branch: one copy of each section, one source of truth for
            its states, and the trace-led order restored the moment traces
            return. -->
-          <!-- The headline figures as KPI cards — the same icon-chip + value
-               chrome the AI Insights strip uses, so the two products read as one
-               design. While the read is in flight the value + caption skeleton
-               in place rather than flashing an em dash. The provenance caption
-               rides above the row and stays CONDITIONAL: "instrumented callers
-               only" describes the trace-derived tiles, so over the two
-               server-sourced figures it renders nothing rather than
-               misattributing them. The group keeps the order-2 swap so a
-               zero-trace fleet still hoists the server block above it. -->
+          <!-- The provenance caption stays CONDITIONAL: it describes the
+               trace-derived tiles, so it renders nothing over the two
+               server-sourced figures rather than misattributing them. The order-2
+               swap hoists the server block on a zero-trace fleet. -->
           <div
             class="flex flex-col gap-2"
             :class="traceVantage ? '' : 'order-2'"
@@ -676,9 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t("dbm.detail.whereItRuns.noInstance")
                     }}
                   </span>
-                  <!-- Tooltip is a SIBLING of the tag, not its child: OTag's
-                       default slot overrides the `label` prop, so a tooltip
-                       placed inside would blank the "focused" text. -->
+                  <!-- Tooltip is a SIBLING of the tag: OTag's default slot overrides the `label` prop, so a tooltip inside would blank the "focused" text. -->
                   <span
                     v-if="isWhereRowActive(whereRow, whereScope)"
                     class="inline-flex shrink-0"
@@ -2098,10 +2087,7 @@ const visibleHeadlineStats = computed(() =>
     : headlineStats.value.filter((tile) => tile.id === "load" || tile.id === "calls"),
 );
 
-// The KPI cards want the number and its unit set separately, so the value can be
-// large and bold while its unit rides small beside it (52.05 · ms). The split is
-// on the FORMATTED string — a leading number then the rest — so "none" and "—"
-// pass through as their own "number" with no unit.
+// Split the FORMATTED value into leading number and trailing unit, so "none" and "—" pass through as a number with no unit.
 const summaryCards = computed(() =>
   visibleHeadlineStats.value.map((tile) => {
     const formatted = String(tile.value ?? "");
@@ -2136,10 +2122,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
     return raw(formatSignedPercent(delta.ratio));
   };
 
-  // Colour a signed delta by its ACTIONABLE direction — a rise in a cost metric
-  // (latency, calls) is the one worth reddening; a fall is good news and stays
-  // green. Below the deadband there is no change to colour, so the caption keeps
-  // its quiet secondary. Same tone rule the delta COLUMN uses, so the two agree.
+  // Colour a signed delta by direction — a rise in a cost metric reddens, a fall greens; below the deadband it stays neutral. Same rule as the delta column.
   const deltaTone = (delta: ReturnType<typeof deltaFor>): string | undefined => {
     if (delta.state !== "changed" || delta.ratio === undefined) return undefined;
     if (Math.abs(delta.ratio) < DELTA_PHRASING.deadband) return undefined;
@@ -3080,8 +3063,7 @@ const openEndpointTraces = (endpoint: EndpointCallerRow) => {
 const onSampleClick = (params: unknown) => {
   const value = (params as { value?: [number, number] })?.value;
   if (!value) return;
-  // The scatter plots epoch-MS (a `time` axis wants ms, samples carry micros),
-  // so match the datum's ms back to the sample's micros; duration disambiguates.
+  // The scatter plots epoch-ms (samples carry micros), so match the datum's ms back to the sample's micros; duration disambiguates.
   const sample = samples.value.find(
     (entry) => Math.floor(entry.timestamp / 1000) === value[0] && entry.durationNs === value[1],
   );

@@ -34,19 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   health's bare full-width search input has none to give.
 
   So the AFFORDANCE is adopted and the geometry is kept: same OButton, with the
-  staleness dot AND the relative age beside it — always-on, matching what the AI
-  Observability pages show left of their refresh control, so "how old is this?"
-  is answered at a glance rather than on hover. The reading itself is
-  `ORefreshButton`'s, shared through `useDbmLastRefreshed` — same thresholds,
-  same copy keys — so the two controls cannot drift into disagreeing about what
+  staleness dot and the relative age beside it. The reading is `ORefreshButton`'s,
+  shared through `useDbmLastRefreshed`, so the two controls cannot drift on what
   "stale" means.
 -->
 <template>
   <div class="inline-flex items-center gap-1.5" :class="shrink ? 'shrink-0' : undefined">
-    <!-- The dot is the colour half: it answers "should I trust this number?" at
-         a glance. Rendered only once a load has succeeded — before that there is
-         no staleness to report, and a grey dot on first paint would read as a
-         verdict rather than as the absence of one. -->
+    <!-- Rendered only after a successful load: a grey dot on first paint would read
+         as a verdict rather than the absence of one. -->
     <span
       v-if="hasRun && mode !== 'button'"
       class="size-2 shrink-0 rounded-full transition-colors duration-700"
@@ -58,9 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip side="bottom" :content="dotStatus" />
     </span>
 
-    <!-- The words half: the relative age, always-on beside the dot (the exact
-         clock time stays on the dot's hover). Shown only once a load has landed,
-         for the same reason the dot is. -->
     <span
       v-if="hasRun && mode !== 'button'"
       class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
@@ -109,12 +101,7 @@ const props = withDefaults(
      * adopting the timestamp is per-page rather than a flag day.
      */
     lastRunAt?: number | null;
-    /**
-     * Which halves to render. `full` (default) is the dot + age + button in one
-     * row. `status` is just the dot + age, `button` is just the reload control —
-     * so a caller can split them across a picker (last-refreshed, then the range
-     * picker, then the reload).
-     */
+    /** Which halves to render: `full` (dot + age + button), `status` (dot + age), or `button` (just the reload). */
     mode?: "full" | "status" | "button";
   }>(),
   { loading: false, shrink: true, lastRunAt: null, mode: "full" },

@@ -59,11 +59,7 @@ describe("DbmPageChrome", () => {
     expect(layout.props("bleed")).toBe(true);
   });
 
-  /**
-   * One constant "Databases" header for every tab — the tab strip names the
-   * view, so a per-tab title only made the section read as seven unrelated
-   * screens. Only the title's data-test varies, for the e2e selectors keyed off it.
-   */
+  // One shared "Databases" header across tabs; per-tab titles made the section read as unrelated screens. Only the title's data-test varies, for e2e selectors.
   it("wears the one shared Databases header, with the page's own title data-test", () => {
     const layout = mountChrome().findComponent(OPageLayout);
 

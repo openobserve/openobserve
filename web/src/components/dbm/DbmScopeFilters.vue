@@ -46,11 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <!-- A titled panel of labelled fields over a pinned action row, so the
-           popover reads as one thing to fill in and dismiss rather than a loose
-           stack of selects. Each select carries its dimension via OSelect's own
-           label; the placeholder names the unset state ("All engines"). The
-           label string is the same one the toolbar chip shows, so the two agree. -->
       <div class="flex w-72 flex-col">
         <div class="flex flex-col gap-2.5 p-3">
           <p class="text-text-heading text-sm font-semibold" data-test="dbm-queries-scope-title">
@@ -71,9 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- Pinned action row: just Clear all — the filters apply live, so there
-             is nothing to submit and no Done to press. Kept present but disabled
-             with nothing set, so its place never shifts. -->
         <div class="border-border-default flex items-center border-t px-3 py-2.5">
           <OButton
             variant="outline"
@@ -91,17 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The chips scroll rather than push: five set dimensions are wider than
          the toolbar, and a chip strip that grows must not shove the refresh and
          column controls off the right edge. -->
-    <!-- `overflow-x-auto` also clips the Y axis (overflow-y computes to auto),
-         which would shave the top off the hover-reveal remove badge that pokes
-         above each chip. The `py-1`/`-my-1` pair grows the clip box to fit it
-         without changing the toolbar row's height. -->
+    <!-- `overflow-x-auto` forces overflow-y to auto, clipping the remove badge that pokes above each chip; the `py-1`/`-my-1` pair grows the clip box to fit it. -->
     <div class="-my-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-1">
       <!-- Active scope, inline and clearable. The chip is the app-standard
            ODimensionChip, so `service` here is the same colour it is on the
-           incident list. The remove button floats at the chip's top-right
-           corner rather than taking an inline slot beside it — the chip is a
-           shared primitive with no slot for one, and a corner overlay keeps the
-           strip narrow enough that several scopes fit without scrolling. -->
+           incident list. The remove button sits outside the chip because
+           ODimensionChip is a shared primitive with no slot for one. -->
       <span
         v-for="filter in activeFilters"
         :key="filter.key"

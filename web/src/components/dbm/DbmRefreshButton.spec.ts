@@ -152,13 +152,12 @@ describe("DbmRefreshButton last-refreshed", () => {
     expect(dot.classes()).not.toContain("bg-refresh-dot-critical");
   });
 
-  /** Before a load the button names the action alone; after one, the staleness
-   *  reading rides the DOT's tooltip (the age is also an always-on span). */
+  // Before a load the button names the action alone; after one, the staleness reading rides the dot's tooltip.
   it("names the action alone before a load, and adds the age after one", () => {
     expect(mountButton().findAllComponents(OTooltip)[0].props("content")).toBe("Refresh");
 
     const loaded = mountButton({ lastRunAt: Date.now() });
-    // Two tooltips now — the dot's (first in tree order) and the button's.
+    // Two tooltips: the dot's (first in tree order) and the button's.
     const tooltips = loaded.findAllComponents(OTooltip);
     expect(tooltips).toHaveLength(2);
     expect(String(tooltips[0].props("content"))).toContain("Last refreshed");

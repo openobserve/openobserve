@@ -205,10 +205,7 @@ async function mountAlertList() {
           emits: ["update:ok", "update:cancel", "update:modelValue"],
           template: '<div class="confirm-dialog-stub" :data-open="modelValue"></div>',
         },
-        // Real reka-ui toggle groups make every mount of this page markedly
-        // slower, and this file mounts 70 times — enough to push borderline
-        // tests past their timeouts. Both groups here (type filter and search
-        // scope) are stubbed for speed.
+        // Real reka-ui toggle groups slow every mount, and this file mounts 70 times — enough to push borderline tests past their timeouts.
         OToggleGroup: {
           name: "OToggleGroup",
           props: ["modelValue"],

@@ -42,7 +42,7 @@ describe("DbmQueryCell", () => {
     expect(line.classes()).toEqual(
       expect.arrayContaining(["text-text-code", "min-w-0", "truncate", "font-mono", "text-xs"]),
     );
-    // The full statement rides OTooltip's content now, not a native title attr.
+    // Full statement rides OTooltip's content, not a native title attr.
     expect(String(line.findComponent(OTooltip).props("content"))).toBe(
       "SELECT * FROM orders WHERE id = $1",
     );

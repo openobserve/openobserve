@@ -32,12 +32,7 @@ describe("useDbmChartTheme", () => {
     chartColor.mockClear();
   });
 
-  /**
-   * ECharts draws on a canvas and cannot read a CSS custom property, so every
-   * token has to arrive as a resolved literal. These are the scatter's whole
-   * palette — series, axis, the dashed gridline and the dashboard tooltip's own
-   * surface — both callers draw the same chart and must not drift apart.
-   */
+  // ECharts draws on canvas and can't read CSS custom properties, so every token must resolve to a literal; both callers draw the same chart and must not drift apart.
   it("resolves the scatter's tokens to literals", () => {
     expect(useDbmChartTheme().value).toEqual({
       calls: "light:--color-chart-series-1",

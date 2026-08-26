@@ -197,12 +197,19 @@ read it once, it is the backbone of everything below.
      Default to `text-sm` for body. Go smaller only for genuinely dense/secondary UI,
      larger only for titles. If a design needs a size not on the scale, snap to the
      nearest step — do **not** reintroduce an arbitrary `text-[..]`.
-   - **Casing — never ALL-CAPS user-facing text.** No shouting: don't bake caps into
-     a string (`"FIRST APPEARED AT {time}"`, `"NEW TO THIS LIST"`) and don't force it
-     with the `uppercase` utility. Write copy in **sentence case** (`"First appeared
-     at {time}"`) — capitalize the first word and proper nouns only, not Every Word.
-     This includes micro-labels, stat/tile captions, table headers, chips, and badges:
-     use `text-text-label`/`text-xs` weight + colour to make a label quiet, not caps.
+   - **Casing — never uppercase anywhere in the app, except an established short
+     form.** This is app-wide and strict. No shouting: don't bake caps into a string
+     (`"FIRST APPEARED AT {time}"`, `"NEW TO THIS LIST"`) and don't force it with the
+     `uppercase` utility. Write copy in **sentence case** (`"First appeared at {time}"`)
+     — capitalize the first word and proper nouns only, not Every Word.
+     **The one exception is an established short form** — an acronym, initialism, or
+     abbreviation that is conventionally written in caps (`SQL`, `API`, `URL`, `ID`,
+     `CPU`, `AI`, `HTTP`, `JSON`) and metric tokens (`p95`, `p99`) — which keep their
+     canonical casing inside otherwise-sentence-case copy. A full word is never a short
+     form: `DELETE`, `SAVE`, `NEW`, `SERVER` are violations; `Delete`, `Save`, `New`,
+     `Server` are correct. This applies everywhere text renders: micro-labels,
+     stat/tile captions, table headers, chips, badges, buttons, tooltips, empty states.
+     Make a label quiet with `text-text-label`/`text-xs` weight + colour, not caps.
      `tracking-wide uppercase` is **not** the house label style. (The transform is a
      legibility cost — caps runs slow the reader and break at small sizes — and a
      baked-in caps string also can't be sentence-cased per locale.) `capitalize` is
@@ -640,8 +647,11 @@ considering the UI done:
 - [ ] Corner radius is `rounded-default` / `rounded-surface` / `rounded-full`
       only — no bare `rounded`, no `rounded-[..]`, no retired
       `rounded-{sm,md,lg,xl}`.
-- [ ] **No ALL-CAPS text** — no caps baked into a string and no `uppercase`
-      utility on labels/headers/chips/badges. Copy is sentence case; make labels
+- [ ] **No uppercase anywhere except established short forms** — no caps baked
+      into a string and no `uppercase` utility on labels/headers/chips/badges/
+      buttons/tooltips. Copy is sentence case; the only caps allowed are acronyms/
+      abbreviations (`SQL`, `API`, `URL`, `ID`, `AI`) and metric tokens (`p95`).
+      A full word (`DELETE`, `SAVE`, `NEW`) is never a short form. Make labels
       quiet with size/weight/colour, not capitals.
 - [ ] No `<style scoped>` block added. No `style="…"` attribute added.
 - [ ] No literal colors anywhere. Colours come from `--color-*` token **utilities**
@@ -650,6 +660,12 @@ considering the UI done:
       keyframes, `color-mix`, `calc`, SVG `fill`/`stroke`, `v-html`). No raw
       Tailwind palette (`bg-gray-*`) and no raw `grey-*`/`primary-*` ramp — use a
       semantic token.
+- [ ] **Text colour matches its semantic role** — `heading` (titles/emphasis),
+      `body` (main content), `secondary` (labels, captions, metadata, units),
+      `muted` ONLY for disabled/absent content (disabled control, em-dash /
+      "none" / "not measured" placeholder). Never `muted` on a live value or a
+      label; make text quieter by dropping one tier + size/weight, not opacity.
+      See [design-tokens § text colour](references/design-tokens.md).
 - [ ] **Calm Signal** — the screen's *primary signal* is coloured (state /
       category / role / progress) via the shared toolkit (`OStatStrip`/`OStatCard`,
       `OTag` chips, row rail + exception tint, relative `OTimeCell`), and the rest

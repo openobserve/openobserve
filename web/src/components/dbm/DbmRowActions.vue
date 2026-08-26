@@ -24,9 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   detail page. So the four things a reader actually does next live on the row.
 
   Always visible, matching the app-standard action column on the Dashboards and
-  Alerts lists — one consistent "Actions" column across the product rather than
-  a DBM-only hover-reveal. They stay in the DOM and focusable, so keyboard users
-  reach them in tab order and screen readers announce them.
+  Alerts lists. They stay in the DOM and focusable, so keyboard users reach them
+  in tab order and screen readers announce them.
 -->
 <template>
   <div class="flex items-center justify-end gap-0.5" :data-test="dataTest">
@@ -39,9 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`${dataTest}-${action.id}`"
       @click.stop="emit('action', action.id)"
     >
-      <!-- `left`, the convention for an icon-only action in a table's trailing
-           cell — it opens INTO the row rather than over the row above. These
-           buttons carry no label, so the tooltip is the only thing naming them. -->
+      <!-- Icon-only actions carry no label, so the tooltip names them; `left` opens it into the row, not over the row above. -->
       <OTooltip side="left" :content="action.label" />
     </OButton>
   </div>
