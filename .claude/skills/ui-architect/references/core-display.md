@@ -255,6 +255,17 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Import:** `@/lib/core/EmptyState/OEmptyState.vue`
 **Use when:** The app-wide empty-state primitive for "no data / no results" contexts. Driven by a named `preset` (fills illustration + copy + actions) or by props/slots. Three sizes for the three contexts: full page/section (`hero`), inside a card/panel (`block`), inside a table/dropdown (`inline`).
 **Don't use for:** Loading/skeleton states, or inline validation errors.
+
+> **Rule (strict) — every empty state IS `OEmptyState`.** Never hand-roll a
+> "no data / no results / nothing here yet" state from a bare `<div>` with
+> centered text and a button. ANY empty/zero state — a table with no rows, a
+> panel or tab with nothing yet, a filtered list with no matches — renders
+> through `OEmptyState` (illustration + title + description). **Actions use the
+> ONE standard layout:** a rich action **card** — `EmptyStateActionCard` via the
+> `actions` prop or the `#actions` slot — for a primary next-step CTA (icon chip
+> + label + sublabel + chevron, the same card the empty dashboard uses), or
+> `actionLabel` + `@action` for a simple button. Never a hand-placed button row
+> or a custom card. So every empty state across the app reads as one system.
 **Key props:**
 - `preset` (`EmptyStatePresetName` — named scenario from the catalog; see `EmptyState/presets.ts`)
 - `size` (`hero` | `block` | `inline` — default `block`)

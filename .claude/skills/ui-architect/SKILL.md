@@ -614,9 +614,12 @@ considering the UI done:
       (`#toolbar-trailing`, wired to fetch), and the **column show/hide toggle**
       (`:persist-columns` + `table-id` + a `hideable` column). Non-essential
       columns hidden by default via `:column-visibility`.
-- [ ] Empty state is a single `OEmptyState` with a `preset` + **`:filtered`**
+- [ ] Every empty/zero state is a single `OEmptyState` (never a hand-rolled
+      `<div>` + centered text + button). Use a `preset` + **`:filtered`**
       (search/filter active) + `@action` resetting on `clear-filters`; `#error` if
-      fetch can fail.
+      fetch can fail. Its actions use the standard layout — an `EmptyStateActionCard`
+      (`actions` prop / `#actions` slot) for a primary CTA, or `actionLabel`, never
+      a custom button row.
 - [ ] Page is **registered in navigation** (route + one of rail item / Settings
       sub-page / flyout child) and **gated** for env/role
       (`config.isEnterprise` / `config.isCloud` / `zoConfig.*`), with the route,

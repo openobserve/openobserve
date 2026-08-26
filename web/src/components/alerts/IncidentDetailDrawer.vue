@@ -877,10 +877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="space-y-2">
                           <!-- Alert Name -->
                           <div class="flex flex-col gap-0.5">
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-3xs tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-3xs">
                               {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
@@ -893,10 +890,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
                             class="flex flex-col gap-0.5"
                           >
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-3xs tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-3xs">
                               {{ t("alerts.alertType") }}
                             </span>
                             <OTag type="alertType" :value="'composite'" class="w-fit" />
@@ -905,10 +899,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Stream Type & Name -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.streamType") }}
                               </span>
                               <OTag
@@ -918,10 +909,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
                               <span :class="'text-text-body'" class="truncate text-sm font-medium">
@@ -933,10 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Threshold & Period -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -948,10 +933,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.period") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -967,10 +949,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Frequency & Silence -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -985,10 +964,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.silence") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1016,10 +992,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'border-border-default',
                             ]"
                           >
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-2xs font-semibold tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-2xs font-semibold">
                               {{
                                 alerts[selectedAlertIndex]?.query_condition?.type === "sql"
                                   ? t("alerts.alertDetails.sqlQuery")
