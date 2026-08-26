@@ -48,10 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sort and didn't would be a lie the UI tells by omission.
 -->
 <template>
-  <DbmPageChrome
-    title-data-test="dbm-queries-title"
-    :tab-counts="tabCounts"
-  >
+  <DbmPageChrome title-data-test="dbm-queries-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Blocked queries emit no span until they finish, so a lock storm makes
            QPS FALL — and a falling line reads as recovery at the worst possible
@@ -101,24 +98,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @clear="clearScope"
           @clear-insight="activeInsightId = null"
         />
-        <OToggleGroup
-          :model-value="stmtClass"
-          class="shrink-0"
+        <!-- Off = real SQL only; on ADDS the driver's connection bookkeeping. A
+             checkbox rather than a two-option switch, because the choice is a
+             single "also include" and the second toggle half only ever restated
+             the first plus that addition. -->
+        <span
+          class="border-border-default rounded-default inline-flex shrink-0 items-center border px-2.5 py-2"
           data-test="dbm-queries-stmt-class"
-          @update:model-value="onStmtClassChange"
         >
-          <!-- The second option names what it ADDS rather than restating the
-               whole: two halves that both read as "everything" ("Queries" /
-               "All statements") make the distinction invisible. -->
-          <OToggleGroupItem value="query" size="sm">
-            {{ t("dbm.queries.stmtClass.query") }}
-            <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.queryHint')" />
-          </OToggleGroupItem>
-          <OToggleGroupItem value="all" size="sm">
-            {{ t("dbm.queries.stmtClass.all") }}
-            <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
-          </OToggleGroupItem>
-        </OToggleGroup>
+          <OCheckbox
+            :model-value="stmtClass"
+            true-value="all"
+            false-value="query"
+            size="sm"
+            :label="t('dbm.queries.stmtClass.overheadLabel')"
+            @update:model-value="onStmtClassChange"
+          />
+          <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
+        </span>
 
         <!-- What every Δ and every insight is measured AGAINST (W5). Each rule
              line names the choice, so a number can always be traced to the
@@ -591,6 +588,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";

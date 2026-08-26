@@ -15020,7 +15020,8 @@
         "query": "Queries",
         "queryHint": "Only real SQL — SELECT, INSERT, UPDATE and DELETE.",
         "all": "Queries + connection overhead",
-        "allHint": "Also counts the bookkeeping your driver sends between queries: BEGIN and COMMIT, SET, and the checks that keep a pooled connection alive."
+        "allHint": "Also counts the bookkeeping your driver sends between queries: BEGIN and COMMIT, SET, and the checks that keep a pooled connection alive.",
+        "overheadLabel": "Include connection overhead"
       },
       "completionBias": {
         "title": "Calls dropped {drop}% while failures rose",
