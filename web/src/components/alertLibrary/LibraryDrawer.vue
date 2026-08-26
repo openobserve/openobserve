@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <section>
-        <h3 class="text-text-secondary text-2xs pb-1 font-semibold uppercase">
+        <h3 class="text-text-secondary pb-1 text-xs font-semibold">
           {{ t("alert_library.drawer.detects") }}
         </h3>
         <p class="text-text-body text-sm" data-test="alert-library-drawer-description">
@@ -100,9 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-else-if="file">
         <section>
-          <h3
-            class="text-text-secondary text-2xs flex items-center gap-1.5 pb-2 font-semibold uppercase"
-          >
+          <h3 class="text-text-secondary flex items-center gap-1.5 pb-2 text-xs font-semibold">
             <OIcon name="code" size="xs" />
             <span>{{ t("alert_library.drawer.query") }}</span>
           </h3>
@@ -130,9 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
 
         <section data-test="alert-library-drawer-preview">
-          <h3
-            class="text-text-secondary text-2xs flex items-center gap-1.5 pb-2 font-semibold uppercase"
-          >
+          <h3 class="text-text-secondary flex items-center gap-1.5 pb-2 text-xs font-semibold">
             <OIcon name="query-stats" size="xs" />
             <span>{{ t("alerts.preview") }}</span>
             <template v-if="evaluation">
