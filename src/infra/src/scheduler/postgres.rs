@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use chrono::Duration;
 use config::{
     metrics::DB_QUERY_NUMS,
@@ -215,17 +214,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             return Err(e.into());
         }
 
-        // For now, only send realtime alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
-            );
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, Bytes::from(""), true, None)
-                .await?;
-        }
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
@@ -313,7 +302,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     SET status = $1, start_time = $2, end_time = $3, retries = $4, next_run_at = $5, is_realtime = $6, is_silenced = $7, data = $8
     WHERE org = $9 AND module_key = $10 AND module = $11;"#,
             )
-            .bind(trigger.status)
+            .bind(&trigger.status)
             .bind(trigger.start_time)
             .bind(trigger.end_time)
             .bind(trigger.retries)
@@ -330,7 +319,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
     WHERE org = $7 AND module_key = $8 AND module = $9;"#,
             )
-            .bind(trigger.status)
+            .bind(&trigger.status)
             .bind(trigger.retries)
             .bind(trigger.next_run_at)
             .bind(trigger.is_realtime)
@@ -343,17 +332,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
         query.execute(&pool).await?;
 
-        // For now, only send realtime alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
-            );
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, Bytes::from(""), true, None)
-                .await?;
-        }
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
@@ -421,22 +400,12 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                     .inc();
                 // Handle cluster coordinator for realtime alerts
                 for trigger in &triggers {
-                    if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-                        let key = format!(
-                            "{TRIGGERS_KEY}{}/{}/{}",
-                            trigger.module, &trigger.org, &trigger.module_key
+                    if let Err(e) = super::emit_realtime_trigger_event(trigger).await {
+                        log::error!(
+                            "Error updating cluster coordinator for trigger {}/{}: {e}",
+                            trigger.org,
+                            trigger.module_key
                         );
-                        let cluster_coordinator = db::get_coordinator().await;
-                        if let Err(e) = cluster_coordinator
-                            .put(&key, Bytes::from(""), true, None)
-                            .await
-                        {
-                            log::error!(
-                                "Error updating cluster coordinator for trigger {}: {}",
-                                key,
-                                e
-                            );
-                        }
                     }
                 }
                 Ok(())
