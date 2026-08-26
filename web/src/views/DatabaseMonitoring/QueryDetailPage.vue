@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="firstSeenTime" class="text-text-secondary text-xs">
             <i18n-t keypath="dbm.detail.firstSeen" tag="span">
               <template #time>
-                <span class="text-text-primary font-semibold tabular-nums">{{
+                <span class="text-text-heading font-semibold tabular-nums">{{
                   firstSeenTime
                 }}</span>
               </template>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <i18n-t keypath="dbm.detail.lastSeen" tag="span">
               <template #time>
-                <span class="text-text-primary font-semibold tabular-nums">{{ lastSeenTime }}</span>
+                <span class="text-text-heading font-semibold tabular-nums">{{ lastSeenTime }}</span>
               </template>
             </i18n-t>
             <OTooltip side="bottom" :content="t('dbm.detail.lastSeenHint')" />

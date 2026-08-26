@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            label string is the same one the toolbar chip shows, so the two agree. -->
       <div class="flex w-72 flex-col">
         <div class="flex flex-col gap-2.5 p-3">
-          <p class="text-text-primary text-sm font-semibold" data-test="dbm-queries-scope-title">
+          <p class="text-text-heading text-sm font-semibold" data-test="dbm-queries-scope-title">
             {{ t("dbm.filters.popoverTitle") }}
           </p>
           <OSelect
