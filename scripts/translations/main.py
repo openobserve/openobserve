@@ -148,7 +148,10 @@ def main():
         # does not match prettier's formatting (short arrays are written
         # multi-line), so an unconditional write would reformat an otherwise
         # unchanged locale file and break the `format:check` gate. Skipping the
-        # write keeps the committed prettier formatting intact.
+        # write keeps the committed prettier formatting intact. A file that *did*
+        # change is rewritten in json.dumps style throughout, so callers must run
+        # prettier over whatever this rewrites — update-translations.yml does that
+        # before it commits.
         if target != existing:
             # Flushed per locale (atomically), so a run that is cancelled or dies
             # part way through still leaves every completed locale on disk for CI

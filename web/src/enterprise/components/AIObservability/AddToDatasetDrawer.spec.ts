@@ -162,6 +162,25 @@ describe("AddToDatasetDrawer", () => {
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
   });
 
+  it("pushes a telemetry row without a reference answer", async () => {
+    const wrapper = await mountDrawer();
+    const form = (wrapper.vm as any).$.setupState.form;
+    form.setFieldValue("datasetId", "ds-1");
+    await flushPromises();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(mockAddTelemetryItem).toHaveBeenCalledWith("test-org", "ds-1", {
+      refType: "span",
+      refId: "span-1",
+      sourceStream: "default",
+      refTraceStartTime: 1_700_000_000_000_000,
+      expectedOutput: undefined,
+      tags: [],
+    });
+  });
+
   it("surfaces a failed push and leaves the drawer open", async () => {
     mockAddTelemetryItem.mockRejectedValueOnce(new Error("nope"));
     const wrapper = await mountDrawer();

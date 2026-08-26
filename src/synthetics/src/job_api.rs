@@ -721,7 +721,7 @@ use config::meta::{
     synthetics::{Synthetic, SyntheticAuth, for_each_string_at_path},
 };
 use infra::{
-    db::ORM_CLIENT,
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::{
         org_ingestion_tokens, synthetics_checks, synthetics_jobs, synthetics_locations,
         synthetics_runs,
@@ -995,9 +995,7 @@ pub async fn artifact_urls(
     req: ArtifactUrlsRequest,
     token_org: &str,
 ) -> anyhow::Result<ArtifactUrlsResponse> {
-    let conn = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let conn = get_orm_client_ro().await;
 
     let check = synthetics_jobs::get_by_id(conn, &req.job_id)
         .await
@@ -1442,9 +1440,7 @@ pub enum AlertDecision {
 /// `check.auth` is redacted in the response — the probe reads credentials from
 /// `env_inject` only so the encrypted blob never leaves the backend.
 pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<ResolveResponse> {
-    let conn = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let conn = get_orm_client_rw().await;
 
     let check = synthetics_jobs::get_by_id(conn, &req.job_id)
         .await
@@ -1746,9 +1742,7 @@ pub async fn ack(
     token_org: &str,
     pool: StepPoolView,
 ) -> anyhow::Result<AckResponse> {
-    let conn = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let conn = get_orm_client_rw().await;
 
     // Fetch the leased row first for context (location, check_id, org_id).
     let check = synthetics_jobs::get_by_id(conn, &req.job_id)

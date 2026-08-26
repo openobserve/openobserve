@@ -24,8 +24,10 @@
 
 use openobserve_core::llm_evaluations::datasets::{
     CreateDataset, CreateDatasetItem, Dataset, DatasetItem, DatasetItemPage, DatasetItemSource,
-    ListDatasetItems, PushDatasetItemResult, PushQueueItemToDataset,
-    TelemetryDatasetItemRefType as ServiceRefType, UpdateDataset, UpdateDatasetItem,
+    DatasetSnapshotPage, DatasetSourceCounts, ListDatasetItems, PushDatasetItemResult,
+    PushQueueItemToDataset, ReadSnapshotRows, TelemetryDatasetItemRefType as ServiceRefType,
+    UpdateDataset, UpdateDatasetItem, UpsertDatasetItem, UpsertDatasetItemsResult, UpsertOutcome,
+    UpsertedDatasetItem,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -49,6 +51,16 @@ pub struct UpdateDatasetRequestBody {
     pub tags: Vec<String>,
 }
 
+/// Live-Item counts by origin. Buckets can sum to less than `itemCount` if an
+/// Item carries a source this response shape does not name yet.
+#[derive(Clone, Copy, Debug, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetSourceCountsResponseBody {
+    pub trace: i64,
+    pub annotation: i64,
+    pub manual: i64,
+}
+
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetResponseBody {
@@ -58,6 +70,10 @@ pub struct DatasetResponseBody {
     pub description: Option<String>,
     pub tags: Vec<String>,
     pub global_version: i64,
+    /// Live (non-deleted) Items, counted once per logical Item rather than once
+    /// per stored revision.
+    pub item_count: i64,
+    pub sources: DatasetSourceCountsResponseBody,
     pub created_by: String,
     pub created_at: i64,
     pub updated_by: String,
@@ -94,6 +110,60 @@ impl From<ListDatasetItemsQuery> for ListDatasetItems {
     }
 }
 
+/// Query for a pinned historical Snapshot read.
+#[derive(Clone, Copy, Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(deny_unknown_fields)]
+pub struct DatasetSnapshotRowsQuery {
+    /// Snapshot version to resolve. Defaults to the Dataset's current version.
+    pub version: Option<i64>,
+    /// Zero-based result offset. Defaults to 0.
+    pub from: Option<usize>,
+    /// Page size from 1 through 100. Defaults to 20.
+    pub size: Option<usize>,
+}
+
+impl From<DatasetSnapshotRowsQuery> for ReadSnapshotRows {
+    fn from(value: DatasetSnapshotRowsQuery) -> Self {
+        let defaults = ReadSnapshotRows::default();
+        Self {
+            snapshot_version: value.version,
+            from: value.from.unwrap_or(defaults.from),
+            size: value.size.unwrap_or(defaults.size),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetSnapshotRowsResponseBody {
+    pub rows: Vec<DatasetItemResponseBody>,
+    /// The version actually resolved, which a caller that omitted `version`
+    /// needs in order to pin the same Snapshot again.
+    pub snapshot_version: i64,
+    pub total: u64,
+    pub from: usize,
+    pub size: usize,
+    pub has_more: bool,
+}
+
+impl From<DatasetSnapshotPage> for DatasetSnapshotRowsResponseBody {
+    fn from(value: DatasetSnapshotPage) -> Self {
+        Self {
+            rows: value
+                .rows
+                .into_iter()
+                .map(DatasetItemResponseBody::from)
+                .collect(),
+            snapshot_version: value.snapshot_version,
+            total: value.total,
+            from: value.from,
+            size: value.size,
+            has_more: value.has_more,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TelemetryDatasetItemRefType {
@@ -108,7 +178,7 @@ pub enum PushDatasetItemRequestBody {
     Manual {
         input: Value,
         #[serde(rename = "expectedOutput")]
-        expected_output: Value,
+        expected_output: Option<Value>,
         #[serde(default)]
         metadata: Option<Value>,
         #[serde(default)]
@@ -128,7 +198,7 @@ pub enum PushDatasetItemRequestBody {
         #[serde(rename = "refTraceStartTime")]
         ref_trace_start_time: i64,
         #[serde(rename = "expectedOutput")]
-        expected_output: Value,
+        expected_output: Option<Value>,
         #[serde(default)]
         metadata: Option<Value>,
         #[serde(default)]
@@ -140,7 +210,7 @@ pub enum PushDatasetItemRequestBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateDatasetItemRequestBody {
     pub input: Value,
-    pub expected_output: Value,
+    pub expected_output: Option<Value>,
     #[serde(default)]
     pub metadata: Option<Value>,
     #[serde(default)]
@@ -178,7 +248,7 @@ pub struct DatasetItemResponseBody {
     pub org_id: String,
     pub dataset_id: String,
     pub input: Value,
-    pub expected_output: Value,
+    pub expected_output: Option<Value>,
     pub global_version: i64,
     pub is_deleted: bool,
     pub source: DatasetItemSourceResponseBody,
@@ -219,6 +289,120 @@ pub struct PushDatasetItemResponseBody {
     pub item: DatasetItemResponseBody,
 }
 
+/// One Dataset Case a client declares should exist.
+///
+/// The body is serialized back for the idempotency request hash, so every field
+/// a client can vary has to round-trip through it.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UpsertDatasetItemBody {
+    /// Stable Dataset Case identity. Omit to append a new Case with a
+    /// server-generated identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logical_id: Option<String>,
+    pub input: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_output: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// The `rowId` the client read. Required when `logicalId` names an existing
+    /// Case.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub if_row_id: Option<String>,
+    /// Bring a soft-deleted Case back instead of conflicting on it.
+    #[serde(default)]
+    pub restore: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UpsertDatasetItemsRequestBody {
+    /// Client-generated key, scoped to this organization and Dataset. Repeating
+    /// it with identical content replays the first response.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idempotency_key: Option<String>,
+    pub items: Vec<UpsertDatasetItemBody>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UpsertOutcomeBody {
+    Created,
+    Updated,
+    Restored,
+    Unchanged,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertedDatasetItemBody {
+    pub logical_id: String,
+    pub row_id: String,
+    pub global_version: i64,
+    pub outcome: UpsertOutcomeBody,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertDatasetItemsResponseBody {
+    pub items: Vec<UpsertedDatasetItemBody>,
+    pub dataset_version: i64,
+    /// True when the response was replayed from a stored idempotency record.
+    pub replayed: bool,
+}
+
+impl From<UpsertDatasetItemBody> for UpsertDatasetItem {
+    fn from(value: UpsertDatasetItemBody) -> Self {
+        Self {
+            logical_id: value.logical_id,
+            input: value.input,
+            expected_output: value.expected_output,
+            metadata: value.metadata,
+            tags: value.tags,
+            if_row_id: value.if_row_id,
+            restore: value.restore,
+        }
+    }
+}
+
+impl From<UpsertOutcome> for UpsertOutcomeBody {
+    fn from(value: UpsertOutcome) -> Self {
+        match value {
+            UpsertOutcome::Created => Self::Created,
+            UpsertOutcome::Updated => Self::Updated,
+            UpsertOutcome::Restored => Self::Restored,
+            UpsertOutcome::Unchanged => Self::Unchanged,
+        }
+    }
+}
+
+impl From<UpsertedDatasetItem> for UpsertedDatasetItemBody {
+    fn from(value: UpsertedDatasetItem) -> Self {
+        Self {
+            logical_id: value.logical_id,
+            row_id: value.row_id,
+            global_version: value.global_version,
+            outcome: value.outcome.into(),
+        }
+    }
+}
+
+impl From<UpsertDatasetItemsResult> for UpsertDatasetItemsResponseBody {
+    fn from(value: UpsertDatasetItemsResult) -> Self {
+        Self {
+            items: value
+                .items
+                .into_iter()
+                .map(UpsertedDatasetItemBody::from)
+                .collect(),
+            dataset_version: value.dataset_version,
+            replayed: value.replayed,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportDatasetItemsResponseBody {
@@ -256,10 +440,22 @@ impl From<Dataset> for DatasetResponseBody {
             description: value.description,
             tags: value.tags,
             global_version: value.global_version,
+            item_count: value.item_count,
+            sources: value.sources.into(),
             created_by: value.created_by,
             created_at: value.created_at,
             updated_by: value.updated_by,
             updated_at: value.updated_at,
+        }
+    }
+}
+
+impl From<DatasetSourceCounts> for DatasetSourceCountsResponseBody {
+    fn from(value: DatasetSourceCounts) -> Self {
+        Self {
+            trace: value.trace,
+            annotation: value.annotation,
+            manual: value.manual,
         }
     }
 }
@@ -463,7 +659,7 @@ mod dataset_item_contract_tests {
         }))
         .unwrap();
         let command: UpdateDatasetItem = body.into();
-        assert_eq!(command.expected_output, "answer");
+        assert_eq!(command.expected_output, Some(serde_json::json!("answer")));
 
         let spoofed: Result<UpdateDatasetItemRequestBody, _> =
             serde_json::from_value(serde_json::json!({
@@ -472,6 +668,21 @@ mod dataset_item_contract_tests {
                 "source": "manual"
             }));
         assert!(spoofed.is_err());
+
+        let without_reference: PushDatasetItemRequestBody =
+            serde_json::from_value(serde_json::json!({
+                "entryPoint": "manual",
+                "input": "question"
+            }))
+            .unwrap();
+        let command: CreateDatasetItem = without_reference.into();
+        assert!(matches!(
+            command,
+            CreateDatasetItem::Manual {
+                expected_output: None,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -539,6 +750,24 @@ mod dataset_item_contract_tests {
                 "expectedOutput": "corrected answer"
             }));
         assert!(duplicated_trace_id.is_err());
+
+        let without_reference: PushDatasetItemRequestBody =
+            serde_json::from_value(serde_json::json!({
+                "entryPoint": "telemetry",
+                "refType": "trace",
+                "refId": "trace-1",
+                "sourceStream": "default",
+                "refTraceStartTime": 1
+            }))
+            .unwrap();
+        let command: CreateDatasetItem = without_reference.into();
+        assert!(matches!(
+            command,
+            CreateDatasetItem::Telemetry {
+                expected_output: None,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -572,5 +801,82 @@ mod dataset_item_contract_tests {
                 "expectedOutput": "final"
             }));
         assert!(missing_dataset.is_err());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_upsert_body_round_trips_the_fields_that_carry_identity_and_concurrency() {
+        let body: UpsertDatasetItemsRequestBody = serde_json::from_value(serde_json::json!({
+            "idempotencyKey": "run-42",
+            "items": [{
+                "logicalId": "case-42",
+                "input": {"question": "refund?"},
+                "expectedOutput": "30 days",
+                "ifRowId": "row-7",
+                "restore": true,
+                "tags": ["hard"],
+            }],
+        }))
+        .unwrap();
+
+        let item = UpsertDatasetItem::from(body.items[0].clone());
+        assert_eq!(item.logical_id.as_deref(), Some("case-42"));
+        assert_eq!(item.if_row_id.as_deref(), Some("row-7"));
+        assert!(item.restore);
+        assert_eq!(item.tags, ["hard"]);
+    }
+
+    #[test]
+    fn an_omitted_logical_id_stays_absent_so_the_server_generates_one() {
+        let body: UpsertDatasetItemsRequestBody = serde_json::from_value(serde_json::json!({
+            "items": [{"input": "question"}],
+        }))
+        .unwrap();
+
+        let item = UpsertDatasetItem::from(body.items[0].clone());
+        assert!(item.logical_id.is_none());
+        assert!(item.if_row_id.is_none());
+        assert!(!item.restore);
+    }
+
+    #[test]
+    fn the_canonical_request_hashes_the_same_whether_optional_fields_are_sent_as_null() {
+        let omitted: UpsertDatasetItemsRequestBody = serde_json::from_value(serde_json::json!({
+            "items": [{"input": "question"}],
+        }))
+        .unwrap();
+        let explicit: UpsertDatasetItemsRequestBody = serde_json::from_value(serde_json::json!({
+            "idempotencyKey": null,
+            "items": [{"input": "question", "expectedOutput": null, "tags": []}],
+        }))
+        .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(&omitted).unwrap(),
+            serde_json::to_value(&explicit).unwrap()
+        );
+    }
+
+    #[test]
+    fn an_upsert_response_reports_what_each_case_actually_did() {
+        let body = UpsertDatasetItemsResponseBody::from(UpsertDatasetItemsResult {
+            items: vec![UpsertedDatasetItem {
+                logical_id: "case-42".to_string(),
+                row_id: "row-8".to_string(),
+                global_version: 9,
+                outcome: UpsertOutcome::Restored,
+            }],
+            dataset_version: 9,
+            replayed: true,
+        });
+
+        let value = serde_json::to_value(&body).unwrap();
+        assert_eq!(value["items"][0]["outcome"], "restored");
+        assert_eq!(value["datasetVersion"], 9);
+        assert_eq!(value["replayed"], true);
     }
 }

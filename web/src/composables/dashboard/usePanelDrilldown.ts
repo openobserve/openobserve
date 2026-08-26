@@ -22,6 +22,7 @@ import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUt
 import searchService from "@/services/search";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import { extractFields } from "@/utils/query/sqlUtils";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -73,6 +74,12 @@ export function usePanelDrilldown({
 }) {
   // Cross-linking: store cross-links from result_schema response
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
+
+  // Panel query's WHERE, parsed by the backend (result_schema); "" falls back to client extraction.
+  const panelBaseWhere = ref("");
+
+  // Per-stream WHERE for join panels ({stream -> scoped WHERE}), parsed by the backend.
+  const panelWhereByStream = ref<Record<string, string>>({});
 
   const drilldownArray: any = ref([]);
 
@@ -252,6 +259,106 @@ export function usePanelDrilldown({
 
     return whereClause;
   };
+
+  // Table cell → Logs drilldown: drillable = a plain column_ref (aggregates invalid in WHERE).
+  const cellDrilldownFields: any = ref(new Map());
+  const cellDrilldownByQuery: any = ref(new Map());
+  // SELECT * / dynamic-columns tables: every column id is drillable (see wildcard branch).
+  const cellDrilldownWildcard: any = ref(null);
+
+  const drilldownColumnAliases = computed<string[]>(
+    () => Array.from(cellDrilldownFields.value.keys()) as string[],
+  );
+  const drilldownAllColumns = computed(() => !!cellDrilldownWildcard.value);
+
+  const isSelectStar = (ast: any): boolean =>
+    Array.isArray(ast?.columns) &&
+    ast.columns.some((col: any) => col?.expr?.column === "*" || col?.expr?.type === "star");
+
+  const computeCellDrilldownFields = async () => {
+    const map = new Map<string, any>();
+    const byQuery = new Map<number, Map<string, any>>();
+    let wildcard: any = null;
+    const schema = panelSchema.value;
+    if (!schema || schema.type !== "table" || schema.queryType === "promql") {
+      cellDrilldownFields.value = map;
+      cellDrilldownByQuery.value = byQuery;
+      cellDrilldownWildcard.value = null;
+      return;
+    }
+    if (!parser) await importSqlParser();
+
+    const queries = schema.queries ?? [];
+    const singleQuery = queries.length === 1;
+
+    queries.forEach((query: any, queryIndex: number) => {
+      const executedQuery = metadata?.value?.queries?.[queryIndex]?.query ?? query?.query;
+      const streamName = query?.fields?.stream;
+      const streamType = query?.fields?.stream_type;
+      if (!executedQuery || !streamName) return;
+
+      let parsed: any;
+      try {
+        parsed = parser.astify(executedQuery);
+      } catch {
+        return;
+      }
+      const ast = Array.isArray(parsed) ? parsed[0] : parsed;
+      if (!ast || ast.type !== "select") return;
+
+      const isJoin = (ast.from?.length ?? 0) > 1;
+
+      const aliasToStream = new Map<string, string>();
+      (Array.isArray(ast.from) ? ast.from : []).forEach((f: any) => {
+        if (!f?.table) return;
+        if (f.as) aliasToStream.set(f.as, f.table);
+        aliasToStream.set(f.table, f.table);
+      });
+
+      const fields = extractFields(ast, "_timestamp", parser);
+
+      // SELECT *: resolve drillable columns by id at click time (needs the response).
+      if (!fields.length && !isJoin && singleQuery && isSelectStar(ast)) {
+        wildcard = { streamName, streamType, query: executedQuery };
+        return;
+      }
+
+      const perQuery = new Map<string, any>();
+      fields.forEach((field: any) => {
+        if (field.aggregationFunction || !field.column) return;
+        const resolvedStream = field.streamAlias
+          ? (aliasToStream.get(field.streamAlias) ?? streamName)
+          : streamName;
+        const entry = {
+          column: field.column,
+          streamName: resolvedStream,
+          streamType,
+          query: executedQuery,
+          isJoin,
+        };
+        map.set(field.alias, entry);
+        perQuery.set(field.alias, entry);
+      });
+      if (perQuery.size) byQuery.set(queryIndex, perQuery);
+    });
+
+    cellDrilldownFields.value = map;
+    cellDrilldownByQuery.value = byQuery;
+    cellDrilldownWildcard.value = wildcard;
+  };
+
+  watch(
+    () => [
+      metadata?.value?.queries,
+      panelSchema.value?.queries,
+      panelSchema.value?.type,
+      panelSchema.value?.queryType,
+    ],
+    () => {
+      computeCellDrilldownFields();
+    },
+    { immediate: true, deep: true },
+  );
 
   const replaceVariablesValue = (
     query: any,
@@ -483,6 +590,9 @@ export function usePanelDrilldown({
         return;
       }
     }
+
+    // Cross-links are fetched lazily (not on panel render) — resolve them now, before use.
+    await ensureDrilldownSchema();
 
     // Store click parameters for drilldown (including cross-links)
     const crossLinkItems = getCrossLinkDrilldownItems();
@@ -1068,31 +1178,71 @@ export function usePanelDrilldown({
     return;
   };
 
-  // Cross-linking: fetch cross-links when the executed query (with variables resolved) changes
-  watch(
-    () => metadata.value?.queries?.[0]?.query || panelSchema.value?.queries?.[0]?.query,
-    async (newQuery: string) => {
-      // Cross-linking is only supported for logs streams; skip the result_schema
-      // call for panels backed by other stream types (metrics, traces,
-      // enrichment_tables) to avoid failing requests.
-      const crossLinkStreamType = panelSchema.value?.queries?.[0]?.fields?.stream_type;
-      if (
-        !isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType) ||
-        !newQuery ||
-        panelSchema.value?.queryType === "promql"
-      ) {
-        crossLinksData.value = { stream_links: [], org_links: [] };
-        return;
-      }
+  // Cross-links + panel WHERE both come from result_schema. This is LAZY: a dashboard refresh
+  // must NOT fire one result_schema per panel — it's fetched on the first drilldown interaction
+  // (chart click / cell search icon) and cached PER QUERY. Multi-query panels fetch one schema
+  // per clicked query index, on demand, so clicking a 2nd-query cell fetches that query's schema.
+  interface DrilldownSchema {
+    crossLinks: { stream_links: unknown[]; org_links: unknown[] };
+    baseWhere: string;
+    whereByStream: Record<string, string>;
+  }
+  const EMPTY_SCHEMA: DrilldownSchema = {
+    crossLinks: { stream_links: [], org_links: [] },
+    baseWhere: "",
+    whereByStream: {},
+  };
+  // Keyed by executed query string (not index) so identical queries share one fetch.
+  const schemaCache = new Map<string, DrilldownSchema>();
+  const schemaInFlight = new Map<string, Promise<void>>();
+
+  // Reflect a resolved schema onto the shared refs the consumers read.
+  const applyDrilldownSchema = (s: DrilldownSchema) => {
+    crossLinksData.value = s.crossLinks;
+    panelBaseWhere.value = s.baseWhere;
+    panelWhereByStream.value = s.whereByStream;
+  };
+
+  const resetDrilldownSchema = () => {
+    schemaCache.clear();
+    schemaInFlight.clear();
+    applyDrilldownSchema(EMPTY_SCHEMA);
+  };
+
+  // Fetch cross-links + WHERE for the clicked query, once, on demand, and apply them to the
+  // shared refs. Concurrent callers of the same query share the in-flight promise; a repeat
+  // click on a query already fetched hits the cache. `queryIndex` selects the multi-query cell.
+  const ensureDrilldownSchema = async (queryIndex = 0): Promise<void> => {
+    const query =
+      metadata.value?.queries?.[queryIndex]?.query ||
+      panelSchema.value?.queries?.[queryIndex]?.query ||
+      "";
+    // Cross-linking is only supported for logs streams; skip the result_schema call for panels
+    // backed by other stream types (metrics, traces, enrichment_tables) to avoid failing requests.
+    const crossLinkStreamType = panelSchema.value?.queries?.[queryIndex]?.fields?.stream_type;
+    if (
+      !isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType) ||
+      !query ||
+      panelSchema.value?.queryType === "promql"
+    ) {
+      applyDrilldownSchema(EMPTY_SCHEMA);
+      return;
+    }
+    const cached = schemaCache.get(query);
+    if (cached) {
+      applyDrilldownSchema(cached);
+      return;
+    }
+    const inFlight = schemaInFlight.get(query);
+    if (inFlight) return inFlight;
+    const fetchPromise = (async () => {
       try {
         const response = await searchService.result_schema(
           {
             org_identifier: store.state.selectedOrganization.identifier,
             query: {
               query: {
-                sql: store.state.zoConfig.sql_base64_enabled
-                  ? b64EncodeUnicode(newQuery)
-                  : newQuery,
+                sql: store.state.zoConfig.sql_base64_enabled ? b64EncodeUnicode(query) : query,
                 query_fn: null,
                 start_time: (Date.now() - 3600000) * 1000,
                 end_time: Date.now() * 1000,
@@ -1108,15 +1258,31 @@ export function usePanelDrilldown({
           },
           "dashboards",
         );
-        crossLinksData.value = response.data?.cross_links || {
-          stream_links: [],
-          org_links: [],
+        const schema: DrilldownSchema = {
+          crossLinks: response.data?.cross_links || { stream_links: [], org_links: [] },
+          baseWhere: response.data?.where_clause ?? "",
+          whereByStream: response.data?.where_by_stream ?? {},
         };
+        schemaCache.set(query, schema);
+        applyDrilldownSchema(schema);
       } catch {
-        crossLinksData.value = { stream_links: [], org_links: [] };
+        applyDrilldownSchema(EMPTY_SCHEMA);
+      } finally {
+        schemaInFlight.delete(query);
       }
+    })();
+    schemaInFlight.set(query, fetchPromise);
+    return fetchPromise;
+  };
+
+  // Any executed query changed → drop the whole cache (do NOT fetch; that was the per-panel
+  // fan-out on every dashboard refresh). The next drilldown interaction refetches per query.
+  watch(
+    () => (metadata.value?.queries ?? panelSchema.value?.queries ?? []).map((q: any) => q?.query),
+    () => {
+      resetDrilldownSchema();
     },
-    { immediate: true },
+    { deep: true },
   );
 
   return {
@@ -1128,5 +1294,14 @@ export function usePanelDrilldown({
     parser,
     interval,
     intervalMicro,
+    drilldownColumnAliases,
+    drilldownAllColumns,
+    // Per-column drilldown target, join-aware: the row's own query first, then any query.
+    getCellDrilldownField: (queryIndex: number, alias: string) =>
+      cellDrilldownByQuery.value.get(queryIndex)?.get(alias) ??
+      cellDrilldownFields.value.get(alias),
+    panelBaseWhere,
+    panelWhereByStream,
+    ensureDrilldownSchema,
   };
 }

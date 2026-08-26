@@ -19,7 +19,7 @@ use sea_orm::{
 };
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::trial_quota_usage,
 };
 
@@ -30,8 +30,7 @@ pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), 
     if records.is_empty() {
         return Ok(());
     }
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let db = get_orm_client_rw().await;
     // one transaction for the whole batch so the write lock is held for a
     // single commit instead of one autocommit round-trip per record
     let txn = db.begin().await?;
@@ -74,7 +73,7 @@ pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), 
 /// Load all quota records (all features, all orgs).
 /// Called once on node startup to populate the in-memory DashMap.
 pub async fn load_all() -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     trial_quota_usage::Entity::find().all(db).await
 }
 
@@ -89,7 +88,7 @@ pub async fn get_total_usage_for_org(
     org_id: &str,
     features: &[&str],
 ) -> Result<i64, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let result: Option<Option<i64>> = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
@@ -110,7 +109,7 @@ pub async fn get_total_usage_for_org(
 /// Get the explicitly configured shared usage limit for an organization.
 /// A missing value means the deployment-wide default still applies.
 pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let result = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .select_only()
@@ -128,7 +127,7 @@ pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_or
 /// did before — meant raising an org's AI credit limit silently raised its
 /// one-time synthetics grant by the same amount.
 pub async fn load_all_usage_limits() -> Result<Vec<(String, String, i64)>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let results: Vec<(String, String, Option<i64>)> = trial_quota_usage::Entity::find()
         .select_only()
         .column(trial_quota_usage::Column::OrgId)
@@ -156,8 +155,7 @@ pub async fn set_usage_limit_for_org(
     features: &[&str],
     usage_limit: i64,
 ) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
     let now = config::utils::time::now_micros();
     let active_model = trial_quota_usage::ActiveModel {
@@ -205,7 +203,7 @@ pub async fn get_for_org_feature(
     org_id: &str,
     feature: &str,
 ) -> Result<Option<trial_quota_usage::Model>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .filter(trial_quota_usage::Column::Feature.eq(feature))
@@ -215,7 +213,7 @@ pub async fn get_for_org_feature(
 
 /// Get the highest notified checkpoint for an org (across all feature rows).
 pub async fn get_notified_checkpoint(org_id: &str) -> Result<i16, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let result = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .column_as(
@@ -235,8 +233,7 @@ pub async fn update_notified_checkpoint(
     org_id: &str,
     checkpoint: i16,
 ) -> Result<bool, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let db = get_orm_client_rw().await;
     let result = trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .filter(trial_quota_usage::Column::NotifiedCheckpoint.lt(checkpoint))
@@ -251,8 +248,7 @@ pub async fn update_notified_checkpoint(
 }
 
 pub async fn reset_notified_checkpoint(org_id: &str) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let db = get_orm_client_rw().await;
     trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .col_expr(
@@ -266,7 +262,7 @@ pub async fn reset_notified_checkpoint(org_id: &str) -> Result<(), sea_orm::DbEr
 
 /// Load all notified checkpoints (one per org, max across features).
 pub async fn load_all_checkpoints() -> Result<Vec<(String, i16)>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let results: Vec<(String, Option<i16>)> = trial_quota_usage::Entity::find()
         .select_only()
         .column(trial_quota_usage::Column::OrgId)
@@ -288,8 +284,7 @@ pub async fn load_all_checkpoints() -> Result<Vec<(String, i16)>, sea_orm::DbErr
 /// Deletes all trial quota usage entries for the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let db = get_orm_client_rw().await;
     trial_quota_usage::Entity::delete_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .exec(db)

@@ -15,6 +15,8 @@
 
 use axum::{extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use infra::db::get_orm_client_ro;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -157,9 +159,7 @@ async fn get_dedup_counts_from_db(org_id: &str) -> Result<(i64, i64), anyhow::Er
     use infra::table::entity::alert_dedup_state;
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
 
     // Get all dedup states for this org
     let states = alert_dedup_state::Entity::find()

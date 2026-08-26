@@ -55,11 +55,7 @@ use db::{
 };
 #[cfg(feature = "enterprise")]
 use infra::table::workflows::WorkflowTriggerEntity;
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    schema::unwrap_stream_settings,
-    table,
-};
+use infra::{db::get_orm_client_ro, schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{
     AsyncTransport, Message,
@@ -1068,7 +1064,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
 }
 
 pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     get_by_id(conn, org_id, alert_id).await.map(|f_a| f_a.1)
 }
 
@@ -1120,11 +1116,11 @@ pub async fn list(
     }
 }
 
-/// Gets a list of alerts from the database `ORM_CLIENT`.
+/// Gets a list of alerts from the database.
 pub async fn list_with_folders_db(
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, AlertError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     db::alerts::alert::list_with_folders(conn, params)
         .await
         .map_err(|e| e.into())
@@ -1801,9 +1797,7 @@ pub async fn delete_by_name(
         .map_err(|_| AlertError::AlertNotFound)?
         .ok_or(AlertError::AlertNotFound)?;
     let alert_id = alert.id.ok_or(AlertError::AlertNotFound)?;
-    let client = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
+    let client = infra::db::get_orm_client_rw().await;
     delete_by_id_user(client, org_id, alert_id).await
 }
 
@@ -3807,8 +3801,8 @@ mod threshold_validation_tests {
     // every one of them green.
     //
     // Closing that needs `prepare_alert` itself, which reaches for folders,
-    // `get_by_id_db` and `infra::schema::get` — all through the global
-    // `ORM_CLIENT` rather than an injectable connection. The infra SQLite
+    // `get_by_id_db` and `infra::schema::get` — all through the global ORM
+    // clients rather than an injectable connection. The infra SQLite
     // harness cannot reach it without first making that global overridable in
     // tests; until then the wiring is verified by review, not by test.
 
@@ -7019,11 +7013,7 @@ async fn validate_slo_alert_wiring(
             .map_err(AlertError::InvalidSloAlert);
     };
 
-    let db = infra::db::ORM_CLIENT.get().ok_or_else(|| {
-        AlertError::InfraError(infra::errors::Error::Message(
-            "database not initialized".into(),
-        ))
-    })?;
+    let db = get_orm_client_ro().await;
 
     let slo = infra::table::slos::get(db, org_id, &cond.slo_id)
         .await
