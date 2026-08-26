@@ -11670,7 +11670,6 @@
       "providerLoadError": "Could not load providers.",
       "datasetLoadError": "Could not load datasets.",
       "runFailed": "The run failed.",
-      "backendPending": "Running against sample output — the Playground run API is not live yet.",
       "windowCount": "{count} of {max} windows",
       "output": "Output",
       "reset": "Reset",

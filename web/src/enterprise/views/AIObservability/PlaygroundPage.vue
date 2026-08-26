@@ -133,16 +133,6 @@
         </template>
       </OBanner>
 
-      <OBanner
-        v-else-if="usingMockRuns"
-        variant="warning"
-        dense
-        icon="info"
-        class="mx-4 mt-3 shrink-0"
-        :content="t('aiObservability.playground.backendPending')"
-        data-test="ai-playground-mock-banner"
-      />
-
       <!-- A snapshot is a copy someone sent you, so the page says so until you
            take it over. Editing is never blocked: the edits are local and the
            link they arrived on cannot change. -->
@@ -288,7 +278,6 @@ import llmDatasetsService, {
   type LlmDatasetItem,
 } from "@/services/llm-datasets.service";
 import {
-  PLAYGROUND_USE_MOCK,
   PlaygroundRunError,
   runPlayground,
   scorePlayground,
@@ -328,8 +317,6 @@ const router = useRouter();
 const store = useStore();
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-
-const usingMockRuns = PLAYGROUND_USE_MOCK;
 
 // ── state ─────────────────────────────────────────────────────────
 

@@ -14,16 +14,10 @@
  * the data payload rather than an `event:` line, and passes `tools` and
  * `responseFormat` through to the provider verbatim — so the wire shaping for
  * those lives here, keyed on the provider's type.
- *
- * The mock adapter below stays for tests and for working offline; flip
- * `PLAYGROUND_USE_MOCK` to reach it.
  */
 
 import store from "@/stores";
 import http, { attemptTokenRefresh } from "@/services/http";
-
-/** Set true to run against the deterministic mock instead of the live route. */
-export const PLAYGROUND_USE_MOCK = false;
 
 export type PlaygroundMessageRole = "system" | "user" | "assistant" | "tool";
 
@@ -97,9 +91,7 @@ export function runPlayground(
   request: PlaygroundRunRequest,
   options: PlaygroundRunOptions,
 ): Promise<PlaygroundRunResult> {
-  return PLAYGROUND_USE_MOCK
-    ? runPlaygroundMock(request, options)
-    : runLive(orgId, request, options);
+  return runLive(orgId, request, options);
 }
 
 // ── scoring ───────────────────────────────────────────────────────
@@ -164,8 +156,8 @@ function normalizeScore(row: any): PlaygroundScoreResult {
 // ── wire shaping ──────────────────────────────────────────────────
 
 /** Provider kinds the server does NOT route through its OpenAI-compatible body
- *  builder. Everything else — OpenAI, DeepSeek, Azure, gateways, the test mock
- *  — takes the `chat/completions` shape. */
+ *  builder. Everything else — OpenAI, DeepSeek, Azure, gateways — takes the
+ *  `chat/completions` shape. */
 const ANTHROPIC_KIND = "anthropic";
 
 function providerKind(request: PlaygroundRunRequest): string {
@@ -344,10 +336,7 @@ async function runLive(
           // Once the stream is open the server has no status code left, so an
           // error frame is the only failure channel. Treat it as retryable:
           // these are provider hiccups mid-call, not rejected requests.
-          throw new PlaygroundRunError(
-            String(data.error ?? "Playground run failed"),
-            true,
-          );
+          throw new PlaygroundRunError(String(data.error ?? "Playground run failed"), true);
         // `rendered` carries the prompt exactly as sent. The bench already
         // renders it locally, so it is accepted and ignored.
         default:
@@ -412,174 +401,4 @@ function normalizeUsage(data: Record<string, unknown>): PlaygroundRunUsage {
 
 function emptyUsage(): PlaygroundRunUsage {
   return { promptTokens: 0, completionTokens: 0, costUsd: 0, latencyMs: 0 };
-}
-
-// ── mock adapter ──────────────────────────────────────────────────
-
-/** Chunk cadence, in ms. Small enough to look like streaming, large enough that
- *  a test can advance past a whole run in a handful of timer ticks. */
-const MOCK_CHUNK_MS = 40;
-
-/** Deterministic 32-bit hash, so the same request always yields the same run. */
-function hashRequest(request: PlaygroundRunRequest): number {
-  const source = JSON.stringify([
-    request.model,
-    request.params.temperature ?? 0,
-    request.messages.map((message) => `${message.role}:${message.content}`),
-    request.responseSchema ? "structured" : "text",
-  ]);
-  let hash = 2166136261;
-  for (let i = 0; i < source.length; i += 1) {
-    hash ^= source.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-/** Mulberry32 — a small seeded PRNG, so a seeded run is reproducible. */
-function seededRandom(seed: number): () => number {
-  let state = seed;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const MOCK_SENTENCES = [
-  "Refunds are available within 30 days of delivery for unopened items.",
-  "The policy applies to every region except where local law requires longer.",
-  "Shipping costs are refunded only when the return is caused by a defect.",
-  "Store credit is issued immediately; card refunds settle in 5–7 business days.",
-  "Escalate to a human agent when the order predates the current policy.",
-];
-
-function mockBody(request: PlaygroundRunRequest, random: () => number): string {
-  if (request.responseSchema) {
-    return JSON.stringify(
-      {
-        answer: MOCK_SENTENCES[Math.floor(random() * MOCK_SENTENCES.length)],
-        grounded: random() > 0.25,
-        citations: ["policy§2.1"],
-      },
-      null,
-      2,
-    );
-  }
-  const count = 2 + Math.floor(random() * 3);
-  const picked: string[] = [];
-  for (let i = 0; i < count; i += 1) {
-    picked.push(MOCK_SENTENCES[Math.floor(random() * MOCK_SENTENCES.length)]);
-  }
-  return picked.join(" ");
-}
-
-/**
- * Reproduces the three shapes the live endpoint will have: a streamed text
- * completion, a terminal tool call, and a retryable provider failure. Timers
- * are plain `setTimeout`, so a test drives it with fake timers.
- */
-export function runPlaygroundMock(
-  request: PlaygroundRunRequest,
-  { onDelta, signal }: PlaygroundRunOptions,
-): Promise<PlaygroundRunResult> {
-  return new Promise<PlaygroundRunResult>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException("Aborted", "AbortError"));
-      return;
-    }
-
-    const random = seededRandom(hashRequest(request));
-    const promptTokens = request.messages.reduce(
-      (total, message) => total + Math.ceil(message.content.length / 4),
-      0,
-    );
-
-    let detachAbort = () => {};
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let interval: ReturnType<typeof setInterval> | null = null;
-
-    const stop = () => {
-      if (timer !== null) clearTimeout(timer);
-      if (interval !== null) clearInterval(interval);
-      detachAbort();
-    };
-
-    detachAbort = onAbort(signal, () => {
-      stop();
-      reject(new DOMException("Aborted", "AbortError"));
-    });
-
-    // A model given tools calls one instead of answering — same as the live
-    // contract, where the call terminates the run.
-    const tool = request.tools?.[0];
-    if (tool && !request.messages.some((message) => message.role === "tool")) {
-      timer = setTimeout(() => {
-        stop();
-        resolve({
-          text: "",
-          toolCall: { name: tool.name, arguments: '{ "order_id": "SH202604280912" }' },
-          usage: {
-            promptTokens,
-            completionTokens: 21,
-            costUsd: mockCost(promptTokens + 21),
-            latencyMs: MOCK_CHUNK_MS * 3,
-          },
-        });
-      }, MOCK_CHUNK_MS * 3);
-      return;
-    }
-
-    // A stable ~8% of runs fail retryably, so the error path is exercised
-    // without a developer having to force it.
-    if (random() < 0.08) {
-      timer = setTimeout(() => {
-        stop();
-        reject(new PlaygroundRunError("provider 429 · rate limited after 3 retries", true));
-      }, MOCK_CHUNK_MS * 2);
-      return;
-    }
-
-    const body = mockBody(request, random);
-    let emitted = 0;
-    let elapsed = 0;
-
-    interval = setInterval(() => {
-      const step = 6 + Math.floor(random() * 10);
-      const next = Math.min(body.length, emitted + step);
-      onDelta(body.slice(emitted, next));
-      emitted = next;
-      elapsed += MOCK_CHUNK_MS;
-
-      if (emitted >= body.length) {
-        stop();
-        const completionTokens = Math.ceil(body.length / 4);
-        resolve({
-          text: body,
-          toolCall: null,
-          usage: {
-            promptTokens,
-            completionTokens,
-            costUsd: mockCost(promptTokens + completionTokens),
-            latencyMs: elapsed,
-          },
-        });
-      }
-    }, MOCK_CHUNK_MS);
-  });
-}
-
-/** A plausible blended per-token price, so the cost strip shows real digits. */
-function mockCost(tokens: number): number {
-  return Number((tokens * 0.0000025).toFixed(6));
-}
-
-/** Wires an abort listener and hands back the detach function, so a settled run
- *  never leaves a listener on a long-lived signal. */
-function onAbort(signal: AbortSignal | undefined, handler: () => void): () => void {
-  if (!signal) return () => {};
-  signal.addEventListener("abort", handler, { once: true });
-  return () => signal.removeEventListener("abort", handler);
 }
