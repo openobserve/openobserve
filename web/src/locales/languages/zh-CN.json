@@ -1384,7 +1384,7 @@
     "breadcrumbs": "面包屑",
     "tags": "标签",
     "traces": "追踪",
-    "searchEvents": "搜索活动",
+    "searchEvents": "搜索事件",
     "loadingSessions": "等一下，我们正在获取会话。",
     "errorStack": "错误堆栈",
     "sessionReplay": "会话重放",
@@ -5679,7 +5679,7 @@
       "shippers": "Shippers"
     },
     "indexSizeLbl": "索引大小",
-    "docsCountLbl": "活动",
+    "docsCountLbl": "事件",
     "functionTitle": "函数",
     "schedulePipelineTitle": "定时",
     "rtPipelineTitle": "实时",
@@ -12185,7 +12185,7 @@
       "recent": "最近："
     },
     "noEvents": {
-      "title": "未找到任何活动",
+      "title": "未找到任何事件",
       "descNoFilters": "在 {range} 中未找到任何事件。尝试扩大加载结果的时间范围。",
       "descWithFilters": "在所选窗口中，没有与<strong>该查询</strong>相匹配的内容。尝试扩大时间范围、放松筛选条件或重置查询。",
       "descOutOfRange": "您的时间窗口不包含来自此流的任何数据。跳转到最后出现数据的时间。",
