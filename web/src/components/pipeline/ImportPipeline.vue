@@ -424,6 +424,7 @@ import {
   convertV1ToV2,
   convertV1BEToV2,
 } from "@/utils/alerts/alertDataTransforms";
+import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
 
 export default defineComponent({
   name: "ImportPipeline",
@@ -1050,7 +1051,11 @@ export default defineComponent({
                 }
                 return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
               } else if (item.filterType === "condition") {
-                if (!item.column || !item.operator || item.value === undefined) {
+                if (
+                  !item.column ||
+                  !item.operator ||
+                  (item.value === undefined && !isNullOperator(item.operator))
+                ) {
                   pipelineErrors.push({
                     message: t("pipeline.importErrors.v2ConditionFields", { index, nodeIndex }),
                     field: "condition_format",
@@ -1063,7 +1068,11 @@ export default defineComponent({
             };
 
             const validateV1Condition = (condition: any): boolean => {
-              if (condition.column && condition.operator && condition.value !== undefined) {
+              if (
+                condition.column &&
+                condition.operator &&
+                (condition.value !== undefined || isNullOperator(condition.operator))
+              ) {
                 return true;
               }
               if (condition.and || condition.or) {
@@ -1086,7 +1095,11 @@ export default defineComponent({
             if (Array.isArray(conditionsToValidate)) {
               // V0 format - flat array
               const valid = conditionsToValidate.every((condition: any) => {
-                return condition.column && condition.operator && condition.value !== undefined;
+                return (
+                  condition.column &&
+                  condition.operator &&
+                  (condition.value !== undefined || isNullOperator(condition.operator))
+                );
               });
               if (!valid) {
                 pipelineErrors.push({

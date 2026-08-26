@@ -49,6 +49,7 @@ import {
 } from "@/utils/zincutils";
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
+import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
@@ -858,7 +859,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return false;
     }
     if (conditions.filterType === "condition") {
-      return !!(conditions.column && conditions.value !== undefined && conditions.value !== "");
+      return !!(
+        conditions.column &&
+        (isNullOperator(conditions.operator) ||
+          (conditions.value !== undefined && conditions.value !== ""))
+      );
     }
     if (conditions.filterType === "group" && Array.isArray(conditions.conditions)) {
       return conditions.conditions.every((cond: any) => allConditionsValid(cond));

@@ -38,6 +38,22 @@ export interface FormatOptions {
 }
 
 /**
+ * Unary null-check operators: they take no value, so completeness checks and
+ * formatters must not require one. Tolerates the backend's serde aliases
+ * ("IsNull"/"IsNotNull") alongside the canonical "is_null"/"is_not_null".
+ */
+export function isNullOperator(operator: unknown): boolean {
+  if (typeof operator !== "string") return false;
+  const op = operator.toLowerCase();
+  return op === "is_null" || op === "isnull" || op === "is_not_null" || op === "isnotnull";
+}
+
+/** Display text for a null-check operator; the SQL form is its uppercase. */
+export function nullOperatorText(operator: unknown): "is null" | "is not null" {
+  return String(operator).toLowerCase().includes("not") ? "is not null" : "is null";
+}
+
+/**
  * Check if an item is a group (has conditions array and filterType)
  *
  * @param item - The item to check
@@ -104,6 +120,11 @@ function getFormattedCondition(
   value: string,
   sqlMode: boolean = false,
 ): string {
+  if (isNullOperator(operator)) {
+    const text = nullOperatorText(operator);
+    return sqlMode ? `${column} ${text.toUpperCase()}` : `${column} ${text}`;
+  }
+
   let condition = "";
   const op = operator.toLowerCase();
 
@@ -186,7 +207,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
           item.filterType === "condition" &&
           item.column &&
           item.operator &&
-          item.value !== undefined
+          (item.value !== undefined || isNullOperator(item.operator))
         ) {
           // Step 1: Format the value (add quotes if needed, based on type)
           const formattedValue = formatValues
@@ -224,7 +245,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
       node.filterType === "condition" &&
       node.column &&
       node.operator &&
-      node.value !== undefined
+      (node.value !== undefined || isNullOperator(node.operator))
     ) {
       const formattedValue = formatValues
         ? formatValue(node.column, node.operator, node.value, streamFieldsMap)

@@ -17,6 +17,20 @@
 // workflow condition nodes (canvas card + Run-From labels) so they never drift.
 // Handles the V2 group format ({filterType:"group", conditions:[...]}), the V1
 // backend formats (and/or/not, items), a single condition, and the V0 array.
+
+import { isNullOperator, nullOperatorText } from "@/utils/alerts/conditionsFormatter";
+
+const leafPreview = (item: any): string => {
+  const column = item.column || "field";
+  const operator = item.operator || "=";
+  if (isNullOperator(operator)) {
+    return `${column} ${nullOperatorText(operator)}`;
+  }
+  const value =
+    item.value !== undefined && item.value !== null && item.value !== "" ? `'${item.value}'` : "''";
+  return `${column} ${operator} ${value}`;
+};
+
 export const buildConditionPreview = (node: any): string => {
   if (!node) return "";
 
@@ -32,13 +46,7 @@ export const buildConditionPreview = (node: any): string => {
         const nestedPreview = buildConditionPreview(item);
         if (nestedPreview) conditionStr = `(${nestedPreview})`;
       } else if (item.filterType === "condition") {
-        const column = item.column || "field";
-        const operator = item.operator || "=";
-        const value =
-          item.value !== undefined && item.value !== null && item.value !== ""
-            ? `'${item.value}'`
-            : "''";
-        conditionStr = `${column} ${operator} ${value}`;
+        conditionStr = leafPreview(item);
       }
 
       if (index > 0 && item.logicalOperator) {
@@ -90,26 +98,14 @@ export const buildConditionPreview = (node: any): string => {
 
   // Single condition
   if (node.column && node.operator) {
-    const column = node.column || "field";
-    const operator = node.operator || "=";
-    const value =
-      node.value !== undefined && node.value !== null && node.value !== ""
-        ? `'${node.value}'`
-        : "''";
-    return `${column} ${operator} ${value}`;
+    return leafPreview(node);
   }
 
   // V0 Format: Array
   if (Array.isArray(node)) {
     return node
       .filter((c: any) => c.column && c.operator)
-      .map((c: any) => {
-        const column = c.column || "field";
-        const operator = c.operator || "=";
-        const value =
-          c.value !== undefined && c.value !== null && c.value !== "" ? `'${c.value}'` : "''";
-        return `${column} ${operator} ${value}`;
-      })
+      .map(leafPreview)
       .join(" and ");
   }
 

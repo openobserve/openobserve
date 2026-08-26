@@ -16,6 +16,8 @@
 
 import { z } from "zod";
 
+import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
+
 const isFilled = (v: any): boolean => v !== undefined && v !== null && String(v).trim() !== "";
 
 // A V2 group node — its children live in `conditions` (or legacy V1 `items`).
@@ -42,9 +44,12 @@ const collectLeafConditions = (group: any): any[] => {
 // operator carries a default ("="), so it's ignored for the blank check.
 const isBlankCondition = (c: any): boolean => !isFilled(c?.column) && !isFilled(c?.value);
 
-// A leaf is usable only when all three fields are present.
+// A leaf is usable only when all three fields are present (null checks are
+// unary, so they need no value).
 const isCompleteCondition = (c: any): boolean =>
-  isFilled(c?.column) && isFilled(c?.operator) && isFilled(c?.value);
+  isFilled(c?.column) &&
+  isFilled(c?.operator) &&
+  (isFilled(c?.value) || isNullOperator(c?.operator));
 
 export const makeConditionSchema = (t: (_key: string) => string) =>
   z

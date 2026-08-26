@@ -314,6 +314,7 @@ import {
   convertV1ToV2,
   convertV1BEToV2,
 } from "@/utils/alerts/alertDataTransforms";
+import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
 
 export default defineComponent({
   name: "ImportAlert",
@@ -697,7 +698,11 @@ export default defineComponent({
             return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
           } else if (item.filterType === "condition") {
             // V2 condition - validate required fields
-            if (!item.column || !item.operator || item.value === undefined) {
+            if (
+              !item.column ||
+              !item.operator ||
+              (item.value === undefined && !isNullOperator(item.operator))
+            ) {
               alertErrors.push(t("alerts.import.v2ConditionFieldsRequired", { index }));
               return false;
             }
@@ -715,7 +720,8 @@ export default defineComponent({
                 "NotContains",
                 "contains",
                 "not_contains",
-              ].includes(item.operator)
+              ].includes(item.operator) &&
+              !isNullOperator(item.operator)
             ) {
               alertErrors.push(
                 t("alerts.import.invalidOperator", { index, operator: item.operator }),
@@ -729,7 +735,11 @@ export default defineComponent({
 
         const validateV1Condition = (condition: any) => {
           // Check if it's a simple condition (V0/V1 format)
-          if (condition.column && condition.operator && condition.value !== undefined) {
+          if (
+            condition.column &&
+            condition.operator &&
+            (condition.value !== undefined || isNullOperator(condition.operator))
+          ) {
             if (
               input.query_condition.type === "custom" &&
               ![
@@ -743,7 +753,8 @@ export default defineComponent({
                 "NotContains",
                 "contains",
                 "not_contains",
-              ].includes(condition.operator)
+              ].includes(condition.operator) &&
+              !isNullOperator(condition.operator)
             ) {
               alertErrors.push(t("alerts.import.invalidQueryConditionOperator", { index }));
             }
@@ -777,7 +788,11 @@ export default defineComponent({
         if (Array.isArray(conditionsToValidate)) {
           // V0 format - flat array of conditions
           conditionsToValidate.forEach((condition: any) => {
-            if (!condition.column || !condition.operator || condition.value === undefined) {
+            if (
+              !condition.column ||
+              !condition.operator ||
+              (condition.value === undefined && !isNullOperator(condition.operator))
+            ) {
               alertErrors.push(t("alerts.import.queryConditionFieldsRequired", { index }));
             }
           });

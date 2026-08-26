@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildConditionsString } from "./conditionsFormatter";
+import { buildConditionsString, isNullOperator } from "./conditionsFormatter";
 import type { StreamFieldsMap } from "./alertQueryBuilder";
 
 describe("conditionsFormatter", () => {
@@ -8,6 +8,18 @@ describe("conditionsFormatter", () => {
     name: { label: "name", value: "name", type: "String" },
     city: { label: "city", value: "city", type: "String" },
   };
+
+  describe("isNullOperator", () => {
+    it("matches the canonical spellings and the serde aliases", () => {
+      expect(isNullOperator("is_null")).toBe(true);
+      expect(isNullOperator("is_not_null")).toBe(true);
+      expect(isNullOperator("IsNull")).toBe(true);
+      expect(isNullOperator("IsNotNull")).toBe(true);
+      expect(isNullOperator("=")).toBe(false);
+      expect(isNullOperator("Contains")).toBe(false);
+      expect(isNullOperator(undefined)).toBe(false);
+    });
+  });
 
   describe("buildConditionsString", () => {
     it("generates display format (lowercase operators, no WHERE)", () => {
@@ -301,6 +313,41 @@ describe("conditionsFormatter", () => {
       });
 
       expect(result).toBe("WHERE name NOT LIKE '%test%'");
+    });
+
+    it("handles null-check operators without a value", () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "name",
+            operator: "is_null",
+            value: "",
+            logicalOperator: "AND",
+          },
+          {
+            filterType: "condition",
+            column: "city",
+            operator: "is_not_null",
+            logicalOperator: "AND",
+          },
+        ],
+      };
+
+      expect(
+        buildConditionsString(group, {
+          sqlMode: true,
+          addWherePrefix: true,
+          formatValues: true,
+          streamFieldsMap,
+        }),
+      ).toBe("WHERE name IS NULL AND city IS NOT NULL");
+
+      expect(buildConditionsString(group, { sqlMode: false })).toBe(
+        "name is null and city is not null",
+      );
     });
 
     it("handles mixed OR and AND operators", () => {

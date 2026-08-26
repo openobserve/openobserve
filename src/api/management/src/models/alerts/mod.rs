@@ -507,6 +507,8 @@ pub enum Operator {
     LessThanEquals,
     Contains,
     NotContains,
+    IsNull,
+    IsNotNull,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -703,6 +705,8 @@ impl From<meta_alerts::Operator> for Operator {
             meta_alerts::Operator::LessThanEquals => Self::LessThanEquals,
             meta_alerts::Operator::Contains => Self::Contains,
             meta_alerts::Operator::NotContains => Self::NotContains,
+            meta_alerts::Operator::IsNull => Self::IsNull,
+            meta_alerts::Operator::IsNotNull => Self::IsNotNull,
         }
     }
 }
@@ -896,6 +900,8 @@ impl From<Operator> for meta_alerts::Operator {
             Operator::LessThanEquals => Self::LessThanEquals,
             Operator::Contains => Self::Contains,
             Operator::NotContains => Self::NotContains,
+            Operator::IsNull => Self::IsNull,
+            Operator::IsNotNull => Self::IsNotNull,
         }
     }
 }

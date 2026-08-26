@@ -334,6 +334,10 @@ pub enum ConditionOperator {
     Contains,
     #[serde(rename = "not_contains")]
     NotContains,
+    #[serde(rename = "is_null")]
+    IsNull,
+    #[serde(rename = "is_not_null")]
+    IsNotNull,
 }
 
 impl From<MetaOperator> for ConditionOperator {
@@ -347,6 +351,8 @@ impl From<MetaOperator> for ConditionOperator {
             MetaOperator::LessThanEquals => Self::LessThanEquals,
             MetaOperator::Contains => Self::Contains,
             MetaOperator::NotContains => Self::NotContains,
+            MetaOperator::IsNull => Self::IsNull,
+            MetaOperator::IsNotNull => Self::IsNotNull,
         }
     }
 }
@@ -362,6 +368,8 @@ impl From<ConditionOperator> for MetaOperator {
             ConditionOperator::LessThanEquals => Self::LessThanEquals,
             ConditionOperator::Contains => Self::Contains,
             ConditionOperator::NotContains => Self::NotContains,
+            ConditionOperator::IsNull => Self::IsNull,
+            ConditionOperator::IsNotNull => Self::IsNotNull,
         }
     }
 }

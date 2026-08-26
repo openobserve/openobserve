@@ -80,6 +80,11 @@ describe("buildConditionPreview", () => {
       expect(buildConditionPreview(node)).toBe("status = '500' and host != 'web-01'");
     });
 
+    it("renders null-check operators without a value", () => {
+      const node = group([cond("err", "is_null", ""), cond("host", "is_not_null", "", "AND")]);
+      expect(buildConditionPreview(node)).toBe("err is null and host is not null");
+    });
+
     it("lowercases an OR logicalOperator", () => {
       const node = group([cond("a", "=", "1"), cond("b", "=", "2", "OR")]);
       expect(buildConditionPreview(node)).toBe("a = '1' or b = '2'");

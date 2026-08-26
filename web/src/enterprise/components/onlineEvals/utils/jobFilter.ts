@@ -6,6 +6,7 @@ import {
   ensureIds,
   type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
+import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
 
 export function createEmptyJobFilterGroup(): V2Group {
   return ensureIds(convertV0ToV2([])) as V2Group;
@@ -53,6 +54,10 @@ export function normalizeJobFilterCondition(value: any): V2Group {
   return ensureIds(convertV1BEToV2(conditionValue)) as V2Group;
 }
 
+const conditionHasValue = (item: any): boolean =>
+  isNullOperator(item?.operator) ||
+  (item?.value !== undefined && item?.value !== null && item?.value !== "");
+
 export function cleanFilterGroup(group: any): V2Group {
   const logicalOperator = group?.logicalOperator === "OR" ? "OR" : "AND";
   const conditions = (group?.conditions || [])
@@ -67,15 +72,14 @@ export function cleanFilterGroup(group: any): V2Group {
           : null;
       }
 
-      const hasValue = item?.value !== undefined && item?.value !== null && item?.value !== "";
-      if (item?.filterType !== "condition" || !item.column || !item.operator || !hasValue)
-        return null;
+      if (item?.filterType !== "condition" || !item.column || !item.operator) return null;
+      if (!conditionHasValue(item)) return null;
 
       return {
         filterType: "condition",
         column: item.column,
         operator: item.operator,
-        value: item.value,
+        value: item.value ?? "",
         values: item.values || [],
         logicalOperator: item.logicalOperator === "OR" ? "OR" : "AND",
       };
@@ -101,8 +105,7 @@ export function isJobFilterComplete(group: any): boolean {
       if (!isJobFilterComplete(item)) return false;
     } else if (item?.filterType === "condition") {
       const hasValue =
-        (item.value !== undefined && item.value !== null && item.value !== "") ||
-        (Array.isArray(item.values) && item.values.length > 0);
+        conditionHasValue(item) || (Array.isArray(item.values) && item.values.length > 0);
       if (!item.column || !item.operator || !hasValue) return false;
     }
   }
