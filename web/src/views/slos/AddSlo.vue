@@ -27,7 +27,7 @@
 <template>
   <OPageLayout
     :title="isEdit ? t('slos.editTitle') : t('slos.newTitle')"
-    icon="track-changes"
+    icon="target"
     :back="{ to: backTarget, label: t('slos.title') }"
     scroll
     pad-y

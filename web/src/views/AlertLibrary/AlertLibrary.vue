@@ -33,10 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.header')"
       icon="shield-alert-outline"
       title-data-test="alert-library-title"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
-      <!-- Section-level title, identical on all four alerting pages, so the
-           peer tabs anchor at the same x — see AlertList.vue for the rationale.
-           Subtitle-free for the same reason. -->
+      <!-- Section-level title and subtitle, identical on all four alerting
+           pages — see AlertList.vue. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>

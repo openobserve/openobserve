@@ -28,7 +28,7 @@
 <template>
   <OPageLayout
     :title="notFound ? t('slos.notFound') : raw(slo?.name || sloId)"
-    icon="track-changes"
+    icon="target"
     :subtitle="notFound ? raw('') : subtitle"
     :back="{ to: backTarget, label: t('slos.title') }"
     title-data-test="slos-slodetail-title"

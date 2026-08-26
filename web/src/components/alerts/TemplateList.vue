@@ -21,38 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showImportTemplate && !showTemplateEditor"
       :title="t('alerts.header')"
       icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
-      <!-- Section-level title, identical on all four alerting pages, so the
-           peer tabs anchor at the same x — see AlertList.vue for the rationale.
-           Subtitle-free for the same reason. -->
+      <!-- Section-level title and subtitle, identical on all four alerting
+           pages — see AlertList.vue. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
 
       <template #actions>
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="
-            (v: any) => {
-              activeTab = v;
-            }
-          "
-          data-test="template-list-tabs"
-          class="mr-2"
-        >
-          <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
-            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-            {{ t("alert_templates.filterAll") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
-            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-            {{ t("alert_templates.filterPrebuilt") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
-            <template #icon-left><OIcon name="settings" size="sm" /></template>
-            {{ t("alert_templates.filterCustom") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
         <OButton
           variant="outline"
           size="sm-action"
@@ -90,13 +68,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <!-- Type filter sits with the search box, not in the header: the
+               header carries page actions only. -->
           <template #toolbar>
-            <OSearchInput
-              v-model="filterQuery"
-              class="flex-1"
-              :placeholder="t('template.search')"
-              data-test="template-list-search-input"
-            />
+            <div class="flex w-full items-center gap-2">
+              <OToggleGroup
+                :model-value="activeTab"
+                @update:model-value="
+                  (v: any) => {
+                    activeTab = v;
+                  }
+                "
+                data-test="template-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("alert_templates.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
+                  <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                  {{ t("alert_templates.filterPrebuilt") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
+                  <template #icon-left><OIcon name="settings" size="sm" /></template>
+                  {{ t("alert_templates.filterCustom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <OSearchInput
+                v-model="filterQuery"
+                class="flex-1"
+                :placeholder="t('template.search')"
+                data-test="template-list-search-input"
+              />
+            </div>
           </template>
           <template #toolbar-trailing>
             <OButton

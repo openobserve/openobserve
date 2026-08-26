@@ -27,7 +27,7 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    icon="track-changes"
+    icon="target"
     :subtitle="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
@@ -294,7 +294,7 @@
 
       <template #empty>
         <OEmptyState
-          icon="track-changes"
+          icon="target"
           :title="t('slos.empty.title')"
           :description="t('slos.empty.description')"
         >
