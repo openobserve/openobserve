@@ -89,7 +89,17 @@ TERMS = {
         "sense": "a named dataset of ingested telemetry (logs, metrics, or traces) "
         "— the data-stream sense, never a brook/creek and never audio/video streaming",
         "zh-CN": "数据流",
-        "zh-TW": "資料流",
+        "zh-TW": "串流",
+    },
+    "alert": {
+        "sense": "a monitoring alert: an alerting rule or the notification it "
+        "sends — the alarm sense, not a browser dialog",
+        "zh-CN": "告警",
+        "zh-TW": "警示",
+    },
+    "filter": {
+        "sense": "a condition that narrows query or list results",
+        "zh-CN": "过滤器",
     },
     "event": {
         "sense": "a recorded occurrence in the system (log event, alert event) — "
@@ -121,6 +131,8 @@ TERMS = {
     "pipeline": {
         "sense": "a data-processing pipeline that routes and transforms ingested "
         "records",
+        "zh-CN": "流水线",
+        "zh-TW": "管線",
     },
     "destination": {
         "sense": "a configured endpoint that alerts or pipeline output are "
