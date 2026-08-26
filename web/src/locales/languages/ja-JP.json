@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms（トレースの{percent}%）",
       "requestCount": "{count} リクエスト"
-    }
+    },
+    "spanEventTimeline": "スパンイベントタイムライン",
+    "eventClusterTooltip": "{count} イベント",
+    "spanEventCount": "{count} イベント",
+    "spanEventCountPlural": "{count} イベント",
+    "spanEventCountWithErrors": "{count} · {errors} エラー",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} エラー",
+    "spanEventErrorCount": "{errors} エラー",
+    "spanEventErrorCountPlural": "{errors} エラー",
+    "eventClusterAriaLabel": "{count} イベント, {errors} エラー",
+    "eventClusterAriaLabelPlural": "{count} イベント, {errors} エラー",
+    "eventMarkerTooltip": "イベント: {name}",
+    "exceptionMarkerTooltip": "例外: {type}",
+    "spanEventFallback": "スパンイベント"
   },
   "actions": {
     "realTime": "リアルタイム",
@@ -11017,7 +11030,7 @@
         "loadError": "データセットの読み込みに失敗しました",
         "footerTitle": "項目",
         "tabs": {
-          "items": "アイテム",
+          "items": "項目",
           "experiments": "実験"
         },
         "searchPlaceholder": "項目を検索...",

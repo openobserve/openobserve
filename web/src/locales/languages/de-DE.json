@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% des Trace)",
       "requestCount": "{count} Anfragen"
-    }
+    },
+    "spanEventTimeline": "Zeitleiste der Span-Ereignisse",
+    "eventClusterTooltip": "{count} Ereignisse",
+    "spanEventCount": "{count} Ereignis",
+    "spanEventCountPlural": "{count} Ereignisse",
+    "spanEventCountWithErrors": "{count} · {errors} Fehler",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} Fehler",
+    "spanEventErrorCount": "{errors} Fehler",
+    "spanEventErrorCountPlural": "{errors} Fehler",
+    "eventClusterAriaLabel": "{count} Ereignisse, {errors} Fehler",
+    "eventClusterAriaLabelPlural": "{count} Ereignisse, {errors} Fehler",
+    "eventMarkerTooltip": "Ereignis: {name}",
+    "exceptionMarkerTooltip": "Ausnahme: {type}",
+    "spanEventFallback": "Span-Ereignis"
   },
   "actions": {
     "realTime": "Echtzeit",
@@ -11017,7 +11030,7 @@
         "loadError": "Fehler beim Laden des Datensatzes",
         "footerTitle": "Elemente",
         "tabs": {
-          "items": "Einträge",
+          "items": "Elemente",
           "experiments": "Experimente"
         },
         "searchPlaceholder": "Elemente suchen...",

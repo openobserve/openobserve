@@ -9707,7 +9707,20 @@
       "p99Label": "P99 :",
       "averageOfTrace": "{avg} ms ({percent}% de la trace)",
       "requestCount": "{count} req"
-    }
+    },
+    "spanEventTimeline": "Chronologie des événements de span",
+    "eventClusterTooltip": "{count} événements",
+    "spanEventCount": "{count} événement",
+    "spanEventCountPlural": "{count} événements",
+    "spanEventCountWithErrors": "{count} · {errors} erreur",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} erreurs",
+    "spanEventErrorCount": "{errors} erreur",
+    "spanEventErrorCountPlural": "{errors} erreurs",
+    "eventClusterAriaLabel": "{count} événements, {errors} erreur",
+    "eventClusterAriaLabelPlural": "{count} événements, {errors} erreurs",
+    "eventMarkerTooltip": "Événement : {name}",
+    "exceptionMarkerTooltip": "Exception : {type}",
+    "spanEventFallback": "événement de span"
   },
   "actions": {
     "realTime": "Temps réel",
@@ -11017,8 +11030,8 @@
         "loadError": "Échec du chargement du jeu de données",
         "footerTitle": "Éléments",
         "tabs": {
-          "items": "Items",
-          "experiments": "Experiments"
+          "items": "Éléments",
+          "experiments": "Expériences"
         },
         "searchPlaceholder": "Rechercher des éléments...",
         "columns": {

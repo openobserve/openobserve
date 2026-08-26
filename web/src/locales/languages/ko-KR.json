@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms (트레이스의 {percent}%)",
       "requestCount": "{count}건"
-    }
+    },
+    "spanEventTimeline": "Span 이벤트 타임라인",
+    "eventClusterTooltip": "{count} 이벤트",
+    "spanEventCount": "{count} 이벤트",
+    "spanEventCountPlural": "{count} 이벤트",
+    "spanEventCountWithErrors": "{count} · {errors} 오류",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} 오류",
+    "spanEventErrorCount": "{errors} 오류",
+    "spanEventErrorCountPlural": "{errors} 오류",
+    "eventClusterAriaLabel": "{count} 이벤트, {errors} 오류",
+    "eventClusterAriaLabelPlural": "{count} 이벤트, {errors} 오류",
+    "eventMarkerTooltip": "이벤트: {name}",
+    "exceptionMarkerTooltip": "예외: {type}",
+    "spanEventFallback": "span 이벤트"
   },
   "actions": {
     "realTime": "실시간",

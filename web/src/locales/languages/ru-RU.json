@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}мс ({percent}% трейса)",
       "requestCount": "{count} запр."
-    }
+    },
+    "spanEventTimeline": "Временная шкала событий спана",
+    "eventClusterTooltip": "{count} событий",
+    "spanEventCount": "{count} событие",
+    "spanEventCountPlural": "{count} событий",
+    "spanEventCountWithErrors": "{count} · {errors} ошибка",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} ошибок",
+    "spanEventErrorCount": "{errors} ошибка",
+    "spanEventErrorCountPlural": "{errors} ошибок",
+    "eventClusterAriaLabel": "{count} событий, {errors} ошибка",
+    "eventClusterAriaLabelPlural": "{count} событий, {errors} ошибок",
+    "eventMarkerTooltip": "Событие: {name}",
+    "exceptionMarkerTooltip": "Исключение: {type}",
+    "spanEventFallback": "событие спана"
   },
   "actions": {
     "realTime": "Реальное время",

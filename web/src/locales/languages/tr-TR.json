@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms (iz'in {percent}%)",
       "requestCount": "{count} istek"
-    }
+    },
+    "spanEventTimeline": "Span olay zaman çizelgesi",
+    "eventClusterTooltip": "{count} olay",
+    "spanEventCount": "{count} olay",
+    "spanEventCountPlural": "{count} olay",
+    "spanEventCountWithErrors": "{count} · {errors} hata",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} hata",
+    "spanEventErrorCount": "{errors} hata",
+    "spanEventErrorCountPlural": "{errors} hata",
+    "eventClusterAriaLabel": "{count} olay, {errors} hata",
+    "eventClusterAriaLabelPlural": "{count} olay, {errors} hata",
+    "eventMarkerTooltip": "Olay: {name}",
+    "exceptionMarkerTooltip": "İstisna: {type}",
+    "spanEventFallback": "span olayı"
   },
   "actions": {
     "realTime": "Gerçek Zamanlı",
@@ -11017,8 +11030,8 @@
         "loadError": "Veri seti yüklenemedi",
         "footerTitle": "Öğeler",
         "tabs": {
-          "items": "Items",
-          "experiments": "Experiments"
+          "items": "Öğeler",
+          "experiments": "Deneyler"
         },
         "searchPlaceholder": "Öğelerde Ara...",
         "columns": {

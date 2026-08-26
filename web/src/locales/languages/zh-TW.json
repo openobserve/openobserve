@@ -9702,7 +9702,20 @@
       "p99Label": "P99：",
       "averageOfTrace": "{avg}毫秒（{percent}% 的追蹤）",
       "requestCount": "{count} 個請求"
-    }
+    },
+    "spanEventTimeline": "Span 事件時間軸",
+    "eventClusterTooltip": "{count} 個事件",
+    "spanEventCount": "{count} 個事件",
+    "spanEventCountPlural": "{count} 個事件",
+    "spanEventCountWithErrors": "{count} · {errors} 個錯誤",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} 個錯誤",
+    "spanEventErrorCount": "{errors} 個錯誤",
+    "spanEventErrorCountPlural": "{errors} 個錯誤",
+    "eventClusterAriaLabel": "{count} 個事件，{errors} 個錯誤",
+    "eventClusterAriaLabelPlural": "{count} 個事件，{errors} 個錯誤",
+    "eventMarkerTooltip": "事件：{name}",
+    "exceptionMarkerTooltip": "例外：{type}",
+    "spanEventFallback": "span 事件"
   },
   "actions": {
     "realTime": "即時",

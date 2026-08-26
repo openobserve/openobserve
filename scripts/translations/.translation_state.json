@@ -15362,6 +15362,11 @@
     "evaluations": {
       "templateBadge": "5cde0f1298f41f7d"
     },
+    "eventClusterAriaLabel": "9ba986705f5fcd72",
+    "eventClusterAriaLabelPlural": "4bfb9b7819b13ed5",
+    "eventClusterTooltip": "70894bd5fc64132e",
+    "eventMarkerTooltip": "0535eef47c7b4e95",
+    "exceptionMarkerTooltip": "3a5255ea45c369ce",
     "exceptionsWithCount": "601d0d3d584fa458",
     "exportTraces": "483b795b63104bd8",
     "failedToAnalyzeDimensions": "32d91e7d417eb1a1",
@@ -15783,6 +15788,14 @@
       "viewByStream": "a0d0cca9513a3a25"
     },
     "showTraces": "a00b6ee5be4c03ef",
+    "spanEventCount": "243b69d08fdc2e97",
+    "spanEventCountPlural": "70894bd5fc64132e",
+    "spanEventCountWithErrors": "cab44ef95c96bbd8",
+    "spanEventCountWithErrorsPlural": "d5b91747a833782a",
+    "spanEventErrorCount": "da9a0efeb3dd839a",
+    "spanEventErrorCountPlural": "77d6c7975ab235d7",
+    "spanEventFallback": "54fadef5fedf5c77",
+    "spanEventTimeline": "aba0fa70010b93a3",
     "spansFound": "049b595177231c4f",
     "spansLabel": "cd6c32ae17a18e16",
     "spansTab": "b3393bfb2a55adff",

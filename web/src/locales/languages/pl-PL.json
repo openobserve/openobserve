@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% śladu)",
       "requestCount": "{count} req"
-    }
+    },
+    "spanEventTimeline": "Oś czasu zdarzeń span",
+    "eventClusterTooltip": "{count} zdarzeń",
+    "spanEventCount": "{count} zdarzenie",
+    "spanEventCountPlural": "{count} zdarzeń",
+    "spanEventCountWithErrors": "{count} · {errors} błąd",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} błędów",
+    "spanEventErrorCount": "{errors} błąd",
+    "spanEventErrorCountPlural": "{errors} błędów",
+    "eventClusterAriaLabel": "{count} zdarzeń, {errors} błąd",
+    "eventClusterAriaLabelPlural": "{count} zdarzeń, {errors} błędów",
+    "eventMarkerTooltip": "Zdarzenie: {name}",
+    "exceptionMarkerTooltip": "Wyjątek: {type}",
+    "spanEventFallback": "zdarzenie span"
   },
   "actions": {
     "realTime": "Czas rzeczywisty",

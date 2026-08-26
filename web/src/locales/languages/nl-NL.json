@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% van trace)",
       "requestCount": "{count} verzoek"
-    }
+    },
+    "spanEventTimeline": "Tijdlijn van span-gebeurtenissen",
+    "eventClusterTooltip": "{count} gebeurtenissen",
+    "spanEventCount": "{count} gebeurtenis",
+    "spanEventCountPlural": "{count} gebeurtenissen",
+    "spanEventCountWithErrors": "{count} · {errors} fout",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} fouten",
+    "spanEventErrorCount": "{errors} fout",
+    "spanEventErrorCountPlural": "{errors} fouten",
+    "eventClusterAriaLabel": "{count} gebeurtenissen, {errors} fout",
+    "eventClusterAriaLabelPlural": "{count} gebeurtenissen, {errors} fouten",
+    "eventMarkerTooltip": "Gebeurtenis: {name}",
+    "exceptionMarkerTooltip": "Uitzondering: {type}",
+    "spanEventFallback": "span-gebeurtenis"
   },
   "actions": {
     "realTime": "Realtime",

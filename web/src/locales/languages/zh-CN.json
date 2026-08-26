@@ -9707,7 +9707,20 @@
       "p99Label": "P99：",
       "averageOfTrace": "{avg}毫秒（占追踪的{percent}%）",
       "requestCount": "{count}请求"
-    }
+    },
+    "spanEventTimeline": "Span 事件时间线",
+    "eventClusterTooltip": "{count} 个事件",
+    "spanEventCount": "{count} 个事件",
+    "spanEventCountPlural": "{count} 个事件",
+    "spanEventCountWithErrors": "{count} · {errors} 个错误",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} 个错误",
+    "spanEventErrorCount": "{errors} 个错误",
+    "spanEventErrorCountPlural": "{errors} 个错误",
+    "eventClusterAriaLabel": "{count} 个事件，{errors} 个错误",
+    "eventClusterAriaLabelPlural": "{count} 个事件，{errors} 个错误",
+    "eventMarkerTooltip": "事件：{name}",
+    "exceptionMarkerTooltip": "异常：{type}",
+    "spanEventFallback": "Span 事件"
   },
   "actions": {
     "realTime": "实时",
