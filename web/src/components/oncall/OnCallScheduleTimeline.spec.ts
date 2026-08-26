@@ -502,14 +502,15 @@ describe("OnCallScheduleTimeline", () => {
     });
 
     /// Beside Add rotation, at the same weight: the two are alternative ways
-    /// to build the same schedule, and the preset is the shorter one.
-    it("stands beside Add rotation and carries its own icon", () => {
+    /// to build the same schedule, and the label alone is the entry point —
+    /// no icon on either, matching the plain-text buttons next to them.
+    it("stands beside Add rotation as a plain labeled button", () => {
       const wrapper = render();
       const add = wrapper.find('[data-test="oncall-timeline-add"]');
       const presets = wrapper.find('[data-test="oncall-timeline-presets"]');
 
       expect(add.text()).toBe("Add rotation");
-      expect(presets.attributes("data-icon")).toBe("auto-awesome");
+      expect(presets.attributes("data-icon")).toBeUndefined();
       // Adjacent in the DOM, so they read as one pair of choices.
       expect(add.element.nextElementSibling).toBe(presets.element);
     });

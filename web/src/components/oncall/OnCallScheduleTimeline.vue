@@ -94,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm-action"
-          icon-left="add"
           data-test="oncall-timeline-add"
           @click="emit('add')"
         >
@@ -112,7 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm-action"
-          icon-left="auto-awesome"
           data-test="oncall-timeline-presets"
           @click="emit('presets')"
         >
