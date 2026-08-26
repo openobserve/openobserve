@@ -4600,6 +4600,7 @@
     "mapsNameLabel": "Bezeichnung des Standorts",
     "mapsMapType": "Kartentyp",
     "tableAggregations": "Tabellenaggregationen",
+    "tableCellDrilldownTooltip": "Passende Protokolle erkunden",
     "promqlTableMode": "PromQL-Tabellenmodus",
     "visibleColumns": "Sichtbare Spalten",
     "hiddenColumns": "Versteckte Spalten",
@@ -5504,8 +5505,7 @@
     "variableNameAlreadyExists": "Variable mit demselben Namen existiert bereits",
     "pivotTotal": "Gesamt",
     "pivotOthers": "Andere",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Passende Protokolle erkunden"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5571,29 +5571,6 @@
     "rowFields": "Zeilenfelder",
     "valueFields": "Wertfelder",
     "noData": "Keine Daten",
-    "addJoin": "Join hinzufügen",
-    "removeJoin": "Join entfernen",
-    "leftJoin": "Linker Join",
-    "innerJoin": "Innere Verbindung",
-    "rightJoin": "Richtiger Beitritt",
-    "removeClause": "Klausel entfernen",
-    "SQL": "SQL",
-    "builder": "Baumeister",
-    "custom": "Benutzerdefiniert",
-    "discard": "Verwerfen",
-    "apply": "Anwenden",
-    "collapseFields": "Felder einklappen",
-    "fields": "Felder",
-    "layout": "Layout",
-    "promQL": "PromQL",
-    "latitude": "Breitengrad",
-    "longitude": "Längengrad",
-    "weight": "Gewichtung",
-    "mapname": "Name",
-    "mapvalue": "Wert",
-    "source": "Quelle",
-    "target": "Ziel",
-    "value": "Wert",
     "logExplorer": {
       "title": "Protokoll-Explorer",
       "openInLogs": "In Protokollen öffnen",
@@ -5645,7 +5622,30 @@
         "contextTooltip": "Andere Ereignisse aus diesem Stream in den 3 Minuten vor und nach diesem Ereignis — zeigt, was sonst noch im selben Moment geschah.",
         "contextEmpty": "Keine umgebenden Ereignisse gefunden"
       }
-    }
+    },
+    "addJoin": "Join hinzufügen",
+    "removeJoin": "Join entfernen",
+    "leftJoin": "Linker Join",
+    "innerJoin": "Innere Verbindung",
+    "rightJoin": "Richtiger Beitritt",
+    "removeClause": "Klausel entfernen",
+    "SQL": "SQL",
+    "builder": "Baumeister",
+    "custom": "Benutzerdefiniert",
+    "discard": "Verwerfen",
+    "apply": "Anwenden",
+    "collapseFields": "Felder einklappen",
+    "fields": "Felder",
+    "layout": "Layout",
+    "promQL": "PromQL",
+    "latitude": "Breitengrad",
+    "longitude": "Längengrad",
+    "weight": "Gewichtung",
+    "mapname": "Name",
+    "mapvalue": "Wert",
+    "source": "Quelle",
+    "target": "Ziel",
+    "value": "Wert"
   },
   "home": {
     "alertsOverviewSection": "Alerts-Übersichtsbereich",
@@ -14627,6 +14627,7 @@
       "disabled": "Deaktiviert",
       "emptyTitle": "Noch keine Alarme für dieses SLO",
       "emptyHint": "Burn-Rate-Alarme warnen Sie, solange noch Budget übrig ist, um das SLO zu schützen.",
+      "emptyActionDesc": "Erhalten Sie eine Warnung, bevor das Budget aufgebraucht ist",
       "loadFailed": "Die Alarme für dieses SLO konnten nicht geladen werden.",
       "editTargetMissing": "Dieser Alarm ist diesem SLO nicht mehr zugeordnet.",
       "describeBurn": "Burn-Rate > {critical} über {long} und {short}",
@@ -14919,7 +14920,12 @@
     "common": {
       "reload": "Aktualisieren",
       "lastRefreshed": "Zuletzt aktualisiert {age}",
-      "loadFailed": "Datenbankdaten konnten nicht geladen werden. Versuchen Sie es erneut oder grenzen Sie den Zeitraum ein."
+      "loadFailed": "Datenbankdaten konnten nicht geladen werden. Versuchen Sie es erneut oder grenzen Sie den Zeitraum ein.",
+      "actions": "Aktionen"
+    },
+    "header": {
+      "title": "Datenbanken",
+      "subtitle": "Abfrageleistung und -zustand in Ihren Datenbanken"
     },
     "ai": {
       "suggestFix": "KI fragen, wie das zu beheben ist",
@@ -14946,7 +14952,7 @@
         "namespace": "Schema",
         "env": "Umgebung",
         "service": "Dienst",
-        "insight": "Erkenntnis"
+        "insight": "Einblick"
       }
     },
     "delta": {
@@ -14961,8 +14967,6 @@
       "wasValue": "war {value}"
     },
     "databases": {
-      "title": "Datenbanken",
-      "subtitle": "Abfrageleistung und -zustand pro Datenbank",
       "searchPlaceholder": "Datenbank oder Dienst suchen…",
       "unnamedInstance": "Instanz nicht benannt",
       "unnamedInstanceHint": "Die eigenen Anweisungsberichte der Datenbank beweisen, dass diese Engine läuft, aber sie nennen keinen Host. Die Zeile zeigt eine Adresse, sobald ein Feed eingerichtet ist, der eine solche liefert — Session-Sampling oder Instanzmetriken.",
@@ -15009,9 +15013,6 @@
       }
     },
     "queries": {
-      "title": "Top-Abfragen",
-      "subtitle": "Die Abfragen mit der höchsten Datenbankzeit",
-      "subtitleServer": "Die Anweisungen, die Ihre Datenbanken ausgeführt haben, innerhalb der Datenbank gezählt — am häufigsten ausgeführte zuerst",
       "searchPlaceholder": "Abfragetext, Tabelle oder Dienst suchen…",
       "trendLabel": "Wie sich die Zeit dieser Abfrage über den Zeitraum entwickelt hat",
       "otherRow": "Alle anderen Abfragen",
@@ -15020,7 +15021,8 @@
         "query": "Abfragen",
         "queryHint": "Nur echte SQL-Befehle — SELECT, INSERT, UPDATE und DELETE.",
         "all": "Abfragen + Verbindungsaufwand",
-        "allHint": "Zählt auch die Buchhaltung, die Ihr Treiber zwischen Abfragen sendet: BEGIN und COMMIT, SET und die Prüfungen, die eine gepoolte Verbindung am Leben halten."
+        "allHint": "Zählt auch die Buchhaltung, die Ihr Treiber zwischen Abfragen sendet: BEGIN und COMMIT, SET und die Prüfungen, die eine gepoolte Verbindung am Leben halten.",
+        "overheadLabel": "Verbindungsaufwand einbeziehen"
       },
       "completionBias": {
         "title": "Aufrufe sanken um {drop}%, während Fehlschläge stiegen",
@@ -15267,9 +15269,9 @@
       "ambiguousStream": "Diese Organisation hat mehr als einen Trace-Stream, und wir können nicht feststellen, auf welchem diese Abfrage läuft. Wählen Sie einen Stream, um die Aufrufer und Beispiel-Traces zu laden.",
       "pickStream": "Trace-Stream auswählen",
       "invalidStream": "Dieser Trace-Stream-Name ist uns nicht bekannt, daher haben wir die Suche nicht ausgeführt.",
-      "firstSeen": "ZUM ERSTEN MAL IN DIESER LISTE UM {time}",
+      "firstSeen": "Erstmals erschienen in dieser Liste um {time}",
       "firstSeenHint": "Der früheste Punkt in diesem Zeitraum, an dem diese Abfrage schwer genug war, um eigenständig verfolgt zu werden.",
-      "lastSeen": "ZULETZT ERSCHIENEN UM {time}",
+      "lastSeen": "Zuletzt erschienen um {time}",
       "lastSeenHint": "Der letzte Punkt in diesem Zeitraum, an dem diese Abfrage schwer genug war, um eigenständig verfolgt zu werden. Sie läuft möglicherweise noch – dies ist das letzte Mal, dass sie in der Liste auftauchte.",
       "errorsByCode": {
         "title": "Fehler nach Ursachencode",
@@ -15436,9 +15438,6 @@
       }
     },
     "samples": {
-      "title": "Langsamste Aufrufe",
-      "subtitle": "Die langsamsten einzelnen Datenbankaufrufe in diesem Zeitraum, über alle Datenbanken und Abfragen hinweg — so wie ihre Aufrufer sie gemessen haben, nur abgeschlossene Aufrufe.",
-      "subtitleServer": "Die langsamsten Anweisungen, die Ihre Datenbanken in diesem Zeitraum abgeschlossen haben, innerhalb der Datenbank gemessen.",
       "logOffTitle": "Ihre Datenbanken protokollieren noch keine langsamen Anweisungen.",
       "logOffDescription": "Nichts hat diese Aufrufe getracet, also haben wir die Datenbanken nach ihren eigenen langsamsten Anweisungen gefragt — und sie protokollieren keine. Diese Liste stammt aus dem Anweisungsprotokoll von PostgreSQL (log_min_duration_statement), das standardmäßig deaktiviert ist — der Protokollierungsschritt der Setup-Karte aktiviert es. Die Erfassung pro Anweisung ist derzeit nur für PostgreSQL verfügbar, daher können MySQL und MariaDB diese Liste noch nicht speisen. Top-Abfragen können Ihnen weiterhin zeigen, was am häufigsten läuft, da sie stattdessen die Zähltabellen liest.",
       "searchPlaceholder": "Abfragetext, Dienst oder Datenbank suchen…",
@@ -15480,16 +15479,14 @@
       }
     },
     "rowChips": {
-      "new": "NEU IN DIESER LISTE",
-      "slower": "{ratio}× LANGSAMER ALS ÜBLICH",
-      "loop": "LÄUFT {multiplier}× PRO ANFRAGE",
-      "allFailed": "ALLE {count} FEHLGESCHLAGEN",
-      "busier": "BESCHÄFTIGTER, NICHT LANGSAMER",
-      "climbed": "NEUE SCHWERSTE ABFRAGE"
+      "new": "Neu in dieser Liste",
+      "slower": "{ratio}× langsamer als üblich",
+      "loop": "Läuft {multiplier}× pro Anfrage",
+      "allFailed": "Alle {count} fehlgeschlagen",
+      "busier": "Stärker ausgelastet, nicht langsamer",
+      "climbed": "Neue schwerste Abfrage"
     },
     "deadlocks": {
-      "title": "Datenbanken",
-      "subtitle": "Transaktionen, die sich gegenseitig blockiert haben und zurückgerollt wurden",
       "deadlockCount": "keine Deadlocks | {count} Deadlock | {count} Deadlocks",
       "pairCount": "keine Abfragepaare | {count} Abfragepaar | {count} Abfragepaare",
       "searchPlaceholder": "Abfragetext, Tabelle oder Anwendung suchen…",
@@ -15516,10 +15513,10 @@
         "mysqlPartial": "Ihre MySQL-Datenbank speichert nur den neuesten Deadlock, sofern innodb_print_all_deadlocks nicht aktiviert ist."
       },
       "chips": {
-        "oppositeOrder": "UMGEKEHRTE ZEILENREIHENFOLGE",
-        "cadence": "ALLE {seconds}s",
-        "noQueries": "ABFRAGEN NICHT ERFASST",
-        "partial": "NUR EINE SEITE"
+        "oppositeOrder": "Umgekehrte Zeilenreihenfolge",
+        "cadence": "Alle {seconds}s",
+        "noQueries": "Abfragen nicht erfasst",
+        "partial": "Nur eine Seite"
       },
       "rowActions": {
         "topQueries": "Finden Sie diese in den Top-Abfragen",
@@ -15536,7 +15533,7 @@
         "pid": "pid {pid}",
         "thread": "thread {pid}",
         "transaction": "Transaktion {id}",
-        "eachWaits": "jede wartet auf die andere",
+        "eachWaits": "Jede wartet auf die andere",
         "deadlock": "Deadlock",
         "noQueryCaptured": "Das Protokoll hat diesen Deadlock aufgezeichnet, aber nicht die Anweisung.",
         "waitingFor": "Wartete auf das Ende von {target}.",
@@ -15639,9 +15636,6 @@
       }
     },
     "blocked": {
-      "title": "Datenbanken",
-      "subtitle": "Sitzungen, die derzeit auf eine Sperre warten",
-      "subtitlePast": "Sitzungen, die in diesem Zeitraum auf eine Sperre gewartet haben",
       "waitingCount": "keine Sitzungen warten auf eine Sperre | {count} Sitzung wartet gerade auf eine Sperre | {count} Sitzungen warten gerade auf eine Sperre",
       "waitingCountPast": "keine Sitzungen haben auf eine Sperre gewartet | {count} Sitzung hat in diesem Zeitraum auf eine Sperre gewartet | {count} Sitzungen haben in diesem Zeitraum auf eine Sperre gewartet",
       "sessionCount": "keine Sitzungen | {count} Sitzung | {count} Sitzungen",
@@ -15687,14 +15681,14 @@
       },
       "deep": "{count} tief",
       "notWaiting": "wartet nicht",
-      "longestWait": "LÄNGSTE WARTEZEIT",
-      "holdsTheLock": "HÄLT DIE SPERRE, DIE ALLE WOLLEN",
+      "longestWait": "Längste Wartezeit",
+      "holdsTheLock": "Hält die Sperre, die alle wollen",
       "lastStatement": "letzte Anweisung vor {age}",
       "idleInTransaction": "wartet auf nichts · im Leerlauf in einer offenen Transaktion",
       "pills": {
-        "root": "WURZEL — HIER STARTEN",
-        "waitingBlocking": "WARTET & BLOCKIERT {count}",
-        "waiting": "WARTET"
+        "root": "Ursprung – hier beginnen",
+        "waitingBlocking": "Wartet & blockiert {count}",
+        "waiting": "Wartend"
       },
       "waitingOn": "wartet auf {pid}",
       "degraded": "Eine Sitzung hält {count} auf. Sie hat seit {age} eine offene Transaktion und in dieser Zeit keine Abfrage ausgeführt — höchstwahrscheinlich eine Anwendung, die vergessen hat, einen Commit auszuführen.",
@@ -15772,9 +15766,6 @@
       }
     },
     "activity": {
-      "title": "Aktivität",
-      "subtitle": "Was Ihre Datenbanken gerade tun, abgetastet aus ihren eigenen Sitzungstabellen.",
-      "subtitlePast": "Was Ihre Datenbanken während dieses Zeitfensters taten, abgetastet aus ihren eigenen Sitzungstabellen.",
       "searchPlaceholder": "Sitzungen, Benutzer, Anwendungen durchsuchen",
       "wait": {
         "onCpu": "Auf CPU / keine Wartezeit",
@@ -15898,8 +15889,6 @@
       "deadlockLabel": "Deadlocks"
     },
     "tableHealth": {
-      "title": "Tabellenzustand",
-      "subtitle": "Größe, Bloat und Vakuum-Status für jede Tabelle, neuester Snapshot zuerst.",
       "searchPlaceholder": "Tabellen durchsuchen",
       "never": "Nie",
       "countersCumulative": "Scan- und Vakuum-Zähler sind Gesamtwerte seit dem letzten Statistik-Reset, keine Zähler für den ausgewählten Zeitraum.",

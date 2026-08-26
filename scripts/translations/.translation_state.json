@@ -5742,15 +5742,12 @@
       "state": {
         "unknown": "0e906fd86d00ebf4"
       },
-      "subtitle": "baced9b1b8cf6357",
-      "subtitlePast": "c1d9c44562703ce3",
       "summary": {
         "idleInTransaction": "ff2e0c7318ecdc5b",
         "onCpu": "41d57724c8eb5b2c",
         "sessions": "6fa3cbf451b2a1d5",
         "waiting": "6e293a8c009e0011"
       },
-      "title": "38da1505ca837328",
       "transactionOpen": "56ca82c3416e10d6",
       "wait": {
         "onCpu": "08e24f59d004b84b",
@@ -5820,11 +5817,11 @@
         "descriptionPast": "448694694219f0fa",
         "title": "2f66294abed43c76"
       },
-      "holdsTheLock": "9e135b7e930459cd",
+      "holdsTheLock": "96c8a7f71fea2845",
       "idleInTransaction": "80790b2dabe82b6a",
       "inChain": "9185ac12ea245ca5",
       "lastStatement": "b27c3cbfcbacffbf",
-      "longestWait": "c7e8963260c371b4",
+      "longestWait": "0344209e8a455cc7",
       "notCollecting": {
         "checklistTitle": "cf26b983696fd931",
         "checks": {
@@ -5863,9 +5860,9 @@
         "waitingHint": "9e6c00f40d167720"
       },
       "pills": {
-        "root": "32446a10e7e96768",
-        "waiting": "77aaf105c28c4c82",
-        "waitingBlocking": "ef05150edc8cd88c"
+        "root": "1d20872bc27f266d",
+        "waiting": "6e293a8c009e0011",
+        "waitingBlocking": "2e882e7000557d32"
       },
       "rootCount": "ce593fc61daaa6cb",
       "rowActions": {
@@ -5875,8 +5872,6 @@
       },
       "searchPlaceholder": "9d15a817c957bdb7",
       "sessionCount": "872855722557db38",
-      "subtitle": "9d56af5532ac67e4",
-      "subtitlePast": "72e80c743af6f901",
       "summary": {
         "chains": "79aaa1a603013cfd",
         "longest": "0344209e8a455cc7",
@@ -5887,7 +5882,6 @@
         "hint": "80decc27d1bb1fa9",
         "hintNoInstance": "3af0c760403de2d7"
       },
-      "title": "61d2afe2349913ce",
       "waitEvent": {
         "advisory": "398b32c9f4819823",
         "buffer": "9520b883245dd5a8",
@@ -5911,6 +5905,7 @@
       "shortfall": "883e563de1437274"
     },
     "common": {
+      "actions": "ff8059dc6752afdd",
       "lastRefreshed": "41200a71998f3e68",
       "loadFailed": "188f776fec6ce374",
       "reload": "0e91610117029a62"
@@ -5973,23 +5968,21 @@
       "moreServices": "ecadd87ff0e5d0aa",
       "openQueries": "1cc7003257a55ac4",
       "searchPlaceholder": "5b5e4ae9bc9f4827",
-      "subtitle": "ca2269cf34caf992",
       "summary": {
         "calls": "b73a5e2ca6458665",
         "databases": "61d2afe2349913ce",
         "failed": "031a8f0f659df890",
         "time": "1235846a41c69aa3"
       },
-      "title": "61d2afe2349913ce",
       "unnamedInstance": "11ca9f99e438664d",
       "unnamedInstanceHint": "d793c53a423bbdd2"
     },
     "deadlocks": {
       "chips": {
-        "cadence": "a2189667d81080f0",
-        "noQueries": "cede8c832375a5cf",
-        "oppositeOrder": "0ac624b15136c63b",
-        "partial": "930887d6546ac57f"
+        "cadence": "ad4e4b835817ca07",
+        "noQueries": "2d8555529fc0177d",
+        "oppositeOrder": "5a873ed7162026e8",
+        "partial": "ab2b74be6ba03379"
       },
       "columns": {
         "applications": "98e33b0f3104fcf1",
@@ -6015,8 +6008,8 @@
         "copyForSlackHint": "71294c89cabdc3f2",
         "copyHint": "a07ec10b0a0dd73c",
         "copySqlTooltip": "636199e234e8d7c2",
-        "deadlock": "4f6c0efa1a0f9935",
-        "eachWaits": "33f89b01a3f49d2d",
+        "deadlock": "aaf168baa09e163b",
+        "eachWaits": "180ec31d59123e9c",
         "earlier": "e10ae99074011888",
         "fixBody": "88c1adb586d85b45",
         "fixGeneric": "7828652ddd07e5b8",
@@ -6128,12 +6121,10 @@
         "copyForSlack": "e21f935f11d7e966",
         "title": "c904ede925e58ed8"
       },
-      "subtitle": "cb6dd0125d1cabd5",
       "summary": {
         "deadlocks": "cdc2395de66afa4f",
         "pairs": "dd72f4dae2323619"
-      },
-      "title": "61d2afe2349913ce"
+      }
     },
     "delta": {
       "comparison": "99d351b2e23b19f2",
@@ -6200,11 +6191,11 @@
         "sampleHint": "14ce64e949b654ce",
         "title": "68e083296db6bae0"
       },
-      "firstSeen": "7ef8346a2b878fa9",
+      "firstSeen": "80a3b2a23bf8b137",
       "firstSeenCaveat": "c72190d565eff3cc",
       "firstSeenHint": "99328bb38f9b438f",
       "invalidStream": "42bb740f4729b7d6",
-      "lastSeen": "9d2f737d748ddf26",
+      "lastSeen": "30444ca8a5f3abae",
       "lastSeenHint": "e7cbd5f9d66bd7fb",
       "latencyTitle": "7f5fb7a6e419d850",
       "liveSeries": "f756770545aec2b1",
@@ -6387,12 +6378,12 @@
       "allServices": "5b980982fa251af0",
       "clearScope": "29a390f9237e3c84",
       "dimension": {
-        "env": "ba5285161ba6eed0",
-        "insight": "e43ba08557cbb4f1",
-        "instance": "3549b0028b75d981",
-        "namespace": "df0ad6e43880f09c",
-        "service": "9df6b026a8c6c26e",
-        "system": "ed9f6f25068608ef"
+        "env": "9e471951a1b4106e",
+        "insight": "1d7ecddb3e1f0881",
+        "instance": "fa7fe67124e94375",
+        "namespace": "07b091a3fdc4e4c0",
+        "service": "d677190e0a9990e7",
+        "system": "8e75ebbdb21505d2"
       },
       "popoverTitle": "2ee6635f891bb689",
       "removeScope": "7b7141ee715851b5",
@@ -6400,6 +6391,10 @@
     },
     "freshness": {
       "neverAggregated": "97037dc42d71e89c"
+    },
+    "header": {
+      "subtitle": "edac89e67399fbc7",
+      "title": "61d2afe2349913ce"
     },
     "insights": {
       "all-failing": {
@@ -6580,18 +6575,16 @@
       "stmtClass": {
         "all": "ab9dcc553467b834",
         "allHint": "8e5beeb9b29be0dd",
+        "overheadLabel": "387ec3bc2fec5dab",
         "query": "80d2e18c7da9f0be",
         "queryHint": "4610c57ac29e9a78"
       },
-      "subtitle": "bde88aa5104f1ad3",
-      "subtitleServer": "41d8d980fcbae490",
       "summary": {
         "calls": "b73a5e2ca6458665",
         "failed": "031a8f0f659df890",
         "queries": "f0e5d5b427726b2c",
         "time": "1235846a41c69aa3"
       },
-      "title": "6fbe590f4fe13e19",
       "trendLabel": "95ded69384a7e085",
       "truncatedText": "b1c01c2c3d2d401b"
     },
@@ -6627,12 +6620,12 @@
       }
     },
     "rowChips": {
-      "allFailed": "a883b01930629f33",
-      "busier": "4e65a51122fc3af4",
-      "climbed": "c541f40ab519f89e",
-      "loop": "f8ca436660128d95",
-      "new": "770f54e880a10153",
-      "slower": "c38639a0bd66b303"
+      "allFailed": "efbbb17bb1350c3c",
+      "busier": "722040bc714a79ae",
+      "climbed": "f775bd54b60b28b9",
+      "loop": "fdeff924ee008929",
+      "new": "a29c643668058f08",
+      "slower": "1476a550f6f3ae46"
     },
     "samples": {
       "columnHints": {
@@ -6673,9 +6666,6 @@
         "title": "72a3187c47d84035",
         "truncated": "890656bf3bd9bccf"
       },
-      "subtitle": "67869fd3af7fcf97",
-      "subtitleServer": "643ec8b14b6ff53b",
-      "title": "7e38c4258cbb11a2",
       "viewTrace": "0e2865ffff2d46c0"
     },
     "tableHealth": {
@@ -6710,8 +6700,6 @@
       "notCollectingDescription": "7ebf5d6d83793673",
       "notCollectingTitle": "7b0476ed807f91ed",
       "searchPlaceholder": "3394de3474d7cbf2",
-      "subtitle": "7b3f3ed37654fd29",
-      "title": "e25af56211da67f1",
       "tuplesEstimated": "0ede6fcd9e883244"
     }
   },
@@ -13065,6 +13053,7 @@
       "describeBurn": "bcc89db9478e8be3",
       "disabled": "75081b593d15cf6e",
       "editTargetMissing": "2a30412f3ed2c01b",
+      "emptyActionDesc": "9cb6ebd6b000c133",
       "emptyHint": "9ffb4354995a558b",
       "emptyTitle": "1f1d4fee0e7c5a9e",
       "loadFailed": "1760368c39b88f33",

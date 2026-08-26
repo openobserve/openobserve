@@ -4600,6 +4600,7 @@
     "mapsNameLabel": "ロケーション名ラベル",
     "mapsMapType": "マップタイプ",
     "tableAggregations": "テーブル集約",
+    "tableCellDrilldownTooltip": "一致するログを探索",
     "promqlTableMode": "プロムQL テーブルモード",
     "visibleColumns": "表示カラム",
     "hiddenColumns": "非表示列",
@@ -5504,8 +5505,7 @@
     "variableNameAlreadyExists": "同じ名前の変数が既に存在します。",
     "pivotTotal": "合計",
     "pivotOthers": "その他",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "一致するログを探索"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5571,29 +5571,6 @@
     "rowFields": "行フィールド",
     "valueFields": "値フィールド",
     "noData": "データなし",
-    "addJoin": "追加ジョイン",
-    "removeJoin": "[結合を削除]",
-    "leftJoin": "レフト・ジョイン",
-    "innerJoin": "インナー・ジョイン",
-    "rightJoin": "右結合",
-    "removeClause": "条項を削除",
-    "SQL": "SQL",
-    "builder": "ビルダー",
-    "custom": "カスタム",
-    "discard": "破棄",
-    "apply": "適用",
-    "collapseFields": "フィールドを折りたたむ",
-    "fields": "フィールド",
-    "layout": "レイアウト",
-    "promQL": "PromQL",
-    "latitude": "緯度",
-    "longitude": "経度",
-    "weight": "重み",
-    "mapname": "名前",
-    "mapvalue": "値",
-    "source": "ソース",
-    "target": "ターゲット",
-    "value": "値",
     "logExplorer": {
       "title": "ログエクスプローラー",
       "openInLogs": "ログで開く",
@@ -5645,7 +5622,30 @@
         "contextTooltip": "このイベントの前後3分間にこのストリーム内で発生した他のイベント — 同じ時点で他に何が起こっていたかを示します。",
         "contextEmpty": "周辺のイベントが見つかりません"
       }
-    }
+    },
+    "addJoin": "追加ジョイン",
+    "removeJoin": "[結合を削除]",
+    "leftJoin": "レフト・ジョイン",
+    "innerJoin": "インナー・ジョイン",
+    "rightJoin": "右結合",
+    "removeClause": "条項を削除",
+    "SQL": "SQL",
+    "builder": "ビルダー",
+    "custom": "カスタム",
+    "discard": "破棄",
+    "apply": "適用",
+    "collapseFields": "フィールドを折りたたむ",
+    "fields": "フィールド",
+    "layout": "レイアウト",
+    "promQL": "PromQL",
+    "latitude": "緯度",
+    "longitude": "経度",
+    "weight": "重み",
+    "mapname": "名前",
+    "mapvalue": "値",
+    "source": "ソース",
+    "target": "ターゲット",
+    "value": "値"
   },
   "home": {
     "alertsOverviewSection": "アラート概要セクション",
@@ -14627,6 +14627,7 @@
       "disabled": "無効",
       "emptyTitle": "このSLOにはまだアラートがありません",
       "emptyHint": "バーンレートアラートは、まだ予算が残っているうちにあなたに通知します。",
+      "emptyActionDesc": "予算が尽きる前に警告を受け取る",
       "loadFailed": "このSLOのアラートを読み込めませんでした。",
       "editTargetMissing": "そのアラートはこのSLOにはもうありません。",
       "describeBurn": "バーンレート > {critical}（{long} と {short} にわたって）",
@@ -14919,7 +14920,12 @@
     "common": {
       "reload": "更新",
       "lastRefreshed": "最終更新 {age}",
-      "loadFailed": "データベースデータを読み込めませんでした。再試行するか、時間範囲を絞り込んでください。"
+      "loadFailed": "データベースデータを読み込めませんでした。再試行するか、時間範囲を絞り込んでください。",
+      "actions": "アクション"
+    },
+    "header": {
+      "title": "データベース",
+      "subtitle": "データベース全体のクエリパフォーマンスと健全性"
     },
     "ai": {
       "suggestFix": "AIに修正方法を尋ねる",
@@ -14961,8 +14967,6 @@
       "wasValue": "以前は {value}"
     },
     "databases": {
-      "title": "データベース",
-      "subtitle": "データベースごとのクエリパフォーマンスと健全性",
       "searchPlaceholder": "データベースまたはサービスを検索…",
       "unnamedInstance": "インスタンス名がありません",
       "unnamedInstanceHint": "データベース自身のステートメントレポートはこのエンジンが稼働していることを証明しますが、ホスト名は示されません。ホスト情報を含むフィード — セッションサンプリングやインスタンスメトリクス — が設定されると、行にアドレスが表示されます。",
@@ -15009,9 +15013,6 @@
       }
     },
     "queries": {
-      "title": "上位クエリ",
-      "subtitle": "最もデータベース時間を使用しているクエリ",
-      "subtitleServer": "データベースが実行したステートメントで、データベース内部でカウントされます — 最も頻繁に実行された順に表示されます",
       "searchPlaceholder": "クエリテキスト、テーブル、またはサービスを検索…",
       "trendLabel": "このクエリの時間が範囲全体でどのように変化したか",
       "otherRow": "その他すべてのクエリ",
@@ -15020,7 +15021,8 @@
         "query": "クエリ",
         "queryHint": "実際のSQLのみ — SELECT、INSERT、UPDATE、DELETE。",
         "all": "クエリ + 接続オーバーヘッド",
-        "allHint": "また、ドライバーがクエリ間で送信するブックキーピング（BEGIN、COMMIT、SET、プールされた接続を維持するためのチェック）もカウントします。"
+        "allHint": "また、ドライバーがクエリ間で送信するブックキーピング（BEGIN、COMMIT、SET、プールされた接続を維持するためのチェック）もカウントします。",
+        "overheadLabel": "接続オーバーヘッドを含める"
       },
       "completionBias": {
         "title": "呼び出しが {drop}% 減少し、失敗が増加しました",
@@ -15269,7 +15271,7 @@
       "invalidStream": "そのトレースストリーム名は認識できなかったため、検索を実行しませんでした。",
       "firstSeen": "このリストに最初に表示されたのは {time} です",
       "firstSeenHint": "この期間内で、このクエリが単独で追跡するほど重かった最も早い時点。",
-      "lastSeen": "このリストに最後に表示されたのは {time} です",
+      "lastSeen": "最後に表示されたのは {time} です",
       "lastSeenHint": "この期間内で、このクエリが単独で追跡するほど重かった最新の時点。現在も実行中かもしれません。これが最後にリストに載った時点です。",
       "errorsByCode": {
         "title": "理由コード別の失敗数",
@@ -15436,9 +15438,6 @@
       }
     },
     "samples": {
-      "title": "最も遅いコール",
-      "subtitle": "このウィンドウ内で、すべてのデータベースとクエリにわたる最も遅い個々のデータベースコール — 呼び出し元が測定したもので、完了したコールのみ",
-      "subtitleServer": "このウィンドウでデータベースが完了した最も遅いステートメント（データベース内で測定）",
       "logOffTitle": "データベースはまだ遅いステートメントをログに記録していません",
       "logOffDescription": "これらのコールをトレースしたものはなかったため、データベースに独自の最も遅いステートメントを問い合わせましたが、何もログに記録されていません。このリストはPostgreSQLのステートメントログ（log_min_duration_statement）からのもので、デフォルトではオフになっています — セットアップカードのロギング手順でオンになります。ステートメントごとのキャプチャは現在PostgreSQLのみであるため、MySQLとMariaDBはこのリストにまだ対応していません。上位クエリは代わりにカウンターテーブルを読み取るため、何が最も多く実行されているかを引き続き表示できます。",
       "searchPlaceholder": "クエリテキスト、サービス、またはデータベースを検索…",
@@ -15480,16 +15479,14 @@
       }
     },
     "rowChips": {
-      "new": "このリストに新登場",
-      "slower": "{ratio}× 通常より遅い",
-      "loop": "リクエストごとに{multiplier}×実行",
-      "allFailed": "すべて{count}件失敗",
-      "busier": "ビジーだが低速ではない",
-      "climbed": "新しい最重量クエリ"
+      "new": "このリストに新しい",
+      "slower": "通常より {ratio} 倍遅い",
+      "loop": "リクエストごとに {multiplier} 回実行",
+      "allFailed": "{count} 件すべて失敗",
+      "busier": "遅いのではなく、忙しい",
+      "climbed": "新しい最も重いクエリ"
     },
     "deadlocks": {
-      "title": "データベース",
-      "subtitle": "互いにブロックし合い、ロールバックされたトランザクション",
       "deadlockCount": "デッドロックなし | {count}件のデッドロック | {count}件のデッドロック",
       "pairCount": "クエリペアなし | {count}件のクエリペア | {count}件のクエリペア",
       "searchPlaceholder": "クエリテキスト、テーブル、またはアプリケーションを検索…",
@@ -15517,7 +15514,7 @@
       },
       "chips": {
         "oppositeOrder": "逆の行順序",
-        "cadence": "毎{seconds}秒",
+        "cadence": "{seconds}秒ごと",
         "noQueries": "キャプチャされていないクエリ",
         "partial": "片側のみ"
       },
@@ -15536,7 +15533,7 @@
         "pid": "pid {pid}",
         "thread": "スレッド {pid}",
         "transaction": "トランザクション {id}",
-        "eachWaits": "互いに相手を待っている",
+        "eachWaits": "互いに待ち合っている",
         "deadlock": "デッドロック",
         "noQueryCaptured": "ログにはこのデッドロックが記録されていますが、ステートメントは記録されていません。",
         "waitingFor": "{target} の完了を待っていました。",
@@ -15639,9 +15636,6 @@
       }
     },
     "blocked": {
-      "title": "データベース",
-      "subtitle": "現在ロックを待機しているセッション",
-      "subtitlePast": "この期間中にロックを待機していたセッション",
       "waitingCount": "ロックを待機しているセッションなし | {count} セッションが現在ロックを待機しています | {count} セッションが現在ロックを待機しています",
       "waitingCountPast": "ロックを待機していたセッションなし | {count} セッションがこの期間中にロックを待機していました | {count} セッションがこの期間中にロックを待機していました",
       "sessionCount": "セッションなし | {count} セッション | {count} セッション",
@@ -15687,7 +15681,7 @@
       },
       "deep": "深さ{count}",
       "notWaiting": "待機していません",
-      "longestWait": "最長待ち時間",
+      "longestWait": "最長待機",
       "holdsTheLock": "全員が求めるロックを保持",
       "lastStatement": "最後のステートメントは{age}前",
       "idleInTransaction": "何も待機していません · オープントランザクションでアイドル中",
@@ -15772,9 +15766,6 @@
       }
     },
     "activity": {
-      "title": "アクティビティ",
-      "subtitle": "データベースが現在何をしているかを、各データベースのセッションテーブルからサンプリングしています。",
-      "subtitlePast": "この期間中にデータベースが何をしていたかを、各データベースのセッションテーブルからサンプリングしています。",
       "searchPlaceholder": "セッション、ユーザー、アプリケーションを検索",
       "wait": {
         "onCpu": "CPU実行中 / 待機なし",
@@ -15898,8 +15889,6 @@
       "deadlockLabel": "デッドロック"
     },
     "tableHealth": {
-      "title": "テーブルの健全性",
-      "subtitle": "各テーブルのサイズ、肥大化、バキューム状態。最新のスナップショットが最初に表示されます。",
       "searchPlaceholder": "テーブルを検索",
       "never": "なし",
       "countersCumulative": "スキャン数とバキューム数は、最後の統計リセット以降の累計であり、選択した期間内の回数ではありません。",

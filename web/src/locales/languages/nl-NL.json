@@ -4600,6 +4600,7 @@
     "mapsNameLabel": "Label met de naam van de locatie",
     "mapsMapType": "Kaarttype",
     "tableAggregations": "Tabelaggregaties",
+    "tableCellDrilldownTooltip": "Verken overeenkomende logs",
     "promqlTableMode": "ProMQL-tabelmodus",
     "visibleColumns": "Zichtbare kolommen",
     "hiddenColumns": "Verborgen kolommen",
@@ -5504,8 +5505,7 @@
     "variableNameAlreadyExists": "Er bestaat al een variabele met dezelfde naam",
     "pivotTotal": "Totaal",
     "pivotOthers": "Overige",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Verken overeenkomende logs"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5571,29 +5571,6 @@
     "rowFields": "Rijvelden",
     "valueFields": "Waardevelden",
     "noData": "Geen gegevens",
-    "addJoin": "Join toevoegen",
-    "removeJoin": "Join verwijderen",
-    "leftJoin": "Links aansluiten",
-    "innerJoin": "Innerlijke verbinding",
-    "rightJoin": "Right Join",
-    "removeClause": "Clausule verwijderen",
-    "SQL": "SQL",
-    "builder": "Bouwer",
-    "custom": "Op maat",
-    "discard": "Weggooien",
-    "apply": "Toepassen",
-    "collapseFields": "Velden samenvouwen",
-    "fields": "Velden",
-    "layout": "Indeling",
-    "promQL": "PromQL",
-    "latitude": "Breedtegraad",
-    "longitude": "Lengtegraad",
-    "weight": "Gewicht",
-    "mapname": "Naam",
-    "mapvalue": "Waarde",
-    "source": "Bron",
-    "target": "Doelwit",
-    "value": "Waarde",
     "logExplorer": {
       "title": "Logverkenner",
       "openInLogs": "Openen in Logs",
@@ -5645,7 +5622,30 @@
         "contextTooltip": "Andere gebeurtenissen uit deze stream in de 3 minuten voor en na deze gebeurtenis — toont wat er op hetzelfde moment nog meer gebeurde.",
         "contextEmpty": "Geen omringende gebeurtenissen gevonden"
       }
-    }
+    },
+    "addJoin": "Join toevoegen",
+    "removeJoin": "Join verwijderen",
+    "leftJoin": "Links aansluiten",
+    "innerJoin": "Innerlijke verbinding",
+    "rightJoin": "Right Join",
+    "removeClause": "Clausule verwijderen",
+    "SQL": "SQL",
+    "builder": "Bouwer",
+    "custom": "Op maat",
+    "discard": "Weggooien",
+    "apply": "Toepassen",
+    "collapseFields": "Velden samenvouwen",
+    "fields": "Velden",
+    "layout": "Indeling",
+    "promQL": "PromQL",
+    "latitude": "Breedtegraad",
+    "longitude": "Lengtegraad",
+    "weight": "Gewicht",
+    "mapname": "Naam",
+    "mapvalue": "Waarde",
+    "source": "Bron",
+    "target": "Doelwit",
+    "value": "Waarde"
   },
   "home": {
     "alertsOverviewSection": "Sectie overzicht van waarschuwingen",
@@ -14627,6 +14627,7 @@
       "disabled": "Uitgeschakeld",
       "emptyTitle": "Nog geen meldingen voor deze SLO",
       "emptyHint": "Burn-rate-meldingen waarschuwen u terwijl er nog budget over is om te beschermen.",
+      "emptyActionDesc": "Word gewaarschuwd voordat het budget op is",
       "loadFailed": "Kon de meldingen van deze SLO niet laden.",
       "editTargetMissing": "Die melding staat niet meer op deze SLO.",
       "describeBurn": "Verbrandingssnelheid > {critical} over {long} en {short}",
@@ -14919,7 +14920,12 @@
     "common": {
       "reload": "Vernieuwen",
       "lastRefreshed": "Laatst vernieuwd {age}",
-      "loadFailed": "Kan databasegegevens niet laden. Probeer het opnieuw of verklein het tijdsbereik."
+      "loadFailed": "Kan databasegegevens niet laden. Probeer het opnieuw of verklein het tijdsbereik.",
+      "actions": "Acties"
+    },
+    "header": {
+      "title": "Databases",
+      "subtitle": "Queryprestaties en status van uw databases"
     },
     "ai": {
       "suggestFix": "Vraag AI hoe dit op te lossen",
@@ -14941,12 +14947,12 @@
       "removeScope": "Verwijder dit filter",
       "popoverTitle": "Beperk dit",
       "dimension": {
-        "system": "engine",
-        "instance": "database",
-        "namespace": "schema",
-        "env": "omgeving",
-        "service": "dienst",
-        "insight": "inzicht"
+        "system": "Engine",
+        "instance": "Database",
+        "namespace": "Schema",
+        "env": "Omgeving",
+        "service": "Service",
+        "insight": "Inzicht"
       }
     },
     "delta": {
@@ -14961,8 +14967,6 @@
       "wasValue": "was {value}"
     },
     "databases": {
-      "title": "Databases",
-      "subtitle": "Queryprestaties en gezondheid per database",
       "searchPlaceholder": "Zoek database of service…",
       "unnamedInstance": "Instantie niet benoemd",
       "unnamedInstanceHint": "De eigen statement-rapporten van de database bewijzen dat deze engine draait, maar ze geven geen hostnaam. De rij toont een adres zodra een feed die er een bevat — sessiesampling of instantiemetrieken — is ingesteld.",
@@ -15009,9 +15013,6 @@
       }
     },
     "queries": {
-      "title": "Top-query's",
-      "subtitle": "De query's die de meeste databasetijd gebruiken",
-      "subtitleServer": "De statements die je databases uitvoerden, geteld in de database — de meest uitgevoerde eerst.",
       "searchPlaceholder": "Zoek querytekst, tabel of service…",
       "trendLabel": "Hoe de tijd van deze query is veranderd over het bereik",
       "otherRow": "Alle andere query's",
@@ -15020,7 +15021,8 @@
         "query": "Query's",
         "queryHint": "Alleen echte SQL — SELECT, INSERT, UPDATE en DELETE.",
         "all": "Query's + verbindingsoverhead",
-        "allHint": "Telt ook de administratie die je driver tussen query's verstuurt: BEGIN en COMMIT, SET, en de controles die een gepoolde verbinding in leven houden."
+        "allHint": "Telt ook de administratie die je driver tussen query's verstuurt: BEGIN en COMMIT, SET, en de controles die een gepoolde verbinding in leven houden.",
+        "overheadLabel": "Verbindingsoverhead meenemen"
       },
       "completionBias": {
         "title": "Aanroepen daalden met {drop}% terwijl fouten stegen.",
@@ -15267,9 +15269,9 @@
       "ambiguousStream": "Deze organisatie heeft meer dan één trace stream, en we kunnen niet bepalen op welke deze query draait. Kies een stream om de aanroepers en voorbeeld-traces te laden.",
       "pickStream": "Kies een trace stream",
       "invalidStream": "Die naam van de trace stream herkennen we niet, dus we hebben de zoekopdracht niet uitgevoerd.",
-      "firstSeen": "VOOR HET EERST VERSCHENEN IN DEZE LIJST OM {time}",
+      "firstSeen": "Voor het eerst verschenen in deze lijst om {time}",
       "firstSeenHint": "Het vroegste punt in dit bereik waarop deze query zwaar genoeg was om apart te worden gevolgd.",
-      "lastSeen": "LAATST VERSCHENEN OM {time}",
+      "lastSeen": "Laatst verschenen om {time}",
       "lastSeenHint": "Het meest recente punt in dit bereik waarop deze query zwaar genoeg was om apart te worden gevolgd. Het kan nu nog steeds actief zijn — dit is de laatste keer dat het op de lijst stond.",
       "errorsByCode": {
         "title": "Fouten per redencode",
@@ -15436,9 +15438,6 @@
       }
     },
     "samples": {
-      "title": "Traagste aanroepen",
-      "subtitle": "De traagste individuele database-aanroepen in dit venster, over elke database en query — zoals hun aanroepers ze hebben gemeten, alleen voltooide aanroepen",
-      "subtitleServer": "De traagste statements die je databases in dit venster hebben voltooid, gemeten binnen de database",
       "logOffTitle": "Je databases loggen nog geen trage statements",
       "logOffDescription": "Niets heeft deze aanroepen getraceerd, dus we hebben de databases gevraagd naar hun eigen traagste statements — en ze loggen er geen. Deze lijst komt uit PostgreSQL's statementlog (log_min_duration_statement), dat standaard is uitgeschakeld — de logstap van de setupkaart schakelt dit in. Per-statement-capturering is momenteel alleen voor PostgreSQL, dus MySQL en MariaDB kunnen deze lijst nog niet voeden. Top queries kunnen nog steeds tonen wat het meest draait, omdat die in plaats daarvan de tellertabellen leest.",
       "searchPlaceholder": "Zoek querytekst, service of database…",
@@ -15480,16 +15479,14 @@
       }
     },
     "rowChips": {
-      "new": "NIEUW IN DEZE LIJST",
-      "slower": "{ratio}× LANGZAMER DAN GEBRUIKELIJK",
-      "loop": "DRAAIT {multiplier}× PER AANVRAAG",
-      "allFailed": "ALLE {count} MISLUKT",
-      "busier": "DRUKKER, NIET LANGZAMER",
-      "climbed": "NIEUWE ZWAARSTE QUERY"
+      "new": "Nieuw in deze lijst",
+      "slower": "{ratio}× langzamer dan normaal",
+      "loop": "Draait {multiplier}× per verzoek",
+      "allFailed": "Alle {count} zijn mislukt",
+      "busier": "Drukker, niet langzamer",
+      "climbed": "Nieuwe zwaarste query"
     },
     "deadlocks": {
-      "title": "Databases",
-      "subtitle": "Transacties die elkaar blokkeerden en zijn teruggedraaid",
       "deadlockCount": "geen deadlocks | {count} deadlock | {count} deadlocks",
       "pairCount": "geen queryparen | {count} querypaar | {count} queryparen",
       "searchPlaceholder": "Zoek querytekst, tabel of applicatie…",
@@ -15516,10 +15513,10 @@
         "mysqlPartial": "Je MySQL-database bewaart alleen de meest recente deadlock, tenzij innodb_print_all_deadlocks aan staat."
       },
       "chips": {
-        "oppositeOrder": "TEGENGESTELDE RIJVOLGORDE",
-        "cadence": "ELKE {seconds}s",
-        "noQueries": "QUERIES NIET VASTGELEGD",
-        "partial": "MAAR ÉÉN KANT"
+        "oppositeOrder": "Tegengestelde rijvolgorde",
+        "cadence": "Elke {seconds}s",
+        "noQueries": "Query's niet vastgelegd",
+        "partial": "Slechts één kant"
       },
       "rowActions": {
         "topQueries": "Vind deze in Top-query's",
@@ -15536,8 +15533,8 @@
         "pid": "pid {pid}",
         "thread": "thread {pid}",
         "transaction": "transactie {id}",
-        "eachWaits": "elk wacht op de ander",
-        "deadlock": "deadlock",
+        "eachWaits": "Elke wacht op de andere",
+        "deadlock": "Deadlock",
         "noQueryCaptured": "Het logboek heeft deze deadlock vastgelegd, maar niet de statement.",
         "waitingFor": "Wachtte tot {target} klaar was.",
         "waitingForRow": "Wachtte tot {target} klaar was — de andere sessie had de rij die het wilde al gewijzigd.",
@@ -15639,9 +15636,6 @@
       }
     },
     "blocked": {
-      "title": "Databases",
-      "subtitle": "Sessies die momenteel wachten op een lock",
-      "subtitlePast": "Sessies die tijdens dit tijdsvenster op een lock wachtten",
       "waitingCount": "geen sessies wachten op een lock | {count} sessie wacht nu op een lock | {count} sessies wachten nu op een lock",
       "waitingCountPast": "geen sessies wachtten op een lock | {count} sessie wachtte op een lock in dit tijdsvenster | {count} sessies wachtten op een lock in dit tijdsvenster",
       "sessionCount": "geen sessies | {count} sessie | {count} sessies",
@@ -15687,14 +15681,14 @@
       },
       "deep": "{count} diep",
       "notWaiting": "niet aan het wachten",
-      "longestWait": "LANGSTE WACHTTIJD",
-      "holdsTheLock": "HOUDT DE LOCK VAST DIE IEDEREEN WIL",
+      "longestWait": "Langste wachttijd",
+      "holdsTheLock": "Houdt de lock die iedereen wil",
       "lastStatement": "laatste statement {age} geleden",
       "idleInTransaction": "niet aan het wachten op iets · inactief in een open transactie",
       "pills": {
-        "root": "ROOT — BEGIN HIER",
-        "waitingBlocking": "WACHTEND & BLOKKEREND {count}",
-        "waiting": "WACHTEND"
+        "root": "Root — begin hier",
+        "waitingBlocking": "Wachten en blokkeren {count}",
+        "waiting": "Wachten"
       },
       "waitingOn": "wachtend op {pid}",
       "degraded": "Eén sessie houdt {count} tegen. Deze heeft al {age} een open transactie en heeft in die tijd geen query uitgevoerd — hoogstwaarschijnlijk een applicatie die is vergeten te committen.",
@@ -15772,9 +15766,6 @@
       }
     },
     "activity": {
-      "title": "Activiteit",
-      "subtitle": "Wat je databases op dit moment doen, gesampled uit hun eigen sessietabellen.",
-      "subtitlePast": "Wat je databases tijdens dit venster deden, gesampled uit hun eigen sessietabellen.",
       "searchPlaceholder": "Zoek sessies, gebruikers, applicaties",
       "wait": {
         "onCpu": "Op CPU / geen wachttijd",
@@ -15898,8 +15889,6 @@
       "deadlockLabel": "deadlocks"
     },
     "tableHealth": {
-      "title": "Tabelgezondheid",
-      "subtitle": "Grootte, bloat en vacuumstatus voor elke tabel, nieuwste snapshot eerst.",
       "searchPlaceholder": "Zoek tabellen",
       "never": "Nooit",
       "countersCumulative": "Scan- en vacuumtellingen zijn totalen over de levensduur sinds de laatste reset van statistieken, geen tellingen voor het geselecteerde tijdsbereik.",

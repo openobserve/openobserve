@@ -4595,6 +4595,7 @@
     "mapsNameLabel": "位置名稱標籤",
     "mapsMapType": "地圖類型",
     "tableAggregations": "表格彙總",
+    "tableCellDrilldownTooltip": "探索相符的日誌",
     "promqlTableMode": "PromQL 表格模式",
     "visibleColumns": "可見欄位",
     "hiddenColumns": "隱藏欄位",
@@ -5499,8 +5500,7 @@
     "variableNameAlreadyExists": "已存在相同名稱的變數",
     "pivotTotal": "總計",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "探索相符的日誌"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5566,29 +5566,6 @@
     "rowFields": "列欄位",
     "valueFields": "值欄位",
     "noData": "無資料",
-    "addJoin": "新增 Join",
-    "removeJoin": "移除 Join",
-    "leftJoin": "Left Join",
-    "innerJoin": "Inner Join",
-    "rightJoin": "Right Join",
-    "removeClause": "移除子句",
-    "SQL": "SQL",
-    "builder": "建構器",
-    "custom": "自訂",
-    "discard": "捨棄",
-    "apply": "套用",
-    "collapseFields": "收合欄位",
-    "fields": "欄位",
-    "layout": "版面配置",
-    "promQL": "PromQL",
-    "latitude": "緯度",
-    "longitude": "經度",
-    "weight": "權重",
-    "mapname": "名稱",
-    "mapvalue": "值",
-    "source": "來源",
-    "target": "目標",
-    "value": "值",
     "logExplorer": {
       "title": "日誌瀏覽器",
       "openInLogs": "在日誌中開啟",
@@ -5640,7 +5617,30 @@
         "contextTooltip": "此資料流中，此事件前後 3 分鐘內的其他事件 — 顯示同一時間點還發生了什麼事。",
         "contextEmpty": "找不到周圍事件"
       }
-    }
+    },
+    "addJoin": "新增 Join",
+    "removeJoin": "移除 Join",
+    "leftJoin": "Left Join",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Right Join",
+    "removeClause": "移除子句",
+    "SQL": "SQL",
+    "builder": "建構器",
+    "custom": "自訂",
+    "discard": "捨棄",
+    "apply": "套用",
+    "collapseFields": "收合欄位",
+    "fields": "欄位",
+    "layout": "版面配置",
+    "promQL": "PromQL",
+    "latitude": "緯度",
+    "longitude": "經度",
+    "weight": "權重",
+    "mapname": "名稱",
+    "mapvalue": "值",
+    "source": "來源",
+    "target": "目標",
+    "value": "值"
   },
   "home": {
     "alertsOverviewSection": "警示概覽區段",
@@ -14622,6 +14622,7 @@
       "disabled": "已停用",
       "emptyTitle": "此 SLO 上尚無警示",
       "emptyHint": "燃燒率警示會在仍有剩餘預算可保護時通知你。",
+      "emptyActionDesc": "在預算耗盡前收到警告",
       "loadFailed": "無法載入此 SLO 的警示。",
       "editTargetMissing": "該警示已不在這個 SLO 上。",
       "describeBurn": "燃燒率 > {critical} 在 {long} 和 {short} 期間",
@@ -14914,7 +14915,12 @@
     "common": {
       "reload": "重新整理",
       "lastRefreshed": "上次重新整理 {age}",
-      "loadFailed": "無法載入資料庫資料。請重試，或縮小時間範圍。"
+      "loadFailed": "無法載入資料庫資料。請重試，或縮小時間範圍。",
+      "actions": "操作"
+    },
+    "header": {
+      "title": "資料庫",
+      "subtitle": "跨資料庫的查詢效能與健康狀態"
     },
     "ai": {
       "suggestFix": "詢問 AI 如何修正",
@@ -14956,8 +14962,6 @@
       "wasValue": "原本 {value}"
     },
     "databases": {
-      "title": "資料庫",
-      "subtitle": "每個資料庫的查詢效能與健康狀態",
       "searchPlaceholder": "搜尋資料庫或服務…",
       "unnamedInstance": "執行個體未命名",
       "unnamedInstanceHint": "資料庫自身的陳述式報告證明此引擎正在執行，但未指明主機。一旦設定了帶有主機的來源 — 工作階段取樣或執行個體指標 — 該列便會顯示位址。",
@@ -15004,9 +15008,6 @@
       }
     },
     "queries": {
-      "title": "熱門查詢",
-      "subtitle": "使用最多資料庫時間的查詢",
-      "subtitleServer": "您的資料庫所執行的陳述式，在資料庫內部統計 — 最常執行的排在前面",
       "searchPlaceholder": "搜尋查詢文字、資料表或服務…",
       "trendLabel": "此查詢時間在範圍內的變化",
       "otherRow": "所有其他查詢",
@@ -15015,7 +15016,8 @@
         "query": "查詢",
         "queryHint": "僅限實際 SQL — SELECT、INSERT、UPDATE 和 DELETE。",
         "all": "查詢 + 連線負擔",
-        "allHint": "也計算驅動程式在查詢之間傳送的維護作業：BEGIN 和 COMMIT、SET，以及維持連線集區存活的檢查。"
+        "allHint": "也計算驅動程式在查詢之間傳送的維護作業：BEGIN 和 COMMIT、SET，以及維持連線集區存活的檢查。",
+        "overheadLabel": "包含連線開銷"
       },
       "completionBias": {
         "title": "呼叫量下降 {drop}%，失敗卻增加",
@@ -15262,7 +15264,7 @@
       "ambiguousStream": "此組織有多個追蹤串流，我們無法判斷此查詢在哪一個上執行。請選擇一個串流以載入其呼叫者和範例追蹤。",
       "pickStream": "選擇追蹤串流",
       "invalidStream": "該追蹤串流名稱不是我們認得的，因此我們未執行搜尋。",
-      "firstSeen": "在此清單中首次出現於 {time}",
+      "firstSeen": "首次出現於此清單的時間為 {time}",
       "firstSeenHint": "此範圍內該查詢嚴重到足以自行追蹤的最早時間點。",
       "lastSeen": "最後出現於 {time}",
       "lastSeenHint": "此範圍內該查詢嚴重到足以自行追蹤的最近時間點。它現在可能仍在執行中 — 這是它最後一次進入清單的時間。",
@@ -15431,9 +15433,6 @@
       }
     },
     "samples": {
-      "title": "最慢的呼叫",
-      "subtitle": "此時間範圍內最慢的個別資料庫呼叫，涵蓋所有資料庫與查詢——以呼叫端測量結果為準，僅限已完成的呼叫。",
-      "subtitleServer": "您的資料庫在此時間範圍內完成的最慢陳述式（在資料庫內部測量）",
       "logOffTitle": "您的資料庫尚未記錄慢速陳述式。",
       "logOffDescription": "沒有任何追蹤涵蓋這些呼叫，所以我們向資料庫查詢它們自己的最慢陳述式——但它們沒有記錄任何項目。此清單來自 PostgreSQL 的陳述式日誌 (log_min_duration_statement)，該日誌預設為關閉——設定卡中的記錄步驟會將其開啟。目前僅 PostgreSQL 支援逐陳述式擷取，因此 MySQL 和 MariaDB 尚無法提供此清單的資料。Top queries 仍可向您顯示哪些查詢最常執行，因為它改為讀取計數器資料表。",
       "searchPlaceholder": "搜尋查詢文字、服務或資料庫…",
@@ -15475,16 +15474,14 @@
       }
     },
     "rowChips": {
-      "new": "新上榜",
-      "slower": "比平常慢 {ratio}×",
-      "loop": "每個要求執行 {multiplier}×",
+      "new": "此清單的新增項目",
+      "slower": "{ratio}× 比平常慢",
+      "loop": "每次請求執行 {multiplier}×",
       "allFailed": "全部 {count} 個失敗",
-      "busier": "更繁忙，並非更慢",
-      "climbed": "新的最繁重查詢"
+      "busier": "更忙碌，而非更慢",
+      "climbed": "新的最重查詢"
     },
     "deadlocks": {
-      "title": "資料庫",
-      "subtitle": "互相封鎖並被回滾的交易",
       "deadlockCount": "沒有死結 | {count} 個死結 | {count} 個死結",
       "pairCount": "沒有查詢配對 | {count} 個查詢配對 | {count} 個查詢配對",
       "searchPlaceholder": "搜尋查詢文字、資料表或應用程式…",
@@ -15511,10 +15508,10 @@
         "mysqlPartial": "除非啟用 innodb_print_all_deadlocks，否則您的 MySQL 資料庫只會保留最近一次的死結。"
       },
       "chips": {
-        "oppositeOrder": "相反的資料列順序",
+        "oppositeOrder": "相反的列順序",
         "cadence": "每 {seconds} 秒",
         "noQueries": "未擷取的查詢",
-        "partial": "僅單一側"
+        "partial": "僅單邊"
       },
       "rowActions": {
         "topQueries": "在 Top queries 中尋找這些",
@@ -15634,9 +15631,6 @@
       }
     },
     "blocked": {
-      "title": "資料庫",
-      "subtitle": "目前正在等待鎖的會話",
-      "subtitlePast": "在此時間範圍內等待鎖的會話",
       "waitingCount": "沒有會話正在等待鎖 | {count} 個會話正在等待鎖 | {count} 個會話正在等待鎖",
       "waitingCountPast": "沒有會話等待鎖 | {count} 個會話在此時間範圍內等待鎖 | {count} 個會話在此時間範圍內等待鎖",
       "sessionCount": "沒有會話 | {count} 個會話 | {count} 個會話",
@@ -15683,12 +15677,12 @@
       "deep": "深度 {count}",
       "notWaiting": "未等待",
       "longestWait": "最長等待",
-      "holdsTheLock": "持有所有人都想要的鎖",
+      "holdsTheLock": "持有大家都要的鎖",
       "lastStatement": "最後一條語句在 {age} 前",
       "idleInTransaction": "未等待任何事物 · 在開啟的交易中閒置",
       "pills": {
-        "root": "根節點 — 從這裡開始",
-        "waitingBlocking": "等待中並阻塞 {count}",
+        "root": "根因 — 從這裡開始",
+        "waitingBlocking": "等待與封鎖 {count}",
         "waiting": "等待中"
       },
       "waitingOn": "等待 {pid}",
@@ -15767,9 +15761,6 @@
       }
     },
     "activity": {
-      "title": "活動",
-      "subtitle": "您的資料庫目前正在做什麼，取樣自它們自己的工作階段表。",
-      "subtitlePast": "您的資料庫在此時間區間內做了什麼，取樣自它們自己的工作階段表。",
       "searchPlaceholder": "搜尋工作階段、使用者、應用程式",
       "wait": {
         "onCpu": "在 CPU 上 / 無等待",
@@ -15893,8 +15884,6 @@
       "deadlockLabel": "死結"
     },
     "tableHealth": {
-      "title": "資料表健康狀態",
-      "subtitle": "每個資料表的大小、膨脹程度和 vacuum 狀態，以最新快照優先顯示。",
       "searchPlaceholder": "搜尋資料表",
       "never": "從未",
       "countersCumulative": "掃描和 vacuum 計數是自上次統計重設以來的生命週期總計，而非所選時間範圍內的計數。",

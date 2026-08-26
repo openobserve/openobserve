@@ -4600,6 +4600,7 @@
     "mapsNameLabel": "Étiquette de nom de lieu",
     "mapsMapType": "Type de carte",
     "tableAggregations": "Agrégations de tableaux",
+    "tableCellDrilldownTooltip": "Explorer les journaux correspondants",
     "promqlTableMode": "Mode Tableau ProMQL",
     "visibleColumns": "Colonnes visibles",
     "hiddenColumns": "Colonnes masquées",
@@ -5504,8 +5505,7 @@
     "variableNameAlreadyExists": "Une variable portant le même nom existe déjà",
     "pivotTotal": "Total",
     "pivotOthers": "Autres",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Explorer les journaux correspondants"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5571,29 +5571,6 @@
     "rowFields": "Champs de ligne",
     "valueFields": "Champs de valeur",
     "noData": "Aucune donnée",
-    "addJoin": "Ajouter Rejoindre",
-    "removeJoin": "Supprimer Rejoindre",
-    "leftJoin": "Rejoindre à gauche",
-    "innerJoin": "Jointure intérieure",
-    "rightJoin": "Adhérez à droite",
-    "removeClause": "Supprimer la clause",
-    "SQL": "SQL",
-    "builder": "Constructeur",
-    "custom": "Personnalisé",
-    "discard": "Jeter",
-    "apply": "Appliquer",
-    "collapseFields": "Réduire les champs",
-    "fields": "Champs",
-    "layout": "Mise en page",
-    "promQL": "PromQL",
-    "latitude": "Latitude",
-    "longitude": "Longitude",
-    "weight": "Poids",
-    "mapname": "Nom",
-    "mapvalue": "Valeur",
-    "source": "Source",
-    "target": "Cible",
-    "value": "Valeur",
     "logExplorer": {
       "title": "Explorateur de journaux",
       "openInLogs": "Ouvrir dans les journaux",
@@ -5645,7 +5622,30 @@
         "contextTooltip": "Autres événements de ce flux dans les 3 minutes avant et après cet événement — montre ce qui se passait d'autre au même moment.",
         "contextEmpty": "Aucun événement environnant trouvé"
       }
-    }
+    },
+    "addJoin": "Ajouter Rejoindre",
+    "removeJoin": "Supprimer Rejoindre",
+    "leftJoin": "Rejoindre à gauche",
+    "innerJoin": "Jointure intérieure",
+    "rightJoin": "Adhérez à droite",
+    "removeClause": "Supprimer la clause",
+    "SQL": "SQL",
+    "builder": "Constructeur",
+    "custom": "Personnalisé",
+    "discard": "Jeter",
+    "apply": "Appliquer",
+    "collapseFields": "Réduire les champs",
+    "fields": "Champs",
+    "layout": "Mise en page",
+    "promQL": "PromQL",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "weight": "Poids",
+    "mapname": "Nom",
+    "mapvalue": "Valeur",
+    "source": "Source",
+    "target": "Cible",
+    "value": "Valeur"
   },
   "home": {
     "alertsOverviewSection": "Section d'aperçu des alertes",
@@ -14627,6 +14627,7 @@
       "disabled": "Désactivé",
       "emptyTitle": "Aucune alerte sur ce SLO pour le moment.",
       "emptyHint": "Les alertes de taux de combustion vous préviennent tant qu'il reste encore du budget à protéger.",
+      "emptyActionDesc": "Soyez averti avant l'épuisement du budget",
       "loadFailed": "Impossible de charger les alertes de ce SLO.",
       "editTargetMissing": "Cette alerte ne fait plus partie de ce SLO.",
       "describeBurn": "Taux de combustion > {critical} sur {long} et {short}",
@@ -14919,7 +14920,12 @@
     "common": {
       "reload": "Actualiser",
       "lastRefreshed": "Dernière actualisation il y a {age}",
-      "loadFailed": "Impossible de charger les données de la base. Réessayez ou réduisez la plage de temps."
+      "loadFailed": "Impossible de charger les données de la base. Réessayez ou réduisez la plage de temps.",
+      "actions": "Actions"
+    },
+    "header": {
+      "title": "Bases de données",
+      "subtitle": "Performances et santé des requêtes sur vos bases de données"
     },
     "ai": {
       "suggestFix": "Demander à l'IA comment corriger ceci",
@@ -14941,12 +14947,12 @@
       "removeScope": "Supprimer ce filtre",
       "popoverTitle": "Affiner",
       "dimension": {
-        "system": "moteur",
-        "instance": "base de données",
-        "namespace": "schéma",
-        "env": "environnement",
-        "service": "service",
-        "insight": "aperçu"
+        "system": "Moteur",
+        "instance": "Base de données",
+        "namespace": "Schéma",
+        "env": "Environnement",
+        "service": "Service",
+        "insight": "Aperçu"
       }
     },
     "delta": {
@@ -14961,8 +14967,6 @@
       "wasValue": "était {value}"
     },
     "databases": {
-      "title": "Bases de données",
-      "subtitle": "Performance et santé des requêtes par base de données",
       "searchPlaceholder": "Rechercher une base de données ou un service…",
       "unnamedInstance": "Instance non nommée",
       "unnamedInstanceHint": "Les rapports d'instructions de la base de données prouvent que ce moteur est en cours d'exécution, mais ils ne nomment pas d'hôte. La ligne affichera une adresse dès qu'un flux qui en contient — échantillonnage de session ou métriques d'instance — sera configuré.",
@@ -15009,9 +15013,6 @@
       }
     },
     "queries": {
-      "title": "Requêtes principales",
-      "subtitle": "Les requêtes qui utilisent le plus de temps de base de données",
-      "subtitleServer": "Les instructions exécutées par vos bases de données, comptées dans la base de données — les plus fréquemment exécutées en premier",
       "searchPlaceholder": "Rechercher un texte de requête, une table ou un service…",
       "trendLabel": "Comment le temps de cette requête a évolué sur la période",
       "otherRow": "Toutes les autres requêtes",
@@ -15020,7 +15021,8 @@
         "query": "Requêtes",
         "queryHint": "Uniquement du vrai SQL — SELECT, INSERT, UPDATE et DELETE.",
         "all": "Requêtes + surcharge de connexion",
-        "allHint": "Compte également les opérations de gestion que votre pilote envoie entre les requêtes : BEGIN et COMMIT, SET, et les vérifications qui maintiennent une connexion de pool en vie."
+        "allHint": "Compte également les opérations de gestion que votre pilote envoie entre les requêtes : BEGIN et COMMIT, SET, et les vérifications qui maintiennent une connexion de pool en vie.",
+        "overheadLabel": "Inclure la surcharge de connexion"
       },
       "completionBias": {
         "title": "Les appels ont chuté de {drop} % tandis que les échecs augmentaient",
@@ -15267,9 +15269,9 @@
       "ambiguousStream": "Cette organisation possède plus d'un flux de trace, et nous ne pouvons pas déterminer sur lequel s'exécute cette requête. Choisissez un flux pour charger ses appelants et des exemples de traces.",
       "pickStream": "Choisir un flux de trace",
       "invalidStream": "Ce nom de flux de trace n'est pas reconnu, c'est pourquoi nous n'avons pas effectué la recherche.",
-      "firstSeen": "PREMIÈRE APPARITION DANS CETTE LISTE À {time}",
+      "firstSeen": "Première apparition dans cette liste à {time}",
       "firstSeenHint": "Le point le plus ancien de cette plage où cette requête était assez lourde pour être suivie individuellement.",
-      "lastSeen": "DERNIÈRE APPARITION À {time}",
+      "lastSeen": "Dernière apparition à {time}",
       "lastSeenHint": "Le point le plus récent de cette plage où cette requête était assez lourde pour être suivie individuellement. Elle peut encore être en cours d'exécution — c'est la dernière fois qu'elle a figuré dans la liste.",
       "errorsByCode": {
         "title": "Échecs par code de raison",
@@ -15436,9 +15438,6 @@
       }
     },
     "samples": {
-      "title": "Appels les plus lents",
-      "subtitle": "Les appels de base de données individuels les plus lents dans cette fenêtre, sur toutes les bases et toutes les requêtes — tels que mesurés par leurs appelants, uniquement les appels terminés",
-      "subtitleServer": "Les instructions les plus lentes que vos bases de données ont exécutées dans cette fenêtre, mesurées à l'intérieur de la base de données",
       "logOffTitle": "Vos bases de données ne journalisent pas encore les instructions lentes",
       "logOffDescription": "Aucune trace n'a été faite pour ces appels, nous avons donc demandé aux bases de données leurs propres instructions les plus lentes — et elles n'en journalisent aucune. Cette liste provient du journal des instructions de PostgreSQL (log_min_duration_statement), désactivé par défaut — l'étape de journalisation de la carte de configuration l'active. La capture par instruction est actuellement réservée à PostgreSQL, donc MySQL et MariaDB ne peuvent pas encore alimenter cette liste. Les requêtes principales peuvent toujours montrer ce qui s'exécute le plus, car elles lisent les tables de compteurs à la place.",
       "searchPlaceholder": "Rechercher du texte de requête, un service ou une base de données…",
@@ -15480,16 +15479,14 @@
       }
     },
     "rowChips": {
-      "new": "NOUVEAU DANS CETTE LISTE",
-      "slower": "{ratio}× PLUS LENT QUE D'HABITUDE",
-      "loop": "S'EXÉCUTE {multiplier}× PAR REQUÊTE",
-      "allFailed": "TOUS LES {count} ONT ÉCHOUÉ",
-      "busier": "PLUS OCCUPÉ, PAS PLUS LENT",
-      "climbed": "NOUVELLE REQUÊTE LA PLUS LOURDE"
+      "new": "Nouveau dans cette liste",
+      "slower": "{ratio}× plus lent que d'habitude",
+      "loop": "S'exécute {multiplier}× par requête",
+      "allFailed": "Tous les {count} ont échoué",
+      "busier": "Plus chargé, pas plus lent",
+      "climbed": "Nouvelle requête la plus lourde"
     },
     "deadlocks": {
-      "title": "Bases de données",
-      "subtitle": "Transactions qui se sont mutuellement bloquées et ont été annulées",
       "deadlockCount": "aucun interblocage | {count} interblocage | {count} interblocages",
       "pairCount": "aucune paire de requêtes | {count} paire de requêtes | {count} paires de requêtes",
       "searchPlaceholder": "Rechercher du texte de requête, une table ou une application…",
@@ -15516,10 +15513,10 @@
         "mysqlPartial": "Votre base de données MySQL ne conserve que le blocage le plus récent, sauf si innodb_print_all_deadlocks est activé."
       },
       "chips": {
-        "oppositeOrder": "ORDRE DE LIGNES OPPOSÉ",
-        "cadence": "TOUTES LES {seconds}s",
-        "noQueries": "REQUÊTES NON CAPTURÉES",
-        "partial": "UN SEUL CÔTÉ"
+        "oppositeOrder": "Ordre des lignes inverse",
+        "cadence": "Toutes les {seconds}s",
+        "noQueries": "Requêtes non capturées",
+        "partial": "Un côté uniquement"
       },
       "rowActions": {
         "topQueries": "Trouvez-les dans les requêtes principales",
@@ -15536,8 +15533,8 @@
         "pid": "pid {pid}",
         "thread": "thread {pid}",
         "transaction": "transaction {id}",
-        "eachWaits": "chacun attend l'autre",
-        "deadlock": "blocage",
+        "eachWaits": "Chacun attend l'autre",
+        "deadlock": "Interblocage",
         "noQueryCaptured": "Le journal a enregistré ce blocage mais pas l'instruction.",
         "waitingFor": "Attendait que {target} se termine.",
         "waitingForRow": "Attendait que {target} se termine — l'autre session avait déjà modifié la ligne voulue.",
@@ -15639,9 +15636,6 @@
       }
     },
     "blocked": {
-      "title": "Bases de données",
-      "subtitle": "Sessions en attente d'un verrou actuellement",
-      "subtitlePast": "Sessions qui étaient en attente d'un verrou pendant cette fenêtre",
       "waitingCount": "aucune session en attente d'un verrou | {count} session en attente d'un verrou actuellement | {count} sessions en attente d'un verrou actuellement",
       "waitingCountPast": "aucune session n'a attendu un verrou | {count} session a attendu un verrou dans cette fenêtre | {count} sessions ont attendu un verrou dans cette fenêtre",
       "sessionCount": "aucune session | {count} session | {count} sessions",
@@ -15687,14 +15681,14 @@
       },
       "deep": "{count} de profondeur",
       "notWaiting": "pas en attente",
-      "longestWait": "ATTENTE LA PLUS LONGUE",
-      "holdsTheLock": "DÉTIENT LE VERROU QUE TOUT LE MONDE VEUT",
+      "longestWait": "Attente la plus longue",
+      "holdsTheLock": "Détient le verrou que tout le monde veut",
       "lastStatement": "dernière instruction il y a {age}",
       "idleInTransaction": "n'attend rien · inactif dans une transaction ouverte",
       "pills": {
-        "root": "RACINE — COMMENCEZ ICI",
-        "waitingBlocking": "EN ATTENTE & BLOQUANT {count}",
-        "waiting": "EN ATTENTE"
+        "root": "Racine — commencez ici",
+        "waitingBlocking": "En attente et bloquant {count}",
+        "waiting": "En attente"
       },
       "waitingOn": "en attente de {pid}",
       "degraded": "Une session bloque {count}. Elle a une transaction ouverte depuis {age} et n'a pas exécuté de requête pendant ce temps — probablement une application qui a oublié de valider.",
@@ -15772,9 +15766,6 @@
       }
     },
     "activity": {
-      "title": "Activité",
-      "subtitle": "Ce que font vos bases de données en ce moment, échantillonné à partir de leurs propres tables de sessions.",
-      "subtitlePast": "Ce que faisaient vos bases de données pendant cette fenêtre, échantillonné à partir de leurs propres tables de sessions.",
       "searchPlaceholder": "Rechercher sessions, utilisateurs, applications",
       "wait": {
         "onCpu": "Sur CPU / sans attente",
@@ -15898,8 +15889,6 @@
       "deadlockLabel": "interblocages"
     },
     "tableHealth": {
-      "title": "Santé des tables",
-      "subtitle": "Taille, bloat et état du vacuum pour chaque table, instantané le plus récent en premier.",
       "searchPlaceholder": "Rechercher des tables",
       "never": "Jamais",
       "countersCumulative": "Les compteurs de scan et de vacuum sont des totaux cumulés depuis la dernière réinitialisation des statistiques, pas des compteurs pour la période sélectionnée.",

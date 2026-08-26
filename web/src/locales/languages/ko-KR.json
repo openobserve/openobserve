@@ -4600,6 +4600,7 @@
     "mapsNameLabel": "위치 이름 라벨",
     "mapsMapType": "맵 유형",
     "tableAggregations": "테이블 어그리게이션",
+    "tableCellDrilldownTooltip": "일치하는 로그 탐색",
     "promqlTableMode": "ProMQL 테이블 모드",
     "visibleColumns": "보이는 컬럼",
     "hiddenColumns": "히든 컬럼",
@@ -5504,8 +5505,7 @@
     "variableNameAlreadyExists": "같은 이름의 변수가 이미 존재합니다.",
     "pivotTotal": "총계",
     "pivotOthers": "기타",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "일치하는 로그 탐색"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5571,29 +5571,6 @@
     "rowFields": "행 필드",
     "valueFields": "값 필드",
     "noData": "데이터 없음",
-    "addJoin": "조인 추가",
-    "removeJoin": "제거 조인",
-    "leftJoin": "왼쪽 조인",
-    "innerJoin": "내부 조인",
-    "rightJoin": "오른쪽 조인",
-    "removeClause": "조항 제거",
-    "SQL": "SQL",
-    "builder": "건축업자",
-    "custom": "사용자 지정",
-    "discard": "폐기",
-    "apply": "적용하기",
-    "collapseFields": "필드 접기",
-    "fields": "필드",
-    "layout": "레이아웃",
-    "promQL": "PromQL",
-    "latitude": "위도",
-    "longitude": "경도",
-    "weight": "무게",
-    "mapname": "이름",
-    "mapvalue": "가치",
-    "source": "소스",
-    "target": "타깃",
-    "value": "가치",
     "logExplorer": {
       "title": "로그 탐색기",
       "openInLogs": "로그에서 열기",
@@ -5645,7 +5622,30 @@
         "contextTooltip": "이 이벤트 전후 3분 동안 이 스트림의 다른 이벤트 — 같은 순간에 어떤 일이 일어났는지 보여줍니다.",
         "contextEmpty": "주변 이벤트를 찾을 수 없습니다"
       }
-    }
+    },
+    "addJoin": "조인 추가",
+    "removeJoin": "제거 조인",
+    "leftJoin": "왼쪽 조인",
+    "innerJoin": "내부 조인",
+    "rightJoin": "오른쪽 조인",
+    "removeClause": "조항 제거",
+    "SQL": "SQL",
+    "builder": "건축업자",
+    "custom": "사용자 지정",
+    "discard": "폐기",
+    "apply": "적용하기",
+    "collapseFields": "필드 접기",
+    "fields": "필드",
+    "layout": "레이아웃",
+    "promQL": "PromQL",
+    "latitude": "위도",
+    "longitude": "경도",
+    "weight": "무게",
+    "mapname": "이름",
+    "mapvalue": "가치",
+    "source": "소스",
+    "target": "타깃",
+    "value": "가치"
   },
   "home": {
     "alertsOverviewSection": "알림 개요 섹션",
@@ -14627,6 +14627,7 @@
       "disabled": "비활성화됨",
       "emptyTitle": "이 SLO에 아직 알림이 없습니다",
       "emptyHint": "소진율 알림은 보호할 예산이 아직 남아 있을 때 알려줍니다.",
+      "emptyActionDesc": "예산이 소진되기 전에 경고를 받으세요",
       "loadFailed": "이 SLO의 알림을 불러올 수 없습니다.",
       "editTargetMissing": "그 알림은 더 이상 이 SLO에 없습니다.",
       "describeBurn": "소진율 > {critical} ({long} 및 {short} 동안)",
@@ -14919,7 +14920,12 @@
     "common": {
       "reload": "새로고침",
       "lastRefreshed": "마지막 새로고침: {age}",
-      "loadFailed": "데이터베이스 데이터를 불러오지 못했습니다. 다시 시도하거나 시간 범위를 좁히세요."
+      "loadFailed": "데이터베이스 데이터를 불러오지 못했습니다. 다시 시도하거나 시간 범위를 좁히세요.",
+      "actions": "작업"
+    },
+    "header": {
+      "title": "데이터베이스",
+      "subtitle": "데이터베이스 전반의 쿼리 성능 및 상태"
     },
     "ai": {
       "suggestFix": "AI에게 수정 방법 묻기",
@@ -14961,8 +14967,6 @@
       "wasValue": "이전 값: {value}"
     },
     "databases": {
-      "title": "데이터베이스",
-      "subtitle": "데이터베이스별 쿼리 성능 및 상태",
       "searchPlaceholder": "데이터베이스 또는 서비스 검색…",
       "unnamedInstance": "인스턴스 이름 없음",
       "unnamedInstanceHint": "데이터베이스 자체의 명령문 보고서는 이 엔진이 실행 중임을 증명하지만 호스트 이름을 명명하지 않습니다. 호스트 정보를 전달하는 피드(세션 샘플링 또는 인스턴스 메트릭)가 설정되면 행에 주소가 표시됩니다.",
@@ -15009,9 +15013,6 @@
       }
     },
     "queries": {
-      "title": "상위 쿼리",
-      "subtitle": "데이터베이스 시간을 가장 많이 사용하는 쿼리",
-      "subtitleServer": "데이터베이스 내부에서 집계된, 데이터베이스가 실행한 명령문 — 가장 자주 실행된 순서",
       "searchPlaceholder": "쿼리 텍스트, 테이블 또는 서비스 검색…",
       "trendLabel": "이 쿼리의 시간이 범위에 걸쳐 어떻게 변화했는지",
       "otherRow": "기타 모든 쿼리",
@@ -15020,7 +15021,8 @@
         "query": "쿼리",
         "queryHint": "실제 SQL만 — SELECT, INSERT, UPDATE 및 DELETE.",
         "all": "쿼리 + 연결 오버헤드",
-        "allHint": "또한 드라이버가 쿼리 사이에 보내는 부가 작업(BEGIN 및 COMMIT, SET, 풀 연결을 유지하는 검사)도 집계합니다."
+        "allHint": "또한 드라이버가 쿼리 사이에 보내는 부가 작업(BEGIN 및 COMMIT, SET, 풀 연결을 유지하는 검사)도 집계합니다.",
+        "overheadLabel": "연결 오버헤드 포함"
       },
       "completionBias": {
         "title": "호출이 {drop}% 감소한 반면 실패는 증가했습니다",
@@ -15269,7 +15271,7 @@
       "invalidStream": "인식할 수 없는 트레이스 스트림 이름이므로 검색을 실행하지 않았습니다.",
       "firstSeen": "이 목록에 처음 나타난 시각: {time}",
       "firstSeenHint": "이 범위에서 이 쿼리가 자체적으로 추적할 수 있을 만큼 무거웠던 가장 이른 지점입니다.",
-      "lastSeen": "마지막으로 나타난 시각: {time}",
+      "lastSeen": "이 목록에 마지막으로 나타난 시각: {time}",
       "lastSeenHint": "이 범위에서 이 쿼리가 자체적으로 추적할 수 있을 만큼 무거웠던 가장 최근 지점입니다. 지금도 실행 중일 수 있습니다 — 목록에 마지막으로 오른 시각입니다.",
       "errorsByCode": {
         "title": "사유 코드별 실패",
@@ -15436,9 +15438,6 @@
       }
     },
     "samples": {
-      "title": "가장 느린 호출",
-      "subtitle": "이 창에서 모든 데이터베이스와 쿼리 중 가장 느린 개별 데이터베이스 호출 — 호출자가 측정한 대로, 완료된 호출만",
-      "subtitleServer": "이 창에서 데이터베이스가 완료한 가장 느린 문장, 데이터베이스 내부에서 측정됨",
       "logOffTitle": "데이터베이스가 아직 느린 문장을 기록하지 않고 있습니다",
       "logOffDescription": "이 호출들을 추적한 것이 없어 데이터베이스에 자체 가장 느린 문장을 요청했지만 로그가 없습니다. 이 목록은 PostgreSQL의 문장 로그(log_min_duration_statement)에서 가져오며 기본적으로 꺼져 있습니다 — 설정 카드의 로깅 단계에서 켭니다. 문장별 캡처는 현재 PostgreSQL 전용이므로 MySQL과 MariaDB는 아직 이 목록을 제공할 수 없습니다. 상위 쿼리는 카운터 테이블을 읽으므로 가장 많이 실행되는 것을 계속 보여줄 수 있습니다.",
       "searchPlaceholder": "쿼리 텍스트, 서비스 또는 데이터베이스 검색…",
@@ -15481,15 +15480,13 @@
     },
     "rowChips": {
       "new": "이 목록에 새로 추가됨",
-      "slower": "평소보다 {ratio}배 느림",
-      "loop": "요청당 {multiplier}회 실행",
-      "allFailed": "모두 {count}개 실패",
-      "busier": "더 바쁨, 느리지 않음",
-      "climbed": "새로운 최대 부하 쿼리"
+      "slower": "평소보다 {ratio}× 느림",
+      "loop": "요청당 {multiplier}× 실행",
+      "allFailed": "{count}개 모두 실패",
+      "busier": "더 바쁘지만 느리지는 않음",
+      "climbed": "새로운 최중량 쿼리"
     },
     "deadlocks": {
-      "title": "데이터베이스",
-      "subtitle": "서로 차단되어 롤백된 트랜잭션",
       "deadlockCount": "교착 상태 없음 | {count}개 교착 상태 | {count}개 교착 상태",
       "pairCount": "쿼리 쌍 없음 | {count}개 쿼리 쌍 | {count}개 쿼리 쌍",
       "searchPlaceholder": "쿼리 텍스트, 테이블 또는 애플리케이션 검색…",
@@ -15517,9 +15514,9 @@
       },
       "chips": {
         "oppositeOrder": "반대 행 순서",
-        "cadence": "매 {seconds}초마다",
+        "cadence": "{seconds}초마다",
         "noQueries": "캡처되지 않은 쿼리",
-        "partial": "한쪽만"
+        "partial": "한쪽에만 있음"
       },
       "rowActions": {
         "topQueries": "Top 쿼리에서 찾기",
@@ -15536,7 +15533,7 @@
         "pid": "pid {pid}",
         "thread": "스레드 {pid}",
         "transaction": "트랜잭션 {id}",
-        "eachWaits": "서로 상대를 기다림",
+        "eachWaits": "서로를 기다림",
         "deadlock": "교착 상태",
         "noQueryCaptured": "로그에 이 교착 상태가 기록되었지만 문장은 기록되지 않았습니다.",
         "waitingFor": "{target}이(가) 끝나기를 기다리고 있었습니다.",
@@ -15639,9 +15636,6 @@
       }
     },
     "blocked": {
-      "title": "데이터베이스",
-      "subtitle": "현재 잠금을 기다리는 세션",
-      "subtitlePast": "이 시간 범위 동안 잠금을 기다린 세션",
       "waitingCount": "잠금을 기다리는 세션 없음 | 지금 잠금을 기다리는 세션 {count}개 | 지금 잠금을 기다리는 세션 {count}개",
       "waitingCountPast": "잠금을 기다린 세션 없음 | 이 시간 범위에 잠금을 기다린 세션 {count}개 | 이 시간 범위에 잠금을 기다린 세션 {count}개",
       "sessionCount": "세션 없음 | 세션 {count}개 | 세션 {count}개",
@@ -15687,8 +15681,8 @@
       },
       "deep": "{count}단계 깊이",
       "notWaiting": "대기 중 아님",
-      "longestWait": "최장 대기",
-      "holdsTheLock": "모두가 원하는 잠금 보유",
+      "longestWait": "가장 긴 대기",
+      "holdsTheLock": "모두가 원하는 잠금을 보유 중",
       "lastStatement": "마지막 쿼리 {age} 전",
       "idleInTransaction": "아무것도 기다리지 않음 · 열린 트랜잭션에서 유휴 상태",
       "pills": {
@@ -15772,9 +15766,6 @@
       }
     },
     "activity": {
-      "title": "활동",
-      "subtitle": "지금 데이터베이스가 무엇을 하고 있는지, 자체 세션 테이블에서 샘플링한 내용입니다.",
-      "subtitlePast": "이 기간 동안 데이터베이스가 무엇을 했는지, 자체 세션 테이블에서 샘플링한 내용입니다.",
       "searchPlaceholder": "세션, 사용자, 애플리케이션 검색",
       "wait": {
         "onCpu": "CPU 사용 중 / 대기 없음",
@@ -15898,8 +15889,6 @@
       "deadlockLabel": "교착 상태"
     },
     "tableHealth": {
-      "title": "테이블 상태",
-      "subtitle": "각 테이블의 크기, 블로트, 진공 상태를 최신 스냅샷부터 표시합니다.",
       "searchPlaceholder": "테이블 검색",
       "never": "없음",
       "countersCumulative": "스캔 및 진공 횟수는 마지막 통계 초기화 이후의 누적 총계이며 선택한 기간 동안의 횟수가 아닙니다.",
