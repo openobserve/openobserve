@@ -16,8 +16,11 @@
 use ::datafusion::arrow::datatypes::Schema;
 use chrono::{DateTime, TimeZone, Utc};
 use config::{
-    get_config,
-    meta::stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
+    cluster, get_config,
+    meta::{
+        cluster::Node,
+        stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
+    },
     metrics,
     utils::time::hour_micros,
 };
@@ -325,8 +328,14 @@ pub async fn merge_by_stream(
 
                 // the merged source files still sit in this node's disk cache
                 // (downloaded by `cache_remote_files`); drop them now instead of
-                // waiting for capacity eviction
-                file_data::delete::add(delete_file_list.iter().map(|f| f.key.clone()).collect());
+                // waiting for capacity eviction. Only pure compactor nodes evict:
+                // on a node that is also a querier (or Role::All) those files may
+                // still be served from cache by in-flight queries, so we keep them.
+                if can_evict_merged_sources(&cluster::LOCAL_NODE) {
+                    file_data::delete::add(
+                        delete_file_list.iter().map(|f| f.key.clone()).collect(),
+                    );
+                }
 
                 // collect orphan blooms after writing file list successfully
                 for file in delete_file_list {
@@ -464,6 +473,13 @@ async fn write_file_list(
     Ok(())
 }
 
+/// True when the node may evict merged source files from its local disk cache:
+/// only pure compactor nodes. A node that is also a querier (or Role::All) may
+/// still serve those files from cache, so they must be kept.
+fn can_evict_merged_sources(node: &Node) -> bool {
+    node.is_compactor() && !node.is_querier()
+}
+
 /// sort by time range without overlapping
 fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
     let files_num = file_list.len();
@@ -495,9 +511,38 @@ fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::{FileKey, FileMeta};
+    use config::meta::{
+        cluster::{Node, Role},
+        stream::{FileKey, FileMeta},
+    };
 
     use super::*;
+
+    fn node_with_roles(roles: Vec<Role>) -> Node {
+        Node {
+            role: roles,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_can_evict_merged_sources() {
+        // pure compactor: evict
+        assert!(can_evict_merged_sources(&node_with_roles(vec![
+            Role::Compactor
+        ])));
+        // compactor + querier: queries may still use cached files, keep them
+        assert!(!can_evict_merged_sources(&node_with_roles(vec![
+            Role::Compactor,
+            Role::Querier,
+        ])));
+        // single-node all-role deployment: keep
+        assert!(!can_evict_merged_sources(&node_with_roles(vec![Role::All])));
+        // querier only: keep
+        assert!(!can_evict_merged_sources(&node_with_roles(vec![
+            Role::Querier
+        ])));
+    }
 
     // Helper function to create test FileKey
     fn create_file_key(key: &str, min_ts: i64, max_ts: i64, original_size: i64) -> FileKey {
