@@ -124,7 +124,8 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error> {
+/// Returns `false` when a row with the same `short_id` already exists.
+pub async fn add(short_id: &str, original_url: &str) -> Result<bool, errors::Error> {
     let record = ActiveModel {
         short_id: Set(short_id.to_string()),
         original_url: Set(original_url.to_string()),
@@ -136,9 +137,16 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record).exec(client).await?;
+    let inserted = Entity::insert(record)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::column(Column::ShortId)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(client)
+        .await?;
 
-    Ok(())
+    Ok(inserted > 0)
 }
 
 pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
@@ -182,17 +190,6 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
     let records = res.into_model::<ShortUrlRecord>().all(client).await?;
 
     Ok(records)
-}
-
-pub async fn contains(short_id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find()
-        .filter(Column::ShortId.eq(short_id))
-        .into_model::<ShortUrlRecord>()
-        .one(client)
-        .await?;
-
-    Ok(record.is_some())
 }
 
 pub async fn len() -> usize {

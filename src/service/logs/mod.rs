@@ -579,7 +579,7 @@ async fn write_logs(
 
     // only one trigger per request
     if !triggers.is_empty() {
-        tokio::spawn(async move { evaluate_trigger(triggers).await });
+        tokio::spawn(evaluate_trigger(triggers));
     }
 
     Ok(req_stats)

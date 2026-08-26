@@ -27,9 +27,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             if original_url.is_empty() {
                 return Err(Error::Message("Invalid message value".to_string()));
             }
-            if infra::table::short_urls::contains(&short_id).await? {
-                return Ok(());
-            }
+            // `add` is a no-op if the short id already exists.
             infra::table::short_urls::add(&short_id, &original_url).await?;
         }
         MessageType::ShortUrlDelete => {

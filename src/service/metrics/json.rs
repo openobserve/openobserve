@@ -565,10 +565,10 @@ pub async fn ingest(
         ])
         .inc();
 
-    // only one trigger per request
+    // only one trigger per request; notification/db work must not block ingestion
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
-            evaluate_trigger(entry).await;
+            tokio::spawn(evaluate_trigger(entry));
         }
     }
 
