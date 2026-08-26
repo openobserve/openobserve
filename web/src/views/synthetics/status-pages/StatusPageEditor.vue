@@ -112,18 +112,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :label="t('statusPages.fields.description')"
                   />
                   <OFormInput name="brand_name" :label="t('statusPages.fields.brandName')" />
-                  <div class="grid grid-cols-2 gap-4">
-                    <OFormColor
-                      name="accent_color"
-                      :label="t('statusPages.fields.accentColor')"
-                      :placeholder="raw('#2563EB')"
-                    />
-                    <OFormInput
-                      name="display_tz"
-                      :label="t('statusPages.fields.displayTz')"
-                      :placeholder="raw('UTC')"
+
+                  <!-- Logo — mirrors the field-level lock pattern used for
+                       Notices/Custom Domains dropdown items in StatusPagesList,
+                       adapted to an input: a disabled control plus a lock icon
+                       and tooltip rather than a disabled menu item. -->
+                  <div class="flex flex-col gap-1.5">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-text-label text-sm font-medium">{{
+                        t("statusPages.fields.logo")
+                      }}</span>
+                      <template v-if="!logoUploadEnabled">
+                        <OIcon
+                          name="lock"
+                          size="xs"
+                          aria-hidden="true"
+                          data-test="status-page-logo-lock"
+                        />
+                        <OTooltip side="right" :content="t('statusPages.fields.logoLocked')" />
+                      </template>
+                    </div>
+
+                    <p
+                      v-if="orgLogoOverrideEnabled && usingOrgLogoDefault"
+                      class="text-text-secondary text-xs"
+                    >
+                      {{ t("statusPages.fields.logoUsingOrgDefault") }}
+                    </p>
+
+                    <div v-if="logoPreview" class="flex items-center gap-2">
+                      <img
+                        :src="logoPreview"
+                        :alt="t('statusPages.fields.logo')"
+                        data-test="status-page-logo-preview"
+                        class="max-h-9 max-w-37.5 object-contain"
+                      />
+                      <OButton
+                        v-if="logoUploadEnabled"
+                        type="button"
+                        variant="ghost-destructive"
+                        size="icon-xs-sq"
+                        icon-left="close"
+                        data-test="status-page-logo-clear"
+                        @click="clearLogo"
+                      >
+                        <OTooltip
+                          side="bottom"
+                          :content="
+                            usingOrgLogoDefault
+                              ? t('statusPages.fields.logoRevertToOrg')
+                              : t('statusPages.fields.logoRemove')
+                          "
+                        />
+                      </OButton>
+                    </div>
+                    <OFile
+                      v-else
+                      :disabled="!logoUploadEnabled"
+                      :model-value="null"
+                      :placeholder="t('statusPages.fields.logoUpload')"
+                      accept=".png, .jpg, .jpeg, .gif, .svg, image/*"
+                      data-test="status-page-logo-upload"
+                      @update:model-value="onLogoFileSelected"
                     />
                   </div>
+
+                  <OFormColor
+                    name="accent_color"
+                    :label="t('statusPages.fields.accentColor')"
+                    :placeholder="raw('#2563EB')"
+                  />
                 </div>
               </OFormSection>
 
@@ -285,6 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="previewValues.name"
               :brand-name="previewValues.brand_name"
               :accent-color="previewValues.accent_color"
+              :logo-img="previewValues.logo_img"
               :visibility="previewValues.visibility"
               :show-uptime-percent="previewValues.show_uptime_percent"
               :show-timeline-bars="previewValues.show_timeline_bars"
@@ -318,6 +377,9 @@ import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import type { FileValue } from "@/lib/forms/File/OFile.types";
 import StatusPagePreview from "./StatusPagePreview.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -356,12 +418,31 @@ const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
 
+// Logo upload itself is available on any licensed build (cloud or self-hosted
+// enterprise) — unlike Notices/Custom Domains (see StatusPagesList's
+// `advancedEnabled`), which stay enterprise-only.
+const logoUploadEnabled = computed(() => store.state.zoConfig?.build_type !== "opensource");
+
+// Self-hosted enterprise only, never cloud: the org-wide logo (Settings →
+// General) is an on-prem-org concept, so defaulting/overriding a status
+// page's logo from it only makes sense off cloud. Cloud gets its own
+// independent logo field with no relationship to an org-level logo.
+const orgLogoOverrideEnabled = computed(() => store.state.zoConfig?.build_type === "enterprise");
+
+const orgLogoImg = computed<string>(() =>
+  orgLogoOverrideEnabled.value ? ((store.state as any).zoConfig?.custom_logo_img ?? "") : "",
+);
+
 const loading = ref(true);
 const page = ref<StatusPageListItem | null>(null);
 const pageName = ref("");
 const rotating = ref(false);
 const currentSlug = ref("");
 const splitPct = ref(58);
+// True while the form's logo_img still IS the org default (no page-specific
+// override saved yet) — drives the "Using org logo" note and whether Clear
+// means "remove" or "revert to org default".
+const usingOrgLogoDefault = ref(false);
 
 const publicUrl = computed(() => publicStatusPageUrl(currentSlug.value));
 const schema = computed(() => makeEditStatusPageSchema(t));
@@ -371,7 +452,7 @@ const emptyDefaults = (): EditStatusPageForm => ({
   description: "",
   brand_name: "",
   accent_color: "",
-  display_tz: "",
+  logo_img: "",
   visibility: "draft",
   password: "",
   noindex: false,
@@ -384,12 +465,17 @@ const emptyDefaults = (): EditStatusPageForm => ({
 });
 
 function defaultsFromPage(p: StatusPageListItem): EditStatusPageForm {
+  // No page-specific logo saved yet: fall back to the org default (enterprise
+  // only) so the admin sees what visitors will actually see, with an explicit
+  // override/clear control rather than a silent substitution.
+  const hasOwnLogo = !!p.logo_img;
+  usingOrgLogoDefault.value = !hasOwnLogo && !!orgLogoImg.value;
   return {
     name: p.name,
     description: p.description ?? "",
     brand_name: p.brand_name ?? "",
     accent_color: p.accent_color ?? "",
-    display_tz: p.display_tz ?? "",
+    logo_img: hasOwnLogo ? p.logo_img : orgLogoImg.value,
     visibility: visibilityToMode(p.visibility),
     password: "",
     noindex: p.noindex,
@@ -415,10 +501,51 @@ const previewValues = form.useStore((s: any) => ({
   name: s.values.name ?? "",
   brand_name: s.values.brand_name ?? "",
   accent_color: s.values.accent_color ?? "",
+  logo_img: s.values.logo_img ?? "",
   visibility: s.values.visibility ?? "draft",
   show_uptime_percent: !!s.values.show_uptime_percent,
   show_timeline_bars: !!s.values.show_timeline_bars,
 }));
+
+const logoPreview = computed(() => {
+  const v = previewValues.value.logo_img;
+  return v ? `data:image;base64,${v}` : "";
+});
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      // FileReader.readAsDataURL yields "data:<mime>;base64,<data>" — the page
+      // stores/serves the bare base64 payload, matching custom_logo_img.
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onLogoFileSelected(value: FileValue) {
+  const file = Array.isArray(value) ? value[0] : value;
+  if (!file) return;
+  try {
+    const base64 = await readFileAsBase64(file);
+    usingOrgLogoDefault.value = false;
+    form.setFieldValue("logo_img", base64);
+  } catch (err) {
+    console.error("[status-pages] failed to read logo file", err);
+    toast({ variant: "error", message: t("statusPages.fields.logoReadFailed") });
+  }
+}
+
+// Clears the page-specific override. If an org logo exists, that means
+// reverting to it (Clear reads as "use the org default" per the label change
+// above); otherwise it empties the field entirely.
+function clearLogo() {
+  usingOrgLogoDefault.value = !!orgLogoImg.value;
+  form.setFieldValue("logo_img", orgLogoImg.value);
+}
 
 // ── Components ─────────────────────────────────────────────────────────────
 let uidSeq = 0;
@@ -503,7 +630,9 @@ async function saveSettings(values: EditStatusPageForm) {
     description: values.description,
     brand_name: values.brand_name,
     accent_color: values.accent_color,
-    display_tz: values.display_tz,
+    // Still on the org default: persist nothing page-specific so a later org
+    // logo change keeps following through, rather than freezing today's copy.
+    logo_img: usingOrgLogoDefault.value ? "" : values.logo_img,
     visibility: modeToVisibility(values.visibility),
     noindex: values.noindex,
     show_uptime_percent: values.show_uptime_percent,

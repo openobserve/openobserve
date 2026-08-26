@@ -69,7 +69,7 @@ pub async fn create_page(
         confirm_after_secs: None,
         brand_name: None,
         accent_color: None,
-        display_tz: None,
+        logo_img: None,
         tracking_since: None,
         owner: Some(owner.to_string()),
         created_at: now,
@@ -99,6 +99,7 @@ pub async fn update_page(
         anyhow::bail!("validation: accent_color must be #RRGGBB");
     }
     apply_display_fields(&mut model, &req);
+    apply_logo_field(&mut model, &req);
     if let Some(v) = req.name {
         model.name = v;
     }
@@ -676,10 +677,21 @@ fn apply_display_fields(model: &mut page_entity::Model, req: &UpdatePageRequest)
     if let Some(v) = &req.accent_color {
         model.accent_color = Some(v.clone());
     }
-    if let Some(v) = &req.display_tz {
-        model.display_tz = Some(v.clone());
+}
+
+/// Sets/clears the page logo. Licensed — unlike `apply_display_fields`, the
+/// write is gated (an empty string clears it, matching the org-level logo's
+/// delete semantics); an already-set logo keeps rendering regardless of
+/// license, since only the write path is gated.
+#[cfg(feature = "enterprise")]
+fn apply_logo_field(model: &mut page_entity::Model, req: &UpdatePageRequest) {
+    if let Some(v) = &req.logo_img {
+        model.logo_img = if v.is_empty() { None } else { Some(v.clone()) };
     }
 }
+
+#[cfg(not(feature = "enterprise"))]
+fn apply_logo_field(_model: &mut page_entity::Model, _req: &UpdatePageRequest) {}
 
 async fn unique_slug(_org_id: &str) -> Result<String, anyhow::Error> {
     for _ in 0..5 {
@@ -728,7 +740,7 @@ fn to_admin_view(
         confirm_after_secs: m.confirm_after_secs,
         brand_name: m.brand_name,
         accent_color: m.accent_color,
-        display_tz: m.display_tz,
+        logo_img: m.logo_img,
         tracking_since: m.tracking_since,
         owner: m.owner,
         created_at: m.created_at,

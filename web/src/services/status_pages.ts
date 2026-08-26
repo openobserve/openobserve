@@ -42,7 +42,7 @@ export interface StatusPageListItem {
   confirm_after_secs: number;
   brand_name: string;
   accent_color: string;
-  display_tz: string;
+  logo_img: string;
   tracking_since: number;
   owner: string;
   created_at: number;

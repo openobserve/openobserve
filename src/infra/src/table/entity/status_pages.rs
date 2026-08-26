@@ -25,7 +25,8 @@ pub struct Model {
     pub confirm_after_secs: Option<i32>,
     pub brand_name: Option<String>,
     pub accent_color: Option<String>,
-    pub display_tz: Option<String>,
+    /// Base64-encoded image. Enterprise-gated on write; always served once set.
+    pub logo_img: Option<String>,
     /// Set at first publish; uptime denominators never reach past it.
     pub tracking_since: Option<i64>,
     pub owner: Option<String>,

@@ -139,8 +139,11 @@ pub async fn snapshot(Path(slug): Path<String>, headers: axum::http::HeaderMap) 
     let (body, noindex) = match load_public(&slug).await {
         Some((page, snap)) => (
             Some(format!(
-                "{{\"name\":{},\"current\":{},\"history\":{}}}",
+                "{{\"name\":{},\"brand_name\":{},\"accent_color\":{},\"logo_img\":{},\"current\":{},\"history\":{}}}",
                 serde_json::to_string(&page.name).unwrap_or_else(|_| "\"\"".into()),
+                serde_json::to_string(&page.brand_name).unwrap_or_else(|_| "null".into()),
+                serde_json::to_string(&page.accent_color).unwrap_or_else(|_| "null".into()),
+                serde_json::to_string(&page.logo_img).unwrap_or_else(|_| "null".into()),
                 snap.current,
                 snap.history
             )),

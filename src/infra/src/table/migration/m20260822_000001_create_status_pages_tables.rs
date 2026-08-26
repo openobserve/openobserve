@@ -182,7 +182,10 @@ fn create_pages_stmt() -> TableCreateStatement {
         .col(ColumnDef::new(StatusPages::ConfirmAfterSecs).integer().null())
         .col(ColumnDef::new(StatusPages::BrandName).string_len(256).null())
         .col(ColumnDef::new(StatusPages::AccentColor).string_len(7).null())
-        .col(ColumnDef::new(StatusPages::DisplayTz).string_len(64).null())
+        // Base64-encoded image, same encoding as the org-level `custom_logo_img`
+        // KV entry; unlike that one this is a per-page column. Enterprise-gated
+        // on write only (see `apply_logo_field`).
+        .col(ColumnDef::new(StatusPages::LogoImg).text().null())
         .col(ColumnDef::new(StatusPages::TrackingSince).big_integer().null())
         .col(ColumnDef::new(StatusPages::Owner).string_len(256).null())
         .col(ColumnDef::new(StatusPages::CreatedAt).big_integer().not_null())
@@ -653,7 +656,7 @@ enum StatusPages {
     ConfirmAfterSecs,
     BrandName,
     AccentColor,
-    DisplayTz,
+    LogoImg,
     TrackingSince,
     Owner,
     CreatedAt,
