@@ -38,12 +38,8 @@ import { parseSearchError } from "@/utils/query/searchError";
 const PANEL_DATA_LOADER_DEBOUNCE_TIME = 50;
 
 /**
- * Longest a single panel may hold a load slot.
- *
- * The executors return once the request is dispatched — the stream's handlers
- * land later — so the slot is held until the panel settles. This bounds the
- * damage if a stream never reports completion: one wedged panel must not keep
- * a slot for the rest of the session.
+ * Longest a single panel may hold a load slot, so one wedged stream cannot
+ * keep a slot for the rest of the session.
  */
 const PANEL_LOAD_SLOT_MAX_HOLD_TIME = 30000;
 
@@ -300,9 +296,8 @@ export const usePanelDataLoader = (
     });
   };
 
-  // Resolves once this panel's load has actually settled. Never rejects — the
-  // caller releases its load slot in a `finally`, and a rejection path that
-  // skipped that would shrink the pool a slot at a time until nothing loads.
+  // Resolves once this panel's load has settled. Never rejects — the caller
+  // must always reach its finally to release the load slot.
   const waitForPanelLoadToSettle = (signal: AbortSignal) => {
     return new Promise<void>((resolve) => {
       if (!state.loading) {
@@ -422,10 +417,8 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
-      // Wait for isVisible to become true.
-      // This gates the cache restore below as well: restoring first would render
-      // every cached panel on mount, which is what made a large dashboard's
-      // SECOND visit far heavier than its first.
+      // Wait for visibility BEFORE the cache restore below — restoring first
+      // rendered every cached panel on mount, visible or not.
       await waitForThePanelToBecomeVisible(abortController.signal);
 
       // if force load is true, skip restoring from cache
@@ -479,13 +472,11 @@ export const usePanelDataLoader = (
         code: "",
       };
 
-      // A dashboard puts no limit on how many panels sit above the fold, so
-      // admission is capped globally rather than per panel.
+      // Cap how many panels load at once (a dashboard has no panel limit).
       try {
         await acquirePanelLoadSlot(abortController.signal);
       } catch (slotError) {
-        // Superseded while queued. The abort listener runs before the newer
-        // loadData() clears its own debounce, so this cannot unset its spinner.
+        // Superseded while queued — give up the place, clear the spinner.
         state.loading = false;
         throw slotError;
       }
@@ -500,8 +491,7 @@ export const usePanelDataLoader = (
           await executeSQL(startISOTimestamp, endISOTimestamp, abortController);
         }
 
-        // The executors above return once the request is dispatched, so
-        // releasing here would cap dispatch rate rather than concurrent loads.
+        // Executors return at dispatch time; hold the slot until data lands.
         await waitForPanelLoadToSettle(abortController.signal);
       } finally {
         releasePanelLoadSlot();

@@ -158,12 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      is an anonymous flex item and never picks up the ellipsis. -->
                 <span class="truncate">{{ item.title }}</span>
               </h2>
-              <!-- Off-screen panels render this placeholder instead of their
-                   component tree: the grid item keeps its size (so layout and
-                   scrollbar are correct) while the container, renderer, chart
-                   instance and watchers exist only for panels near the
-                   viewport. Mounting everything up front froze large
-                   dashboards for seconds before any query could fire. -->
+              <!-- Off-screen panels render this lightweight placeholder; the
+                   real panel mounts only when it comes near the viewport.
+                   Mounting everything up front froze large dashboards. -->
               <div
                 v-else-if="!shouldMountPanel(item.id)"
                 class="flex h-full flex-col p-2"
@@ -435,26 +432,16 @@ export default defineComponent({
     // Store IntersectionObserver for cleanup
     const panelObserver = ref<IntersectionObserver | null>(null);
 
-    // Panel ids whose full component tree is mounted. Everything else renders
-    // as a lightweight placeholder: a dashboard has no cap on panel count, and
-    // mounting every panel's container + renderer + chart instance on entry
-    // froze the page for seconds before a single query could even fire.
-    // Mounting is one-way — a panel that scrolls out of view stays mounted, so
-    // its in-flight query is never cancelled by scrolling and scrolling back
-    // never refetches.
+    // Panels whose full component tree is mounted; the rest are placeholders.
+    // One-way: scrolling away never unmounts, so queries are never cancelled
+    // by scrolling and scrolling back never refetches.
     const mountedPanelIds = reactive(new Set<string>());
 
-    // Drives mounting, separate from panelObserver (whose exact-viewport
-    // threshold feeds variable lazy-loading). The one-viewport margin mounts
-    // panels just before they scroll into view.
+    // Mounts panels one viewport before they scroll into view.
     let panelMountObserver: IntersectionObserver | null = null;
 
-    // Print/report rendering waits for every panel to load, and forceLoad
-    // callers expect all panels live regardless of scroll position. They are
-    // fed through mountedPanelIds in batches (see the watcher below panels)
-    // rather than bypassing it: flipping a computed would mount every
-    // placeholder in one synchronous flush — the exact freeze the lazy
-    // mounting exists to prevent.
+    // Print/forceLoad needs every panel; they are fed into mountedPanelIds in
+    // batches (watcher below panels) instead of mounting all in one flush.
     const mountAllPanels = computed(() => props.forceLoad || store.state.printMode);
 
     const shouldMountPanel = (panelId: string) => mountedPanelIds.has(panelId);
@@ -604,10 +591,8 @@ export default defineComponent({
         : [];
     });
 
-    // Print/forceLoad: mount every remaining panel, a small batch per tick, so
-    // entering print mode on a large dashboard ramps up over ~a second instead
-    // of freezing on one giant mount flush. Print capture waits on the
-    // all-panels-loaded flag, so the staggering never truncates a report.
+    // Print/forceLoad: mount remaining panels a batch per tick. Print capture
+    // waits on the all-panels-loaded flag, so this never truncates a report.
     let mountAllTimer: any = null;
     const mountRemainingPanelsInBatches = () => {
       if (mountAllTimer !== null) return;
@@ -627,8 +612,7 @@ export default defineComponent({
     };
 
     watch(
-      // re-fill when print mode turns on and when the panel list changes
-      // (tab switch while printing) — panels.value identity is enough
+      // re-fill when print mode turns on or the panel list changes
       () => [mountAllPanels.value, panels.value],
       () => {
         if (mountAllPanels.value) mountRemainingPanelsInBatches();

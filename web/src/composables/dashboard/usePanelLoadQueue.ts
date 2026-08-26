@@ -14,14 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Global admission control for dashboard panel loads.
- *
- * A dashboard has no cap on panel count, and every panel that loads lands its
- * streaming results, converts them, and builds a chart on the main thread at
- * whatever moment the server replies. Without a cap, a dashboard entry or a
- * fast scroll fires dozens of loads whose results all land together and the
- * page stutters. This bounds how many panels are in flight at once so the rest
- * queue instead of competing.
+ * Global cap on concurrent dashboard panel loads. Without it, entry or a fast
+ * scroll fires dozens of loads whose results all land, convert and render on
+ * the main thread at once.
  */
 
 /** Matches the metrics explorer's PREVIEW_CONCURRENCY. Fixed, so perf runs are reproducible. */
@@ -46,12 +41,8 @@ const pump = () => {
 };
 
 /**
- * Resolves once a slot is free. Every resolved call MUST be paired with a
- * `releasePanelLoadSlot()` in a `finally` — a leaked slot permanently shrinks
- * the pool and eventually stalls every panel on the dashboard.
- *
- * Rejects with the abort reason if `signal` fires while still queued; a panel
- * whose load was superseded gives up its place rather than loading stale data.
+ * Resolves once a slot is free; always pair with releasePanelLoadSlot() in a
+ * finally. Rejects if `signal` aborts while still queued.
  */
 export const acquirePanelLoadSlot = (signal?: AbortSignal): Promise<void> => {
   if (signal?.aborted) {

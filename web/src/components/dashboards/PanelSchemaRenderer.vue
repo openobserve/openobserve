@@ -1396,10 +1396,8 @@ export default defineComponent({
       }
     });
 
-    // panelData is a shallowRef replaced wholesale on every conversion, so the
-    // ref change alone is the signal. Deep-watching it forced Vue to traverse
-    // the entire converted chart option — every series, every point — per
-    // update, per panel, for nothing.
+    // panelData is a shallowRef replaced wholesale, so no deep watch needed —
+    // deep would traverse every data point of the chart options per update.
     watch(panelData, () => {
       emit("series-data-update", panelData.value);
     });

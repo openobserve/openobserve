@@ -574,11 +574,8 @@ export const logsUtils = () => {
   }
 
   // validate if timestamp column alias is used for any field
-  //
-  // Ordered cheapest-first: astify() is a full parse of the query, and the SQL
-  // grammar backtracks catastrophically on deeply parenthesized WHERE chains —
-  // a real customer's 4.9KB query took 30s of blocked main thread PER PANEL,
-  // wedging any large dashboard on entry. The parse must be the last resort.
+  // Cheap checks first: astify() can take 30s on deeply nested WHERE chains,
+  // so the full parse is a last resort.
   const checkTimestampAlias = (query: string): boolean => {
     const tsCol = timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
 
