@@ -1112,12 +1112,14 @@ async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::Ste
 /// grant is already spent and the ack is billable either way. That is what keeps
 /// [`resolve_step_pool`] to one in-memory counter read for every org past its
 /// evaluation budget, which is every established paying org.
+#[cfg(any(test, feature = "cloud"))]
 fn needs_plan_read(billing_enabled: bool, remaining: u64) -> bool {
     billing_enabled && remaining > 0
 }
 
 /// SPEC §6.1 / §7.3 — the whole free/billable decision for one ack, as pure
 /// arithmetic over the three facts that decide it.
+#[cfg(any(test, feature = "cloud"))]
 fn step_pool_view(
     billing_enabled: bool,
     remaining: u64,
