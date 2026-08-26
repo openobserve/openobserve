@@ -6,7 +6,7 @@
 // (at your option) any later version.
 
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     errors::{Error, Result},
     table::entity::llm_playground_snapshots,
 };
@@ -54,7 +54,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 /// makes the merge commutative, so replays and out-of-order delivery converge
 /// on the same answer and no cluster expires a snapshot another is still using.
 async fn apply_put(snapshot: llm_playground_snapshots::Model) -> Result<()> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let Some(current) = llm_playground_snapshots::Entity::find_by_id(&snapshot.id)
         .one(db)
         .await?
@@ -85,7 +85,7 @@ async fn apply_put(snapshot: llm_playground_snapshots::Model) -> Result<()> {
 /// remote purge and a local purge reach the same end state, and a replayed
 /// delete must not fail the queue.
 async fn apply_delete(org_id: &str, snapshot_id: &str) -> Result<()> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     llm_playground_snapshots::Entity::delete_many()
         .filter(llm_playground_snapshots::Column::Id.eq(snapshot_id))
         .filter(llm_playground_snapshots::Column::OrgId.eq(org_id))
