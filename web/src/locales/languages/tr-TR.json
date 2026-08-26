@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "Konum Adı Etiketi",
     "mapsMapType": "Harita Türü",
     "tableAggregations": "Tablo Toplamaları",
+    "tableCellDrilldownTooltip": "Eşleşen günlükleri keşfet",
     "promqlTableMode": "PromQL Tablo Modu",
     "visibleColumns": "Görünür Sütunlar",
     "hiddenColumns": "Gizli Sütunlar",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "Aynı isimde değişken zaten mevcut",
     "pivotTotal": "Toplam",
     "pivotOthers": "Diğerleri",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Eşleşen günlükleri keşfet"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "Satır Alanları",
     "valueFields": "Değer Alanları",
     "noData": "Veri Yok",
-    "addJoin": "Katıl Ekle",
-    "removeJoin": "Katılmayı Kaldır",
-    "leftJoin": "Sol Katılım",
-    "innerJoin": "İç Katılım",
-    "rightJoin": "Sağ Katıl",
-    "removeClause": "Maddeyi Kaldır",
-    "SQL": "SQL",
-    "builder": "inşaatçı",
-    "custom": "Özel",
-    "discard": "Atmak",
-    "apply": "Uygula",
-    "collapseFields": "Alanları Daralt",
-    "fields": "Tarlalar",
-    "layout": "Düzen",
-    "promQL": "PromQL",
-    "latitude": "Enlem",
-    "longitude": "Boylam",
-    "weight": "Ağırlığı",
-    "mapname": "İsim",
-    "mapvalue": "Değer",
-    "source": "Kaynak",
-    "target": "Hedef",
-    "value": "Değer",
     "logExplorer": {
       "title": "Günlük Gezgini",
       "openInLogs": "Günlüklerde Aç",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "Bu olaydan önceki ve sonraki 3 dakika içinde bu akıştan diğer olaylar — aynı anda başka neler olduğunu gösterir.",
         "contextEmpty": "Çevredeki olay bulunamadı"
       }
-    }
+    },
+    "addJoin": "Katıl Ekle",
+    "removeJoin": "Katılmayı Kaldır",
+    "leftJoin": "Sol Katılım",
+    "innerJoin": "İç Katılım",
+    "rightJoin": "Sağ Katıl",
+    "removeClause": "Maddeyi Kaldır",
+    "SQL": "SQL",
+    "builder": "inşaatçı",
+    "custom": "Özel",
+    "discard": "Atmak",
+    "apply": "Uygula",
+    "collapseFields": "Alanları Daralt",
+    "fields": "Tarlalar",
+    "layout": "Düzen",
+    "promQL": "PromQL",
+    "latitude": "Enlem",
+    "longitude": "Boylam",
+    "weight": "Ağırlığı",
+    "mapname": "İsim",
+    "mapvalue": "Değer",
+    "source": "Kaynak",
+    "target": "Hedef",
+    "value": "Değer"
   },
   "home": {
     "alertsOverviewSection": "Uyarılar genel bakış bölümü",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms (iz'in {percent}%)",
       "requestCount": "{count} istek"
-    }
+    },
+    "spanEventTimeline": "Span olay zaman çizelgesi",
+    "eventClusterTooltip": "{count} olay",
+    "spanEventCount": "{count} olay",
+    "spanEventCountPlural": "{count} olay",
+    "spanEventCountWithErrors": "{count} · {errors} hata",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} hata",
+    "spanEventErrorCount": "{errors} hata",
+    "spanEventErrorCountPlural": "{errors} hata",
+    "eventClusterAriaLabel": "{count} olay, {errors} hata",
+    "eventClusterAriaLabelPlural": "{count} olay, {errors} hata",
+    "eventMarkerTooltip": "Olay: {name}",
+    "exceptionMarkerTooltip": "İstisna: {type}",
+    "spanEventFallback": "span olayı"
   },
   "actions": {
     "realTime": "Gerçek Zamanlı",
@@ -11016,6 +11029,10 @@
         "meta": "{count} öğe · {updated} güncellendi",
         "loadError": "Veri seti yüklenemedi",
         "footerTitle": "Öğeler",
+        "tabs": {
+          "items": "Öğeler",
+          "experiments": "Deneyler"
+        },
         "searchPlaceholder": "Öğelerde Ara...",
         "columns": {
           "input": "Girdi (Arındırılmış)",

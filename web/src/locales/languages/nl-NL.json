@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "Label met de naam van de locatie",
     "mapsMapType": "Kaarttype",
     "tableAggregations": "Tabelaggregaties",
+    "tableCellDrilldownTooltip": "Verken overeenkomende logs",
     "promqlTableMode": "ProMQL-tabelmodus",
     "visibleColumns": "Zichtbare kolommen",
     "hiddenColumns": "Verborgen kolommen",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "Er bestaat al een variabele met dezelfde naam",
     "pivotTotal": "Totaal",
     "pivotOthers": "Overige",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Verken overeenkomende logs"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "Rijvelden",
     "valueFields": "Waardevelden",
     "noData": "Geen gegevens",
-    "addJoin": "Join toevoegen",
-    "removeJoin": "Join verwijderen",
-    "leftJoin": "Links aansluiten",
-    "innerJoin": "Innerlijke verbinding",
-    "rightJoin": "Right Join",
-    "removeClause": "Clausule verwijderen",
-    "SQL": "SQL",
-    "builder": "Bouwer",
-    "custom": "Op maat",
-    "discard": "Weggooien",
-    "apply": "Toepassen",
-    "collapseFields": "Velden samenvouwen",
-    "fields": "Velden",
-    "layout": "Indeling",
-    "promQL": "PromQL",
-    "latitude": "Breedtegraad",
-    "longitude": "Lengtegraad",
-    "weight": "Gewicht",
-    "mapname": "Naam",
-    "mapvalue": "Waarde",
-    "source": "Bron",
-    "target": "Doelwit",
-    "value": "Waarde",
     "logExplorer": {
       "title": "Logverkenner",
       "openInLogs": "Openen in Logs",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "Andere gebeurtenissen uit deze stream in de 3 minuten voor en na deze gebeurtenis — toont wat er op hetzelfde moment nog meer gebeurde.",
         "contextEmpty": "Geen omringende gebeurtenissen gevonden"
       }
-    }
+    },
+    "addJoin": "Join toevoegen",
+    "removeJoin": "Join verwijderen",
+    "leftJoin": "Links aansluiten",
+    "innerJoin": "Innerlijke verbinding",
+    "rightJoin": "Right Join",
+    "removeClause": "Clausule verwijderen",
+    "SQL": "SQL",
+    "builder": "Bouwer",
+    "custom": "Op maat",
+    "discard": "Weggooien",
+    "apply": "Toepassen",
+    "collapseFields": "Velden samenvouwen",
+    "fields": "Velden",
+    "layout": "Indeling",
+    "promQL": "PromQL",
+    "latitude": "Breedtegraad",
+    "longitude": "Lengtegraad",
+    "weight": "Gewicht",
+    "mapname": "Naam",
+    "mapvalue": "Waarde",
+    "source": "Bron",
+    "target": "Doelwit",
+    "value": "Waarde"
   },
   "home": {
     "alertsOverviewSection": "Sectie overzicht van waarschuwingen",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% van trace)",
       "requestCount": "{count} verzoek"
-    }
+    },
+    "spanEventTimeline": "Tijdlijn van span-gebeurtenissen",
+    "eventClusterTooltip": "{count} gebeurtenissen",
+    "spanEventCount": "{count} gebeurtenis",
+    "spanEventCountPlural": "{count} gebeurtenissen",
+    "spanEventCountWithErrors": "{count} · {errors} fout",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} fouten",
+    "spanEventErrorCount": "{errors} fout",
+    "spanEventErrorCountPlural": "{errors} fouten",
+    "eventClusterAriaLabel": "{count} gebeurtenissen, {errors} fout",
+    "eventClusterAriaLabelPlural": "{count} gebeurtenissen, {errors} fouten",
+    "eventMarkerTooltip": "Gebeurtenis: {name}",
+    "exceptionMarkerTooltip": "Uitzondering: {type}",
+    "spanEventFallback": "span-gebeurtenis"
   },
   "actions": {
     "realTime": "Realtime",
@@ -11016,6 +11029,10 @@
         "meta": "{count} items · bijgewerkt {updated}",
         "loadError": "Dataset laden mislukt",
         "footerTitle": "Items",
+        "tabs": {
+          "items": "Items",
+          "experiments": "Experimenten"
+        },
         "searchPlaceholder": "Zoek items...",
         "columns": {
           "input": "Invoer (gezuiverd)",

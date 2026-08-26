@@ -4602,6 +4602,7 @@
     "mapsNameLabel": "位置名稱標籤",
     "mapsMapType": "地圖類型",
     "tableAggregations": "表格彙總",
+    "tableCellDrilldownTooltip": "探索相符的日誌",
     "promqlTableMode": "PromQL 表格模式",
     "visibleColumns": "可見欄位",
     "hiddenColumns": "隱藏欄位",
@@ -5506,8 +5507,7 @@
     "variableNameAlreadyExists": "已存在相同名稱的變數",
     "pivotTotal": "總計",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "探索相符的日誌"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5573,29 +5573,6 @@
     "rowFields": "列欄位",
     "valueFields": "值欄位",
     "noData": "無資料",
-    "addJoin": "新增 Join",
-    "removeJoin": "移除 Join",
-    "leftJoin": "Left Join",
-    "innerJoin": "Inner Join",
-    "rightJoin": "Right Join",
-    "removeClause": "移除子句",
-    "SQL": "SQL",
-    "builder": "建構器",
-    "custom": "自訂",
-    "discard": "捨棄",
-    "apply": "套用",
-    "collapseFields": "收合欄位",
-    "fields": "欄位",
-    "layout": "版面配置",
-    "promQL": "PromQL",
-    "latitude": "緯度",
-    "longitude": "經度",
-    "weight": "權重",
-    "mapname": "名稱",
-    "mapvalue": "值",
-    "source": "來源",
-    "target": "目標",
-    "value": "值",
     "logExplorer": {
       "title": "日誌瀏覽器",
       "openInLogs": "在日誌中開啟",
@@ -5647,7 +5624,30 @@
         "contextTooltip": "此資料流中，此事件前後 3 分鐘內的其他事件 — 顯示同一時間點還發生了什麼事。",
         "contextEmpty": "找不到周圍事件"
       }
-    }
+    },
+    "addJoin": "新增 Join",
+    "removeJoin": "移除 Join",
+    "leftJoin": "Left Join",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Right Join",
+    "removeClause": "移除子句",
+    "SQL": "SQL",
+    "builder": "建構器",
+    "custom": "自訂",
+    "discard": "捨棄",
+    "apply": "套用",
+    "collapseFields": "收合欄位",
+    "fields": "欄位",
+    "layout": "版面配置",
+    "promQL": "PromQL",
+    "latitude": "緯度",
+    "longitude": "經度",
+    "weight": "權重",
+    "mapname": "名稱",
+    "mapvalue": "值",
+    "source": "來源",
+    "target": "目標",
+    "value": "值"
   },
   "home": {
     "alertsOverviewSection": "警示概覽區段",
@@ -9702,7 +9702,20 @@
       "p99Label": "P99：",
       "averageOfTrace": "{avg}毫秒（{percent}% 的追蹤）",
       "requestCount": "{count} 個請求"
-    }
+    },
+    "spanEventTimeline": "Span 事件時間軸",
+    "eventClusterTooltip": "{count} 個事件",
+    "spanEventCount": "{count} 個事件",
+    "spanEventCountPlural": "{count} 個事件",
+    "spanEventCountWithErrors": "{count} · {errors} 個錯誤",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} 個錯誤",
+    "spanEventErrorCount": "{errors} 個錯誤",
+    "spanEventErrorCountPlural": "{errors} 個錯誤",
+    "eventClusterAriaLabel": "{count} 個事件，{errors} 個錯誤",
+    "eventClusterAriaLabelPlural": "{count} 個事件，{errors} 個錯誤",
+    "eventMarkerTooltip": "事件：{name}",
+    "exceptionMarkerTooltip": "例外：{type}",
+    "spanEventFallback": "span 事件"
   },
   "actions": {
     "realTime": "即時",
@@ -11011,6 +11024,10 @@
         "meta": "{count} 個項目 · 已更新 {updated}",
         "loadError": "載入資料集失敗",
         "footerTitle": "項目",
+        "tabs": {
+          "items": "項目",
+          "experiments": "實驗"
+        },
         "searchPlaceholder": "搜尋項目...",
         "columns": {
           "input": "輸入（已淨化）",

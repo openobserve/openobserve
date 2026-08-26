@@ -4607,6 +4607,7 @@
     "mapsNameLabel": "Bezeichnung des Standorts",
     "mapsMapType": "Kartentyp",
     "tableAggregations": "Tabellenaggregationen",
+    "tableCellDrilldownTooltip": "Passende Protokolle erkunden",
     "promqlTableMode": "PromQL-Tabellenmodus",
     "visibleColumns": "Sichtbare Spalten",
     "hiddenColumns": "Versteckte Spalten",
@@ -5511,8 +5512,7 @@
     "variableNameAlreadyExists": "Variable mit demselben Namen existiert bereits",
     "pivotTotal": "Gesamt",
     "pivotOthers": "Andere",
-    "pivotTotalForField": "{total} - {field}",
-    "tableCellDrilldownTooltip": "Passende Protokolle erkunden"
+    "pivotTotalForField": "{total} - {field}"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5578,29 +5578,6 @@
     "rowFields": "Zeilenfelder",
     "valueFields": "Wertfelder",
     "noData": "Keine Daten",
-    "addJoin": "Join hinzufügen",
-    "removeJoin": "Join entfernen",
-    "leftJoin": "Linker Join",
-    "innerJoin": "Innere Verbindung",
-    "rightJoin": "Richtiger Beitritt",
-    "removeClause": "Klausel entfernen",
-    "SQL": "SQL",
-    "builder": "Baumeister",
-    "custom": "Benutzerdefiniert",
-    "discard": "Verwerfen",
-    "apply": "Anwenden",
-    "collapseFields": "Felder einklappen",
-    "fields": "Felder",
-    "layout": "Layout",
-    "promQL": "PromQL",
-    "latitude": "Breitengrad",
-    "longitude": "Längengrad",
-    "weight": "Gewichtung",
-    "mapname": "Name",
-    "mapvalue": "Wert",
-    "source": "Quelle",
-    "target": "Ziel",
-    "value": "Wert",
     "logExplorer": {
       "title": "Protokoll-Explorer",
       "openInLogs": "In Protokollen öffnen",
@@ -5652,7 +5629,30 @@
         "contextTooltip": "Andere Ereignisse aus diesem Stream in den 3 Minuten vor und nach diesem Ereignis — zeigt, was sonst noch im selben Moment geschah.",
         "contextEmpty": "Keine umgebenden Ereignisse gefunden"
       }
-    }
+    },
+    "addJoin": "Join hinzufügen",
+    "removeJoin": "Join entfernen",
+    "leftJoin": "Linker Join",
+    "innerJoin": "Innere Verbindung",
+    "rightJoin": "Richtiger Beitritt",
+    "removeClause": "Klausel entfernen",
+    "SQL": "SQL",
+    "builder": "Baumeister",
+    "custom": "Benutzerdefiniert",
+    "discard": "Verwerfen",
+    "apply": "Anwenden",
+    "collapseFields": "Felder einklappen",
+    "fields": "Felder",
+    "layout": "Layout",
+    "promQL": "PromQL",
+    "latitude": "Breitengrad",
+    "longitude": "Längengrad",
+    "weight": "Gewichtung",
+    "mapname": "Name",
+    "mapvalue": "Wert",
+    "source": "Quelle",
+    "target": "Ziel",
+    "value": "Wert"
   },
   "home": {
     "alertsOverviewSection": "Alerts-Übersichtsbereich",
@@ -9707,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% des Trace)",
       "requestCount": "{count} Anfragen"
-    }
+    },
+    "spanEventTimeline": "Zeitleiste der Span-Ereignisse",
+    "eventClusterTooltip": "{count} Ereignisse",
+    "spanEventCount": "{count} Ereignis",
+    "spanEventCountPlural": "{count} Ereignisse",
+    "spanEventCountWithErrors": "{count} · {errors} Fehler",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} Fehler",
+    "spanEventErrorCount": "{errors} Fehler",
+    "spanEventErrorCountPlural": "{errors} Fehler",
+    "eventClusterAriaLabel": "{count} Ereignisse, {errors} Fehler",
+    "eventClusterAriaLabelPlural": "{count} Ereignisse, {errors} Fehler",
+    "eventMarkerTooltip": "Ereignis: {name}",
+    "exceptionMarkerTooltip": "Ausnahme: {type}",
+    "spanEventFallback": "Span-Ereignis"
   },
   "actions": {
     "realTime": "Echtzeit",
@@ -11016,6 +11029,10 @@
         "meta": "{count} Elemente · aktualisiert {updated}",
         "loadError": "Fehler beim Laden des Datensatzes",
         "footerTitle": "Elemente",
+        "tabs": {
+          "items": "Elemente",
+          "experiments": "Experimente"
+        },
         "searchPlaceholder": "Elemente suchen...",
         "columns": {
           "input": "Eingabe (bereinigt)",
