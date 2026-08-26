@@ -15,7 +15,7 @@
 
 use async_trait::async_trait;
 use chrono::Duration;
-use config::utils::{json, time::now_micros};
+use config::utils::time::now_micros;
 use sqlx::Row;
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
@@ -174,22 +174,11 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // release lock
         drop(client);
 
-        // For now, only send realtime alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
-            );
-
-            // TODO: For sqlite cluster coordinator, the alert triggers are put
-            // into the sqlite meta database to send watch events. Hence, there is a
-            // redundancy of alert triggers stored both in scheduled_jobs and meta
-            // tables. How to remove this redundancy?
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
-                .await?;
-        }
+        // TODO: For sqlite cluster coordinator, the alert triggers are put
+        // into the sqlite meta database to send watch events. Hence, there is a
+        // redundancy of alert triggers stored both in scheduled_jobs and meta
+        // tables. How to remove this redundancy?
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
@@ -307,17 +296,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // release lock
         drop(client);
 
-        // For now, only send alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
-            );
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
-                .await?;
-        }
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
