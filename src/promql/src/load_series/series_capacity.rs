@@ -15,17 +15,15 @@
 
 //! Sample-capacity estimation for hash-sorted series materialization.
 
-use datafusion::arrow::array::UInt64Array;
-
 const STORAGE_HOUR_MICROS: i64 = 60 * 60 * 1_000_000;
 const MAX_SERIES_FRAGMENT_HINT: usize = 24;
 const MAX_INITIAL_SERIES_CAPACITY: usize = 2048;
 
 /// Length of the contiguous run of equal hashes starting at `start`.
-pub(super) fn batch_run_len(hash_values: &UInt64Array, start: usize) -> usize {
-    let hash = hash_values.value(start);
+pub(super) fn batch_run_len(hashes: &[u64], start: usize) -> usize {
+    let hash = hashes[start];
     let mut end = start + 1;
-    while end < hash_values.len() && hash_values.value(end) == hash {
+    while end < hashes.len() && hashes[end] == hash {
         end += 1;
     }
     end - start
@@ -76,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_batch_run_len() {
-        let hashes = UInt64Array::from(vec![7u64, 7, 7, 9, 9, 1]);
+        let hashes = [7u64, 7, 7, 9, 9, 1];
         assert_eq!(batch_run_len(&hashes, 0), 3);
         assert_eq!(batch_run_len(&hashes, 3), 2);
         assert_eq!(batch_run_len(&hashes, 5), 1);
