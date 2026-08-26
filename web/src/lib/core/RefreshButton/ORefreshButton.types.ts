@@ -5,6 +5,8 @@ export interface RefreshButtonProps {
   loading?: boolean;
   /** Disables the button independently of loading */
   disabled?: boolean;
+  /** Reload icon-button style. `outline` draws a border; default is borderless `ghost`. */
+  variant?: "ghost" | "outline";
 }
 
 export interface RefreshButtonEmits {

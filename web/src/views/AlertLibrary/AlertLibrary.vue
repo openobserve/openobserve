@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #actions>
         <ORefreshButton
+          variant="outline"
           :last-run-at="lastFetched"
           :loading="isLoading"
           data-test="alert-library-refresh"
@@ -127,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="index in 6"
                   :key="index"
                   type="rect"
-                  class="rounded-surface h-32 w-full"
+                  class="rounded-default h-32 w-full"
                 />
               </div>
 
@@ -166,14 +167,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <section v-for="group in groupedEntries" :key="group.id" class="pt-3">
                   <h2
-                    class="text-text-secondary text-2xs flex items-center gap-2 pb-2 font-semibold uppercase"
+                    class="text-text-secondary text-2xs flex items-center gap-2 pb-2 font-semibold"
                     :data-test="`alert-library-group-${group.id}`"
                   >
                     <span v-if="group.packLabel" class="opacity-70"
                       >{{ group.packLabel }} &middot;</span
                     >
                     <span>{{ group.label }}</span>
-                    <span class="tabular-nums opacity-70">{{ group.entries.length }}</span>
+                    <OTag :label="raw(String(group.entries.length))" size="xs" />
                   </h2>
                   <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <LibraryCard
@@ -247,6 +248,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 
 /** Where the alerts are authored. Not the serving URL — that is a constant. */

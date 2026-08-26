@@ -14627,6 +14627,7 @@
       "disabled": "Disabled",
       "emptyTitle": "No alerts on this SLO yet",
       "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "emptyActionDesc": "Get warned before the budget runs out",
       "loadFailed": "Could not load this SLO's alerts.",
       "editTargetMissing": "That alert is no longer on this SLO.",
       "describeBurn": "Burn rate > {critical} over {long} and {short}",
