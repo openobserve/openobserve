@@ -35,6 +35,7 @@ import type {
   PreviewRung,
   PriorityRung,
   PromoteSeverity,
+  ResponseEventKind,
 } from "@/ts/interfaces/oncall";
 import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
@@ -1440,3 +1441,21 @@ export function fromZonedInputValue(value: string, timezone: string): number | n
     return asIfUtc * 1000;
   }
 }
+
+/**
+ * The activity feed's default view: what a person did, and what the ladder
+ * did that changed who got woken. Engine bookkeeping (`sys`, `state`,
+ * `delivery`, `exhausted`) is folded away behind "Show all" — shared by
+ * OnCallActivityTimeline (which filters by it) and the page header (which
+ * counts what it hides).
+ */
+export const DEFAULT_ACTIVITY_KINDS: ResponseEventKind[] = [
+  "note",
+  "ack",
+  "handoff",
+  "page",
+  "rca",
+  "ai_verdict",
+  "severity_promoted",
+  "flapped",
+];

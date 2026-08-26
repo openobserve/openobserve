@@ -258,32 +258,29 @@
                    so the thread began mid-air under a bare border. -->
               <OCardSection role="header" dense>
                 <OText variant="card-title">{{ t("oncall.tabActivity") }}</OText>
+                <OButton
+                  variant="ghost-primary"
+                  size="sm"
+                  class="ml-auto"
+                  data-test="oncall-response-activity-toggle-all"
+                  @click="showAllActivity = !showAllActivity"
+                >
+                  {{
+                    showAllActivity
+                      ? t("oncall.activityShowPeopleOnly")
+                      : t("oncall.activityShowAllCount", { count: events.length })
+                  }}
+                </OButton>
               </OCardSection>
 
               <OCardSection role="body" dense>
-                <OnCallTimeline :events="events" :opened-at="response.opened_at" />
-
-                <!-- Pinned under the thread it appends to. A note is a comment. -->
-                <div class="border-border-default mt-4 flex flex-col gap-2 border-t pt-4">
-                  <OTextarea
-                    v-model="noteBody"
-                    :placeholder="t('oncall.notePlaceholder')"
-                    :rows="2"
-                    data-test="oncall-response-note-input"
-                  />
-                  <div class="flex justify-end">
-                    <OButton
-                      variant="outline"
-                      size="sm-action"
-                      :loading="addingNote"
-                      :disabled="!noteBody.trim()"
-                      data-test="oncall-response-note-submit"
-                      @click="addNote"
-                    >
-                      {{ t("oncall.addNote") }}
-                    </OButton>
-                  </div>
-                </div>
+                <OnCallActivityTimeline
+                  :events="events"
+                  v-model:comment-text="noteBody"
+                  v-model:show-all="showAllActivity"
+                  :submitting="addingNote"
+                  @submit="addNote"
+                />
               </OCardSection>
             </OCard>
 
@@ -597,7 +594,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
-import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
+import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
 import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -756,6 +753,7 @@ const escalatingNow = ref(false);
 // on-call has no business depending on that module for an em dash.
 const ABSENT = raw("—");
 const noteBody = ref("");
+const showAllActivity = ref(false);
 const resolveCause = ref<ResolutionCause | "">("");
 const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
