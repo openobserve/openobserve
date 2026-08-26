@@ -60,7 +60,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // snapshots.
 // 75: drop action_scripts, the actions feature is removed.
 // 76: add steps_configured to synthetics_jobs.
-pub const DB_SCHEMA_VERSION: u64 = 76;
+// 77: create status_pages tables and status_page_custom_domains.
+pub const DB_SCHEMA_VERSION: u64 = 77;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

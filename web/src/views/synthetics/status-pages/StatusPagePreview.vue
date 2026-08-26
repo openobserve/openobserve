@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center justify-between gap-2">
               <h3 class="text-text-heading text-sm font-semibold">{{ comp.name }}</h3>
               <span
-                class="bg-status-success-bg text-status-success-text rounded-full inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold"
+                class="bg-status-success-bg text-status-success-text inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
               >
                 <span class="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
                 {{ t("statusPages.preview.operational") }}

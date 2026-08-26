@@ -18,13 +18,7 @@ import http from "./http";
 export type StatusPageVisibility = 0 | 1 | 2;
 
 export type StatusPageHealth =
-  | "operational"
-  | "degraded"
-  | "partial_outage"
-  | "major_outage"
-  | "maintenance"
-  | "no_data"
-  | null;
+  "operational" | "degraded" | "partial_outage" | "major_outage" | "maintenance" | "no_data" | null;
 
 export interface StatusPageListItem {
   id: string;
@@ -168,10 +162,9 @@ const statusPagesService = {
     http().get(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/updates`),
 
   markFalsePositive: (orgIdentifier: string, noticeId: string, snoozeHours = 6) =>
-    http().post(
-      `/api/${orgIdentifier}/status_pages/notices/${noticeId}/mark_false_positive`,
-      { snooze_hours: snoozeHours },
-    ),
+    http().post(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/mark_false_positive`, {
+      snooze_hours: snoozeHours,
+    }),
 
   // Widens impact (never narrows it — see UpdateNoticePayload) on the existing incident.
   updateNotice: (orgIdentifier: string, noticeId: string, payload: UpdateNoticePayload) =>

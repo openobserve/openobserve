@@ -119,7 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Updated -->
       <template #cell-updated_at="{ row }">
-        <OTimeCell :value="(row as any).updated_at" unit="us" mode="relative" :timezone="timezone" />
+        <OTimeCell
+          :value="(row as any).updated_at"
+          unit="us"
+          mode="relative"
+          :timezone="timezone"
+        />
       </template>
 
       <!-- Row actions -->

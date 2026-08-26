@@ -188,40 +188,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Visibility -->
               <OFormSection :title="t('statusPages.sections.visibility')">
                 <div class="flex flex-col gap-5">
-                <OFormToggleGroup name="visibility" :label="t('statusPages.fields.visibility')">
-                  <OToggleGroupItem value="draft" size="sm" data-test="status-page-visibility-draft">{{
-                    t("statusPages.visibility.draft")
-                  }}</OToggleGroupItem>
-                  <OToggleGroupItem
-                    value="public"
-                    size="sm"
-                    data-test="status-page-visibility-public"
-                    >{{ t("statusPages.visibility.public") }}</OToggleGroupItem
-                  >
-                  <OToggleGroupItem
-                    value="password"
-                    size="sm"
-                    data-test="status-page-visibility-password"
-                    >{{ t("statusPages.visibility.password") }}</OToggleGroupItem
-                  >
-                </OFormToggleGroup>
-                <OFormInput
-                  v-if="visibilityMode === 'password'"
-                  name="password"
-                  type="password"
-                  :label="t('statusPages.fields.password')"
-                  :placeholder="
-                    page.password_set
-                      ? t('statusPages.fields.passwordSetPlaceholder')
-                      : t('statusPages.fields.passwordPlaceholder')
-                  "
-                  :help-text="
-                    page.password_set
-                      ? t('statusPages.fields.passwordSetHelp')
-                      : t('statusPages.fields.passwordHelp')
-                  "
-                  data-test="status-page-password-input"
-                />
+                  <OFormToggleGroup name="visibility" :label="t('statusPages.fields.visibility')">
+                    <OToggleGroupItem
+                      value="draft"
+                      size="sm"
+                      data-test="status-page-visibility-draft"
+                      >{{ t("statusPages.visibility.draft") }}</OToggleGroupItem
+                    >
+                    <OToggleGroupItem
+                      value="public"
+                      size="sm"
+                      data-test="status-page-visibility-public"
+                      >{{ t("statusPages.visibility.public") }}</OToggleGroupItem
+                    >
+                    <OToggleGroupItem
+                      value="password"
+                      size="sm"
+                      data-test="status-page-visibility-password"
+                      >{{ t("statusPages.visibility.password") }}</OToggleGroupItem
+                    >
+                  </OFormToggleGroup>
+                  <OFormInput
+                    v-if="visibilityMode === 'password'"
+                    name="password"
+                    type="password"
+                    :label="t('statusPages.fields.password')"
+                    :placeholder="
+                      page.password_set
+                        ? t('statusPages.fields.passwordSetPlaceholder')
+                        : t('statusPages.fields.passwordPlaceholder')
+                    "
+                    :help-text="
+                      page.password_set
+                        ? t('statusPages.fields.passwordSetHelp')
+                        : t('statusPages.fields.passwordHelp')
+                    "
+                    data-test="status-page-password-input"
+                  />
                 </div>
               </OFormSection>
 
@@ -284,48 +287,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <div class="flex flex-col gap-3">
-                <p v-if="components.length === 0" class="text-text-secondary text-sm">
-                  {{ t("statusPages.components.empty") }}
-                </p>
+                  <p v-if="components.length === 0" class="text-text-secondary text-sm">
+                    {{ t("statusPages.components.empty") }}
+                  </p>
 
-                <div
-                  v-for="(comp, idx) in components"
-                  :key="comp._uid"
-                  class="rounded-surface border-border-default flex flex-col gap-3 border p-3"
-                  :data-test="`status-page-component-row-${idx}`"
-                >
-                  <div class="flex items-start gap-2">
-                    <div class="min-w-0 flex-1">
-                      <OInput
-                        v-model="comp.name"
-                        :label="t('statusPages.components.name')"
-                        :placeholder="t('statusPages.components.namePlaceholder')"
-                        :data-test="`status-page-component-name-${idx}`"
-                      />
-                    </div>
-                    <OButton
-                      variant="ghost-destructive"
-                      size="icon-sm"
-                      icon-left="delete"
-                      class="mt-6"
-                      :data-test="`status-page-component-remove-${idx}`"
-                      @click="removeComponent(idx)"
-                    >
-                      <OTooltip side="bottom" :content="t('statusPages.components.remove')" />
-                    </OButton>
-                  </div>
-                  <OSelect
-                    v-model="comp.check_ids"
-                    multiple
-                    :label="t('statusPages.components.checks')"
-                    :options="checkOptions"
-                    :loading="checksLoading"
-                    :placeholder="t('statusPages.components.checksPlaceholder')"
-                    :data-test="`status-page-component-checks-${idx}`"
+                  <div
+                    v-for="(comp, idx) in components"
+                    :key="comp._uid"
+                    class="rounded-surface border-border-default flex flex-col gap-3 border p-3"
+                    :data-test="`status-page-component-row-${idx}`"
                   >
-                    <template #empty>{{ t("statusPages.components.noChecks") }}</template>
-                  </OSelect>
-                </div>
+                    <div class="flex items-start gap-2">
+                      <div class="min-w-0 flex-1">
+                        <OInput
+                          v-model="comp.name"
+                          :label="t('statusPages.components.name')"
+                          :placeholder="t('statusPages.components.namePlaceholder')"
+                          :data-test="`status-page-component-name-${idx}`"
+                        />
+                      </div>
+                      <OButton
+                        variant="ghost-destructive"
+                        size="icon-sm"
+                        icon-left="delete"
+                        class="mt-6"
+                        :data-test="`status-page-component-remove-${idx}`"
+                        @click="removeComponent(idx)"
+                      >
+                        <OTooltip side="bottom" :content="t('statusPages.components.remove')" />
+                      </OButton>
+                    </div>
+                    <OSelect
+                      v-model="comp.check_ids"
+                      multiple
+                      :label="t('statusPages.components.checks')"
+                      :options="checkOptions"
+                      :loading="checksLoading"
+                      :placeholder="t('statusPages.components.checksPlaceholder')"
+                      :data-test="`status-page-component-checks-${idx}`"
+                    >
+                      <template #empty>{{ t("statusPages.components.noChecks") }}</template>
+                    </OSelect>
+                  </div>
                 </div>
               </OFormSection>
             </div>

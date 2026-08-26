@@ -50,17 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="loading" class="flex justify-center py-8">
         <OSpinner />
       </div>
-      <p
-        v-else-if="domains.length === 0"
-        class="text-text-secondary py-8 text-center text-sm"
-      >
+      <p v-else-if="domains.length === 0" class="text-text-secondary py-8 text-center text-sm">
         {{ t("statusPages.domains.empty") }}
       </p>
       <div
         v-for="d in domains"
         v-else
         :key="d.id"
-        class="border-border-subtle flex flex-col gap-2 rounded-default border p-3"
+        class="border-border-subtle rounded-default flex flex-col gap-2 border p-3"
         :data-test="`status-page-domain-row-${d.id}`"
       >
         <div class="flex items-start justify-between gap-2">

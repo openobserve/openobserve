@@ -406,7 +406,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-id="domainsPage.id"
       :page-name="domainsPage.name"
     />
-
   </OPageLayout>
 </template>
 

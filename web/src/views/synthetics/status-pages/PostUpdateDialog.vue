@@ -42,18 +42,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else>
       <div v-if="activeIncident" class="mb-4 flex flex-col gap-2">
-        <div class="bg-surface-subtle flex flex-col gap-1 rounded-default p-3 text-sm">
-          <span class="text-text-secondary">{{ t("statusPages.postUpdate.openIncidentHint") }}</span>
+        <div class="bg-surface-subtle rounded-default flex flex-col gap-1 p-3 text-sm">
+          <span class="text-text-secondary">{{
+            t("statusPages.postUpdate.openIncidentHint")
+          }}</span>
           <span class="font-medium">{{ raw(activeIncident.title) }}</span>
         </div>
-        <OToggleGroup
-          v-model="mode"
-          type="single"
-          :label="t('statusPages.postUpdate.mode')"
-        >
-          <OToggleGroupItem value="attach" size="sm" data-test="status-page-post-update-mode-attach">{{
-            t("statusPages.postUpdate.modeAttach")
-          }}</OToggleGroupItem>
+        <OToggleGroup v-model="mode" type="single" :label="t('statusPages.postUpdate.mode')">
+          <OToggleGroupItem
+            value="attach"
+            size="sm"
+            data-test="status-page-post-update-mode-attach"
+            >{{ t("statusPages.postUpdate.modeAttach") }}</OToggleGroupItem
+          >
           <OToggleGroupItem value="new" size="sm" data-test="status-page-post-update-mode-new">{{
             t("statusPages.postUpdate.modeNew")
           }}</OToggleGroupItem>
@@ -71,9 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onSubmitAttach"
       >
         <OFormToggleGroup name="escalateTo" :label="t('statusPages.postUpdate.escalate')">
-          <OToggleGroupItem value="none" size="sm" data-test="status-page-post-update-escalate-none">{{
-            t("statusPages.postUpdate.escalateNone")
-          }}</OToggleGroupItem>
+          <OToggleGroupItem
+            value="none"
+            size="sm"
+            data-test="status-page-post-update-escalate-none"
+            >{{ t("statusPages.postUpdate.escalateNone") }}</OToggleGroupItem
+          >
           <template v-for="opt in escalationOptions" :key="opt">
             <OToggleGroupItem
               :value="opt"
@@ -104,18 +108,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onSubmitNew"
       >
         <OFormToggleGroup name="impact" :label="t('statusPages.postUpdate.impact')">
-          <OToggleGroupItem value="degraded" size="sm" data-test="status-page-post-update-impact-degraded">{{
-            t("statusPages.postUpdate.impactDegraded")
-          }}</OToggleGroupItem>
+          <OToggleGroupItem
+            value="degraded"
+            size="sm"
+            data-test="status-page-post-update-impact-degraded"
+            >{{ t("statusPages.postUpdate.impactDegraded") }}</OToggleGroupItem
+          >
           <OToggleGroupItem
             value="partial_outage"
             size="sm"
             data-test="status-page-post-update-impact-partial"
             >{{ t("statusPages.postUpdate.impactPartial") }}</OToggleGroupItem
           >
-          <OToggleGroupItem value="major_outage" size="sm" data-test="status-page-post-update-impact-major">{{
-            t("statusPages.postUpdate.impactMajor")
-          }}</OToggleGroupItem>
+          <OToggleGroupItem
+            value="major_outage"
+            size="sm"
+            data-test="status-page-post-update-impact-major"
+            >{{ t("statusPages.postUpdate.impactMajor") }}</OToggleGroupItem
+          >
         </OFormToggleGroup>
 
         <div class="flex flex-col gap-2">
@@ -268,7 +278,11 @@ async function onSubmitAttach(values: AttachUpdateForm) {
         impact: impactToWire(values.escalateTo),
       });
     }
-    await statusPagesService.addNoticeUpdate(props.orgIdentifier, activeIncident.value.id, values.body);
+    await statusPagesService.addNoticeUpdate(
+      props.orgIdentifier,
+      activeIncident.value.id,
+      values.body,
+    );
     dismiss();
     toast({ variant: "success", message: t("statusPages.postUpdate.posted") });
     emit("update:open", false);

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="notice in notices"
         v-else
         :key="notice.id"
-        class="border-border-subtle flex flex-col gap-2 rounded-default border p-3"
+        class="border-border-subtle rounded-default flex flex-col gap-2 border p-3"
         :data-test="`status-page-notice-row-${notice.id}`"
       >
         <div class="flex items-start justify-between gap-2">
