@@ -66,6 +66,51 @@ pub(super) enum LoadedMetrics {
 
 type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, RangeValue>, HashSet<i64>)>>;
 
+const STORAGE_HOUR_MICROS: i64 = 60 * 60 * 1_000_000;
+const MAX_SERIES_FRAGMENT_HINT: usize = 24;
+const MAX_INITIAL_SERIES_CAPACITY: usize = 2048;
+
+fn series_fragment_hint(start: i64, end: i64, lookback: i64) -> usize {
+    let query_start = start.saturating_sub(lookback);
+    let duration = end.saturating_sub(query_start).max(0);
+    let hourly_fragments = duration
+        .saturating_add(STORAGE_HOUR_MICROS - 1)
+        .div_euclid(STORAGE_HOUR_MICROS)
+        .max(1);
+    usize::try_from(hourly_fragments)
+        .unwrap_or(1)
+        .clamp(1, MAX_SERIES_FRAGMENT_HINT)
+}
+
+fn initial_series_capacity(
+    first_run_len: usize,
+    fragment_hint: usize,
+    first_timestamp: i64,
+    last_timestamp: i64,
+    query_duration: i64,
+) -> usize {
+    let run_based = first_run_len.saturating_mul(fragment_hint.max(1));
+    let interval_based = if first_run_len > 1 && last_timestamp > first_timestamp {
+        let intervals = i64::try_from(first_run_len - 1).unwrap_or(i64::MAX);
+        let sample_interval = (last_timestamp - first_timestamp)
+            .div_euclid(intervals)
+            .max(1);
+        usize::try_from(
+            query_duration
+                .max(0)
+                .saturating_add(sample_interval - 1)
+                .div_euclid(sample_interval)
+                .saturating_add(1),
+        )
+        .unwrap_or(MAX_INITIAL_SERIES_CAPACITY)
+    } else {
+        0
+    };
+    run_based
+        .max(interval_based)
+        .min(MAX_INITIAL_SERIES_CAPACITY.max(first_run_len))
+}
+
 /// Materialize the labels exposed to the query. The process-wide cache stores
 /// only source labels, so raw-data queries add their synthetic hash label at
 /// this boundary for both cache hits and freshly loaded labels.
@@ -194,6 +239,8 @@ pub(super) async fn selector_load_data_from_datafusion(
             hash_field_type,
             df_group.clone(),
             !skip_labels,
+            series_fragment_hint(start, end, lookback),
+            end.saturating_sub(start.saturating_sub(lookback)),
         )
         .await?
     };
@@ -246,6 +293,8 @@ pub(super) async fn load_samples_from_datafusion(
     hash_field_type: &DataType,
     df: DataFrame,
     collect_timestamps: bool,
+    fragment_hint: usize,
+    query_duration: i64,
 ) -> Result<(PartitionedMetrics, HashSet<i64>)> {
     let ctx = Arc::new(df.task_ctx());
     let target_partitions = ctx.session_config().target_partitions();
@@ -301,12 +350,30 @@ pub(super) async fn load_samples_from_datafusion(
                             for i in 0..batch.num_rows() {
                                 let timestamp = time_values.value(i);
                                 let hash: u64 = hash_values.value(i);
-                                let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
-                                    labels: vec![],
-                                    samples: vec![],
-                                    exemplars: None,
-                                    time_window: None,
-                                });
+                                let entry = match metrics.entry(hash) {
+                                    hashbrown::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+                                    hashbrown::hash_map::Entry::Vacant(entry) => {
+                                        let mut run_end = i + 1;
+                                        while run_end < batch.num_rows()
+                                            && hash_values.value(run_end) == hash
+                                        {
+                                            run_end += 1;
+                                        }
+                                        let capacity = initial_series_capacity(
+                                            run_end - i,
+                                            fragment_hint,
+                                            time_values.value(i),
+                                            time_values.value(run_end - 1),
+                                            query_duration,
+                                        );
+                                        entry.insert(RangeValue {
+                                            labels: vec![],
+                                            samples: Vec::with_capacity(capacity),
+                                            exemplars: None,
+                                            time_window: None,
+                                        })
+                                    }
+                                };
                                 entry
                                     .samples
                                     .push(Sample::new(timestamp, value_values.value(i)));
@@ -535,6 +602,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_series_fragment_and_capacity_hints_are_bounded() {
+        let hour = STORAGE_HOUR_MICROS;
+        assert_eq!(
+            series_fragment_hint(8 * hour, 11 * hour, 5 * 60 * 1_000_000),
+            4
+        );
+        assert_eq!(series_fragment_hint(8 * hour, 8 * hour, 0), 1);
+        assert_eq!(
+            series_fragment_hint(0, 100 * hour, 0),
+            MAX_SERIES_FRAGMENT_HINT,
+        );
+
+        assert_eq!(initial_series_capacity(160, 4, 0, 0, 0), 640);
+        assert_eq!(
+            initial_series_capacity(100, 4, 0, 99 * 15 * 1_000_000, 11_100 * 1_000_000,),
+            741,
+        );
+        assert_eq!(initial_series_capacity(1024, 4, 0, 0, 0), 2048);
+        assert_eq!(initial_series_capacity(4096, 4, 0, 0, 0), 4096);
+    }
+
+    #[test]
     fn test_into_loaded_metrics_only_keeps_uint64_hashes_partitioned() {
         let partitions = vec![HashMap::from([(11, RangeValue::default())])];
         assert!(matches!(
@@ -569,7 +658,7 @@ mod tests {
         let df = ctx.read_batch(batch).unwrap();
 
         let (metrics_without_timestamps, skipped_timestamps) =
-            load_samples_from_datafusion("test", &DataType::UInt64, df.clone(), false)
+            load_samples_from_datafusion("test", &DataType::UInt64, df.clone(), false, 1, 0)
                 .await
                 .unwrap();
         assert!(skipped_timestamps.is_empty());
@@ -578,7 +667,7 @@ mod tests {
         assert_eq!(metrics_without_timestamps[&11].samples.len(), 2);
 
         let (metrics, timestamps) =
-            load_samples_from_datafusion("test", &DataType::UInt64, df, true)
+            load_samples_from_datafusion("test", &DataType::UInt64, df, true, 1, 0)
                 .await
                 .unwrap();
         let metrics = merge_partitioned_metrics(metrics);
