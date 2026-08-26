@@ -17,7 +17,7 @@
 //!
 //! `password_updated_at` is backfilled from `created_at` rather than left NULL: the rotation
 //! check reads it as "when this password was set", so a NULL-everywhere column would mark every
-//! pre-existing user as already expired the first time `ZO_PASSWORD_ROTATION_DAYS` is turned on.
+//! pre-existing user as already expired the first time an admin enables `rotation_days`.
 
 use sea_orm_migration::prelude::*;
 

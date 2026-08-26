@@ -19,12 +19,17 @@ use config::{
 };
 use sea_orm::{
     ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema,
-    Set, entity::prelude::*, sea_query::Func,
+    Set,
+    entity::prelude::*,
+    sea_query::{Func, Query, SimpleExpr},
 };
 use serde::{Deserialize, Serialize};
 
 use super::{
-    entity::users::{ActiveModel, Column, Entity, Model},
+    entity::{
+        org_users,
+        users::{ActiveModel, Column, Entity, Model},
+    },
     get_lock,
 };
 use crate::{
@@ -145,6 +150,10 @@ pub async fn add(user: UserRecord) -> Result<(), errors::Error> {
         created_at: Set(now),
         updated_at: Set(now),
         id: Set(ider::uuid()),
+        must_reset_password: Set(false),
+        password_reset_reason: Set(None),
+        flagged_at: Set(None),
+        password_updated_at: Set(Some(now)),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -182,6 +191,35 @@ pub async fn update(
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(result.rows_affected)
+}
+
+/// Flag every interactive native user for a forced password reset.
+///
+/// Three groups are left alone: external users authenticate elsewhere, so the local password
+/// policy never applies to them; service accounts have no interactive password to reset, so
+/// flagging them would only break the automation using their tokens; and root is exempt so a
+/// tightened policy can never lock the instance out of its own recovery path.
+pub async fn flag_all_for_password_reset(reason: &str) -> Result<u64, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let external: i16 = UserType::External.into();
+    let result = Entity::update_many()
+        .col_expr(Column::MustResetPassword, Expr::value(true))
+        .col_expr(Column::PasswordResetReason, Expr::value(reason))
+        .col_expr(
+            Column::FlaggedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .filter(Column::UserType.ne(external))
+        .filter(Column::IsRoot.eq(false))
+        .filter(not_a_service_account())
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -289,11 +327,41 @@ pub async fn batch_remove(emails: Vec<String>) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Matches users that hold no service-account role in any organization. The role lives on
+/// `org_users`, not `users`, so this has to go through a subquery.
+fn not_a_service_account() -> SimpleExpr {
+    let service_account_roles: Vec<i16> =
+        vec![UserRole::ServiceAccount.into(), UserRole::SreAgent.into()];
+
+    Expr::expr(Func::lower(Expr::col(Column::Email))).not_in_subquery(
+        Query::select()
+            .expr(Func::lower(Expr::col(org_users::Column::Email)))
+            .from(org_users::Entity)
+            .and_where(org_users::Column::Role.is_in(service_account_roles))
+            .to_owned(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::user::{DBUser, UserOrg, UserRole, UserType};
 
     use super::*;
+
+    #[test]
+    fn test_not_a_service_account_excludes_both_service_account_roles() {
+        let sql = Query::select()
+            .column(Column::Email)
+            .from(Entity)
+            .and_where(not_a_service_account())
+            .to_owned()
+            .to_string(sea_orm::sea_query::SqliteQueryBuilder);
+
+        assert!(sql.contains("NOT IN"), "{sql}");
+        assert!(sql.contains("org_users"), "{sql}");
+        // ServiceAccount = 5, SreAgent = 6
+        assert!(sql.contains("IN (5, 6)"), "{sql}");
+    }
 
     fn make_db_user(is_external: bool, role: UserRole) -> DBUser {
         DBUser {
@@ -362,6 +430,10 @@ mod tests {
             user_type: 0, // 0 = Internal
             created_at: 1_000_000,
             updated_at: 2_000_000,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: Some(1_000_000),
         };
         let rec = UserRecord::from(model);
         assert_eq!(rec.email, "model@example.com");

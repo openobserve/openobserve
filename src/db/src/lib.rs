@@ -45,6 +45,7 @@ pub mod org_ingestion_tokens;
 pub mod org_status;
 pub mod org_users;
 pub mod organization;
+pub mod password_policy;
 pub mod pipeline_errors;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
