@@ -533,10 +533,62 @@ use crate::{
 )]
 pub struct ApiDoc;
 
+#[cfg(feature = "enterprise")]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::experiments::preview_experiment,
+    openobserve_api_management::request::experiments::create_experiment,
+    openobserve_api_management::request::experiments::list_experiments,
+    openobserve_api_management::request::experiments::compare_experiments,
+    openobserve_api_management::request::experiments::get_experiment,
+    openobserve_api_management::request::experiments::get_experiment_row,
+    openobserve_api_management::request::experiments::retry_experiment_slot,
+    openobserve_api_management::request::experiments::cancel_experiment,
+    openobserve_api_management::request::experiments::retry_experiment,
+    openobserve_api_management::request::experiments::clone_experiment,
+    openobserve_api_management::request::experiments::delete_experiment,
+    openobserve_api_management::request::experiments::set_experiment_baseline,
+    openobserve_api_management::request::experiments::clear_experiment_baseline,
+    openobserve_api_management::request::remote_tasks::list_remote_tasks,
+    openobserve_api_management::request::remote_tasks::create_remote_task,
+    openobserve_api_management::request::remote_tasks::test_remote_task,
+    openobserve_api_management::request::remote_tasks::get_remote_task,
+    openobserve_api_management::request::remote_tasks::list_remote_task_versions,
+    openobserve_api_management::request::remote_tasks::get_remote_task_stats,
+    openobserve_api_management::request::remote_tasks::save_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::get_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::discard_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::publish_remote_task,
+    openobserve_api_management::request::remote_tasks::delete_remote_task,
+    openobserve_api_management::request::remote_tasks::test_run_remote_task,
+    openobserve_api_management::request::remote_tasks::replace_remote_task_auth_secret,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_auth_secret,
+    openobserve_api_management::request::remote_tasks::replace_remote_task_header_secret,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_header_secret,
+    openobserve_api_management::request::remote_tasks::get_remote_task_signing_status,
+    openobserve_api_management::request::remote_tasks::rotate_remote_task_signing_secret,
+    openobserve_api_management::request::remote_tasks::test_remote_task_signing_candidate,
+    openobserve_api_management::request::remote_tasks::activate_remote_task_signing_candidate,
+    openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
+))]
+struct EnterpriseExperimentApiDoc;
+
 pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        #[cfg(feature = "enterprise")]
+        {
+            let enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi.paths.paths.extend(enterprise.paths.paths);
+            if let (Some(components), Some(enterprise_components)) =
+                (openapi.components.as_mut(), enterprise.components)
+            {
+                components.schemas.extend(enterprise_components.schemas);
+                components.responses.extend(enterprise_components.responses);
+            }
+        }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
@@ -622,4 +674,45 @@ pub async fn openapi_info() -> OpenapiInfo {
     }
 
     tag_operations
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod experiment_tests {
+    use super::*;
+
+    #[test]
+    fn coordinate_retry_is_registered_in_openapi() {
+        let api = EnterpriseExperimentApiDoc::openapi();
+        let path = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry")
+            .expect("coordinate retry path must be documented");
+        assert_eq!(
+            path.post
+                .as_ref()
+                .and_then(|operation| operation.operation_id.as_deref()),
+            Some("RetryExperimentSlot")
+        );
+        let row_detail = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}")
+            .and_then(|path| path.get.as_ref())
+            .expect("row detail path must be documented");
+        assert!(row_detail.responses.responses.contains_key("403"));
+
+        let comparison = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/compare")
+            .and_then(|path| path.get.as_ref())
+            .expect("comparison path must be documented");
+        assert_eq!(
+            comparison.operation_id.as_deref(),
+            Some("CompareExperiments")
+        );
+        assert!(comparison.responses.responses.contains_key("400"));
+        assert!(comparison.responses.responses.contains_key("403"));
+    }
 }

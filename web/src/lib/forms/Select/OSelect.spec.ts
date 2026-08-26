@@ -16,6 +16,14 @@ describe("OSelect", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  it.each([
+    ["sm", "h-6"],
+    ["md", "h-[2.125rem]"],
+  ] as const)("sizes the trigger for %s", (size, expected) => {
+    wrapper = mount(OSelect, { props: { size } });
+    expect(wrapper.find("button").classes()).toContain(expected);
+  });
+
   it("renders a label when prop is provided", () => {
     wrapper = mount(OSelect, { props: { label: "Country" } });
     expect(wrapper.find("label").text()).toBe("Country");

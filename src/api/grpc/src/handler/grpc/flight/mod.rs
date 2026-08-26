@@ -40,6 +40,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
+    search::utils::AsyncDefer,
     search_service::SEARCH_SERVER,
 };
 
@@ -113,25 +114,9 @@ impl FlightService for FlightServiceImpl {
         let trace_id_move = trace_id.clone();
         let result = async move {
             #[cfg(feature = "enterprise")]
-            if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id_move).await {
-                // this is for work_group check in super cluster follower leader
-                SEARCH_SERVER
-                    .insert(
-                        trace_id_move.clone(),
-                        TaskStatus::new_follower(vec![], false),
-                    )
-                    .await;
-            }
-
-            let result = get_ctx_and_physical_plan(&trace_id_move, &req_move).await;
-
-            #[cfg(feature = "enterprise")]
-            if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id_move).await {
-                // this is for work_group check in super cluster follower leader
-                SEARCH_SERVER.remove(&trace_id_move, false).await;
-            }
-
-            result
+            let _task_status =
+                register_follower_task_status(is_super_cluster, &trace_id_move).await;
+            get_ctx_and_physical_plan(&trace_id_move, &req_move).await
         }
         .instrument(span.clone())
         .await;
@@ -157,13 +142,9 @@ impl FlightService for FlightServiceImpl {
         let (ctx, plan, lock, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
-                #[cfg(feature = "enterprise")]
-                if get_o2_config().work_group.max_nodes_per_query > 0 {
-                    o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
-                    log::error!(
-                        "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
-                    );
-                }
+                log::error!(
+                    "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
+                );
                 return Err(Status::internal(e.to_string()));
             }
         };
@@ -210,17 +191,12 @@ impl FlightService for FlightServiceImpl {
         let partial_err_ref = get_partial_err(&plan);
 
         // One stream per output partition so they encode in parallel
-        let streams =
-            execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
-                #[cfg(feature = "enterprise")]
-                if get_o2_config().work_group.max_nodes_per_query > 0 {
-                    o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
-                    log::error!(
-                        "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
-                    );
-                }
-                Status::internal(e.to_string())
-            })?;
+        let streams = execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
+            log::error!(
+                "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
+            );
+            Status::internal(e.to_string())
+        })?;
 
         let mut stream =
             FlightEncoderStreamBuilder::new(write_options, MAX_FLIGHT_DATA_SIZE, session_guard)
@@ -336,6 +312,15 @@ impl SessionGuard {
 impl Drop for SessionGuard {
     fn drop(&mut self) {
         clear_session_data(&self.trace_id);
+
+        #[cfg(feature = "enterprise")]
+        if get_o2_config().work_group.max_nodes_per_query > 0 {
+            o2_enterprise::enterprise::search::admission::ledger::release(&self.trace_id);
+            log::info!(
+                "[trace_id {}] flight->search: releasing slot",
+                self.trace_id
+            );
+        }
     }
 }
 
@@ -370,6 +355,28 @@ async fn get_ctx_and_physical_plan(
 ) -> Result<PlanResult, infra::errors::Error> {
     let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
     Ok((ctx, physical_plan, None, scan_stats))
+}
+
+/// Registers this node's follower task status for a super cluster query and removes it when the
+/// returned defer drops, so a request cancelled during plan generation cannot leave it behind.
+#[cfg(feature = "enterprise")]
+async fn register_follower_task_status(
+    is_super_cluster: bool,
+    trace_id: &str,
+) -> Option<AsyncDefer> {
+    if !is_super_cluster || SEARCH_SERVER.contain_key(trace_id).await {
+        return None;
+    }
+    SEARCH_SERVER
+        .insert(
+            trace_id.to_string(),
+            TaskStatus::new_follower(vec![], false),
+        )
+        .await;
+    let trace_id = trace_id.to_string();
+    Some(AsyncDefer::new(async move {
+        SEARCH_SERVER.remove(&trace_id, false).await;
+    }))
 }
 
 fn clear_session_data(trace_id: &str) {
