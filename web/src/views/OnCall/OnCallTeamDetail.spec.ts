@@ -762,6 +762,45 @@ describe("OnCallTeamDetail", () => {
     },
   );
 
+  /// A finding that names a rotation ("single_member_rotation") has to open
+  /// THAT rotation's own drawer — landing on the bare table again is
+  /// indistinguishable from nothing having happened when the reader was
+  /// already on the Schedule tab, since `activeTab` would be a no-op write.
+  it("opens the named rotation's drawer, not just the schedule tab", async () => {
+    service.getSchedule.mockResolvedValue({
+      data: { timezone: "UTC", rotations: [rotation("rot_2", "Rotation 2")] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("act", "schedule", "Rotation 2");
+    await flushPromises();
+
+    const panels = wrapper.findComponent({ name: "OTabPanels" });
+    expect(panels.props("modelValue")).toBe("schedule");
+    const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
+    expect(editor.props("intent")).toEqual({ mode: "edit", id: "rot_2" });
+  });
+
+  /// A rotation the schedule fetch never returned (renamed or deleted between
+  /// the check and the click) must not crash the page or fling the reader at
+  /// a drawer for an id nothing recognises — the tab switch is still the
+  /// whole answer.
+  it("still switches tabs when the named rotation cannot be found", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    wrapper
+      .findComponent({ name: "OnCallTeamAttention" })
+      .vm.$emit("act", "schedule", "Some Deleted Rotation");
+    await flushPromises();
+
+    const panels = wrapper.findComponent({ name: "OTabPanels" });
+    expect(panels.props("modelValue")).toBe("schedule");
+    const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
+    expect(editor.props("intent")).toBeFalsy();
+  });
+
   /// The panel and the overview list both read this team's own pages; asking
   /// for the whole org's would count other teams' work as this team's.
   it("asks only for this team's pages", async () => {

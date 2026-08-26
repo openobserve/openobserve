@@ -13590,7 +13590,6 @@
     "attentionNoTransportDetail": "Email, Slack and webhook are all unset on this deployment. Every rung of every escalation policy resolves to a person with no way to reach them.",
     "attentionAddMember": "Add a member",
     "attentionAddFinalRung": "Add a final rung",
-    "attentionCollapse": "Collapse",
     "attentionFindings": "{count} finding | {count} findings",
     "attentionCountBlocking": "{count} blocking",
     "attentionCountGaps": "{count} gap | {count} gaps",

@@ -21,28 +21,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   only orders them, groups them by what they cost, adds the evidence the
   sentence cannot carry, and points each at the tab that repairs it.
 
-  Two shapes. Collapsed it is one line — the worst finding and a way in — because
-  a banner that stacks three finished sentences is a paragraph nobody finishes.
-  Opened it is one finding per row, so each keeps its own detail, evidence and
-  fix instead of sharing a line with the next one.
+  One line collapsed — the worst finding and a way in — because a banner that
+  stacks three finished sentences is a paragraph nobody finishes. The rest of
+  the findings open in a side drawer rather than inline, so reading them never
+  reflows the page the banner sits on: one finding per row, so each keeps its
+  own detail, evidence and fix instead of sharing a line with the next one.
 -->
 <template>
   <template v-if="rows.length">
-    <div
-      v-if="expanded"
-      class="card-container rounded-surface bg-surface-base border-border-default overflow-hidden border"
+    <OBanner
+      variant="warning"
+      icon="warning-amber"
+      inline-actions
+      dense
       data-test="oncall-team-attention"
     >
-      <!-- Tinted on the header only: the findings below carry their own severity
-           on the row rail, and tinting the whole card would drown them. -->
-      <div
-        class="bg-banner-warning-bg border-banner-warning-border flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2.5"
-      >
-        <OIcon name="warning-amber" size="sm" class="text-status-warning-text shrink-0" />
-        <OText variant="panel-title">{{ t("oncall.attentionHeading") }}</OText>
+      <span class="flex min-w-0 items-center gap-x-3">
+        <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
+          {{ t("oncall.attentionHeading") }}
+        </span>
+        <span class="flex min-w-0 items-center gap-1.5" data-test="oncall-attention-worst">
+          <span
+            class="size-1.5 shrink-0 rounded-full"
+            :class="DOT_CLASS[worst.bucket]"
+            aria-hidden="true"
+          />
+          <!-- The worst finding whole, on one line. The count moved into the
+               disclosure button, so nothing here can wrap the strip. -->
+          <span class="text-text-body min-w-0 truncate text-sm">
+            {{ worst.message }}
+            <OTooltip side="bottom" :content="worst.message" />
+          </span>
+        </span>
+      </span>
 
-        <!-- The three counts are the shape of the problem before any reading:
-             what is broken, what is thin, and what is merely dead. -->
+      <template #actions>
+        <span class="flex shrink-0 items-center gap-2">
+          <OButton
+            v-if="worst.fix"
+            variant="outline"
+            size="xs"
+            data-test="oncall-attention-fix-now"
+            @click="emit('act', worst.fix, worst.rotation)"
+          >
+            {{ t(worst.cta) }}
+          </OButton>
+          <OButton
+            variant="outline"
+            size="xs"
+            data-test="oncall-attention-expand"
+            @click="expanded = true"
+          >
+            {{ t("oncall.attentionFindings", { count: findingCount }, findingCount) }}
+          </OButton>
+        </span>
+      </template>
+    </OBanner>
+
+    <ODrawer
+      v-model:open="expanded"
+      side="right"
+      size="lg"
+      :title="t('oncall.attentionHeading')"
+      data-test="oncall-team-attention-drawer"
+    >
+      <template #header-right>
+        <span
+          v-if="checkedLabel"
+          class="text-text-secondary text-xs"
+          data-test="oncall-attention-checked"
+        >
+          {{ checkedLabel }}
+        </span>
+      </template>
+
+      <!-- The three counts are the shape of the problem before any reading:
+           what is broken, what is thin, and what is merely dead. -->
+      <div class="mb-3 flex flex-wrap items-center gap-2">
         <OTag
           v-for="group in groups"
           :key="`count-${group.id}`"
@@ -52,37 +107,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t(group.countKey, { count: group.rows.length }, group.rows.length) }}
         </OTag>
-
-        <span class="ms-auto flex shrink-0 items-center gap-3">
-          <span
-            v-if="checkedLabel"
-            class="text-text-muted text-xs"
-            data-test="oncall-attention-checked"
-          >
-            {{ checkedLabel }}
-          </span>
-          <OButton
-            variant="ghost"
-            size="xs"
-            icon-right="expand-less"
-            data-test="oncall-attention-collapse"
-            @click="expanded = false"
-          >
-            {{ t("oncall.attentionCollapse") }}
-          </OButton>
-        </span>
       </div>
 
       <section
         v-for="group in groups"
         :key="group.id"
+        class="border-border-default rounded-default border"
         :data-test="`oncall-attention-group-${group.id}`"
       >
         <h3
           class="text-text-secondary text-2xs bg-surface-subtle border-border-subtle flex items-center gap-2 border-b px-4 py-1.5 tracking-wide uppercase"
         >
           {{ t(group.headingKey) }}
-          <span class="text-text-muted">{{ group.rows.length }}</span>
+          <span class="text-text-secondary">{{ group.rows.length }}</span>
         </h3>
 
         <div
@@ -105,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  path has actually been used lately. -->
             <p
               v-if="row.evidence.length"
-              class="text-text-muted flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs"
+              class="text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs"
               :data-test="`oncall-attention-evidence-${row.kind}`"
             >
               <span v-for="fact in row.evidence" :key="String(fact)">{{ fact }}</span>
@@ -121,85 +158,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="xs"
             class="shrink-0"
             :data-test="`oncall-attention-cta-${row.kind}`"
-            @click="emit('act', row.fix)"
+            @click="emit('act', row.fix, row.rotation)"
           >
             {{ t(row.cta) }}
           </OButton>
         </div>
       </section>
 
-      <div
-        class="border-border-default bg-surface-subtle flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-4 py-2"
-      >
-        <span class="text-text-muted text-xs">{{ t("oncall.attentionFooter") }}</span>
-        <!-- Stated rather than silently dropped: the server truncates, and a
-             list that ends without saying so reads as the whole answer. -->
-        <span v-if="hidden > 0" class="text-text-muted text-xs" data-test="oncall-attention-hidden">
-          {{ t("oncall.attentionHidden", { count: hidden }, hidden) }}
-        </span>
-        <OButton
-          variant="outline"
-          size="xs"
-          icon-left="refresh"
-          class="ms-auto shrink-0"
-          data-test="oncall-attention-recheck"
-          @click="emit('recheck')"
-        >
-          {{ t("oncall.attentionRecheck") }}
-        </OButton>
-      </div>
-    </div>
-
-    <OBanner
-      v-else
-      variant="warning"
-      icon="warning-amber"
-      inline-actions
-      dense
-      data-test="oncall-team-attention"
-    >
-      <span class="flex min-w-0 items-center gap-x-3">
-        <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
-          {{ t("oncall.attentionHeading") }}
-        </span>
-        <span class="flex min-w-0 items-center gap-1.5" :data-test="`oncall-attention-${worst.kind}`">
+      <template #footer>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span class="text-text-secondary text-xs">{{ t("oncall.attentionFooter") }}</span>
+          <!-- Stated rather than silently dropped: the server truncates, and a
+               list that ends without saying so reads as the whole answer. -->
           <span
-            class="size-1.5 shrink-0 rounded-full"
-            :class="DOT_CLASS[worst.bucket]"
-            aria-hidden="true"
-          />
-          <!-- The worst finding whole, on one line. The count moved into the
-               disclosure button, so nothing here can wrap the strip. -->
-          <span class="text-text-body min-w-0 truncate text-sm">
-            {{ worst.message }}
-            <OTooltip side="bottom" :content="worst.message" />
+            v-if="hidden > 0"
+            class="text-text-secondary text-xs"
+            data-test="oncall-attention-hidden"
+          >
+            {{ t("oncall.attentionHidden", { count: hidden }, hidden) }}
           </span>
-        </span>
-      </span>
-
-      <template #actions>
-        <span class="flex shrink-0 items-center gap-2">
           <OButton
-            v-if="worst.fix"
             variant="outline"
             size="xs"
-            data-test="oncall-attention-fix-now"
-            @click="emit('act', worst.fix)"
+            icon-left="refresh"
+            class="ms-auto shrink-0"
+            data-test="oncall-attention-recheck"
+            @click="emit('recheck')"
           >
-            {{ t(worst.cta) }}
+            {{ t("oncall.attentionRecheck") }}
           </OButton>
-          <OButton
-            variant="ghost"
-            size="xs"
-            icon-right="expand-more"
-            data-test="oncall-attention-expand"
-            @click="expanded = true"
-          >
-            {{ t("oncall.attentionFindings", { count: findingCount }, findingCount) }}
-          </OButton>
-        </span>
+        </div>
       </template>
-    </OBanner>
+    </ODrawer>
   </template>
 </template>
 
@@ -209,9 +199,9 @@ import { computed, ref } from "vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   ConfigRisk,
@@ -270,8 +260,12 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  /** The tab that repairs the finding: `policy` | `schedule` | `ownership`. */
-  (e: "act", tab: string): void;
+  /**
+   * The tab that repairs the finding: `policy` | `schedule` | `ownership`, and
+   * the rotation it is about, by name, when the finding names one — so
+   * `schedule` can open that rotation's own drawer instead of its bare table.
+   */
+  (e: "act", tab: string, rotation?: string | null): void;
   /** Re-run the checks — they are derived, so a refetch is the whole answer. */
   (e: "recheck"): void;
 }>();
@@ -349,6 +343,12 @@ interface AttentionRow {
   /** The tab that repairs it, or null when this screen cannot. */
   fix: FixTab | null;
   cta: I18nKey;
+  /**
+   * Which rotation the fix is about, by name — so landing on `schedule`
+   * can open that rotation's own drawer instead of a bare table the reader
+   * has to search again. `undefined` when the finding names no rotation.
+   */
+  rotation?: string | null;
 }
 
 /// The server writes `what is wrong — why it matters`. Split on that break so
@@ -456,6 +456,7 @@ function rowFor(risk: ConfigRisk): AttentionRow {
     evidence: evidenceFor(risk),
     fix: fix.tab,
     cta: fix.cta,
+    rotation: risk.rotation,
   };
 }
 

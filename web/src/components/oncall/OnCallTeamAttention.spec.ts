@@ -33,9 +33,14 @@ const stubs = {
     emits: ["click"],
     template: "<button @click=\"$emit('click')\"><slot /></button>",
   },
+  ODrawer: {
+    name: "ODrawer",
+    props: ["open"],
+    template:
+      "<div v-if='open'><slot name='header-right' /><slot /><slot name='footer' /></div>",
+  },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OIcon: { name: "OIcon", template: "<i />" },
   OTooltip: { name: "OTooltip", template: "<span />" },
 };
 
@@ -230,7 +235,23 @@ describe("OnCallTeamAttention", () => {
     const wrapper = await open(render(risks([risk({ kind })])));
     await wrapper.find(`[data-test="oncall-attention-cta-${kind}"]`).trigger("click");
 
-    expect(wrapper.emitted("act")?.[0]).toEqual([tab]);
+    expect(wrapper.emitted("act")?.[0]?.[0]).toBe(tab);
+  });
+
+  /// A `single_member_rotation` finding names which rotation is thin, and that
+  /// name has to reach the parent — landing back on a bare table the reader
+  /// already searched once is not a fix, it is the same click again.
+  it("names which rotation the fix is about", async () => {
+    const wrapper = await open(
+      render(
+        risks([
+          risk({ kind: "single_member_rotation", severity: "medium", rotation: "Rotation 2" }),
+        ]),
+      ),
+    );
+    await wrapper.find('[data-test="oncall-attention-cta-single_member_rotation"]').trigger("click");
+
+    expect(wrapper.emitted("act")?.[0]).toEqual(["schedule", "Rotation 2"]);
   });
 
   /// The button is named for the repair, not the destination — two findings on
