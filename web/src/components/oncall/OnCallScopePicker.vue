@@ -15,129 +15,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  What a team owns, chosen as a level of the estate rather than as a row of the
-  service registry.
+  What a team owns, drawn as the thing it actually is: a path.
 
-  The registry is not a list of services. Anything arriving without a `service`
-  dimension is filed under its infrastructure identity or, failing that, its
-  stream name — so `node_filesystem_used_percent`, `us-east-1c` and
-  `aws_alb_httpcode_target_2xx_count` sit in it beside `payment-gateway`, and a
-  real estate has ten thousand rows. Asking somebody to find the thing they own
-  in that list is asking them to do the registry's filing by hand, and it is why
-  the most powerful part of routing read as the least usable.
+  The model has always been one. Rules are stored and displayed as
+  `k8s-cluster=production/k8s-namespace=payments`, and precedence is
+  longest-prefix — a longer path beats a shorter one. Every earlier attempt at
+  this screen took that path apart into separate controls (pick a level, then a
+  value, then optionally a narrowing) and the shape was lost: three questions in
+  a row, none of which shows that the answers nest.
 
-  Almost every real claim is one of three sentences:
+  So the control IS the path. Segments left to right, coarse to fine, each one a
+  value or `Any`:
 
-      we own this cluster
-      we own this namespace
-      we own this service, wherever it runs
+      production  ›  Any  ›  payment-gateway
 
-  So those are the choices, and the values behind each come from the identity
-  the org has already described — not from the registry's raw row list. A level
-  is offered only when telemetry has actually carried it, so the picker is short
-  because the estate is, not because it was truncated.
+  reads as "payment-gateway, in production, in any namespace" — and it is
+  literally the row that gets saved. Breadth stops being something to reason
+  about: an `Any` in the middle is visibly a gap the rule does not care about,
+  and the count under each segment says how much of the estate it takes.
 
-  Anything else is Advanced, which is the old field-and-value builder, unchanged
-  and one click away. This narrows the front door; it closes nothing.
+  Segments come from the org's own `distinguish_by` order, which is where the
+  hierarchy is already written down. They are grouped by identity set, because a
+  record is either an ECS task or a Kubernetes pod and a path that mixed the two
+  would describe nothing that exists.
+
+  Anything a path cannot say — a wildcard, a dimension outside the sets — is
+  Advanced, unchanged and one click away.
 -->
 <template>
   <div class="flex flex-col gap-3" data-test="oncall-scope-picker">
-    <!-- One row, read as a sentence: **owns** *this kind of thing* **=** *this
-         one*. It was a tab strip per level, which broke down as soon as a real
-         org appeared — five platforms means five tabs, in an order nobody
-         chose, with a Kubernetes shop landing on Azure Resource Group because
-         it sorted first. A select scales to any number of levels, costs one
-         line instead of two, and puts the level and its value side by side
-         where the claim actually reads. -->
-    <div class="flex flex-wrap items-end gap-2" data-test="oncall-scope-picker-value">
-      <OSelect
-        :model-value="mode"
-        :label="t('oncall.scopeOwns')"
-        :options="levelOptions"
-        size="sm"
-        width="sm"
-        searchable
-        data-test="oncall-scope-level"
-        @update:model-value="(v: unknown) => v && selectMode(String(v))"
-      >
-        <template #tooltip>
-          <OTooltip side="right" :content="t('oncall.scopeLevelPickerHelp')" />
-        </template>
-      </OSelect>
+    <div
+      class="border-border-subtle bg-surface-panel rounded-default flex flex-col gap-3 border px-3 py-3"
+    >
+      <span class="flex flex-wrap items-center gap-x-2">
+        <OText variant="label">{{ t("oncall.scopeOwns") }}</OText>
 
-      <OSelect
-        v-if="active"
-        :model-value="value"
-        :label="raw(active.label)"
-        :options="valueOptions"
-        :placeholder="t('oncall.scopeValuePlaceholder')"
-        size="sm"
-        width="md"
-        searchable
-        data-test="oncall-scope-value"
-        @update:model-value="(v: unknown) => setValue(String(v ?? ''))"
-      >
-        <template #tooltip>
-          <OTooltip side="right" :content="scopeHelp" />
-        </template>
-      </OSelect>
+        <!-- Only when the estate genuinely has more than one shape. A single
+             -platform org should never be asked which platform. -->
+        <OSelect
+          v-if="platforms.length > 1"
+          :model-value="platform"
+          :options="platformOptions"
+          size="xs"
+          width="xs"
+          data-test="oncall-scope-platform"
+          @update:model-value="(v: unknown) => selectPlatform(String(v))"
+        />
 
-      <!-- Only for the finest level, and only when there is a coarser one to
-           narrow to. "This service, everywhere" is the claim people mean far
-           more often than "this service in this one cluster", so it is the
-           default and the narrowing is the deliberate act. -->
-      <OSelect
-        v-if="narrowable"
-        :model-value="narrowValue"
-        :label="raw(narrowable.label)"
-        :options="narrowOptions"
-        size="sm"
-        width="md"
-        searchable
-        data-test="oncall-scope-narrow"
-        @update:model-value="(v: unknown) => setNarrow(String(v ?? ''))"
-      >
-        <template #tooltip>
-          <OTooltip side="right" :content="t('oncall.scopeNarrowHelp')" />
-        </template>
-      </OSelect>
+        <OButton
+          variant="ghost"
+          size="xs"
+          icon-left="tune"
+          class="ms-auto"
+          data-test="oncall-scope-mode-advanced"
+          @click="emit('advanced')"
+        >
+          {{ t("oncall.scopeAdvanced") }}
+        </OButton>
+      </span>
 
-      <!-- Kept out of the level list. Advanced is not a kind of thing a team
-           can own, and reading it as one is how somebody picks it by accident
-           looking for a level further down. -->
-      <OButton
-        variant="ghost"
-        size="sm"
-        icon-left="tune"
-        class="mb-0.5"
-        data-test="oncall-scope-mode-advanced"
-        @click="emit('advanced')"
-      >
-        {{ t("oncall.scopeAdvanced") }}
-      </OButton>
+      <!-- The path. Each segment carries its dimension's own colour, the same
+           one its chip has in the incident list, so a cluster is recognisable
+           here without reading the label. -->
+      <div class="flex flex-wrap items-start gap-x-1 gap-y-2" data-test="oncall-scope-path">
+        <template v-for="(segment, index) in segments" :key="segment.dimension">
+          <OIcon
+            v-if="index"
+            name="chevron-right"
+            size="sm"
+            class="text-text-secondary mt-7 shrink-0"
+            aria-hidden="true"
+          />
+          <div class="flex min-w-0 flex-col gap-1">
+            <span class="flex items-center gap-1.5">
+              <span
+                class="size-1.5 shrink-0 rounded-full"
+                :class="dotClassOf(segment.dimension)"
+                aria-hidden="true"
+              />
+              <OText variant="meta">{{ raw(segment.label) }}</OText>
+            </span>
+            <OSelect
+              :model-value="segment.value"
+              :options="segment.options"
+              size="sm"
+              width="sm"
+              searchable
+              :data-test="`oncall-scope-segment-${segment.dimension}`"
+              @update:model-value="(v: unknown) => setSegment(segment.dimension, String(v ?? ''))"
+            />
+            <!-- How much of the estate this segment takes. The one number
+                 somebody weighing a broad rule wants, and the reason `Any` does
+                 not read as harmless. -->
+            <OText
+              variant="meta"
+              class="ps-0.5"
+              :data-test="`oncall-scope-breadth-${segment.dimension}`"
+            >
+              {{ segment.breadth }}
+            </OText>
+          </div>
+        </template>
+      </div>
     </div>
 
-    <!-- What the choice above actually claims, in a sentence. Inheritance is
-         the part of this model people get wrong, and the only honest place to
-         say it is beside the claim being made. -->
+    <!-- The claim as a sentence, and what it leaves to everybody else.
+         Inheritance is the half of this model people get wrong, and beside the
+         claim is the only place saying so lands. -->
     <div
-      v-if="claimed.length"
-      class="border-border-subtle bg-surface-panel rounded-default flex flex-col gap-2 border px-3 py-2.5"
+      v-if="pinned.length"
+      class="flex items-start gap-1.5"
       data-test="oncall-scope-picker-claim"
     >
-      <span class="flex flex-wrap items-center gap-1.5">
-        <template v-for="(pair, index) in claimed" :key="pair.name">
-          <OText v-if="index" variant="meta">{{ t("oncall.ruleEditorAnd") }}</OText>
-          <ODimensionChip
-            :dim-key="pair.name"
-            :key-label="displayOf(pair.name)"
-            :value="pair.value"
-          />
-        </template>
-      </span>
+      <OIcon name="check-circle-outline" size="sm" class="text-success mt-0.5 shrink-0" />
       <OText variant="meta" data-test="oncall-scope-picker-consequence">
         {{ consequence }}
       </OText>
+    </div>
+    <div v-else class="flex items-start gap-1.5" data-test="oncall-scope-picker-empty">
+      <OIcon name="info-outline" size="sm" class="text-text-secondary mt-0.5 shrink-0" />
+      <OText variant="meta">{{ t("oncall.scopePathEmpty") }}</OText>
     </div>
   </div>
 </template>
@@ -145,36 +142,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 
-import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import { dimensionVariant } from "@/lib/core/Badge/badgeGroups";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IdentitySet } from "@/services/service_streams";
 import type { DimensionCatalogue, DiscoveredService } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { SERVICE_DIMENSION } from "@/utils/oncall";
 
-/** A level of the estate somebody can claim, coarsest first. */
-export interface ScopeLevel {
-  dimension: string;
-  label: string;
-  /** Position in the hierarchy — 0 is coarsest. `service` is always last. */
-  depth: number;
-}
+/** `Any` is the absence of a condition, and the empty string is how a select says so. */
+const ANY = "";
 
 const props = withDefaults(
   defineProps<{
-    /** Conditions currently on the draft, in `{dimension: value}` form. */
+    /** The rule being drafted, in `{dimension: value}` form. The single source
+     *  of truth for every segment — this component keeps no shadow copy, which
+     *  is what stopped an earlier version fighting its own emits. */
     modelValue?: Record<string, string>;
     /** The org's identity sets — the ordered hierarchy, straight from config. */
     sets?: IdentitySet[];
     /** What this org emits, and how many services carry each value. */
     catalogue?: DimensionCatalogue;
-    /** Discovered services, for the finest level's own value list. */
+    /** Discovered services, for the finest segment. */
     services?: DiscoveredService[];
-    /** Display names for dimensions, so a level reads as it does elsewhere. */
+    /** Display names, so a segment reads as it does everywhere else. */
     aliases?: { id: string; display?: string }[];
   }>(),
   {
@@ -194,236 +188,180 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-/// The levels, from the ordering the org already wrote.
-///
-/// `distinguish_by` is an ordered list per identity set, so an org that wrote
-/// `[k8s-cluster, k8s-namespace]` has said a cluster contains namespaces. That
-/// is the hierarchy — read here rather than asked for again on a routing
-/// screen, where the two answers could disagree about the shape of one estate.
-///
-/// Deduped across sets by dimension, keeping the coarsest position, because a
-/// dimension that is second in one set and first in another is at best
-/// ambiguous and should not outrank one that is unambiguously finer. The
-/// backend's `DimensionDepth::from_sets` resolves collisions the same way, so
-/// this row and the decision it previews cannot disagree.
-const levels = computed<ScopeLevel[]>(() => {
-  const depths = new Map<string, number>();
-  for (const set of props.sets) {
-    set.distinguish_by.forEach((dimension, position) => {
-      if (dimension === SERVICE_DIMENSION) return;
-      const seen = depths.get(dimension);
-      depths.set(dimension, seen === undefined ? position : Math.min(seen, position));
-    });
-  }
-
-  const ordered = [...depths.entries()]
-    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
-    // A level nothing has ever carried is a level nobody can pick a value for.
-    // Offering it produces a rule that matches nothing, which is the failure
-    // this picker exists to make impossible.
-    .filter(([dimension]) => Object.keys(props.catalogue.values[dimension] ?? {}).length > 0)
-    .map(([dimension], index) => ({
-      dimension,
-      label: displayOf(dimension),
-      depth: index,
-    }));
-
-  // Service is finest by definition, and is offered whenever discovery has
-  // named anything — it needs no identity set to be a real level.
-  if (serviceNames.value.length) {
-    ordered.push({
-      dimension: SERVICE_DIMENSION,
-      label: displayOf(SERVICE_DIMENSION),
-      depth: ordered.length,
-    });
-  }
-  return ordered;
-});
-
-/// Services that carry a real service name.
-///
-/// Deliberately the registry's `services` list rather than
-/// `catalogue.values.service`: a row filed under a stream name has no `service`
-/// dimension, so it never reaches the catalogue under that key, and the two
-/// disagree by exactly the noise this picker is trying not to show.
-const serviceNames = computed(() =>
-  [...new Set(props.services.map((service) => service.name).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b),
-  ),
-);
-
-/// The levels as select options, each carrying its own colour dot so a level
-/// is recognisable here the same way its chips are everywhere else.
-const levelOptions = computed(() =>
-  levels.value.map((level) => ({ label: raw(level.label), value: level.dimension })),
-);
-
-/// Where a fresh rule starts.
-///
-/// The finest level, which is `service` whenever discovery has named anything.
-/// Not the first: levels are ordered coarsest-first for reading, so "first"
-/// meant whichever platform sorted earliest, and a Kubernetes shop opened the
-/// form on Azure Resource Group. Finest is also the safer default — an
-/// accidental narrow claim pages one team about one service, an accidental
-/// broad one takes an entire cluster.
-function defaultLevel(): string {
-  return levels.value[levels.value.length - 1]?.dimension ?? "";
-}
-
-const mode = ref("");
-const value = ref("");
-const narrowValue = ref("");
-
-const active = computed(() => levels.value.find((level) => level.dimension === mode.value) ?? null);
-
-/// The coarsest level, offered as an optional narrowing on the finest one.
-///
-/// Only on the finest level: at any other, narrowing is what picking a deeper
-/// level already does, and offering both ways to say one thing is how a form
-/// starts needing explaining.
-const narrowable = computed(() => {
-  if (!active.value || active.value.dimension !== SERVICE_DIMENSION) return null;
-  return levels.value.find((level) => level.dimension !== SERVICE_DIMENSION) ?? null;
-});
-
-/// Read the draft back into the control whenever it changes underneath — the
-/// host owns the dimensions, and an edit opened on an existing rule has to land
-/// on the level that rule actually claims.
-watch(
-  () => props.modelValue,
-  (dimensions) => {
-    const names = Object.keys(dimensions ?? {});
-    if (!names.length) {
-      // Only fall back to a default when the current level is not a real one.
-      // Choosing a level publishes an empty claim — the old value belongs to
-      // the old level — so re-deriving the level from those empty dimensions
-      // put it straight back to `levels[0]`, and every level past the first
-      // read as an unclickable tab.
-      const chosen = levels.value.some((level) => level.dimension === mode.value);
-      if (mode.value !== "advanced" && !chosen) mode.value = defaultLevel();
-      value.value = "";
-      narrowValue.value = "";
-      return;
-    }
-    // The finest dimension present is the level being claimed; anything coarser
-    // alongside it is the narrowing. A rule the picker cannot express in those
-    // terms belongs to the field builder, and says so by landing there.
-    const ranked = levels.value.filter((level) => names.includes(level.dimension));
-    const finest = ranked[ranked.length - 1];
-    if (!finest || names.length > 2 || (names.length === 2 && ranked.length < 2)) {
-      // Say so rather than sitting on a level with nothing selected. The host
-      // decides which builder is on screen, and it can only decide correctly if
-      // the one that knows the claim is inexpressible is the one that tells it.
-      mode.value = "advanced";
-      emit("advanced");
-      return;
-    }
-    mode.value = finest.dimension;
-    value.value = String(dimensions[finest.dimension] ?? "");
-    const narrow = ranked.length > 1 ? ranked[0] : null;
-    narrowValue.value = narrow ? String(dimensions[narrow.dimension] ?? "") : "";
-  },
-  { immediate: true, deep: true },
-);
-
 function displayOf(name: string): string {
   return props.aliases.find((alias) => alias.id === name)?.display || name;
 }
 
-const valueOptions = computed(() => {
-  if (!active.value) return [];
-  if (active.value.dimension === SERVICE_DIMENSION) {
-    return serviceNames.value.map((name) => ({ label: raw(name), value: name }));
+/// Values seen for a dimension, commonest first, with how many services carry
+/// each. `service` comes from the registry's own names rather than the
+/// catalogue: a row filed under a stream name has no `service` dimension, so it
+/// never reaches the catalogue under that key.
+function valuesOf(dimension: string): { value: string; services: number }[] {
+  if (dimension === SERVICE_DIMENSION) {
+    return [...new Set(props.services.map((s) => s.name).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => ({ value, services: 0 }));
   }
-  const counts = props.catalogue.values[active.value.dimension] ?? {};
-  return Object.entries(counts)
+  return Object.entries(props.catalogue.values[dimension] ?? {})
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([name, services]) => ({
-      label: raw(name),
-      value: name,
-      // How much of the estate this claim covers, which is the one number
-      // somebody weighing a broad rule actually wants and could not get before.
-      description: services
-        ? String(t("oncall.ruleEditorValueServices", { count: services }, services))
-        : undefined,
-    }));
-});
+    .map(([value, services]) => ({ value, services }));
+}
 
-/// "Everywhere" first and selected by default: a service is owned by one team
-/// wherever it runs far more often than it changes hands per cluster.
-const narrowOptions = computed(() => {
-  if (!narrowable.value) return [];
-  const counts = props.catalogue.values[narrowable.value.dimension] ?? {};
-  return [
-    { label: String(t("oncall.scopeEverywhere")), value: "" },
-    ...Object.entries(counts)
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([name]) => ({ label: raw(name), value: name })),
-  ];
-});
-
-/// The dimensions this choice would write, coarsest first so the chips read in
-/// the same order as the levels above them.
-const claimed = computed(() => {
-  if (!active.value || !value.value) return [];
-  const pairs: { name: string; value: string }[] = [];
-  if (narrowable.value && narrowValue.value) {
-    pairs.push({ name: narrowable.value.dimension, value: narrowValue.value });
-  }
-  pairs.push({ name: active.value.dimension, value: value.value });
-  return pairs;
-});
-
-const scopeHelp = computed<I18nText>(() =>
-  active.value?.dimension === SERVICE_DIMENSION
-    ? t("oncall.scopeServiceHelp")
-    : t("oncall.scopeLevelHelp", { level: raw(active.value?.label ?? "") }),
+/// The platforms this estate actually has, each with its ordered dimensions.
+///
+/// A set whose dimensions have never carried a value is dropped: it describes a
+/// platform this deployment does not run, and offering it produces a path that
+/// can only match nothing.
+const platforms = computed(() =>
+  props.sets
+    .map((set) => ({
+      id: set.id,
+      label: set.label || set.id,
+      dimensions: set.distinguish_by.filter(
+        (dimension) => dimension !== SERVICE_DIMENSION && valuesOf(dimension).length > 0,
+      ),
+    }))
+    .filter((set) => set.dimensions.length > 0),
 );
 
-/// What the claim means once other rules exist. Stated in terms of inheritance,
-/// because "we own the cluster" and "and therefore everything in it that nobody
-/// else claimed" are the same sentence to the person writing it and two
-/// different rules to the engine.
-const consequence = computed<I18nText>(() => {
-  if (!active.value) return raw("");
-  if (active.value.dimension === SERVICE_DIMENSION) {
-    return narrowValue.value
-      ? t("oncall.scopeClaimServiceHere", {
-          service: raw(value.value),
-          scope: raw(narrowValue.value),
-        })
-      : t("oncall.scopeClaimServiceEverywhere", { service: raw(value.value) });
-  }
-  return t("oncall.scopeClaimContainer", {
-    level: raw(active.value.label.toLowerCase()),
-    value: raw(value.value),
-  });
+const platformOptions = computed(() =>
+  platforms.value.map((set) => ({ label: raw(set.label), value: set.id })),
+);
+
+const chosenPlatform = ref("");
+
+/// Which platform's path is on screen. Follows the draft when the draft names
+/// dimensions belonging to one, so opening an existing rule lands on its own
+/// platform rather than the first.
+const platform = computed(() => {
+  const names = Object.keys(props.modelValue ?? {});
+  const owning = platforms.value.find((set) =>
+    set.dimensions.some((dimension) => names.includes(dimension)),
+  );
+  if (owning) return owning.id;
+  const chosen = platforms.value.find((set) => set.id === chosenPlatform.value);
+  return chosen?.id ?? platforms.value[0]?.id ?? "";
 });
 
-function publish() {
-  emit(
-    "update:modelValue",
-    Object.fromEntries(claimed.value.map((pair) => [pair.name, pair.value])),
+/// The path: the chosen platform's dimensions coarsest first, then `service`,
+/// which is finest by definition and belongs to every platform.
+const pathDimensions = computed(() => {
+  const set = platforms.value.find((candidate) => candidate.id === platform.value);
+  const dimensions = set ? [...set.dimensions] : [];
+  if (valuesOf(SERVICE_DIMENSION).length) dimensions.push(SERVICE_DIMENSION);
+  return dimensions;
+});
+
+const segments = computed(() =>
+  pathDimensions.value.map((dimension) => {
+    const values = valuesOf(dimension);
+    const value = String(props.modelValue?.[dimension] ?? ANY);
+    const chosen = values.find((candidate) => candidate.value === value);
+    return {
+      dimension,
+      label: displayOf(dimension),
+      value,
+      options: [
+        { label: String(t("oncall.scopeAny")), value: ANY },
+        ...values.map((candidate) => ({ label: raw(candidate.value), value: candidate.value })),
+      ],
+      // Under an `Any`, how much it is letting through; under a value, how much
+      // that value covers. Both answer "how broad is this", which is the
+      // question a path makes askable and a list of dropdowns did not.
+      breadth: value
+        ? chosen?.services
+          ? t("oncall.ruleEditorValueServices", { count: chosen.services }, chosen.services)
+          : t("oncall.scopeBreadthOne")
+        : t("oncall.scopeBreadthAny", { count: values.length }, values.length),
+    };
+  }),
+);
+
+/// The segments that are actually conditions — `Any` writes nothing.
+const pinned = computed(() =>
+  segments.value.filter((segment) => segment.value !== ANY),
+);
+
+/// The claim in a sentence, including what it does not take.
+const consequence = computed<I18nText>(() => {
+  const finest = pinned.value[pinned.value.length - 1];
+  if (!finest) return raw("");
+  const gaps = segments.value.filter(
+    (segment) => segment.value === ANY && segment.dimension !== finest.dimension,
   );
+  const where = pinned.value
+    .slice(0, -1)
+    .map((segment) => segment.value)
+    .join(" / ");
+
+  if (finest.dimension === SERVICE_DIMENSION) {
+    return where
+      ? t("oncall.scopeClaimServiceHere", { service: raw(finest.value), scope: raw(where) })
+      : t("oncall.scopeClaimServiceEverywhere", { service: raw(finest.value) });
+  }
+  return gaps.length
+    ? t("oncall.scopeClaimContainerAny", {
+        level: raw(finest.label.toLowerCase()),
+        value: raw(finest.value),
+      })
+    : t("oncall.scopeClaimContainer", {
+        level: raw(finest.label.toLowerCase()),
+        value: raw(finest.value),
+      });
+});
+
+/// The colour the dimension carries everywhere else.
+///
+/// Spelled out rather than interpolated: Tailwind scans source text for class
+/// names, so a computed `bg-${tone}` exists at runtime and not in the
+/// stylesheet — the dot renders, invisibly, in every colour.
+const DOT_CLASSES: Record<string, string> = {
+  "default-soft": "bg-badge-default-soft-text",
+  "primary-soft": "bg-badge-primary-soft-text",
+  "success-soft": "bg-badge-success-soft-text",
+  "warning-soft": "bg-badge-warning-soft-text",
+  "error-soft": "bg-badge-error-soft-text",
+  "amber-soft": "bg-badge-amber-soft-text",
+  "blue-soft": "bg-badge-blue-soft-text",
+  "cyan-soft": "bg-badge-cyan-soft-text",
+  "indigo-soft": "bg-badge-indigo-soft-text",
+  "lime-soft": "bg-badge-lime-soft-text",
+  "orange-soft": "bg-badge-orange-soft-text",
+  "purple-soft": "bg-badge-purple-soft-text",
+  "teal-soft": "bg-badge-teal-soft-text",
+};
+
+function dotClassOf(dimension: string): string {
+  return DOT_CLASSES[String(dimensionVariant(dimension))] ?? DOT_CLASSES["default-soft"];
 }
 
-function selectMode(next: string) {
-  mode.value = next;
-  // Switching level abandons the old value rather than carrying it across: a
-  // cluster name is not a namespace name, and a silently retained value is a
-  // rule that claims something nobody chose.
-  value.value = "";
-  narrowValue.value = "";
-  publish();
+function setSegment(dimension: string, next: string) {
+  const dimensions: Record<string, string> = { ...(props.modelValue ?? {}) };
+  if (next === ANY) delete dimensions[dimension];
+  else dimensions[dimension] = next;
+  // Only this platform's path may contribute. Switching platform leaves the old
+  // platform's values behind on the draft otherwise, and they would be saved
+  // invisibly — a condition nobody can see is a rule that matches nothing.
+  const allowed = new Set(pathDimensions.value);
+  for (const key of Object.keys(dimensions)) if (!allowed.has(key)) delete dimensions[key];
+  emit("update:modelValue", dimensions);
 }
 
-function setValue(next: string) {
-  value.value = next;
-  publish();
+function selectPlatform(next: string) {
+  chosenPlatform.value = next;
+  // A cluster name is not a resource-group name. Carrying values across
+  // platforms would claim something nobody picked.
+  if (Object.keys(props.modelValue ?? {}).length) emit("update:modelValue", {});
 }
 
-function setNarrow(next: string) {
-  narrowValue.value = next;
-  publish();
-}
+/// Keep the platform selection honest when the estate changes underneath —
+/// a set that disappears must not leave the path pointing at nothing.
+watch(
+  () => platforms.value.map((set) => set.id).join(),
+  (ids) => {
+    if (chosenPlatform.value && !ids.split(",").includes(chosenPlatform.value)) {
+      chosenPlatform.value = "";
+    }
+  },
+);
 </script>

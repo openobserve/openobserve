@@ -19,21 +19,16 @@ import { describe, expect, it } from "vitest";
 import OnCallScopePicker from "@/components/oncall/OnCallScopePicker.vue";
 import i18n from "@/locales";
 
-/// The selects are stubbed down to their options so a test can assert what was
-/// offered — which is the whole point of this component — without driving a
-/// listbox.
+/// Selects render their options as buttons so a test can assert what was
+/// offered — the point of this component — without driving a listbox.
 const stubs = {
-  // Each select renders its options as buttons, so a test can assert what was
-  // offered — the point of this component — without driving a listbox. The
-  // level select is tagged so level clicks and value clicks stay separable.
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options", "label"],
-    template: `<div :data-label="label" :data-test="$attrs['data-test']"><button
+    props: ["modelValue", "options"],
+    template: `<div :data-test="$attrs['data-test']" :data-value="modelValue"><button
         v-for="option in options"
         :key="String(option.value)"
         :data-option="String(option.value)"
-        :data-description="option.description || ''"
         @click="$emit('update:modelValue', option.value)"
       >{{ option.label }}</button></div>`,
   },
@@ -41,24 +36,19 @@ const stubs = {
     name: "OButton",
     template: `<button :data-test="$attrs['data-test']" @click="$emit('click')"><slot /></button>`,
   },
-  OTooltip: { name: "OTooltip", template: "<span />" },
+  OIcon: { name: "OIcon", template: "<i />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
-  ODimensionChip: {
-    name: "ODimensionChip",
-    props: ["dimKey", "value"],
-    template: `<span :data-chip="dimKey + '=' + value" />`,
-  },
 };
 
-const SETS = [
-  { id: "k8s", label: "Kubernetes", distinguish_by: ["k8s-cluster", "k8s-namespace"] },
-];
+const K8S = { id: "k8s", label: "Kubernetes", distinguish_by: ["k8s-cluster", "k8s-namespace"] };
+const AWS = { id: "aws", label: "AWS", distinguish_by: ["ecs-task"] };
 
 const CATALOGUE = {
-  present: ["k8s-cluster", "k8s-namespace"],
+  present: ["k8s-cluster", "k8s-namespace", "ecs-task"],
   values: {
     "k8s-cluster": { production: 48, "common-dev": 12 },
-    "k8s-namespace": { payments: 6, search: 4 },
+    "k8s-namespace": { payments: 6, search: 4, checkout: 3 },
+    "ecs-task": { billing: 2 },
   },
 };
 
@@ -69,166 +59,137 @@ const SERVICES = [
 
 function render(props: Record<string, unknown> = {}) {
   return mount(OnCallScopePicker, {
-    props: { sets: SETS, catalogue: CATALOGUE, services: SERVICES, ...props },
+    props: { sets: [K8S], catalogue: CATALOGUE, services: SERVICES, ...props },
     global: { plugins: [i18n], stubs },
   });
 }
 
-function levelSelect(wrapper: ReturnType<typeof render>) {
-  return wrapper.find('[data-test="oncall-scope-level"]');
+function path(wrapper: ReturnType<typeof render>) {
+  return wrapper
+    .findAll('[data-test^="oncall-scope-segment-"]')
+    .map((node) => node.attributes("data-test")!.replace("oncall-scope-segment-", ""));
 }
 
-function modes(wrapper: ReturnType<typeof render>) {
-  return levelSelect(wrapper)
-    .findAll("[data-option]")
-    .map((node) => node.attributes("data-option"));
+function pick(wrapper: ReturnType<typeof render>, dimension: string, value: string) {
+  return wrapper
+    .find(`[data-test="oncall-scope-segment-${dimension}"] [data-option="${value}"]`)
+    .trigger("click");
 }
 
-/// Choose a level, then a value for it — the two-step every claim goes through.
-async function claim(wrapper: ReturnType<typeof render>, level: string, value: string) {
-  await levelSelect(wrapper).find(`[data-option="${level}"]`).trigger("click");
-  await wrapper.find(`[data-test="oncall-scope-value"] [data-option="${value}"]`).trigger("click");
+function lastEmit(wrapper: ReturnType<typeof render>) {
+  return wrapper.emitted("update:modelValue")?.at(-1)?.[0];
 }
 
 describe("OnCallScopePicker", () => {
-  /// The ordering is not invented here — it is the org's own `distinguish_by`,
-  /// which is what keeps this row and the backend's ranking from disagreeing
-  /// about which of two rules is the narrower claim.
-  it("offers levels coarsest first, from the identity set's own order", () => {
-    const wrapper = render();
-
-    // Advanced is a button beside the row, not a kind of thing a team can own.
-    expect(modes(wrapper)).toEqual(["k8s-cluster", "k8s-namespace", "service"]);
+  /// The order is the org's own `distinguish_by`, which is what keeps this row
+  /// and the backend's precedence from disagreeing about which rule is narrower.
+  it("draws the path coarsest first, with service last", () => {
+    expect(path(render())).toEqual(["k8s-cluster", "k8s-namespace", "service"]);
   });
 
-  /// The failure this component exists to remove. The registry files anything
-  /// without a `service` dimension under its stream name, so a real estate has
-  /// metric names and availability zones in it — none of which is a level
-  /// anybody owns.
-  it("never offers a level nothing has ever carried", () => {
+  /// A dimension nothing has ever carried describes a platform this deployment
+  /// does not run. Offering it can only produce a path that matches nothing.
+  it("leaves out a segment nothing has ever carried", () => {
     const wrapper = render({
       sets: [{ id: "k8s", label: "K8s", distinguish_by: ["k8s-cluster", "k8s-deployment"] }],
     });
-
-    expect(modes(wrapper)).toContain("k8s-cluster");
-    expect(modes(wrapper)).not.toContain("k8s-deployment");
+    expect(path(wrapper)).toEqual(["k8s-cluster", "service"]);
   });
 
-  it("claims a whole cluster as one dimension", async () => {
+  it("every segment starts on Any, so a fresh rule claims nothing", () => {
     const wrapper = render();
-
-    await claim(wrapper, "k8s-cluster", "production");
-
-    const emitted = wrapper.emitted("update:modelValue");
-    expect(emitted?.at(-1)?.[0]).toEqual({ "k8s-cluster": "production" });
+    const values = wrapper
+      .findAll('[data-test^="oncall-scope-segment-"]')
+      .map((node) => node.attributes("data-value"));
+    expect(values).toEqual(["", "", ""]);
+    expect(wrapper.find('[data-test="oncall-scope-picker-empty"]').exists()).toBe(true);
   });
 
-  /// How broad the claim is, which is the one number somebody weighing a
-  /// cluster-wide rule wants and had no way to get from a flat service list.
-  it("says how much of the estate each value covers", () => {
+  it("claims a whole cluster from one segment", async () => {
     const wrapper = render();
-
-    const option = wrapper.find('[data-test="oncall-scope-value"] [data-option="production"]');
-    expect(option.attributes("data-description")).toContain("48");
+    await pick(wrapper, "k8s-cluster", "production");
+    expect(lastEmit(wrapper)).toEqual({ "k8s-cluster": "production" });
   });
 
-  /// One team owns a service wherever it runs, far more often than it changes
-  /// hands per cluster — so "everywhere" is the default, not a thing to find.
-  it("claims a service everywhere unless narrowed", async () => {
-    const wrapper = render();
-
-    await claim(wrapper, "service", "payment-gateway");
-
-    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({
-      service: "payment-gateway",
-    });
-  });
-
-  it("narrows a service to one enclosing scope when asked", async () => {
-    const wrapper = render();
-
-    await claim(wrapper, "service", "payment-gateway");
-    await wrapper
-      .find('[data-test="oncall-scope-narrow"] [data-option="production"]')
-      .trigger("click");
-
-    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({
+  /// The case a path expresses and three dropdowns could not: a hole in the
+  /// middle. `Any` namespace is visibly a gap the rule does not care about.
+  it("writes only the segments that are pinned, leaving Any out", async () => {
+    const wrapper = render({ modelValue: { "k8s-cluster": "production" } });
+    await pick(wrapper, "service", "payment-gateway");
+    expect(lastEmit(wrapper)).toEqual({
       "k8s-cluster": "production",
       service: "payment-gateway",
     });
   });
 
-  /// A cluster name is not a namespace name. Carrying the value across would
-  /// produce a rule claiming something nobody picked.
-  it("drops the value when the level changes", async () => {
-    const wrapper = render();
-
-    await claim(wrapper, "k8s-cluster", "production");
-    await levelSelect(wrapper).find('[data-option="k8s-namespace"]').trigger("click");
-
-    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({});
+  it("clearing a segment back to Any removes that condition", async () => {
+    const wrapper = render({
+      modelValue: { "k8s-cluster": "production", "k8s-namespace": "payments" },
+    });
+    await pick(wrapper, "k8s-namespace", "");
+    expect(lastEmit(wrapper)).toEqual({ "k8s-cluster": "production" });
   });
 
-  it("hands off to the field builder when Advanced is chosen", async () => {
-    const wrapper = render();
-
-    await wrapper.find('[data-test="oncall-scope-mode-advanced"]').trigger("click");
-
-    expect(wrapper.emitted("advanced")).toHaveLength(1);
+  /// How broad the claim is, per segment — the question a path makes askable
+  /// and a row of disconnected dropdowns did not.
+  it("says how much of the estate each segment takes", () => {
+    const wrapper = render({ modelValue: { "k8s-cluster": "production" } });
+    expect(wrapper.find('[data-test="oncall-scope-breadth-k8s-cluster"]').text()).toContain("48");
+    // An Any segment reports what it is letting through, so breadth is visible
+    // rather than something to infer from an empty control.
+    expect(wrapper.find('[data-test="oncall-scope-breadth-k8s-namespace"]').text()).toContain("3");
   });
 
-  /// Inheritance is the part of this model people get wrong, and the only
-  /// honest place to state it is beside the claim being made.
-  it("spells out what the claim leaves to narrower rules", async () => {
-    const wrapper = render();
-
-    await claim(wrapper, "k8s-cluster", "production");
-
-    const claimBox = wrapper.find('[data-test="oncall-scope-picker-consequence"]');
-    expect(claimBox.text()).toContain("unless a narrower rule claims it");
+  it("spells out what a container claim leaves to longer paths", () => {
+    const wrapper = render({ modelValue: { "k8s-cluster": "production" } });
+    expect(wrapper.find('[data-test="oncall-scope-picker-consequence"]').text()).toContain(
+      "unless a longer path claims it",
+    );
   });
 
-  /// A service beats a cluster in the engine's ranking, so the sentence beside
-  /// it has to say so — otherwise the reader writes the rule and then wonders
-  /// which of the two overlapping claims won.
-  it("says a service claim holds against the scopes around it", async () => {
-    const wrapper = render();
-
-    await claim(wrapper, "service", "payment-gateway");
-
+  /// A service beats any container rule in the engine's ranking, so the
+  /// sentence has to say so — otherwise the reader writes it and then wonders
+  /// which of two overlapping claims won.
+  it("says a service claim holds against the scopes around it", () => {
+    const wrapper = render({ modelValue: { service: "payment-gateway" } });
     expect(wrapper.find('[data-test="oncall-scope-picker-consequence"]').text()).toContain(
       "whoever owns the ones around it",
     );
   });
 
-  /// Opening an existing rule has to land on the level that rule claims, or the
-  /// editor silently rewrites it to whatever the picker defaulted to.
-  it("reads an existing claim back onto its own level", () => {
-    const wrapper = render({ modelValue: { "k8s-namespace": "payments" } });
+  describe("more than one platform", () => {
+    /// A record is either an ECS task or a Kubernetes pod. One path mixing both
+    /// would describe nothing that exists.
+    it("keeps each platform's path to itself", async () => {
+      const wrapper = render({ sets: [K8S, AWS] });
+      expect(path(wrapper)).toEqual(["k8s-cluster", "k8s-namespace", "service"]);
 
-    const chips = wrapper.findAll("[data-chip]").map((node) => node.attributes("data-chip"));
-    expect(chips).toEqual(["k8s-namespace=payments"]);
-  });
-
-  /// The bug that made every level past the first read as an unclickable tab:
-  /// choosing a level publishes an empty claim, and the watcher re-derived the
-  /// level from those empty dimensions, putting it straight back to the first.
-  it("keeps the chosen level after it publishes an empty claim", async () => {
-    const wrapper = render();
-
-    await levelSelect(wrapper).find('[data-option="k8s-cluster"]').trigger("click");
-    await wrapper.vm.$nextTick();
-
-    const valueLabel = wrapper.find('[data-test="oncall-scope-value"]').attributes("data-label");
-    expect(valueLabel).toBe("k8s-cluster");
-  });
-
-  it("shows a service claim with its narrowing, coarsest chip first", () => {
-    const wrapper = render({
-      modelValue: { service: "payment-gateway", "k8s-cluster": "production" },
+      await wrapper.find('[data-test="oncall-scope-platform"] [data-option="aws"]').trigger("click");
+      expect(path(wrapper)).toEqual(["ecs-task", "service"]);
     });
 
-    const chips = wrapper.findAll("[data-chip]").map((node) => node.attributes("data-chip"));
-    expect(chips).toEqual(["k8s-cluster=production", "service=payment-gateway"]);
+    it("does not ask which platform when the estate has only one", () => {
+      expect(render().find('[data-test="oncall-scope-platform"]').exists()).toBe(false);
+    });
+
+    /// Values from the platform that was left behind would be saved invisibly —
+    /// a condition nobody can see is a rule that matches nothing.
+    it("drops the old platform's values when switching", async () => {
+      const wrapper = render({ sets: [K8S, AWS], modelValue: { "k8s-cluster": "production" } });
+      await wrapper.find('[data-test="oncall-scope-platform"] [data-option="aws"]').trigger("click");
+      expect(lastEmit(wrapper)).toEqual({});
+    });
+
+    /// Opening an existing rule has to land on its own platform, not the first.
+    it("follows the draft to the platform that owns its dimensions", () => {
+      const wrapper = render({ sets: [K8S, AWS], modelValue: { "ecs-task": "billing" } });
+      expect(path(wrapper)).toEqual(["ecs-task", "service"]);
+    });
+  });
+
+  it("hands off to the field builder when Advanced is chosen", async () => {
+    const wrapper = render();
+    await wrapper.find('[data-test="oncall-scope-mode-advanced"]').trigger("click");
+    expect(wrapper.emitted("advanced")).toHaveLength(1);
   });
 });

@@ -398,6 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sets="sets"
       :signals="openSignals"
       :ladder="ladder"
+      :conflict="conflict"
       :saving="saving"
       @update:open="
         (v: boolean) => {
@@ -406,6 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       @save="save"
       @remove="remove"
+      @preview="(dimensions: Record<string, string>) => emit('preview', dimensions)"
     />
   </div>
 </template>
@@ -415,6 +417,7 @@ import { computed, ref, watch } from "vue";
 
 import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
 import type { IdentitySet } from "@/services/service_streams";
+import type { RoutingPreview } from "@/ts/interfaces/oncall";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -486,6 +489,8 @@ const props = withDefaults(
     services?: DiscoveredService[];
     /** The org's identity sets — the ordered hierarchy the scope picker uses. */
     sets?: IdentitySet[];
+    /** Who holds the drafted path today, for the editor's conflict line. */
+    conflict?: RoutingPreview | null;
     teamId?: string;
     teamName?: string;
     teams?: { id: string; name: string }[];
@@ -505,6 +510,7 @@ const props = withDefaults(
     catalogue: () => ({ present: [], values: {} }),
     services: () => [],
     sets: () => [],
+    conflict: null,
     teamId: "",
     teamName: "",
     teams: () => [],
@@ -525,6 +531,8 @@ const emit = defineEmits<{
   (e: "claim-all", signals: UnroutedSignal[]): void;
   (e: "dismiss", signal: UnroutedSignal): void;
   (e: "toggle-tester"): void;
+  /** The drafted path changed — the host asks the engine who holds it today. */
+  (e: "preview", dimensions: Record<string, string>): void;
 }>();
 
 const { t } = useI18nTyped();

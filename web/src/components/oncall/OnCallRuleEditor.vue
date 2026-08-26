@@ -283,6 +283,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSelect>
       </div>
 
+      <!-- Who holds this path today, answered by the engine rather than
+           re-derived here. The draft's own conditions are replayed as if they
+           were a signal, so this is the real decision — the same call the
+           routing tester makes, on the path being written.
+
+           It answers the question a rule editor otherwise leaves hanging: not
+           "is this valid" but "what changes when I save it". -->
+      <div
+        v-if="conflict && pairs.length"
+        class="rounded-default flex items-start gap-2 border px-2.5 py-2"
+        :class="
+          conflictIsContested
+            ? 'border-warning-400 bg-warning-surface'
+            : 'border-border-subtle bg-surface-panel'
+        "
+        data-test="oncall-rule-editor-conflict"
+      >
+        <OIcon
+          :name="conflictIsContested ? 'warning-outline' : 'info-outline'"
+          size="sm"
+          :class="
+            conflictIsContested
+              ? 'text-warning-700 mt-0.5 shrink-0'
+              : 'text-text-secondary mt-0.5 shrink-0'
+          "
+        />
+        <span class="flex min-w-0 flex-col gap-0.5">
+          <OText variant="meta" data-test="oncall-rule-editor-conflict-now">
+            {{ conflictNow }}
+          </OText>
+          <!-- The server's own sentence about precedence. Rendered, never
+               restated — a second copy of the ordering on this side is a second
+               thing to keep in step with the engine. -->
+          <OText
+            v-if="conflictOutcome"
+            variant="meta"
+            class="font-medium"
+            data-test="oncall-rule-editor-conflict-outcome"
+          >
+            {{ conflictOutcome }}
+          </OText>
+        </span>
+      </div>
+
       <!-- The verification, in the same panel as the edit. Only the unrouted
            queue can be replayed on this side, so this is a floor on what the
            rule would take rather than a full replay of every page. -->
@@ -373,6 +417,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { IdentitySet } from "@/services/service_streams";
 import type {
+  RoutingPreview,
   DimensionCatalogue,
   DiscoveredService,
   OwnershipRuleStats,
@@ -413,6 +458,9 @@ const props = withDefaults(
     services?: DiscoveredService[];
     /** The org's identity sets — the ordered hierarchy the scope picker uses. */
     sets?: IdentitySet[];
+    /** Who holds the drafted path today, straight from the routing engine.
+     *  The host fetches it in response to `preview`; null while in flight. */
+    conflict?: RoutingPreview | null;
     /** Replayed against the draft to answer "what would this catch". */
     signals?: UnroutedSignal[];
     /** The target team's ladder, so "page" says what paging means. */
@@ -429,6 +477,7 @@ const props = withDefaults(
     catalogue: () => ({ present: [], values: {} }),
     services: () => [],
     sets: () => [],
+    conflict: null,
     signals: () => [],
     ladder: () => [],
     saving: false,
@@ -438,6 +487,10 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: "update:open", open: boolean): void;
   (e: "save", draft: RuleDraft): void;
+  /** The drafted conditions changed — ask the engine who holds them today.
+   *  Debounced here so a host can answer it with a request per pause, not one
+   *  per keystroke. Empty when there is nothing to ask about. */
+  (e: "preview", dimensions: Record<string, string>): void;
   /** Removal lives here so a row keeps one button; the host confirms it. */
   (e: "remove"): void;
 }>();
@@ -540,11 +593,18 @@ const scoped = ref(true);
 function scopeCanExpress(dimensions: Record<string, string>): boolean {
   const names = Object.keys(dimensions);
   if (!names.length) return true;
-  if (names.length > 2) return false;
+  // A wildcard is a family, not a path segment, and the picker has no way to
+  // say one. Those rules stay in the builder that wrote them.
   if (Object.values(dimensions).some((value) => String(value).endsWith("*"))) return false;
-  const known = new Set<string>([SERVICE_DIMENSION]);
-  for (const set of props.sets) for (const dimension of set.distinguish_by) known.add(dimension);
-  return names.every((name) => known.has(name));
+
+  // Everything else has to sit on ONE platform's path, plus `service`, which
+  // belongs to every platform. A rule mixing an ECS task with a Kubernetes
+  // namespace describes no record that can exist, so the path cannot draw it —
+  // and it must open in Advanced rather than be silently rewritten to whatever
+  // path the picker settled on.
+  const named = names.filter((name) => name !== SERVICE_DIMENSION);
+  if (!named.length) return true;
+  return props.sets.some((set) => named.every((name) => set.distinguish_by.includes(name)));
 }
 
 function useAdvanced() {
@@ -648,6 +708,79 @@ const matchCount = computed<I18nText>(() => {
   const fires = matched.value.reduce((total, signal) => total + signal.occurrences, 0);
   return t("oncall.ruleEditorMatchCount", { count: fires }, fires);
 });
+
+/// How many segments the current holder's path pins.
+///
+/// `path()` is `k=v/k=v`, so counting segments counts conditions — which is the
+/// FIRST term of the engine's ordering and the only one that can be read off a
+/// string. The finer terms (which level, exact versus wildcard) are the
+/// server's to decide, and this deliberately does not guess at them.
+function segmentsOf(path: string): number {
+  return path.split("/").filter(Boolean).length;
+}
+
+/// The rule that holds this path today, if any. `also_matched` lists the losers,
+/// so the winner is the decision itself — which is why this reads `decision`
+/// rather than picking the first of the list.
+const conflictHolder = computed(() => {
+  const decision = props.conflict?.decision as { path?: string; rule_id?: string } | undefined;
+  if (!decision?.path) return null;
+  return {
+    path: String(decision.path),
+    teamId: props.conflict?.team_id ?? "",
+    segments: segmentsOf(String(decision.path)),
+  };
+});
+
+/// Whether saving this would change who gets paged for the path.
+const conflictIsContested = computed(
+  () => !!conflictHolder.value && conflictHolder.value.teamId !== team.value,
+);
+
+/// What happens today — always stated, because "nothing claims this yet" is as
+/// useful an answer as naming the holder.
+const conflictNow = computed<I18nText>(() => {
+  const holder = conflictHolder.value;
+  if (!holder) return t("oncall.ruleEditorConflictUnclaimed");
+  return t("oncall.ruleEditorConflictHeldBy", {
+    team: raw(teamNameOf(holder.teamId)),
+    path: raw(holder.path),
+  });
+});
+
+/// What changes when this is saved.
+///
+/// Only claimed where the answer is certain. Specificity is the first term of
+/// the ordering, so a strictly longer path wins and a strictly shorter one
+/// loses whatever the finer terms say. At equal length the depth ranking
+/// decides, and that lives on the server — so this says the two contend and
+/// stops, rather than guessing and being wrong about which team gets woken.
+const conflictOutcome = computed<I18nText | "">(() => {
+  const holder = conflictHolder.value;
+  if (!holder || !pairs.value.length) return "";
+  if (holder.teamId === team.value) return t("oncall.ruleEditorConflictSameTeam");
+  if (pairs.value.length > holder.segments) {
+    return t("oncall.ruleEditorConflictTakesOver", { team: raw(teamNameOf(holder.teamId)) });
+  }
+  if (pairs.value.length < holder.segments) {
+    return t("oncall.ruleEditorConflictKeptBy", { team: raw(teamNameOf(holder.teamId)) });
+  }
+  return t("oncall.ruleEditorConflictEqual");
+});
+
+/// Ask the host who holds the drafted path, one request per pause rather than
+/// one per keystroke. The dialog is short-lived, so the timer is cleared on
+/// close rather than tracked across the component's whole life.
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  [draftDimensions, () => props.open],
+  ([dimensions, isOpen]) => {
+    clearTimeout(previewTimer);
+    if (!isOpen) return;
+    previewTimer = setTimeout(() => emit("preview", dimensions), 300);
+  },
+  { deep: true },
+);
 
 const catchSummary = computed<I18nText>(() =>
   pairs.value.length ? t("oncall.ruleEditorCatchNone") : t("oncall.ruleEditorEmpty"),

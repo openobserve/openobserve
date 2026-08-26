@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :teams="teams"
       :default-team-id="routingConfig?.default_team_id ?? null"
       :ladder="ladder"
+      :conflict="conflict"
       :loading="loadingRules"
       :saving="saving"
       :saving-default="savingDefault"
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @claim-all="claimAllOpen = true"
       @dismiss="dismissSignal"
       @toggle-tester="testerOpen = !testerOpen"
+      @preview="previewConflict"
     />
 
     <OnCallRoutingSimulator
@@ -154,6 +156,10 @@ const { config: routingConfig, load: loadRoutingConfig, refresh: refreshRoutingC
   useOnCallRoutingConfig();
 
 const preview = ref<RoutingPreview | null>(null);
+/// Who holds the path the rule editor is currently drafting. Separate from
+/// `preview`, which belongs to the tester strip and answers a different
+/// question the reader asked deliberately.
+const conflict = ref<RoutingPreview | null>(null);
 
 const loadingRules = ref(false);
 const testing = ref(false);
@@ -222,6 +228,30 @@ async function fetchServices() {
 /// The hierarchy, straight from correlation's own configuration rather than
 /// asked for again here — two screens describing one estate is how they end up
 /// disagreeing about its shape.
+/// Who holds a drafted path today, answered by the engine.
+///
+/// The draft's own conditions are replayed as if they were a signal, so this is
+/// the real decision rather than a second copy of the ordering on this side.
+/// Debounced by the editor, so this runs once per pause.
+///
+/// Never surfaces an error: a conflict line that cannot be drawn is missing
+/// context, not a reason to stop somebody writing a rule.
+async function previewConflict(dimensions: Record<string, string>) {
+  if (!Object.keys(dimensions).length) {
+    conflict.value = null;
+    return;
+  }
+  try {
+    const res = await oncallService.previewRouting({
+      org_identifier: orgId.value,
+      data: { dimensions },
+    });
+    conflict.value = res.data ?? null;
+  } catch {
+    conflict.value = null;
+  }
+}
+
 async function fetchSets() {
   try {
     const res = await getIdentityConfig(orgId.value);
