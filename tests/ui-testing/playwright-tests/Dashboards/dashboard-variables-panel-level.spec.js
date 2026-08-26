@@ -181,11 +181,12 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await pm.dashboardSetting.closeSettingWindow();
 
-    // Wait for variable to appear on dashboard
-    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Panel1 should be out of viewport, so variable should not be loaded yet
+    // The variable is panel-scoped: its selector renders inside Panel1, which
+    // is below the fold and lazily unmounted — so it must not be on the page yet.
+    await expect(scopedVars.getVariableSelectorLocator(variableName)).not.toBeVisible();
+
     // Monitor API calls when we scroll to Panel1
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
 
@@ -201,6 +202,9 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     // Scrolling near the viewport mounts the lazy panel — its full container
     // appearing is the visibility signal that triggers variable loading.
     await scopedVars.getPanelContainer(6).waitFor({ state: "visible", timeout: 15000 });
+
+    // The panel-scoped variable selector appears together with its panel
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for panel to be in viewport and API calls to complete
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
