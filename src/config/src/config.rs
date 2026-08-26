@@ -454,7 +454,6 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
-        status_pages_enabled,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
         status_page_trust_proxy_headers,
@@ -479,10 +478,6 @@ pub(crate) fn synthetics_restart_required_changes(
     // registration; honouring it at runtime would be a structural change.
     if old.enabled != *enabled {
         changed.push("ZO_SYNTHETICS_ENABLED");
-    }
-    // Gates a `tokio::spawn` exactly like `enabled` does.
-    if old.status_pages_enabled != *status_pages_enabled {
-        changed.push("ZO_STATUS_PAGES_ENABLED");
     }
     // Read once when the rebuilder loop starts.
     if old.status_page_rebuild_interval != *status_page_rebuild_interval {
@@ -919,15 +914,6 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
-    /// Public status pages built on synthetics. Off by default; requires
-    /// `enabled` — the rebuilder and status-page routes only exist when both
-    /// are true.
-    #[env_config(
-        name = "ZO_STATUS_PAGES_ENABLED",
-        default = false,
-        help = "Master switch for public status pages built on synthetics. Requires ZO_SYNTHETICS_ENABLED."
-    )]
-    pub status_pages_enabled: bool,
     /// Seconds between status-page snapshot rebuild ticks.
     #[env_config(
         name = "ZO_STATUS_PAGE_REBUILD_INTERVAL",

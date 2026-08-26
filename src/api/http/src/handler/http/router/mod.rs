@@ -704,7 +704,7 @@ pub fn basic_routes() -> Router {
     // above: existence and visibility are checked inside the handler, and the
     // handlers are pure meta-store point-reads (no search, storage, or
     // cross-node calls on this plane).
-    if get_config().synthetics.enabled && get_config().synthetics.status_pages_enabled {
+    if get_config().synthetics.enabled {
         router = router
             .route(
                 "/api/status_pages_public/{slug}",
@@ -1463,66 +1463,63 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload));
 
         // Status pages — authenticated admin CRUD (the public read plane lives
-        // in basic_routes, not here). Gated on the same flag as the public
-        // routes. RBAC is enforced by the OpenFGA route-permission middleware
+        // in basic_routes, not here). Ships with synthetics, no separate
+        // toggle. RBAC is enforced by the OpenFGA route-permission middleware
         // (resource "status_page"); the per-mapped-check folder-authz is
         // in-handler (R-1).
-        if config::get_config().synthetics.status_pages_enabled {
-            router = router
-                .route(
-                    "/{org_id}/status_pages",
-                    get(status_pages::admin::list_pages).post(status_pages::admin::create_page),
-                )
-                .route(
-                    "/{org_id}/status_pages/{id}",
-                    get(status_pages::admin::get_page)
-                        .put(status_pages::admin::update_page)
-                        .delete(status_pages::admin::delete_page),
-                )
-                .route(
-                    "/{org_id}/status_pages/{id}/components",
-                    put(status_pages::admin::set_components),
-                )
-                .route(
-                    "/{org_id}/status_pages/{id}/rotate_slug",
-                    post(status_pages::admin::rotate_slug),
-                )
-                .route(
-                    "/{org_id}/status_pages/{id}/preview",
-                    get(status_pages::admin::preview),
-                )
-                .route(
-                    "/{org_id}/status_pages/{id}/notices",
-                    get(status_pages::admin::list_page_notices)
-                        .post(status_pages::admin::create_notice),
-                )
-                .route(
-                    "/{org_id}/status_pages/notices/{nid}",
-                    put(status_pages::admin::update_notice)
-                        .delete(status_pages::admin::delete_notice),
-                )
-                .route(
-                    "/{org_id}/status_pages/notices/{nid}/updates",
-                    get(status_pages::admin::list_notice_updates)
-                        .post(status_pages::admin::add_notice_update),
-                )
-                .route(
-                    "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
-                    post(status_pages::admin::mark_false_positive),
-                )
-                .route(
-                    "/{org_id}/status_pages/{id}/domains",
-                    get(status_pages::admin::list_domains).post(status_pages::admin::create_domain),
-                )
-                .route(
-                    "/{org_id}/status_pages/domains/{did}",
-                    delete(status_pages::admin::delete_domain),
-                )
-                .route(
-                    "/{org_id}/status_pages/domains/{did}/verify",
-                    post(status_pages::admin::verify_domain),
-                );
-        }
+        router = router
+            .route(
+                "/{org_id}/status_pages",
+                get(status_pages::admin::list_pages).post(status_pages::admin::create_page),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}",
+                get(status_pages::admin::get_page)
+                    .put(status_pages::admin::update_page)
+                    .delete(status_pages::admin::delete_page),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/components",
+                put(status_pages::admin::set_components),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/rotate_slug",
+                post(status_pages::admin::rotate_slug),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/preview",
+                get(status_pages::admin::preview),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/notices",
+                get(status_pages::admin::list_page_notices)
+                    .post(status_pages::admin::create_notice),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}",
+                put(status_pages::admin::update_notice).delete(status_pages::admin::delete_notice),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}/updates",
+                get(status_pages::admin::list_notice_updates)
+                    .post(status_pages::admin::add_notice_update),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
+                post(status_pages::admin::mark_false_positive),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/domains",
+                get(status_pages::admin::list_domains).post(status_pages::admin::create_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}",
+                delete(status_pages::admin::delete_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}/verify",
+                post(status_pages::admin::verify_domain),
+            );
 
         // The private-VPC-agent path, and the only part of synthetics that
         // is enterprise. Not registered at all in an OSS build, so these
@@ -1789,7 +1786,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     // them apart, and it has to be checked before normal routing claims the
     // request. See `host_route_middleware`'s doc comment for the fall-through
     // guarantee that keeps this safe for ordinary (non-custom-domain) traffic.
-    if config::get_config().synthetics.status_pages_enabled {
+    if config::get_config().synthetics.enabled {
         app = app.layer(middleware::from_fn(
             status_pages::public::host_route_middleware,
         ));

@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="location-on" size="sm" />
           <span>{{ t("synthetics.tabs.private") }}</span>
         </OTab>
-        <OTab v-if="statusPagesEnabled" name="status-pages">
+        <OTab name="status-pages">
           <OIcon name="monitor-heart" size="sm" />
           <span>{{ t("statusPages.tabTitle") }}</span>
         </OTab>
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- ── STATUS PAGES TAB ── -->
       <StatusPagesList
-        v-if="statusPagesEnabled && activeSection === 'status-pages'"
+        v-if="activeSection === 'status-pages'"
         :pages="statusPages"
         :loading="statusPagesLoading"
         :timezone="store.state.timezone"
@@ -372,7 +372,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Create status page -->
     <CreateStatusPageDialog
-      v-if="statusPagesEnabled"
       v-model:open="showCreateStatusPage"
       :org-identifier="orgIdentifier"
       @created="onStatusPageCreated"
@@ -380,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Post update -->
     <PostUpdateDialog
-      v-if="statusPagesEnabled && postUpdatePage"
+      v-if="postUpdatePage"
       v-model:open="showPostUpdate"
       :org-identifier="orgIdentifier"
       :page-id="postUpdatePage.id"
@@ -391,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Notice history -->
     <NoticeHistoryDialog
-      v-if="statusPagesEnabled && noticeHistoryPage"
+      v-if="noticeHistoryPage"
       v-model:open="showNoticeHistory"
       :org-identifier="orgIdentifier"
       :page-id="noticeHistoryPage.id"
@@ -401,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom domains -->
     <DomainsDialog
-      v-if="statusPagesEnabled && domainsPage"
+      v-if="domainsPage"
       v-model:open="showDomains"
       :org-identifier="orgIdentifier"
       :page-id="domainsPage.id"
@@ -633,13 +632,6 @@ const privateLocationsEnabled = computed(() =>
   Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
 );
 
-// Status pages are gated on their own /config flag on top of synthetics_enabled,
-// mirroring the private-locations split — an OSS build can ship synthetics
-// without offering status pages.
-const statusPagesEnabled = computed(() =>
-  Boolean(store.state.zoConfig?.status_pages_enabled),
-);
-
 // Defaults to 'checks', but honors ?section=private / ?section=status-pages so
 // links back from a detail surface land on the tab the user actually came from
 // instead of always resetting to Checks. A ?section for a tab this build does not
@@ -647,7 +639,7 @@ const statusPagesEnabled = computed(() =>
 const initialSection = ((): SyntheticsSection => {
   const s = route.query.section;
   if (s === "private" && privateLocationsEnabled.value) return "private";
-  if (s === "status-pages" && statusPagesEnabled.value) return "status-pages";
+  if (s === "status-pages") return "status-pages";
   return "checks";
 })();
 const activeSection = ref<SyntheticsSection>(initialSection);

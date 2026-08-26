@@ -188,9 +188,9 @@ const useEnterpriseRoutes = () => {
   // `synthetics_private_locations_enabled` gate on top of it.
   //
   // The Status Pages admin UI is a tab on this same view (reached via
-  // `?section=status-pages`), so it needs no route of its own. Its narrower
-  // `status_pages_enabled` /config gate is enforced in-view (the tab, the action
-  // button, and the panels all check it) — the same shape as private locations.
+  // `?section=status-pages`), so it needs no route of its own — it ships
+  // with synthetics, no separate toggle. Notices/Custom Domains within it
+  // are Enterprise-only, gated in-view on `build_type` instead.
   routes.push({
     path: "synthetics",
     name: "synthetics",

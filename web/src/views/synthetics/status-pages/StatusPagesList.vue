@@ -149,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <ODropdownItem
+              :disabled="!advancedEnabled"
               :data-test="`status-pages-post-update-item-${(row as any).id}`"
               @select="emit('post-update', row)"
             >
@@ -156,9 +157,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="campaign" size="sm" />
               </template>
               {{ t("statusPages.postUpdate.action") }}
+              <!-- Decorative: the tooltip carries the sentence, and
+                   DropdownMenuItem already exposes aria-disabled. Same
+                   shape as DbmSectionTabs' locked-tab lock icon. -->
+              <template v-if="!advancedEnabled" #icon-right>
+                <OIcon
+                  name="lock"
+                  size="xs"
+                  class="ms-auto"
+                  aria-hidden="true"
+                  :data-test="`status-pages-post-update-lock-${(row as any).id}`"
+                />
+                <OTooltip side="left" :content="t('statusPages.postUpdate.locked')" />
+              </template>
             </ODropdownItem>
 
             <ODropdownItem
+              :disabled="!advancedEnabled"
               :data-test="`status-pages-view-updates-item-${(row as any).id}`"
               @select="emit('view-updates', row)"
             >
@@ -166,6 +181,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="history-toggle-off" size="sm" />
               </template>
               {{ t("statusPages.notices.action") }}
+              <template v-if="!advancedEnabled" #icon-right>
+                <OIcon
+                  name="lock"
+                  size="xs"
+                  class="ms-auto"
+                  aria-hidden="true"
+                  :data-test="`status-pages-view-updates-lock-${(row as any).id}`"
+                />
+                <OTooltip side="left" :content="t('statusPages.notices.locked')" />
+              </template>
             </ODropdownItem>
 
             <ODropdownItem
@@ -179,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
 
             <ODropdownItem
+              :disabled="!advancedEnabled"
               :data-test="`status-pages-domains-item-${(row as any).id}`"
               @select="emit('manage-domains', row)"
             >
@@ -186,6 +212,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="dns" size="sm" />
               </template>
               {{ t("statusPages.domains.action") }}
+              <template v-if="!advancedEnabled" #icon-right>
+                <OIcon
+                  name="lock"
+                  size="xs"
+                  class="ms-auto"
+                  aria-hidden="true"
+                  :data-test="`status-pages-domains-lock-${(row as any).id}`"
+                />
+                <OTooltip side="left" :content="t('statusPages.domains.locked')" />
+              </template>
             </ODropdownItem>
 
             <ODropdownSeparator />
@@ -225,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -263,7 +300,17 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 const search = ref("");
+
+/**
+ * Notices ("Post update" / "View updates") and Custom domains are Enterprise
+ * sub-features of status pages — locked in an OSS build, same split as
+ * Database Monitoring's per-tab enterprise gate (`DbmSectionTabs.vue`), but
+ * keyed off `build_type` (already the established `/config` signal — see
+ * `router.ts`, `AlertList.vue`) rather than a bespoke feature flag.
+ */
+const advancedEnabled = computed(() => store.state.zoConfig?.build_type === "enterprise");
 
 const filteredPages = computed(() => {
   const q = search.value.trim().toLowerCase();

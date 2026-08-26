@@ -31,7 +31,7 @@ use super::entity::{
     status_page_notices, status_page_snapshots, status_pages, synthetics_checks,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -201,7 +201,6 @@ pub async fn insert_notice<C: ConnectionTrait>(
     conn: &C,
     model: status_page_notices::Model,
 ) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
     model.into_active_model().insert(conn).await?;
     Ok(())
 }
@@ -210,7 +209,6 @@ pub async fn insert_notice_component<C: ConnectionTrait>(
     conn: &C,
     model: status_page_notice_components::Model,
 ) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
     model.into_active_model().insert(conn).await?;
     Ok(())
 }
@@ -222,7 +220,7 @@ pub async fn insert_notice_component<C: ConnectionTrait>(
 pub async fn list_notices_for_org(
     org_id: &str,
 ) -> Result<Vec<status_page_notices::Model>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_page_notices::Entity::find()
         .filter(status_page_notices::Column::OrgId.eq(org_id))
         .filter(status_page_notices::Column::DeletedAt.is_null())
@@ -235,7 +233,7 @@ pub async fn get_notice_by_id(
     org_id: &str,
     id: &str,
 ) -> Result<Option<status_page_notices::Model>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_page_notices::Entity::find_by_id(id)
         .filter(status_page_notices::Column::OrgId.eq(org_id))
         .filter(status_page_notices::Column::DeletedAt.is_null())
@@ -247,8 +245,7 @@ pub async fn get_notice_by_id(
 /// all go through here) — unlike [`update_notice_runtime`] this is not a
 /// column-selective patch, so the caller supplies the complete model.
 pub async fn put_notice(model: &status_page_notices::Model) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     let am = model.clone().into_active_model().reset_all();
     am.update(conn).await?;
     Ok(())
@@ -259,8 +256,7 @@ pub async fn replace_notice_components(
     notice_id: &str,
     component_ids: &[String],
 ) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     status_page_notice_components::Entity::delete_many()
         .filter(status_page_notice_components::Column::NoticeId.eq(notice_id))
         .exec(conn)
@@ -280,8 +276,7 @@ pub async fn replace_notice_components(
 }
 
 pub async fn soft_delete_notice(org_id: &str, id: &str, at: i64) -> Result<bool, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     let res = status_page_notices::Entity::update_many()
         .col_expr(status_page_notices::Column::DeletedAt, Expr::value(at))
         .col_expr(status_page_notices::Column::UpdatedAt, Expr::value(at))
@@ -296,8 +291,7 @@ pub async fn soft_delete_notice(org_id: &str, id: &str, at: i64) -> Result<bool,
 pub async fn insert_notice_update(
     model: status_page_notice_updates::Model,
 ) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     model.into_active_model().insert(conn).await?;
     Ok(())
 }
@@ -306,7 +300,7 @@ pub async fn list_notice_updates(
     org_id: &str,
     notice_id: &str,
 ) -> Result<Vec<status_page_notice_updates::Model>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_page_notice_updates::Entity::find()
         .filter(status_page_notice_updates::Column::NoticeId.eq(notice_id))
         .filter(status_page_notice_updates::Column::OrgId.eq(org_id))
@@ -324,8 +318,7 @@ pub async fn upsert_check_snooze(
     owner: Option<&str>,
     now: i64,
 ) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     status_page_check_snoozes::Entity::insert(
         status_page_check_snoozes::Model {
             id: config::ider::generate(),
@@ -361,7 +354,6 @@ pub async fn update_notice_runtime<C: ConnectionTrait>(
     auto_recovery_streak: i32,
     now: i64,
 ) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
     status_page_notices::Entity::update_many()
         .col_expr(status_page_notices::Column::State, Expr::value(state))
         .col_expr(
@@ -391,7 +383,6 @@ pub async fn upsert_snapshot<C: ConnectionTrait>(
     current: Option<&str>,
     now: i64,
 ) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
     let mut update = status_page_snapshots::Entity::update_many();
     if let Some(h) = history {
         update = update
@@ -434,8 +425,7 @@ pub async fn upsert_snapshot<C: ConnectionTrait>(
 // ── Admin CRUD ops (org-scoped, service-facing; fetch conn internally) ────────
 
 pub async fn insert_page(model: &status_pages::Model) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     model.clone().into_active_model().insert(conn).await?;
     Ok(())
 }
@@ -445,7 +435,7 @@ pub async fn get_page_by_id(
     org_id: &str,
     id: &str,
 ) -> Result<Option<status_pages::Model>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_pages::Entity::find_by_id(id)
         .filter(status_pages::Column::OrgId.eq(org_id))
         .one(conn)
@@ -457,7 +447,7 @@ pub async fn get_page_by_id(
 pub async fn get_page_by_slug_any(
     slug: &str,
 ) -> Result<Option<status_pages::Model>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_pages::Entity::find()
         .filter(status_pages::Column::Slug.eq(slug))
         .one(conn)
@@ -465,7 +455,7 @@ pub async fn get_page_by_slug_any(
 }
 
 pub async fn list_pages(org_id: &str) -> Result<Vec<status_pages::Model>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_pages::Entity::find()
         .filter(status_pages::Column::OrgId.eq(org_id))
         .order_by_desc(status_pages::Column::UpdatedAt)
@@ -474,8 +464,7 @@ pub async fn list_pages(org_id: &str) -> Result<Vec<status_pages::Model>, errors
 }
 
 pub async fn update_page(model: &status_pages::Model) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     // A Model loaded from the DB converts to an ActiveModel with every field
     // `Unchanged`, so a plain `.update()` writes NOTHING. `reset_all` marks all
     // columns dirty so the mutated fields actually persist. (This bit the
@@ -489,8 +478,7 @@ pub async fn update_page(model: &status_pages::Model) -> Result<(), errors::Erro
 /// Delete a page (org-scoped) and its components/mappings. Returns whether the
 /// page existed.
 pub async fn delete_page(org_id: &str, id: &str) -> Result<bool, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     let comp_ids: Vec<String> = status_page_components::Entity::find()
         .select_only()
         .column(status_page_components::Column::Id)
@@ -524,7 +512,7 @@ pub async fn list_components_with_checks(
     org_id: &str,
     page_id: &str,
 ) -> Result<Vec<config::meta::status_pages::ComponentView>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     let comps = status_page_components::Entity::find()
         .filter(status_page_components::Column::StatusPageId.eq(page_id))
         .filter(status_page_components::Column::OrgId.eq(org_id))
@@ -552,7 +540,7 @@ pub async fn list_components_with_checks(
 }
 
 pub async fn count_components(org_id: &str, page_id: &str) -> Result<i64, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_page_components::Entity::find()
         .filter(status_page_components::Column::StatusPageId.eq(page_id))
         .filter(status_page_components::Column::OrgId.eq(org_id))
@@ -567,7 +555,7 @@ pub async fn pages_for_components(
     org_id: &str,
     component_ids: &[String],
 ) -> Result<Vec<String>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     let ids: std::collections::HashSet<String> = status_page_components::Entity::find()
         .select_only()
         .column(status_page_components::Column::StatusPageId)
@@ -587,8 +575,7 @@ pub async fn pages_for_components(
 // re-publishes). Snapshots are never applied here — region-local by design.
 
 pub async fn apply_upsert(org_id: &str, tbl: &str, json: &str) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     macro_rules! upsert {
         ($ent:path, $model:ty) => {{
             let model: $model = serde_json::from_str(json)
@@ -656,8 +643,7 @@ pub async fn apply_delete(org_id: &str, tbl: &str, id: &str) -> Result<(), error
             delete_page(org_id, id).await?;
         }
         "status_page_notices" => {
-            let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-            let _lock = super::get_lock().await;
+            let conn = get_orm_client_rw().await;
             status_page_notices::Entity::delete_many()
                 .filter(status_page_notices::Column::Id.eq(id))
                 .filter(status_page_notices::Column::OrgId.eq(org_id))
@@ -687,7 +673,7 @@ pub async fn get_snapshot_overall(
     org_id: &str,
     page_id: &str,
 ) -> Result<Option<config::meta::status_pages::ComponentStatus>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     let Some(row) = status_page_snapshots::Entity::find_by_id(page_id)
         .filter(status_page_snapshots::Column::OrgId.eq(org_id))
         .one(conn)
@@ -714,8 +700,7 @@ pub async fn insert_audit(
     at: i64,
 ) -> Result<(), errors::Error> {
     use super::entity::status_page_audit_log;
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     status_page_audit_log::Model {
         id: config::ider::generate(),
         org_id: org_id.to_string(),
@@ -758,7 +743,7 @@ pub async fn synthetics_check_belongs_to_org(
     org_id: &str,
     check_id: &str,
 ) -> Result<bool, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(synthetics_checks::Entity::find_by_id(check_id)
         .filter(synthetics_checks::Column::OrgId.eq(org_id))
         .count(conn)
@@ -776,8 +761,7 @@ pub async fn replace_components(
     inputs: &[config::meta::status_pages::ComponentInput],
     now: i64,
 ) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
 
     let existing: Vec<String> = status_page_components::Entity::find()
         .select_only()
@@ -866,8 +850,7 @@ pub async fn replace_components(
 pub async fn insert_domain_if_unclaimed(
     model: &status_page_custom_domains::Model,
 ) -> Result<bool, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     let claimed = status_page_custom_domains::Entity::find()
         .filter(status_page_custom_domains::Column::Domain.eq(model.domain.clone()))
         .filter(status_page_custom_domains::Column::ReleasedAt.is_null())
@@ -885,7 +868,7 @@ pub async fn list_domains_for_page(
     org_id: &str,
     page_id: &str,
 ) -> Result<Vec<status_page_custom_domains::Model>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_page_custom_domains::Entity::find()
         .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
         .filter(status_page_custom_domains::Column::StatusPageId.eq(page_id))
@@ -899,7 +882,7 @@ pub async fn get_domain_by_id(
     org_id: &str,
     id: &str,
 ) -> Result<Option<status_page_custom_domains::Model>, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     Ok(status_page_custom_domains::Entity::find_by_id(id)
         .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
         .one(conn)
@@ -930,8 +913,7 @@ pub async fn list_domains_due_for_check<C: ConnectionTrait>(
 }
 
 pub async fn update_domain(model: &status_page_custom_domains::Model) -> Result<(), errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     let am = model.clone().into_active_model().reset_all();
     am.update(conn).await?;
     Ok(())
@@ -940,8 +922,7 @@ pub async fn update_domain(model: &status_page_custom_domains::Model) -> Result<
 /// Tombstone (never hard-delete, see the entity doc comment). Returns whether
 /// a live row existed to release.
 pub async fn release_domain(org_id: &str, id: &str, at: i64) -> Result<bool, errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = super::get_lock().await;
+    let conn = get_orm_client_rw().await;
     let Some(existing) = status_page_custom_domains::Entity::find_by_id(id)
         .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
         .filter(status_page_custom_domains::Column::ReleasedAt.is_null())

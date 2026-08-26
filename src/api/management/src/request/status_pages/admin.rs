@@ -45,6 +45,9 @@ fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     if msg == "not found" {
         return MetaHttpResponse::not_found(msg);
     }
+    if let Some(reason) = msg.strip_prefix("enterprise: ") {
+        return MetaHttpResponse::forbidden(reason);
+    }
     tracing::error!("[status_pages] {ctx}: {e}");
     MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
 }

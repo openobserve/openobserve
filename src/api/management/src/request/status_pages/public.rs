@@ -35,10 +35,7 @@ use axum::{
     http::{StatusCode, header},
     response::Response,
 };
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    table::status_pages as table,
-};
+use infra::{db::get_orm_client_ro, table::status_pages as table};
 
 /// The whole visitor UI for the POC: one self-contained page, no build step,
 /// no external assets, that fetches the snapshot JSON and renders it. The
@@ -249,10 +246,10 @@ pub async fn page(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> R
 /// HTML shell is a static const so no snapshot read is needed here.
 async fn slug_visibility(slug: &str) -> Option<i32> {
     let cfg = config::get_config();
-    if !cfg.synthetics.enabled || !cfg.synthetics.status_pages_enabled {
+    if !cfg.synthetics.enabled {
         return None;
     }
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     table::get_page_by_slug(conn, slug)
         .await
         .ok()
@@ -270,10 +267,10 @@ async fn load_public(
     infra::table::entity::status_page_snapshots::Model,
 )> {
     let cfg = config::get_config();
-    if !cfg.synthetics.enabled || !cfg.synthetics.status_pages_enabled {
+    if !cfg.synthetics.enabled {
         return None;
     }
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     let page = table::get_page_by_slug(conn, slug).await.ok()??;
     if page.visibility != 1 {
         return None;
@@ -293,10 +290,10 @@ async fn maybe_serve_password_page(
     headers: &axum::http::HeaderMap,
 ) -> Option<Response> {
     let cfg = config::get_config();
-    if !cfg.synthetics.enabled || !cfg.synthetics.status_pages_enabled {
+    if !cfg.synthetics.enabled {
         return None;
     }
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     let page = table::get_page_by_slug(conn, slug).await.ok().flatten()?;
     if page.visibility != 2 {
         return None; // not a password page — normal path handles it
@@ -362,10 +359,10 @@ pub async fn auth(
 
     // Resolve the page's stored hash (password pages only).
     let cfg = config::get_config();
-    if !cfg.synthetics.enabled || !cfg.synthetics.status_pages_enabled {
+    if !cfg.synthetics.enabled {
         return unauthorized();
     }
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     let Some(page) = table::get_page_by_slug(conn, &slug).await.ok().flatten() else {
         return unauthorized(); // unknown slug: same 401 as wrong password
     };
@@ -640,36 +637,52 @@ fn not_found() -> Response {
 /// `verification_state = 1` claim resolves to tenant data; a claimed-but-
 /// unverified or released domain still gets intercepted (so it never reaches
 /// the app's own UI either — see `domain_not_connected`), it just doesn't get
-/// served *content*, per the design's ownership-gate rule.
+/// served *content*, per the design's ownership-gate rule. Licensed (Custom
+/// Domains is an enterprise sub-feature of status pages); the OSS build never
+/// looks up a Host, so no unlicensed OSS deployment can be domain-routed to.
+#[cfg(feature = "enterprise")]
 pub async fn host_route_middleware(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
+    use o2_enterprise::enterprise::status_pages::host_routing::{
+        HostRouteDecision, resolve_host_route,
+    };
+
     let cfg = config::get_config();
-    if !cfg.synthetics.enabled || !cfg.synthetics.status_pages_enabled {
+    if !cfg.synthetics.enabled {
         return next.run(request).await;
     }
     let Some(host) = host_header(request.headers()) else {
         return next.run(request).await;
     };
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let Ok(Some(claim)) = table::get_domain_claim_by_host(conn, &host).await else {
-        return next.run(request).await;
-    };
-    if claim.verification_state != 1 {
-        return domain_not_connected();
-    }
-    let Ok(Some(owning_page)) = table::get_page_by_id(&claim.org_id, &claim.status_page_id).await
-    else {
-        return domain_not_connected();
-    };
-    let headers = request.headers().clone();
-    match request.uri().path() {
-        "/api/status_pages_public_by_host" => snapshot(Path(owning_page.slug), headers).await,
-        _ => page(Path(owning_page.slug), headers).await,
+    let path = request.uri().path();
+    match resolve_host_route(&host, path).await {
+        HostRouteDecision::Fallthrough => next.run(request).await,
+        HostRouteDecision::NotConnected => domain_not_connected(),
+        HostRouteDecision::Page {
+            slug,
+            is_snapshot_path,
+        } => {
+            let headers = request.headers().clone();
+            if is_snapshot_path {
+                snapshot(Path(slug), headers).await
+            } else {
+                page(Path(slug), headers).await
+            }
+        }
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+pub async fn host_route_middleware(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    next.run(request).await
+}
+
+#[cfg(feature = "enterprise")]
 fn host_header(headers: &axum::http::HeaderMap) -> Option<String> {
     let host = headers.get(header::HOST)?.to_str().ok()?;
     Some(host.split(':').next().unwrap_or(host).to_ascii_lowercase())
@@ -681,6 +694,7 @@ fn host_header(headers: &axum::http::HeaderMap) -> Option<String> {
 /// the domain-routing layer, unlike the slug layer, sits in front of hosts an
 /// admin is actively trying to connect and deserves a clearer signal than a
 /// generic 404 that a page simply doesn't exist.
+#[cfg(feature = "enterprise")]
 fn domain_not_connected() -> Response {
     Response::builder()
         .status(StatusCode::NOT_FOUND)

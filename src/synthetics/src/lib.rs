@@ -202,10 +202,9 @@ fn spawn_workers() {
     tokio::spawn(reaper::run());
     // POC scope: single cluster. Multi-region needs this split — the
     // incident-engine half claim-gated, the snapshot half per region.
-    if config::get_config().synthetics.status_pages_enabled {
-        tokio::spawn(status_pages::run());
-        tokio::spawn(status_pages::run_domain_verifier());
-    }
+    // Status pages ships with synthetics — no separate toggle.
+    tokio::spawn(status_pages::run());
+    tokio::spawn(status_pages::run_domain_verifier());
     // Its own task, not a step on the reaper's tick: a pass is up to a thousand
     // rows of outbound HTTP, and the reaper's lease bookkeeping cannot wait
     // behind it. Its own kill switch too, checked per pass rather than here.

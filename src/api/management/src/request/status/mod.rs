@@ -213,9 +213,6 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
-    /// Whether public status pages are available — the Status Pages tab in
-    /// Synthetics gates on this in addition to `synthetics_enabled`.
-    status_pages_enabled: bool,
     /// Whether private locations — pools served by long-running agents deployed
     /// inside the customer's network — are available. Enterprise only, so the
     /// UI hides the private-locations views, the agent-setup drawer and the
@@ -482,7 +479,6 @@ pub async fn zo_config(
     // Read straight from the config in every build: synthetics is OSS now, and
     // reporting `false` here is what hid the whole feature from the UI.
     let synthetics_enabled = cfg.synthetics.enabled;
-    let status_pages_enabled = cfg.synthetics.status_pages_enabled;
     // The private-agent path is the part that stays enterprise, so it gets its
     // own flag. Gating the UI on this rather than on `synthetics_enabled` is
     // what lets an OSS build show synthetics without offering a location it
@@ -602,7 +598,6 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
-        status_pages_enabled,
         synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,

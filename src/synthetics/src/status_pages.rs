@@ -26,7 +26,7 @@ use std::collections::{HashMap, HashSet};
 
 use config::meta::status_pages as engine;
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::{entity::status_page_notices, status_pages as table},
 };
 
@@ -55,7 +55,7 @@ pub async fn preview_snapshot(
     org_id: &str,
     page_id: &str,
 ) -> Result<Option<(engine::SnapshotCurrent, engine::SnapshotHistory)>, infra::errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     let Some(page) = table::get_page_by_id(org_id, page_id).await? else {
         return Ok(None);
     };
@@ -134,7 +134,7 @@ pub async fn refresh_snapshot(org_id: &str, page_id: &str) -> Result<(), infra::
     };
     let current_json = serde_json::to_string(&current).unwrap_or_default();
     let history_json = serde_json::to_string(&history).unwrap_or_default();
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     table::upsert_snapshot(
         conn,
         page_id,
@@ -190,7 +190,7 @@ async fn tick(
     down_streaks: &mut HashMap<String, i32>,
     rt: &mut RebuilderState,
 ) -> Result<(), infra::errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let data = load(conn, now, rt).await?;
     for s in &data.states {
@@ -677,77 +677,12 @@ fn opaque_key(page_id: &str, component_id: &str) -> String {
 /// deliberately out of scope here: a verified domain's HTTPS termination is
 /// the operator's own reverse proxy/CDN, which forwards the original `Host`
 /// header to `page_by_host` (see the public handler) once the request is
-/// already plaintext.
+/// already plaintext. Licensed (Custom Domains is an enterprise sub-feature of
+/// status pages); the OSS stub never spawns any DNS work.
+#[cfg(feature = "enterprise")]
 pub async fn run_domain_verifier() {
-    let interval = config::get_config()
-        .synthetics
-        .status_page_domain_verify_interval
-        .max(5);
-    loop {
-        tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
-        if let Err(e) = domain_verify_tick().await {
-            tracing::error!("[status_pages] domain verify tick failed: {e}");
-        }
-    }
+    o2_enterprise::enterprise::status_pages::domain_verifier::run_domain_verifier().await
 }
 
-const DOMAIN_VERIFY_BATCH: u64 = 200;
-
-async fn domain_verify_tick() -> Result<(), infra::errors::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let now = config::utils::time::now_micros();
-    let due = table::list_domains_due_for_check(conn, now, DOMAIN_VERIFY_BATCH).await?;
-    for model in due {
-        let checked = check_domain_ownership(model).await?;
-        table::update_domain(&checked).await?;
-    }
-    Ok(())
-}
-
-/// Resolves `_o2-verify.<domain>` and compares it to the stored token. Shared
-/// by the periodic loop above and the admin "Verify now" action so both paths
-/// apply the exact same rule and can never disagree on what "verified" means.
-pub async fn check_domain_ownership(
-    mut model: infra::table::entity::status_page_custom_domains::Model,
-) -> Result<infra::table::entity::status_page_custom_domains::Model, infra::errors::Error> {
-    use hickory_resolver::{
-        TokioResolver,
-        config::{ResolverConfig, ResolverOpts},
-        name_server::TokioConnectionProvider,
-    };
-
-    let now = config::utils::time::now_micros();
-    model.last_checked_at = Some(now);
-    model.updated_at = now;
-
-    let resolver = TokioResolver::builder_with_config(
-        ResolverConfig::default(),
-        TokioConnectionProvider::default(),
-    )
-    .with_options(ResolverOpts::default())
-    .build();
-    let query = format!("_o2-verify.{}", model.domain);
-    match resolver.txt_lookup(query).await {
-        Ok(answer) => {
-            let found = answer
-                .iter()
-                .any(|txt| txt.to_string() == model.verification_token);
-            if found {
-                model.verification_state = 1;
-                model.verification_failure_reason = None;
-                model.verified_at = Some(now);
-            } else {
-                let had_any_record = answer.iter().next().is_some();
-                model.verification_state = 2;
-                // 0 record-missing, 1 value-mismatch.
-                model.verification_failure_reason = Some(if had_any_record { 1 } else { 0 });
-            }
-        }
-        Err(_) => {
-            model.verification_state = 2;
-            // 2 dns-resolution-failed.
-            model.verification_failure_reason = Some(2);
-        }
-    }
-    Ok(model)
-}
+#[cfg(not(feature = "enterprise"))]
+pub async fn run_domain_verifier() {}

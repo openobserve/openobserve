@@ -14242,6 +14242,7 @@
     },
     "postUpdate": {
       "action": "Post update",
+      "locked": "Post update is an Enterprise feature. Upgrade to post incident updates on this status page.",
       "title": "Post update — {name}",
       "impact": "Impact",
       "impactDegraded": "Degraded",
@@ -14271,6 +14272,7 @@
     },
     "notices": {
       "action": "View updates",
+      "locked": "Updates is an Enterprise feature. Upgrade to post and review incident updates on this status page.",
       "title": "Updates — {name}",
       "empty": "No updates posted yet.",
       "loadFailed": "Failed to load updates",
@@ -14287,6 +14289,7 @@
     },
     "domains": {
       "action": "Manage domains",
+      "locked": "Custom domains is an Enterprise feature. Upgrade to serve this status page from your own domain.",
       "title": "Custom domains — {name}",
       "empty": "No custom domains added yet.",
       "loadFailed": "Failed to load domains",

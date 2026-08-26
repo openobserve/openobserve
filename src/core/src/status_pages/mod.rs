@@ -33,10 +33,7 @@ use config::{
     },
     utils::{rand::generate_random_string, time::now_micros},
 };
-use infra::table::{
-    entity::{status_page_notice_updates, status_pages as page_entity},
-    status_pages as table,
-};
+use infra::table::{entity::status_pages as page_entity, status_pages as table};
 
 /// 22 base62 chars ≈ 131 bits of CSPRNG entropy — the public identifier.
 const SLUG_LEN: usize = 22;
@@ -245,257 +242,149 @@ pub async fn set_components(
 /// way an auto-incident does; `starts_at` in the future makes it a scheduled
 /// maintenance window (kind=1 callers set this), not an active incident. An
 /// empty `component_ids` defaults to every component on `page_id`.
+/// Licensed (Notices is an enterprise sub-feature of status pages).
+#[cfg(feature = "enterprise")]
 pub async fn create_notice(
     org_id: &str,
     page_id: &str,
     req: CreateNoticeRequest,
     owner: &str,
 ) -> Result<NoticeAdminView, anyhow::Error> {
-    if req.title.trim().is_empty() {
-        anyhow::bail!("validation: title is required");
-    }
-    if !(0..=2).contains(&req.kind) {
-        anyhow::bail!("validation: kind must be 0, 1, or 2");
-    }
-    if !(0..=3).contains(&req.impact) {
-        anyhow::bail!("validation: impact must be 0-3");
-    }
-    let component_ids = if req.component_ids.is_empty() {
-        table::list_components_with_checks(org_id, page_id)
-            .await?
-            .into_iter()
-            .map(|c| c.id)
-            .collect()
-    } else {
-        req.component_ids
-    };
-    let now = now_micros();
-    let starts_at = req.starts_at.unwrap_or(now);
-    // Scheduled (future-dated) maintenance starts life in state=0; everything
-    // else is active immediately — there is no manual "draft" state.
-    let state = if req.kind == 1 && starts_at > now {
-        0
-    } else {
-        1
-    };
-    let model = infra::table::entity::status_page_notices::Model {
-        id: config::ider::generate(),
-        org_id: org_id.to_string(),
-        kind: req.kind,
-        impact: req.impact,
-        source: 1,
-        title: req.title,
-        body: req.body,
-        state,
-        starts_at,
-        resolved_at: None,
-        segments: segments_json(starts_at, state),
-        excluded_from_uptime: false,
-        deleted_at: None,
-        auto_check_id: None,
-        auto_recovery_streak: 0,
-        owner: Some(owner.to_string()),
-        created_at: now,
-        updated_at: now,
-    };
-    let conn = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
-    table::insert_notice(conn, model.clone()).await?;
-    table::replace_notice_components(org_id, &model.id, &component_ids).await?;
-    emit_notice_upsert(org_id, "status_page_notices", &model).await;
-    refresh_affected_pages(org_id, &component_ids).await;
-    Ok(to_notice_view(model, component_ids))
+    o2_enterprise::enterprise::status_pages::notices::create_notice(org_id, page_id, req, owner)
+        .await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn create_notice(
+    _org_id: &str,
+    _page_id: &str,
+    _req: CreateNoticeRequest,
+    _owner: &str,
+) -> Result<NoticeAdminView, anyhow::Error> {
+    enterprise_required()
 }
 
 /// Notices touching any component on `page_id` — a filtered view over the
-/// org's full notice set, for the page's "past updates" panel.
+/// org's full notice set, for the page's "past updates" panel. Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn list_notices_for_page(
     org_id: &str,
     page_id: &str,
 ) -> Result<Vec<NoticeAdminView>, anyhow::Error> {
-    let page_component_ids: std::collections::HashSet<String> =
-        table::list_components_with_checks(org_id, page_id)
-            .await?
-            .into_iter()
-            .map(|c| c.id)
-            .collect();
-    let notices = table::list_notices_for_org(org_id).await?;
-    let ids: Vec<String> = notices.iter().map(|n| n.id.clone()).collect();
-    let conn = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
-    let joins = table::list_notice_components(conn, &ids).await?;
-    Ok(notices
-        .into_iter()
-        .filter_map(|n| {
-            let component_ids: Vec<String> = joins
-                .iter()
-                .filter(|j| j.notice_id == n.id)
-                .map(|j| j.component_id.clone())
-                .collect();
-            component_ids
-                .iter()
-                .any(|c| page_component_ids.contains(c))
-                .then(|| to_notice_view(n, component_ids))
-        })
-        .collect())
+    o2_enterprise::enterprise::status_pages::notices::list_notices_for_page(org_id, page_id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn list_notices_for_page(
+    _org_id: &str,
+    _page_id: &str,
+) -> Result<Vec<NoticeAdminView>, anyhow::Error> {
+    enterprise_required()
 }
 
 /// Edits a manual notice's narrative, impact, mapped components, or resolves
 /// it by hand. Rejects touching an auto-sourced notice's `state`/`impact` —
-/// those are rebuilder-owned; use [`mark_false_positive`] to override one.
+/// those are rebuilder-owned; use `mark_false_positive` to override one.
+/// Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn update_notice(
     org_id: &str,
     id: &str,
     req: UpdateNoticeRequest,
 ) -> Result<NoticeAdminView, anyhow::Error> {
-    let mut model = table::get_notice_by_id(org_id, id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("not found"))?;
-    if model.source == 0 && (req.state.is_some() || req.impact.is_some()) {
-        anyhow::bail!(
-            "validation: this notice is auto-managed; use mark_false_positive to override it"
-        );
-    }
-    if let Some(v) = req.impact {
-        if !(0..=3).contains(&v) {
-            anyhow::bail!("validation: impact must be 0-3");
-        }
-        model.impact = v;
-    }
-    if let Some(v) = req.title {
-        if v.trim().is_empty() {
-            anyhow::bail!("validation: title is required");
-        }
-        model.title = v;
-    }
-    if let Some(v) = req.body {
-        model.body = v;
-    }
-    let now = now_micros();
-    if let Some(v) = req.state {
-        if !(0..=2).contains(&v) {
-            anyhow::bail!("validation: state must be 0, 1, or 2");
-        }
-        if v == 2 && model.state != 2 {
-            close_open_segment(&mut model, now);
-            model.resolved_at = Some(now);
-        }
-        model.state = v;
-    }
-    model.updated_at = now;
-    table::put_notice(&model).await?;
-    let component_ids = match req.component_ids {
-        Some(ids) => {
-            table::replace_notice_components(org_id, id, &ids).await?;
-            ids
-        }
-        None => {
-            let conn = infra::db::ORM_CLIENT
-                .get_or_init(infra::db::connect_to_orm)
-                .await;
-            table::list_notice_components(conn, &[id.to_string()])
-                .await?
-                .into_iter()
-                .map(|j| j.component_id)
-                .collect()
-        }
-    };
-    emit_notice_upsert(org_id, "status_page_notices", &model).await;
-    refresh_affected_pages(org_id, &component_ids).await;
-    Ok(to_notice_view(model, component_ids))
+    o2_enterprise::enterprise::status_pages::notices::update_notice(org_id, id, req).await
 }
 
+#[cfg(not(feature = "enterprise"))]
+pub async fn update_notice(
+    _org_id: &str,
+    _id: &str,
+    _req: UpdateNoticeRequest,
+) -> Result<NoticeAdminView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn delete_notice(org_id: &str, id: &str) -> Result<bool, anyhow::Error> {
-    let component_ids = notice_component_ids(id).await.unwrap_or_default();
-    let deleted = table::soft_delete_notice(org_id, id, now_micros()).await?;
-    if deleted {
-        emit_notice_delete(org_id, "status_page_notices", id).await;
-        refresh_affected_pages(org_id, &component_ids).await;
-    }
-    Ok(deleted)
+    o2_enterprise::enterprise::status_pages::notices::delete_notice(org_id, id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn delete_notice(_org_id: &str, _id: &str) -> Result<bool, anyhow::Error> {
+    enterprise_required()
 }
 
 /// Appends a timestamped narrative update to a notice's public timeline.
+/// Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn add_notice_update(
     org_id: &str,
     notice_id: &str,
     req: NoticeUpdateRequest,
     owner: &str,
 ) -> Result<(), anyhow::Error> {
-    if req.body.trim().is_empty() {
-        anyhow::bail!("validation: body is required");
-    }
-    if table::get_notice_by_id(org_id, notice_id).await?.is_none() {
-        anyhow::bail!("not found");
-    }
-    table::insert_notice_update(status_page_notice_updates::Model {
-        id: config::ider::generate(),
-        notice_id: notice_id.to_string(),
-        org_id: org_id.to_string(),
-        body: req.body,
-        owner: Some(owner.to_string()),
-        created_at: now_micros(),
-    })
-    .await?;
-    // A narrative update never changes impact/state, but it does change what
-    // the public snapshot's `notices[].updates` should show — refresh so it
-    // is not stuck behind the rebuilder's own tick either.
-    let component_ids = notice_component_ids(notice_id).await.unwrap_or_default();
-    refresh_affected_pages(org_id, &component_ids).await;
-    Ok(())
+    o2_enterprise::enterprise::status_pages::notices::add_notice_update(
+        org_id, notice_id, req, owner,
+    )
+    .await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn add_notice_update(
+    _org_id: &str,
+    _notice_id: &str,
+    _req: NoticeUpdateRequest,
+    _owner: &str,
+) -> Result<(), anyhow::Error> {
+    enterprise_required()
 }
 
 /// The 3am escape hatch: resolves an auto-incident, excludes it from the
 /// uptime math (reversible via a later `update_notice`), and snoozes the
 /// underlying check org-wide so the same flap does not immediately reopen it.
+/// Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn mark_false_positive(
     org_id: &str,
     notice_id: &str,
     snooze_hours: i64,
     actor: &str,
 ) -> Result<(), anyhow::Error> {
-    let mut model = table::get_notice_by_id(org_id, notice_id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("not found"))?;
-    let now = now_micros();
-    close_open_segment(&mut model, now);
-    model.state = 2;
-    model.resolved_at = Some(now);
-    model.excluded_from_uptime = true;
-    model.updated_at = now;
-    table::put_notice(&model).await?;
-    if let Some(check_id) = &model.auto_check_id {
-        table::upsert_check_snooze(
-            org_id,
-            check_id,
-            now + snooze_hours.max(1) * 3_600_000_000,
-            Some(actor),
-            now,
-        )
-        .await?;
-    }
-    emit_notice_upsert(org_id, "status_page_notices", &model).await;
-    let component_ids = notice_component_ids(notice_id).await.unwrap_or_default();
-    refresh_affected_pages(org_id, &component_ids).await;
-    Ok(())
+    o2_enterprise::enterprise::status_pages::notices::mark_false_positive(
+        org_id,
+        notice_id,
+        snooze_hours,
+        actor,
+    )
+    .await
 }
 
+#[cfg(not(feature = "enterprise"))]
+pub async fn mark_false_positive(
+    _org_id: &str,
+    _notice_id: &str,
+    _snooze_hours: i64,
+    _actor: &str,
+) -> Result<(), anyhow::Error> {
+    enterprise_required()
+}
+
+/// Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn list_notice_updates(
     org_id: &str,
     notice_id: &str,
 ) -> Result<Vec<config::meta::status_pages::NoticeUpdateView>, anyhow::Error> {
-    Ok(table::list_notice_updates(org_id, notice_id)
-        .await?
-        .into_iter()
-        .map(|u| config::meta::status_pages::NoticeUpdateView {
-            id: u.id,
-            body: u.body,
-            owner: u.owner,
-            created_at: u.created_at,
-        })
-        .collect())
+    o2_enterprise::enterprise::status_pages::notices::list_notice_updates(org_id, notice_id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn list_notice_updates(
+    _org_id: &str,
+    _notice_id: &str,
+) -> Result<Vec<config::meta::status_pages::NoticeUpdateView>, anyhow::Error> {
+    enterprise_required()
 }
 
 /// Renders the exact bytes a visitor would see if the page were published
@@ -518,74 +407,73 @@ pub async fn preview(
 /// `status.brandname.com` collide as the same string (R-3 note: the row is
 /// still org-scoped by `org_id`, but domain uniqueness is deliberately
 /// global — a second org must never be able to claim a domain another org
-/// already holds).
+/// already holds). Licensed (Custom Domains is an enterprise sub-feature of
+/// status pages).
+#[cfg(feature = "enterprise")]
 pub async fn create_domain(
     org_id: &str,
     page_id: &str,
     req: config::meta::status_pages::CreateDomainRequest,
 ) -> Result<config::meta::status_pages::CreateDomainResponse, anyhow::Error> {
-    let domain = normalize_domain(&req.domain)?;
-    if table::get_page_by_id(org_id, page_id).await?.is_none() {
-        anyhow::bail!("validation: page not found");
-    }
-    let now = now_micros();
-    let token = format!("o2v_{}", generate_random_string(32));
-    let model = infra::table::entity::status_page_custom_domains::Model {
-        id: config::ider::generate(),
-        org_id: org_id.to_string(),
-        status_page_id: page_id.to_string(),
-        domain: domain.clone(),
-        verification_token: token.clone(),
-        verification_state: 0,
-        verification_failure_reason: None,
-        verified_at: None,
-        released_at: None,
-        last_checked_at: None,
-        created_at: now,
-        updated_at: now,
-    };
-    let claimed = table::insert_domain_if_unclaimed(&model).await?;
-    if !claimed {
-        anyhow::bail!("validation: domain is already claimed");
-    }
-    Ok(config::meta::status_pages::CreateDomainResponse {
-        id: model.id,
-        domain,
-        txt_name: format!("_o2-verify.{}", model.domain),
-        txt_value: token,
-    })
+    o2_enterprise::enterprise::status_pages::domains::create_domain(org_id, page_id, req).await
 }
 
+#[cfg(not(feature = "enterprise"))]
+pub async fn create_domain(
+    _org_id: &str,
+    _page_id: &str,
+    _req: config::meta::status_pages::CreateDomainRequest,
+) -> Result<config::meta::status_pages::CreateDomainResponse, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn list_domains(
     org_id: &str,
     page_id: &str,
 ) -> Result<Vec<config::meta::status_pages::DomainAdminView>, anyhow::Error> {
-    Ok(table::list_domains_for_page(org_id, page_id)
-        .await?
-        .into_iter()
-        .map(to_domain_view)
-        .collect())
+    o2_enterprise::enterprise::status_pages::domains::list_domains(org_id, page_id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn list_domains(
+    _org_id: &str,
+    _page_id: &str,
+) -> Result<Vec<config::meta::status_pages::DomainAdminView>, anyhow::Error> {
+    enterprise_required()
 }
 
 /// Tombstones the claim (R-3: org-scoped, so a delete for another org's
-/// domain id is a no-op returning false, not a leak).
+/// domain id is a no-op returning false, not a leak). Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn delete_domain(org_id: &str, id: &str) -> Result<bool, anyhow::Error> {
-    Ok(table::release_domain(org_id, id, now_micros()).await?)
+    o2_enterprise::enterprise::status_pages::domains::delete_domain(org_id, id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn delete_domain(_org_id: &str, _id: &str) -> Result<bool, anyhow::Error> {
+    enterprise_required()
 }
 
 /// Runs one immediate verification pass for a single domain — the admin-facing
 /// "Verify now" action, distinct from the background loop's periodic sweep, so
 /// an admin who just fixed their DNS doesn't have to wait for the next tick.
+/// Licensed.
+#[cfg(feature = "enterprise")]
 pub async fn verify_domain_now(
     org_id: &str,
     id: &str,
 ) -> Result<config::meta::status_pages::DomainAdminView, anyhow::Error> {
-    let Some(model) = table::get_domain_by_id(org_id, id).await? else {
-        anyhow::bail!("validation: domain not found");
-    };
-    let checked = openobserve_synthetics::status_pages::check_domain_ownership(model).await?;
-    table::update_domain(&checked).await?;
-    Ok(to_domain_view(checked))
+    o2_enterprise::enterprise::status_pages::domains::verify_domain_now(org_id, id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn verify_domain_now(
+    _org_id: &str,
+    _id: &str,
+) -> Result<config::meta::status_pages::DomainAdminView, anyhow::Error> {
+    enterprise_required()
 }
 
 // ── Super-cluster emit (enterprise, gated on super_cluster.enabled) ──────────
@@ -660,46 +548,8 @@ async fn emit_replace_components(
     }
 }
 
-async fn emit_notice_upsert(
-    _org_id: &str,
-    _table: &str,
-    _model: &infra::table::entity::status_page_notices::Model,
-) {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        let json = match serde_json::to_string(_model) {
-            Ok(j) => j,
-            Err(e) => {
-                log::error!("[status_pages] emit_notice_upsert serialize: {e}");
-                return;
-            }
-        };
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::status_pages_upsert(
-            _org_id, _table, json,
-        )
-        .await
-        {
-            log::error!("[status_pages] super-cluster notice upsert publish failed: {e}");
-        }
-    }
-}
-
-async fn emit_notice_delete(_org_id: &str, _table: &str, _id: &str) {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::status_pages_delete(
-            _org_id, _table, _id,
-        )
-        .await
-    {
-        log::error!("[status_pages] super-cluster notice delete publish failed: {e}");
-    }
-}
+// Notice super-cluster emit moved with the (now enterprise-only) Notices CRUD
+// to `o2_enterprise::enterprise::status_pages` — no OSS caller remains.
 
 // ── Password unlock (public plane, R-5/R-7) ──────────────────────────────────
 
@@ -857,26 +707,6 @@ fn is_valid_hex_color(s: &str) -> bool {
     s.len() == 7 && s.starts_with('#') && s[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-/// Lowercases and strips a trailing dot; rejects anything that isn't a
-/// plausible hostname. Real DNS validity (does it resolve, is it an apex,
-/// etc.) is the verifier job's problem, not this fast synchronous check's.
-fn normalize_domain(raw: &str) -> Result<String, anyhow::Error> {
-    let d = raw.trim().trim_end_matches('.').to_ascii_lowercase();
-    if d.is_empty() || d.len() > 253 || !d.contains('.') {
-        anyhow::bail!("validation: not a valid domain");
-    }
-    let valid = d.split('.').all(|label| {
-        !label.is_empty()
-            && label
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
-    });
-    if !valid {
-        anyhow::bail!("validation: not a valid domain");
-    }
-    Ok(d)
-}
-
 fn to_admin_view(
     m: page_entity::Model,
     health: Option<config::meta::status_pages::ComponentStatus>,
@@ -909,107 +739,14 @@ fn to_admin_view(
     }
 }
 
-fn to_notice_view(
-    m: infra::table::entity::status_page_notices::Model,
-    component_ids: Vec<String>,
-) -> NoticeAdminView {
-    NoticeAdminView {
-        id: m.id,
-        kind: m.kind,
-        impact: m.impact,
-        source: m.source,
-        title: m.title,
-        body: m.body,
-        state: m.state,
-        starts_at: m.starts_at,
-        resolved_at: m.resolved_at,
-        excluded_from_uptime: m.excluded_from_uptime,
-        component_ids,
-        created_at: m.created_at,
-        updated_at: m.updated_at,
-    }
-}
-
-fn to_domain_view(
-    m: infra::table::entity::status_page_custom_domains::Model,
-) -> config::meta::status_pages::DomainAdminView {
-    config::meta::status_pages::DomainAdminView {
-        id: m.id,
-        domain: m.domain,
-        verification_state: m.verification_state,
-        verification_failure_reason: m.verification_failure_reason,
-        verified_at: m.verified_at,
-        last_checked_at: m.last_checked_at,
-        created_at: m.created_at,
-    }
-}
-
-/// A fresh notice's initial segment: open (`to: None`) once active, empty
-/// while merely scheduled — scheduled maintenance has not started accruing
-/// anything yet.
-fn segments_json(starts_at: i64, state: i32) -> String {
-    if state == 0 {
-        return "[]".to_string();
-    }
-    serde_json::to_string(&[config::meta::status_pages::Segment {
-        from: starts_at,
-        to: None,
-    }])
-    .unwrap_or_else(|_| "[]".to_string())
-}
-
-/// Closes a notice's still-open segment at `at` — the manual-resolve
-/// counterpart of the rebuilder's own `Resolve` action.
-fn close_open_segment(model: &mut infra::table::entity::status_page_notices::Model, at: i64) {
-    let mut segments: Vec<config::meta::status_pages::Segment> =
-        serde_json::from_str(&model.segments).unwrap_or_default();
-    if let Some(open) = segments.iter_mut().find(|s| s.to.is_none()) {
-        open.to = Some(at);
-    }
-    model.segments = serde_json::to_string(&segments).unwrap_or_else(|_| "[]".to_string());
-}
-
-/// Recomputes and writes the cached snapshot for every page one of a
-/// notice's mapped components belongs to, right after a notice write — so
-/// the admin list's Health column and the public page reflect the change
-/// immediately instead of waiting for the rebuilder's next tick (up to
-/// `ZO_STATUS_PAGE_REBUILD_INTERVAL`, default 60s). Best-effort: a failure
-/// here is logged, not propagated — the write itself already succeeded, and
-/// the next scheduled tick would correct the cache regardless.
-async fn refresh_affected_pages(org_id: &str, component_ids: &[String]) {
-    if component_ids.is_empty() {
-        return;
-    }
-    let page_ids = match table::pages_for_components(org_id, component_ids).await {
-        Ok(ids) => ids,
-        Err(e) => {
-            log::error!("[status_pages] refresh_affected_pages: resolve pages failed: {e}");
-            return;
-        }
-    };
-    for page_id in page_ids {
-        if let Err(e) =
-            openobserve_synthetics::status_pages::refresh_snapshot(org_id, &page_id).await
-        {
-            log::error!("[status_pages] refresh_affected_pages: refresh {page_id} failed: {e}");
-        }
-    }
-}
-
-/// A notice's current mapped component ids — needed by write paths
-/// (delete/mark_false_positive/add_notice_update) that only receive the
-/// notice id, to resolve which pages' caches to refresh.
-async fn notice_component_ids(notice_id: &str) -> Result<Vec<String>, anyhow::Error> {
-    let conn = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
-    Ok(
-        table::list_notice_components(conn, &[notice_id.to_string()])
-            .await?
-            .into_iter()
-            .map(|j| j.component_id)
-            .collect(),
-    )
+/// Every OSS stub for a Notices/Custom-Domains function returns this same
+/// error so the handler's `map_err` can map it to one 403, regardless of
+/// which licensed action was attempted.
+#[cfg(not(feature = "enterprise"))]
+fn enterprise_required<T>() -> Result<T, anyhow::Error> {
+    Err(anyhow::anyhow!(
+        "enterprise: Notices and Custom Domains require an enterprise license"
+    ))
 }
 
 #[cfg(test)]
@@ -1052,63 +789,6 @@ mod tests {
         let b = pw_version("$argon2id$v=19$...bbb");
         assert_ne!(a, b);
         assert_eq!(a, pw_version("$argon2id$v=19$...aaa")); // stable
-    }
-
-    #[test]
-    fn segments_json_is_empty_for_scheduled_maintenance() {
-        assert_eq!(segments_json(1_000, 0), "[]");
-    }
-
-    #[test]
-    fn segments_json_opens_a_segment_for_active_notices() {
-        let json = segments_json(1_000, 1);
-        let segs: Vec<config::meta::status_pages::Segment> = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            segs,
-            vec![config::meta::status_pages::Segment {
-                from: 1_000,
-                to: None
-            }]
-        );
-    }
-
-    #[test]
-    fn close_open_segment_closes_only_the_open_one() {
-        let mut model = infra::table::entity::status_page_notices::Model {
-            id: "n1".into(),
-            org_id: "org1".into(),
-            kind: 0,
-            impact: 2,
-            source: 0,
-            title: "t".into(),
-            body: "b".into(),
-            state: 1,
-            starts_at: 0,
-            resolved_at: None,
-            segments: serde_json::to_string(&[
-                config::meta::status_pages::Segment {
-                    from: 0,
-                    to: Some(100),
-                },
-                config::meta::status_pages::Segment {
-                    from: 200,
-                    to: None,
-                },
-            ])
-            .unwrap(),
-            excluded_from_uptime: false,
-            deleted_at: None,
-            auto_check_id: None,
-            auto_recovery_streak: 0,
-            owner: None,
-            created_at: 0,
-            updated_at: 0,
-        };
-        close_open_segment(&mut model, 300);
-        let segs: Vec<config::meta::status_pages::Segment> =
-            serde_json::from_str(&model.segments).unwrap();
-        assert_eq!(segs[0].to, Some(100));
-        assert_eq!(segs[1].to, Some(300));
     }
 
     #[test]
