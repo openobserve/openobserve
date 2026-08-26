@@ -38,7 +38,10 @@ const boundedNumber = (min: number, max: number, message: string) =>
     return Number.isFinite(parsed) && parsed >= min && parsed <= max;
   }, message);
 
-export const makeRemoteTaskSchema = (t: (_key: string) => string) =>
+export const makeRemoteTaskSchema = (
+  t: (_key: string) => string,
+  options: { requireHttps: boolean },
+) =>
   z
     .object({
       name: filled(t("aiObservability.remoteTasks.form.validation.nameRequired")),
@@ -80,9 +83,14 @@ export const makeRemoteTaskSchema = (t: (_key: string) => string) =>
       signingKey: z.string().optional().default(""),
     })
     .superRefine((values, ctx) => {
-      // The server refuses anything but https unless the deployment opted into
-      // private destinations, so catch the common case before a round trip.
-      if (values.endpoint.trim() && !/^https:\/\//i.test(values.endpoint.trim())) {
+      // Cloud only accepts public HTTPS destinations. Self-hosted builds may
+      // use plain HTTP for private and loopback services; the server still
+      // rejects public plaintext endpoints.
+      if (
+        options.requireHttps &&
+        values.endpoint.trim() &&
+        !/^https:\/\//i.test(values.endpoint.trim())
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["endpoint"],

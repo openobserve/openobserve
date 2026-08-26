@@ -91,7 +91,7 @@
                   name="endpoint"
                   :label="t('aiObservability.remoteTasks.form.endpointLabel')"
                   :placeholder="t('aiObservability.remoteTasks.form.endpointPlaceholder')"
-                  :help-text="t('aiObservability.remoteTasks.form.endpointHelp')"
+                  :help-text="endpointHelp"
                   size="sm"
                   required
                   data-test="ai-remote-task-form-endpoint-input"
@@ -459,6 +459,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -534,8 +535,15 @@ const authOptions = computed(() => [
   { label: t("aiObservability.remoteTasks.auth.apiKeyHeader"), value: "api_key_header" },
 ]);
 
+const requireHttps = config.isCloud === "true";
+const endpointHelp = computed<I18nText>(() =>
+  requireHttps
+    ? t("aiObservability.remoteTasks.form.endpointHelp")
+    : t("aiObservability.remoteTasks.form.endpointHelpSelfHosted"),
+);
+
 // Built once, not computed: useOForm hands the schema straight to TanStack.
-const schema = makeRemoteTaskSchema(t as unknown as (_key: string) => string);
+const schema = makeRemoteTaskSchema(t as unknown as (_key: string) => string, { requireHttps });
 
 const form = useOForm<RemoteTaskFormValues>({
   defaultValues: remoteTaskFormDefaults(),

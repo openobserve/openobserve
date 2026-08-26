@@ -11,7 +11,8 @@ import {
 } from "./RemoteTaskForm.schema";
 
 const t = (key: string) => key;
-const schema = makeRemoteTaskSchema(t);
+const schema = makeRemoteTaskSchema(t, { requireHttps: true });
+const selfHostedSchema = makeRemoteTaskSchema(t, { requireHttps: false });
 
 function values(overrides: Partial<RemoteTaskFormValues> = {}): RemoteTaskFormValues {
   return {
@@ -38,9 +39,14 @@ describe("makeRemoteTaskSchema", () => {
     expect(issuePaths(values({ endpoint: "" }))).toContain("endpoint");
   });
 
-  // The server refuses plain http, so the form says so before a round trip.
-  it("refuses a non-https endpoint", () => {
+  it("refuses a non-https endpoint in cloud builds", () => {
     expect(issuePaths(values({ endpoint: "http://tasks.example.com/run" }))).toContain("endpoint");
+  });
+
+  it("allows a non-https endpoint in self-hosted builds", () => {
+    expect(
+      selfHostedSchema.safeParse(values({ endpoint: "http://127.0.0.1:8000/sre/query" })).success,
+    ).toBe(true);
   });
 
   it.each([

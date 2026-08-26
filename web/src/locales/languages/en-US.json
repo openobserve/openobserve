@@ -11358,6 +11358,7 @@
         "endpointLabel": "Endpoint URL",
         "endpointPlaceholder": "https://tasks.example.com/run",
         "endpointHelp": "An https URL on a public host, with no credentials and no fragment.",
+        "endpointHelpSelfHosted": "Use https for public hosts. Private and loopback hosts may use http. Credentials and fragments are not allowed.",
         "authTypeLabel": "Auth Type",
         "tokenLabel": "Token",
         "tokenPlaceholder": "Pasted once, stored encrypted",
