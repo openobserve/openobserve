@@ -187,7 +187,7 @@
            can own its own scroller. This page is a document, so the body is
            the scroller — without it the activity thread was clipped at the
            fold with no way to reach the rest. -->
-      <OContent y class="min-h-0 flex-1 overflow-y-auto">
+      <OContent y class="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <!-- The one sentence this screen exists to say when it is true:
              nobody has seen this page, and here is why. -->
         <OnCallReachAlarm
@@ -242,7 +242,7 @@
              that were never optional, and the rail's answers — who this is
              reaching, what fires next, why this team — are the ones people
              opened the tabs to find. -->
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div class="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-3">
           <div class="flex flex-col gap-4 lg:col-span-2">
             <!-- Renders nothing until a verdict event exists (§G.7) — the
                  default deployment has no agent and must not show an
@@ -255,7 +255,7 @@
                  own expand toggle with no hint of what was inside. Tabs put
                  all three labels on screen at once, so which one has the
                  answer is a glance, not three clicks to find out. -->
-            <OCard variant="glass" data-test="oncall-response-tabs">
+            <OCard variant="glass" class="flex-1" data-test="oncall-response-tabs">
               <OCardSection role="header" dense class="flex-wrap items-center gap-2">
                 <OTabs v-model="activeDetailTab" dense data-test="oncall-response-tabs-strip">
                   <OTab

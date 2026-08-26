@@ -151,59 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
       <template #toolbar>
-        <div v-if="selectedIds.length" class="flex w-full flex-wrap items-center gap-2">
-          <OText variant="body" as="span" data-test="oncall-bulk-count">
-            {{ t("oncall.selectedCount", { count: selectedIds.length }) }}
-          </OText>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :loading="bulkBusy"
-            data-test="oncall-bulk-ack"
-            @click="bulkAcknowledge"
-          >
-            {{ t("oncall.acknowledge") }}
-          </OButton>
-          <ODropdown>
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="sm-action"
-                icon-right="expand-more"
-                :loading="bulkBusy"
-                data-test="oncall-bulk-snooze"
-              >
-                {{ t("oncall.snooze") }}
-              </OButton>
-            </template>
-            <ODropdownItem
-              v-for="option in snoozeOptions"
-              :key="option.minutes"
-              :data-test="`oncall-bulk-snooze-${option.minutes}`"
-              @select="bulkSnooze(option.minutes)"
-            >
-              {{ option.label }}
-            </ODropdownItem>
-          </ODropdown>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            :loading="bulkBusy"
-            data-test="oncall-bulk-resolve"
-            @click="confirmBulkResolve = true"
-          >
-            {{ t("oncall.resolve") }}
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="oncall-bulk-cancel"
-            @click="selectedIds = []"
-          >
-            {{ t("oncall.cancel") }}
-          </OButton>
-        </div>
-        <div v-else class="flex w-full flex-wrap items-center gap-2">
+        <div class="flex w-full flex-wrap items-center gap-2">
           <ODropdown align="start" side="bottom" :side-offset="4">
             <template #trigger>
               <OButton
@@ -316,6 +264,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="oncall-responses-cause-filter"
             @update:model-value="onCauseFilter"
           />
+        </div>
+      </template>
+
+      <template v-if="selectedIds.length" #bottom>
+        <div class="flex w-full flex-wrap items-center gap-2">
+          <OText variant="body" as="span" data-test="oncall-bulk-count">
+            {{ t("oncall.selectedCount", { count: selectedIds.length }) }}
+          </OText>
+          <OButton
+            variant="primary"
+            size="sm-toolbar"
+            :loading="bulkBusy"
+            data-test="oncall-bulk-ack"
+            @click="bulkAcknowledge"
+          >
+            {{ t("oncall.acknowledge") }}
+          </OButton>
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm-toolbar"
+                icon-right="expand-more"
+                :loading="bulkBusy"
+                data-test="oncall-bulk-snooze"
+              >
+                {{ t("oncall.snooze") }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              v-for="option in snoozeOptions"
+              :key="option.minutes"
+              :data-test="`oncall-bulk-snooze-${option.minutes}`"
+              @select="bulkSnooze(option.minutes)"
+            >
+              {{ option.label }}
+            </ODropdownItem>
+          </ODropdown>
+          <OButton
+            variant="outline"
+            size="sm-toolbar"
+            :loading="bulkBusy"
+            data-test="oncall-bulk-resolve"
+            @click="confirmBulkResolve = true"
+          >
+            {{ t("oncall.resolve") }}
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm-toolbar"
+            data-test="oncall-bulk-cancel"
+            @click="selectedIds = []"
+          >
+            {{ t("oncall.cancel") }}
+          </OButton>
         </div>
       </template>
 
