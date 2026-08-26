@@ -262,6 +262,13 @@ async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
     ingester::collect_wal_parquet_metrics()
         .await
         .map_err(|e| anyhow::anyhow!("Failed to collect parquet metrics: {}", e))?;
+    // and the wal search locks, plus the deletions they are holding back
+    metrics::INGEST_WAL_SEARCHING_FILES
+        .with_label_values::<&str>(&[])
+        .set(crate::common::infra::wal::lock_files_len() as i64);
+    metrics::INGEST_WAL_PENDING_DELETE_FILES
+        .with_label_values::<&str>(&[])
+        .set(crate::service::db::file_list::local::pending_delete_len().await as i64);
     Ok(())
 }
 

@@ -63,6 +63,10 @@ pub async fn get_pending_delete() -> Vec<String> {
     PENDING_DELETE_FILES.read().await.iter().cloned().collect()
 }
 
+pub async fn pending_delete_len() -> usize {
+    PENDING_DELETE_FILES.read().await.len()
+}
+
 pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
     // Acquire locks in a consistent order to prevent deadlocks
     let pending = PENDING_DELETE_FILES.read().await;
