@@ -1,0 +1,31 @@
+{
+  "feature_slug": "span-event-markers",
+  "feature_title": "Trace Span Event Markers",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "spanEventMarkers.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/spanEventMarkers.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/composables/traces/useSpanEvents.ts",
+    "web/src/plugins/traces/SpanBlock.vue",
+    "web/src/components/traces/FlameGraphView.vue",
+    "web/src/plugins/traces/TraceDetails.vue",
+    "web/src/plugins/traces/TraceDetailsSidebar.vue",
+    "web/src/plugins/traces/TraceTree.vue",
+    "web/src/utils/traces/traceColors.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives under web/src/** (components/traces, composables/traces, plugins/traces, utils/traces, lib/styles/tokens, locales) plus scripts/translations. None fall under enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/) or enterprise-gated modules, and no enterprise keywords (SSO/SAML/RBAC/SDR/cipher/sensitive-data/logo-management) appear in the changed paths or symbol names — this is an OSS change.",
+    "skip": "Not skipped. No explicit opt-out label (tests-added) was passed and the trigger comment is empty, so no human skip marker applies. The change is user-facing: it alters trace-waterfall/flame-graph rendering, which a user sees and interacts with, not a docs/CI/comment-only change.",
+    "e2e": "E2E is warranted. The change introduces span-event severity markers (error/warning/info ticks) on span bars in the trace waterfall, the flame graph, and the span-details sidebar, plus an event-count badge and marker tooltips/clicks — new user-visible rendering and interaction that need verifying against a real trace view.",
+    "area": "Traces. The bulk of the UI changes live in web/src/plugins/traces/ (SpanBlock, TraceDetails, TraceDetailsSidebar, TraceTree) and web/src/components/traces/ (FlameGraphView), and the sibling E2E specs (tracesSearch, traceDetails, traceQueryEditor, traceErrorFilter, traceAdvancedFiltering, tracesAnalyzeDimensions) all live in the Traces folder.",
+    "group": "The Traces matrix shard (testfolder 'Traces', actual_folder 'Traces') in ci_matrix_env.json already runs all trace UI specs; this feature is a trace-details/waterfall behavior and belongs in that same group rather than a new shard.",
+    "existing_tests": "No Playwright E2E specs in the diff. The changed test files (FlameGraphView.spec.ts, useSpanEvents.spec.ts, SpanBlock.spec.ts, TraceDetails.spec.ts, TraceDetailsSidebar.spec.ts, TraceTree.spec.ts, spanPalette.spec.ts, traceColors.spec.ts) are Vitest unit specs under web/src/**, not E2E coverage, so no existing E2E tests to enhance."
+  }
+}

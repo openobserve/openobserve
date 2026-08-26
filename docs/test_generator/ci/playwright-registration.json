@@ -1,0 +1,6 @@
+{
+  "group": "Traces",
+  "spec_filename": "spanEventMarkers.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

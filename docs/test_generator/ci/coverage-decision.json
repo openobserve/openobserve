@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/spanEventMarkers.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/tracesAnalyzeDimensions.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceErrorFilter.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing Traces spec covers span event markers. traceDetails.spec.js covers the trace-details panel chrome (timeline toggle, copy trace ID, view logs, search-within, share link) but none of the span-event marker surfaces (span-event-marker / span-event-count-badge / span-event-timeline-marker). tracesAnalyzeDimensions.spec.js and traceErrorFilter.spec.js use ingestTraces but assert on the search/insights dashboard, not the marker rendering. Span event markers is a cohesive new visual feature spanning four surfaces (waterfall ticks, tree badge, sidebar mini-timeline, marker-click handoff), so a new spec in Traces/ is warranted. The new file must be added to ci_matrix.json Traces.run_files."
+}

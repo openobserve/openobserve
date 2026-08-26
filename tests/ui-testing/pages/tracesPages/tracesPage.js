@@ -175,6 +175,18 @@ export class TracesPage {
 
     // Trace details span attribute table (rendered inside trace-details-sidebar)
     this.traceDetailsSidebarRow = '[data-test="trace-details-sidebar"] [data-test^="o2-table-row-"]';
+
+    // Span event markers (span-event-markers feature) — waterfall ticks, tree
+    // badge, and sidebar mini-timeline all key off the shared useSpanEvents
+    // severity/position vocabulary.
+    this.spanEventMarker = '[data-test="span-event-marker"]';
+    this.spanEventCountBadge = '[data-test="span-event-count-badge"]';
+    this.spanEventErrorCount = '[data-test="span-event-error-count"]';
+    this.spanEventTimelineMarker = '[data-test="span-event-timeline-marker"]';
+    this.traceDetailsSidebarTabsEvents = '[data-test="trace-details-sidebar-tabs-events"]';
+    this.traceDetailsSidebarEventsTimeline = '[data-test="trace-details-sidebar-events-timeline"]';
+    this.traceDetailsSidebarEventsTable = '[data-test="trace-details-sidebar-events-table"]';
+    this.traceDetailsSidebarNoEvents = '[data-test="trace-details-sidebar-no-events"]';
   }
 
   // Getter methods for common trace elements
@@ -2606,6 +2618,122 @@ export class TracesPage {
    */
   getOrgMenuItemLabels() {
     return this.page.locator('[data-test="organization-menu-item-label-item-label"]');
+  }
+
+  /**
+   * Direct-navigate to a specific trace by traceId (deterministic span-event
+   * selection). `fromUs`/`toUs` are microseconds since epoch bracketing the
+   * trace window so `get_trace_details` can resolve the span list.
+   */
+  async navigateToTraceDetails(traceId, stream, fromUs, toUs) {
+    const org = process.env["ORGNAME"] || "default";
+    const baseUrl = (process.env["ZO_BASE_URL"] || "").replace(/\/+$/, '');
+    const url =
+      `${baseUrl}/web/traces/trace-details?org_identifier=${org}` +
+      `&stream=${stream}&trace_id=${traceId}&from=${fromUs}&to=${toUs}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('domcontentloaded');
+    // The trace view hydrates spanList -> spanMap -> events asynchronously; wait
+    // for the tree to mount before anything downstream touches markers.
+    await this.page
+      .locator(this.traceDetailsTree)
+      .waitFor({ state: 'visible', timeout: 30000 })
+      .catch(() => {});
+  }
+
+  /** @returns {import('@playwright/test').Locator} waterfall span-event ticks */
+  getSpanEventMarkers() {
+    return this.page.locator(this.spanEventMarker);
+  }
+
+  /** @returns {import('@playwright/test').Locator} tree per-span event-count badges */
+  getSpanEventCountBadges() {
+    return this.page.locator(this.spanEventCountBadge);
+  }
+
+  /** @returns {import('@playwright/test').Locator} trailing error tally inside a badge */
+  getSpanEventErrorCounts() {
+    return this.page.locator(this.spanEventErrorCount);
+  }
+
+  /** @returns {import('@playwright/test').Locator} sidebar mini-timeline ticks */
+  getSpanEventTimelineMarkers() {
+    return this.page.locator(this.spanEventTimelineMarker);
+  }
+
+  /**
+   * Span-block row that carries at least one event marker. In the deterministic
+   * ingest-helper trace only the server span has events, so this resolves to
+   * that row.
+   * @returns {import('@playwright/test').Locator}
+   */
+  getSpanBlockWithEvents() {
+    return this.page.locator(this.spanBlock, { has: this.page.locator(this.spanEventMarker) });
+  }
+
+  /** @returns {import('@playwright/test').Locator} events-table rows in the sidebar */
+  getEventsTableRows() {
+    return this.page.locator(
+      `${this.traceDetailsSidebarEventsTable} [data-test^="o2-table-row-"]:not([data-test="o2-table-row-drag-handle"])`,
+    );
+  }
+
+  /** Click the first waterfall event tick (selects span + opens sidebar Events tab). */
+  async clickFirstSpanEventMarker() {
+    await this.page.locator(this.spanEventMarker).first().click();
+  }
+
+  /** Click the first span-block row (opens the sidebar on the span's default tab). */
+  async clickFirstSpanBlock() {
+    await this.page.locator(this.spanBlock).first().click();
+  }
+
+  /** Click the span-block row that carries event markers (the server span). */
+  async clickSpanBlockWithEvents() {
+    await this.getSpanBlockWithEvents().first().click();
+  }
+
+  /** Open the sidebar Events tab and verify it became active (Reka data-state). */
+  async openSidebarEventsTab() {
+    const tab = this.page.locator(this.traceDetailsSidebarTabsEvents);
+    await tab.waitFor({ state: 'visible', timeout: 20000 });
+    await tab.click();
+    await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 10000 });
+  }
+
+  /** Verify the sidebar Events tab is active (used after a marker-click handoff). */
+  async expectSidebarEventsTabActive() {
+    await expect(this.page.locator(this.traceDetailsSidebarTabsEvents)).toHaveAttribute(
+      'data-state',
+      'active',
+      { timeout: 10000 },
+    );
+  }
+
+  /** Verify the sidebar events table is mounted/visible. */
+  async expectEventsTableVisible() {
+    await expect(this.page.locator(this.traceDetailsSidebarEventsTable)).toBeVisible({
+      timeout: 20000,
+    });
+  }
+
+  /**
+   * Verify at least one events-table row is expanded (JsonPreview rendered).
+   * A marker click focuses the matching event, which expands its row.
+   */
+  async expectEventRowExpanded() {
+    await expect(
+      this.page
+        .locator(`${this.traceDetailsSidebarEventsTable} [data-test^="json-preview-key-"]`)
+        .first(),
+    ).toBeVisible({ timeout: 20000 });
+  }
+
+  /** Verify the no-events empty state renders for a span without an events payload. */
+  async expectNoEventsEmptyStateVisible() {
+    await expect(this.page.locator(this.traceDetailsSidebarNoEvents)).toBeVisible({
+      timeout: 20000,
+    });
   }
 
 }
