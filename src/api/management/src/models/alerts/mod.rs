@@ -198,7 +198,7 @@ pub struct Alert {
     pub scheduler_job_present: Option<bool>,
 
     #[serde(default)]
-    pub pending_period_sec: i64
+    pub pending_period_sec: i64,
 }
 
 /// Configuration for when and how an alert should be triggered.

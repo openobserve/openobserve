@@ -210,9 +210,9 @@ pub fn plan_dispatch(
                     row: row.clone(),
                 });
             }
-            DeliveryDecision::SuppressedBySilence | DeliveryDecision::SuppressedByWarningPolicy => {
-                suppressed += 1
-            }
+            DeliveryDecision::SuppressedBySilence
+            | DeliveryDecision::SuppressedByWarningPolicy
+            | DeliveryDecision::SuppressedByPending => suppressed += 1,
             DeliveryDecision::NotFiring => {}
         }
     }

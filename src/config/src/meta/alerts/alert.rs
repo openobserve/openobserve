@@ -195,7 +195,7 @@ impl Default for Alert {
             workflows: vec![],
             priority: None,
             tags: vec![],
-            pending_period_sec: 0
+            pending_period_sec: 0,
         }
     }
 }

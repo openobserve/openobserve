@@ -1118,7 +1118,7 @@ pub(super) mod tests {
             dedup_config: None,
             creates_incident: false,
             workflows: serde_json::json!(["abc123"]),
-            pending_period_sec: 0
+            pending_period_sec: 0,
         }
     }
 

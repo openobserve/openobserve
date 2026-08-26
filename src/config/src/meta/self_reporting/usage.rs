@@ -132,6 +132,10 @@ pub enum RunOutcome {
     /// this, a webhook outage silently undercounts firings.
     #[serde(rename = "notify_failed")]
     NotifyFailed,
+    /// alert is in pending state, will wait for configured time before
+    /// transitioning to firing
+    #[serde(rename = "pending")]
+    Pending,
 }
 
 impl RunOutcome {
@@ -152,6 +156,7 @@ impl RunOutcome {
             Self::Error => 3,
             Self::Skipped => 4,
             Self::NotifyFailed => 5,
+            Self::Pending => 6,
         }
     }
 
@@ -163,6 +168,7 @@ impl RunOutcome {
             3 => Some(Self::Error),
             4 => Some(Self::Skipped),
             5 => Some(Self::NotifyFailed),
+            6 => Some(Self::Pending),
             _ => None,
         }
     }
@@ -175,6 +181,7 @@ impl RunOutcome {
             Self::Error => "error",
             Self::Skipped => "skipped",
             Self::NotifyFailed => "notify_failed",
+            Self::Pending => "pending",
         }
     }
 }
@@ -216,6 +223,7 @@ pub fn normalize_outcome(
         "error" => Some(RunOutcome::Error),
         "skipped" => Some(RunOutcome::Skipped),
         "notify_failed" => Some(RunOutcome::NotifyFailed),
+        "pending" => Some(RunOutcome::Pending),
 
         // ── legacy vocabulary ──
         "condition_not_satisfied" => Some(RunOutcome::Normal),

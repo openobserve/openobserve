@@ -1772,6 +1772,10 @@ async fn handle_alert_triggers(
                 .num_microseconds()
                 .unwrap();
 
+    let last_states = load_tracked_group_states(&alert.get_unique_key()).await.inspect_err(|e|{
+        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {} error in getting alert state: {e}",trigger.module_key);
+    })?;
+
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
     // Set when per-group dispatch handled delivery (§5.5 MN-1): it commits the
@@ -2115,6 +2119,97 @@ async fn handle_alert_triggers(
             let _ = is_multi_alert;
             false
         };
+
+        // for non multi alert, we need to check if it should move to pending state or firing state
+        // this only applies if the pending period > 0, for 0 pending period, always immediately
+        // transition to firing etc.
+        if !is_multi_alert && alert.pending_period_sec > 0 {
+            if let Some(last_state) = last_states.get("") {
+                match (last_state.last_outcome.as_ref(), last_state.since) {
+                    (None, _) | (Some(RunOutcome::Normal), _) => {
+                        // last state not recorded, so maybe first firing, or normal
+                        // so set to pending
+                        trigger_data_stream.status = RunOutcome::Pending;
+                        trigger_data.period_end_time = if should_store_last_end_time {
+                            Some(trigger_results.end_time)
+                        } else {
+                            None
+                        };
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        // Condition matched; only the notification was
+                        // deduplicated away. State must reflect the firing.
+                        if let Some(alert_id) = alert.id.as_ref() {
+                            let _ = persist_alert_run_state(
+                                &alert,
+                                &alert_id.to_string(),
+                                &trigger_data_stream.status,
+                                eval_level,
+                                trigger_results.group_classification.as_ref(),
+                            )
+                            .await;
+                        }
+                        publish_triggers_usage(trigger_data_stream);
+                        return Ok(());
+                    }
+                    (Some(RunOutcome::Pending), Some(last)) => {
+                        // last state was pending, so check if the the pending state exists for more
+                        // than pending seconds or not.
+                        if now - last < alert.pending_period_sec * 1_000_000 {
+                            trigger_data_stream.status = RunOutcome::Pending;
+                            trigger_data.period_end_time = if should_store_last_end_time {
+                                Some(trigger_results.end_time)
+                            } else {
+                                None
+                            };
+                            new_trigger.data = json::to_string(&trigger_data).unwrap();
+                            db::scheduler::update_trigger(new_trigger, true, &query_trace_id)
+                                .await?;
+                            // Condition matched; only the notification was
+                            // deduplicated away. State must reflect the firing.
+                            if let Some(alert_id) = alert.id.as_ref() {
+                                let _ = persist_alert_run_state(
+                                    &alert,
+                                    &alert_id.to_string(),
+                                    &trigger_data_stream.status,
+                                    eval_level,
+                                    trigger_results.group_classification.as_ref(),
+                                )
+                                .await;
+                            }
+                            publish_triggers_usage(trigger_data_stream);
+                            return Ok(());
+                        }
+                    }
+                    // for all other states, continue processing
+                    _ => {}
+                }
+            } else {
+                // last state not recorded, so maybe first firing, set it to pending
+                trigger_data_stream.status = RunOutcome::Pending;
+                trigger_data.period_end_time = if should_store_last_end_time {
+                    Some(trigger_results.end_time)
+                } else {
+                    None
+                };
+                new_trigger.data = json::to_string(&trigger_data).unwrap();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                // Condition matched; only the notification was
+                // deduplicated away. State must reflect the firing.
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert,
+                        &alert_id.to_string(),
+                        &trigger_data_stream.status,
+                        eval_level,
+                        trigger_results.group_classification.as_ref(),
+                    )
+                    .await;
+                }
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
+        }
 
         if grouping_enabled {
             #[cfg(feature = "enterprise")]

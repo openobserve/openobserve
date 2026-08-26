@@ -306,7 +306,8 @@ impl TriggerStatus {
                     // is a healthy trigger; a failed delivery is not.
                     usage::RunOutcome::Firing
                     | usage::RunOutcome::Normal
-                    | usage::RunOutcome::Succeeded => status.healthy += 1,
+                    | usage::RunOutcome::Succeeded
+                    | usage::RunOutcome::Pending => status.healthy += 1,
                     usage::RunOutcome::Error | usage::RunOutcome::NotifyFailed => {
                         status.failed += 1
                     }
