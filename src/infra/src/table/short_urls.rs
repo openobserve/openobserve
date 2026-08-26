@@ -137,10 +137,13 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<bool, errors::Err
         ..Default::default()
     };
 
+    // init the client before get_lock: connect_to_orm locks the same CLIENT_RW
+    // mutex on sqlite, so the reverse order self-deadlocks on first db access
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let inserted = Entity::insert(record)
         .on_conflict(
             sea_orm::sea_query::OnConflict::column(Column::ShortId)
