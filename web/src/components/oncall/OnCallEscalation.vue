@@ -38,18 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-      <!-- D-21: an impacted record is a liaison seat, and its ladder is
-           deliberately two rungs — the opening page and one chase — with no
-           repeat and no handoff. Unexplained, that reads as a ladder somebody
-           misconfigured, and its end reads as a failure. -->
-      <p
-        v-if="isLiaison"
-        class="text-text-secondary mb-3 text-sm"
-        data-test="oncall-escalation-liaison-note"
-      >
-        {{ t("oncall.ladderLiaisonNote") }}
-      </p>
-
       <p
         v-if="!groups.length"
         class="text-text-secondary mb-3 text-sm"

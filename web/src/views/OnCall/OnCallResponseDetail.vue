@@ -68,6 +68,7 @@
         >
           {{ t("oncall.liaisonTag") }}
         </OTag>
+        <OTooltip v-if="isImpacted" side="bottom" :content="t('oncall.ladderLiaisonNote')" />
       </template>
     </template>
 

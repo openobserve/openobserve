@@ -73,7 +73,11 @@ const stubs = {
     template:
       "<div><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><slot /></div>",
   },
-  OTooltip: { name: "OTooltip", template: "<span><slot name='content' /></span>" },
+  OTooltip: {
+    name: "OTooltip",
+    props: ["content"],
+    template: "<span>{{ content }}<slot name='content' /></span>",
+  },
   RouterLink: { name: "RouterLink", props: ["to"], template: "<a><slot /></a>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
@@ -703,6 +707,20 @@ describe("OnCallResponseDetail", () => {
         "another team's failure reaches your service",
       );
       expect(wrapper.find('[data-test="oncall-response-origin-link"]').exists()).toBe(true);
+    });
+
+    /// The ladder-shape explanation used to sit as a paragraph inside the
+    /// escalation card; it now rides the "Liaison seat" tag itself as a
+    /// tooltip, next to the title where the tag is seen first.
+    it("explains the truncated ladder as a tooltip on the liaison tag", async () => {
+      const wrapper = await renderWith({
+        responder_role: "impacted",
+        origin_response_id: "resp_owner",
+      });
+
+      const tag = wrapper.find('[data-test="oncall-response-liaison-tag"]');
+      const tooltip = tag.element.nextElementSibling;
+      expect(tooltip?.textContent).toContain("one chase");
     });
 
     /// The role is what the ladder is truncated by, so it is what the ladder

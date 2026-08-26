@@ -203,13 +203,6 @@ describe("OnCallEscalation", () => {
   /// short ladder that stops is the design working, and the owner ladder's
   /// warning ("nobody left to escalate to") would ask a team to chase an
   /// outage it cannot fix.
-  it("says a liaison ladder is short on purpose", () => {
-    const wrapper = render({ fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] }, [], "impacted");
-    expect(wrapper.find('[data-test="oncall-escalation-liaison-note"]').text()).toContain(
-      "one chase",
-    );
-  });
-
   it("reads a spent liaison ladder as finished, not as exhausted", () => {
     const wrapper = render({ exhausted: true }, [], "impacted");
     const end = wrapper.find('[data-test="oncall-escalation-end"]');
@@ -223,7 +216,6 @@ describe("OnCallEscalation", () => {
     expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain(
       "nobody left to escalate to",
     );
-    expect(wrapper.find('[data-test="oncall-escalation-liaison-note"]').exists()).toBe(false);
   });
 
   it("puts no nobody-tag on a rung that landed", () => {
