@@ -43,6 +43,7 @@
     "allCaughtUp": "Você está em dia",
     "noPanels": {
       "title": "Ainda não há painéis aqui",
+      "description": "Adicione um painel para começar a visualizar registros, métricas e rastros.",
       "action": "Adicionar painel",
       "actionDesc": "Gráficos, tabelas e muito mais"
     },
@@ -77,6 +78,7 @@
     },
     "noDashboards": {
       "title": "Crie seu primeiro painel",
+      "description": "Os painéis reúnem suas métricas, registros e rastros em uma única visualização. Crie um para começar.",
       "action": "Novo painel",
       "actionDesc": "Comece com uma tela vazia",
       "import": "Painel de importação",
@@ -122,6 +124,7 @@
     },
     "noIngestionTokens": {
       "title": "Ainda não há tokens de ingestão",
+      "description": "Os tokens de ingestão autenticam fontes de dados ao enviar registros, métricas e rastros.",
       "action": "Novo token",
       "actionDesc": "Gere um token de ingestão"
     },
@@ -130,7 +133,11 @@
       "description": "As organizações agrupam seus usuários e dados. Crie um para começar."
     },
     "noAlertDestinations": {
+      "title": "Nenhum destino ainda",
+      "description": "Os destinos definem para onde as notificações de alerta são enviadas — Slack, e-mail, webhooks e muito mais.",
+      "action": "Novo destino",
       "actionDesc": "Conectar um canal de notificação",
+      "import": "Importar destino",
       "importDesc": "Importar de um arquivo JSON"
     },
     "noAlertSources": {
@@ -140,7 +147,10 @@
       "actionDesc": "Crie uma URL e um token para webhook"
     },
     "noPipelineDestinations": {
-      "description": "Alvos externos para saída do pipeline — endpoints HTTP e destinos de gravação remota."
+      "title": "Nenhum destino ainda",
+      "description": "Alvos externos para saída do pipeline — endpoints HTTP e destinos de gravação remota.",
+      "action": "Novo destino",
+      "actionDesc": "Conectar um destino de oleoduto"
     },
     "noAlertTemplates": {
       "title": "Ainda não há modelos",
@@ -181,7 +191,8 @@
       "actionDesc": "Configurar um provedor LLM"
     },
     "noDiscoveredServices": {
-      "title": "Nenhum serviço descoberto"
+      "title": "Nenhum serviço descoberto",
+      "description": "Os serviços aparecerão aqui automaticamente assim que os rastros começarem a chegar."
     },
     "noNodes": {
       "title": "Não há nós disponíveis",
@@ -237,6 +248,7 @@
     },
     "noDatasets": {
       "title": "Crie seu primeiro dataset",
+      "description": "Os conjuntos de dados dourados coletam rastros anotados e avaliações em conjuntos de avaliação versionados. Crie um para começar a curar.",
       "action": "Novo dataset",
       "actionDesc": "Iniciar um dataset vazio"
     },
@@ -276,11 +288,15 @@
     },
     "noLLMInsights": {
       "title": "Ainda não há atividade de LLM",
-      "action": "Instrumento com OpenTelemetry"
+      "description": "Instrumente seus serviços com as convenções semânticas de IA generativa do OpenTelemetry e ingira pelo menos um rastro para preencher este painel.",
+      "action": "Instrumento com OpenTelemetry",
+      "actionDesc": "Capture os atributos gen_ai_* em seus rastros"
     },
     "noLLMSessions": {
       "title": "Ainda não há sessões de LLM",
-      "action": "Instrumento com OpenTelemetry"
+      "description": "As sessões são agrupadas por gen_ai_conversation_id. Instrumente seus serviços para que cada conversa marque seus rastros, e as sessões aparecerão aqui.",
+      "action": "Instrumento com OpenTelemetry",
+      "actionDesc": "Marque spans com gen_ai_conversation_id"
     },
     "noScorers": {
       "title": "Ainda não há marcadores",
@@ -324,9 +340,13 @@
       "title": "Nenhum item não saudável aqui",
       "description": "Nenhum item não saudável nesta janela. Amplie o intervalo de tempo ou alterne o filtro da fila para ver itens que você já triou."
     },
-    "noTraces": {},
+    "noTraces": {
+      "title": "Nenhum rastro encontrado",
+      "description": "Nenhum rastro corresponde ao serviço e ao intervalo de tempo selecionados. Tente um intervalo de tempo maior ou um serviço diferente."
+    },
     "noServiceGraph": {
-      "title": "Sem dados do gráfico de serviço"
+      "title": "Sem dados do gráfico de serviço",
+      "description": "Tente consultar um intervalo de tempo maior ou verifique se seus serviços estão emitindo métricas de span."
     },
     "noServicesCatalog": {
       "title": "Nenhum serviço encontrado",
@@ -386,13 +406,16 @@
       "pipelines": "oleodutos",
       "workflows": "fluxos de trabalho",
       "functions": "funções",
+      "streams": "streams",
       "alerts": "alertas",
       "incidents": "incidentes",
+      "traces": "rastros",
       "discoveryItems": "itens não saudáveis",
       "datasetItems": "itens",
       "searches": "pesquisa",
       "searchJobs": "trabalhos de pesquisa",
       "users": "usuários",
+      "reports": "relatórios",
       "queries": "consultas",
       "serviceAccounts": "contas de serviço",
       "invitations": "convites",
@@ -403,7 +426,9 @@
       "roleLimits": "limites de função",
       "ingestionTokens": "tokens de ingestão",
       "organizations": "organizações",
+      "alertDestinations": "destinos",
       "alertSources": "fontes de alerta",
+      "pipelineDestinations": "destinos",
       "alertTemplates": "modelos",
       "evalTemplates": "modelos de avaliação",
       "enrichmentTables": "tabelas de enriquecimento",
@@ -455,6 +480,7 @@
       "noSearchResults": "Sem resultados de pesquisa",
       "noServiceAccounts": "Sem contas de serviço",
       "noStreams": "Sem dados ingeridos",
+      "noTraces": "Nenhum rastro",
       "noUsers": "Sem usuários"
     },
     "noExperiments": {
@@ -497,6 +523,8 @@
     "relatedEvents": "Eventos relacionados",
     "on": "em",
     "event": "evento",
+    "viewTraceDetails": "Ver detalhes do rastro",
+    "viewTrace": "Ver Rastro",
     "networkRequests": "Solicitações de rede",
     "noNetworkRequestsFound": "Nenhuma solicitação de rede encontrada para este evento",
     "consoleLogsComingSoon": "Logs do console em breve",
@@ -547,6 +575,7 @@
     "list": "Lista",
     "condition": "Condição",
     "operator": "Operador",
+    "value": "Valor",
     "filters": "Filtros",
     "selectFilter": "Selecionar filtro",
     "confirm": "Confirme",
@@ -715,6 +744,7 @@
     "nameIsRequired": "O nome é obrigatório",
     "streamTypeIsRequired": "O tipo de stream é obrigatório",
     "functionNameIsRequired": "O nome da função é obrigatório",
+    "remoteDestinationIsRequired": "O destino remoto é obrigatório",
     "timezoneIsRequired": "O fuso horário é obrigatório",
     "idPrefix": "ID: {id}",
     "unchangedCount": "Inalterado ({count})",
@@ -773,6 +803,7 @@
     "relativeTimeAgo": "há {value} {unit}",
     "relativeTimePast": "Últimos {value} {unit}",
     "metrics": "Métricas",
+    "traces": "Rastros",
     "browserTime": "Horário do navegador",
     "invalidCredentials": "Credenciais inválidas",
     "notFound": "Não encontrado",
@@ -813,7 +844,11 @@
       "loading": "Carregando condições...",
       "loadError": "A condição salva não pôde ser lida e foi redefinida. Salvar agora a substituirá."
     },
-    "destination": {},
+    "destination": {
+      "createNew": "Criar novo destino",
+      "select": "Destino",
+      "loadError": "Erro ao carregar destinos."
+    },
     "function": {
       "createNew": "Criar nova função",
       "createNewNoteWorkflow": "Nota: A função será criada e você será redirecionado ao formulário anterior para associar a função recém-criada ao fluxo de trabalho.",
@@ -872,6 +907,7 @@
     "of": "do",
     "rowDetail": "Detalhes da fonte",
     "sourceName": "Nome",
+    "sourceValue": "Valor",
     "showHistogramLabel": "Histograma",
     "hideHistogram": "Ocultar histograma",
     "showPatternsLabel": "Padrões",
@@ -1025,7 +1061,10 @@
     "regionFilterMsg": "Região/cluster de pesquisa",
     "queryRangeRestrictionMsg": "O intervalo de consulta é restrito a {range}. Ajuste o intervalo de datas adequadamente. Caso contrário, a data de início será ajustada automaticamente para caber dentro do limite permitido.",
     "cancel": "Cancelar consulta",
+    "viewTrace": "Ver Rastro",
+    "viewTraceUnavailable": "Não foi possível abrir o rastro para este registro de log.",
     "viewRelated": "Exibir relacionado",
+    "viewRelatedTooltip": "Ver rastros e métricas relacionados",
     "flattened": "Achatado",
     "original": "Original",
     "resetFilters": "Redefinir filtros",
@@ -1107,6 +1146,8 @@
     "selectFunctionNamePlaceholder": "Selecione o nome da função",
     "confirmFunctionUpdateTitle": "Confirme a atualização",
     "confirmFunctionUpdateMsg": "Tem certeza de que deseja atualizar a função {name}?",
+    "traceIdLabel": "ID do rastro:",
+    "enterTraceIdPlaceholder": "Digite o ID do rastro",
     "changeQueryModeTitle": "Alterar modo de consulta",
     "changeQueryModeConfirm": "Tem certeza de que deseja alterar o modo de consulta? Os dados salvos para o eixo X, eixo Y e filtros serão apagados.",
     "patternExampleLog": "Exemplo de log",
@@ -1156,7 +1197,9 @@
     "upgradeToProPlan": "Atualizar para o Plano PRO",
     "home": "Início",
     "about": "Sobre",
+    "index": "Streams",
     "search": "Registros",
+    "traces": "Rastros",
     "serviceGraph": "Grafo de serviços",
     "services": "Catálogo de serviços",
     "aiObservability": "Observabilidade da IA",
@@ -1174,6 +1217,7 @@
     "rum": "Monitoramento de usuários reais",
     "settings": "Configurações",
     "iam": "IAM",
+    "report": "Relatórios",
     "pipeline": "Oleodutos",
     "workflows": "Fluxos de trabalho",
     "language": "Idioma",
@@ -1339,6 +1383,8 @@
     "loadingMsg": "Espere aí, estamos carregando dados do RUM.",
     "breadcrumbs": "Pão ralado",
     "tags": "Etiquetas",
+    "traces": "Rastros",
+    "searchEvents": "Pesquisar eventos",
     "loadingSessions": "Espere aí, estamos buscando sessões.",
     "errorStack": "Pilha de erros",
     "sessionReplay": "Repetição da sessão",
@@ -1348,6 +1394,11 @@
     "discoverSessionMessage": "O Session Replay captura e reproduz as interações do usuário em seu site ou aplicativo. Isso permite que você analise visualmente como os usuários navegam, onde clicam, o que digitam e como interagem com seu conteúdo.",
     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
     "eventID": "ID do evento",
+    "noCorrelatedTraces": "Nenhum rastro correlacionado encontrado para esta sessão.",
+    "span": "span",
+    "spans": "spans",
+    "errorTraces": "rastros de erro",
+    "failedToFetchTraces": "Falha ao buscar dados de rastro. Tente novamente.",
     "seekToMoment": "Busque esse momento na sessão",
     "route": "Rota",
     "duration": "Duração",
@@ -1434,6 +1485,7 @@
     "frustrationErrorClick": "Clique acionou um erro de JavaScript",
     "frustrationRageTap": "Usuário tocou rapidamente várias vezes (3+) - indicando frustração",
     "frustrationErrorTap": "Toque acionou um erro de JavaScript",
+    "fetchTraceMetadataFailed": "Falha ao buscar metadados do rastro",
     "frustrationEventTooltip": "⚠️ FRUSTRAÇÃO: {types}\n{name}",
     "errorEventTooltip": "⛔ ERRO: {name}",
     "frustrationSignalType": "Sinal de frustração: {type}"
@@ -1485,8 +1537,10 @@
     "feature_column_name": "Característica",
     "feature_logs": "Registros",
     "feature_metrics": "Métricas",
+    "feature_traces": "Rastreamentos",
     "feature_alerts": "Alertas",
     "feature_dashboards": "Painéis",
+    "feature_reports": "Relatórios",
     "feature_vrl_functions": "Funções VRL",
     "feature_pipelines": "Oleodutos",
     "feature_high_availability": "Alta disponibilidade",
@@ -1507,6 +1561,7 @@
     "feature_license": "Licença",
     "feature_support": "Suporte",
     "feature_cost": "Custo",
+    "feature_pipelines_external": "Oleodutos - Destinos externos",
     "feature_extreme_performance": "Desempenho extremo (melhoria de 100 vezes para muitas consultas)",
     "feature_query_optimizer": "Otimizador de consultas",
     "value_license_agpl": "AGPL",
@@ -1608,6 +1663,7 @@
       },
       "core_features": {
         "logs_metrics_traces": {
+          "name": "Registros, Métricas, Rastreamentos",
           "note": "Ingestão e análise completas de dados de observabilidade"
         },
         "rum": {
@@ -1622,6 +1678,7 @@
           "note": "Painéis de visualização personalizáveis"
         },
         "reports": {
+          "name": "Relatórios",
           "note": "Relatórios programados e sob demanda"
         },
         "vrl_functions": {
@@ -1678,7 +1735,10 @@
           "name": "Redação de dados confidenciais",
           "note": "Proteja PII e informações confidenciais"
         },
-        "pipeline_remote_destinations": {},
+        "pipeline_remote_destinations": {
+          "name": "Destinos Remotos de Oleodutos",
+          "note": "Envie dados para destinos remotos"
+        },
         "query_optimizer": {
           "name": "Otimizador de consultas/cache de agregação",
           "note": "Agregação TopK e otimização de consultas"
@@ -1720,6 +1780,7 @@
           "note": "Operações otimizadas de junção distribuída"
         },
         "logs_metrics_traces_correlation": {
+          "name": "Correlação de Registros, Métricas e Rastreamentos",
           "note": "Detecção e correlação automatizadas"
         },
         "service_maps": {
@@ -2403,6 +2464,7 @@
       "secondaryIndexCount": "Índice secundário ({count})"
     },
     "deleteField": "Excluir campo",
+    "header": "Streams",
     "subtitle": "Gerenciamento de índices e configuração de streams",
     "streamNameHelpText": "Use somente caracteres alfanuméricos, sublinhado e dois pontos.",
     "search": "Fluxo de pesquisa",
@@ -2442,6 +2504,7 @@
     "deleteDatesMessage": "Tem certeza de que deseja excluir as datas selecionadas? Essa ação não pode ser desfeita.",
     "labelLogs": "Registros",
     "labelMetrics": "Métricas",
+    "labelTraces": "Rastreamentos",
     "labelMetadata": "Metadados",
     "add": "Adicionar stream",
     "dataRetention": "Retenção de dados (em dias)",
@@ -2483,6 +2546,7 @@
   },
   "workflow": {
     "header": "Fluxos de trabalho",
+    "subtitle": "Automatize Ações com Gatilhos, Lógica e Destinos",
     "create": "Novo workflow",
     "createSuccess": "Fluxo de trabalho criado com sucesso",
     "name": "Nome do workflow",
@@ -2563,6 +2627,7 @@
     },
     "triggerMeta": {
       "orgId": "ID da organização à qual o alerta pertence.",
+      "streamType": "Tipo de stream — registros, métricas ou rastreamentos.",
       "streamName": "Stream que o alerta monitora.",
       "alertName": "Nome do alerta que foi acionado.",
       "alertType": "Tipo de alerta — em tempo real ou agendado.",
@@ -2599,6 +2664,8 @@
         "input": "Entrada",
         "output": "Saída",
         "noInput": "Este passo não recebeu nenhum registro na última execução.",
+        "sentExternally": "Enviado para o destino externo",
+        "destinationNoRecords": "Nenhum registro chegou a este destino — nada foi enviado.",
         "branchFiltered": "0 registros — nada passou para este ramo.",
         "conditionNoMatch": "Nenhum registro correspondeu a esta condição — nada continuou a jusante.",
         "errorHeading": "Erro",
@@ -2647,12 +2714,15 @@
       "kindAction": "Ação",
       "condition": "Condição",
       "function": "Função",
+      "sendToDestination": "Destino",
       "configComingSoon": "A configuração de {node} virá em uma etapa posterior",
       "sectionTransform": "Transformar",
+      "sectionDestination": "Destino",
       "stepSearchPlaceholder": "Pesquisar etapas...",
       "stepNoMatch": "Nenhuma etapa corresponde à sua pesquisa.",
       "conditionDesc": "Ramificar em uma regra",
       "functionDesc": "Remodelar o payload com uma função",
+      "destinationDesc": "Enviar para um destino",
       "triggerBody": "Executa quando um alerta associado dispara",
       "triggerDataExampleNote": "Apenas exemplo — as colunas reais vêm da consulta do seu alerta.",
       "incidentEventTypeLabel": "Tipo de evento",
@@ -2671,7 +2741,12 @@
       "functionCreateNew": "Criar nova função",
       "functionRequired": "A função é obrigatória",
       "functionLoadError": "Não foi possível carregar funções",
+      "destinationBody": "Enviar para um destino",
       "destinationBodySet": "Envia para {name}",
+      "destinationSelect": "Destino",
+      "destinationCreateNew": "Criar novo destino",
+      "destinationRequired": "Selecione um destino",
+      "destinationLoadError": "Não foi possível carregar os destinos",
       "namePlaceholder": "Nomeie esta etapa (opcional)",
       "commentLabel": "Comentário (opcional)",
       "commentPlaceholder": "Adicione uma nota sobre esta etapa...",
@@ -2681,6 +2756,8 @@
       "disabledBadge": "Desativado",
       "incompleteBadge": "Configurar depois",
       "destinationSetUpLater": "Configurar depois",
+      "destinationSetUpLaterPrompt": "Ainda não tem um destino? Ative esta opção para configurá-lo depois — você pode salvar um rascunho e testar agora.",
+      "destinationSetUpLaterActive": "O destino é ignorado por enquanto — o nome e o comentário ainda são salvos. Você precisará de um destino antes de publicar.",
       "functionSetUpLater": "Configurar depois",
       "functionSetUpLaterPrompt": "Ainda não tem uma função? Ative esta opção para configurá-la depois — você pode salvar um rascunho e testar agora.",
       "functionSetUpLaterActive": "A função é ignorada por enquanto — o nome e o comentário ainda são salvos. Você precisará de uma função antes de publicar."
@@ -2738,6 +2815,8 @@
       "functionNodeEmptyName": "O nó de função {id} tem nome de função vazio",
       "functionNodeInvalidName": "O nó de função {id} tem nome de função inválido \"{name}\". Deve ser uma das funções disponíveis.",
       "outputStreamNodeEmptyName": "O nó de fluxo de saída {id} tem nome de fluxo vazio",
+      "remoteStreamNodeEmptyDestination": "O nó de stream remoto {id} tem nome de destino vazio",
+      "remoteStreamNodeInvalidDestination": "O nó de stream remoto {id} tem destino inválido \"{destination}\". Deve ser um dos destinos de oleodutos disponíveis.",
       "edgeMissingSourceNode": "A aresta {id} referencia um nó de origem inexistente {source}",
       "edgeMissingTargetNode": "A aresta {id} referencia um nó de destino inexistente {target}",
       "inputNodeHasIncomingEdges": "O nó de entrada {id} não deve ter arestas de entrada. Encontradas {count} arestas de entrada.",
@@ -2752,6 +2831,7 @@
     "importErrors": {
       "unknownError": "Erro Desconhecido",
       "nameRequired": "Pipeline - {index}: Nome é obrigatório",
+      "streamTypeInvalid": "Oleoduto - {index}: O tipo de stream é obrigatório e deve ser um de: 'logs', 'metrics', 'traces'.",
       "sourceStreamNameRequired": "Pipeline - {index}: O nome do stream de origem é obrigatório ",
       "sqlQueryRequired": "Pipeline - {index}: A consulta SQL é obrigatória",
       "timezoneRequired": "Pipeline - {index}: O fuso horário é obrigatório",
@@ -2764,6 +2844,7 @@
       "v0ConditionFields": "Pipeline - {index}, Nó {nodeIndex}: Formato V0 - cada condição deve ter coluna, operador e valor.",
       "v1ConditionInvalid": "Pipeline - {index}, Nó {nodeIndex}: Formato de condição V1 inválido.",
       "conditionFormatUnrecognized": "Pipeline - {index}, Nó {nodeIndex}: Formato de condição não reconhecido.",
+      "remoteDestinationRequired": "Oleoduto - {index}: O destino remoto é obrigatório",
       "createSuccess": "Pipeline - {index}: \"{name}\" criado com sucesso \nNota: remova o objeto de pipeline {name} do arquivo json",
       "createFailed": "Pipeline - {index}: Falha na criação de \"{name}\" --> \n Motivo: {reason}",
       "sqlQueryMismatch": "Pipeline - {index}: A consulta SQL deve ser a mesma em todos os nós e também tente corresponder à consulta nos nós \n\n          input.sql_query: {sqlQuery} \n\n          input.source.query_condition.sql: {sourceSql} \n",
@@ -2864,8 +2945,10 @@
     "defaultDelayTooltip": "Padrão: 5 segundos",
     "deleteDataBeforeBackfill": "Excluir dados existentes antes do backfill",
     "irreversibleDeletionWarning": "Aviso: Exclusão de Dados Irreversível",
+    "deleteBackfillWarningMessage": "Isso excluirá permanentemente todos os dados no stream de destino para o intervalo de tempo especificado antes de executar o backfill. Esta ação não pode ser desfeita.",
     "timeAlignmentRequirements": "Requisitos de Alinhamento de Horário (UTC):",
     "logsHourBoundaryNote": "streams: Os horários devem estar alinhados às bordas de hora em UTC (ex.: 10:00:00, não 10:15:00)",
+    "metricsTracesLabel": "Métricas/Rastreamentos",
     "dayBoundaryNote": "streams: Os horários devem estar alinhados às bordas de dia em UTC (ex.: 00:00:00)",
     "estimatedProcessingTime": "Tempo Estimado de Processamento:",
     "estimatedChunks": "Chunks Estimados:",
@@ -2888,6 +2971,8 @@
       "statusUnknown": "Desconhecido",
       "phaseInitializing": "Inicializando"
     },
+    "deleteBackfillConfirmMessage": "Você selecionou excluir dados existentes antes do backfill. Isso excluirá permanentemente todos os dados no stream de destino para o intervalo de tempo especificado.",
+    "editBackfillDeleteConfirmMessage": "Você selecionou excluir dados existentes antes do backfill. Isso excluirá permanentemente todos os dados no stream de destino para o intervalo de tempo especificado. Esta ação NÃO pode ser desfeita ou cancelada depois que o trabalho for atualizado. Tem certeza de que deseja continuar?",
     "actionCannotBeUndone": "Esta ação NÃO pode ser desfeita ou cancelada depois que o job for criado.",
     "areYouSureProceed": "Tem certeza de que deseja continuar?",
     "clearFilters": "Limpar Filtros",
@@ -2908,6 +2993,7 @@
     "chunkPeriodDefaultPlaceholder": "60",
     "organizationId": "ID da Organização",
     "functionName": "Nome da Função",
+    "remoteDestination": "Destino Remoto",
     "failedToLoadPipeline": "Falha ao carregar pipeline",
     "header": "Oleodutos",
     "subtitle": "Transforme, enriqueça e direcione dados em voo",
@@ -2935,6 +3021,7 @@
     "trigger": "Gatilho",
     "aggregation": "Agregação",
     "selectColumn": "Selecionar coluna",
+    "value": "Valor",
     "fieldRequired": "O campo é obrigatório!",
     "sqlQuery": "Consulta SQL",
     "promqlQuery": "Consulta ProMQL",
@@ -2949,11 +3036,15 @@
     "sourceQueryTooltip": "Fonte: Query Node",
     "functionTooltip": "Nodo de função",
     "conditionTooltip": "Nodo de condição",
+    "destinationStreamTooltip": "Destino: Nó de Stream",
+    "destinationExternalTooltip": "Destino: Nó de Destino Externo",
     "pipelineNotFound": "Pipeline não encontrado",
     "pipelineNameRequired": "O nome do pipeline é obrigatório",
     "sourceNodeRequired": "O nó de origem é obrigatório",
+    "destinationNodeRequired": "O nó de destino é obrigatório",
     "connectAllNodes": "Conecte todos os nós antes de salvar",
     "connectAllNodesShort": "Conecte todos os nós",
+    "enrichmentTablesScheduledOnly": "Tabelas de enriquecimento como stream de destino só estão disponíveis para oleodutos agendados",
     "savingPipeline": "Salvando o pipeline...",
     "pipelineUpdated": "Pipeline atualizado com sucesso",
     "pipelineSaved": "Pipeline salvo com sucesso",
@@ -2985,6 +3076,7 @@
     "functionAlreadyAssociated": "A função já está associada",
     "atLeastOneCondition": "Adicione pelo menos uma condição",
     "fillAllConditionFields": "Preencha todos os campos da condição (coluna, operador e valor são obrigatórios)",
+    "selectExternalDestination": "Selecione o destino externo da lista",
     "backfillNumericRange": "Deve estar entre {min} e {max}",
     "selectValidTimeRange": "Selecione um intervalo de tempo válido",
     "startBeforeEndTime": "A hora de início deve ser antes da hora de término",
@@ -3000,9 +3092,11 @@
       "streamType": "Tipo de Stream *"
     },
     "sourceNode": "Fonte",
+    "streamNode": "Stream",
     "queryNode": "Consulta",
     "transformNode": "Transformar",
     "functionNode": "Função",
+    "destinationNode": "Destino",
     "remoteNode": "Remoto",
     "conditionsNode": "Condições",
     "editorFunctionTooltip": "Reformatar o payload com uma função",
@@ -3061,7 +3155,8 @@
       "customStep4": "Configure quaisquer cabeçalhos necessários para autenticação",
       "customStep5": "Escolha o formato de saída (JSON ou NDJSON)",
       "customStep6": "Teste a conexão para verificar se funciona",
-      "defaultTitle": "Detalhes da Conexão"
+      "defaultTitle": "Detalhes da Conexão",
+      "defaultStep1": "Selecione um tipo de destino para ver instruções específicas"
     },
     "deleteFunctionAssociationConfirm": "Tem certeza de que deseja excluir a associação de função?",
     "deleteStreamRoutingConfirm": "Tem certeza de que deseja excluir o roteamento de stream?",
@@ -3087,6 +3182,7 @@
     "noJobSelected": "Nenhum job selecionado",
     "updateBackfillJobFailed": "Falha ao atualizar o job de backfill",
     "fetchPipelineHistoryFailed": "Falha ao buscar o histórico do pipeline",
+    "defaultDestinationNodeWarning": "Remover o nó de destino padrão interrompe a ingestão de dados nele. O stream de origem então roteará apenas para o stream de destino recém-adicionado. Os dados não roteados para nenhum stream de destino serão descartados.",
     "confirmBulkDeleteMsg": "Tem certeza de que deseja excluir {count} pipeline(s)?",
     "confirmPauseBackfillJob": "Tem certeza de que deseja pausar o job de backfill de \"{name}\"? Você pode retomá-lo mais tarde.",
     "confirmResumeBackfillJob": "Tem certeza de que deseja retomar o job de backfill de \"{name}\"?",
@@ -3196,6 +3292,10 @@
     "analyzingDimensions": "Analisando dimensões...",
     "arrowSeparator": "→",
     "computingDistributions": "Computando distribuições de frequência em {count} dimensões",
+    "dashboardDescError": "Comparando a porcentagem de erros de rastreamentos durante o período de pico de erros vs a linha de base em todas as dimensões",
+    "dashboardDescLatency": "Comparando a latência percentil dos rastreamentos selecionados (duração {start}-{end}µs) vs a linha de base em todas as dimensões",
+    "dashboardDescVolume": "Comparando a distribuição da contagem de rastreamentos vs a linha de base em todas as dimensões",
+    "dashboardDescVolumeRate": "Comparando a distribuição da contagem de rastreamentos dos períodos selecionados (taxa de {start}-{end} rastreamentos) vs a linha de base em todas as dimensões",
     "dashboardTitleError": "Insights de Erros",
     "dashboardTitleLatency": "Insights de Latência",
     "dashboardTitleVolume": "Insights de Volume",
@@ -3203,6 +3303,8 @@
     "durationLabel": "Duração:",
     "failedToLoad": "Falha ao carregar a análise",
     "panelDescErrorComparison": "Comparação da porcentagem de erros para a dimensão: {dimension}. Barras selecionadas mais altas indicam que esse valor de dimensão tem mais erros no período de pico de erros.",
+    "panelDescLatencyComparison": "Comparação de latência percentil para a dimensão: {dimension}. Barras Selecionadas mais altas indicam que esse valor de dimensão se correlaciona com rastreamentos mais lentos.",
+    "panelDescVolumeComparison": "Comparação da contagem de rastreamentos para a dimensão: {dimension}. Barras Selecionadas mais altas indicam que esse valor de dimensão aparece com mais frequência em períodos de alto volume.",
     "panelDescVolumeTopValues": "Principais valores por contagem para a dimensão: {dimension}.",
     "refreshTooltip": "Atualize a análise com o percentil atualizado",
     "retryButton": "Tente novamente",
@@ -3213,6 +3315,7 @@
     "title": "Percepções",
     "tabLabel": "Tarifa",
     "analyzeTooltipLogs": "Analise a distribuição de dimensões para o intervalo de tempo atual",
+    "analyzeTooltipTraces": "Analise as dimensões dos rastreamentos para padrões de taxa, latência e erros",
     "rateLabel": "Tarifa:",
     "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa",
     "inspectBtnLabel": "Inspecionar",
@@ -3315,6 +3418,7 @@
       "singleTargetTitle": "Destino único de escrita remota",
       "fanoutTitle": "Fan-out para vários backends",
       "tipPrefix": "Dica: o `vmagent` pode duplicar gravações repetindo o",
+      "tipSuffix": "flag, para que você possa manter um destino VictoriaMetrics existente enquanto também encaminha métricas para o OpenObserve.",
       "docLinkText": "para saber mais sobre como configurar destinos de escrita remota do vmagent."
     },
     "ai": {
@@ -3337,6 +3441,7 @@
     "customLabel": "Personalizado",
     "logsLabel": "Registros",
     "metricsLabel": "Métricas",
+    "tracesLabel": "Rastreamentos",
     "redirectionIngestionMsg": "Observação: para acessar páginas diferentes do IAM, a ingestão de dados deve ser iniciada na organização atual.",
     "databaseLabel": "bancos de dados",
     "securityLabel": "Segurança",
@@ -3361,6 +3466,7 @@
     "dotnettracing": "Rastreamento do.NET",
     "dotnetlogs": "Registros do.NET",
     "macos": "macOS",
+    "tracesotlp": "Rastreamentos ({product})",
     "rum": "Monitoramento real de usuários",
     "openvpn": "OpenVPN",
     "nginx": "Nginx",
@@ -3385,6 +3491,7 @@
       "diagnosticSettingsPath": "Configurações de diagnóstico → + Adicionar configuração de diagnóstico",
       "enterNameCheckCategories": "Insira um nome, marque as categorias de log que deseja habilitar",
       "underPrefix": "Em",
+      "destinationDetails": "Detalhes do destino",
       "chooseSuffix": ", escolha",
       "streamToEventHub": "Transmitir para um hub de eventos",
       "selectEventHubPrefix": "Selecione o namespace do Event Hub e o Event Hub criados na Etapa 1 (prefixo:",
@@ -3522,17 +3629,21 @@
       "anyWindowsHostNote": "Qualquer servidor ou VM Windows.",
       "arrow": "→",
       "askOnSlack": "Pergunte no Slack",
+      "autoInstrumentTracesDesc": "Opcional. O operador OpenTelemetry injeta instrumentação em cargas de trabalho anotadas, para que você obtenha **rastreamentos distribuídos sem tocar no código do aplicativo ou reconstruir imagens**. Escolha uma linguagem e anote o namespace em que ela é executada.",
+      "autoInstrumentTracesTitle": "Instrumente automaticamente seus aplicativos para rastreamentos",
       "cassandraJmxNote": "Ative o acesso remoto JMX no Cassandra para que o receptor se conecte.",
       "cassandraTagline": "Colete métricas do Cassandra por meio do receptor JMX do OpenTelemetry Collector e envie-as para o OpenObserve.",
       "checking": "Verificando…",
       "checkingForLogs": "Verificando logs…",
       "checkingForMetrics": "Verificando métricas…",
+      "checkingForSpans": "Verificando spans…",
       "chipEditor": "Editor",
       "chipInstall": "Instalar",
       "chipLogs": "Logs",
       "chipMetrics": "Métricas",
       "chipRun": "Executar",
       "chipTerminal": "Terminal",
+      "chipTraces": "Rastreamentos",
       "clusterNameHelp": "Identifica este cluster nos seus logs, métricas e painéis.",
       "clusterNameLabel": "Nome do Cluster",
       "collectorInstallDesc": "O receptor está disponível apenas na versão Contrib — escolha sua plataforma.",
@@ -3543,11 +3654,14 @@
       "configureCollectorTitle": "Configurar o OpenTelemetry Collector",
       "connectedLogsHeadline": "Conectado — Logs estão fluindo",
       "connectedMetricsHeadline": "Conectado — As métricas estão fluindo",
+      "connectedTracesHeadline": "Conectado — rastreamentos estão fluindo",
       "countLogs": "{count} log | {count} logs",
       "countMetricStreams": "{count} fluxo de métrica | {count} fluxos de métrica",
+      "countSpans": "{count} span | {count} spans",
       "downloadEnvTooltip": "Baixar .env",
       "downloadJmxJarDesc": "O receptor JMX executa este jar auxiliar (requer Java no host coletor).",
       "downloadJmxJarTitle": "Baixar o JAR de Métricas JMX",
+      "dynamodbFirehoseEndpointDesc": "Use estes como o destino **HTTP Endpoint** ao criar seu fluxo de entrega do Kinesis Data Firehose.",
       "dynamodbFirehoseEndpointTitle": "Endpoint do Firehose do OpenObserve",
       "dynamodbPipelineDesc": "Habilite **DynamoDB Streams** na sua tabela, conecte-o a um **Kinesis Data Stream** e aponte um delivery stream do **Kinesis Data Firehose** para o endpoint HTTP acima.",
       "dynamodbPipelineTitle": "Transmita DynamoDB → Firehose",
@@ -3561,6 +3675,7 @@
       "gcpFixBody": "O GCP relata falhas de entrega na própria assinatura. Se o coletor está publicando, mas nada chega aqui, o endpoint de push geralmente está rejeitando a solicitação:",
       "gcpFixTitle": "Verificar a assinatura de push",
       "gcpPushUrlNote": "Mantenha esta URL em segredo — ela contém a chave de ingestão. Gire-a no cabeçalho desta página se ela vazar.",
+      "gcpSinkDesc": "No console do GCP, crie um **sink do Log Router** (Logging → Log Router → Create sink) com Pub/Sub como destino e deixe-o criar o tópico. O filtro de inclusão do sink decide quais registros chegam ao OpenObserve.",
       "gcpSinkTitle": "Roteie os logs para um tópico Pub/Sub.",
       "gcpSinkWriterNote": "Conceda à identidade do gravador do coletor o papel de Publicador Pub/Sub no tópico; caso contrário, não publicará nada silenciosamente.",
       "gcpStreamHelp": "Usado na URL de push acima e monitorado pela verificação abaixo. Um stream dedicado mantém os logs do GCP separados.",
@@ -3599,6 +3714,7 @@
       "k8sInstallerNote": "Isso instala cert-manager, o operador do OpenTelemetry e o coletor do OpenObserve automaticamente.",
       "k8sInternalEndpointNote": "Use isso quando o OpenObserve estiver no mesmo cluster — o tráfego nunca o deixa.",
       "k8sTroubleAnnotationA": "A injeção ocorre na criação do pod, então os pods existentes não são afetados até serem reiniciados — execute `kubectl rollout restart deployment -n my-namespace`. Confirme se a anotação foi aplicada com `kubectl get ns my-namespace -o yaml` e verifique se o valor corresponde a `openobserve-collector/openobserve-<language>`. Para Go, `otel-go-auto-target-exe` deve ser o caminho do binário **dentro** do contêiner.",
+      "k8sTroubleAnnotationQ": "Anotei um namespace, mas nenhum rastreamento aparece",
       "k8sTroubleEndpointA": "Use **In-Cluster** somente quando o OpenObserve estiver em execução neste cluster; o tráfego permanece dentro dele e nunca atravessa a rede. A URL é `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — o padrão assume a release `o2` no namespace `openobserve`, então edite se a sua for diferente. Todos os demais usam o endpoint externo.",
       "k8sTroubleEndpointQ": "Qual endpoint devo usar — externo ou in-cluster?",
       "k8sTroubleExampleA": "Sim — **HOT commerce** é um aplicativo de exemplo conectado de ponta a ponta, e a documentação do **OpenTelemetry Operator** traz a referência completa de anotações. Ambos estão vinculados na parte inferior desta página.",
@@ -3632,6 +3748,7 @@
       "mysqlTagline": "Colete métricas do MySQL com o OpenTelemetry Collector e envie-as para o OpenObserve.",
       "noLogsFoundYet": "Nenhum log encontrado ainda",
       "noMetricsFoundYet": "Nenhuma métrica encontrada ainda",
+      "noSpansFoundYet": "Nenhum span encontrado ainda",
       "nothingOnStream": "nada em {stream} — execute seu aplicativo e teste novamente",
       "notTestedYet": "Ainda Não Testado",
       "onStream": "em {stream}",
@@ -3640,13 +3757,16 @@
       "oracleTagline": "Colete métricas do Oracle DB com o OpenTelemetry Collector e envie-as para o OpenObserve.",
       "otlpFixBody": "Definir um exportador não é suficiente — ele precisa estar listado em um pipeline. Esse é o motivo mais comum pelo qual uma configuração aparentemente correta não envia nada:",
       "otlpFixTitle": "Verifique se o exportador está realmente conectado ao pipeline",
+      "otlpGrpcNote": "Sobrecarga menor que HTTP para altos volumes de spans. A porta 5081 deve estar acessível a partir do coletor.",
       "otlpHttpNote": "O padrão para o OpenTelemetry Collector — funciona em qualquer lugar, inclusive atrás de proxies e balanceadores de carga.",
       "otlpSdkEnvNote": "Variáveis de ambiente padrão OTEL_* — todos os SDKs do OpenTelemetry as leem, portanto nenhuma alteração de código é necessária.",
       "otlpTracesStreamHelp": "Escrito no config acima como `stream-name` e monitorado pela verificação abaixo.",
       "otlpTrouble401A": "O cabeçalho `Authorization` deve ser `Basic <token>` usando o token de ingestão desta organização — o valor acima já está correto. Se ele foi rotacionado, copie-o novamente desta página.",
       "otlpTrouble401Q": "O coletor registra 401 ou 403",
+      "otlpTroubleHttpGrpcA": "HTTP é o padrão seguro e atravessa proxies e balanceadores de carga facilmente. gRPC tem menor sobrecarga em alto volume de spans, mas precisa que a porta 5081 esteja acessível de ponta a ponta.",
       "otlpTroubleHttpGrpcQ": "Devo usar HTTP ou gRPC?",
       "otlpTroubleStreamA": "O cabeçalho `stream-name` decide o stream. Defina-o com o mesmo nome do campo acima; caso contrário, a verificação abaixo monitora um stream para o qual nada é gravado.",
+      "otlpTroubleStreamQ": "Os spans chegam, mas caem no fluxo errado",
       "otlpTroubleTlsA": "A flag `tls.insecure` deve corresponder ao esquema do endpoint — ela está definida como `{insecure}` acima com base na URL desta implantação. Um endpoint HTTP simples precisa de `insecure: true`; um HTTPS precisa de `false`.",
       "otlpTroubleTlsQ": "A conexão gRPC falha com erro de TLS",
       "pillActiveBackends": "Backends ativos",
@@ -3704,6 +3824,7 @@
       "pillServiceMap": "Mapa de Serviços",
       "pillSessions": "Sessões",
       "pillSetup": "Configuração",
+      "pillSpans": "Spans",
       "pillSqlCompilationRate": "Taxa de compilação SQL",
       "pillStorageBytes": "Bytes de armazenamento",
       "pillSystem": "Sistema",
@@ -3735,6 +3856,7 @@
       "preparePostgresqlTitle": "Preparar PostgreSQL",
       "prepareSqlServerDesc": "Crie o login de monitoramento — execute-o em um cliente SQL, **não** no seu shell.",
       "prepareSqlServerTitle": "Preparar SQL Server",
+      "providerNameOtlpTraces": "Rastreamentos (OpenTelemetry)",
       "providerNameRum": "Monitoramento de usuário real",
       "quickInstallDesc": "Instale o coletor OpenObserve com **um único comando** — basta definir o nome do cluster e executar. O nome etiqueta cada registro, então você pode diferenciar os clusters quando vários estiverem reportando.",
       "quickInstallTitle": "Instalação Rápida (Recomendada)",
@@ -3847,16 +3969,19 @@
       "sqlServerTagline": "Colete métricas do SQL Server com o OpenTelemetry Collector e envie-as para o OpenObserve.",
       "startIngestingTestForLogs": "inicie a ingestão e depois teste os logs",
       "startIngestingTestForMetrics": "inicie a ingestão e depois teste as métricas",
+      "startIngestingTestForSpans": "inicie a ingestão e depois teste os spans",
       "streamNameError": "Use apenas letras, números e _.",
       "streamNameLabel": "Nome do Stream",
       "stuck": "Travou?",
       "taglineDatabricks": "Envie logs de notebooks Databricks para o OpenObserve pela API de logs.",
       "taglineGcp": "Transmita logs do Google Cloud para o OpenObserve com uma assinatura push do Pub/Sub — sem agente ou coletor para executar.",
+      "taglineKubernetes": "Implante o coletor do OpenObserve no seu cluster — registros de contêineres, eventos do Kubernetes e métricas do cluster, além de rastreamentos sem código para suas cargas de trabalho.",
       "taglineLinux": "Instale o agente do OpenObserve em qualquer host Linux — logs do sistema e do journald, além de métricas de CPU, memória, disco e rede.",
       "taglineMacos": "Instale o agente do OpenObserve em qualquer Mac — o log unificado e os arquivos de log padrão, além de métricas de CPU, memória, disco e rede.",
       "taglineOtlpTraces": "Aponte qualquer exportador OpenTelemetry para o OpenObserve — coletor ou SDK, HTTP ou gRPC. Seu endpoint e token estão preenchidos abaixo.",
       "taglineWindows": "Instale o agente do OpenObserve em qualquer host Windows — Log de Eventos, contadores de desempenho e métricas do host.",
       "testAgain": "Testar Novamente",
+      "tracesStreamNameLabel": "Nome do fluxo de rastreamentos",
       "trackScreensDesc": "Se você usa React Navigation, entregue ao SDK a sua ref de navegação e cada mudança de rota é registrada como uma view RUM — sem código por tela.",
       "trackScreensTitle": "Rastrear Telas Automaticamente (Opcional)",
       "troubleshooting": "Solução de Problemas",
@@ -3876,6 +4001,7 @@
       "verifyMongodbMetricsDesc": "Clique em Test abaixo ou verifique os Streams para as métricas `mongodb_*`.",
       "verifyMysqlMetricsDesc": "Clique em Test abaixo ou verifique os Streams para as métricas `mysql_*`.",
       "verifyOracledbMetricsDesc": "Clique em Test abaixo ou verifique os Streams para as métricas `oracledb_*`.",
+      "verifyOtlpTracesDesc": "Reinicie o coletor (ou seu aplicativo), execute uma solicitação que produza um span e clique em Testar.",
       "verifyPostgresqlMetricsDesc": "Clique em Test abaixo ou verifique os Streams para as métricas `postgresql_*`.",
       "verifyReactNativeRumDesc": "Execute o aplicativo em um simulador, emulador ou dispositivo, navegue entre algumas telas e clique em Test — os eventos do React Native chegam no stream `_rumdata`.",
       "verifyRedisMetricsDesc": "Clique em Test abaixo ou verifique os Streams para as métricas `redis_*`.",
@@ -3886,6 +4012,7 @@
       "verifyZookeeperMetricsDesc": "Clique em Test abaixo ou verifique os Streams para as métricas `zookeeper_*`.",
       "viewLogs": "Ver Logs",
       "viewStreams": "Ver Streams",
+      "viewTraces": "Ver rastreamentos",
       "whatTheInstallerDoes": "O Que o Instalador Faz",
       "windowsAgentFixBody": "O instalador registra o agente como um serviço do Windows. Se nada aparecer, confirme se ele está em execução e leia as entradas mais recentes do log:",
       "windowsTroubleScriptA": "O PowerShell bloqueia scripts não assinados por padrão. Execute o console **como Administrador** e, se necessário, permita o script para essa sessão com `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.",
@@ -3909,8 +4036,11 @@
       "verifyAndroidRumDesc": "Execute o aplicativo em um emulador ou dispositivo, navegue por algumas telas e clique em Testar — os eventos Android nativos chegam no stream `_rumdata`.",
       "verifyIosRumDesc": "Execute o aplicativo em um simulador ou dispositivo, navegue por algumas telas e clique em Testar — os eventos iOS nativos chegam no stream `_rumdata`.",
       "dbmPreparePostgresTitle": "Monitoramento de banco de dados · Conceder acesso (opcional)",
+      "dbmPreparePostgresDesc": "**Tudo acima é completo por si só** — os tempos de consulta já chegam aos Bancos de dados a partir dos rastreamentos do seu aplicativo, sem configuração aqui. Estas últimas etapas adicionam o que um rastreamento nunca pode ver: deadlocks e consultas bloqueadas, que apenas o próprio banco de dados registra. Conceda `pg_monitor` para que o coletor possa ler as consultas de outras sessões — execute em um cliente SQL, **não** no seu shell.",
       "dbmPrepareMysqlTitle": "Monitoramento de banco de dados · Manter histórico de deadlocks (opcional)",
       "dbmPrepareMariadbTitle": "Monitoramento de banco de dados · Manter histórico de deadlocks (opcional)",
+      "dbmPrepareMysqlDesc": "**Tudo acima é completo por si só** — os tempos de consulta já chegam aos Bancos de dados a partir dos rastreamentos do seu aplicativo, sem configuração aqui. Estas últimas etapas adicionam o que um rastreamento nunca pode ver: deadlocks e consultas bloqueadas, que apenas o próprio banco de dados registra. Ative o histórico completo de deadlocks — execute em um cliente SQL, **não** no seu shell.",
+      "dbmPrepareMariadbDesc": "**Tudo acima é completo por si só** — os tempos de consulta já chegam aos Bancos de dados a partir dos rastreamentos do seu aplicativo, sem configuração aqui. Estas últimas etapas adicionam o que um rastreamento nunca pode ver: deadlocks e consultas bloqueadas, que apenas o próprio banco de dados registra. Ative o histórico completo de deadlocks — execute em um cliente SQL, **não** no seu shell.",
       "dbmPgLoggingTitle": "Monitoramento de banco de dados · Permitir que o Postgres registre deadlocks (opcional)",
       "dbmPgLoggingDesc": "Deadlocks só são gravados no log do Postgres, e somente quando as configurações abaixo estão ativadas — portanto, esta etapa é o que faz a aba Deadlocks ser preenchida. A linha de prefixo precisa corresponder exatamente: o coletor a lê para descobrir quem estava envolvido, e um prefixo diferente significa que ele não encontra nada enquanto ainda reporta saudável.",
       "dbmPgLoggingVerifyTitle": "Monitoramento de banco de dados · Verificar se as configurações foram aplicadas (opcional)",
@@ -3936,6 +4066,7 @@
       "dbmMysqlLogPathHelp": "O coletor deve conseguir ler este arquivo. Encontre-o com: SHOW VARIABLES LIKE 'log_error';",
       "dbmMariadbLogPathHelp": "O coletor deve conseguir ler este arquivo. Encontre-o com: SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "Monitoramento de Banco de Dados · Conceder acesso (opcional)",
+      "dbmPrepareMssqlDesc": "**Tudo acima é completo por si só** — os tempos de consulta já chegam aos Bancos de dados a partir dos rastreamentos do seu aplicativo, sem configuração aqui. Este último grupo adiciona o que um rastreamento nunca pode ver: deadlocks e consultas bloqueadas, que apenas o próprio banco de dados registra. Ambas as permissões são necessárias — uma permite que o coletor leia outras sessões, a outra permite que ele leia o histórico de deadlocks. Execute-as em um cliente SQL, **não** no seu shell.",
       "dbmConfigureMssqlDesc": "Grava `dbm-config.yaml` — defina abaixo o banco de dados ao qual conectar. O SQL Server obtém deadlocks, consultas bloqueadas, amostras de atividade, principais consultas e planos de execução aqui. O receptor sqlserver lê em toda a instância, portanto a atividade e as principais consultas não se limitam ao banco de dados nomeado acima.",
       "dbmRunMssqlDesc": "Executa ambas as configurações juntas. Use o mesmo login e senha que você criou no passo 1.",
       "dbmVerifyBlockingDesc": "Abra **Infra → Bancos de dados → Consultas bloqueadas**. Sessões aguardando em um bloqueio aparecem assim que uma é amostrada — uma aba vazia ali indica se nada está bloqueado ou se nada está sendo coletado.",
@@ -3945,6 +4076,7 @@
       "dbmVerifyTableHealthDesc": "Abra **Infra → Bancos de dados** e escolha uma aba abaixo. Deadlocks e consultas bloqueadas aparecem assim que o banco de dados relata um — uma aba vazia ali indica se nada aconteceu ou se nada está sendo coletado. A saúde da tabela é preenchida após o primeiro snapshot de 60 segundos."
     },
     "instrumentBeforeImportTitle": "Instrumente Antes de Importar o Cliente",
+    "instrumentBeforeImportBody": "Se o seu aplicativo estiver em execução mas nenhum span chegar, a instrumentação provavelmente foi carregada depois que o cliente foi importado. Reordene para que a inicialização seja executada primeiro:",
     "launchCloudFormationStack": "Iniciar Pilha CloudFormation",
     "openStackSetsConsole": "Abrir o Console do StackSets",
     "integrations": {
@@ -4107,6 +4239,7 @@
       "streamOverview": "Visão geral de {stream}"
     },
     "selectField": "Campo",
+    "selectIndex": "Fluxo",
     "selectStreamType": "Tipo de transmissão",
     "toggleFunctionEditor": "Alternar editor de funções",
     "useSavedFunction": "Use a função Salva",
@@ -4220,6 +4353,7 @@
     "extraOptions": "Opções",
     "nameOfVariable": "Nome",
     "labelOfVariable": "Etiqueta (opcional)",
+    "ValueOfVariable": "Valor",
     "DefaultValue": "Valor padrão (opcional)",
     "typeOfVariable": "Tipo de variável",
     "DefaultSize": "Tamanho máximo padrão do registro (opcional)",
@@ -4289,6 +4423,7 @@
     "alignRight": "Right",
     "sectionStyling": "Estilo",
     "sectionConditionalStyling": "Estilo condicional",
+    "conditionThreshold": "Valor",
     "conditionAddRule": "+ Adicionar regra",
     "conditionNoRules": "Ainda não há regras.",
     "conditionIfValue": "Se o valor for",
@@ -4351,6 +4486,7 @@
     "unsavedMessage": "Você tem alterações não salvas. Tem certeza de que quer sair?",
     "currentFolderLabel": "Pasta atual",
     "selectFolderLabel": "Selecionar pasta",
+    "selectFolderPlaceholder": "Escolha uma pasta de destino",
     "selectDashboardLabel": "Selecione o painel",
     "selectTabLabel": "Selecione a guia",
     "layerType": "Tipo de camada",
@@ -4510,6 +4646,7 @@
     "markLinesTooltip": "Mostre linhas de limite no gráfico.",
     "markLineType": "Tipo",
     "markLineLabel": "Rótulo",
+    "markLineValue": "Valor",
     "markLineAdd": "+ Adicionar",
     "markLineAverage": "Média",
     "markLineMedian": "Mediana",
@@ -4611,6 +4748,7 @@
     "editValueMapping": "Editar mapeamento de valores",
     "valueMappingsTitle": "Mapeamentos de valor",
     "valueMappingType": "Tipo",
+    "valueMappingValue": "Valor",
     "valueMappingRegex": "Regex",
     "valueMappingFrom": "De",
     "valueMappingTo": "Para",
@@ -4778,6 +4916,7 @@
         "storage": "Armazenamento",
         "dashboard": "Dashboard"
       },
+      "selectFolderTitle": "Selecionar Pasta de Destino",
       "back": "Voltar",
       "addDashboard": "Adicionar Dashboard",
       "folder": "Pasta",
@@ -4965,6 +5104,7 @@
       "configuration": "Configuração",
       "having": "Tendo",
       "add": "Adicionar",
+      "value": "Valor",
       "markAsNonTimestamp": "Marcar este campo como não timestamp",
       "renderDataAsJson": "Renderizar Dados como JSON / Array",
       "sortBy": "Ordenar por",
@@ -5414,6 +5554,7 @@
     "deletePanelTitle": "Excluir painel",
     "deletePanelMessage": "Tem certeza de que deseja excluir este painel?",
     "movePanelTitle": "Mover painel para outra guia",
+    "movePanelMessage": "Selecione a guia de destino",
     "noQueriesToCreateAlert": "Este painel não tem consultas para criar um alerta",
     "panelQueryMustHaveStream": "A consulta do painel deve ter um fluxo configurado",
     "unsupportedPanelTypeAlert": "A criação de alertas a partir de painéis {type} pode não funcionar conforme o esperado",
@@ -5421,6 +5562,7 @@
     "panelDuplicationFailed": "Falha na duplicação do painel",
     "firstColumn": "Primeira coluna",
     "zAxis": "Eixo Z",
+    "breakdown": "Detalhamento",
     "pivotField": "Campo pivô",
     "pivotFieldTooltip": "Arraste um campo de dimensão aqui. Seus valores distintos se tornam cabeçalhos de coluna na tabela dinâmica. Até 3 campos são permitidos para dinamização em vários níveis.",
     "breakdownTooltipHBar": "Use esses campos para dividir os dados em diferentes seções no eixo Y para uma visão mais clara.",
@@ -5468,6 +5610,7 @@
         "anomalyHint": "{n} eventos amostrados",
         "colField": "Campo",
         "colRarity": "Raridade",
+        "colValue": "Valor",
         "rarity": {
           "anomalous": "Anômalo",
           "rare": "Raro",
@@ -5506,12 +5649,15 @@
     "longitude": "Longitude",
     "weight": "Peso",
     "mapname": "Nome",
+    "mapvalue": "Valor",
     "source": "Fonte",
-    "target": "Alvo"
+    "target": "Alvo",
+    "value": "Valor"
   },
   "home": {
     "alertsOverviewSection": "Seção de visão geral de alertas",
     "pipelinesOverviewSection": "Seção de visão geral de pipelines",
+    "streams": "Fluxos",
     "totalDataIngested": "Total de dados ingeridos",
     "totalDataCompressed": "Tamanho comprimido",
     "viewButton": "Visualizar",
@@ -5523,6 +5669,7 @@
       "description": "Essa organização não recebeu nenhum dado, então não há nada para mapear. Quando os eventos começarem a fluir, o <strong>volume de ingestão, o armazenamento e o uso da consulta</strong> aparecerão aqui automaticamente.",
       "logs": "Enviar registros",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} e mais",
+      "traces": "Enviar rastreamentos",
       "tracesDesc": "{product1} / {product2} / {product3} rastreamento distribuído",
       "metrics": "Enviar métricas",
       "metricsDesc": "{product1}, {product2}, {product3} e mais",
@@ -5532,6 +5679,7 @@
       "shippers": "Expedidores de toras"
     },
     "indexSizeLbl": "Tamanho do índice",
+    "docsCountLbl": "Eventos",
     "functionTitle": "Funções",
     "schedulePipelineTitle": "Programado",
     "rtPipelineTitle": "Tempo real",
@@ -5569,6 +5717,8 @@
     "emptyActionAlertsDesc": "Revise alertas e limites configurados",
     "emptyActionLogs": "Explorar registros",
     "emptyActionLogsDesc": "Pesquise e filtre seus fluxos de log",
+    "emptyActionTraces": "Explorar rastreamentos",
+    "emptyActionTracesDesc": "Inspecione rastreamentos distribuídos e latência de serviço",
     "anomalyDetectedTitle": "Anomalia detectada — {name}",
     "anomalyDetectedDescription": "Stream: {stream} · {count} ponto(s) anômalo(s)",
     "secondsAgo": "{count}s atrás",
@@ -5617,6 +5767,7 @@
     "stderr": "Stderr",
     "truncatedLabel": "truncado",
     "copyQuery": "Copiar consulta",
+    "stream": "Fluxo",
     "start": "Início",
     "end": "Fim",
     "from": "De",
@@ -5655,6 +5806,7 @@
       "taglineTail": ". Eu posso escrever seu",
       "taglineSql": "SQL",
       "taglineVrl": "VRL",
+      "taglineAnd": "e guiá-lo por seus registros, rastreamentos, métricas e incidentes.",
       "signedInAs": "Conectado como",
       "role": "Função",
       "tryOneOfThese": "Ou experimente um desses"
@@ -5662,10 +5814,12 @@
     "capabilities": {
       "query": {
         "title": "Escrever uma consulta",
+        "description": "SQL para registros, rastreamentos, Monitoramento de usuários reais, ou PromQL para métricas.",
         "prompt": "Ajude-me a escrever uma consulta"
       },
       "incident": {
         "title": "Investigue incidentes",
+        "description": "Causa raiz entre registros, traces e alertas — por exemplo, \"Por que o gateway-5xx disparou?\"",
         "prompt": "Ajude-me a investigar incidentes"
       },
       "dashboard": {
@@ -5762,7 +5916,9 @@
         "alert": "alerta",
         "dashboard": "painel",
         "pipeline": "pipeline",
+        "report": "relatório",
         "function": "função",
+        "stream": "stream",
         "folder": "pasta",
         "panel": "painel",
         "user": "usuário",
@@ -5806,6 +5962,7 @@
     "features": "CARACTERÍSTICAS",
     "included": "O que está incluído?",
     "proPlanSubtitle": "Soluções personalizadas para equipes pequenas",
+    "unlimitedNote": "Usuários ilimitados, registros, métricas, traces e muito mais.",
     "paymentNote": "Pagamento calculado pelo uso no final do ciclo de cobrança mensal.",
     "proPlanLabel": "Pague conforme o uso",
     "contactLabel": "Entre em contato com vendas",
@@ -5988,10 +6145,13 @@
       "anomalyImportFailed": "Detecção de Anomalias - {index}: falha na importação de \"{name}\" — {reason}",
       "nameRequired": "Alerta - {index}: Nome é obrigatório e deve ser uma string válida.",
       "orgIdInvalid": "Alerta - {index}: ID da organização é obrigatório, deve existir na lista de organizações e deve ser igual a {orgId}.",
+      "streamTypeInvalid": "Alerta - {index}: O Tipo de Stream é obrigatório e deve ser um dos: 'logs', 'metrics', 'traces'.",
       "streamNameInvalid": "Alerta - {index}: Nome do stream é obrigatório, deve existir na lista de streams e deve ser uma string válida.",
+      "destinationsRequired": "Alerta - {index}: Destinos são obrigatórios e devem ser um array.",
       "enabledBoolean": "Alerta - {index}: Habilitado deve ser booleano.",
       "tzOffsetNumber": "Alerta - {index}: O deslocamento de fuso horário deve ser um número.",
       "timezoneRequiredForCron": "Alerta - {index}: O fuso horário é obrigatório quando o tipo de frequência é 'cron'.",
+      "destinationNotExist": "Alerta - {index}: o destino \"{destination}\" não existe",
       "createSuccess": "Alerta - {index}: \"{name}\" criado com sucesso \nNota: remova o objeto de alerta criado {name} do arquivo json",
       "createFailed": "Alerta - {index}: falha na criação de \"{name}\" --> \n Motivo: {reason}",
       "unknownError": "Erro desconhecido",
@@ -6101,6 +6261,7 @@
       "noChildren": "Ainda não há sub-alertas. Adicione pelo menos dois.",
       "wouldTrigger": "Dispararia",
       "wouldNotTrigger": "Não dispararia",
+      "firing": "Disparado",
       "normal": "Normal",
       "stepByStep": "Passo a passo",
       "result": "Resultado",
@@ -6127,6 +6288,7 @@
     "exportDialogSubtitle": "Revise a definição e baixe-a como JSON ou como Terraform para o provedor OpenObserve.",
     "jsonFilesOnlyHint": "Somente arquivos .json",
     "outputMessages": "Mensagens de saída",
+    "destinationsRequiredLabel": "Destinos *",
     "timezoneRequiredLabel": "Fuso horário *",
     "organizationIdLabel": "ID da organização",
     "alertCreationTitle": "Criação de alerta",
@@ -6166,11 +6328,13 @@
     "guidelinesLabel": "Diretrizes:",
     "selectStreamGuideline": "Selecione um stream existente na lista ou insira o nome para criar um novo",
     "enrichmentTablesTerm": "Enrichment_tables",
+    "enrichmentTablesDestinationNote": "pois o stream de destino só está disponível para oleodutos agendados",
     "useCurlyBracesNote": "Use chaves",
     "configureStreamNameDynamicNote": "para configurar o nome do stream dinamicamente. ex.",
     "staticTextBeforeAfterNote": ". Texto estático antes/depois",
     "isOptionalNote": "é opcional",
     "noTriggersLoaded": "Nenhum gatilho carregado",
+    "externalDestinationTitle": "Destino Externo",
     "serviceGraphLegendTitle": "Legenda do Gráfico",
     "serviceGraphRootCause": "Vermelho = Causa Raiz Potencial",
     "serviceGraphHighFrequency": "Laranja = Alta Frequência",
@@ -6198,6 +6362,7 @@
     "pendingBatches": "Lotes Pendentes",
     "pendingBatchesTooltip": "Alertas aguardando para serem agrupados",
     "historyTimeline": {
+      "firing": "Disparado",
       "ok": "Ok",
       "error": "Erro",
       "skipped": "Ignorado",
@@ -6216,6 +6381,7 @@
     "duration": "Duração",
     "retries": "Tentativas",
     "dedup": "Dedup",
+    "noDestinations": "Nenhum destino disponível",
     "validation": {
       "streamTypeRequired": "O tipo de Stream é obrigatório.",
       "streamNameRequired": "O nome do Stream é obrigatório.",
@@ -6226,6 +6392,7 @@
       "validEmails": "Adicione e-mails válidos!",
       "silenceNonNegative": "O silenciamento de notificações deve ser maior ou igual a 0",
       "periodPositive": "O período deve ser maior que 0",
+      "destinationRequired": "Pelo menos um destino é obrigatório.",
       "thresholdPositive": "O limite deve ser maior que 0",
       "frequencyPositive": "A frequência deve ser maior que 0",
       "aggregationColumnRequired": "Coluna é obrigatória ao usar uma função de agregação.",
@@ -6236,6 +6403,7 @@
       "minimumFrequency": "Frequência mínima deve ser de {minutes} minutos",
       "nameMandatoryString": "Nome é obrigatório e deve ser uma string válida",
       "orgIdMismatch": "O ID da organização deve ser igual a {orgId}",
+      "streamTypeMandatory": "O Tipo de Stream é obrigatório e deve ser um dos: logs, metrics, traces",
       "streamNameMandatoryString": "O nome do stream é obrigatório e deve ser uma string válida",
       "streamNotInList": "Stream \"{streamName}\" não existe na lista de streams",
       "isRealTimeMandatoryBoolean": "É obrigatório que Is Real-Time seja um valor booleano",
@@ -6267,6 +6435,10 @@
       "cronRequiredForCronType": "Expressão cron é obrigatória quando o tipo de frequência é cron",
       "timezoneRequiredForCronType": "Fuso horário é obrigatório quando o tipo de frequência é cron",
       "triggerConditionRequired": "Condição de trigger é obrigatória",
+      "destinationsArray": "Destinos devem ser um array",
+      "destinationRequiredPlain": "Pelo menos um destino é obrigatório",
+      "noDestinationsInSystem": "Nenhum destino disponível encontrado no sistema",
+      "invalidDestinations": "Destinos inválidos: {destinations} - devem ser da lista de destinos disponíveis",
       "enabledFlagBoolean": "Flag de ativação deve ser booleana",
       "silenceNotificationRequired": "Notificação de silêncio não deve estar vazia",
       "thresholdNotEmpty": "Limiar não deve estar vazio",
@@ -6287,6 +6459,8 @@
     "searchAllFolders": "Todas as pastas",
     "streamConfig": "Configuração de transmissão",
     "alertRules": "Regras de alerta",
+    "noTemplatesMsg": "Para criar um alerta, você precisa de pelo menos um modelo e um destino. Os modelos definem o formato da mensagem de notificação — comece criando um.",
+    "noDestinationsMsg": "Para criar um alerta, você precisa de pelo menos um destino e um modelo. Os destinos definem para onde as notificações são enviadas — comece criando um.",
     "add": "Adicionar alerta",
     "edit": "Editar",
     "clone": "Alerta de clone",
@@ -6337,25 +6511,37 @@
     "frequency": "Frequência",
     "threshold": "Limite",
     "silenceNotification": "Notificação de silêncio para",
+    "destination": "Destino",
+    "destinationOrWorkflowRequired": "Adicione pelo menos um destino ou fluxo de trabalho.",
+    "customDestination": "Destino Personalizado",
+    "customDestinationDescription": "Configure um endpoint HTTP personalizado ou um destino de e-mail",
+    "testIdleMessage": "Clique em 'Testar' para verificar sua configuração de destino",
+    "destinationPreview": "Pré-visualização do Destino",
     "template": "Substituição de modelo",
     "additionalVariables": "Variáveis adicionais",
+    "testSuccessMessage": "Teste bem-sucedido! Seu destino está configurado corretamente.",
     "testFailedMessage": "O teste falhou. Verifique sua configuração e tente novamente.",
     "testFailedWithReason": "Teste falhou: {reason}",
+    "testInProgress": "Testando destino...",
     "sendingNotification": "Enviando uma notificação de teste para verificar a conectividade",
     "testErrorDNS": "Falha na resolução do DNS. Verifique o URL do webhook ou o nome do host.",
     "testErrorConnection": "Conexão recusada. Verifique o URL e verifique se o serviço está acessível.",
+    "testErrorTimeout": "A solicitação expirou. O serviço de destino pode estar lento ou inacessível.",
     "testErrorSSL": "Erro no certificado SSL/TLS. Verifique o certificado ou desative a verificação SSL.",
     "testErrorClientError": "Erro do cliente (4xx). Verifique suas credenciais e configuração.",
+    "testErrorServerError": "Erro do servidor (5xx). O serviço de destino está enfrentando problemas.",
     "viewDetails": "Exibir detalhes",
     "error": "Erro",
     "httpStatus": "Status HTTP",
     "responseBody": "Corpo de resposta",
     "retry": "Tente novamente",
     "suggestCheckUrl": "Verifique se o URL do webhook está correto e acessível.",
+    "suggestCheckFirewall": "Verifique as configurações do firewall e garanta que o serviço de destino está acessível.",
     "suggestCheckCredentials": "Verifique se suas credenciais de API estão corretas.",
     "suggestCheckPermissions": "Verifique se suas credenciais têm as permissões necessárias.",
     "suggestCheckEndpoint": "Verifique se o URL do endpoint está correto.",
     "suggestRateLimit": "Você excedeu o limite da taxa. Aguarde antes de tentar novamente.",
+    "suggestServerIssue": "O serviço de destino está enfrentando problemas. Tente novamente mais tarde.",
     "description": "Descrição",
     "stream_name": "Nome do stream",
     "cloneTitle": "Alerta de clone",
@@ -6415,6 +6601,7 @@
       "notEqualTo": "não é igual a",
       "eventsDetected": "eventos detectados",
       "sendsTo": "Envia para",
+      "noDestination": "Nenhum destino",
       "notSetupYet": "(ainda não configurado)",
       "cooldown": "Tempo de recarga",
       "betweenAlerts": "entre alertas",
@@ -6462,6 +6649,7 @@
     },
     "placeholders": {
       "typeSomething": "Digite algo",
+      "value": "Valor",
       "selectColumn": "Selecionar coluna",
       "savedFunctions": "Funções salvas",
       "autoUsesCheckInterval": "Automático (usa intervalo de verificação)",
@@ -6544,6 +6732,7 @@
       "ifPrefix": "se",
       "noConditionsDefined": "Nenhuma condição definida",
       "loadingCorrelatedMetrics": "Carregando métricas correlacionadas...",
+      "loadingCorrelatedTraces": "Carregando traces correlacionados...",
       "disambiguationChangedMessage": "A configuração de descoberta de serviços (campos de desambiguação) foi alterada após a criação deste incidente.",
       "noActivityYet": "Nenhuma atividade ainda",
       "eventsAndCommentsAppearHere": "Eventos e comentários aparecerão aqui",
@@ -6577,6 +6766,7 @@
       "correlatedAlertsCount": "Alertas: {count} alertas correlacionados",
       "noCorrelatedLogs": "Nenhum log correlacionado encontrado",
       "noCorrelatedMetrics": "Nenhuma métrica correlacionada encontrada",
+      "noCorrelatedTraces": "Nenhum trace correlacionado encontrado",
       "lastAlertAt": "Último alerta",
       "title_field": "Título",
       "stableDimensions": "Dimensões",
@@ -6589,6 +6779,7 @@
       "acknowledge": "Reconhecer",
       "resolve": "Resolver",
       "reopen": "Reabrir",
+      "statusOpen": "Aberto",
       "statusAcknowledged": "Reconhecido",
       "statusResolved": "Resolvido",
       "correlationServiceDiscovery": "Descoberta de serviços",
@@ -6653,6 +6844,7 @@
       "noAlertDetailsAvailable": "Nenhum detalhe de alerta disponível",
       "clickOnTriggerToViewDetails": "Clique em um disparo na tabela para ver os detalhes",
       "refreshCorrelatedData": "Atualizar dados correlacionados",
+      "showingCorrelatedTraces": "Mostrando traces correlacionados do período do incidente",
       "incidentTitleUpdatedSuccess": "Título do incidente atualizado com sucesso",
       "markAsAcknowledgedTooltip": "Marcar o incidente como reconhecido e em andamento",
       "markAsResolvedTooltip": "Marcar o incidente como resolvido e fechá-lo",
@@ -6772,10 +6964,16 @@
       "helpLegendLiveExample": "CPU alta",
       "helpLegendSampleExample": "42",
       "sectionTitle": "Configurações",
+      "noDestinationsAvailable": "Nenhum destino disponível",
+      "noTargetsAvailable": "Nenhum destino ou fluxo de trabalho disponível",
+      "targetsDestinationsGroup": "Destinos",
       "targetsWorkflowsGroup": "Fluxos de trabalho",
+      "refreshDestinations": "Atualizar destinos mais recentes",
+      "addNewDestination": "Adicionar Destino",
       "cooldownTooltip": "Se o alerta for acionado, quanto tempo ele deve esperar antes de enviar outra notificação. Por exemplo, se o alerta for acionado às 16h e a notificação de silêncio estiver definida para 10 minutos, ele não enviará outra notificação até as 16h10, mesmo que o alerta ainda esteja após 1 minuto. Isso é para evitar enviar spam ao usuário com notificações.",
       "periodTooltip": "Período durante o qual a consulta deve ser executada. Por exemplo, 10 minutos significa que sempre que a consulta for executada, ela usará os últimos 10 minutos de dados.",
       "timezoneWarning": "Aviso: O fuso horário exibido é aproximado. Verifique e selecione o fuso horário correto manualmente.",
+      "destinationsTooltip": "Selecione um ou mais destinos para enviar notificações de alerta.",
       "createsIncident": "Cria Incidente",
       "createsIncidentTooltip": "Se um alerta pode criar um incidente, ele não envia uma notificação dedicada. Em vez disso, uma notificação do incidente é enviada quando um novo incidente é criado ou quando um novo tipo de alerta se junta a um incidente existente.",
       "helpTemplateTitle": "Substituição de modelo",
@@ -6787,7 +6985,11 @@
       "helpLegendLive": "os valores reais do seu alerta",
       "helpLegendSample": "uma amostra — o valor real é definido quando o alerta é acionado",
       "helpLegendOpaque": "adicionado automaticamente quando o alerta é acionado",
+      "helpTemplateExplain": "Um modelo é a mensagem de notificação que é enviada — o texto mais variáveis como {'{'}alert_name{'}'}. Escolher um aqui substitui o modelo de cada destino, apenas para este alerta.",
       "helpCurrentHeading": "O que esse alerta envia agora",
+      "helpCurrentNoOverride": "Nenhuma substituição definida — cada destino usa seu próprio modelo:",
+      "helpCurrentNoDestinations": "Nenhum destino selecionado ainda. Cada destino usará seu próprio modelo configurado.",
+      "helpCurrentOverrideHeading": "Todos os destinos usam este modelo:",
       "helpPreviewHeading": "Pré-visualizar um modelo",
       "helpPreviewSelectPlaceholder": "Selecione um modelo para pré-visualizar",
       "helpApplyToAlert": "Inscreva-se para alertar",
@@ -6799,6 +7001,7 @@
       "helpYourVariablesEmpty": "Você ainda não adicionou nenhuma variável.",
       "helpRowTemplateExplain": "Um alerta pode corresponder a várias linhas. O modelo de linha decide a aparência de uma única linha. Em seguida, {'{'} linhas {'}'} em seu modelo principal aparecem em todas as linhas correspondentes, já formatadas.",
       "helpRowTemplateTypeHeading": "String versus JSON",
+      "helpRowTemplateTypeExplain": "String produz texto simples por linha. JSON produz um objeto JSON por linha, adequado para destinos estruturados.",
       "helpRowTemplateTypeCurrent": "Selecionado atualmente:",
       "helpPreviewHeadingShort": "prévia",
       "helpWhyHeading": "Por que usar uma variável?",
@@ -6811,6 +7014,7 @@
       "helpVariablesExampleCaption": "Adicione gravidade e equipe como variáveis e use-as em qualquer lugar do modelo:",
       "helpExampleResultLabel": "O que é enviado",
       "helpTemplateWhenHeading": "Quando devo cancelar?",
+      "helpTemplateWhenDesc": "Deixe isso vazio e cada destino usa seu próprio modelo. Defina uma substituição quando você quiser que este alerta envie a mesma mensagem consistente para todos os destinos — sem editar o modelo de cada destino.",
       "helpRowTemplateWhyHeading": "Por que um modelo de linha?",
       "helpRowTemplateWhyDesc": "Um alerta pode corresponder a vários registros. O modelo de linha formata um registro; {'{'} rows {'}'} então coloca todos os registros formatados no modelo principal. Assim, você lista todas as correspondências sem escrever um loop.",
       "helpRowTemplateExampleCaption": "Cada linha correspondente é formatada pelo modelo de linha e, em seguida, {'{'} rows {'}'} coloca todas elas no modelo principal:",
@@ -6819,8 +7023,10 @@
       "helpRowTemplatePreviewEmpty": "Ainda não há modelo de linha — digite um na guia Configurações adicionais para visualizá-lo aqui.",
       "helpPreviewSelectEmpty": "Escolha um modelo acima para visualizar a mensagem que ele enviaria.",
       "helpCurrentBodyEmpty": "Este modelo não tem corpo para pré-visualizar.",
+      "helpDestinationNoTemplate": "Usa a formatação padrão deste destino.",
       "builtInVars": {
         "orgName": "Nome da sua organização",
+        "streamType": "Tipo de stream (registros, métricas, traces)",
         "streamName": "Nome do stream que o alerta monitora",
         "alertName": "Nome do alerta",
         "alertType": "Tipo de alerta (ex.: agendado, tempo real)",
@@ -6842,6 +7048,7 @@
     },
     "advanced": {
       "addVariable": "Adicionar variável",
+      "variablesTooltip": "As variáveis são usadas para passar dados do alerta para o destino.",
       "templateType": "Tipo de modelo:",
       "noTemplatesAvailable": "Nenhum modelo disponível",
       "refreshTemplates": "Atualizar Modelos mais recentes",
@@ -6926,10 +7133,12 @@
     },
     "anomaly": {
       "addFilter": "Adicionar filtro",
+      "addNewDestination": "Adicionar Novo Destino",
       "anomalyScoreRange": "Faixa de pontuação de anomalias:",
       "checkEvery": "Verifique cada",
       "checkEveryTooltip": "Com que frequência o trabalho de detecção é executado. Pode ser maior do que o período de amostragem (por exemplo, amostra a cada 5m, detecção de execução a cada 1h).",
       "clickLoadDataHint": "Clique em Carregar dados para visualizar a série temporal",
+      "destinationRequired": "Pelo menos um destino é obrigatório!",
       "detectionResolution": "Resolução de detecção",
       "detectionResolutionTooltip": "Quão granular é cada ponto de dados. Por exemplo, “5m” significa que anomalias são detectadas com resolução de 5 minutos.",
       "disabled": "Desativado",
@@ -6944,8 +7153,10 @@
       "lookBackWindowTooltip": "Há quanto tempo cada detecção executa consultas. Fecha a janela mesmo depois de uma longa pausa. O padrão é Verificar cada intervalo.",
       "maxThresholdMarkLine": "limite máximo",
       "minThresholdMarkLine": "limite mínimo",
+      "noDestinationsFound": "Nenhum destino encontrado",
       "noFieldsFound": "Nenhum campo encontrado",
       "notifications": "Notificações",
+      "notificationsTooltip": "Quando ativado, uma notificação será enviada ao destino selecionado sempre que uma anomalia for detectada.",
       "retrainEvery": "Treine novamente cada",
       "retrainEveryTooltip": "Com que frequência treinar automaticamente o modelo. “Nunca” significa treinar uma vez e manter o modelo até que seja retreinado manualmente.",
       "retrainFourteenDays": "14 dias",
@@ -6960,12 +7171,14 @@
       "sqlColumnsHint": "A consulta deve retornar duas colunas: {timeBucket} e {valueColumn}.",
       "sqlRequired": "O SQL é necessário no modo SQL personalizado",
       "summaryAlerting": "✓ Alertas: {status}",
+      "summaryAlertingEnabled": "✓ Alertas: Ativado → {destinations}",
       "summaryAlertingNoDestination": "✓ Alertas: Ativado ⚠️ {warning}",
       "summaryConfiguring": "Configurando detecção de anomalias para o stream {streamType} \"{stream}\"",
       "summaryDataSource": "✓ Fonte de dados: {type} — {name}",
       "summaryDetectionFunction": "✓ Função de detecção: {fn}",
       "summaryDetectionWindow": "✓ Janela de detecção: últimos {window}",
       "summaryMonitoring": "Monitorar \"{stream}\" a cada {schedule} para anomalias de {fn}, treinado em {trainingDays} dias de histórico",
+      "summaryNoDestinationSet": "Nenhum destino definido",
       "summaryQueryMode": "✓ Modo de consulta: {mode}",
       "summaryResolution": "✓ Resolução: {resolution}",
       "summaryRetrain": "✓ Retreinamento: {retrain}",
@@ -7091,14 +7304,21 @@
       "triggerAlertFailed": "Falha ao acionar o alerta",
       "triggerRetrainingFailed": "Falha ao acionar o retreinamento",
       "bulkDeleteAlertsFailed": "Erro ao excluir alertas. Tente novamente.",
+      "deleteDestinationFailed": "Erro ao excluir destino",
+      "bulkDeleteDestinationsFailed": "Erro ao excluir destinos. Tente novamente.",
       "bulkDeleteTemplatesFailed": "Erro ao excluir modelos. Tente novamente."
     },
     "prebuilt": {
+      "conversionSuccess": "Destino convertido com sucesso",
       "validationError": "Erro de validação: {error}",
+      "invalidDestinationType": "Tipo de destino inválido",
       "invalidTargetType": "Tipo de alvo inválido",
+      "unknownDestinationType": "Tipo de destino desconhecido",
       "testFailedUnknownError": "Teste falhou com erro desconhecido"
     },
     "confirmDeleteAlerts": "Tem certeza de que deseja excluir {count} alerta? | Tem certeza de que deseja excluir {count} alertas?",
+    "confirmDeleteDestinations": "Tem certeza de que deseja excluir {count} destino? | Tem certeza de que deseja excluir {count} destinos?",
+    "prebuiltDestination": "Destino predefinido {type}",
     "errorValidations": "Validações de Erro",
     "outputMessagesLabel": "Mensagens de Saída",
     "incidentSingular": "Incidente",
@@ -7154,6 +7374,7 @@
       "critical": "Crítico",
       "warning": "Aviso",
       "ok": "OK",
+      "firingTotal": "Disparado",
       "observedTotal": "Grupos",
       "nOfMFiring": "{firing} de {observed} grupos em disparo",
       "groupedBy": "agrupado por {columns}",
@@ -7167,6 +7388,7 @@
       "when": "Quando",
       "change": "Mudança de nível",
       "outcome": "Resultado",
+      "value": "Valor",
       "rollupRow": "Todos os grupos (resumo)",
       "noHistoryTitle": "Nenhuma transição registrada",
       "noHistoryDescription": "Alterações de nível aparecem aqui quando os grupos começam a disparar, escalam ou se recuperam.",
@@ -7214,6 +7436,7 @@
       "dialog": {
         "title": "Criar alerta",
         "continue": "Continuar para o alerta",
+        "streamLabel": "Stream",
         "thresholdLabel": "Alertar sobre",
         "thresholdMatchingRows": "Linhas correspondentes",
         "thresholdCount": "Contagem de linhas",
@@ -7300,22 +7523,26 @@
     "actionOpen": "Abrir",
     "actionDelete": "Excluir",
     "deleteTitle": "Excluir {name}?",
+    "deleteMessage": "Isso o remove permanentemente. A exclusão é bloqueada se um alerta ou destino ainda o utiliza.",
     "deletedToast": "{name} excluído",
     "deleteFailedToast": "Não foi possível excluir {name}",
     "loading": "Construindo grafo de dependências…",
     "failedToLoad": "Falha ao carregar dependências: {error}",
     "usedBy": "{count} alerta | {count} alertas",
+    "countDestinations": "{count} destino | {count} destinos",
     "usedByColumn": "Usado por",
     "searchPlaceholder": "Pesquisar",
     "noDependencies": "Sem dependências.",
     "noMatches": "Sem correspondências.",
     "laneEmpty": "Sem alertas",
     "directOverrides": "Usa este modelo diretamente",
+    "sectionDestinations": "Destinos",
     "sectionAlerts": "Alertas",
     "orphanTag": "Não usado",
     "missingTag": "Ausente",
     "enabled": "Ativado",
     "paused": "Pausado",
+    "impactTemplate": "Usado por {destinations} · {alerts}",
     "impactDestination": "Usado por {alerts}"
   },
   "alert_library": {
@@ -7360,6 +7587,7 @@
       "noDescription": "Nenhuma descrição na biblioteca.",
       "needsDataCallout": "Este alerta consulta {stream}, que esta organização não está recebendo. Instalá-lo agora criaria um alerta que nunca dispara.",
       "query": "Consulta",
+      "stream": "Stream",
       "streamType": "Tipo de stream",
       "metricCondition": "Condição da métrica",
       "matchCount": "Linhas correspondentes necessárias",
@@ -7381,11 +7609,18 @@
     "install": {
       "title": "Instalar da biblioteca",
       "subtitle": "Escolha para onde os alertas notificam, quais alertas instalar e onde eles são arquivados.",
+      "stepDestination": "Destino",
       "stepAlerts": "Alertas",
       "stepFolder": "Pasta",
       "stepTune": "Ajustar",
       "stepInstall": "Instalar",
+      "destinationIntro": "Cada alerta neste lote notifica o destino que você escolher aqui. Os arquivos da biblioteca nomeiam os destinos da organização de onde foram exportados, que não existem na sua.",
+      "destinationLabel": "Destino",
+      "destinationPlaceholder": "Escolha um destino",
+      "destinationsLoadFailed": "Não foi possível carregar seus destinos existentes.",
       "retry": "Tentar novamente",
+      "destinationsNoneBody": "Esta organização ainda não tem destinos de alerta, portanto não há para onde esses alertas notificar. Crie um na página Destinos e depois volte e escolha aqui.",
+      "openDestinations": "Abrir Destinos",
       "selectAll": "Selecionar todos",
       "clear": "Limpar",
       "selectedCount": "{count} de {total} selecionados",
@@ -7440,6 +7675,7 @@
     "importBodyLabel": "Corpo do Modelo *",
     "importTypeLabel": "Tipo do Modelo *",
     "importTitleLabel": "Título do Modelo *",
+    "header": "Modelos de Destino",
     "add": "Adicionar modelo",
     "edit": "Editar",
     "name": "Nome",
@@ -7499,6 +7735,7 @@
     "chartPreviewPlaceholder": "O gráfico aparece aqui em notificações reais — ele é gerado a partir do histórico de avaliação do próprio alerta, que uma prévia não possui.",
     "channelTitlesDescription": "Use um título diferente em canais específicos — por exemplo, uma linha de assunto mais curta para e-mail.",
     "namePlaceholder": "ex.: alta taxa de erro",
+    "nameLockedHint": "Alertas e destinos referenciam este modelo pelo nome, por isso ele não pode ser renomeado. Clone o modelo para começar uma cópia com um novo nome.",
     "rawBodyCaption": "Enviado exatamente como escrito, com {'{'}variables{'}'} substituídos. Consulte o Guia de Variáveis para ver tudo o que está disponível.",
     "contentTitlePlaceholder": "{'{'}alert_name{'}'} · {'{'}stream_name{'}'}",
     "fieldLabelPlaceholder": "ex.: Valor",
@@ -7512,6 +7749,7 @@
     "moveUp": "Mover para cima",
     "moveDown": "Mover para baixo",
     "fieldLabel": "Rótulo",
+    "fieldValue": "Valor",
     "linkLabel": "Rótulo",
     "linkUrl": "URL",
     "channelTitleSlack": "Slack",
@@ -7571,10 +7809,12 @@
     "channelSns": "SNS",
     "testSendGroupLabel": "Enviar uma mensagem de teste real",
     "testSend": "Enviar teste",
+    "testSendDestinationLabel": "Destino",
     "testSendConfirmTitle": "Enviar uma mensagem de teste real?",
     "testSendConfirm": "Isto publicará uma mensagem real no canal selecionado, marcada como [TEST].",
     "testSendSuccess": "Mensagem de teste enviada",
-    "testSendRateLimited": "Muitos envios de teste — aguarde um momento e tente novamente."
+    "testSendRateLimited": "Muitos envios de teste — aguarde um momento e tente novamente.",
+    "testSendNoDestination": "Selecione um destino primeiro"
   },
   "alert_sources": {
     "header": "Fontes de alerta externas",
@@ -7612,8 +7852,10 @@
     "editTitle": "Editar Fonte de Alerta",
     "name": "Nome",
     "nameHint": "Apenas um rótulo — todas as fontes usam a mesma configuração.",
+    "incidentDestination": "Destino de incidente",
     "incidentDestinationPlaceholder": "Usar padrão da organização",
     "incidentDestinationHint": "Para onde as notificações vão quando os alertas desta fonte criam ou entram em um incidente. Deixe vazio para usar o padrão da organização — sem nenhum dos dois definido, incidentes correspondentes disparam silenciosamente.",
+    "noDestinationSet": "Nenhum destino de incidente definido",
     "setupStep1Title": "1. Crie um webhook",
     "setupStep1Body": "No Grafana, Alertmanager ou qualquer ferramenta que possa enviar JSON via POST, crie um ponto de contato / receptor de webhook.",
     "setupRemainingStepsHint": "Salve esta fonte para obter sua URL e token e cole-os na configuração do webhook.",
@@ -7636,10 +7878,13 @@
     "createdSuccess": "Fonte de alerta criada",
     "updatedSuccess": "Fonte de alerta atualizada",
     "error": "Erro ao carregar fontes de alerta",
-    "senderError": "Erro ao carregar status da fonte"
+    "senderError": "Erro ao carregar status da fonte",
+    "destinationsLoadError": "Erro ao carregar destinos"
   },
   "alert_destinations": {
+    "sectionTab": "Destinos",
     "chooseTypeTitle": "Escolher tipo",
+    "selectDestinationType": "Selecione o Tipo de Destino",
     "connectionStepTitle": "Conexão",
     "connectionDetailsTitle": "Detalhes da conexão",
     "urlHelpText": "URL base sem barra final (ex.: https://your-domain.com)",
@@ -7658,6 +7903,10 @@
     "datadogHostnameHelpText": "Nome do host para logs do Datadog",
     "exampleLabel": "Exemplo:",
     "subtitle": "Onde os alertas disparados são entregues",
+    "exportDestination": "Exportar Destino",
+    "deleteDestinationTitle": "Excluir Destino",
+    "deleteDestinationMessage": "Tem certeza de que deseja excluir o destino?",
+    "deleteDestinationsTitle": "Excluir Destinos",
     "selected": "selecionados",
     "organizationLabel": "Organização",
     "defaultPlaceholder": "ex.: default",
@@ -7676,18 +7925,25 @@
     "ddTagsPlaceholder": "Digite as tags (ex.: env:prod,version:1.0)",
     "serviceLabel": "Serviço",
     "servicePlaceholder": "Digite o nome do serviço (ex.: api-gateway)",
+    "header": "Destinos de Notificação",
+    "add": "Novo destino",
     "edit": "Editar",
+    "search": "Pesquisar destino",
     "filterAll": "Todos",
     "filterPrebuilt": "Pré-construído",
     "filterCustom": "Personalizado",
     "templateDefaultBadge": "Padrão",
     "name": "Nome",
+    "destination_type": "Tipo de Destino",
     "template": "Modelo",
     "actions": "Ações",
+    "addTitle": "Novo Destino",
+    "updateTitle": "Atualizar Destino",
     "delete": "Excluir",
     "method": "Método",
     "url": "URL",
     "api_header": "cabeçalho",
+    "api_header_value": "Valor",
     "skip_tls_verify": "Ignorar a verificação de TLS",
     "action": "Ação",
     "output_format": "Formato de saída",
@@ -7696,6 +7952,7 @@
     "custom_headers": "Cabeçalhos personalizados (opcional)",
     "preview": "prévia",
     "test": "Teste",
+    "saved": "Destino salvo com sucesso",
     "customWebhook": "Personalizado (Webhook)",
     "customEmail": "Personalizado (e-mail)",
     "customAction": "Personalizado (Ação)",
@@ -7705,6 +7962,7 @@
     "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)",
     "templateDefaultOption": "Default ({name})",
     "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one.",
+    "loadingData": "Carregando dados do destino...",
     "noEmailTemplates": "Parece que você ainda não criou nenhum Template de Email.",
     "createEmailTemplate": "Criar Template de Email",
     "headers": "Cabeçalhos",
@@ -7719,14 +7977,40 @@
       "servicenowDescription": "Criar incidentes no ServiceNow"
     },
     "import": {
+      "title": "Importar Destino",
       "errorValidations": "Validações de Erro",
       "outputMessages": "Mensagens de Saída",
+      "destinationName": "Nome do Destino",
+      "destinationUrl": "URL do Destino",
+      "destinationMethod": "Método do Destino",
       "templates": "Templates",
       "emails": "Emails (separados por vírgula)",
       "actions": "Ações",
+      "destinationCreation": "Criação de Destino",
       "jsonStringEmpty": "A string JSON está vazia",
       "invalidJsonFormat": "Formato JSON inválido",
-      "unknownError": "Erro Desconhecido"
+      "importSuccess": "Destinos importados com sucesso",
+      "importError": "Erro ao importar o Destino, verifique o JSON",
+      "unknownError": "Erro Desconhecido",
+      "nameRequired": "Destino - {index}: O campo \"name\" é obrigatório e deve ser uma string válida.",
+      "nameExists": "Destino - {index}: \"{name}\" já existe",
+      "typeInvalid": "Destino - {index}: O campo \"type\" deve ser \"email\", \"http\" ou \"action\"",
+      "actionTypeNotSupported": "Destino - {index}: o tipo 'action' não é suportado.",
+      "actionNotFound": "Destino - {index}: a ação \"{actionId}\" não existe para o tipo \"{type}\"",
+      "urlRequired": "Destino - {index}: O campo \"url\" é obrigatório para destinos do tipo http.",
+      "methodInvalid": "Destino - {index}: O campo \"method\" deve ser um de \"post\", \"get\" ou \"put\"",
+      "templateRequiredHttp": "Destino - {index}: O campo \"template\" é obrigatório para destinos do tipo http.",
+      "skipTlsVerifyRequired": "Destino - {index}: O campo \"skip_tls_verify\" é obrigatório e deve ser um valor booleano",
+      "headersMustBeObject": "Destino - {index}: 'headers' deve ser um objeto para o tipo http",
+      "urlNotAllowedEmail": "Destino - {index}: 'url' não deve ser fornecido para o tipo email",
+      "headersNotAllowedEmail": "Destino - {index}: 'headers' não deve ser fornecido para o tipo email",
+      "emailsRequired": "Destino - {index}: O campo \"emails\" é obrigatório e deve ser um array para destinos do tipo email.",
+      "emailsMustBeStrings": "Destino - {index}: 'emails' deve ser um array de strings para o tipo email",
+      "templateRequiredEmail": "Destino - {index}: O campo \"template\" é obrigatório para destinos do tipo email.",
+      "templateNotFound": "Destino - {index}: o modelo \"{template}\" não existe para o tipo \"{type}\"",
+      "actionIdInvalid": "Destino - {index}: O campo \"action_id\" deve ser uma string válida.",
+      "createSuccess": "Destino - {index}: \"{name}\" criado com sucesso \nNota: remova o objeto de destino criado {name} do arquivo json ",
+      "createFailed": "Destino - {index}: criação de \"{name}\" falhou --> \n Motivo: {reason}"
     },
     "priorityP1Description": "Alertas de maior prioridade",
     "priorityP2Description": "Alertas de alta prioridade",
@@ -7738,7 +8022,10 @@
     "severityWarningDescription": "Incidentes de nível de aviso",
     "severityInfoDescription": "Incidentes informativos"
   },
-  "pipeline_destinations": {},
+  "pipeline_destinations": {
+    "header": "Destinos de Oleodutos",
+    "search": "Pesquisar destino"
+  },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
     "tabLabel": "Armazenamento organizacional",
@@ -7947,6 +8234,7 @@
     },
     "metricCard": {
       "lastRefreshed": "Última atualização:",
+      "traceId": "Trace ID: {id}",
       "metricLabel": "Métrica: {name}",
       "queryLabel": "Consulta: {query}",
       "errorLabel": "Erro: {error}",
@@ -7979,6 +8267,7 @@
       "loadingLabels": "Carregando rótulos...",
       "noLabelsFound": "Nenhum rótulo encontrado",
       "operator": "Operador",
+      "value": "Valor",
       "selectLabelFirst": "Selecione um rótulo primeiro",
       "noValuesFound": "Nenhum valor encontrado",
       "addLabelFilter": "Adicionar filtro de rótulo",
@@ -8069,6 +8358,7 @@
     "generalLabel": "Geral",
     "groupGeneral": "Geral",
     "groupAccessSecurity": "Acesso e Segurança",
+    "groupDestinations": "Destinos",
     "groupDataAI": "Dados e IA",
     "groupOperations": "Operações",
     "groupSynthetics": "Sintéticos",
@@ -8097,6 +8387,8 @@
     "customLogoText": "Texto de logotipo personalizado",
     "orgLabel": "Parâmetros da organização",
     "logDetails": "Detalhes do registro",
+    "traceIdFieldName": "Nome do campo Trace ID",
+    "spanIdFieldName": "Nome do campo Span ID",
     "toggleIngestionLogsLabel": "Alternar registros de ingestão",
     "usageStreamEnabledLabel": "Ativar fluxo de uso",
     "claimParserFunction": "Analisador de declarações de SSO",
@@ -8222,6 +8514,7 @@
     "genAiAgentMapping": {
       "tabLabel": "Mapeamento de agentes GenAI",
       "title": "Mapeamento de agentes GenAI",
+      "description": "Configure atributos de telemetria de fallback usados para normalizar a identidade do agente para traces de LLM e avaliações.",
       "agentNameFields": "Campos alternativos do nome do agente",
       "agentNameHelp": "Atributos de entrada a serem usados como substitutos para gen_ai.agent.name.",
       "agentNameInfo": "Verificado somente quando o atributo gen_ai.agent.name padrão está ausente ou vazio. Adicione um atributo de telemetria de entrada por linha.",
@@ -8239,6 +8532,7 @@
       "resetToEmpty": "Redefinir como vazio",
       "clearRegistry": "Limpar registro",
       "clearRegistryTitle": "Limpar o registro do agente?",
+      "clearRegistryDescription": "Isso exclui todas as linhas do registro de agentes GenAI descobertas para esta organização. Novos traces correspondentes repopularão o registro durante a ingestão.",
       "clearRegistryConfirm": "Limpar registro",
       "saved": "O mapeamento do agente GenAI foi salvo com sucesso",
       "clearRegistrySuccess": "Registro de agentes GenAI limpo. Excluídos {deletedCount} agentes armazenados e {bufferCount} observações na fila.",
@@ -8258,6 +8552,7 @@
       "fieldAliasesSaveError": "Falha ao salvar os aliases de campos",
       "fieldAliasesUnsavedConfirm": "Você tem alterações de mapeamento de campos não salvas. Descartá-las e sair?",
       "discoveredServicesTitle": "Serviços descobertos",
+      "discoveredServicesDescription": "Os serviços são descobertos automaticamente a partir dos seus dados de telemetria e agrupados pelo Nome do Serviço para correlação. Serviços que compartilham o mesmo Nome do Serviço são correlacionados entre registros, traces e métricas.",
       "noServicesYet": "Nenhum serviço descoberto ainda",
       "noServicesDescription": "Os serviços aparecerão aqui à medida que os dados de telemetria forem ingeridos com atributos de identificação do serviço (como k8s-deployment, nome do serviço etc.)",
       "searchServiceName": "Pesquisar nome do serviço ou stream...",
@@ -8265,6 +8560,7 @@
       "serviceName": "Nome do serviço",
       "service": "Serviço",
       "logs": "Registros",
+      "traces": "Traces",
       "metrics": "Métricas",
       "lastSeen": "Visto pela Última Vez",
       "retry": "Tente novamente",
@@ -8276,6 +8572,7 @@
       "fieldMappingDialogHelp": "Adicione ou remova nomes de campos que devem ser reconhecidos como o nome do serviço em seus dados de telemetria.",
       "fieldMappingPlaceholder": "Digite um nome de campo e pressione Enter",
       "foundInLogs": "Encontrado em Logs",
+      "foundInTraces": "Encontrado em Traces",
       "foundInMetrics": "Encontrado em Métricas",
       "distinguishByLabel": "Distinguir Serviços Por",
       "distinguishByHelp": "Escolha campos que definam onde seus serviços são executados. Por exemplo, cluster + namespace + deployment juntos criam uma identidade única para cada serviço. Até 5 campos.",
@@ -8311,11 +8608,13 @@
       "instancesCount": "({count} instâncias)",
       "noDimensions": "sem dimensões",
       "defaultSetWarningTitle": "A correlação pode ser não confiável.",
+      "defaultSetWarningBody": "Esta instância não tem desambiguação — foi descoberta sem qualquer correspondência de workload (sem contexto de cluster, namespace ou ambiente). Registros e traces podem vir de diferentes implantações do mesmo nome de serviço.",
       "instanceIdentity": "Identidade da Instância",
       "noDimensionsCatchAll": "Sem dimensões — instância genérica",
       "streamSources": "Fontes de Stream",
       "fieldNameMapping": "Mapeamento de Nome de Campo",
       "logsWithCount": "Logs ({count})",
+      "tracesWithCount": "Traces ({count})",
       "metricsWithCount": "Métricas ({count})"
     },
     "addRegexPattern": {
@@ -8428,7 +8727,9 @@
       "importPatternFailed": "Falha ao importar o padrão \"{name}\": {error}",
       "createFailed": "Padrão de regex - {index}: criação de \"{name}\" falhou --> \n Motivo: {error}"
     },
-    "index": {},
+    "index": {
+      "genAiAgentMappingDesc": "Mapear spans GenAI para identificadores de agente"
+    },
     "organizationManagementPage": {
       "setAiCredits": "Definir Créditos de IA",
       "setAiCreditsSubtitle": "Defina a cota de créditos de IA vitalícia da organização.",
@@ -8562,6 +8863,8 @@
       "noValues": "Nenhum valor",
       "cardinality": "Cardinalidade:",
       "uniqueValues": "{n} valores únicos",
+      "streams": "Streams",
+      "streamsSubtext": "streams",
       "noAdditionalDimensions": "Nenhuma dimensão adicional detectada.",
       "noSampleData": "Nenhum dado de amostra disponível para este campo.",
       "uniqueValuesDetected": "{n} valores únicos detectados",
@@ -8628,6 +8931,7 @@
     "cachedReportHint": "Nota: Relatórios em cache são armazenados para acesso rápido aos painéis; o compartilhamento está desabilitado para esses relatórios.",
     "selectDashboardStep": "Selecionar painel",
     "timeRangeDescription": "Gera relatório com os dados do intervalo de tempo especificado",
+    "pngPageLimitNote": "O PNG captura apenas a primeira página visível do painel. Use PDF se o painel abranger várias páginas.",
     "widthPlaceholder": "ex.: 1440",
     "heightPlaceholder": "ex.: 900",
     "dimensionsDefaultHint": "Deixe em branco para usar as configurações padrão do servidor",
@@ -8643,6 +8947,7 @@
     "searchAllFoldersTitle": "Pesquisar em todas as pastas",
     "never": "Nunca",
     "startDate": "Data de início",
+    "header": "Relatórios",
     "subtitle": "Relatórios e exportações programados",
     "searchThisFolder": "Esta pasta",
     "searchAllFolders": "Todas as pastas",
@@ -8745,6 +9050,7 @@
     "totalTimeRange": "Intervalo total de consultas",
     "searchType": "Tipo de pesquisa",
     "querySource": "Fonte da consulta",
+    "traceId": "ID do rastreamento",
     "userId": "ID do usuário",
     "orgId": "ID da organização",
     "streamType": "Tipo de stream",
@@ -8831,10 +9137,16 @@
     },
     "openInFullView": "Abrir à vista completa",
     "viewLogs": "Exibir registros",
+    "viewLogsUnavailable": "Não foi possível abrir os registros para este span.",
     "backToLogs": "Voltar aos registros",
+    "openInTraces": "Abrir em Rastreamentos",
     "loadingStream": "Carregando Stream...",
     "noLogsAvailableForService": "Não há registros disponíveis para este serviço",
+    "noCorrelatedLogsFound": "Nenhum registro correlacionado encontrado para este span",
     "noData": {
+      "title": "Comece a enviar rastreamentos para {product}",
+      "description": "Nenhum stream de rastreamento encontrado nesta organização ainda. Instrumente seus serviços e os rastreamentos aparecerão aqui automaticamente.",
+      "otlp": "Envie rastreamentos via {product}",
       "otlpDesc": "{product1}, {product2} e qualquer SDK compatível com {product3}",
       "otelCollectorDesc": "Roteie todos os sinais de telemetria através do {product}",
       "or": "Ou:",
@@ -8843,12 +9155,21 @@
     "configureFullTextSearch": "para configurar um campo de pesquisa de texto completo para o fluxo.",
     "collapseFields": "Colapsar campos",
     "openFields": "Campos abertos",
+    "timeRangeUpdated": "O intervalo de tempo selecionado não incluía este rastreamento. O intervalo de tempo foi atualizado para corresponder ao timestamp do rastreamento.",
+    "errorRetrievingTraces": "Ocorreu um erro ao recuperar os rastreamentos.",
+    "fetchingTraces": "Carregando rastreamentos...",
     "noStream": {
       "title": "Escolha um stream para começar a explorar",
+      "description": "Escolha um stream de rastreamento e pressione <strong>Executar consulta</strong>. Você pode filtrar por serviço, duração, status do span e mais quando os resultados carregarem.",
       "selectStream": "Selecione um stream",
+      "selectStreamDesc": "Navegue pelos streams de rastreamento disponíveis nesta organização",
+      "queryGuide": "Leia o guia de rastreamentos",
+      "queryGuideDesc": "Grafo de serviços, filtragem de spans, métricas RED e mais",
       "recent": "Recente:"
     },
     "noEvents": {
+      "title": "Nenhum rastreamento encontrado",
+      "descNoFilters": "Nenhum rastreamento foi encontrado em {range}.",
       "descWithFilters": "Nada correspondeu a <strong>essa consulta</strong> na janela selecionada. Tente ampliar o intervalo de tempo ou remover um filtro.",
       "descOutOfRange": "Sua janela de tempo não contém nenhum dado deste stream. Vá para quando os dados foram vistos pela última vez.",
       "jumpToData": "Ir para os dados mais recentes",
@@ -8856,19 +9177,38 @@
       "askAi": "Peça à IA que corrija minha consulta",
       "selectedRange": "o intervalo selecionado"
     },
+    "tracesFound": "Rastreamentos encontrados",
+    "spansFound": "Spans encontrados",
+    "errorTraces": "Rastreamentos com erro",
+    "errorSpans": "Spans com erro",
     "filterByErrors": "Filtrar por erros",
     "clearErrorFilter": "Limpar filtro de erro",
     "error": "ERRO",
     "errorCount": "{n} ERRO | {n} ERROS",
     "success": "SUCESSO",
+    "applyPendingFilters": "Aplicar filtros pendentes e pesquisar rastreamentos",
+    "backToTraces": "Voltar para Rastreamentos",
     "loadingTrace": "Carregando...",
+    "traceId": "ID do rastreamento",
+    "copyTraceId": "Copiar ID do rastreamento",
     "viewFilters": "Exibir filtros",
+    "reviewAndApplyFilters": "Revisar e aplicar filtros aos Rastreamentos",
+    "spansLabel": "spans",
     "errorsLabel": "erros",
     "previousMatch": "Partida anterior",
     "nextMatch": "Próxima partida",
+    "searchInSpans": "Pesquisar em spans",
+    "spansTableView": "Exibição de tabela de spans",
     "comingSoon": "Em breve...",
+    "fetchingTrace": "Buscando seu rastreamento.",
+    "traceFilters": "Filtros de rastreamento",
+    "showTraces": "Mostrar rastreamentos",
     "applyAndSearch": "Inscreva-se e pesquise",
     "timestamp": "Carimbo de data/hora",
+    "noErrorPresent": "Nenhum erro presente para este span",
+    "noEventsPresent": "Nenhum evento para este span",
+    "noLinksPresent": "Nenhum link para este span",
+    "loadingTraceDag": "Carregando DAG do rastreamento...",
     "exceptionsWithCount": "Exceções ({count})",
     "typeLabel": "Tipo:",
     "messageLabel": "Mensagem:",
@@ -8882,6 +9222,7 @@
       "templateBadge": "modelo"
     },
     "sessionsList": {
+      "streamLabel": "Stream",
       "sessions": "sessões",
       "failedToLoad": "Falha ao carregar sessões",
       "retry": "Tente novamente",
@@ -8899,6 +9240,7 @@
         "cost": "Custo",
         "status": "Status"
       },
+      "stream": "Stream",
       "agent": "Agente",
       "noAgentsTitle": "Nenhum Agente Neste Intervalo",
       "noAgentsDescription": "Nenhum agente GenAI foi detectado para a janela de tempo selecionada. Tente um intervalo maior ou volte para a visualização de stream.",
@@ -8912,9 +9254,12 @@
       "failedToLoad": "Falha ao carregar a sessão",
       "retry": "Tente novamente",
       "sessionNotFound": "Sessão não encontrada",
+      "noSpansFound": "Nenhum span encontrado para {id} no intervalo de tempo atual.",
+      "searchPlaceholder": "Pesquisar rastreamentos nesta sessão…",
       "turn": "vire",
       "turns": "gira",
       "turnCount": "{count} {unit}",
+      "openInTraceExplorer": "Ver rastreamento",
       "filters": {
         "status": "Status",
         "model": "modelo",
@@ -9003,6 +9348,7 @@
         "warning": "Aviso",
         "critical": "Crítico"
       },
+      "viewTraces": "Ver rastreamentos",
       "types": {
         "all": "Todos",
         "service": "Serviços",
@@ -9016,15 +9362,20 @@
         "title": "Taxa de Erros"
       }
     },
+    "spansTab": "Spans",
+    "tracesTab": "Rastreamentos",
     "serviceGraphTab": "Gráfico de serviços",
     "serviceGraphSubtitle": "Veja como seus serviços se comunicam — dependências, throughput e taxas de erro",
+    "servicesCatalogSubtitle": "Cada serviço que envia rastreamentos, com latência, throughput e taxa de erro",
     "treeView": "Visualização em árvore",
     "graphView": "Visualização gráfica",
     "layoutHorizontal": "Horizontal",
     "layoutVertical": "Vertical",
     "layoutForce": "Layout de força",
+    "exportTraces": "Exportar rastreamentos",
     "waterfall": "Cachoeira",
     "flameGraph": "Gráfico de chamas",
+    "traceGraph": "Grafo de rastreamento",
     "thread": "Tópico",
     "dbSpanDetails": {
       "dbSystem": "Sistema de BD",
@@ -9034,6 +9385,7 @@
       "host": "Host",
       "user": "Usuário",
       "storedProcedure": "Procedimento Armazenado",
+      "noQueryText": "Nenhum texto de consulta registrado para este span.",
       "performance": "Desempenho",
       "rowsReturned": "Linhas Retornadas",
       "batchSize": "Tamanho do Lote",
@@ -9046,11 +9398,13 @@
       "changeStreamTitle": "Alterar stream?",
       "switchStream": "Alternar stream",
       "cancel": "Cancelar",
+      "changeStreamMessage": "Isso também atualizará o stream na aba Rastreamentos/Spans e redefinirá a consulta existente.",
       "errorGettingFunctions": "Erro ao obter funções",
       "errorPullingIndex": "Erro ao obter índice para a organização selecionada{message}",
       "errorGettingStreams": "Erro ao obter streams",
       "errorLoadingStreams": "Erro ao carregar streams",
       "errorConstructingQuery": "Ocorreu um erro ao construir a consulta de pesquisa.",
+      "traceNotFound": "Rastreamento {traceId} não encontrado",
       "errorProcessingRequest": "Erro ao processar a solicitação",
       "searchRequestFailed": "Falha na solicitação de pesquisa"
     },
@@ -9071,6 +9425,9 @@
       "service": "Serviço",
       "operationName": "Nome da operação",
       "duration": "Duração",
+      "spans": "Spans",
+      "spanKind": "Tipo de Span",
+      "spanStatus": "Status do Span",
       "status": "Status",
       "serviceLatency": "Latência do serviço",
       "inputTokens": "Tokens de entrada",
@@ -9082,9 +9439,11 @@
       "noErrorsInRange": "Nenhum erro neste intervalo de tempo",
       "time": "Tempo",
       "service": "Serviço",
-      "operation": "Operação"
+      "operation": "Operação",
+      "traceId": "ID do Trace"
     },
     "lLMInsightsDashboard": {
+      "stream": "Stream",
       "agent": "Agente",
       "compareEntry": "Comparar versões",
       "compareEntryHint": "Compare duas versões deste agente lado a lado",
@@ -9095,6 +9454,7 @@
       "viewByStream": "Visualizar por Stream",
       "totalCost": "Custo Total",
       "totalTokens": "Total de Tokens",
+      "totalTraces": "Total de Traces",
       "p95Latency": "Latência P95",
       "errorRate": "Taxa de Erro",
       "timeAxis": "Tempo",
@@ -9106,10 +9466,13 @@
     "serviceGraphNodeSidePanel": {
       "viewRelated": "Ver Relacionados",
       "logs": "Logs",
+      "traces": "Traces",
       "databases": "Bancos de dados",
+      "viewTraces": "Ver Traces",
       "operations": "Operações",
       "metrics": "Métricas",
       "noOperationsFound": "Nenhuma operação encontrada",
+      "viewInTraces": "Ver em Traces",
       "noResourceDataFound": "Nenhum dado de {resource} encontrado",
       "retry": "Tentar novamente",
       "noMetricsAvailable": "Nenhuma métrica disponível para este serviço.",
@@ -9133,11 +9496,13 @@
       "tabHosts": "Hosts",
       "tabDatabases": "Bancos de dados",
       "tabQueries": "Consultas",
+      "tabDestinations": "Destinos",
       "tabRpcServices": "Serviços RPC",
       "tabUrls": "URLs",
       "colHost": "Host",
       "colDatabase": "Banco de dados",
       "colDbOperation": "Operação de banco de dados",
+      "colDestination": "Destino",
       "colRpcService": "Serviço RPC",
       "colUrl": "URL",
       "envHost": "Host",
@@ -9152,11 +9517,14 @@
       "dbResponseStatusCode": "Código de Status de Resposta DB",
       "processExitCode": "Código de Saída do Processo"
     },
-    "traceLatencyCell": {},
+    "traceLatencyCell": {
+      "spansAcrossServices": "{spans} spans em {services} serviços"
+    },
     "threadToolCalls": {
       "toolCall": "chamada de ferramenta",
       "toolCalls": "chamadas de ferramenta",
       "showCalls": "Mostrar chamadas",
+      "openSpanDetails": "Abrir detalhes do span",
       "arguments": "Argumentos",
       "result": "Resultado",
       "empty": "(vazio)"
@@ -9170,13 +9538,17 @@
       "cost": "Custo",
       "model": "Modelo",
       "errors": "Erros",
+      "noSpansLoaded": "Nenhum span carregado para este trace.",
+      "noLlmTurns": "Nenhum turno de LLM detectado. O trace não contém spans com",
       "system": "Sistema",
+      "historicalMessage": "{count} mensagem anterior desta sessão — tratada em traces anteriores. | {count} mensagens anteriores desta sessão — tratadas em traces anteriores.",
       "user": "Usuário",
       "startedAt": "Iniciado às {time}",
       "unknown": "desconhecido",
       "tokens": "Tokens",
       "tokensSuffix": "tokens",
-      "error": "Erro"
+      "error": "Erro",
+      "viewSpan": "Ver span"
     },
     "traceHeader": {
       "operationName": "Nome da Operação"
@@ -9194,6 +9566,7 @@
       "start": "Início",
       "requestResent": "Requisição reenviada {count} vez | Requisição reenviada {count} vezes",
       "resends": "Reenvios",
+      "spanIdTitle": "ID do Span: {id}",
       "inputTokens": "Tokens de Entrada",
       "in": "Entrada",
       "outputTokens": "Tokens de Saída",
@@ -9211,8 +9584,11 @@
       "modelParameters": "Parâmetros do Modelo",
       "table": "Tabela",
       "field": "Campo",
+      "value": "Valor",
       "timestamp": "Timestamp",
       "enterpriseLicenseRequired": "O recurso de correlação requer licença empresarial",
+      "missingSpanOrStream": "Nome do span ou stream ausente",
+      "spanIdCopied": "ID do Span copiado para a área de transferência",
       "attributesCopied": "Atributos copiados para a área de transferência",
       "copiedToClipboard": "{type} copiado para a área de transferência",
       "failedToCopyClipboard": "Falha ao copiar para a área de transferência",
@@ -9225,20 +9601,26 @@
       "filterAdded": "Filtro adicionado: {field} {operator} '{value}'",
       "timeline": "Linha do tempo",
       "serviceMap": "Mapa de Serviços",
+      "traceNotFound": "Trace {traceId} não encontrado",
+      "spanNotFound": "Span {spanId} não encontrado no trace",
       "unknownOperation": "Operação Desconhecida",
       "unknownService": "Serviço Desconhecido",
+      "traceIdCopied": "ID do Trace copiado para a área de transferência",
       "sessionIdCopied": "ID da Sessão copiado para a área de transferência"
     },
     "traceTree": {
       "clickToExpand": "Clique para expandir",
       "clickToCollapse": "Clique para recolher",
-      "httpStatus": "HTTP {status}"
+      "errorSpan": "Span de erro",
+      "httpStatus": "HTTP {status}",
+      "spanEvent": "{count} evento de span | {count} eventos de span"
     },
     "tracesAnalysisDashboard": {
       "baseline": "Linha de base:",
       "selected": "Selecionado:",
       "dimensions": "Dimensões",
-      "collapseDimensions": "Recolher Dimensões"
+      "collapseDimensions": "Recolher Dimensões",
+      "tracesPerInterval": "traces/intervalo"
     },
     "sessionDetails": {
       "missingSessionInfo": "ID da sessão ou stream ausente na URL",
@@ -9246,21 +9628,36 @@
       "copied": "Copiado"
     },
     "flameGraphView": {
+      "spans": "spans",
       "depth": "profundidade",
+      "noSpansToDisplay": "Nenhum span para exibir",
       "service": "Serviço:",
       "duration": "Duração:",
+      "percentOfTrace": "% do trace:",
       "hasErrors": "⚠ Tem erros"
     },
     "tracesNoEventsState": {
       "lastData": "Últimos dados: {formatted} ({zone})"
     },
     "correlation": {
+      "distributedTrace": "Trace distribuído",
+      "loadingTraceData": "Carregando dados do trace...",
+      "noTraceInfoAvailable": "Nenhuma informação de trace disponível para este evento",
+      "traceIdLabel": "ID do Trace:",
+      "copyTraceId": "Copiar ID do Trace",
+      "spanIdLabel": "ID do Span:",
+      "spanHierarchy": "Hierarquia de Span:",
+      "applicationSpan": "Span de aplicação",
+      "browserSdkSpanPrefix": "Span do SDK do navegador (",
       "closingParen": ")",
+      "backendSpansPrefix": "Spans de backend (",
       "performanceBreakdown": "Detalhamento de desempenho:",
       "totalDuration": "Duração total:",
       "browserLabel": "Navegador:",
       "networkLabel": "Rede:",
-      "backendLabel": "Backend:"
+      "backendLabel": "Backend:",
+      "viewTraceDetails": "Ver detalhes do trace",
+      "backendTraceNotAvailable": "Dados de trace de backend ainda não disponíveis. Os dados do trace podem levar até 30 segundos para serem ingeridos."
     },
     "failedToAnalyzeDimensions": "Falha ao analisar dimensões",
     "failedToFetchCorrelatedLogs": "Falha ao buscar logs correlacionados",
@@ -9288,6 +9685,7 @@
     "serviceDiscoveryNotEnabled": "O Service Discovery não está habilitado. Este é um recurso empresarial.",
     "startTime": "Hora de início",
     "streamNameRequiredForCorrelation": "O nome do stream é obrigatório para correlação",
+    "trace": "Trace",
     "unableToConnectToServer": "Não foi possível conectar ao servidor. Verifique se o aplicativo está em execução.",
     "unknownService": "Serviço desconhecido",
     "unknownPattern": "Padrão desconhecido",
@@ -9298,6 +9696,7 @@
       "requestsLabel": "Requisições:",
       "errorsLabel": "Erros:",
       "errorRateLabel": "Taxa de erro:",
+      "spansLabel": "Spans:",
       "callsLabel": "Chamadas:",
       "averageLabel": "Média:",
       "minimumLabel": "Mínimo:",
@@ -9306,8 +9705,10 @@
       "p75Label": "P75:",
       "p95Label": "P95:",
       "p99Label": "P99:",
+      "averageOfTrace": "{avg}ms ({percent}% do trace)",
       "requestCount": "{count} req"
     },
+    "spanEventTimeline": "Linha do tempo do evento de span",
     "eventClusterTooltip": "{count} eventos",
     "spanEventCount": "{count} evento",
     "spanEventCountPlural": "{count} eventos",
@@ -9318,7 +9719,8 @@
     "eventClusterAriaLabel": "{count} eventos, {errors} erro",
     "eventClusterAriaLabelPlural": "{count} eventos, {errors} erros",
     "eventMarkerTooltip": "Evento: {name}",
-    "exceptionMarkerTooltip": "Exceção: {type}"
+    "exceptionMarkerTooltip": "Exceção: {type}",
+    "spanEventFallback": "evento de span"
   },
   "actions": {
     "realTime": "Tempo real",
@@ -9392,6 +9794,7 @@
     "requiresConfirmation": "Exigir confirmação antes da execução",
     "envVars": "Variáveis de ambiente",
     "envKey": "Nome da variável",
+    "envValue": "Valor",
     "addEnvVar": "Adicionar variável",
     "credentialFiles": "Arquivos de credenciais",
     "credEnvVar": "Nome da variável de ambiente",
@@ -9614,9 +10017,11 @@
     "selectMetrics": "Selecione fluxos métricos",
     "correlatedLogs": "Registros correlacionados",
     "correlatedMetrics": "Métricas correlacionadas",
+    "correlatedTraces": "Traces",
     "loadingCorrelation": "Carregando dados de correlação...",
     "clickToLoadLogs": "Clique para carregar registros correlacionados",
     "clickToLoadMetrics": "Clique para carregar métricas correlacionadas",
+    "clickToLoadTraces": "Clique para carregar traces correlacionados",
     "logs": {
       "filtersLabel": "Filtros",
       "allValues": "Todos os valores",
@@ -9635,11 +10040,19 @@
     "noLogsFound": "Nenhum registro correlacionado foi encontrado",
     "noDataFound": "Nenhum dado encontrado",
     "noLogsDescription": "Nenhum registro encontrado para essa correlação no intervalo de tempo selecionado.",
+    "correlatedTracesFor": "Traces correlacionados para o serviço: {service}",
     "all": "Todos",
+    "loadingTraces": "Carregando rastros...",
+    "tracesError": "Não foi possível carregar os rastros",
+    "tracesErrorDetails": "Ocorreu um erro ao buscar os dados de rastro. Tente novamente.",
     "metricsError": "Não é possível carregar métricas",
     "metricsErrorDetails": "Ocorreu um erro ao buscar dados de métricas. Por favor, tente novamente.",
     "noMetricsDescription": "Nenhuma métrica encontrada para essa correlação no intervalo de tempo selecionado.",
     "dimensionBasedCorrelation": "Correlação baseada em dimensões",
+    "tracesFromService": "Rastros do serviço: {service}",
+    "noTracesFound": "Nenhum rastro encontrado",
+    "noTracesDescription": "Nenhum rastro encontrado para esta correlação no intervalo de tempo selecionado.",
+    "viewInTraces": "Ver em Rastros",
     "filters": "Filtros",
     "semanticFieldGroupsCaption": "Defina mapeamentos de nomes de campos para correlação e desduplicação (por exemplo, host, hostname, node → grupo 'host')",
     "exportToJson": "Exportar para JSON",
@@ -9772,8 +10185,10 @@
     "editCrossLink": "Editar link cruzado",
     "name": "Nome",
     "nameRequired": "O nome é obrigatório",
+    "namePlaceholder": "ex.: Ver detalhes do rastro",
     "urlTemplate": "Modelo de URL",
     "urlRequired": "O URL é obrigatório",
+    "urlPlaceholder": "ex.: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
     "urlInvalid": "Introduza um URL http(s) válido",
     "urlHint": "Use {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campos",
@@ -9866,6 +10281,7 @@
     "colPattern": "Padrão",
     "colPricingSimple": "Preços",
     "testMatchTitle": "Teste o Model Match",
+    "testMatchSubtitle": "Simule como um nome de modelo dos seus spans corresponderia às regras de precificação.",
     "modelNameInput": "Nome do modelo",
     "modelNameHint": "O nome do modelo de suas gerações.",
     "enterModelName": "Insira um nome de modelo para testar a correspondência",
@@ -9961,7 +10377,8 @@
         "errorRate": "Taxa de erro",
         "p50": "Latência P50",
         "p95": "Latência P95",
-        "p99": "Latência P99"
+        "p99": "Latência P99",
+        "cost": "Custo / rastro"
       },
       "insufficientLabel": "indicativo",
       "tooltip": {
@@ -10028,8 +10445,11 @@
       "sessions": "Navegue e inspecione as sessões dos agentes, passo a passo",
       "agentGraph": "Veja com o que seus agentes interagem — ferramentas, modelos, serviços e bancos de dados",
       "agentBehavior": "Identifique agentes presos em loops e os erros que os fazem falhar",
+      "discovery": "Encontre rastros problemáticos que valem a pena revisar",
       "queues": "Listas de tarefas de revisão com estado",
+      "datasets": "Crie conjuntos de dados dourados a partir de rastros anotados e revisões",
       "experiments": "Pré-visualize e crie execuções de avaliação offline imutáveis",
+      "quality": "Acompanhe a qualidade das pontuações nas avaliações de span, rastro e sessão",
       "evalJobs": "Execute e monitore trabalhos de avaliação em suas sessões",
       "scorers": "Crie e gerencie os marcadores que classificam os resultados do LLM",
       "scoreConfigs": "Configure as rubricas de pontuação usadas por suas avaliações"
@@ -10038,6 +10458,8 @@
       "button": "Anotar",
       "title": "Anotar · {scope}",
       "scope": {
+        "span": "Span",
+        "trace": "Rastro",
         "session": "Sessão"
       },
       "viaAnnotation": "Anotação",
@@ -10071,6 +10493,7 @@
       "dataset": {
         "button": "Adicionar ao dataset",
         "title": "Adicionar ao dataset",
+        "hint": "Transforme {ref} em um golden. A entrada é lida do rastro — você escreve a saída esperada.",
         "errors": {
           "dataset": "Selecionar um dataset",
           "expectedOutput": "Escreva a saída esperada"
@@ -10079,6 +10502,7 @@
         "datasetPlaceholder": "Selecionar um dataset...",
         "noDatasets": "Nenhum dataset ainda — crie um na página de Datasets primeiro.",
         "inputLabel": "Entrada",
+        "inputReadOnly": "lido do rastro",
         "expectedLabel": "Saída esperada",
         "expectedPlaceholder": "Escreva a saída que isso deveria ter produzido...",
         "confirm": "Adicionar ao dataset",
@@ -10092,9 +10516,13 @@
       "searchPlaceholder": "Pesquisar serviço, entrada, qualidade...",
       "searchFooter": "{matched} de {loaded} nesta página correspondem",
       "scope": {
+        "span": "Spans",
+        "trace": "Rastros",
         "session": "Sessões"
       },
       "scopeNoun": {
+        "span": "spans",
+        "trace": "rastros",
         "session": "sessões"
       },
       "inQueueFilter": {
@@ -10110,8 +10538,10 @@
         "started": "Iniciado",
         "type": "Tipo",
         "kind": "Categoria",
+        "span": "Span",
         "session": "Sessão",
         "topic": "Tópico",
+        "traces": "Rastros",
         "duration": "Duração",
         "service": "Serviço",
         "input": "Entrada",
@@ -10119,6 +10549,7 @@
         "inQueue": "Na Fila?",
         "actions": "Ações"
       },
+      "spanParent": "Em {trace}",
       "quality": {
         "issue": "Problema",
         "multiple": "Múltiplo",
@@ -10191,6 +10622,7 @@
         "operatorIs": "é",
         "operatorIsNot": "não é",
         "conditionScorePlaceholder": "Configuração de Pontuação",
+        "conditionValuePlaceholder": "Valor",
         "pin": "Fixar Versão",
         "versionLatest": "v{version} (mais recente)",
         "success": "Fila criada",
@@ -10206,8 +10638,10 @@
         "searchPlaceholder": "Pesquisar Itens...",
         "footerTitle": "Itens",
         "allItems": "Todos",
+        "inTrace": "No rastro {traceId}",
         "reviewAgain": "Revisar Novamente",
         "emptyTitle": "Nada para Revisar",
+        "emptyBody": "Adicione rastros, spans ou sessões a esta fila a partir do Discovery ou de uma visualização de rastro.",
         "columns": {
           "refType": "Ref",
           "refId": "Referência",
@@ -10226,6 +10660,8 @@
         "next": "Próximo item",
         "collapseNav": "Recolher lista de itens",
         "expandNav": "Expandir lista de itens",
+        "openTrace": "Abrir rastro completo",
+        "openTraceSoon": "A visualização de rastro completo chega na próxima atualização.",
         "input": "Entrada",
         "output": "Saída",
         "retrievedContext": "Contexto recuperado",
@@ -10256,6 +10692,7 @@
         "distill": {
           "title": "Destilar para Dataset",
           "action": "Dataset",
+          "hint": "Escreva a resposta que este item DEVERIA ter produzido. Ela se torna a saída golden; a entrada é obtida do rastro revisado.",
           "datasetLabel": "Dataset",
           "datasetPlaceholder": "Selecione um Dataset...",
           "noDatasets": "Nenhum dataset ainda — crie um na página de Datasets primeiro.",
@@ -10267,6 +10704,7 @@
           "updated": "Saída de ouro atualizada — este item já estava nesse dataset",
           "openDataset": "Abrir Dataset",
           "needsReview": "Conclua a revisão primeiro — um golden precisa de um julgamento adjudicado",
+          "sessionUnsupported": "Itens de sessão não podem ser destilados — apenas rastros e spans",
           "loadError": "Falha ao carregar datasets",
           "error": "Falha ao adicionar este item ao dataset"
         },
@@ -10292,10 +10730,12 @@
       "trial": "tentativa {index}",
       "summary": "Conjunto de dados v{version} · {trials} tentativa(s) · {scorers} avaliador(es)",
       "previewCounts": "{rows} linhas × {trials} tentativas = {slots} slots",
+      "viewTrace": "Ver rastro de execução",
       "scoresTitle": "Pontuações",
       "taskProgress": "Tarefas: {completed}/{total} concluídas · {skipped} ignoradas",
       "scoringProgress": "Pontuações: {completed}/{total} concluídas · {skipped} ignoradas",
       "skipTiers": "Linhas ignoradas: {full} totalmente · {partial} parcialmente",
+      "scoreEvidence": "{scorer} · v{version}: {samples} amostras, {noReference} sem referência, {noTrace} sem rastro",
       "scorerApplicability": "{scorer} · v{version}: {eligible} slots elegíveis, {noReference} sem referência",
       "loadError": "Falha ao carregar experimentos",
       "previewError": "Falha ao pré-visualizar os slots do experimento",
@@ -10341,6 +10781,7 @@
         "sourcesPlaceholder": "Todas as fontes",
         "sourcesHelp": "Deixe vazio para executar todas as linhas do conjunto de dados.",
         "sources": {
+          "trace": "Rastro",
           "annotation": "Anotação",
           "manual": "Manual"
         },
@@ -10471,6 +10912,7 @@
         "trials": "Tentativas",
         "trial": "Tentativa {index}",
         "retryFailedSlot": "Repetir slot com falha",
+        "viewTrace": "Ver rastro",
         "scores": "Pontuações",
         "dimension": "Dimensão",
         "unknownDimension": "Dimensão desconhecida",
@@ -10557,6 +10999,7 @@
         "actions": "Ações"
       },
       "source": {
+        "trace": "rastro",
         "annotation": "anotação",
         "manual": "manual"
       },
@@ -10612,6 +11055,8 @@
           },
           "versionPill": "v{version} · {count} Versão | v{version} · {count} Versões",
           "sourceSection": "Origem",
+          "sourceTrace": "Rastro",
+          "sourceSpan": "Span",
           "sourceReview": "Revisão de envio",
           "sourceImport": "Importado de",
           "inputSection": "Entrada",
@@ -10652,8 +11097,10 @@
       "version": "Versão"
     },
     "agentGraph": {
+      "stream": "Stream",
       "agent": "Agente",
       "noAgentsTitle": "Nenhum agente encontrado",
+      "noAgentsDescription": "Nenhum agente foi descoberto neste intervalo de tempo. Tente ampliar o intervalo ou verifique se seus rastros incluem atributos de agente gen_ai.",
       "versionAgnosticHint": "A topologia é a mesma entre as versões — o gráfico é delimitado por ambiente, não por versão. Use a comparação de versões para comparar versões."
     },
     "panels": {
@@ -10665,7 +11112,10 @@
         "title": "Tendência do token",
         "subtitle": "tokens por modelo"
       },
-      "spanTrend": {},
+      "spanTrend": {
+        "title": "Tendência de spans",
+        "subtitle": "contagem de spans por tipo"
+      },
       "latencyByModel": {
         "title": "Latência por modelo",
         "subtitle": "p50/p90/p95/p99"
@@ -10679,6 +11129,7 @@
         "subtitle": "contagem de erros"
       },
       "spansByModel": {
+        "title": "Spans por modelo",
         "subtitle": "contagem de chamadas por modelo"
       },
       "tokensByModel": {
@@ -10686,7 +11137,8 @@
         "subtitle": "total de tokens por modelo"
       },
       "recentErrors": {
-        "title": "Erros recentes"
+        "title": "Erros recentes",
+        "subtitle": "últimos 10 spans com falha"
       }
     },
     "behavior": {
@@ -10696,6 +11148,7 @@
         "disabled": "Os sinais de comportamento do agente estão desativados para esta implantação"
       },
       "loopsTitle": "Agentes em loop",
+      "loopsHint": "Agentes executando a mesma ferramenta muitas vezes por rastro",
       "summaryLoops": "Agentes em loop",
       "summaryFailures": "Taxonomia de falhas",
       "summaryAgents": "Agentes afetados",
@@ -10710,7 +11163,9 @@
       "unknownAgent": "(agente desconhecido)",
       "colAgent": "Agente",
       "colTool": "Ferramenta",
+      "colRatio": "Chamadas / rastro",
       "colCalls": "Chamadas",
+      "colTraces": "Rastros",
       "colFailClass": "Classe de falha",
       "colCount": "Contagem",
       "colCost": "Custo ($)",
@@ -10718,18 +11173,32 @@
       "colErrors": "Erros",
       "detail": {
         "title": "Detalhes do sinal",
+        "tracesTitle": "Rastros",
+        "tracesHint": "Clique em um rastro para abri-lo",
+        "worstLoopTraces": "Piores traces (mais repetições primeiro)",
+        "topCostTraces": "Traces mais caros",
+        "noTraces": "Nenhum trace encontrado para este sinal",
         "errorsTitle": "O que os erros dizem",
+        "noErrors": "Nenhuma mensagem de erro capturada — abra um trace para inspecionar",
+        "colTraceId": "Trace",
+        "colSpans": "Spans",
         "colRepeats": "Repetições",
+        "openInNewTab": "Abre o trace em uma nova aba",
         "showFull": "Mostrar erro completo",
         "showLess": "Mostrar menos",
         "colError": "Mensagem de erro",
         "colOccurrences": "Vezes",
+        "loopHeadline": "{agent} chamou {tool} {ratio}× por trace em média ({calls} chamadas em {traces} traces).",
         "failHeadline": "{agent} encontrou {count} erros “{cls}”.",
-        "costHeadline": "{agent}: ${cost} gasto · {tokens} tokens · {errors} erros."
+        "costHeadline": "{agent}: ${cost} gasto · {tokens} tokens · {errors} erros.",
+        "loopExplain": "Uma alta taxa de repetição geralmente significa que o agente não está armazenando resultados em cache ou está tentando novamente. Abra os piores traces abaixo para ver as chamadas repetidas.",
+        "failExplain": "Estas são as mensagens de erro reais por trás desta classe de falha — leia-as para encontrar a correção, ou abra um trace para ver onde aconteceu.",
+        "costExplain": "Estes traces impulsionaram o gasto deste agente. Abra os mais caros para ver o que foi executado."
       }
     },
     "versionCompare": {
       "datePickerDisabled": "As janelas são por versão neste modo",
+      "sampledNote": "Os intervalos de latência e custo são calculados a partir de até {cap} traces amostrados aleatoriamente por versão.",
       "bar": {
         "versionA": "Versão A",
         "versionB": "Versão B",
@@ -10747,7 +11216,9 @@
         "partial": "Estas versões foram parcialmente concorrentes — as diferenças podem ser parcialmente explicadas por quando cada uma foi executada."
       },
       "windowCard": {
-        "clamp": "A linha de base foi executada apenas por {duration} — comparando os primeiros {duration} de cada versão."
+        "label": "{env} · {version} — {window} · {count} traces",
+        "clamp": "A linha de base foi executada apenas por {duration} — comparando os primeiros {duration} de cada versão.",
+        "labelNoEnv": "{version} — {window} · {count} traces"
       }
     }
   },
@@ -10808,18 +11279,25 @@
     },
     "manualEvaluation": {
       "titles": {
+        "span": "Avaliar span",
+        "trace": "Avaliar trace",
         "session": "Avaliar sessão"
       },
       "targetLabels": {
+        "span": "ID do span",
+        "trace": "ID do trace",
         "session": "ID da sessão"
       },
       "scopes": {
+        "span": "span",
+        "trace": "trace",
         "session": "sessão"
       },
       "description": "Escolha um Eval Job para executar contra este alvo. O worker de avaliação carregará a telemetria de origem do intervalo de tempo desta página.",
       "jobLabel": "Eval Job",
       "jobPlaceholder": "Selecione um Eval Job",
       "jobRequired": "Selecione um Eval Job",
+      "noCompatibleJobs": "Nenhum trabalho de avaliação {scope} usa o stream de traces {stream}.",
       "loadJobsError": "Falha ao carregar os Eval Jobs.",
       "run": "Executar avaliação",
       "queued": "{count} tarefa de avaliação enfileirada. | {count} tarefas de avaliação enfileiradas.",
@@ -10845,6 +11323,8 @@
         "filterLabel": "Escopo da pontuação",
         "filterHint": "Compare esta Configuração de Pontuação entre escopos de destino de avaliação.",
         "all": "Todos",
+        "span": "Span",
+        "trace": "Trace",
         "session": "Sessão"
       },
       "kpis": {
@@ -10913,6 +11393,7 @@
       },
       "runs": {
         "title": "Pontuações de avaliação",
+        "hint": "As pontuações e o raciocínio vêm de _llm_scores. Selecione uma execução para abrir o trace do avaliador para investigação adicional.",
         "filterLabel": "Filtrar pontuações de avaliação",
         "footerTitle": "Pontuações de Avaliação",
         "noThresholdHint": "Defina um limite saudável nesta Configuração de Pontuação para classificar e destacar pontuações não saudáveis.",
@@ -11046,6 +11527,7 @@
         "dataTypeLabel": "Tipo de dados",
         "rangeLabel": "Intervalo",
         "categoriesLabel": "Categorias",
+        "valuesLabel": "Valores",
         "thresholdSection": "Limite saudável",
         "thresholdHint": "Considera uma pontuação como saudável",
         "noThreshold": "Não declarado",
@@ -11106,6 +11588,7 @@
       "booleanInfo": "Configurações booleanas aceitam valores {trueLabel} / {falseLabel}. Nenhuma configuração adicional é necessária.",
       "healthyThresholdTitle": "Limite Saudável",
       "optional": "Opcional",
+      "healthyThresholdIntro": "Defina quando as pontuações nesta dimensão são consideradas saudáveis. Pontuações fora deste intervalo acionarão problemas de qualidade nas listas de traces, sessões e outras visualizações.",
       "healthyWhenValueIs": "Saudável quando o valor for:",
       "healthyCategories": "Categorias saudáveis:",
       "healthyCategoriesHint": "Marque todos os valores que contam como saudáveis.",
@@ -11184,6 +11667,8 @@
           "col": {
             "time": "Hora",
             "job": "Trabalho",
+            "spanId": "ID do span",
+            "traceId": "ID do trace",
             "score": "Pontuação",
             "latency": "Latência",
             "status": "Status"
@@ -11321,7 +11806,9 @@
       "remoteHeaders": {
         "subtitle": "Enviado com cada requisição.",
         "colName": "Nome",
+        "colValue": "Valor",
         "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "valor",
         "addButton": "+ Adicionar Cabeçalho"
       },
       "requestBodyLabel": "Modelo de corpo da solicitação",
@@ -11367,11 +11854,13 @@
         "eyebrow": "Trabalho de Avaliação",
         "refresh": "Atualizar",
         "targetSection": "Alvo da Avaliação",
+        "streamLabel": "Stream",
         "streamTypeLabel": "Tipo de Stream",
         "targetScopeLabel": "Avaliar Cada",
         "idleWindowLabel": "Janela de Inatividade",
         "maxAgeLabel": "Idade Máxima",
         "filterLabel": "Filtro",
+        "filterEmpty": "Sem filtro — todo span é avaliado",
         "scorersSection": "Avaliadores",
         "scorersEmpty": "Nenhum avaliador anexado a este trabalho ainda.",
         "scorerUnknown": "(avaliador removido)",
@@ -11381,6 +11870,7 @@
         "viewScorerHint": "Ver",
         "samplingSection": "Amostragem",
         "samplingModeLabel": "Modo",
+        "samplingValueLabel": "Valor",
         "samplingAll": "Avaliar cada correspondência",
         "samplingRate": "Amostra aleatória por taxa",
         "samplingCount": "Primeiras N correspondências",
@@ -11406,6 +11896,8 @@
           "col": {
             "time": "Hora",
             "scorer": "Avaliador",
+            "spanId": "ID do span",
+            "traceId": "ID do trace",
             "score": "Pontuação",
             "latency": "Latência",
             "status": "Status"
@@ -11426,6 +11918,7 @@
       "columns": {
         "name": "Nome",
         "status": "Status",
+        "stream": "Stream",
         "targetScope": "Escopo",
         "scorers": "Avaliadores",
         "created": "Criado",
@@ -11451,18 +11944,30 @@
       "scorersSection": "Marcadores e mapeamento",
       "nameLabel": "Nome",
       "namePlaceholder": "Monitor de fidelidade de produção",
+      "streamLabel": "Stream",
       "streamPlaceholder": "Selecionar Stream",
       "targetScopeLabel": "Avaliar Cada",
       "targetScopes": {
+        "span": "Span",
+        "trace": "Trace",
         "session": "Sessão"
       },
-      "targetScopeHelp": {},
+      "targetScopeHelp": {
+        "span": "Avalie cada span correspondente de forma independente.",
+        "trace": "Avalie um trace inteiro após o fechamento da janela de conclusão.",
+        "session": "Avalie uma sessão entre traces após o fechamento da janela de conclusão."
+      },
       "completionSection": "Critérios de conclusão",
       "completionHelp": {
+        "trace": "O trace é avaliado assim que a primeira destas condições for atendida.",
         "session": "A sessão é avaliada assim que o primeiro destes for atendido."
       },
       "idleWindowLabel": "Janela ociosa (segundos)",
+      "idleWindowHelp": "Avaliado após {duration} sem novos spans.",
+      "idleWindowHelpEmpty": "Avaliado quando não chegam novos spans.",
       "maxAgeLabel": "Idade máxima (segundos)",
+      "maxAgeHelp": "Avaliado {duration} após o primeiro span.",
+      "maxAgeHelpEmpty": "Avaliado em uma idade fixa, mesmo que ainda estejam chegando spans.",
       "descriptionLabel": "Descrição",
       "samplingModeLabel": "Modo de amostragem",
       "samplingValueLabel": "Taxa de amostragem",
@@ -11473,6 +11978,8 @@
       "scorerPicker": {
         "title": "Marcadores",
         "hint": {
+          "span": "Selecione um ou mais pontuadores para executar para cada span correspondente.",
+          "trace": "Selecione um ou mais pontuadores para executar para cada trace elegível.",
           "session": "Selecione um ou mais scorers para executar para cada sessão elegível."
         },
         "meta": "{type} · v{version}",
@@ -11482,21 +11989,37 @@
       },
       "filter": {
         "title": "Condição do filtro",
-        "hint": {}
+        "hint": {
+          "span": "Apenas spans que correspondem a esta condição entram na amostragem e na pontuação.",
+          "trace": "Um trace entra na amostragem e pontuação se algum de seus spans corresponder a esta condição.",
+          "session": "Uma sessão entra na amostragem e pontuação se algum de seus spans corresponder a esta condição."
+        }
       },
       "selector": {
-        "hint": {}
+        "title": "Quais Spans (opcional)",
+        "hint": {
+          "trace": "Deixe vazio para incluir todos os spans no trace."
+        }
       },
       "endSignal": {
         "title": "Sinal de término (opcional)",
-        "hint": {}
+        "hint": {
+          "trace": "Defina uma condição de span que encerre o trace imediatamente quando qualquer span corresponder a ela.",
+          "session": "Defina uma condição de span que encerre a sessão imediatamente quando qualquer span corresponder a ela."
+        }
       },
       "inputMapping": {
         "title": "Variáveis do prompt",
-        "hint": {},
+        "hint": {
+          "span": "Mapeie cada variável para um atributo de span.",
+          "trace": "Mapeie cada variável para um valor fornecido pelo sistema ou um atributo de span.",
+          "session": "Mapeie cada variável para um valor fornecido pelo sistema ou um atributo de span."
+        },
         "placeholder": "Selecione um valor",
+        "searchPlaceholder": "Pesquisar valores do sistema e atributos de span…",
         "groups": {
-          "systemProvided": "Valores fornecidos pelo sistema · Para cada {scope} que este job avalia"
+          "systemProvided": "Valores fornecidos pelo sistema · Para cada {scope} que este job avalia",
+          "spanAttributes": "Atributos de Span"
         },
         "selectScorers": "Selecione marcadores para configurar seus mapeamentos.",
         "noVariables": "Esse marcador não tem variáveis de modelo para mapear.",
@@ -11506,38 +12029,72 @@
           "title": "Valores do sistema de {scope}",
           "description": "O OpenObserve constrói esses valores separadamente para cada {scope} que este job avalia. Use-os como fontes ao mapear as variáveis de prompt do scorer.",
           "badge": "Fornecido pelo sistema",
+          "selectorRequired": "Seletor de Span obrigatório",
           "columns": {
+            "variable": "Valor",
             "source": "Origem",
             "description": "Valor fornecido"
           },
           "variables": {
-            "input": {},
-            "output": {},
-            "statistics": {},
-            "spans": {},
-            "steps": {}
+            "input": {
+              "trace": "Entrada do span raiz do trace."
+            },
+            "output": {
+              "trace": "Saída do span raiz do trace."
+            },
+            "statistics": {
+              "trace": "Métricas do trace: contagem de spans, duração, chamadas de LLM e ferramentas, erros, tokens e custo.",
+              "session": "Métricas da sessão: contagens de traces e turnos, duração e erros."
+            },
+            "spans": {
+              "trace": "Um subconjunto filtrado de spans, escolhido pelo Seletor de Span do job."
+            },
+            "steps": {
+              "trace": "Spans em ordem de tempo; o meio é recolhido quando o trace é muito longo.",
+              "session": "Traces em ordem de tempo, representados como turnos de conversa."
+            }
           }
         }
       },
       "spanSelector": {
+        "select": "Selecionar Seletor de Span",
+        "bindingHelp": "Traces podem ter centenas de spans. Escolha aqueles que este avaliador deve analisar.",
         "createForScorer": "Criar para scorer",
+        "createForScorerTitle": "Criar um Seletor de Span para este avaliador",
+        "editorTitle": "Seletor de Span",
         "name": "Nome do seletor",
         "schemaMode": "Campos a ler",
         "defaultSchema": "Campos padrão de GenAI",
         "customSchema": "Campos Personalizados",
+        "defaultSchemaHelp": "Esses oito campos são lidos de cada span correspondente. Qualquer coisa ausente virá vazia.",
         "fields": "Campos",
         "fieldsHelp": "Apenas estes campos são lidos — nada mais é enviado ao scorer.",
+        "maximumSpans": "Máximo de Spans",
+        "budget": "Limita quantos spans são selecionados do trace.",
         "validation": {
           "name": "Insira um nome de seletor.",
           "duplicateName": "Os nomes dos seletores devem ser únicos neste job.",
           "filter": "Complete ou remova a condição de filtro inacabada.",
-          "fields": "Selecione pelo menos um campo para um esquema personalizado."
+          "fields": "Selecione pelo menos um campo para um esquema personalizado.",
+          "maximumSpans": "O máximo de spans deve ser um número inteiro positivo.",
+          "budget": "Spans demais para os campos selecionados. Reduza a contagem de spans ou leia menos campos.",
+          "binding": "Selecione um Seletor de Span para cada avaliador que use spans de trace."
         }
       },
       "preview": {
         "scopes": {
-          "span": {},
-          "trace": {},
+          "span": {
+            "title": "Spans Correspondentes",
+            "hint": "Depois que você escolher um stream e um filtro, este painel mostrará quantos spans seu job corresponderá.",
+            "matchedSuffix": "spans correspondentes · última 1h",
+            "matchedLoading": "Contando spans correspondentes…"
+          },
+          "trace": {
+            "title": "Traces Correspondentes",
+            "hint": "Depois que você escolher um stream e um filtro, este painel mostrará quantos traces seu job corresponderá.",
+            "matchedSuffix": "traces correspondentes · última 1h",
+            "matchedLoading": "Contando traces correspondentes…"
+          },
           "session": {
             "title": "Sessões Correspondentes",
             "hint": "Depois de escolher um stream e filtro, este painel mostrará quantas sessões seu job corresponderá.",
@@ -11565,7 +12122,9 @@
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
         "idleWindowMinimum": "A janela ociosa deve ter pelo menos 1 segundo",
+        "idleWindowMaximumTrace": "A janela de inatividade do trace não pode exceder 30 minutos",
         "idleWindowMaximumSession": "A janela ociosa de sessão não pode exceder 4 horas",
+        "maxAgeMaximumTrace": "A idade máxima do trace não pode exceder 2 horas",
         "maxAgeMaximumSession": "A idade máxima de sessão não pode exceder 24 horas",
         "samplingValueRequired": "A sampling value is required"
       }
@@ -11628,6 +12187,7 @@
       "curlDesc": "A maneira mais rápida: cole um comando e os registros começarão a fluir",
       "shippers": "Use um remetente de toras",
       "shippersDesc": "{product1}, {product2}, {product3}, {product4}, {product5} e mais",
+      "otelDesc": "Ingestão OTLP independente de fornecedor para registros, traces e métricas",
       "or": "Ou:",
       "aws": "AWS/CloudWatch",
       "askAi": "Peça à IA que configure a ingestão"
@@ -11636,11 +12196,13 @@
       "title": "Escolha um stream para começar a explorar",
       "description": "Escolha um stream e pressione <strong>Executar consulta</strong>. Você pode refinar com filtros, uma função VRL e um intervalo de tempo personalizado quando os resultados chegarem.",
       "selectStream": "Selecione um stream",
+      "selectStreamDesc": "Navegue por streams de registros, traces, métricas e Monitoramento de usuários reais",
       "queryGuide": "Leia o guia de consulta",
       "queryGuideDesc": "Filtros, modo SQL, VRL e visualizações salvas",
       "recent": "Recente:"
     },
     "noEvents": {
+      "title": "Nenhum evento encontrado",
       "descNoFilters": "Nenhum evento foi encontrado em {range}. Tente ampliar o intervalo de tempo para carregar os resultados.",
       "descWithFilters": "Nada correspondeu a <strong>essa consulta</strong> na janela selecionada. Experimente ampliar o intervalo de tempo, facilitar um filtro ou redefinir a consulta.",
       "descOutOfRange": "Sua janela de tempo não contém nenhum dado deste stream. Vá para quando os dados foram vistos pela última vez.",
@@ -11731,11 +12293,13 @@
       "scannedEventsForQuery": "Eventos escaneados para esta consulta",
       "timeTaken": "Tempo Gasto",
       "noData": "Sem dados",
+      "traceId": "ID do Trace",
       "viewQuery": "Ver Consulta",
       "sqlQuery": "Consulta SQL",
       "copied": "Copiado!",
       "sql": "SQL",
       "noSqlAvailable": "Nenhuma consulta SQL disponível",
+      "fullTraceId": "ID completo do Trace",
       "columnDuration": "Duração",
       "columnNodeName": "Nome do Nó",
       "columnRole": "Função",
@@ -11748,6 +12312,7 @@
       "goodResponse": "Boa resposta",
       "moderateResponse": "Resposta moderada",
       "slowResponse": "Resposta lenta",
+      "failedToCopyTraceId": "Falha ao copiar o ID do trace para a área de transferência",
       "failedToCopySql": "Falha ao copiar SQL para a área de transferência"
     },
     "searchResult": {
@@ -11766,7 +12331,8 @@
       "unableToRetrieveCorrelation": "Não foi possível recuperar dados de correlação",
       "noMetricStreams": "Nenhum stream de métrica encontrado para o serviço \"{service}\"",
       "correlationError": "Erro de correlação: {error}",
-      "contentCopied": "Conteúdo copiado com sucesso!"
+      "contentCopied": "Conteúdo copiado com sucesso!",
+      "noTraceIdForInspection": "Nenhum ID de trace disponível para inspeção"
     },
     "searchBar": {
       "customRangeAlt": "Intervalo Personalizado",
@@ -11930,6 +12496,7 @@
     "expandRangeDesc": "Os dados acessíveis podem estar em uma janela de tempo diferente",
     "copyError": "Copiar detalhes do erro",
     "copied": "Copiado!",
+    "traceId": "ID do Trace:",
     "askAi": "Peça à IA que corrija minha consulta",
     "showDetail": "Mostrar detalhes",
     "hideDetail": "Ocultar detalhes"
@@ -11994,6 +12561,7 @@
       "addVariable": "Adicionar variável",
       "cookieDomainPlaceholder": "Domínio",
       "cookieNamePlaceholder": "Nome",
+      "cookieValuePlaceholder": "Valor",
       "customHeaders": "Cabeçalhos personalizados",
       "headerKeyPlaceholder": "Chave do cabeçalho",
       "headerValuePlaceholder": "Valor do cabeçalho",
@@ -12009,6 +12577,7 @@
       "variableNamePlaceholder": "Nome",
       "variableSecureTooltipHide": "Mascarar este valor como dado sensível.",
       "variableSecureTooltipShow": "Valor está mascarado. Clique para mostrar.",
+      "variableValuePlaceholder": "Valor",
       "variables": "Variáveis"
     },
     "variablesPanel": {
@@ -12358,6 +12927,7 @@
       "stopping": "Parando…",
       "timeoutBelowDefaultWarning": "Abaixo do padrão de {default} ms para esta etapa. Um tempo limite mais curto que o tempo real de resposta da aplicação é a causa mais comum de falhas falsas.",
       "timeoutLabel": "Tempo limite (ms)",
+      "valueFallback": "Valor",
       "showSetupSteps": "Mostrar etapas de configuração",
       "waitingForActions": "Aguardando ações no navegador…"
     },
@@ -12503,6 +13073,7 @@
       "http": {
         "addAssertion": "Adicionar asserção",
         "addHeader": "Adicionar cabeçalho",
+        "assertionValue": "Valor",
         "assertions": "Asserções",
         "body": "Corpo da requisição",
         "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
@@ -12513,6 +13084,7 @@
         },
         "followRedirects": "Seguir redirecionamentos",
         "headerName": "Nome",
+        "headerValue": "Valor",
         "headers": "Cabeçalhos",
         "method": "Método",
         "operators": {
@@ -12696,6 +13268,7 @@
       "maxDuration": "Duração máxima",
       "noExecutionData": "Nenhum dado de execução encontrado",
       "noExecutionDataDesc": "Dados de stream para execução {runId} não foram encontrados na janela de +/-5 min ao redor do horário agendado.",
+      "openTrace": "Abrir Rastreamento do Playwright",
       "runId": "ID da execução",
       "screenshotAlt": "Captura de tela da etapa",
       "screenshotPlaceholder": "Placeholder de captura de tela",
@@ -12781,6 +13354,7 @@
       "errorPatternsWindowDesc": "Normalizado em {window} · clique em uma linha para filtrar execuções"
     },
     "scheduleAlert": {
+      "addNewDestination": "Adicionar Novo Destino",
       "alertedIfFails": "Alertado se o teste falhar",
       "alertedIfFailsSuffix": "vezes.",
       "alerts": "Alertas",
@@ -12796,6 +13370,8 @@
         "weeks": "Semanas"
       },
       "customIntervalValue": "Repetir a cada",
+      "destinationRequired": "Pelo menos um destino é obrigatório",
+      "destinations": "Destinos",
       "frequency": "Frequência",
       "frequencyOptions": {
         "15min": "15 minutos",
@@ -12807,6 +13383,8 @@
         "custom": "Personalizado"
       },
       "minutes": "ata",
+      "noDestinations": "Nenhum destino disponível",
+      "refreshDestinations": "Atualizar destinos",
       "retries": "Tentativas novamente",
       "retriesOnFailure": "Tenta novamente em caso de falha",
       "retriesOnFailureSuffix": "vezes.",
@@ -13064,9 +13642,12 @@
       "logs": "Registros",
       "dashboards": "Painéis",
       "metrics": "Métricas",
+      "traces": "Rastreamentos",
       "alerts": "Alertas",
+      "streams": "Fluxos",
       "pipelines": "Oleodutos",
       "functions": "Funções",
+      "reports": "Relatórios",
       "iam": "IAM",
       "settings": "Configurações",
       "onlineEvals": "Evalações online",
@@ -13081,20 +13662,26 @@
       "dashboards": "Visualização do painel",
       "dashboardsPanel": "Painel — Painel (passe o mouse sobre um painel)",
       "metrics": "Métricas",
+      "traces": "Rastreamentos",
       "alerts": "Alertas",
+      "streams": "Fluxos",
       "pipelines": "Oleodutos",
       "functions": "Funções",
+      "reports": "Relatórios",
       "iamUsers": "IAM — Usuários",
       "iamRoles": "IAM — Funções",
       "iamGroups": "IAM — Grupos",
       "iamServiceAccounts": "IAM — Contas de serviço",
+      "alertDestinations": "Alertas — Destinos",
       "alertSources": "Alertas — Fontes Externas",
       "alertTemplates": "Alertas — Modelos",
       "panelEditor": "Editor de painéis",
+      "traceDetail": "Detalhes do Rastreamento",
       "runningQueries": "Executando consultas",
       "ingestionTokens": "IAM — Tokens de ingestão",
       "syntheticsTokens": "IAM — Tokens de Sintéticos",
       "alertIncidents": "Alertas — Incidentes",
+      "pipelineDestinations": "Oleodutos — Destinos",
       "enrichmentTables": "Tabelas de enriquecimento",
       "iamInvitations": "IAM — Convites",
       "iamOrganizations": "IAM — Organizações",
@@ -13170,6 +13757,7 @@
       "iamGroupsRefresh": "Atualizar lista",
       "iamServiceAccountsAdd": "Adicionar nova conta de serviço",
       "iamServiceAccountsRefresh": "Atualizar lista",
+      "alertDestinationsAdd": "Adicionar novo destino",
       "alertDestinationsRefresh": "Atualizar lista",
       "alertSourcesAdd": "Adicionar nova fonte de alerta",
       "alertSourcesRefresh": "Atualizar lista",
@@ -13180,6 +13768,8 @@
       "panelEditorRun": "Executar/aplicar consulta",
       "panelEditorSave": "Salvar painel",
       "panelEditorBack": "Descarte e volte",
+      "traceNextSpan": "Próximo span",
+      "tracePrevSpan": "Span anterior",
       "runningQueriesRefresh": "Atualizar lista de consultas",
       "ingestionTokensAdd": "Criar novo token",
       "ingestionTokensRefresh": "Atualizar lista de tokens",
@@ -13190,6 +13780,7 @@
       "aiChatExpand": "Expandir/recolher chat de IA",
       "logsSaveView": "Salvar como visualização salva",
       "logsExport": "Exportar resultados como CSV",
+      "tracesCopyUrl": "Copiar URL de compartilhamento do rastreamento",
       "alertIncidentsRefresh": "Atualizar lista",
       "pipelineDestinationsRefresh": "Atualizar lista",
       "enrichmentTablesRefresh": "Atualizar lista",
@@ -13456,6 +14047,7 @@
       "alertState": {
         "ok": "Ok",
         "normal": "Normal",
+        "firing": "Disparado",
         "notifyfailed": "Falha na Notificação",
         "flapping": "Oscilando",
         "anomaly": "Anomalia",
@@ -13486,6 +14078,7 @@
         "error": "Erro"
       },
       "crossLinkSource": {
+        "stream": "Fluxo",
         "global": "Global"
       },
       "themeApplied": {
@@ -13540,6 +14133,7 @@
       },
       "eventStatus": {
         "failed": "Falha",
+        "firing": "Disparado",
         "anomaly": "Anomalia"
       },
       "featureStatus": {
@@ -13554,6 +14148,7 @@
         "array": "Array"
       },
       "incidentStatus": {
+        "firing": "Disparado",
         "closed": "Fechado"
       },
       "invoiceStatus": {
@@ -13565,12 +14160,14 @@
         "pending": "Pendente"
       },
       "logLevel": {
+        "trace": "Trace",
         "debug": "Debug",
         "info": "Info",
         "warn": "Aviso",
         "fatal": "Fatal"
       },
       "pipelineRunOutcome": {
+        "firing": "Disparado",
         "normal": "Normal",
         "succeeded": "Sucesso",
         "skipped": "Ignorado",
@@ -13712,11 +14309,21 @@
       "pleaseSelectStreamType": "Selecione o tipo de stream ",
       "anomalyDetectionClonedSuccessfully": "Detecção de anomalias clonada com sucesso",
       "errorWhileFetchingTemplates": "Erro ao buscar modelos.",
+      "errorWhileFetchingDestinations": "Erro ao buscar destinos.",
       "failedToLoadAlertForEditing": "Falha ao carregar alerta para edição",
       "pleaseWaitWhileLoadingAlert": "Aguarde enquanto o alerta é carregado...",
       "errorWhilePullingAlerts": "Erro ao buscar alertas.",
       "pleaseWaitWhileLoadingAlerts": "Aguarde enquanto os alertas são carregados...",
+      "destinationsDeletedSuccessfully": "{count} destino excluído com sucesso | {count} destinos excluídos com sucesso",
+      "failedToDeleteDestinations": "Falha ao excluir {count} destino | Falha ao excluir {count} destinos",
+      "destinationsDeletedWithFailures": "{count} destino excluído com sucesso, {failed} falhou | {count} destinos excluídos com sucesso, {failed} falharam",
+      "noDestinationsSelectedForDeletion": "Nenhum destino selecionado para exclusão",
+      "deletingDestinations": "Excluindo destinos...",
+      "destinationDeletedSuccessfully": "Destino {name} excluído com sucesso",
+      "errorWhilePullingDestinations": "Erro ao carregar destinos.",
+      "pleaseWaitWhileLoadingDestinations": "Aguarde enquanto carrega os destinos...",
       "errorWhileLoadingActions": "Erro ao carregar ações.",
+      "pleaseWaitWhileLoadingAlertDestination": "Aguarde enquanto carrega o destino do alerta...",
       "errorImportingAlertPleaseCheck": "Erro ao importar alerta. Verifique o JSON.",
       "alertsImportedSuccessfully": "Importado com sucesso {count} alerta | Importados com sucesso {count} alertas",
       "invalidJson": "JSON inválido: {error}",
@@ -13735,6 +14342,8 @@
       "incidentsRefreshed": "Incidentes atualizados",
       "failedToPostComment": "Falha ao postar comentário",
       "commentPostedSuccessfully": "Comentário postado com sucesso",
+      "destinationUpdatedSuccessfully": "Destino \"{name}\" atualizado com sucesso.",
+      "destinationCreatedSuccessfully": "Destino \"{name}\" criado com sucesso.",
       "failedToDeleteTemplates": "Falha ao excluir {count} modelo | Falha ao excluir {count} modelos",
       "templatesDeletedWithFailures": "Excluído {count} modelo, mas {failed} falhou | Excluídos {count} modelos, mas {failed} falharam",
       "successfullyDeletedTemplates": "Excluído com sucesso {count} modelo | Excluídos com sucesso {count} modelos",
@@ -13784,13 +14393,16 @@
       "resources": {
         "dashboards": "Painéis",
         "alerts": "Alertas",
+        "streams": "Fluxos",
         "functions": "Funções",
         "savedviews": "Visualizações salvas",
         "users": "Usuários",
         "roles": "Papéis",
         "organizations": "Organizações",
         "pipelines": "Pipelines",
+        "destinations": "Destinos",
         "templates": "Modelos",
+        "reports": "Relatórios",
         "llmModelPricing": "Preços de Modelos LLM"
       },
       "noPermissionToChangeFavorites": "Você não tem permissão para alterar favoritos",
@@ -13952,6 +14564,8 @@
       "errorWhileUpdating": "Erro ao atualizar o relatório."
     },
     "correlation": {
+      "refreshingTraceData": "Atualizando dados do rastreamento...",
+      "traceDetailViewComingSoon": "Exibição de detalhes do rastreamento em breve",
       "columnIsAlreadyVisible": "A coluna \"{name}\" já está visível",
       "columnAddedToTable": "Coluna \"{name}\" adicionada à tabela"
     },
@@ -13991,6 +14605,7 @@
       "isNotASupportedFileType": "\"{fileName}\" não é um tipo de arquivo suportado. Somente arquivos {allowed} são permitidos."
     },
     "workflows": {
+      "thisBranchAlreadyEndsInA": "Este ramo já termina em um Destino.",
       "chooseATriggerNodeToStart": "Escolha um nó de gatilho para iniciar seu fluxo de trabalho",
       "thisConnectionWouldCreateALoop": "Esta conexão criaria um loop",
       "onlyOneIncomingConnectionToA": "Apenas uma conexão de entrada por etapa é permitida"
@@ -13998,6 +14613,8 @@
     "views": {
       "youAreNotAuthorizedToManage": "Você não está autorizado a gerenciar a licença.",
       "copiedToClipboard": "Copiado para a área de transferência",
+      "noDestinationsFoundPleaseCreateA": "Nenhum destino encontrado. Crie um destino primeiro.",
+      "errorWhilePullingDestinations": "Erro ao carregar destinos.",
       "rumTokenUpdatedSuccessfully": "Token RUM atualizado com sucesso.",
       "rumTokenGeneratedSuccessfully": "Token RUM gerado com sucesso.",
       "tokenResetSuccessfully": "Token redefinido com sucesso.",
@@ -14014,6 +14631,7 @@
       "pleaseWaitWhileLoadingStreams": "Aguarde enquanto os streams são carregados...",
       "errorWhilePullingSummary": "Erro ao buscar o resumo.",
       "pleaseWaitWhileLoadingSummary": "Aguarde enquanto o resumo é carregado...",
+      "noDestinationsCreateOneBeforeSaving": "Nenhum destino encontrado. Crie um antes de salvar este alerta.",
       "errorWhileLoadingAlert": "Erro ao carregar o alerta."
     },
     "RUM": {
@@ -14142,6 +14760,7 @@
       "tags": "Tags",
       "tagsPlaceholder": "Adicionar tag e pressionar Enter",
       "streamType": "Tipo de stream",
+      "stream": "Fluxo",
       "queryLanguage": "Linguagem de consulta",
       "scope": "Escopo",
       "scopeHint": "Filtro opcional aplicado ao denominador. Deixe vazio para todas as linhas.",
@@ -14211,6 +14830,7 @@
         "noHistory": "Nenhum histórico de avaliação para este alerta ainda. A medição começa assim que ele for executado.",
         "loadFailed": "Não foi possível carregar o histórico de avaliação",
         "legendGood": "OK",
+        "legendBad": "Disparado",
         "legendUnmeasured": "Não medido"
       }
     },
@@ -14388,6 +15008,7 @@
     "loginCallback": "Callback de login",
     "emptyStateDemo": "Demonstração de estado vazio",
     "searchScheduler": "Agendador de pesquisa",
+    "traceDetails": "Detalhes do Trace",
     "sessionDetails": "Detalhes da sessão",
     "streamExplorer": "Explorador de streams",
     "viewDashboard": "Visualizar painel",
@@ -14739,17 +15360,20 @@
         "failed": "Falhas"
       },
       "columnHints": {
+        "calls": "Quantas vezes esta consulta foi executada. A contagem do próprio banco de dados, quando ele a reporta — isso cobre todos os clientes, não apenas as partes do seu sistema que enviam traces. Linhas marcadas como observadas pelo cliente são contadas a partir de traces, porque o banco de dados não as reportou.",
         "p50": "Metade de todas as chamadas terminou mais rápido que isto. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
         "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
         "p99": "Os piores 1% das chamadas levaram pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
         "max": "A chamada individual mais lenta nesta janela — uma chamada real, não uma média.",
         "errors": "Quantas dessas chamadas voltaram com erro.",
-        "perTrace": "Quantas vezes isso é executado dentro de uma única solicitação. Um número alto geralmente significa um loop."
+        "perTrace": "Quantas vezes isso é executado dentro de uma única solicitação. Um número alto geralmente significa um loop.",
+        "load": "Tempo total que esta consulta passou no banco de dados. O próprio valor do banco de dados quando ele reporta um: tempo de execução no Postgres, mas tempo de espera no MySQL e MariaDB — cada linha indica qual. Linhas marcadas como observadas pelo cliente são medidas a partir de traces, então incluem a ida e volta da rede."
       },
       "errorsNone": "nenhum",
       "errorsAll": "todos",
       "actions": {
         "open": "Abrir detalhes",
+        "traces": "Ver traces de exemplo",
         "copy": "Copiar consulta",
         "copied": "Consulta copiada",
         "copyFailed": "Não foi possível copiar a consulta.",
@@ -14780,7 +15404,8 @@
       },
       "n-plus-one": {
         "title": "Executa pelo menos {multiplier}× por requisição",
-        "body": "{share} do tempo do banco · {service}"
+        "body": "{share} do tempo do banco · {service}",
+        "rule": "Exibido porque esta consulta é executada pelo menos {ratio} vezes dentro de uma única requisição, em pelo menos {traces} requisições. É um limite inferior, então o número real pode ser maior. Trabalho legítimo em lote pode parecer o mesmo."
       },
       "volume-shift": {
         "title": "Mais ocupada, não mais lenta",
@@ -14854,6 +15479,7 @@
       "subtitleCounts": "{pass} passou, {fail} não. | {pass} passaram, {fail} não.",
       "checklistTitle": "O que verificamos",
       "showMeHow": "Mostre-me como instrumentar",
+      "checkTrace": "Verificar um dos meus traces",
       "checks": {
         "enabled": {
           "ok": "O monitoramento de banco de dados está ativado",
@@ -14862,15 +15488,21 @@
           "noDetail": "Um administrador pode ativá-lo para esta organização e reiniciar o coletor."
         },
         "traces": {
-          "okDetail": "{count} registrados neste intervalo de tempo"
+          "ok": "Seus traces estão chegando",
+          "okDetail": "{count} registrados neste intervalo de tempo",
+          "no": "Nenhum trace chegou",
+          "noDetail": "O monitoramento de banco de dados é construído a partir de traces, e esta organização ainda não enviou nenhum."
         },
         "permission": {
           "ok": "Você tem acesso a estes dados",
           "okDetail": "você é administrador do {org}",
-          "no": "Você não tem acesso a estes dados"
+          "no": "Você não tem acesso a estes dados",
+          "noDetail": "O monitoramento de banco de dados lê seus traces, e a sua função não os inclui. Peça a um administrador acesso de leitura."
         },
         "dbSpans": {
+          "ok": "Seus traces mencionam um banco de dados",
           "okDetail": "chamadas de banco de dados estão sendo registradas",
+          "no": "Nenhum dos seus traces menciona um banco de dados",
           "noDetail": "Seus aplicativos estão sendo rastreados, mas a parte que fala com o banco de dados não está. Adicione a instrumentação de banco de dados para sua linguagem e as consultas aparecerão aqui."
         },
         "counted": {
@@ -14901,6 +15533,7 @@
         "plans": "Planos de consulta",
         "plansHint": "As etapas que seu banco de dados seguiu para executar esta consulta. Comece aqui para descobrir por que ela está lenta.",
         "callers": "Chamadores e exemplos",
+        "callersHint": "Quais partes do seu aplicativo executaram esta consulta, e execuções lentas individuais que você pode abrir como um trace.",
         "callersLocked": "Execuções individuais vêm do rastreamento. Nada rastreou esta consulta neste intervalo de tempo."
       },
       "notFound": {
@@ -14926,6 +15559,10 @@
       "noSamples": "Nenhuma execução individual carregada para este intervalo.",
       "noSeries": "Nenhum histórico para esta consulta no intervalo selecionado.",
       "liveSeries": "Os pontos mais recentes ainda estão sendo contados e podem mudar.",
+      "noStream": "Não conseguimos descobrir qual stream de trace contém esta consulta, então seus chamadores e exemplos não podem ser carregados.",
+      "ambiguousStream": "Esta organização tem mais de um stream de trace, e não conseguimos identificar em qual deles esta consulta é executada. Escolha um stream para carregar seus chamadores e traces de exemplo.",
+      "pickStream": "Escolha um stream de trace",
+      "invalidStream": "Esse nome de stream de trace não é reconhecido, então não executamos a busca.",
       "firstSeen": "PRIMEIRA APARIÇÃO NESTA LISTA EM {time}",
       "firstSeenHint": "O ponto mais antigo neste intervalo em que esta consulta foi pesada o suficiente para ser rastreada por conta própria.",
       "lastSeen": "ÚLTIMA APARIÇÃO EM {time}",
@@ -14956,6 +15593,7 @@
       "sampleOk": "OK",
       "sampleError": "Falhou",
       "viewTrace": "Ver a solicitação →",
+      "viewTraces": "Ver traces de exemplo",
       "copySummary": "Copiar",
       "copySummaryHint": "Cada número aqui já está nesta página — isto apenas escreve a frase, então o minuto 13 de um incidente produz uma mensagem em vez de nada.",
       "summaryCopied": "Resumo copiado",
@@ -15047,7 +15685,8 @@
         "unjoinable": "Não exibido — esta declaração é executada em mais de um tipo de banco de dados aqui, e associar chamadores sem saber qual deles nomearia os serviços errados.",
         "tracedCalls": "{calls} chamadas rastreadas",
         "coverage": "{count} serviços vistos em {traced} das {executions} execuções acima. O restante veio de chamadores que você ainda não está rastreando.",
-        "coverageUnknown": "{count} serviços vistos em {traced} chamadas rastreadas. Seu banco de dados não relatou um total para esta declaração, então não há participação a fornecer."
+        "coverageUnknown": "{count} serviços vistos em {traced} chamadas rastreadas. Seu banco de dados não relatou um total para esta declaração, então não há participação a fornecer.",
+        "noneNamed": "{traced} chamadas foram rastreadas, mas nenhuma delas pôde ser vinculada a um serviço — suas traces começam fora deste intervalo de tempo."
       },
       "callersEmpty": {
         "title": "Nenhuma chamada rastreada para esta consulta ainda",
@@ -15113,7 +15752,9 @@
       "failedWithCode": "Falhou · {code}",
       "viewTrace": "Abrir a solicitação da qual esta chamada fez parte",
       "scatterOk": "Concluída",
+      "partial": "Parte dos seus dados de trace não pôde ser lida, então chamadas podem estar faltando nesta lista.",
       "disclosureShort": "Cada linha é uma chamada concluída real",
+      "disclosureDetail": "Medido pela aplicação que fez a chamada, a partir dos traces que você envia. Somente chamadas que terminaram estão aqui — uma consulta ainda em execução, ou uma que travou e nunca retornou, não produziu medição.",
       "counts": {
         "complete": "Mostrando todas as {count} chamadas ao banco de dados nesta janela, das mais lentas primeiro.",
         "truncated": "As {count} chamadas mais lentas nesta janela — mais foram executadas do que são mostradas aqui.",
@@ -15318,6 +15959,8 @@
         "blocking": "Bloqueando"
       },
       "coverage": {
+        "summary": "A espera mais longa é {longest}. Cada espera remonta a {roots} mantendo um bloqueio aberto.",
+        "summaryCapped": "Mais sessões estavam esperando do que conseguimos ler de uma vez. Das que temos, a espera mais longa é {longest} e elas remontam a {roots} mantendo um bloqueio aberto.",
         "summaryOneRoot": "uma sessão",
         "summaryManyRoots": "{count} sessões",
         "checked": "Verificado a cada {interval} segundos; última verificação {time}.",

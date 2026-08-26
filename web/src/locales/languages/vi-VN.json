@@ -43,6 +43,7 @@
     "allCaughtUp": "Bạn đã xem hết",
     "noPanels": {
       "title": "Chưa có panel nào ở đây",
+      "description": "Thêm bảng để bắt đầu trực quan hóa nhật ký, chỉ số và trace.",
       "action": "Thêm panel",
       "actionDesc": "Biểu đồ, bảng và hơn thế nữa"
     },
@@ -77,6 +78,7 @@
     },
     "noDashboards": {
       "title": "Tạo bảng điều khiển đầu tiên của bạn",
+      "description": "Bảng điều khiển tập hợp chỉ số, nhật ký và trace của bạn vào một chế độ xem. Hãy tạo một bảng để bắt đầu.",
       "action": "Bảng điều khiển mới",
       "actionDesc": "Bắt đầu từ một khung trống",
       "import": "Nhập bảng điều khiển",
@@ -122,6 +124,7 @@
     },
     "noIngestionTokens": {
       "title": "Chưa có mã thông báo nhập nào",
+      "description": "Token tiếp nhận xác thực nguồn dữ liệu khi gửi nhật ký, chỉ số và trace.",
       "action": "Mã thông báo mới",
       "actionDesc": "Tạo mã thông báo nhập"
     },
@@ -130,7 +133,11 @@
       "description": "Tổ chức nhóm người dùng và dữ liệu của bạn lại với nhau. Hãy tạo một tổ chức để bắt đầu."
     },
     "noAlertDestinations": {
+      "title": "Chưa có đích nào",
+      "description": "Đích xác định nơi các thông báo cảnh báo được gửi đến — Slack, email, webhook, v.v.",
+      "action": "Đích mới",
       "actionDesc": "Kết nối kênh thông báo",
+      "import": "Nhập đích",
       "importDesc": "Nhập từ tệp JSON"
     },
     "noAlertSources": {
@@ -140,7 +147,10 @@
       "actionDesc": "Tạo URL webhook và token"
     },
     "noPipelineDestinations": {
-      "description": "Các đích bên ngoài cho đầu ra của đường ống — điểm cuối HTTP và đích ghi từ xa."
+      "title": "Chưa có đích nào",
+      "description": "Các đích bên ngoài cho đầu ra của đường ống — điểm cuối HTTP và đích ghi từ xa.",
+      "action": "Đích mới",
+      "actionDesc": "Kết nối một đích pipeline"
     },
     "noAlertTemplates": {
       "title": "Chưa có mẫu nào",
@@ -181,7 +191,8 @@
       "actionDesc": "Cấu hình nhà cung cấp LLM"
     },
     "noDiscoveredServices": {
-      "title": "Không tìm thấy dịch vụ nào"
+      "title": "Không tìm thấy dịch vụ nào",
+      "description": "Các dịch vụ sẽ tự động xuất hiện tại đây khi trace bắt đầu đến."
     },
     "noNodes": {
       "title": "Không có nút nào khả dụng",
@@ -237,6 +248,7 @@
     },
     "noDatasets": {
       "title": "Tạo tập dữ liệu đầu tiên của bạn",
+      "description": "Golden dataset thu thập các trace được chú thích và đánh giá thành các bộ đánh giá có phiên bản. Tạo một bộ để bắt đầu quản lý.",
       "action": "Tập dữ liệu mới",
       "actionDesc": "Bắt đầu một tập dữ liệu trống"
     },
@@ -276,11 +288,15 @@
     },
     "noLLMInsights": {
       "title": "Chưa có hoạt động LLM nào",
-      "action": "Trang bị với OpenTelemetry"
+      "description": "Hãy cài đặt đo lường cho dịch vụ của bạn bằng các quy ước ngữ nghĩa Gen-AI của OpenTelemetry và tiếp nhận ít nhất một trace để điền dữ liệu vào bảng điều khiển này.",
+      "action": "Trang bị với OpenTelemetry",
+      "actionDesc": "Thu thập các thuộc tính gen_ai_* trên trace của bạn."
     },
     "noLLMSessions": {
       "title": "Chưa có phiên LLM nào",
-      "action": "Trang bị với OpenTelemetry"
+      "description": "Các phiên được nhóm theo gen_ai_conversation_id. Hãy cài đặt đo lường cho dịch vụ của bạn để mỗi cuộc trò chuyện gắn thẻ cho trace của nó, và các phiên sẽ xuất hiện tại đây.",
+      "action": "Trang bị với OpenTelemetry",
+      "actionDesc": "Gắn thẻ span bằng gen_ai_conversation_id"
     },
     "noScorers": {
       "title": "Chưa có bộ chấm điểm nào",
@@ -324,9 +340,13 @@
       "title": "Không có gì bất ổn ở đây",
       "description": "Không có mục bất ổn nào trong khoảng thời gian này. Mở rộng phạm vi thời gian hoặc chuyển bộ lọc hàng đợi để xem các mục bạn đã phân loại."
     },
-    "noTraces": {},
+    "noTraces": {
+      "title": "Không tìm thấy trace nào.",
+      "description": "Không có trace nào khớp với dịch vụ và khoảng thời gian đã chọn. Hãy thử khoảng thời gian rộng hơn hoặc dịch vụ khác."
+    },
     "noServiceGraph": {
-      "title": "Không có dữ liệu đồ thị dịch vụ"
+      "title": "Không có dữ liệu đồ thị dịch vụ",
+      "description": "Hãy thử truy vấn khoảng thời gian dài hơn, hoặc đảm bảo các dịch vụ của bạn đang phát ra chỉ số span."
     },
     "noServicesCatalog": {
       "title": "Không tìm thấy dịch vụ nào",
@@ -386,13 +406,16 @@
       "pipelines": "đường ống",
       "workflows": "quy trình làm việc",
       "functions": "hàm",
+      "streams": "stream",
       "alerts": "cảnh báo",
       "incidents": "sự cố",
+      "traces": "trace",
       "discoveryItems": "mục bất ổn",
       "datasetItems": "mục",
       "searches": "tìm kiếm",
       "searchJobs": "công việc tìm kiếm",
       "users": "người dùng",
+      "reports": "báo cáo",
       "queries": "truy vấn",
       "serviceAccounts": "tài khoản dịch vụ",
       "invitations": "lời mời",
@@ -403,7 +426,9 @@
       "roleLimits": "giới hạn vai trò",
       "ingestionTokens": "token tiếp nhận",
       "organizations": "tổ chức",
+      "alertDestinations": "đích",
       "alertSources": "nguồn cảnh báo",
+      "pipelineDestinations": "đích",
       "alertTemplates": "mẫu",
       "evalTemplates": "mẫu đánh giá",
       "enrichmentTables": "bảng làm giàu",
@@ -455,6 +480,7 @@
       "noSearchResults": "Không có kết quả tìm kiếm",
       "noServiceAccounts": "Không có tài khoản dịch vụ",
       "noStreams": "Không có dữ liệu được đưa vào",
+      "noTraces": "Không có trace",
       "noUsers": "Không có người dùng"
     },
     "noExperiments": {
@@ -497,6 +523,8 @@
     "relatedEvents": "Sự kiện liên quan",
     "on": "trên",
     "event": "sự kiện",
+    "viewTraceDetails": "Xem chi tiết trace",
+    "viewTrace": "Xem trace",
     "networkRequests": "Yêu cầu mạng",
     "noNetworkRequestsFound": "Không tìm thấy yêu cầu mạng nào cho sự kiện này",
     "consoleLogsComingSoon": "Nhật ký console sắp ra mắt",
@@ -547,6 +575,7 @@
     "list": "Danh sách",
     "condition": "Điều kiện",
     "operator": "Toán tử",
+    "value": "Giá trị",
     "filters": "Bộ lọc",
     "selectFilter": "Chọn bộ lọc",
     "confirm": "Xác nhận",
@@ -715,6 +744,7 @@
     "nameIsRequired": "Tên là bắt buộc",
     "streamTypeIsRequired": "Loại luồng là bắt buộc",
     "functionNameIsRequired": "Tên hàm là bắt buộc",
+    "remoteDestinationIsRequired": "Đích từ xa là bắt buộc",
     "timezoneIsRequired": "Múi giờ là bắt buộc",
     "idPrefix": "ID: {id}",
     "unchangedCount": "Không thay đổi ({count})",
@@ -773,6 +803,7 @@
     "relativeTimeAgo": "Cách đây {value} {unit}",
     "relativeTimePast": "Trong {value} {unit} qua",
     "metrics": "Chỉ số",
+    "traces": "Trace",
     "browserTime": "Thời gian trình duyệt",
     "invalidCredentials": "Thông tin đăng nhập không hợp lệ",
     "notFound": "Không tìm thấy",
@@ -813,7 +844,11 @@
       "loading": "Đang tải điều kiện...",
       "loadError": "Điều kiện đã lưu không thể đọc được và đã được đặt lại. Lưu ngay bây giờ sẽ ghi đè lên nó."
     },
-    "destination": {},
+    "destination": {
+      "createNew": "Tạo đích mới",
+      "select": "Đích",
+      "loadError": "Có lỗi khi lấy danh sách đích."
+    },
     "function": {
       "createNew": "Tạo hàm mới",
       "createNewNoteWorkflow": "Lưu ý: Hàm sẽ được tạo, sau đó bạn sẽ được chuyển hướng đến biểu mẫu trước đó để liên kết hàm mới tạo với quy trình làm việc.",
@@ -872,6 +907,7 @@
     "of": "trên",
     "rowDetail": "Chi tiết Nguồn",
     "sourceName": "Tên",
+    "sourceValue": "Giá trị",
     "showHistogramLabel": "Biểu đồ tần suất",
     "hideHistogram": "Ẩn Biểu đồ tần suất",
     "showPatternsLabel": "Mẫu",
@@ -1025,7 +1061,10 @@
     "regionFilterMsg": "Tìm kiếm vùng/cụm",
     "queryRangeRestrictionMsg": "Phạm vi truy vấn bị giới hạn trong {range}. Vui lòng điều chỉnh phạm vi ngày cho phù hợp. Nếu không, ngày bắt đầu sẽ tự động được điều chỉnh để nằm trong giới hạn cho phép.",
     "cancel": "Hủy truy vấn",
+    "viewTrace": "Xem trace",
+    "viewTraceUnavailable": "Không thể mở trace cho bản ghi nhật ký này.",
     "viewRelated": "Xem liên quan",
+    "viewRelatedTooltip": "Xem trace và chỉ số liên quan",
     "flattened": "Đã làm phẳng",
     "original": "Gốc",
     "resetFilters": "Đặt lại bộ lọc",
@@ -1107,6 +1146,8 @@
     "selectFunctionNamePlaceholder": "Chọn tên hàm",
     "confirmFunctionUpdateTitle": "Xác nhận cập nhật",
     "confirmFunctionUpdateMsg": "Bạn có chắc chắn muốn cập nhật hàm {name}?",
+    "traceIdLabel": "ID trace:",
+    "enterTraceIdPlaceholder": "Nhập ID trace",
     "changeQueryModeTitle": "Đổi Chế Độ Truy Vấn",
     "changeQueryModeConfirm": "Bạn có chắc muốn đổi chế độ truy vấn? Dữ liệu đã lưu cho trục X, trục Y và Bộ lọc sẽ bị xóa.",
     "patternExampleLog": "Ví dụ log",
@@ -1156,7 +1197,9 @@
     "upgradeToProPlan": "Nâng cấp lên gói PRO",
     "home": "Trang chủ",
     "about": "Giới thiệu",
+    "index": "Stream",
     "search": "Nhật ký",
+    "traces": "Trace",
     "serviceGraph": "Biểu đồ dịch vụ",
     "services": "Danh mục dịch vụ",
     "aiObservability": "AI",
@@ -1174,6 +1217,7 @@
     "rum": "RUM",
     "settings": "Cài đặt",
     "iam": "IAM",
+    "report": "Báo cáo",
     "pipeline": "Pipeline",
     "workflows": "Quy trình làm việc",
     "language": "Ngôn ngữ",
@@ -1339,6 +1383,8 @@
     "loadingMsg": "Hãy chờ một chút, chúng tôi đang tải dữ liệu RUM.",
     "breadcrumbs": "Breadcrumbs",
     "tags": "Thẻ",
+    "traces": "Trace",
+    "searchEvents": "Tìm kiếm sự kiện",
     "loadingSessions": "Hãy chờ một chút, chúng tôi đang lấy các phiên.",
     "errorStack": "Ngăn xếp lỗi",
     "sessionReplay": "Phát lại phiên",
@@ -1348,6 +1394,11 @@
     "discoverSessionMessage": "Phát lại phiên ghi lại và phát lại các tương tác của người dùng trên trang web hoặc ứng dụng của bạn. Điều này cho phép bạn xem xét trực quan cách người dùng điều hướng, nơi họ nhấp, nội dung họ gõ và cách họ tương tác với nội dung của bạn",
     "loadingErrorDetails": "Hãy chờ một chút, chúng tôi đang lấy chi tiết lỗi.",
     "eventID": "ID sự kiện",
+    "noCorrelatedTraces": "Không tìm thấy trace liên quan cho phiên này.",
+    "span": "span",
+    "spans": "span",
+    "errorTraces": "trace lỗi",
+    "failedToFetchTraces": "Không thể tải dữ liệu trace. Vui lòng thử lại.",
     "seekToMoment": "Chuyển đến thời điểm này trong phiên",
     "route": "Tuyến",
     "duration": "Thời lượng",
@@ -1434,6 +1485,7 @@
     "frustrationErrorClick": "Nhấp chuột đã kích hoạt lỗi JavaScript",
     "frustrationRageTap": "Người dùng chạm nhanh nhiều lần (3+) - biểu thị sự bực bội",
     "frustrationErrorTap": "Chạm đã kích hoạt lỗi JavaScript",
+    "fetchTraceMetadataFailed": "Không thể tải siêu dữ liệu trace.",
     "frustrationEventTooltip": "⚠️ BỰC BỘI: {types}\n{name}",
     "errorEventTooltip": "⛔ LỖI: {name}",
     "frustrationSignalType": "Tín hiệu bực bội: {type}"
@@ -1485,8 +1537,10 @@
     "feature_column_name": "Tính năng",
     "feature_logs": "Nhật ký",
     "feature_metrics": "Chỉ số",
+    "feature_traces": "Trace",
     "feature_alerts": "Cảnh báo",
     "feature_dashboards": "Bảng điều khiển",
+    "feature_reports": "Báo cáo",
     "feature_vrl_functions": "Hàm VRL",
     "feature_pipelines": "Đường ống",
     "feature_high_availability": "Sẵn sàng cao",
@@ -1507,6 +1561,7 @@
     "feature_license": "Giấy phép",
     "feature_support": "Hỗ trợ",
     "feature_cost": "Chi phí",
+    "feature_pipelines_external": "Pipeline - Đích bên ngoài",
     "feature_extreme_performance": "Hiệu suất cực cao (cải thiện 100x cho nhiều truy vấn)",
     "feature_query_optimizer": "Trình tối ưu hóa truy vấn",
     "value_license_agpl": "AGPL",
@@ -1608,6 +1663,7 @@
       },
       "core_features": {
         "logs_metrics_traces": {
+          "name": "Nhật ký, Chỉ số, Trace",
           "note": "Nhập và phân tích dữ liệu quan sát đầy đủ"
         },
         "rum": {
@@ -1622,6 +1678,7 @@
           "note": "Bảng điều khiển trực quan có thể tùy chỉnh"
         },
         "reports": {
+          "name": "Báo cáo",
           "note": "Báo cáo theo lịch và theo yêu cầu"
         },
         "vrl_functions": {
@@ -1678,7 +1735,10 @@
           "name": "Che dữ liệu nhạy cảm",
           "note": "Bảo vệ PII và thông tin nhạy cảm"
         },
-        "pipeline_remote_destinations": {},
+        "pipeline_remote_destinations": {
+          "name": "Pipeline - Đích từ xa",
+          "note": "Gửi dữ liệu đến các đích từ xa"
+        },
         "query_optimizer": {
           "name": "Bộ tối ưu truy vấn / Bộ nhớ đệm tổng hợp",
           "note": "Tổng hợp TopK và tối ưu hóa truy vấn"
@@ -1720,6 +1780,7 @@
           "note": "Vận hành kết nối phân tán tối ưu"
         },
         "logs_metrics_traces_correlation": {
+          "name": "Tương quan Nhật ký, Chỉ số và Trace",
           "note": "Phát hiện và tương quan tự động"
         },
         "service_maps": {
@@ -2403,6 +2464,7 @@
       "secondaryIndexCount": "Chỉ mục phụ ({count})"
     },
     "deleteField": "Xóa trường",
+    "header": "Stream",
     "subtitle": "Quản lý chỉ mục và cấu hình luồng",
     "streamNameHelpText": "Chỉ sử dụng ký tự chữ số, dấu gạch dưới và dấu hai chấm.",
     "search": "Tìm kiếm luồng",
@@ -2442,6 +2504,7 @@
     "deleteDatesMessage": "Bạn có chắc chắn muốn xóa các ngày đã chọn? Hành động này không thể hoàn tác.",
     "labelLogs": "Nhật ký",
     "labelMetrics": "Chỉ số",
+    "labelTraces": "Trace",
     "labelMetadata": "Siêu dữ liệu",
     "add": "Luồng mới",
     "dataRetention": "Lưu giữ dữ liệu (ngày)",
@@ -2483,6 +2546,7 @@
   },
   "workflow": {
     "header": "Quy trình làm việc",
+    "subtitle": "Tự động hóa Hành động bằng Trình kích hoạt, Logic và Đích",
     "create": "Quy trình làm việc mới",
     "createSuccess": "Đã tạo quy trình làm việc thành công",
     "name": "Tên Workflow",
@@ -2563,6 +2627,7 @@
     },
     "triggerMeta": {
       "orgId": "ID tổ chức mà cảnh báo thuộc về.",
+      "streamType": "Loại Stream — nhật ký, chỉ số hoặc trace.",
       "streamName": "Stream mà cảnh báo giám sát.",
       "alertName": "Tên của cảnh báo đã kích hoạt.",
       "alertType": "Loại cảnh báo — realtime hoặc scheduled.",
@@ -2599,6 +2664,8 @@
         "input": "Đầu vào",
         "output": "Đầu ra",
         "noInput": "Bước này không nhận được bản ghi nào trong lần chạy gần nhất.",
+        "sentExternally": "Đã gửi đến đích bên ngoài",
+        "destinationNoRecords": "Không có bản ghi nào đến đích này — không có gì được gửi.",
         "branchFiltered": "0 bản ghi — không có gì được chuyển đến nhánh này.",
         "conditionNoMatch": "Không có bản ghi nào khớp với điều kiện này — không có gì tiếp tục sang các bước tiếp theo.",
         "errorHeading": "Lỗi",
@@ -2647,12 +2714,15 @@
       "kindAction": "Hành động",
       "condition": "Điều kiện",
       "function": "Hàm",
+      "sendToDestination": "Đích",
       "configComingSoon": "Cấu hình {node} sẽ có ở bước sau",
       "sectionTransform": "Biến đổi",
+      "sectionDestination": "Đích",
       "stepSearchPlaceholder": "Tìm kiếm bước...",
       "stepNoMatch": "Không có bước nào phù hợp với tìm kiếm của bạn.",
       "conditionDesc": "Rẽ nhánh theo quy tắc",
       "functionDesc": "Định hình lại tải trọng bằng một hàm",
+      "destinationDesc": "Gửi đến một đích",
       "triggerBody": "Chạy khi một cảnh báo liên quan kích hoạt",
       "triggerDataExampleNote": "Chỉ là ví dụ — các cột thực tế đến từ truy vấn của cảnh báo của bạn.",
       "incidentEventTypeLabel": "Loại sự kiện",
@@ -2671,7 +2741,12 @@
       "functionCreateNew": "Tạo hàm mới",
       "functionRequired": "Hàm là bắt buộc",
       "functionLoadError": "Không thể tải danh sách hàm",
+      "destinationBody": "Gửi đến một đích",
       "destinationBodySet": "Gửi đến {name}",
+      "destinationSelect": "Đích",
+      "destinationCreateNew": "Tạo đích mới",
+      "destinationRequired": "Vui lòng chọn một đích",
+      "destinationLoadError": "Không thể tải các đích",
       "namePlaceholder": "Tên bước này (Tùy chọn)",
       "commentLabel": "Nhận xét (Tùy chọn)",
       "commentPlaceholder": "Thêm ghi chú về bước này...",
@@ -2681,6 +2756,8 @@
       "disabledBadge": "Đã tắt",
       "incompleteBadge": "Thiết lập sau",
       "destinationSetUpLater": "Thiết lập sau",
+      "destinationSetUpLaterPrompt": "Chưa có đích? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
+      "destinationSetUpLaterActive": "Đích hiện đang được bỏ qua — tên và ghi chú vẫn được lưu. Bạn cần có một đích trước khi xuất bản.",
       "functionSetUpLater": "Thiết lập sau",
       "functionSetUpLaterPrompt": "Chưa có hàm? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
       "functionSetUpLaterActive": "Hàm sẽ được bỏ qua trong lúc này — tên và nhận xét vẫn được lưu. Bạn cần một hàm trước khi xuất bản."
@@ -2738,6 +2815,8 @@
       "functionNodeEmptyName": "Nút hàm {id} có tên hàm trống",
       "functionNodeInvalidName": "Nút hàm {id} có tên hàm không hợp lệ \"{name}\". Phải là một trong các hàm khả dụng.",
       "outputStreamNodeEmptyName": "Nút luồng đầu ra {id} có tên luồng trống",
+      "remoteStreamNodeEmptyDestination": "Nút stream từ xa {id} có tên đích trống",
+      "remoteStreamNodeInvalidDestination": "Nút stream từ xa {id} có đích không hợp lệ \"{destination}\". Phải là một trong các đích pipeline khả dụng.",
       "edgeMissingSourceNode": "Cạnh {id} tham chiếu đến nút nguồn {source} không tồn tại",
       "edgeMissingTargetNode": "Cạnh {id} tham chiếu đến nút đích {target} không tồn tại",
       "inputNodeHasIncomingEdges": "Nút đầu vào {id} không nên có cạnh đến. Tìm thấy {count} cạnh đến.",
@@ -2752,6 +2831,7 @@
     "importErrors": {
       "unknownError": "Lỗi không xác định",
       "nameRequired": "Pipeline - {index}: Tên là bắt buộc",
+      "streamTypeInvalid": "Pipeline - {index}: Loại Stream là bắt buộc và phải là một trong: 'logs', 'metrics', 'traces'.",
       "sourceStreamNameRequired": "Pipeline - {index}: Tên stream nguồn là bắt buộc ",
       "sqlQueryRequired": "Pipeline - {index}: Truy vấn SQL là bắt buộc",
       "timezoneRequired": "Pipeline - {index}: Múi giờ là bắt buộc",
@@ -2764,6 +2844,7 @@
       "v0ConditionFields": "Pipeline - {index}, Node {nodeIndex}: Định dạng V0 - mỗi điều kiện phải có cột, toán tử và giá trị.",
       "v1ConditionInvalid": "Pipeline - {index}, Node {nodeIndex}: Định dạng điều kiện V1 không hợp lệ.",
       "conditionFormatUnrecognized": "Pipeline - {index}, Node {nodeIndex}: Định dạng điều kiện không được nhận dạng.",
+      "remoteDestinationRequired": "Pipeline - {index}: Đích từ xa là bắt buộc",
       "createSuccess": "Pipeline - {index}: \"{name}\" đã được tạo thành công \nLưu ý: vui lòng xóa đối tượng pipeline {name} đã tạo khỏi tệp json",
       "createFailed": "Pipeline - {index}: Tạo \"{name}\" thất bại --> \n Lý do: {reason}",
       "sqlQueryMismatch": "Pipeline - {index}: Truy vấn SQL phải giống nhau trên tất cả các nút và cũng cố gắng khớp với truy vấn trong các nút \n\n          input.sql_query: {sqlQuery} \n\n          input.source.query_condition.sql: {sourceSql} \n",
@@ -2864,8 +2945,10 @@
     "defaultDelayTooltip": "Mặc định: 5 giây",
     "deleteDataBeforeBackfill": "Xóa dữ liệu hiện có trước khi backfill",
     "irreversibleDeletionWarning": "Cảnh báo: Xóa dữ liệu không thể hoàn tác",
+    "deleteBackfillWarningMessage": "Thao tác này sẽ xóa vĩnh viễn tất cả dữ liệu trong stream đích cho khoảng thời gian đã chỉ định trước khi chạy backfill. Hành động này không thể hoàn tác.",
     "timeAlignmentRequirements": "Yêu cầu căn chỉnh thời gian (UTC):",
     "logsHourBoundaryNote": "streams: Thời gian phải khớp với ranh giới giờ theo UTC (ví dụ: 10:00:00, không phải 10:15:00)",
+    "metricsTracesLabel": "Chỉ số/Trace",
     "dayBoundaryNote": "streams: Thời gian phải khớp với ranh giới ngày theo UTC (ví dụ: 00:00:00)",
     "estimatedProcessingTime": "Thời gian xử lý ước tính:",
     "estimatedChunks": "Số phân đoạn ước tính:",
@@ -2888,6 +2971,8 @@
       "statusUnknown": "Không xác định",
       "phaseInitializing": "Đang khởi tạo"
     },
+    "deleteBackfillConfirmMessage": "Bạn đã chọn xóa dữ liệu hiện có trước khi backfill. Thao tác này sẽ xóa vĩnh viễn tất cả dữ liệu trong stream đích cho khoảng thời gian đã chỉ định.",
+    "editBackfillDeleteConfirmMessage": "Bạn đã chọn xóa dữ liệu hiện có trước khi backfill. Thao tác này sẽ xóa vĩnh viễn tất cả dữ liệu trong stream đích cho khoảng thời gian đã chỉ định. Hành động này KHÔNG THỂ hoàn tác hoặc hủy sau khi tác vụ được cập nhật. Bạn có chắc chắn muốn tiếp tục?",
     "actionCannotBeUndone": "Hành động này KHÔNG THỂ hoàn tác hoặc hủy bỏ sau khi công việc được tạo.",
     "areYouSureProceed": "Bạn có chắc chắn muốn tiếp tục không?",
     "clearFilters": "Xóa bộ lọc",
@@ -2908,6 +2993,7 @@
     "chunkPeriodDefaultPlaceholder": "60",
     "organizationId": "ID tổ chức",
     "functionName": "Tên hàm",
+    "remoteDestination": "Đích từ xa",
     "failedToLoadPipeline": "Không tải được pipeline",
     "header": "Pipeline",
     "subtitle": "Biến đổi, làm giàu và định tuyến dữ liệu đang xử lý",
@@ -2935,6 +3021,7 @@
     "trigger": "Kích hoạt",
     "aggregation": "Tổng hợp",
     "selectColumn": "Chọn cột",
+    "value": "Giá trị",
     "fieldRequired": "Trường là bắt buộc!",
     "sqlQuery": "Truy vấn SQL",
     "promqlQuery": "Truy vấn PromQL",
@@ -2949,11 +3036,15 @@
     "sourceQueryTooltip": "Nguồn: Nút Truy vấn",
     "functionTooltip": "Nút Hàm",
     "conditionTooltip": "Nút Điều kiện",
+    "destinationStreamTooltip": "Đích: Nút Stream",
+    "destinationExternalTooltip": "Đích: Nút Đích Bên Ngoài",
     "pipelineNotFound": "Không tìm thấy Pipeline",
     "pipelineNameRequired": "Tên Pipeline là bắt buộc",
     "sourceNodeRequired": "Nút nguồn là bắt buộc",
+    "destinationNodeRequired": "Nút đích là bắt buộc",
     "connectAllNodes": "Vui lòng kết nối tất cả các nút trước khi lưu",
     "connectAllNodesShort": "Vui lòng kết nối tất cả các nút",
+    "enrichmentTablesScheduledOnly": "Bảng làm giàu dữ liệu làm stream đích chỉ khả dụng cho pipeline theo lịch trình.",
     "savingPipeline": "Đang lưu pipeline...",
     "pipelineUpdated": "Pipeline đã được cập nhật thành công",
     "pipelineSaved": "Pipeline đã được lưu thành công",
@@ -2985,6 +3076,7 @@
     "functionAlreadyAssociated": "Hàm đã được liên kết",
     "atLeastOneCondition": "Vui lòng thêm ít nhất một điều kiện",
     "fillAllConditionFields": "Vui lòng điền tất cả các trường điều kiện (cột, toán tử và giá trị là bắt buộc)",
+    "selectExternalDestination": "Vui lòng chọn Đích bên ngoài từ danh sách",
     "backfillNumericRange": "Phải nằm trong khoảng từ {min} đến {max}",
     "selectValidTimeRange": "Vui lòng chọn một phạm vi thời gian hợp lệ",
     "startBeforeEndTime": "Thời gian bắt đầu phải trước thời gian kết thúc",
@@ -3000,9 +3092,11 @@
       "streamType": "Loại Stream *"
     },
     "sourceNode": "Nguồn",
+    "streamNode": "Stream",
     "queryNode": "Truy vấn",
     "transformNode": "Biến đổi",
     "functionNode": "Hàm",
+    "destinationNode": "Đích",
     "remoteNode": "Từ xa",
     "conditionsNode": "Điều kiện",
     "editorFunctionTooltip": "Định dạng lại payload bằng một hàm",
@@ -3061,7 +3155,8 @@
       "customStep4": "Cấu hình các header cần thiết để xác thực",
       "customStep5": "Chọn định dạng đầu ra (JSON hoặc NDJSON)",
       "customStep6": "Kiểm tra kết nối để xác minh rằng nó hoạt động",
-      "defaultTitle": "Chi tiết kết nối"
+      "defaultTitle": "Chi tiết kết nối",
+      "defaultStep1": "Chọn một loại đích để xem hướng dẫn cụ thể"
     },
     "deleteFunctionAssociationConfirm": "Bạn có chắc chắn muốn xóa liên kết hàm không?",
     "deleteStreamRoutingConfirm": "Bạn có chắc chắn muốn xóa định tuyến luồng không?",
@@ -3087,6 +3182,7 @@
     "noJobSelected": "Chưa chọn công việc nào",
     "updateBackfillJobFailed": "Không thể cập nhật công việc backfill",
     "fetchPipelineHistoryFailed": "Không thể tải lịch sử pipeline",
+    "defaultDestinationNodeWarning": "Xóa nút đích mặc định sẽ ngừng tiếp nhận dữ liệu vào nút đó. stream nguồn sau đó sẽ chỉ định tuyến đến stream đích mới được thêm. Dữ liệu không được định tuyến đến bất kỳ stream đích nào sẽ bị loại bỏ.",
     "confirmBulkDeleteMsg": "Bạn có chắc chắn muốn xóa {count} pipeline không?",
     "confirmPauseBackfillJob": "Bạn có chắc muốn tạm dừng công việc backfill cho \"{name}\" không? Bạn có thể tiếp tục sau.",
     "confirmResumeBackfillJob": "Bạn có chắc muốn tiếp tục công việc backfill cho \"{name}\" không?",
@@ -3196,6 +3292,10 @@
     "analyzingDimensions": "Đang phân tích các thứ nguyên...",
     "arrowSeparator": "→",
     "computingDistributions": "Đang tính toán phân bố tần số trên {count} thứ nguyên",
+    "dashboardDescError": "So sánh tỷ lệ lỗi của trace trong giai đoạn lỗi tăng đột biến so với đường cơ sở trên các thứ nguyên.",
+    "dashboardDescLatency": "So sánh độ trễ phần trăm của các trace đã chọn (thời lượng {start}-{end}µs) so với đường cơ sở trên các thứ nguyên.",
+    "dashboardDescVolume": "So sánh phân bố số lượng trace so với đường cơ sở trên các thứ nguyên.",
+    "dashboardDescVolumeRate": "So sánh phân bố số lượng trace của các giai đoạn đã chọn (tốc độ {start}-{end} trace) so với đường cơ sở trên các thứ nguyên.",
     "dashboardTitleError": "Thông tin chi tiết về lỗi",
     "dashboardTitleLatency": "Thông tin chi tiết về độ trễ",
     "dashboardTitleVolume": "Thông tin chi tiết về lưu lượng",
@@ -3203,6 +3303,8 @@
     "durationLabel": "Thời lượng:",
     "failedToLoad": "Không tải được phân tích",
     "panelDescErrorComparison": "So sánh tỷ lệ lỗi cho chiều: {dimension}. Các thanh Đã chọn cao hơn cho thấy giá trị chiều này có nhiều lỗi hơn trong giai đoạn đột biến lỗi.",
+    "panelDescLatencyComparison": "So sánh độ trễ phần trăm cho thứ nguyên: {dimension}. Các thanh Đã chọn cao hơn cho thấy giá trị thứ nguyên này tương quan với các trace chậm hơn.",
+    "panelDescVolumeComparison": "So sánh số lượng trace cho thứ nguyên: {dimension}. Các thanh Đã chọn cao hơn cho thấy giá trị thứ nguyên này xuất hiện thường xuyên hơn trong các giai đoạn có lượng lớn.",
     "panelDescVolumeTopValues": "Các giá trị hàng đầu theo số lượng cho chiều: {dimension}.",
     "refreshTooltip": "Làm mới phân tích với phân vị đã cập nhật",
     "retryButton": "Thử lại",
@@ -3213,6 +3315,7 @@
     "title": "Thông tin chi tiết",
     "tabLabel": "Tỷ lệ",
     "analyzeTooltipLogs": "Xem thông tin chi tiết cho khoảng thời gian hiện tại",
+    "analyzeTooltipTraces": "Phân tích các thứ nguyên trace để phát hiện các mẫu tốc độ, độ trễ và lỗi.",
     "rateLabel": "Tỷ lệ:",
     "searchInspectionsLabel": "Xem chi tiết thực thi công việc tìm kiếm",
     "inspectBtnLabel": "Kiểm tra",
@@ -3315,6 +3418,7 @@
       "singleTargetTitle": "Đích ghi từ xa đơn",
       "fanoutTitle": "Phân tán đến nhiều backend",
       "tipPrefix": "Mẹo: `vmagent` có thể nhân bản các lần ghi bằng cách lặp lại",
+      "tipSuffix": "cờ, để bạn có thể giữ điểm đến VictoriaMetrics hiện có trong khi vẫn chuyển tiếp chỉ số đến OpenObserve.",
       "docLinkText": "để tìm hiểu thêm về việc cấu hình các đích ghi từ xa của vmagent."
     },
     "ai": {
@@ -3337,6 +3441,7 @@
     "customLabel": "Tùy chỉnh",
     "logsLabel": "Nhật ký",
     "metricsLabel": "Chỉ số",
+    "tracesLabel": "Truy vết",
     "redirectionIngestionMsg": "Lưu ý: Để truy cập các trang khác ngoài IAM, việc đưa dữ liệu vào phải được khởi tạo trong tổ chức hiện tại.",
     "databaseLabel": "Cơ sở dữ liệu",
     "securityLabel": "Bảo mật",
@@ -3361,6 +3466,7 @@
     "dotnettracing": ".Net Tracing",
     "dotnetlogs": ".Net Logs",
     "macos": "macOS",
+    "tracesotlp": "Truy vết ({product})",
     "rum": "Giám sát người dùng thực",
     "openvpn": "OpenVPN",
     "nginx": "Nginx",
@@ -3385,6 +3491,7 @@
       "diagnosticSettingsPath": "Cài đặt chẩn đoán → + Thêm cài đặt chẩn đoán",
       "enterNameCheckCategories": "Nhập tên, chọn các danh mục nhật ký bạn muốn bật",
       "underPrefix": "Trong",
+      "destinationDetails": "Chi tiết điểm đến",
       "chooseSuffix": ", chọn",
       "streamToEventHub": "Truyền phát tới một event hub",
       "selectEventHubPrefix": "Chọn không gian tên Event Hub và Event Hub đã tạo ở Bước 1 (tiền tố:",
@@ -3522,17 +3629,21 @@
       "anyWindowsHostNote": "Bất kỳ máy chủ hoặc máy ảo Windows nào.",
       "arrow": "→",
       "askOnSlack": "Hỏi trên Slack",
+      "autoInstrumentTracesDesc": "Tùy chọn. Toán tử OpenTelemetry chèn bộ đo lường vào các workload được chú thích, để bạn nhận được **truy vết phân tán mà không cần chạm vào mã ứng dụng hoặc xây dựng lại image**. Chọn một ngôn ngữ, sau đó chú thích namespace nơi nó chạy.",
+      "autoInstrumentTracesTitle": "Tự động chèn bộ đo lường cho ứng dụng của bạn để thu thập truy vết",
       "cassandraJmxNote": "Bật truy cập từ xa JMX trên Cassandra để bộ thu có thể kết nối.",
       "cassandraTagline": "Thu thập số liệu Cassandra qua bộ thu JMX của OpenTelemetry Collector và gửi chúng đến OpenObserve.",
       "checking": "Đang kiểm tra…",
       "checkingForLogs": "Đang kiểm tra nhật ký…",
       "checkingForMetrics": "Đang kiểm tra chỉ số…",
+      "checkingForSpans": "Đang kiểm tra span…",
       "chipEditor": "Trình soạn thảo",
       "chipInstall": "Cài đặt",
       "chipLogs": "Logs",
       "chipMetrics": "Chỉ số",
       "chipRun": "Chạy",
       "chipTerminal": "Terminal",
+      "chipTraces": "Truy vết",
       "clusterNameHelp": "Xác định cụm này trong nhật ký, số liệu và bảng điều khiển của bạn.",
       "clusterNameLabel": "Tên Cụm",
       "collectorInstallDesc": "Bộ thu chỉ có trong bản Contrib — hãy chọn nền tảng của bạn.",
@@ -3543,11 +3654,14 @@
       "configureCollectorTitle": "Cấu hình OpenTelemetry Collector",
       "connectedLogsHeadline": "Đã kết nối — Nhật ký đang được truyền",
       "connectedMetricsHeadline": "Đã kết nối — Chỉ số đang được truyền",
+      "connectedTracesHeadline": "Đã kết nối — Truy vết đang truyền về",
       "countLogs": "{count} nhật ký | {count} nhật ký",
       "countMetricStreams": "{count} luồng số liệu | {count} luồng số liệu",
+      "countSpans": "{count} span | {count} span",
       "downloadEnvTooltip": "Tải xuống .env",
       "downloadJmxJarDesc": "Trình thu JMX chạy jar trợ giúp này (yêu cầu Java trên máy chủ thu thập).",
       "downloadJmxJarTitle": "Tải xuống Jar số liệu JMX",
+      "dynamodbFirehoseEndpointDesc": "Sử dụng các giá trị này làm điểm đến **HTTP Endpoint** khi tạo luồng phân phối Kinesis Data Firehose.",
       "dynamodbFirehoseEndpointTitle": "OpenObserve Firehose Endpoint",
       "dynamodbPipelineDesc": "Bật **DynamoDB Streams** trên bảng của bạn, kết nối nó với một **Kinesis Data Stream**, sau đó trỏ một luồng phân phối **Kinesis Data Firehose** đến HTTP endpoint ở trên.",
       "dynamodbPipelineTitle": "Phát trực tiếp DynamoDB → Firehose",
@@ -3561,6 +3675,7 @@
       "gcpFixBody": "GCP báo cáo lỗi gửi trên chính subscription. Nếu sink đang xuất bản nhưng không có gì đến đây, điểm cuối push thường đang từ chối yêu cầu:",
       "gcpFixTitle": "Kiểm tra Push Subscription",
       "gcpPushUrlNote": "Giữ bí mật URL này — nó chứa khóa tiếp nhận. Nếu bị lộ, hãy xoay vòng từ phần đầu trang này.",
+      "gcpSinkDesc": "Trong bảng điều khiển GCP, tạo một **sink Log Router** (Nhật ký → Bộ định tuyến nhật ký → Tạo sink) với Pub/Sub làm điểm đến và để nó tạo topic. Bộ lọc đưa vào của sink quyết định nhật ký nào đến được OpenObserve.",
       "gcpSinkTitle": "Chuyển hướng Logs đến một Pub/Sub Topic",
       "gcpSinkWriterNote": "Cấp cho danh tính ghi của sink vai trò Pub/Sub Publisher trên topic, nếu không nó sẽ âm thầm không xuất bản gì.",
       "gcpStreamHelp": "Được dùng trong URL đẩy ở trên và được theo dõi bởi kiểm tra bên dưới. Một luồng chuyên dụng giữ nhật ký GCP riêng biệt.",
@@ -3599,6 +3714,7 @@
       "k8sInstallerNote": "Thao tác này tự động cài đặt cert-manager, operator OpenTelemetry và collector OpenObserve.",
       "k8sInternalEndpointNote": "Sử dụng tùy chọn này khi OpenObserve chạy trong chính cụm này — lưu lượng không bao giờ rời khỏi cụm.",
       "k8sTroubleAnnotationA": "Việc tiêm xảy ra khi tạo pod, vì vậy các pod hiện tại không bị ảnh hưởng cho đến khi chúng khởi động lại — chạy `kubectl rollout restart deployment -n my-namespace`. Xác nhận chú thích đã được áp dụng bằng `kubectl get ns my-namespace -o yaml`, và kiểm tra giá trị khớp với `openobserve-collector/openobserve-<language>`. Đối với Go, `otel-go-auto-target-exe` phải là đường dẫn của tệp nhị phân **bên trong** container.",
+      "k8sTroubleAnnotationQ": "Tôi đã chú thích một namespace nhưng không có truy vết nào xuất hiện",
       "k8sTroubleEndpointA": "Chỉ sử dụng **In-Cluster** khi OpenObserve chạy trong chính cụm này; lưu lượng khi đó sẽ ở bên trong và không bao giờ qua mạng. URL là `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — mặc định giả định release `o2` trong namespace `openobserve`, vì vậy hãy chỉnh sửa nếu của bạn khác. Tất cả những người khác sử dụng điểm cuối bên ngoài.",
       "k8sTroubleEndpointQ": "Tôi nên dùng điểm cuối nào — bên ngoài hay trong cụm?",
       "k8sTroubleExampleA": "Có — **HOT commerce** là một ứng dụng mẫu được kết nối từ đầu đến cuối, và tài liệu **OpenTelemetry Operator** chứa tham chiếu chú thích đầy đủ. Cả hai được liên kết ở cuối trang này.",
@@ -3632,6 +3748,7 @@
       "mysqlTagline": "Thu thập các chỉ số MySQL với OpenTelemetry Collector và gửi chúng tới OpenObserve.",
       "noLogsFoundYet": "Chưa tìm thấy nhật ký nào",
       "noMetricsFoundYet": "Chưa tìm thấy chỉ số nào",
+      "noSpansFoundYet": "Chưa tìm thấy span nào",
       "nothingOnStream": "không có gì trên {stream} — hãy chạy ứng dụng của bạn và kiểm tra lại",
       "notTestedYet": "Chưa kiểm tra",
       "onStream": "trên {stream}",
@@ -3640,13 +3757,16 @@
       "oracleTagline": "Thu thập các chỉ số Oracle DB với OpenTelemetry Collector và gửi chúng tới OpenObserve.",
       "otlpFixBody": "Việc định nghĩa exporter là chưa đủ — nó phải được liệt kê trong pipeline. Đây là lý do phổ biến nhất khiến một cấu hình trông có vẻ đúng nhưng lại không gửi dữ liệu:",
       "otlpFixTitle": "Kiểm tra exporter đã thực sự được nối vào pipeline",
+      "otlpGrpcNote": "Ít chi phí hơn HTTP cho khối lượng span lớn. Cổng 5081 phải truy cập được từ collector.",
       "otlpHttpNote": "Mặc định cho OpenTelemetry Collector — hoạt động ở mọi nơi, kể cả sau proxy và bộ cân bằng tải.",
       "otlpSdkEnvNote": "Các biến môi trường OTEL_* tiêu chuẩn — mọi OpenTelemetry SDK đều đọc các biến này, nên không cần thay đổi mã.",
       "otlpTracesStreamHelp": "Được ghi vào cấu hình ở trên dưới dạng `stream-name`, và được theo dõi bởi kiểm tra bên dưới.",
       "otlpTrouble401A": "Tiêu đề `Authorization` phải là `Basic <token>` sử dụng token ingestion của tổ chức này — giá trị ở trên đã đúng. Nếu nó đã được xoay vòng, hãy sao chép lại từ trang này.",
       "otlpTrouble401Q": "Collector ghi nhận lỗi 401 hoặc 403",
+      "otlpTroubleHttpGrpcA": "HTTP là lựa chọn mặc định an toàn và đi qua proxy và bộ cân bằng tải một cách dễ dàng. gRPC có chi phí thấp hơn ở khối lượng span cao nhưng cần cổng 5081 truy cập được từ đầu đến cuối.",
       "otlpTroubleHttpGrpcQ": "Tôi nên dùng HTTP hay gRPC?",
       "otlpTroubleStreamA": "Tiêu đề `stream-name` quyết định stream. Đặt nó trùng với tên trường ở trên, nếu không thì kiểm tra bên dưới sẽ theo dõi một stream không có gì được ghi vào.",
+      "otlpTroubleStreamQ": "Span đến nhưng rơi vào stream sai",
       "otlpTroubleTlsA": "Cờ `tls.insecure` phải khớp với scheme của endpoint — nó được đặt thành `{insecure}` ở trên dựa trên URL của bản triển khai này. Endpoint HTTP thuần túy cần `insecure: true`; endpoint HTTPS cần `false`.",
       "otlpTroubleTlsQ": "Kết nối gRPC thất bại với lỗi TLS",
       "pillActiveBackends": "Backend đang hoạt động",
@@ -3704,6 +3824,7 @@
       "pillServiceMap": "Bản đồ dịch vụ",
       "pillSessions": "Phiên",
       "pillSetup": "Thiết lập",
+      "pillSpans": "Span",
       "pillSqlCompilationRate": "Tỷ lệ biên dịch SQL",
       "pillStorageBytes": "Dung lượng lưu trữ (byte)",
       "pillSystem": "Hệ thống",
@@ -3735,6 +3856,7 @@
       "preparePostgresqlTitle": "Chuẩn bị PostgreSQL",
       "prepareSqlServerDesc": "Tạo tài khoản đăng nhập giám sát — chạy trong một SQL client, **không phải** shell của bạn.",
       "prepareSqlServerTitle": "Chuẩn bị SQL Server",
+      "providerNameOtlpTraces": "Truy vết (OpenTelemetry)",
       "providerNameRum": "Giám sát người dùng thực",
       "quickInstallDesc": "Cài đặt collector OpenObserve bằng **một lệnh duy nhất** — chỉ cần đặt tên cụm của bạn và chạy. Tên này gắn thẻ mọi bản ghi, vì vậy bạn có thể phân biệt các cụm khi có nhiều cụm đang báo cáo.",
       "quickInstallTitle": "Cài đặt Nhanh (Được khuyến nghị)",
@@ -3847,16 +3969,19 @@
       "sqlServerTagline": "Thu thập các chỉ số SQL Server với OpenTelemetry Collector và gửi chúng tới OpenObserve.",
       "startIngestingTestForLogs": "bắt đầu thu thập, sau đó kiểm tra logs",
       "startIngestingTestForMetrics": "bắt đầu thu thập, sau đó kiểm tra metrics",
+      "startIngestingTestForSpans": "bắt đầu tiếp nhận dữ liệu, sau đó kiểm tra span",
       "streamNameError": "Chỉ sử dụng chữ cái, số và _.",
       "streamNameLabel": "Tên Stream",
       "stuck": "Bị kẹt?",
       "taglineDatabricks": "Gửi log notebook Databricks đến OpenObserve qua logs API.",
       "taglineGcp": "Truyền log Google Cloud vào OpenObserve bằng subscription push Pub/Sub — không cần chạy agent hoặc collector.",
+      "taglineKubernetes": "Triển khai collector OpenObserve vào cụm của bạn — nhật ký container, sự kiện Kubernetes và chỉ số cụm, cùng với truy vết không cần mã cho các workload của bạn.",
       "taglineLinux": "Cài đặt agent OpenObserve trên bất kỳ máy chủ Linux nào — log hệ thống và journald cùng với số liệu CPU, bộ nhớ, ổ đĩa và mạng.",
       "taglineMacos": "Cài đặt agent OpenObserve trên bất kỳ Mac nào — log hợp nhất và các tệp log chuẩn cùng với số liệu CPU, bộ nhớ, ổ đĩa và mạng.",
       "taglineOtlpTraces": "Trỏ bất kỳ exporter OpenTelemetry nào đến OpenObserve — collector hoặc SDK, HTTP hoặc gRPC. Endpoint và token của bạn đã được điền bên dưới.",
       "taglineWindows": "Cài đặt agent OpenObserve trên bất kỳ máy chủ Windows nào — Event Log, bộ đếm hiệu suất và số liệu máy chủ.",
       "testAgain": "Kiểm tra lại",
+      "tracesStreamNameLabel": "Tên stream truy vết",
       "trackScreensDesc": "Nếu bạn sử dụng React Navigation, hãy đưa cho SDK tham chiếu navigation của bạn và mọi thay đổi tuyến đường đều được ghi lại dưới dạng chế độ xem RUM — không cần mã cho từng màn hình.",
       "trackScreensTitle": "Theo dõi Màn hình Tự động (Tùy chọn)",
       "troubleshooting": "Xử lý sự cố",
@@ -3876,6 +4001,7 @@
       "verifyMongodbMetricsDesc": "Nhấn Test bên dưới, hoặc kiểm tra Streams để xem các chỉ số `mongodb_*`.",
       "verifyMysqlMetricsDesc": "Nhấn Test bên dưới, hoặc kiểm tra Streams để xem các chỉ số `mysql_*`.",
       "verifyOracledbMetricsDesc": "Nhấn Test bên dưới, hoặc kiểm tra Streams để xem các chỉ số `oracledb_*`.",
+      "verifyOtlpTracesDesc": "Khởi động lại collector (hoặc ứng dụng của bạn), thực hiện một yêu cầu tạo ra span, sau đó nhấn Test.",
       "verifyPostgresqlMetricsDesc": "Nhấn Test bên dưới, hoặc kiểm tra Streams để xem các chỉ số `postgresql_*`.",
       "verifyReactNativeRumDesc": "Chạy ứng dụng trên trình mô phỏng, giả lập hoặc thiết bị, di chuyển qua vài màn hình, rồi nhấn Test — các sự kiện React Native nằm trong luồng `_rumdata`.",
       "verifyRedisMetricsDesc": "Nhấn Test bên dưới, hoặc kiểm tra Streams để xem các chỉ số `redis_*`.",
@@ -3886,6 +4012,7 @@
       "verifyZookeeperMetricsDesc": "Nhấn Test bên dưới, hoặc kiểm tra Streams để xem các chỉ số `zookeeper_*`.",
       "viewLogs": "Xem Logs",
       "viewStreams": "Xem Streams",
+      "viewTraces": "Xem Truy Vết",
       "whatTheInstallerDoes": "Trình cài đặt làm gì",
       "windowsAgentFixBody": "Trình cài đặt đăng ký agent như một dịch vụ Windows. Nếu không có gì đến, hãy xác nhận nó đang chạy và đọc các mục gần nhất từ log của nó:",
       "windowsTroubleScriptA": "PowerShell chặn các tập lệnh chưa ký theo mặc định. Chạy console **với quyền Quản trị viên** và, nếu cần, cho phép tập lệnh cho phiên đó bằng `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.",
@@ -3909,8 +4036,11 @@
       "verifyAndroidRumDesc": "Chạy ứng dụng trên trình giả lập hoặc thiết bị, di chuyển qua một vài màn hình, sau đó nhấn Kiểm tra — các sự kiện Android gốc sẽ được ghi vào luồng `_rumdata`.",
       "verifyIosRumDesc": "Chạy ứng dụng trên trình mô phỏng hoặc thiết bị, di chuyển qua một vài màn hình, sau đó nhấn Kiểm tra — các sự kiện iOS gốc sẽ được ghi vào luồng `_rumdata`.",
       "dbmPreparePostgresTitle": "Giám sát cơ sở dữ liệu · Cấp quyền truy cập (tùy chọn)",
+      "dbmPreparePostgresDesc": "**Mọi thứ ở trên tự hoàn thiện** — thời gian truy vấn đã đến được Cơ sở dữ liệu từ truy vết ứng dụng của bạn mà không cần cài đặt gì ở đây. Các bước cuối này bổ sung những gì truy vết không bao giờ thấy được: deadlock và truy vấn bị chặn, mà chỉ có cơ sở dữ liệu tự ghi lại. Cấp quyền `pg_monitor` để collector có thể đọc truy vấn của các phiên khác — chạy nó trong một SQL client, **không phải** shell của bạn.",
       "dbmPrepareMysqlTitle": "Giám sát cơ sở dữ liệu · Giữ lịch sử deadlock (tùy chọn)",
       "dbmPrepareMariadbTitle": "Giám sát cơ sở dữ liệu · Giữ lịch sử deadlock (tùy chọn)",
+      "dbmPrepareMysqlDesc": "**Mọi thứ ở trên tự hoàn thiện** — thời gian truy vấn đã đến được Cơ sở dữ liệu từ truy vết ứng dụng của bạn mà không cần cài đặt gì ở đây. Các bước cuối này bổ sung những gì truy vết không bao giờ thấy được: deadlock và truy vấn bị chặn, mà chỉ có cơ sở dữ liệu tự ghi lại. Bật lịch sử deadlock đầy đủ — chạy nó trong một SQL client, **không phải** shell của bạn.",
+      "dbmPrepareMariadbDesc": "**Mọi thứ ở trên tự hoàn thiện** — thời gian truy vấn đã đến được Cơ sở dữ liệu từ truy vết ứng dụng của bạn mà không cần cài đặt gì ở đây. Các bước cuối này bổ sung những gì truy vết không bao giờ thấy được: deadlock và truy vấn bị chặn, mà chỉ có cơ sở dữ liệu tự ghi lại. Bật lịch sử deadlock đầy đủ — chạy nó trong một SQL client, **không phải** shell của bạn.",
       "dbmPgLoggingTitle": "Giám sát cơ sở dữ liệu · Cho Postgres ghi lại deadlock (tùy chọn)",
       "dbmPgLoggingDesc": "Deadlock chỉ được ghi vào nhật ký Postgres, và chỉ khi các cài đặt bên dưới được bật — vì vậy bước này là thứ làm cho tab Deadlocks có dữ liệu. Dòng tiền tố phải khớp chính xác: collector đọc nó để tìm ai đã liên quan, và tiền tố khác có nghĩa là nó không tìm thấy gì trong khi vẫn báo cáo khỏe mạnh.",
       "dbmPgLoggingVerifyTitle": "Giám sát cơ sở dữ liệu · Kiểm tra các cài đặt đã có hiệu lực (tùy chọn)",
@@ -3936,6 +4066,7 @@
       "dbmMysqlLogPathHelp": "Collector phải có thể đọc tệp này. Tìm nó bằng: SHOW VARIABLES LIKE 'log_error';",
       "dbmMariadbLogPathHelp": "Collector phải có thể đọc tệp này. Tìm nó bằng: SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "Giám sát cơ sở dữ liệu · Cấp quyền truy cập (tùy chọn)",
+      "dbmPrepareMssqlDesc": "**Mọi thứ ở trên tự hoàn thiện** — thời gian truy vấn đã đến được Cơ sở dữ liệu từ truy vết ứng dụng của bạn mà không cần cài đặt gì ở đây. Nhóm cuối này bổ sung những gì truy vết không bao giờ thấy được: deadlock và truy vấn bị chặn, mà chỉ có cơ sở dữ liệu tự ghi lại. Cả hai quyền đều cần thiết — một quyền cho collector đọc các phiên khác, quyền còn lại cho nó đọc lịch sử deadlock. Chạy chúng trong một SQL client, **không phải** shell của bạn.",
       "dbmConfigureMssqlDesc": "Ghi `dbm-config.yaml` — đặt cơ sở dữ liệu muốn kết nối bên dưới. SQL Server sẽ nhận được deadlock, truy vấn bị chặn, mẫu hoạt động, truy vấn hàng đầu và kế hoạch thực thi ở đây. Bộ thu sqlserver đọc trên toàn bộ instance, vì vậy hoạt động và truy vấn hàng đầu không bị giới hạn trong cơ sở dữ liệu bạn nêu ở trên.",
       "dbmRunMssqlDesc": "Chạy cả hai cấu hình cùng nhau. Sử dụng cùng tên đăng nhập và mật khẩu bạn đã tạo ở bước 1.",
       "dbmVerifyBlockingDesc": "Mở **Infra → Databases → Blocked queries**. Các phiên đang chờ khóa sẽ xuất hiện ngay khi có phiên được lấy mẫu — một tab trống ở đó cho bạn biết liệu không có gì bị chặn hay không có gì đang được thu thập.",
@@ -3945,6 +4076,7 @@
       "dbmVerifyTableHealthDesc": "Mở **Infra → Databases** và chọn một tab bên dưới. Deadlock và truy vấn bị chặn xuất hiện ngay khi cơ sở dữ liệu của bạn báo cáo — một tab trống ở đó cho bạn biết liệu không có gì xảy ra hay không có gì đang được thu thập. Sức khỏe bảng được điền sau khi chụp nhanh 60 giây đầu tiên."
     },
     "instrumentBeforeImportTitle": "Cài đặt công cụ đo lường trước khi nhập client",
+    "instrumentBeforeImportBody": "Nếu ứng dụng của bạn chạy nhưng không có span nào đến, có thể bộ đo lường đã được tải sau khi client được import. Sắp xếp lại để phần khởi tạo chạy trước:",
     "launchCloudFormationStack": "Khởi chạy Stack CloudFormation",
     "openStackSetsConsole": "Mở bảng điều khiển StackSets",
     "integrations": {
@@ -4107,6 +4239,7 @@
       "streamOverview": "Tổng quan {stream}"
     },
     "selectField": "Trường",
+    "selectIndex": "Stream",
     "selectStreamType": "Loại luồng",
     "toggleFunctionEditor": "Chuyển đổi trình chỉnh sửa hàm",
     "useSavedFunction": "Sử dụng hàm đã lưu",
@@ -4220,6 +4353,7 @@
     "extraOptions": "Tùy chọn",
     "nameOfVariable": "Tên",
     "labelOfVariable": "Nhãn (tùy chọn)",
+    "ValueOfVariable": "Giá trị",
     "DefaultValue": "Giá trị mặc định (tùy chọn)",
     "typeOfVariable": "Loại biến",
     "DefaultSize": "Kích thước bản ghi tối đa mặc định (tùy chọn)",
@@ -4289,6 +4423,7 @@
     "alignRight": "Phải",
     "sectionStyling": "Tạo kiểu",
     "sectionConditionalStyling": "Tạo kiểu có điều kiện",
+    "conditionThreshold": "Giá trị",
     "conditionAddRule": "+ Thêm quy tắc",
     "conditionNoRules": "Chưa có quy tắc nào.",
     "conditionIfValue": "Nếu giá trị là",
@@ -4351,6 +4486,7 @@
     "unsavedMessage": "Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời đi?",
     "currentFolderLabel": "Thư mục hiện tại",
     "selectFolderLabel": "Chọn thư mục",
+    "selectFolderPlaceholder": "Chọn một thư mục đích",
     "selectDashboardLabel": "Chọn Bảng điều khiển",
     "selectTabLabel": "Chọn Tab",
     "layerType": "Loại lớp",
@@ -4510,6 +4646,7 @@
     "markLinesTooltip": "Hiển thị đường ngưỡng trên biểu đồ.",
     "markLineType": "Loại",
     "markLineLabel": "Nhãn",
+    "markLineValue": "Giá trị",
     "markLineAdd": "+ Thêm",
     "markLineAverage": "Trung bình",
     "markLineMedian": "Trung vị",
@@ -4611,6 +4748,7 @@
     "editValueMapping": "Sửa ánh xạ giá trị",
     "valueMappingsTitle": "Ánh xạ giá trị",
     "valueMappingType": "Loại",
+    "valueMappingValue": "Giá trị",
     "valueMappingRegex": "Biểu thức chính quy",
     "valueMappingFrom": "Từ",
     "valueMappingTo": "Đến",
@@ -4778,6 +4916,7 @@
         "storage": "Lưu trữ",
         "dashboard": "Bảng điều khiển"
       },
+      "selectFolderTitle": "Chọn thư mục đích",
       "back": "Quay lại",
       "addDashboard": "Thêm Dashboard",
       "folder": "Thư mục",
@@ -4965,6 +5104,7 @@
       "configuration": "Cấu hình",
       "having": "Having",
       "add": "Thêm",
+      "value": "Giá trị",
       "markAsNonTimestamp": "Đánh dấu trường này là không phải timestamp",
       "renderDataAsJson": "Hiển thị dữ liệu dưới dạng JSON / Mảng",
       "sortBy": "Sắp xếp theo",
@@ -5414,6 +5554,7 @@
     "deletePanelTitle": "Xóa Panel",
     "deletePanelMessage": "Bạn có chắc chắn muốn xóa Panel này không?",
     "movePanelTitle": "Di chuyển Panel đến Tab khác",
+    "movePanelMessage": "Chọn tab đích",
     "noQueriesToCreateAlert": "Panel này không có truy vấn nào để tạo cảnh báo",
     "panelQueryMustHaveStream": "Truy vấn Panel phải có một stream được cấu hình",
     "unsupportedPanelTypeAlert": "Tạo cảnh báo từ panel {type} có thể không hoạt động như mong đợi",
@@ -5421,6 +5562,7 @@
     "panelDuplicationFailed": "Nhân bản Panel thất bại",
     "firstColumn": "Cột đầu tiên",
     "zAxis": "Trục Z",
+    "breakdown": "Phân tách",
     "pivotField": "Trường Pivot",
     "pivotFieldTooltip": "Kéo một trường thứ nguyên vào đây. Các giá trị riêng biệt của nó trở thành tiêu đề cột trong bảng pivot. Cho phép tối đa 3 trường để pivot nhiều cấp.",
     "breakdownTooltipHBar": "Sử dụng các trường này để chia dữ liệu thành các phần khác nhau trên trục Y để có cái nhìn rõ ràng hơn.",
@@ -5468,6 +5610,7 @@
         "anomalyHint": "{n} sự kiện đã lấy mẫu",
         "colField": "Trường",
         "colRarity": "Độ hiếm",
+        "colValue": "Giá trị",
         "rarity": {
           "anomalous": "Bất thường",
           "rare": "Hiếm",
@@ -5506,12 +5649,15 @@
     "longitude": "Kinh độ",
     "weight": "Trọng số",
     "mapname": "Tên",
+    "mapvalue": "Giá trị",
     "source": "Nguồn",
-    "target": "Đích"
+    "target": "Đích",
+    "value": "Giá trị"
   },
   "home": {
     "alertsOverviewSection": "Phần tổng quan cảnh báo",
     "pipelinesOverviewSection": "Phần tổng quan quy trình xử lý",
+    "streams": "Streams",
     "totalDataIngested": "Kích thước đã nhập",
     "totalDataCompressed": "Kích thước nén",
     "viewButton": "Xem",
@@ -5523,6 +5669,7 @@
       "description": "Tổ chức này chưa nhận được dữ liệu nào, vì vậy không có gì để biểu đồ. Khi các sự kiện bắt đầu truyền vào, <strong>khối lượng nhập, lưu trữ và sử dụng truy vấn</strong> của bạn sẽ tự động xuất hiện ở đây.",
       "logs": "Gửi nhật ký",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} và nhiều hơn nữa",
+      "traces": "Gửi truy vết",
       "tracesDesc": "Tracing phân tán cho {product1} / {product2} / {product3}",
       "metrics": "Gửi số liệu",
       "metricsDesc": "{product1}, {product2}, {product3} và hơn thế nữa",
@@ -5532,6 +5679,7 @@
       "shippers": "Trình gửi nhật ký"
     },
     "indexSizeLbl": "Kích thước chỉ mục",
+    "docsCountLbl": "Sự kiện",
     "functionTitle": "Hàm",
     "schedulePipelineTitle": "Đã lên lịch",
     "rtPipelineTitle": "Thời gian thực",
@@ -5569,6 +5717,8 @@
     "emptyActionAlertsDesc": "Xem lại các cảnh báo và ngưỡng đã cấu hình",
     "emptyActionLogs": "Khám phá nhật ký",
     "emptyActionLogsDesc": "Tìm kiếm và lọc các luồng log của bạn",
+    "emptyActionTraces": "Khám phá truy vết",
+    "emptyActionTracesDesc": "Kiểm tra truy vết phân tán và độ trễ dịch vụ",
     "anomalyDetectedTitle": "Đã phát hiện bất thường — {name}",
     "anomalyDetectedDescription": "Luồng: {stream} · {count} điểm bất thường",
     "secondsAgo": "{count} giây trước",
@@ -5617,6 +5767,7 @@
     "stderr": "Stderr",
     "truncatedLabel": "đã cắt ngắn",
     "copyQuery": "Sao chép truy vấn",
+    "stream": "Stream",
     "start": "Bắt đầu",
     "end": "Kết thúc",
     "from": "Từ",
@@ -5655,6 +5806,7 @@
       "taglineTail": ". Tôi có thể viết",
       "taglineSql": "SQL",
       "taglineVrl": "VRL",
+      "taglineAnd": "và hướng dẫn bạn qua nhật ký, truy vết, chỉ số và sự cố của bạn.",
       "signedInAs": "Đã đăng nhập với tên",
       "role": "Vai trò",
       "tryOneOfThese": "Hoặc thử một trong những"
@@ -5662,10 +5814,12 @@
     "capabilities": {
       "query": {
         "title": "Viết truy vấn",
+        "description": "SQL cho nhật ký, truy vết, RUM, hoặc PromQL cho chỉ số.",
         "prompt": "Giúp tôi viết một truy vấn"
       },
       "incident": {
         "title": "Điều tra sự cố",
+        "description": "Truy nguyên nguyên nhân gốc trên nhật ký, trace, cảnh báo — ví dụ: \"Tại sao gateway-5xx kích hoạt?\"",
         "prompt": "Giúp tôi điều tra một sự cố"
       },
       "dashboard": {
@@ -5762,7 +5916,9 @@
         "alert": "cảnh báo",
         "dashboard": "bảng điều khiển",
         "pipeline": "đường ống",
+        "report": "báo cáo",
         "function": "hàm",
+        "stream": "stream",
         "folder": "thư mục",
         "panel": "bảng",
         "user": "người dùng",
@@ -5806,6 +5962,7 @@
     "features": "TÍNH NĂNG",
     "included": "Bao gồm những gì?",
     "proPlanSubtitle": "Giải pháp tùy chỉnh cho các nhóm nhỏ",
+    "unlimitedNote": "Không giới hạn người dùng, nhật ký, chỉ số, trace và hơn thế nữa.",
     "paymentNote": "Thanh toán được tính theo mức sử dụng vào cuối chu kỳ thanh toán hàng tháng.",
     "proPlanLabel": "Trả theo mức sử dụng",
     "contactLabel": "Liên hệ bộ phận bán hàng",
@@ -5988,10 +6145,13 @@
       "anomalyImportFailed": "Phát hiện bất thường - {index}: nhập \"{name}\" thất bại — {reason}",
       "nameRequired": "Cảnh báo - {index}: Tên là bắt buộc và phải là chuỗi hợp lệ.",
       "orgIdInvalid": "Cảnh báo - {index}: ID tổ chức là bắt buộc, phải tồn tại trong danh sách tổ chức và phải bằng {orgId}.",
+      "streamTypeInvalid": "Cảnh báo - {index}: Loại Stream là bắt buộc và phải là một trong: 'logs', 'metrics', 'traces'.",
       "streamNameInvalid": "Cảnh báo - {index}: Tên luồng là bắt buộc, phải tồn tại trong danh sách luồng và phải là chuỗi hợp lệ.",
+      "destinationsRequired": "Cảnh báo - {index}: Đích đến là bắt buộc và phải là một mảng.",
       "enabledBoolean": "Cảnh báo - {index}: Enabled phải là Boolean.",
       "tzOffsetNumber": "Cảnh báo - {index}: Múi giờ bù phải là một số.",
       "timezoneRequiredForCron": "Cảnh báo - {index}: Múi giờ là bắt buộc khi loại tần suất là 'cron'.",
+      "destinationNotExist": "Cảnh báo - {index}: Đích đến \"{destination}\" không tồn tại",
       "createSuccess": "Cảnh báo - {index}: \"{name}\" được tạo thành công \nLưu ý: vui lòng xóa đối tượng cảnh báo {name} đã tạo khỏi tệp json",
       "createFailed": "Cảnh báo - {index}: Tạo \"{name}\" thất bại --> \n Lý do: {reason}",
       "unknownError": "Lỗi không xác định",
@@ -6101,6 +6261,7 @@
       "noChildren": "Chưa có cảnh báo con nào. Thêm ít nhất hai.",
       "wouldTrigger": "Sẽ kích hoạt",
       "wouldNotTrigger": "Sẽ không kích hoạt",
+      "firing": "Đang kích hoạt",
       "normal": "Bình thường",
       "stepByStep": "Từng bước",
       "result": "Kết quả",
@@ -6127,6 +6288,7 @@
     "exportDialogSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
     "jsonFilesOnlyHint": "Chỉ chấp nhận tệp .json",
     "outputMessages": "Thông báo đầu ra",
+    "destinationsRequiredLabel": "Đích đến *",
     "timezoneRequiredLabel": "Múi giờ *",
     "organizationIdLabel": "Mã tổ chức",
     "alertCreationTitle": "Tạo cảnh báo",
@@ -6166,11 +6328,13 @@
     "guidelinesLabel": "Hướng dẫn:",
     "selectStreamGuideline": "Chọn một luồng hiện có từ danh sách hoặc nhập tên để tạo luồng mới",
     "enrichmentTablesTerm": "Enrichment_tables",
+    "enrichmentTablesDestinationNote": "vì stream đích chỉ khả dụng cho pipeline theo lịch trình",
     "useCurlyBracesNote": "Sử dụng dấu ngoặc nhọn",
     "configureStreamNameDynamicNote": "để cấu hình tên stream một cách động. ví dụ.",
     "staticTextBeforeAfterNote": ". Văn bản tĩnh trước/sau",
     "isOptionalNote": "là tùy chọn",
     "noTriggersLoaded": "Không có trigger nào được tải",
+    "externalDestinationTitle": "Đích đến bên ngoài",
     "serviceGraphLegendTitle": "Chú giải biểu đồ",
     "serviceGraphRootCause": "Đỏ = Nguyên nhân gốc tiềm ẩn",
     "serviceGraphHighFrequency": "Cam = Tần suất cao",
@@ -6198,6 +6362,7 @@
     "pendingBatches": "Lô đang chờ",
     "pendingBatchesTooltip": "Cảnh báo đang chờ được nhóm lại",
     "historyTimeline": {
+      "firing": "Đang kích hoạt",
       "ok": "OK",
       "error": "Lỗi",
       "skipped": "Đã bỏ qua",
@@ -6216,6 +6381,7 @@
     "duration": "Thời lượng",
     "retries": "Số lần thử lại",
     "dedup": "Dedup",
+    "noDestinations": "Không có đích đến khả dụng",
     "validation": {
       "streamTypeRequired": "Loại luồng là bắt buộc.",
       "streamNameRequired": "Tên luồng là bắt buộc.",
@@ -6226,6 +6392,7 @@
       "validEmails": "Thêm email hợp lệ!",
       "silenceNonNegative": "Thông báo im lặng phải lớn hơn hoặc bằng 0",
       "periodPositive": "Khoảng thời gian phải lớn hơn 0",
+      "destinationRequired": "Cần ít nhất một đích đến.",
       "thresholdPositive": "Ngưỡng phải lớn hơn 0",
       "frequencyPositive": "Tần suất phải lớn hơn 0",
       "aggregationColumnRequired": "Cột là bắt buộc khi sử dụng hàm tổng hợp.",
@@ -6236,6 +6403,7 @@
       "minimumFrequency": "Tần suất tối thiểu phải là {minutes} phút",
       "nameMandatoryString": "Tên là bắt buộc và phải là một chuỗi hợp lệ",
       "orgIdMismatch": "ID tổ chức phải bằng {orgId}",
+      "streamTypeMandatory": "Loại Stream là bắt buộc và phải là một trong: logs, metrics, traces",
       "streamNameMandatoryString": "Tên luồng là bắt buộc và phải là một chuỗi hợp lệ",
       "streamNotInList": "Luồng \"{streamName}\" không tồn tại trong danh sách luồng",
       "isRealTimeMandatoryBoolean": "Is Real-Time là bắt buộc và phải là giá trị boolean",
@@ -6267,6 +6435,10 @@
       "cronRequiredForCronType": "Biểu thức cron là bắt buộc khi loại tần suất là cron",
       "timezoneRequiredForCronType": "Múi giờ là bắt buộc khi loại tần suất là cron",
       "triggerConditionRequired": "Điều kiện kích hoạt là bắt buộc",
+      "destinationsArray": "Đích đến phải là một mảng",
+      "destinationRequiredPlain": "Cần ít nhất một đích đến",
+      "noDestinationsInSystem": "Không tìm thấy đích đến khả dụng trong hệ thống",
+      "invalidDestinations": "Đích đến không hợp lệ: {destinations} - phải thuộc danh sách đích đến khả dụng",
       "enabledFlagBoolean": "Cờ kích hoạt phải là boolean",
       "silenceNotificationRequired": "Thông báo im lặng không được để trống",
       "thresholdNotEmpty": "Ngưỡng không được để trống",
@@ -6287,6 +6459,8 @@
     "searchAllFolders": "Tất cả thư mục",
     "streamConfig": "Cấu hình luồng",
     "alertRules": "Quy tắc cảnh báo",
+    "noTemplatesMsg": "Để tạo cảnh báo, bạn cần ít nhất một mẫu và một đích đến. Mẫu xác định định dạng của thông báo — hãy bắt đầu bằng việc tạo một mẫu.",
+    "noDestinationsMsg": "Để tạo cảnh báo, bạn cần ít nhất một đích đến và một mẫu. Đích đến xác định nơi thông báo được gửi đến — hãy bắt đầu bằng việc tạo một đích đến.",
     "add": "Cảnh báo mới",
     "edit": "Chỉnh sửa",
     "clone": "Nhân bản cảnh báo",
@@ -6337,25 +6511,37 @@
     "frequency": "Kiểm tra mỗi",
     "threshold": "Cảnh báo nếu ",
     "silenceNotification": "Thời gian hồi chiêu",
+    "destination": "Đích đến",
+    "destinationOrWorkflowRequired": "Thêm ít nhất một đích đến hoặc quy trình làm việc.",
+    "customDestination": "Đích đến tùy chỉnh",
+    "customDestinationDescription": "Cấu hình điểm cuối HTTP hoặc đích đến email tùy chỉnh",
+    "testIdleMessage": "Nhấp 'Test' để xác minh cấu hình đích đến của bạn",
+    "destinationPreview": "Xem trước đích đến",
     "template": "Ghi đè mẫu",
     "additionalVariables": "Biến bổ sung",
+    "testSuccessMessage": "Kiểm tra thành công! Đích đến của bạn đã được cấu hình chính xác.",
     "testFailedMessage": "Kiểm tra thất bại. Vui lòng kiểm tra lại cấu hình và thử lại.",
     "testFailedWithReason": "Kiểm tra thất bại: {reason}",
+    "testInProgress": "Đang kiểm tra đích đến...",
     "sendingNotification": "Đang gửi thông báo kiểm tra để xác minh kết nối",
     "testErrorDNS": "Phân giải DNS thất bại. Vui lòng kiểm tra URL webhook hoặc tên máy chủ.",
     "testErrorConnection": "Kết nối bị từ chối. Vui lòng xác minh URL và đảm bảo dịch vụ có thể truy cập.",
+    "testErrorTimeout": "Yêu cầu hết thời gian. Dịch vụ đích đến có thể chậm hoặc không truy cập được.",
     "testErrorSSL": "Lỗi chứng chỉ SSL/TLS. Vui lòng xác minh chứng chỉ hoặc tắt xác minh SSL.",
     "testErrorClientError": "Lỗi máy khách (4xx). Vui lòng kiểm tra thông tin đăng nhập và cấu hình của bạn.",
+    "testErrorServerError": "Lỗi máy chủ (5xx). Dịch vụ đích đến đang gặp sự cố.",
     "viewDetails": "Xem chi tiết",
     "error": "Lỗi",
     "httpStatus": "Trạng thái HTTP",
     "responseBody": "Nội dung phản hồi",
     "retry": "Thử lại",
     "suggestCheckUrl": "Vui lòng xác minh URL webhook là chính xác và có thể truy cập.",
+    "suggestCheckFirewall": "Kiểm tra cài đặt tường lửa và đảm bảo dịch vụ đích đến có thể truy cập được.",
     "suggestCheckCredentials": "Vui lòng xác minh thông tin đăng nhập API của bạn là chính xác.",
     "suggestCheckPermissions": "Kiểm tra rằng thông tin đăng nhập của bạn có các quyền cần thiết.",
     "suggestCheckEndpoint": "Vui lòng xác minh URL điểm cuối là chính xác.",
     "suggestRateLimit": "Bạn đã vượt quá giới hạn tốc độ. Vui lòng đợi trước khi thử lại.",
+    "suggestServerIssue": "Dịch vụ đích đến đang gặp sự cố. Vui lòng thử lại sau.",
     "description": "Mô tả",
     "stream_name": "Tên luồng",
     "cloneTitle": "Nhân bản cảnh báo",
@@ -6415,6 +6601,7 @@
       "notEqualTo": "không bằng",
       "eventsDetected": "sự kiện được phát hiện",
       "sendsTo": "Gửi tới",
+      "noDestination": "Không có đích đến",
       "notSetupYet": "(chưa thiết lập)",
       "cooldown": "Thời gian chờ",
       "betweenAlerts": "giữa các cảnh báo",
@@ -6462,6 +6649,7 @@
     },
     "placeholders": {
       "typeSomething": "Nhập gì đó",
+      "value": "Giá trị",
       "selectColumn": "Chọn cột",
       "savedFunctions": "Các hàm đã lưu",
       "autoUsesCheckInterval": "Tự động (sử dụng khoảng kiểm tra)",
@@ -6544,6 +6732,7 @@
       "ifPrefix": "nếu",
       "noConditionsDefined": "Chưa xác định điều kiện",
       "loadingCorrelatedMetrics": "Đang tải số liệu tương quan...",
+      "loadingCorrelatedTraces": "Đang tải các trace tương quan...",
       "disambiguationChangedMessage": "Cấu hình khám phá dịch vụ (các trường phân biệt) đã được thay đổi sau khi sự cố này được tạo.",
       "noActivityYet": "Chưa có hoạt động nào",
       "eventsAndCommentsAppearHere": "Sự kiện và bình luận sẽ xuất hiện tại đây",
@@ -6577,6 +6766,7 @@
       "correlatedAlertsCount": "Cảnh báo: {count} cảnh báo tương quan",
       "noCorrelatedLogs": "Không tìm thấy nhật ký tương quan",
       "noCorrelatedMetrics": "Không tìm thấy số liệu tương quan",
+      "noCorrelatedTraces": "Không tìm thấy trace tương quan",
       "lastAlertAt": "Cảnh báo cuối cùng",
       "title_field": "Tiêu đề",
       "stableDimensions": "Kích thước",
@@ -6589,6 +6779,7 @@
       "acknowledge": "Xác nhận",
       "resolve": "Giải quyết",
       "reopen": "Mở lại",
+      "statusOpen": "Mở",
       "statusAcknowledged": "Đã xác nhận",
       "statusResolved": "Đã giải quyết",
       "correlationServiceDiscovery": "Khám phá dịch vụ",
@@ -6653,6 +6844,7 @@
       "noAlertDetailsAvailable": "Không có chi tiết cảnh báo",
       "clickOnTriggerToViewDetails": "Nhấp vào một trình kích hoạt trong bảng để xem chi tiết",
       "refreshCorrelatedData": "Làm mới dữ liệu tương quan",
+      "showingCorrelatedTraces": "Hiển thị các trace tương quan trong khung thời gian sự cố",
       "incidentTitleUpdatedSuccess": "Tiêu đề sự cố đã được cập nhật thành công",
       "markAsAcknowledgedTooltip": "Đánh dấu sự cố là đã xác nhận và đang được xử lý",
       "markAsResolvedTooltip": "Đánh dấu sự cố là đã giải quyết và đóng nó",
@@ -6772,10 +6964,16 @@
       "helpLegendLiveExample": "CPU cao",
       "helpLegendSampleExample": "42",
       "sectionTitle": "Cài đặt",
+      "noDestinationsAvailable": "Không có đích đến khả dụng",
+      "noTargetsAvailable": "Không có đích đến hoặc quy trình làm việc khả dụng",
+      "targetsDestinationsGroup": "Đích đến",
       "targetsWorkflowsGroup": "Quy trình làm việc",
+      "refreshDestinations": "Làm mới đích đến mới nhất",
+      "addNewDestination": "Thêm đích đến",
       "cooldownTooltip": "Nếu cảnh báo được kích hoạt, nó sẽ đợi bao lâu trước khi gửi thông báo khác. Ví dụ: nếu cảnh báo được kích hoạt lúc 4:00 PM và thời gian tạm dừng thông báo được đặt là 10 phút, thì nó sẽ không gửi thông báo khác cho đến 4:10 PM ngay cả khi cảnh báo vẫn còn sau 1 phút. Điều này để tránh làm phiền người dùng bằng các thông báo.",
       "periodTooltip": "Khoảng thời gian mà truy vấn sẽ chạy. Ví dụ: 10 phút có nghĩa là bất cứ khi nào truy vấn chạy, nó sẽ sử dụng dữ liệu 10 phút cuối cùng.",
       "timezoneWarning": "Cảnh báo: Múi giờ hiển thị chỉ là xấp xỉ. Hãy xác minh và chọn múi giờ chính xác theo cách thủ công.",
+      "destinationsTooltip": "Chọn một hoặc nhiều đích đến để gửi thông báo cảnh báo.",
       "createsIncident": "Tạo sự cố",
       "createsIncidentTooltip": "Nếu cảnh báo có thể tạo sự cố, nó sẽ không gửi thông báo riêng. Thay vào đó, thông báo về sự cố được gửi khi sự cố mới được tạo hoặc loại cảnh báo mới tham gia vào sự cố hiện có.",
       "helpTemplateTitle": "Ghi đè mẫu",
@@ -6787,7 +6985,11 @@
       "helpLegendLive": "các giá trị thực tế của cảnh báo của bạn",
       "helpLegendSample": "một mẫu — giá trị thực được đặt khi cảnh báo được kích hoạt",
       "helpLegendOpaque": "được thêm tự động khi cảnh báo được kích hoạt",
+      "helpTemplateExplain": "Mẫu là thông báo được gửi đi — văn bản cộng với các biến như {'{'}alert_name{'}'}. Chọn một mẫu ở đây sẽ ghi đè mẫu riêng của từng đích đến, chỉ cho cảnh báo này.",
       "helpCurrentHeading": "Cảnh báo này gửi gì bây giờ",
+      "helpCurrentNoOverride": "Không có ghi đè — mỗi đích đến sử dụng mẫu riêng của nó:",
+      "helpCurrentNoDestinations": "Chưa chọn đích đến nào. Mỗi đích đến sẽ sử dụng mẫu đã cấu hình riêng của nó.",
+      "helpCurrentOverrideHeading": "Tất cả đích đến sử dụng mẫu này:",
       "helpPreviewHeading": "Xem trước mẫu",
       "helpPreviewSelectPlaceholder": "Chọn mẫu để xem trước",
       "helpApplyToAlert": "Áp dụng cho cảnh báo",
@@ -6799,6 +7001,7 @@
       "helpYourVariablesEmpty": "Bạn chưa thêm biến nào.",
       "helpRowTemplateExplain": "Một cảnh báo có thể khớp với nhiều dòng. Mẫu dòng quyết định cách một dòng đơn hiển thị. Sau đó {'{'}rows{'}'} trong mẫu chính của bạn sẽ đưa vào mỗi dòng khớp, đã được định dạng.",
       "helpRowTemplateTypeHeading": "Chuỗi so với JSON",
+      "helpRowTemplateTypeExplain": "Chuỗi (String) tạo ra văn bản thuần cho mỗi hàng. JSON tạo ra một đối tượng JSON cho mỗi hàng, phù hợp cho các đích đến có cấu trúc.",
       "helpRowTemplateTypeCurrent": "Đã chọn hiện tại:",
       "helpPreviewHeadingShort": "Xem trước",
       "helpWhyHeading": "Tại sao sử dụng biến?",
@@ -6811,6 +7014,7 @@
       "helpVariablesExampleCaption": "Thêm mức độ nghiêm trọng và nhóm làm biến, sau đó sử dụng chúng ở bất kỳ đâu trong mẫu:",
       "helpExampleResultLabel": "Nội dung được gửi",
       "helpTemplateWhenHeading": "Khi nào tôi nên ghi đè?",
+      "helpTemplateWhenDesc": "Để trống mục này và mỗi đích sẽ dùng mẫu riêng của nó. Đặt ghi đè khi bạn muốn cảnh báo này gửi cùng một thông điệp nhất quán đến mọi đích — mà không cần chỉnh sửa mẫu của từng đích.",
       "helpRowTemplateWhyHeading": "Tại sao cần mẫu hàng?",
       "helpRowTemplateWhyDesc": "Một cảnh báo có thể khớp với nhiều bản ghi. Mẫu hàng định dạng một bản ghi; {'{'}rows{'}'} sau đó đưa mọi bản ghi đã định dạng vào mẫu chính — vì vậy bạn liệt kê tất cả các kết quả khớp mà không cần viết vòng lặp.",
       "helpRowTemplateExampleCaption": "Mỗi hàng khớp được định dạng bởi mẫu hàng, sau đó {'{'}rows{'}'} đưa tất cả chúng vào mẫu chính:",
@@ -6819,8 +7023,10 @@
       "helpRowTemplatePreviewEmpty": "Chưa có mẫu hàng — hãy nhập một mẫu trong tab Cài đặt bổ sung để xem trước tại đây.",
       "helpPreviewSelectEmpty": "Chọn một mẫu ở trên để xem trước thông điệp mà nó sẽ gửi.",
       "helpCurrentBodyEmpty": "Mẫu này không có nội dung để xem trước.",
+      "helpDestinationNoTemplate": "Sử dụng định dạng mặc định của đích này.",
       "builtInVars": {
         "orgName": "Tên tổ chức của bạn",
+        "streamType": "Loại luồng (nhật ký, chỉ số, truy vết)",
         "streamName": "Tên stream mà cảnh báo theo dõi",
         "alertName": "Tên của cảnh báo",
         "alertType": "Loại cảnh báo (ví dụ: theo lịch, thời gian thực)",
@@ -6842,6 +7048,7 @@
     },
     "advanced": {
       "addVariable": "Thêm biến",
+      "variablesTooltip": "Biến được dùng để truyền dữ liệu từ cảnh báo đến đích.",
       "templateType": "Loại mẫu:",
       "noTemplatesAvailable": "Không có mẫu nào khả dụng",
       "refreshTemplates": "Làm mới các mẫu mới nhất",
@@ -6926,10 +7133,12 @@
     },
     "anomaly": {
       "addFilter": "Thêm bộ lọc",
+      "addNewDestination": "Thêm đích mới",
       "anomalyScoreRange": "Phạm vi điểm bất thường:",
       "checkEvery": "Kiểm tra mỗi",
       "checkEveryTooltip": "Tần suất chạy tác vụ phát hiện. Có thể lớn hơn chu kỳ lấy mẫu (ví dụ: lấy mẫu mỗi 5 phút, chạy phát hiện mỗi 1 giờ).",
       "clickLoadDataHint": "Nhấp vào Tải dữ liệu để xem trước chuỗi thời gian",
+      "destinationRequired": "Cần ít nhất một đích!",
       "detectionResolution": "Độ phân giải phát hiện",
       "detectionResolutionTooltip": "Mức độ chi tiết của mỗi điểm dữ liệu. Ví dụ: \"5m\" nghĩa là các bất thường được phát hiện ở độ phân giải 5 phút.",
       "disabled": "Đã tắt",
@@ -6944,8 +7153,10 @@
       "lookBackWindowTooltip": "Khoảng thời gian tối đa mà mỗi lần chạy phát hiện truy vấn. Giới hạn cửa sổ ngay cả sau khi tạm dừng lâu. Mặc định là khoảng thời gian Kiểm tra mỗi lần.",
       "maxThresholdMarkLine": "ngưỡng tối đa",
       "minThresholdMarkLine": "ngưỡng tối thiểu",
+      "noDestinationsFound": "Không tìm thấy đích nào",
       "noFieldsFound": "Không tìm thấy trường nào",
       "notifications": "Thông báo",
+      "notificationsTooltip": "Khi được bật, một thông báo sẽ được gửi đến đích đã chọn mỗi khi phát hiện bất thường.",
       "retrainEvery": "Huấn luyện lại mỗi",
       "retrainEveryTooltip": "Tần suất tự động huấn luyện lại mô hình. \"Không bao giờ\" nghĩa là huấn luyện một lần và giữ nguyên mô hình cho đến khi huấn luyện lại thủ công.",
       "retrainFourteenDays": "14 ngày",
@@ -6960,12 +7171,14 @@
       "sqlColumnsHint": "Truy vấn phải trả về hai cột: {timeBucket} và {valueColumn}.",
       "sqlRequired": "SQL là bắt buộc trong chế độ SQL tùy chỉnh",
       "summaryAlerting": "✓ Cảnh báo: {status}",
+      "summaryAlertingEnabled": "✓ Cảnh báo: Đã bật → {destinations}",
       "summaryAlertingNoDestination": "✓ Cảnh báo: Đã bật ⚠️ {warning}",
       "summaryConfiguring": "Đang cấu hình phát hiện bất thường cho stream {streamType} \"{stream}\"",
       "summaryDataSource": "✓ Nguồn dữ liệu: {type} — {name}",
       "summaryDetectionFunction": "✓ Chức năng phát hiện: {fn}",
       "summaryDetectionWindow": "✓ Cửa sổ phát hiện: {window} gần nhất",
       "summaryMonitoring": "Giám sát \"{stream}\" mỗi {schedule} để phát hiện bất thường {fn}, được huấn luyện trên {trainingDays} ngày lịch sử",
+      "summaryNoDestinationSet": "Chưa đặt đích",
       "summaryQueryMode": "✓ Chế độ truy vấn: {mode}",
       "summaryResolution": "✓ Độ phân giải: {resolution}",
       "summaryRetrain": "✓ Đào tạo lại: {retrain}",
@@ -7091,14 +7304,21 @@
       "triggerAlertFailed": "Không thể kích hoạt cảnh báo",
       "triggerRetrainingFailed": "Không thể kích hoạt đào tạo lại",
       "bulkDeleteAlertsFailed": "Lỗi khi xóa các cảnh báo. Vui lòng thử lại.",
+      "deleteDestinationFailed": "Lỗi khi xóa đích",
+      "bulkDeleteDestinationsFailed": "Lỗi khi xóa các đích. Vui lòng thử lại.",
       "bulkDeleteTemplatesFailed": "Lỗi khi xóa các mẫu. Vui lòng thử lại."
     },
     "prebuilt": {
+      "conversionSuccess": "Đã chuyển đổi đích thành công",
       "validationError": "Lỗi xác thực: {error}",
+      "invalidDestinationType": "Loại đích không hợp lệ",
       "invalidTargetType": "Loại mục tiêu không hợp lệ",
+      "unknownDestinationType": "Loại đích không xác định",
       "testFailedUnknownError": "Kiểm tra thất bại với lỗi không xác định"
     },
     "confirmDeleteAlerts": "Bạn có chắc chắn muốn xóa {count} cảnh báo không? | Bạn có chắc chắn muốn xóa {count} cảnh báo không?",
+    "confirmDeleteDestinations": "Bạn có chắc chắn muốn xóa {count} đích? | Bạn có chắc chắn muốn xóa {count} đích?",
+    "prebuiltDestination": "Đích {type} dựng sẵn",
     "errorValidations": "Lỗi xác thực",
     "outputMessagesLabel": "Thông báo đầu ra",
     "incidentSingular": "Sự cố",
@@ -7154,6 +7374,7 @@
       "critical": "Nghiêm trọng",
       "warning": "Cảnh báo",
       "ok": "OK",
+      "firingTotal": "Đang kích hoạt",
       "observedTotal": "Nhóm",
       "nOfMFiring": "{firing} trong số {observed} nhóm đang kích hoạt",
       "groupedBy": "nhóm theo {columns}",
@@ -7167,6 +7388,7 @@
       "when": "Khi",
       "change": "Thay đổi mức độ",
       "outcome": "Kết quả",
+      "value": "Giá trị",
       "rollupRow": "Tất cả các nhóm (tổng hợp)",
       "noHistoryTitle": "Không có chuyển tiếp nào được ghi lại",
       "noHistoryDescription": "Các thay đổi mức độ xuất hiện tại đây khi các nhóm bắt đầu kích hoạt, leo thang hoặc phục hồi.",
@@ -7214,6 +7436,7 @@
       "dialog": {
         "title": "Tạo cảnh báo",
         "continue": "Tiếp tục đến cảnh báo",
+        "streamLabel": "Luồng",
         "thresholdLabel": "Cảnh báo trên",
         "thresholdMatchingRows": "Các hàng khớp",
         "thresholdCount": "Số lượng hàng",
@@ -7300,22 +7523,26 @@
     "actionOpen": "Mở",
     "actionDelete": "Xóa",
     "deleteTitle": "Xóa {name}?",
+    "deleteMessage": "Thao tác này xóa vĩnh viễn. Việc xóa bị chặn nếu một cảnh báo hoặc đích vẫn còn sử dụng nó.",
     "deletedToast": "{name} đã được xóa",
     "deleteFailedToast": "Không thể xóa {name}",
     "loading": "Đang xây dựng biểu đồ phụ thuộc…",
     "failedToLoad": "Không thể tải các phụ thuộc: {error}",
     "usedBy": "{count} cảnh báo | {count} cảnh báo",
+    "countDestinations": "{count} đích | {count} đích",
     "usedByColumn": "Được sử dụng bởi",
     "searchPlaceholder": "Tìm kiếm",
     "noDependencies": "Không có phụ thuộc nào.",
     "noMatches": "Không có kết quả khớp nào.",
     "laneEmpty": "Không có cảnh báo",
     "directOverrides": "Sử dụng mẫu này trực tiếp",
+    "sectionDestinations": "Các đích",
     "sectionAlerts": "Cảnh báo",
     "orphanTag": "Không sử dụng",
     "missingTag": "Thiếu",
     "enabled": "Đã bật",
     "paused": "Đã tạm dừng",
+    "impactTemplate": "Được sử dụng bởi {destinations} · {alerts}",
     "impactDestination": "Được sử dụng bởi {alerts}"
   },
   "alert_library": {
@@ -7360,6 +7587,7 @@
       "noDescription": "Không có mô tả trong thư viện.",
       "needsDataCallout": "Cảnh báo này truy vấn {stream}, mà tổ chức này không tiếp nhận. Cài đặt ngay bây giờ sẽ tạo một cảnh báo không bao giờ kích hoạt.",
       "query": "Truy vấn",
+      "stream": "Luồng",
       "streamType": "Loại stream",
       "metricCondition": "Điều kiện metric",
       "matchCount": "Số hàng khớp yêu cầu",
@@ -7381,11 +7609,18 @@
     "install": {
       "title": "Cài đặt từ thư viện",
       "subtitle": "Chọn nơi cảnh báo thông báo, chọn cảnh báo để cài đặt và nơi chúng được lưu trữ.",
+      "stepDestination": "Đích",
       "stepAlerts": "Cảnh báo",
       "stepFolder": "Thư mục",
       "stepTune": "Tinh chỉnh",
       "stepInstall": "Cài đặt",
+      "destinationIntro": "Mọi cảnh báo trong lô này sẽ thông báo đến đích bạn chọn tại đây. Các tệp thư viện đặt tên cho các đích của tổ chức mà chúng được xuất ra, vốn không tồn tại trong tổ chức của bạn.",
+      "destinationLabel": "Đích",
+      "destinationPlaceholder": "Chọn một đích",
+      "destinationsLoadFailed": "Không thể tải các đích hiện có của bạn.",
       "retry": "Thử lại",
+      "destinationsNoneBody": "Tổ chức này chưa có đích cảnh báo nào, vì vậy không có nơi nào để các cảnh báo này gửi thông báo. Hãy tạo một đích trên trang Đích, sau đó quay lại và chọn nó tại đây.",
+      "openDestinations": "Mở Đích",
       "selectAll": "Chọn tất cả",
       "clear": "Xóa",
       "selectedCount": "Đã chọn {count} trong {total}",
@@ -7440,6 +7675,7 @@
     "importBodyLabel": "Nội dung Mẫu *",
     "importTypeLabel": "Loại Mẫu *",
     "importTitleLabel": "Tiêu đề Mẫu *",
+    "header": "Mẫu đích",
     "add": "Mẫu mới",
     "edit": "Chỉnh sửa",
     "name": "Tên",
@@ -7499,6 +7735,7 @@
     "chartPreviewPlaceholder": "Biểu đồ xuất hiện ở đây trong thông báo thực tế — nó được vẽ từ lịch sử đánh giá của chính cảnh báo, điều mà bản xem trước không có.",
     "channelTitlesDescription": "Sử dụng tiêu đề khác trên các kênh cụ thể — ví dụ: dòng chủ đề ngắn hơn cho email.",
     "namePlaceholder": "ví dụ: Tỷ lệ lỗi cao",
+    "nameLockedHint": "Cảnh báo và đích tham chiếu đến mẫu này theo tên, vì vậy không thể đổi tên nó. Nhân bản mẫu để tạo một bản sao với tên mới.",
     "rawBodyCaption": "Được gửi chính xác như đã viết, với {'{'}variables{'}'} được thay thế. Xem Hướng dẫn Biến để biết mọi thứ có sẵn.",
     "contentTitlePlaceholder": "{'{'}alert_name{'}'} · {'{'}stream_name{'}'}",
     "fieldLabelPlaceholder": "ví dụ: Giá trị",
@@ -7512,6 +7749,7 @@
     "moveUp": "Di chuyển lên",
     "moveDown": "Di chuyển xuống",
     "fieldLabel": "Nhãn",
+    "fieldValue": "Giá trị",
     "linkLabel": "Nhãn",
     "linkUrl": "URL",
     "channelTitleSlack": "Slack",
@@ -7571,10 +7809,12 @@
     "channelSns": "SNS",
     "testSendGroupLabel": "Gửi tin nhắn kiểm tra thực tế",
     "testSend": "Gửi kiểm tra",
+    "testSendDestinationLabel": "Đích",
     "testSendConfirmTitle": "Gửi một tin nhắn kiểm tra thực tế?",
     "testSendConfirm": "Thao tác này sẽ đăng một tin nhắn thực tế tới kênh đã chọn, được đánh dấu [TEST].",
     "testSendSuccess": "Tin nhắn kiểm tra đã được gửi",
-    "testSendRateLimited": "Quá nhiều lần gửi kiểm tra — vui lòng chờ một lát và thử lại"
+    "testSendRateLimited": "Quá nhiều lần gửi kiểm tra — vui lòng chờ một lát và thử lại",
+    "testSendNoDestination": "Chọn một đích trước"
   },
   "alert_sources": {
     "header": "Nguồn cảnh báo bên ngoài",
@@ -7612,8 +7852,10 @@
     "editTitle": "Chỉnh sửa nguồn cảnh báo",
     "name": "Tên",
     "nameHint": "Chỉ là nhãn — mọi nguồn đều sử dụng cùng một cấu hình.",
+    "incidentDestination": "Đích sự cố",
     "incidentDestinationPlaceholder": "Sử dụng mặc định của tổ chức",
     "incidentDestinationHint": "Nơi các thông báo được gửi đến khi cảnh báo từ nguồn này tạo hoặc tham gia một sự cố. Để trống để sử dụng mặc định của tổ chức — nếu không thiết lập, các sự cố khớp sẽ kích hoạt âm thầm.",
+    "noDestinationSet": "Chưa đặt đích sự cố",
     "setupStep1Title": "1. Tạo webhook",
     "setupStep1Body": "Trong Grafana, Alertmanager hoặc bất kỳ công cụ nào có thể POST JSON, hãy tạo một điểm liên hệ / bộ thu webhook.",
     "setupRemainingStepsHint": "Lưu nguồn này để lấy URL và token, sau đó dán chúng vào cấu hình webhook đó.",
@@ -7636,10 +7878,13 @@
     "createdSuccess": "Đã tạo nguồn cảnh báo",
     "updatedSuccess": "Đã cập nhật nguồn cảnh báo",
     "error": "Lỗi khi tải nguồn cảnh báo",
-    "senderError": "Lỗi khi tải trạng thái nguồn"
+    "senderError": "Lỗi khi tải trạng thái nguồn",
+    "destinationsLoadError": "Lỗi khi tải các đích"
   },
   "alert_destinations": {
+    "sectionTab": "Đích",
     "chooseTypeTitle": "Chọn Loại",
+    "selectDestinationType": "Chọn Loại Đích",
     "connectionStepTitle": "Kết nối",
     "connectionDetailsTitle": "Chi tiết Kết nối",
     "urlHelpText": "URL gốc không có dấu gạch chéo ở cuối (ví dụ: https://your-domain.com)",
@@ -7658,6 +7903,10 @@
     "datadogHostnameHelpText": "Tên máy chủ cho nhật ký Datadog",
     "exampleLabel": "Ví dụ:",
     "subtitle": "Nơi các cảnh báo đã kích hoạt được gửi đến",
+    "exportDestination": "Xuất Đích",
+    "deleteDestinationTitle": "Xóa Đích",
+    "deleteDestinationMessage": "Bạn có chắc chắn muốn xóa đích không?",
+    "deleteDestinationsTitle": "Xóa Các Đích",
     "selected": "đã chọn",
     "organizationLabel": "Tổ chức",
     "defaultPlaceholder": "ví dụ: default",
@@ -7676,18 +7925,25 @@
     "ddTagsPlaceholder": "Nhập thẻ (ví dụ: env:prod,version:1.0)",
     "serviceLabel": "Dịch vụ",
     "servicePlaceholder": "Nhập tên dịch vụ (ví dụ: api-gateway)",
+    "header": "Đích Thông Báo",
+    "add": "Đích mới",
     "edit": "Chỉnh sửa",
+    "search": "Tìm kiếm đích",
     "filterAll": "Tất cả",
     "filterPrebuilt": "Dựng sẵn",
     "filterCustom": "Tùy chỉnh",
     "templateDefaultBadge": "Mặc định",
     "name": "Tên",
+    "destination_type": "Loại Đích",
     "template": "Mẫu",
     "actions": "Hành động",
+    "addTitle": "Đích mới",
+    "updateTitle": "Cập nhật đích",
     "delete": "Xóa",
     "method": "Phương thức",
     "url": "URL",
     "api_header": "Tiêu đề",
+    "api_header_value": "Giá trị",
     "skip_tls_verify": "Bỏ qua xác thực TLS",
     "action": "Hành động",
     "output_format": "Định dạng đầu ra",
@@ -7696,6 +7952,7 @@
     "custom_headers": "Tiêu đề tùy chỉnh (Tùy chọn)",
     "preview": "Xem trước",
     "test": "Kiểm tra",
+    "saved": "Đã lưu đích thành công",
     "customWebhook": "Tùy chỉnh (Webhook)",
     "customEmail": "Tùy chỉnh (Email)",
     "customAction": "Tùy chỉnh (Hành động)",
@@ -7705,6 +7962,7 @@
     "separator_hint": "Chuỗi phân cách dùng giữa các bản ghi (cho phép khoảng trắng)",
     "templateDefaultOption": "Mặc định ({name})",
     "templateHelp": "Để mặc định để sử dụng mẫu {type} tiêu chuẩn ({name}), hoặc chọn mẫu tùy chỉnh.",
+    "loadingData": "Đang tải dữ liệu đích...",
     "noEmailTemplates": "Có vẻ như bạn chưa tạo Mẫu Email nào.",
     "createEmailTemplate": "Tạo Mẫu Email",
     "headers": "Tiêu đề",
@@ -7719,14 +7977,40 @@
       "servicenowDescription": "Tạo sự cố trong ServiceNow"
     },
     "import": {
+      "title": "Nhập đích",
       "errorValidations": "Xác thực Lỗi",
       "outputMessages": "Tin nhắn Đầu ra",
+      "destinationName": "Tên đích",
+      "destinationUrl": "URL đích",
+      "destinationMethod": "Phương thức đích",
       "templates": "Mẫu",
       "emails": "Email (phân cách bằng dấu phẩy)",
       "actions": "Hành động",
+      "destinationCreation": "Tạo đích",
       "jsonStringEmpty": "Chuỗi JSON trống",
       "invalidJsonFormat": "Định dạng JSON không hợp lệ",
-      "unknownError": "Lỗi không xác định"
+      "importSuccess": "Đã nhập các đích thành công",
+      "importError": "Lỗi khi nhập đích, vui lòng kiểm tra JSON",
+      "unknownError": "Lỗi không xác định",
+      "nameRequired": "Đích - {index}: Trường \"name\" là bắt buộc và phải là một chuỗi hợp lệ.",
+      "nameExists": "Đích - {index}: \"{name}\" đã tồn tại",
+      "typeInvalid": "Đích - {index}: Trường \"type\" phải là \"email\", \"http\" hoặc \"action\".",
+      "actionTypeNotSupported": "Đích - {index}: Loại 'action' không được hỗ trợ.",
+      "actionNotFound": "Đích - {index}: action \"{actionId}\" không tồn tại cho loại \"{type}\"",
+      "urlRequired": "Đích - {index}: Trường \"url\" là bắt buộc cho các đích loại http.",
+      "methodInvalid": "Đích - {index}: Trường \"method\" phải là một trong \"post\", \"get\" hoặc \"put\".",
+      "templateRequiredHttp": "Đích - {index}: Trường \"template\" là bắt buộc cho các đích loại http.",
+      "skipTlsVerifyRequired": "Đích - {index}: Trường \"skip_tls_verify\" là bắt buộc và phải là giá trị boolean.",
+      "headersMustBeObject": "Đích - {index}: 'headers' phải là một đối tượng cho loại http.",
+      "urlNotAllowedEmail": "Đích - {index}: Không nên cung cấp 'url' cho loại email.",
+      "headersNotAllowedEmail": "Đích - {index}: Không nên cung cấp 'headers' cho loại email.",
+      "emailsRequired": "Đích - {index}: Trường \"emails\" là bắt buộc và phải là một mảng cho các đích loại email.",
+      "emailsMustBeStrings": "Đích - {index}: 'emails' phải là một mảng các chuỗi cho loại email.",
+      "templateRequiredEmail": "Đích - {index}: Trường \"template\" là bắt buộc cho các đích loại email.",
+      "templateNotFound": "Đích - {index}: template \"{template}\" không tồn tại cho loại \"{type}\"",
+      "actionIdInvalid": "Đích - {index}: Trường \"action_id\" phải là một chuỗi hợp lệ.",
+      "createSuccess": "Đích - {index}: \"{name}\" đã được tạo thành công \nLưu ý: vui lòng xóa đối tượng đích {name} đã tạo khỏi tệp json ",
+      "createFailed": "Đích - {index}: Tạo \"{name}\" thất bại --> \n Lý do: {reason}"
     },
     "priorityP1Description": "Cảnh báo ưu tiên cao nhất",
     "priorityP2Description": "Cảnh báo ưu tiên cao",
@@ -7738,7 +8022,10 @@
     "severityWarningDescription": "Sự cố mức cảnh báo",
     "severityInfoDescription": "Sự cố thông tin"
   },
-  "pipeline_destinations": {},
+  "pipeline_destinations": {
+    "header": "Đích Pipeline",
+    "search": "Tìm kiếm đích"
+  },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
     "tabLabel": "BYOB",
@@ -7947,6 +8234,7 @@
     },
     "metricCard": {
       "lastRefreshed": "Làm mới lần cuối:",
+      "traceId": "Trace ID: {id}",
       "metricLabel": "Chỉ số: {name}",
       "queryLabel": "Truy vấn: {query}",
       "errorLabel": "Lỗi: {error}",
@@ -7979,6 +8267,7 @@
       "loadingLabels": "Đang tải nhãn...",
       "noLabelsFound": "Không tìm thấy nhãn",
       "operator": "Toán tử",
+      "value": "Giá trị",
       "selectLabelFirst": "Chọn nhãn trước",
       "noValuesFound": "Không tìm thấy giá trị",
       "addLabelFilter": "Thêm bộ lọc nhãn",
@@ -8069,6 +8358,7 @@
     "generalLabel": "Cài đặt chung",
     "groupGeneral": "Chung",
     "groupAccessSecurity": "Truy cập & Bảo mật",
+    "groupDestinations": "Đích",
     "groupDataAI": "Dữ liệu & AI",
     "groupOperations": "Hoạt động",
     "groupSynthetics": "Synthetics",
@@ -8097,6 +8387,8 @@
     "customLogoText": "Văn bản logo tùy chỉnh",
     "orgLabel": "Tham số tổ chức",
     "logDetails": "Chi tiết nhật ký",
+    "traceIdFieldName": "Tên trường Trace ID",
+    "spanIdFieldName": "Tên trường Span ID",
     "toggleIngestionLogsLabel": "Bật/tắt nhật ký nhập",
     "usageStreamEnabledLabel": "Bật luồng sử dụng",
     "claimParserFunction": "Trình phân tích xác nhận SSO",
@@ -8222,6 +8514,7 @@
     "genAiAgentMapping": {
       "tabLabel": "Ánh xạ Tác nhân GenAI",
       "title": "Ánh xạ Tác nhân GenAI",
+      "description": "Định cấu hình các thuộc tính telemetry dự phòng được sử dụng để chuẩn hóa danh tính tác nhân cho các trace LLM và đánh giá.",
       "agentNameFields": "Trường dự phòng tên tác nhân",
       "agentNameHelp": "Các thuộc tính đến để sử dụng làm dự phòng cho gen_ai.agent.name.",
       "agentNameInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.name tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến mỗi dòng.",
@@ -8239,6 +8532,7 @@
       "resetToEmpty": "Đặt lại về trống",
       "clearRegistry": "Xóa sổ đăng ký",
       "clearRegistryTitle": "Xóa sổ đăng ký tác nhân?",
+      "clearRegistryDescription": "Thao tác này xóa tất cả các hàng đăng ký tác nhân GenAI đã được phát hiện cho tổ chức này. Các trace khớp mới sẽ điền lại sổ đăng ký trong quá trình tiếp nhận dữ liệu.",
       "clearRegistryConfirm": "Xóa sổ đăng ký",
       "saved": "Đã lưu ánh xạ tác nhân GenAI thành công",
       "clearRegistrySuccess": "Đã xóa đăng ký tác nhân GenAI. Đã xóa {deletedCount} tác nhân được lưu trữ và {bufferCount} quan sát đang xếp hàng.",
@@ -8258,6 +8552,7 @@
       "fieldAliasesSaveError": "Không thể lưu bí danh trường",
       "fieldAliasesUnsavedConfirm": "Bạn có thay đổi ánh xạ trường chưa lưu. Hủy bỏ chúng và rời đi?",
       "discoveredServicesTitle": "Dịch vụ được phát hiện",
+      "discoveredServicesDescription": "Các dịch vụ được tự động phát hiện từ dữ liệu telemetry của bạn và được nhóm theo Tên dịch vụ để tương quan. Các dịch vụ có cùng Tên dịch vụ được tương quan với nhau qua nhật ký, trace và chỉ số.",
       "noServicesYet": "Chưa có dịch vụ nào được phát hiện",
       "noServicesDescription": "Dịch vụ sẽ xuất hiện ở đây khi dữ liệu đo từ xa được nạp với các thuộc tính nhận dạng dịch vụ (như k8s-deployment, tên dịch vụ, v.v.)",
       "searchServiceName": "Tìm kiếm tên dịch vụ hoặc luồng...",
@@ -8265,6 +8560,7 @@
       "serviceName": "Tên dịch vụ",
       "service": "Dịch vụ",
       "logs": "Nhật ký",
+      "traces": "Trace",
       "metrics": "Số liệu",
       "lastSeen": "Lần cuối thấy",
       "retry": "Thử lại",
@@ -8276,6 +8572,7 @@
       "fieldMappingDialogHelp": "Thêm hoặc xóa các tên trường cần được nhận dạng là tên dịch vụ trên dữ liệu đo từ xa của bạn.",
       "fieldMappingPlaceholder": "Nhập tên trường và nhấn Enter",
       "foundInLogs": "Tìm thấy trong Nhật ký",
+      "foundInTraces": "Tìm thấy trong Trace",
       "foundInMetrics": "Tìm thấy trong Metrics",
       "distinguishByLabel": "Phân biệt Dịch vụ Theo",
       "distinguishByHelp": "Chọn các trường xác định nơi dịch vụ của bạn chạy. Ví dụ: cluster + namespace + deployment cùng tạo ra một định danh duy nhất cho mỗi dịch vụ. Tối đa 5 trường.",
@@ -8311,11 +8608,13 @@
       "instancesCount": "({count} phiên bản)",
       "noDimensions": "không có kích thước",
       "defaultSetWarningTitle": "Tương quan có thể không đáng tin cậy.",
+      "defaultSetWarningBody": "Phiên bản này không có sự phân biệt — nó được phát hiện mà không có bất kỳ khớp khối lượng công việc nào (không có bối cảnh cụm, không gian tên hoặc môi trường). Nhật ký và trace có thể đến từ các triển khai khác nhau của cùng một tên dịch vụ.",
       "instanceIdentity": "Định danh Phiên bản",
       "noDimensionsCatchAll": "Không có kích thước — phiên bản bắt tất cả",
       "streamSources": "Nguồn Luồng",
       "fieldNameMapping": "Ánh xạ Tên Trường",
       "logsWithCount": "Nhật ký ({count})",
+      "tracesWithCount": "Trace ({count})",
       "metricsWithCount": "Metrics ({count})"
     },
     "addRegexPattern": {
@@ -8428,7 +8727,9 @@
       "importPatternFailed": "Không thể nhập mẫu \"{name}\": {error}",
       "createFailed": "Mẫu Regex - {index}: tạo \"{name}\" thất bại --> \n Lý do: {error}"
     },
-    "index": {},
+    "index": {
+      "genAiAgentMappingDesc": "Ánh xạ các span GenAI sang mã định danh tác nhân"
+    },
     "organizationManagementPage": {
       "setAiCredits": "Thiết lập Tín dụng AI",
       "setAiCreditsSubtitle": "Thiết lập hạn mức tín dụng AI trọn đời của tổ chức.",
@@ -8562,6 +8863,8 @@
       "noValues": "Không có giá trị",
       "cardinality": "Số lượng:",
       "uniqueValues": "{n} giá trị duy nhất",
+      "streams": "Stream",
+      "streamsSubtext": "stream",
       "noAdditionalDimensions": "Không phát hiện thêm chiều nào.",
       "noSampleData": "Không có dữ liệu mẫu khả dụng cho trường này.",
       "uniqueValuesDetected": "{n} giá trị duy nhất được phát hiện",
@@ -8628,6 +8931,7 @@
     "cachedReportHint": "Lưu ý: Các báo cáo được lưu vào bộ nhớ đệm để truy cập nhanh vào bảng điều khiển; chia sẻ bị vô hiệu hóa đối với các báo cáo này.",
     "selectDashboardStep": "Chọn bảng điều khiển",
     "timeRangeDescription": "Tạo báo cáo với dữ liệu từ khoảng thời gian đã chỉ định",
+    "pngPageLimitNote": "PNG chỉ chụp trang đầu tiên hiển thị của bảng điều khiển. Hãy dùng PDF nếu bảng điều khiển trải dài trên nhiều trang.",
     "widthPlaceholder": "ví dụ: 1440",
     "heightPlaceholder": "ví dụ: 900",
     "dimensionsDefaultHint": "Để trống để sử dụng mặc định của máy chủ",
@@ -8643,6 +8947,7 @@
     "searchAllFoldersTitle": "Tìm kiếm trên tất cả các thư mục",
     "never": "Không bao giờ",
     "startDate": "Ngày bắt đầu",
+    "header": "Báo cáo",
     "subtitle": "Báo cáo và xuất theo lịch",
     "searchThisFolder": "Thư mục này",
     "searchAllFolders": "Tất cả thư mục",
@@ -8745,6 +9050,7 @@
     "totalTimeRange": "Tổng phạm vi truy vấn",
     "searchType": "Loại tìm kiếm",
     "querySource": "Nguồn truy vấn",
+    "traceId": "Trace ID",
     "userId": "ID người dùng",
     "orgId": "ID tổ chức",
     "streamType": "Loại luồng",
@@ -8831,10 +9137,16 @@
     },
     "openInFullView": "Mở toàn màn hình",
     "viewLogs": "Xem Nhật ký",
+    "viewLogsUnavailable": "Không thể mở nhật ký cho span này.",
     "backToLogs": "Quay lại Nhật ký",
+    "openInTraces": "Mở trong Trace",
     "loadingStream": "Đang tải Luồng...",
     "noLogsAvailableForService": "Không có Nhật ký nào cho dịch vụ này",
+    "noCorrelatedLogsFound": "Không tìm thấy nhật ký tương quan nào cho span này",
     "noData": {
+      "title": "Bắt đầu gửi trace tới {product}",
+      "description": "Chưa tìm thấy stream trace nào trong tổ chức này. Hãy tích hợp trace vào các dịch vụ của bạn và trace sẽ tự động xuất hiện ở đây.",
+      "otlp": "Gửi trace qua {product}",
       "otlpDesc": "{product1}, {product2} và bất kỳ SDK tương thích với {product3}",
       "otelCollectorDesc": "Định tuyến tất cả tín hiệu telemetry qua {product}",
       "or": "Hoặc:",
@@ -8843,12 +9155,21 @@
     "configureFullTextSearch": "để cấu hình trường tìm kiếm văn bản đầy đủ cho luồng.",
     "collapseFields": "Thu gọn Trường",
     "openFields": "Mở Trường",
+    "timeRangeUpdated": "Khoảng thời gian đã chọn không bao gồm trace này. Khoảng thời gian đã được cập nhật để khớp với dấu thời gian của trace.",
+    "errorRetrievingTraces": "Đã xảy ra lỗi khi truy xuất trace.",
+    "fetchingTraces": "Đang tải Trace...",
     "noStream": {
       "title": "Chọn một luồng để bắt đầu khám phá",
+      "description": "Chọn một stream trace, sau đó nhấn <strong>Chạy truy vấn</strong>. Bạn có thể lọc theo dịch vụ, thời lượng, trạng thái span, và nhiều hơn nữa khi kết quả được tải.",
       "selectStream": "Chọn một luồng",
+      "selectStreamDesc": "Duyệt các stream trace khả dụng trong tổ chức này",
+      "queryGuide": "Đọc hướng dẫn về trace",
+      "queryGuideDesc": "Biểu đồ dịch vụ, lọc span, chỉ số RED và nhiều hơn nữa",
       "recent": "Gần đây:"
     },
     "noEvents": {
+      "title": "Không tìm thấy trace nào",
+      "descNoFilters": "Không tìm thấy trace nào trong {range}.",
       "descWithFilters": "Không có gì khớp <strong>truy vấn này</strong> trong cửa sổ đã chọn. Luồng có dữ liệu ở đây — hãy thử nới lỏng một bộ lọc trong thanh truy vấn.",
       "descOutOfRange": "Khoảng thời gian của bạn không chứa dữ liệu nào từ luồng này. Nhảy đến thời điểm dữ liệu được thấy lần cuối.",
       "jumpToData": "Nhảy đến dữ liệu mới nhất",
@@ -8856,19 +9177,38 @@
       "askAi": "Yêu cầu AI sửa truy vấn của tôi",
       "selectedRange": "khoảng đã chọn"
     },
+    "tracesFound": "Số trace tìm thấy",
+    "spansFound": "Số span tìm thấy",
+    "errorTraces": "Trace lỗi",
+    "errorSpans": "Span lỗi",
     "filterByErrors": "Lọc theo lỗi",
     "clearErrorFilter": "Xóa bộ lọc lỗi",
     "error": "LỖI",
     "errorCount": "{n} LỖI | {n} LỖI",
     "success": "THÀNH CÔNG",
+    "applyPendingFilters": "Áp dụng bộ lọc đang chờ và Tìm kiếm trace",
+    "backToTraces": "Quay lại Trace",
     "loadingTrace": "Đang tải...",
+    "traceId": "Trace ID",
+    "copyTraceId": "Sao chép Trace ID",
     "viewFilters": "Xem bộ lọc",
+    "reviewAndApplyFilters": "Xem lại và áp dụng bộ lọc cho Trace",
+    "spansLabel": "span",
     "errorsLabel": "lỗi",
     "previousMatch": "Kết quả trước",
     "nextMatch": "Kết quả tiếp theo",
+    "searchInSpans": "Tìm kiếm trong span",
+    "spansTableView": "Chế độ xem bảng span",
     "comingSoon": "Sắp ra mắt...",
+    "fetchingTrace": "Đang tải trace của bạn.",
+    "traceFilters": "Bộ lọc trace",
+    "showTraces": "Hiển thị trace",
     "applyAndSearch": "Áp dụng & Tìm kiếm",
     "timestamp": "Dấu thời gian",
+    "noErrorPresent": "Không có lỗi nào cho span này",
+    "noEventsPresent": "Không có sự kiện nào cho span này",
+    "noLinksPresent": "Không có liên kết nào cho span này",
+    "loadingTraceDag": "Đang tải DAG trace...",
     "exceptionsWithCount": "Ngoại lệ ({count})",
     "typeLabel": "Loại:",
     "messageLabel": "Tin nhắn:",
@@ -8882,6 +9222,7 @@
       "templateBadge": "mẫu"
     },
     "sessionsList": {
+      "streamLabel": "Stream",
       "sessions": "phiên",
       "failedToLoad": "Tải phiên thất bại",
       "retry": "Thử lại",
@@ -8899,6 +9240,7 @@
         "cost": "Chi phí",
         "status": "Trạng thái"
       },
+      "stream": "Stream",
       "agent": "Tác nhân",
       "noAgentsTitle": "Không có tác nhân nào trong khoảng này",
       "noAgentsDescription": "Không phát hiện tác nhân GenAI nào trong khoảng thời gian đã chọn. Hãy thử khoảng rộng hơn hoặc chuyển lại chế độ luồng.",
@@ -8912,9 +9254,12 @@
       "failedToLoad": "Không tải được phiên",
       "retry": "Thử lại",
       "sessionNotFound": "Không tìm thấy phiên",
+      "noSpansFound": "Không tìm thấy span nào cho {id} trong khoảng thời gian hiện tại.",
+      "searchPlaceholder": "Tìm kiếm trace trong phiên này…",
       "turn": "lượt",
       "turns": "lượt",
       "turnCount": "{count} {unit}",
+      "openInTraceExplorer": "Xem trace",
       "filters": {
         "status": "Trạng thái",
         "model": "Mô hình",
@@ -9003,6 +9348,7 @@
         "warning": "Cảnh báo",
         "critical": "Nghiêm trọng"
       },
+      "viewTraces": "Xem trace",
       "types": {
         "all": "Tất cả",
         "service": "Dịch vụ",
@@ -9016,15 +9362,20 @@
         "title": "Tỷ lệ lỗi"
       }
     },
+    "spansTab": "Span",
+    "tracesTab": "Trace",
     "serviceGraphTab": "Biểu đồ dịch vụ",
     "serviceGraphSubtitle": "Xem cách các dịch vụ của bạn gọi nhau — phụ thuộc, thông lượng và tỷ lệ lỗi",
+    "servicesCatalogSubtitle": "Mọi dịch vụ đang gửi trace, với độ trễ, thông lượng và tỷ lệ lỗi",
     "treeView": "Chế độ xem cây",
     "graphView": "Chế độ xem đồ thị",
     "layoutHorizontal": "Ngang",
     "layoutVertical": "Dọc",
     "layoutForce": "Bố cục lực",
+    "exportTraces": "Xuất trace",
     "waterfall": "Thác nước",
     "flameGraph": "Biểu đồ ngọn lửa",
+    "traceGraph": "Biểu đồ trace",
     "thread": "Luồng",
     "dbSpanDetails": {
       "dbSystem": "Hệ thống DB",
@@ -9034,6 +9385,7 @@
       "host": "Máy chủ",
       "user": "Người dùng",
       "storedProcedure": "Thủ tục lưu trữ",
+      "noQueryText": "Không có văn bản truy vấn nào được ghi lại cho span này.",
       "performance": "Hiệu suất",
       "rowsReturned": "Số hàng trả về",
       "batchSize": "Kích thước lô",
@@ -9046,11 +9398,13 @@
       "changeStreamTitle": "Thay đổi luồng?",
       "switchStream": "Chuyển luồng",
       "cancel": "Hủy",
+      "changeStreamMessage": "Điều này cũng sẽ cập nhật stream trong tab Trace/Span và đặt lại truy vấn hiện có.",
       "errorGettingFunctions": "Lỗi khi lấy hàm",
       "errorPullingIndex": "Lỗi khi kéo chỉ mục cho tổ chức đã chọn{message}",
       "errorGettingStreams": "Lỗi khi lấy luồng",
       "errorLoadingStreams": "Lỗi khi tải luồng",
       "errorConstructingQuery": "Đã xảy ra lỗi khi xây dựng truy vấn tìm kiếm.",
+      "traceNotFound": "Không tìm thấy trace {traceId}",
       "errorProcessingRequest": "Lỗi khi xử lý yêu cầu",
       "searchRequestFailed": "Yêu cầu tìm kiếm thất bại"
     },
@@ -9071,6 +9425,9 @@
       "service": "Dịch vụ",
       "operationName": "Tên thao tác",
       "duration": "Thời lượng",
+      "spans": "Span",
+      "spanKind": "Loại Span",
+      "spanStatus": "Trạng thái Span",
       "status": "Trạng thái",
       "serviceLatency": "Độ trễ dịch vụ",
       "inputTokens": "Token đầu vào",
@@ -9082,9 +9439,11 @@
       "noErrorsInRange": "Không có lỗi trong khoảng thời gian này",
       "time": "Thời gian",
       "service": "Dịch vụ",
-      "operation": "Thao tác"
+      "operation": "Thao tác",
+      "traceId": "Trace ID"
     },
     "lLMInsightsDashboard": {
+      "stream": "Stream",
       "agent": "Tác nhân",
       "compareEntry": "So sánh phiên bản",
       "compareEntryHint": "So sánh hai phiên bản của agent này cạnh nhau",
@@ -9095,6 +9454,7 @@
       "viewByStream": "Xem theo luồng",
       "totalCost": "Tổng chi phí",
       "totalTokens": "Tổng token",
+      "totalTraces": "Tổng số Trace",
       "p95Latency": "Độ trễ P95",
       "errorRate": "Tỷ lệ lỗi",
       "timeAxis": "Thời gian",
@@ -9106,10 +9466,13 @@
     "serviceGraphNodeSidePanel": {
       "viewRelated": "Xem liên quan",
       "logs": "Nhật ký",
+      "traces": "Trace",
       "databases": "Cơ sở dữ liệu",
+      "viewTraces": "Xem Trace",
       "operations": "Thao tác",
       "metrics": "Chỉ số",
       "noOperationsFound": "Không tìm thấy thao tác nào",
+      "viewInTraces": "Xem trong Trace",
       "noResourceDataFound": "Không tìm thấy dữ liệu {resource}",
       "retry": "Thử lại",
       "noMetricsAvailable": "Không có chỉ số nào cho dịch vụ này.",
@@ -9133,11 +9496,13 @@
       "tabHosts": "Máy chủ",
       "tabDatabases": "Cơ sở dữ liệu",
       "tabQueries": "Truy vấn",
+      "tabDestinations": "Điểm đích",
       "tabRpcServices": "Dịch vụ RPC",
       "tabUrls": "URL",
       "colHost": "Máy chủ",
       "colDatabase": "Cơ sở dữ liệu",
       "colDbOperation": "Thao tác DB",
+      "colDestination": "Điểm đích",
       "colRpcService": "Dịch vụ RPC",
       "colUrl": "URL",
       "envHost": "Máy chủ",
@@ -9152,11 +9517,14 @@
       "dbResponseStatusCode": "Mã trạng thái phản hồi DB",
       "processExitCode": "Mã thoát tiến trình"
     },
-    "traceLatencyCell": {},
+    "traceLatencyCell": {
+      "spansAcrossServices": "{spans} span trên {services} dịch vụ"
+    },
     "threadToolCalls": {
       "toolCall": "gọi công cụ",
       "toolCalls": "các cuộc gọi công cụ",
       "showCalls": "Hiển thị cuộc gọi",
+      "openSpanDetails": "Mở chi tiết span",
       "arguments": "Đối số",
       "result": "Kết quả",
       "empty": "(trống)"
@@ -9170,13 +9538,17 @@
       "cost": "Chi phí",
       "model": "Mô hình",
       "errors": "Lỗi",
+      "noSpansLoaded": "Không có span nào được tải cho trace này.",
+      "noLlmTurns": "Không phát hiện lượt LLM nào. Trace không chứa span nào có",
       "system": "Hệ thống",
+      "historicalMessage": "{count} tin nhắn trước đó từ phiên này — đã xử lý trong các trace trước. | {count} tin nhắn trước đó từ phiên này — đã xử lý trong các trace trước.",
       "user": "Người dùng",
       "startedAt": "Bắt đầu lúc {time}",
       "unknown": "không xác định",
       "tokens": "Token",
       "tokensSuffix": "token",
-      "error": "Lỗi"
+      "error": "Lỗi",
+      "viewSpan": "Xem span"
     },
     "traceHeader": {
       "operationName": "Tên thao tác"
@@ -9194,6 +9566,7 @@
       "start": "Bắt đầu",
       "requestResent": "Đã gửi lại yêu cầu {count} lần | Đã gửi lại yêu cầu {count} lần",
       "resends": "Số lần gửi lại",
+      "spanIdTitle": "Span ID: {id}",
       "inputTokens": "Token đầu vào",
       "in": "Vào",
       "outputTokens": "Token đầu ra",
@@ -9211,8 +9584,11 @@
       "modelParameters": "Tham số mô hình",
       "table": "Bảng",
       "field": "Trường",
+      "value": "Giá trị",
       "timestamp": "Dấu thời gian",
       "enterpriseLicenseRequired": "Tính năng tương quan yêu cầu giấy phép doanh nghiệp",
+      "missingSpanOrStream": "Thiếu tên span hoặc stream",
+      "spanIdCopied": "Đã sao chép Span ID vào clipboard",
       "attributesCopied": "Thuộc tính đã sao chép vào bảng nháp",
       "copiedToClipboard": "{type} đã sao chép vào bảng nháp",
       "failedToCopyClipboard": "Không thể sao chép vào bảng nháp",
@@ -9225,20 +9601,26 @@
       "filterAdded": "Bộ lọc đã thêm: {field} {operator} '{value}'",
       "timeline": "Dòng thời gian",
       "serviceMap": "Bản đồ dịch vụ",
+      "traceNotFound": "Không tìm thấy trace {traceId}",
+      "spanNotFound": "Không tìm thấy span {spanId} trong trace",
       "unknownOperation": "Thao tác không xác định",
       "unknownService": "Dịch vụ không xác định",
+      "traceIdCopied": "Đã sao chép Trace ID vào clipboard",
       "sessionIdCopied": "ID phiên đã sao chép vào bảng nháp"
     },
     "traceTree": {
       "clickToExpand": "Nhấp để mở rộng",
       "clickToCollapse": "Nhấp để thu gọn",
-      "httpStatus": "HTTP {status}"
+      "errorSpan": "Span lỗi",
+      "httpStatus": "HTTP {status}",
+      "spanEvent": "{count} sự kiện span | {count} sự kiện span"
     },
     "tracesAnalysisDashboard": {
       "baseline": "Đường cơ sở:",
       "selected": "Đã chọn:",
       "dimensions": "Kích thước",
-      "collapseDimensions": "Thu gọn kích thước"
+      "collapseDimensions": "Thu gọn kích thước",
+      "tracesPerInterval": "trace/khoảng thời gian"
     },
     "sessionDetails": {
       "missingSessionInfo": "Thiếu id phiên hoặc luồng trong URL",
@@ -9246,21 +9628,36 @@
       "copied": "Đã sao chép"
     },
     "flameGraphView": {
+      "spans": "span",
       "depth": "độ sâu",
+      "noSpansToDisplay": "Không có span nào để hiển thị",
       "service": "Dịch vụ:",
       "duration": "Thời lượng:",
+      "percentOfTrace": "% của trace:",
       "hasErrors": "⚠ Có lỗi"
     },
     "tracesNoEventsState": {
       "lastData": "Dữ liệu cuối: {formatted} ({zone})"
     },
     "correlation": {
+      "distributedTrace": "Trace phân tán",
+      "loadingTraceData": "Đang tải dữ liệu trace...",
+      "noTraceInfoAvailable": "Không có thông tin trace nào cho sự kiện này",
+      "traceIdLabel": "Trace ID:",
+      "copyTraceId": "Sao chép Trace ID",
+      "spanIdLabel": "Span ID:",
+      "spanHierarchy": "Phân cấp Span:",
+      "applicationSpan": "Span ứng dụng",
+      "browserSdkSpanPrefix": "Span SDK trình duyệt (",
       "closingParen": ")",
+      "backendSpansPrefix": "Span backend (",
       "performanceBreakdown": "Phân tích hiệu suất:",
       "totalDuration": "Tổng thời gian:",
       "browserLabel": "Trình duyệt:",
       "networkLabel": "Mạng:",
-      "backendLabel": "Backend:"
+      "backendLabel": "Backend:",
+      "viewTraceDetails": "Xem chi tiết trace",
+      "backendTraceNotAvailable": "Dữ liệu trace backend chưa khả dụng. Dữ liệu trace có thể mất tối đa 30 giây để được tiếp nhận."
     },
     "failedToAnalyzeDimensions": "Không thể phân tích các thứ nguyên",
     "failedToFetchCorrelatedLogs": "Không thể tải nhật ký tương quan",
@@ -9288,6 +9685,7 @@
     "serviceDiscoveryNotEnabled": "Khám phá dịch vụ chưa được bật. Đây là tính năng doanh nghiệp.",
     "startTime": "Thời gian bắt đầu",
     "streamNameRequiredForCorrelation": "Tên luồng là bắt buộc để tương quan",
+    "trace": "Trace",
     "unableToConnectToServer": "Không thể kết nối đến máy chủ. Vui lòng kiểm tra xem ứng dụng có đang chạy không.",
     "unknownService": "Dịch vụ không xác định",
     "unknownPattern": "Mẫu không xác định",
@@ -9298,6 +9696,7 @@
       "requestsLabel": "Yêu cầu:",
       "errorsLabel": "Lỗi:",
       "errorRateLabel": "Tỷ lệ lỗi:",
+      "spansLabel": "Span:",
       "callsLabel": "Lời gọi:",
       "averageLabel": "Trung bình:",
       "minimumLabel": "Tối thiểu:",
@@ -9306,8 +9705,10 @@
       "p75Label": "P75:",
       "p95Label": "P95:",
       "p99Label": "P99:",
+      "averageOfTrace": "{avg}ms ({percent}% của trace)",
       "requestCount": "{count} yêu cầu"
     },
+    "spanEventTimeline": "Dòng thời gian sự kiện span",
     "eventClusterTooltip": "{count} sự kiện",
     "spanEventCount": "{count} sự kiện",
     "spanEventCountPlural": "{count} sự kiện",
@@ -9318,7 +9719,8 @@
     "eventClusterAriaLabel": "{count} sự kiện, {errors} lỗi",
     "eventClusterAriaLabelPlural": "{count} sự kiện, {errors} lỗi",
     "eventMarkerTooltip": "Sự kiện: {name}",
-    "exceptionMarkerTooltip": "Ngoại lệ: {type}"
+    "exceptionMarkerTooltip": "Ngoại lệ: {type}",
+    "spanEventFallback": "sự kiện span"
   },
   "actions": {
     "realTime": "Thời gian thực",
@@ -9392,6 +9794,7 @@
     "requiresConfirmation": "Yêu cầu xác nhận trước khi thực thi",
     "envVars": "Biến môi trường",
     "envKey": "Tên biến",
+    "envValue": "Giá trị",
     "addEnvVar": "Thêm biến",
     "credentialFiles": "Tệp thông tin xác thực",
     "credEnvVar": "Tên biến môi trường",
@@ -9614,9 +10017,11 @@
     "selectMetrics": "Chọn Luồng Chỉ số",
     "correlatedLogs": "Nhật ký",
     "correlatedMetrics": "Chỉ số",
+    "correlatedTraces": "Trace",
     "loadingCorrelation": "Đang tải dữ liệu tương quan...",
     "clickToLoadLogs": "Nhấp để tải nhật ký tương quan",
     "clickToLoadMetrics": "Nhấp để tải chỉ số tương quan",
+    "clickToLoadTraces": "Nhấp để tải các trace tương quan",
     "logs": {
       "filtersLabel": "Bộ lọc",
       "allValues": "Tất cả giá trị",
@@ -9635,11 +10040,19 @@
     "noLogsFound": "Không tìm thấy nhật ký",
     "noDataFound": "Không tìm thấy dữ liệu",
     "noLogsDescription": "Không tìm thấy nhật ký cho tương quan này trong phạm vi thời gian đã chọn.",
+    "correlatedTracesFor": "Các trace tương quan cho dịch vụ: {service}",
     "all": "Tất cả",
+    "loadingTraces": "Đang tải trace...",
+    "tracesError": "Không thể tải trace",
+    "tracesErrorDetails": "Đã xảy ra lỗi khi lấy dữ liệu trace. Vui lòng thử lại.",
     "metricsError": "Không thể tải chỉ số",
     "metricsErrorDetails": "Đã xảy ra lỗi khi lấy dữ liệu chỉ số. Vui lòng thử lại.",
     "noMetricsDescription": "Chọn chỉ số từ thanh bên để xem biểu đồ.",
     "dimensionBasedCorrelation": "Tương quan dựa trên Kích thước",
+    "tracesFromService": "Trace từ dịch vụ: {service}",
+    "noTracesFound": "Không tìm thấy trace nào",
+    "noTracesDescription": "Không tìm thấy trace nào cho tương quan này trong khoảng thời gian đã chọn.",
+    "viewInTraces": "Xem trong Trace",
     "filters": "Bộ lọc",
     "semanticFieldGroupsCaption": "Ánh xạ tên trường đo từ xa của bạn thành các nhóm chung để OpenObserve có thể tương quan chúng qua các luồng.",
     "exportToJson": "Xuất ra JSON",
@@ -9772,8 +10185,10 @@
     "editCrossLink": "Chỉnh sửa liên kết chéo",
     "name": "Tên",
     "nameRequired": "Yêu cầu nhập tên",
+    "namePlaceholder": "ví dụ: Xem chi tiết Trace",
     "urlTemplate": "Mẫu URL",
     "urlRequired": "Yêu cầu nhập URL",
+    "urlPlaceholder": "ví dụ: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
     "urlInvalid": "Nhập một URL http(s) hợp lệ",
     "urlHint": "Sử dụng {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Trường",
@@ -9866,6 +10281,7 @@
     "colPattern": "Mẫu",
     "colPricingSimple": "Giá",
     "testMatchTitle": "Kiểm tra khớp mô hình",
+    "testMatchSubtitle": "Mô phỏng cách tên mô hình từ các span của bạn khớp với các quy tắc định giá.",
     "modelNameInput": "Tên mô hình",
     "modelNameHint": "Tên mô hình trên các thế hệ của bạn.",
     "enterModelName": "Nhập tên mô hình để kiểm tra việc khớp",
@@ -9961,7 +10377,8 @@
         "errorRate": "Tỷ lệ lỗi",
         "p50": "Độ trễ P50",
         "p95": "Độ trễ P95",
-        "p99": "Độ trễ P99"
+        "p99": "Độ trễ P99",
+        "cost": "Chi phí / trace"
       },
       "insufficientLabel": "mang tính tham khảo",
       "tooltip": {
@@ -10028,8 +10445,11 @@
       "sessions": "Duyệt và kiểm tra các phiên tác nhân theo từng lượt",
       "agentGraph": "Xem tác nhân của bạn tương tác với gì — công cụ, mô hình, dịch vụ và kho dữ liệu",
       "agentBehavior": "Phát hiện các agent bị kẹt trong vòng lặp và lỗi khiến chúng thất bại",
+      "discovery": "Tìm các trace có vấn đề cần xem xét",
       "queues": "Danh sách việc cần làm để đánh giá có trạng thái",
+      "datasets": "Tuyển chọn các bộ dữ liệu vàng từ các trace được chú thích và đánh giá",
       "experiments": "Xem trước và tạo các lần chạy đánh giá ngoại tuyến bất biến",
+      "quality": "Theo dõi chất lượng điểm số trên các đánh giá span, trace và phiên",
       "evalJobs": "Chạy và giám sát các công việc đánh giá trên các phiên của bạn",
       "scorers": "Tạo và quản lý các bộ chấm điểm đánh giá đầu ra LLM",
       "scoreConfigs": "Cấu hình các tiêu chí chấm điểm được sử dụng bởi các đánh giá của bạn"
@@ -10038,6 +10458,8 @@
       "button": "Chú thích",
       "title": "Chú thích · {scope}",
       "scope": {
+        "span": "Span",
+        "trace": "Trace",
         "session": "Phiên"
       },
       "viaAnnotation": "Chú thích",
@@ -10071,6 +10493,7 @@
       "dataset": {
         "button": "Thêm vào bộ dữ liệu",
         "title": "Thêm vào bộ dữ liệu",
+        "hint": "Chuyển {ref} thành một golden. Đầu vào được đọc lại từ trace — bạn viết đầu ra mong đợi.",
         "errors": {
           "dataset": "Chọn một bộ dữ liệu",
           "expectedOutput": "Viết đầu ra mong đợi"
@@ -10079,6 +10502,7 @@
         "datasetPlaceholder": "Chọn một bộ dữ liệu...",
         "noDatasets": "Chưa có bộ dữ liệu nào — hãy tạo một bộ từ trang Bộ dữ liệu trước.",
         "inputLabel": "Đầu vào",
+        "inputReadOnly": "đọc từ trace",
         "expectedLabel": "Đầu ra mong đợi",
         "expectedPlaceholder": "Viết đầu ra mà mục này lẽ ra phải tạo ra...",
         "confirm": "Thêm vào bộ dữ liệu",
@@ -10092,9 +10516,13 @@
       "searchPlaceholder": "Tìm kiếm Dịch vụ, Đầu vào, Chất lượng...",
       "searchFooter": "{matched} trong {loaded} trên trang này khớp",
       "scope": {
+        "span": "Span",
+        "trace": "Trace",
         "session": "Phiên"
       },
       "scopeNoun": {
+        "span": "span",
+        "trace": "trace",
         "session": "phiên"
       },
       "inQueueFilter": {
@@ -10110,8 +10538,10 @@
         "started": "Bắt đầu",
         "type": "Loại",
         "kind": "Kiểu",
+        "span": "Span",
         "session": "Phiên",
         "topic": "Chủ đề",
+        "traces": "Trace",
         "duration": "Thời lượng",
         "service": "Dịch vụ",
         "input": "Đầu vào",
@@ -10119,6 +10549,7 @@
         "inQueue": "Trong hàng đợi?",
         "actions": "Hành động"
       },
+      "spanParent": "Trong {trace}",
       "quality": {
         "issue": "Vấn đề",
         "multiple": "Nhiều",
@@ -10191,6 +10622,7 @@
         "operatorIs": "bằng",
         "operatorIsNot": "không bằng",
         "conditionScorePlaceholder": "Cấu hình điểm số",
+        "conditionValuePlaceholder": "Giá trị",
         "pin": "Ghim phiên bản",
         "versionLatest": "v{version} (mới nhất)",
         "success": "Đã tạo hàng đợi",
@@ -10206,8 +10638,10 @@
         "searchPlaceholder": "Tìm kiếm mục...",
         "footerTitle": "Mục",
         "allItems": "Tất cả",
+        "inTrace": "Trong Trace {traceId}",
         "reviewAgain": "Xem xét lại",
         "emptyTitle": "Không có gì để xem xét",
+        "emptyBody": "Thêm trace, span hoặc phiên vào hàng đợi này từ Khám phá hoặc chế độ xem trace.",
         "columns": {
           "refType": "Tham chiếu",
           "refId": "Tham chiếu",
@@ -10226,6 +10660,8 @@
         "next": "Mục tiếp theo",
         "collapseNav": "Thu gọn danh sách mục",
         "expandNav": "Mở rộng danh sách mục",
+        "openTrace": "Mở toàn bộ trace",
+        "openTraceSoon": "Chế độ xem toàn bộ trace sẽ có trong bản cập nhật tới.",
         "input": "Đầu vào",
         "output": "Đầu ra",
         "retrievedContext": "Ngữ cảnh đã truy xuất",
@@ -10256,6 +10692,7 @@
         "distill": {
           "title": "Chắt lọc vào bộ dữ liệu",
           "action": "Bộ dữ liệu",
+          "hint": "Viết câu trả lời mà mục này LẼ RA phải tạo ra. Nó trở thành đầu ra golden; đầu vào được lấy từ trace đã xem xét.",
           "datasetLabel": "Bộ dữ liệu",
           "datasetPlaceholder": "Chọn bộ dữ liệu...",
           "noDatasets": "Chưa có bộ dữ liệu nào — hãy tạo một bộ từ trang Bộ dữ liệu trước.",
@@ -10267,6 +10704,7 @@
           "updated": "Đã cập nhật đầu ra vàng — mục này đã có trong bộ dữ liệu đó.",
           "openDataset": "Mở tập dữ liệu",
           "needsReview": "Hoàn thành đánh giá trước — một golden cần có phán quyết thẩm định",
+          "sessionUnsupported": "Các mục phiên không thể được chưng cất — chỉ trace và span",
           "loadError": "Không thể tải tập dữ liệu",
           "error": "Không thể thêm mục này vào tập dữ liệu"
         },
@@ -10292,10 +10730,12 @@
       "trial": "thử nghiệm {index}",
       "summary": "Bộ dữ liệu v{version} · {trials} thử nghiệm · {scorers} bộ chấm điểm",
       "previewCounts": "{rows} hàng × {trials} thử nghiệm = {slots} ô",
+      "viewTrace": "Xem trace thực thi",
       "scoresTitle": "Điểm",
       "taskProgress": "Tác vụ: {completed}/{total} hoàn thành · {skipped} bỏ qua",
       "scoringProgress": "Điểm: {completed}/{total} hoàn thành · {skipped} bỏ qua",
       "skipTiers": "Hàng bị bỏ qua: {full} hoàn toàn · {partial} một phần",
+      "scoreEvidence": "{scorer} · v{version}: {samples} mẫu, {noReference} không tham chiếu, {noTrace} không trace",
       "scorerApplicability": "{scorer} · v{version}: {eligible} ô hợp lệ, {noReference} không tham chiếu",
       "loadError": "Không thể tải thử nghiệm",
       "previewError": "Không thể xem trước các ô thử nghiệm",
@@ -10341,6 +10781,7 @@
         "sourcesPlaceholder": "Tất cả nguồn",
         "sourcesHelp": "Để trống để chạy mọi dòng trong tập dữ liệu.",
         "sources": {
+          "trace": "Trace",
           "annotation": "Chú thích",
           "manual": "Thủ công"
         },
@@ -10471,6 +10912,7 @@
         "trials": "Lần thử",
         "trial": "Lần thử {index}",
         "retryFailedSlot": "Thử lại ô thất bại",
+        "viewTrace": "Xem Trace",
         "scores": "Điểm số",
         "dimension": "Chiều",
         "unknownDimension": "Chiều không xác định",
@@ -10557,6 +10999,7 @@
         "actions": "Hành động"
       },
       "source": {
+        "trace": "trace",
         "annotation": "chú thích",
         "manual": "thủ công"
       },
@@ -10612,6 +11055,8 @@
           },
           "versionPill": "v{version} · {count} phiên bản | v{version} · {count} phiên bản",
           "sourceSection": "Nguồn",
+          "sourceTrace": "Trace",
+          "sourceSpan": "Span",
           "sourceReview": "Đánh giá bài nộp",
           "sourceImport": "Nhập từ",
           "inputSection": "Đầu vào",
@@ -10652,8 +11097,10 @@
       "version": "Phiên bản"
     },
     "agentGraph": {
+      "stream": "Stream",
       "agent": "Tác nhân",
       "noAgentsTitle": "Không tìm thấy tác nhân nào",
+      "noAgentsDescription": "Không phát hiện agent nào trong khoảng thời gian này. Hãy thử mở rộng khoảng thời gian hoặc kiểm tra rằng trace của bạn bao gồm các thuộc tính agent gen_ai.",
       "versionAgnosticHint": "Cấu trúc liên kết giống nhau giữa các phiên bản — biểu đồ phạm vi theo môi trường, không phải phiên bản. Sử dụng so sánh phiên bản để so sánh các phiên bản."
     },
     "panels": {
@@ -10665,7 +11112,10 @@
         "title": "Xu hướng token",
         "subtitle": "token theo mô hình"
       },
-      "spanTrend": {},
+      "spanTrend": {
+        "title": "Xu hướng Span",
+        "subtitle": "số span theo loại"
+      },
       "latencyByModel": {
         "title": "Độ trễ theo mô hình",
         "subtitle": "p50 / p90 / p95 / p99"
@@ -10679,6 +11129,7 @@
         "subtitle": "số lượng lỗi"
       },
       "spansByModel": {
+        "title": "Span theo mô hình",
         "subtitle": "số lượng cuộc gọi trên mỗi mô hình"
       },
       "tokensByModel": {
@@ -10686,7 +11137,8 @@
         "subtitle": "tổng token trên mỗi mô hình"
       },
       "recentErrors": {
-        "title": "Lỗi gần đây"
+        "title": "Lỗi gần đây",
+        "subtitle": "10 span lỗi gần nhất"
       }
     },
     "behavior": {
@@ -10696,6 +11148,7 @@
         "disabled": "Tín hiệu hành vi agent đã tắt cho lần triển khai này"
       },
       "loopsTitle": "Agent bị lặp",
+      "loopsHint": "Agent chạy lại cùng một công cụ nhiều lần trong mỗi trace",
       "summaryLoops": "Các agent lặp",
       "summaryFailures": "Phân loại sự cố",
       "summaryAgents": "Các agent bị ảnh hưởng",
@@ -10710,7 +11163,9 @@
       "unknownAgent": "(agent không xác định)",
       "colAgent": "Agent",
       "colTool": "Công cụ",
+      "colRatio": "Số lần gọi / trace",
       "colCalls": "Cuộc gọi",
+      "colTraces": "Trace",
       "colFailClass": "Lớp lỗi",
       "colCount": "Số lượng",
       "colCost": "Chi phí ($)",
@@ -10718,18 +11173,32 @@
       "colErrors": "Lỗi",
       "detail": {
         "title": "Chi tiết tín hiệu",
+        "tracesTitle": "Trace",
+        "tracesHint": "Nhấp vào một trace để mở",
+        "worstLoopTraces": "Các trace tệ nhất (lặp nhiều nhất trước)",
+        "topCostTraces": "Các trace đắt nhất",
+        "noTraces": "Không tìm thấy trace nào cho tín hiệu này",
         "errorsTitle": "Lỗi nói gì",
+        "noErrors": "Không có thông báo lỗi nào được ghi lại — hãy mở một trace để kiểm tra",
+        "colTraceId": "Trace",
+        "colSpans": "Spans",
         "colRepeats": "Số lần lặp",
+        "openInNewTab": "Mở trace trong tab mới",
         "showFull": "Hiện đầy đủ lỗi",
         "showLess": "Thu gọn",
         "colError": "Thông báo lỗi",
         "colOccurrences": "Số lần",
+        "loopHeadline": "{agent} đã gọi {tool} {ratio}× cho mỗi trace trung bình ({calls} lần gọi trên {traces} trace).",
         "failHeadline": "{agent} gặp {count} lỗi “{cls}”.",
-        "costHeadline": "{agent}: chi tiêu ${cost} · {tokens} token · {errors} lỗi."
+        "costHeadline": "{agent}: chi tiêu ${cost} · {tokens} token · {errors} lỗi.",
+        "loopExplain": "Tỷ lệ lặp lại cao thường có nghĩa là agent không lưu cache kết quả hoặc đang thử lại. Mở các trace tệ nhất bên dưới để xem các lần gọi lặp lại.",
+        "failExplain": "Đây là những thông báo lỗi thực tế đằng sau lớp lỗi này — hãy đọc chúng để tìm cách khắc phục, hoặc mở một trace để xem nó xảy ra ở đâu.",
+        "costExplain": "Các trace này đã làm tăng chi phí của agent. Mở những trace đắt nhất để xem thứ gì đã chạy."
       }
     },
     "versionCompare": {
       "datePickerDisabled": "Các cửa sổ là theo từng phiên bản trong chế độ này",
+      "sampledNote": "Độ trễ & chi phí được tính toán dựa trên tối đa {cap} trace lấy mẫu ngẫu nhiên cho mỗi phiên bản.",
       "bar": {
         "versionA": "Phiên bản A",
         "versionB": "Phiên bản B",
@@ -10747,7 +11216,9 @@
         "partial": "Các phiên bản này chạy một phần đồng thời — sự khác biệt có thể được giải thích một phần bởi thời điểm mỗi phiên bản chạy."
       },
       "windowCard": {
-        "clamp": "Đường cơ sở chỉ chạy {duration} — so sánh {duration} đầu tiên của mỗi phiên bản."
+        "label": "{env} · {version} — {window} · {count} trace",
+        "clamp": "Đường cơ sở chỉ chạy {duration} — so sánh {duration} đầu tiên của mỗi phiên bản.",
+        "labelNoEnv": "{version} — {window} · {count} trace"
       }
     }
   },
@@ -10808,18 +11279,25 @@
     },
     "manualEvaluation": {
       "titles": {
+        "span": "Đánh giá span",
+        "trace": "Đánh giá trace",
         "session": "Đánh giá session"
       },
       "targetLabels": {
+        "span": "ID span",
+        "trace": "ID trace",
         "session": "Session ID"
       },
       "scopes": {
+        "span": "span",
+        "trace": "trace",
         "session": "session"
       },
       "description": "Chọn một Eval Job để chạy với mục tiêu này. Nhân viên đánh giá sẽ tải dữ liệu telemetry nguồn từ phạm vi thời gian của trang này.",
       "jobLabel": "Eval Job",
       "jobPlaceholder": "Chọn một Eval Job",
       "jobRequired": "Chọn một Eval Job",
+      "noCompatibleJobs": "Không có Eval Job {scope} nào sử dụng trace stream {stream}.",
       "loadJobsError": "Không thể tải các Eval Job.",
       "run": "Chạy đánh giá",
       "queued": "Đã xếp hàng {count} tác vụ đánh giá. | Đã xếp hàng {count} tác vụ đánh giá.",
@@ -10845,6 +11323,8 @@
         "filterLabel": "Phạm vi điểm số",
         "filterHint": "So sánh cấu hình điểm số này trên các phạm vi mục tiêu đánh giá.",
         "all": "Tất cả",
+        "span": "Span",
+        "trace": "Trace",
         "session": "Session"
       },
       "kpis": {
@@ -10913,6 +11393,7 @@
       },
       "runs": {
         "title": "Điểm đánh giá",
+        "hint": "Điểm số và lý giải đến từ _llm_scores. Chọn một lần chạy để mở trace đánh giá của nó nhằm điều tra thêm.",
         "filterLabel": "Lọc điểm đánh giá",
         "footerTitle": "Điểm đánh giá",
         "noThresholdHint": "Đặt ngưỡng lành mạnh trên cấu hình điểm số này để phân loại và làm nổi bật các điểm không lành mạnh.",
@@ -11046,6 +11527,7 @@
         "dataTypeLabel": "Kiểu dữ liệu",
         "rangeLabel": "Phạm vi",
         "categoriesLabel": "Danh mục",
+        "valuesLabel": "Giá trị",
         "thresholdSection": "Ngưỡng khỏe mạnh",
         "thresholdHint": "Tính điểm là khỏe mạnh",
         "noThreshold": "Chưa khai báo",
@@ -11106,6 +11588,7 @@
       "booleanInfo": "Cấu hình Boolean chấp nhận giá trị {trueLabel} / {falseLabel}. Không cần cấu hình bổ sung.",
       "healthyThresholdTitle": "Ngưỡng lành mạnh",
       "optional": "Tùy chọn",
+      "healthyThresholdIntro": "Xác định khi nào điểm số trên khía cạnh này được coi là lành mạnh. Điểm số ngoài phạm vi này sẽ gây ra các vấn đề chất lượng trong danh sách trace, phiên, và các chế độ xem khác.",
       "healthyWhenValueIs": "Lành mạnh khi giá trị là:",
       "healthyCategories": "Danh mục lành mạnh:",
       "healthyCategoriesHint": "Chọn tất cả giá trị được coi là lành mạnh.",
@@ -11184,6 +11667,8 @@
           "col": {
             "time": "Thời gian",
             "job": "Công việc",
+            "spanId": "ID span",
+            "traceId": "ID trace",
             "score": "Điểm",
             "latency": "Độ trễ",
             "status": "Trạng thái"
@@ -11321,7 +11806,9 @@
       "remoteHeaders": {
         "subtitle": "Được gửi kèm mỗi yêu cầu.",
         "colName": "Tên",
+        "colValue": "Giá trị",
         "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "giá trị",
         "addButton": "+ Thêm tiêu đề"
       },
       "requestBodyLabel": "Mẫu nội dung yêu cầu",
@@ -11367,11 +11854,13 @@
         "eyebrow": "Công việc đánh giá",
         "refresh": "Làm mới",
         "targetSection": "Mục tiêu Đánh giá",
+        "streamLabel": "Stream",
         "streamTypeLabel": "Loại luồng",
         "targetScopeLabel": "Đánh giá Mỗi",
         "idleWindowLabel": "Cửa sổ Nhàn rỗi",
         "maxAgeLabel": "Tuổi tối đa",
         "filterLabel": "Bộ lọc",
+        "filterEmpty": "Không có bộ lọc — mọi span đều được đánh giá",
         "scorersSection": "Bộ chấm điểm",
         "scorersEmpty": "Chưa có bộ chấm điểm nào được gắn vào tác vụ này.",
         "scorerUnknown": "(đã xóa bộ chấm điểm)",
@@ -11381,6 +11870,7 @@
         "viewScorerHint": "Xem",
         "samplingSection": "Lấy mẫu",
         "samplingModeLabel": "Chế độ",
+        "samplingValueLabel": "Giá trị",
         "samplingAll": "Đánh giá mọi kết quả khớp",
         "samplingRate": "Lấy mẫu ngẫu nhiên theo tỷ lệ",
         "samplingCount": "N kết quả khớp đầu tiên",
@@ -11406,6 +11896,8 @@
           "col": {
             "time": "Thời gian",
             "scorer": "Bộ chấm điểm",
+            "spanId": "ID span",
+            "traceId": "ID trace",
             "score": "Điểm",
             "latency": "Độ trễ",
             "status": "Trạng thái"
@@ -11426,6 +11918,7 @@
       "columns": {
         "name": "Tên",
         "status": "Trạng thái",
+        "stream": "Stream",
         "targetScope": "Phạm vi",
         "scorers": "Bộ chấm điểm",
         "created": "Đã tạo",
@@ -11451,18 +11944,30 @@
       "scorersSection": "Bộ chấm điểm và ánh xạ",
       "nameLabel": "Tên",
       "namePlaceholder": "Production Faithfulness Monitor",
+      "streamLabel": "Stream",
       "streamPlaceholder": "Chọn Luồng",
       "targetScopeLabel": "Đánh giá Mỗi",
       "targetScopes": {
+        "span": "Span",
+        "trace": "Trace",
         "session": "Phiên"
       },
-      "targetScopeHelp": {},
+      "targetScopeHelp": {
+        "span": "Đánh giá từng span khớp một cách độc lập.",
+        "trace": "Đánh giá toàn bộ trace sau khi cửa sổ hoàn tất đóng lại.",
+        "session": "Đánh giá một phiên qua các trace sau khi cửa sổ hoàn tất đóng lại."
+      },
       "completionSection": "Tiêu chí hoàn tất",
       "completionHelp": {
+        "trace": "Trace được đánh giá ngay khi điều kiện đầu tiên trong số này được đáp ứng.",
         "session": "Phiên được đánh giá ngay khi điều kiện đầu tiên trong số này được đáp ứng."
       },
       "idleWindowLabel": "Cửa sổ không hoạt động (giây)",
+      "idleWindowHelp": "Được đánh giá sau {duration} mà không có span mới.",
+      "idleWindowHelpEmpty": "Được đánh giá khi không còn span mới đến.",
       "maxAgeLabel": "Tuổi tối đa (giây)",
+      "maxAgeHelp": "Được đánh giá {duration} sau span đầu tiên.",
+      "maxAgeHelpEmpty": "Được đánh giá sau một khoảng thời gian cố định, ngay cả khi các span vẫn đang đến.",
       "descriptionLabel": "Mô tả",
       "samplingModeLabel": "Chế độ lấy mẫu",
       "samplingValueLabel": "Tỷ lệ lấy mẫu",
@@ -11473,6 +11978,8 @@
       "scorerPicker": {
         "title": "Bộ chấm điểm",
         "hint": {
+          "span": "Chọn một hoặc nhiều bộ chấm điểm để chạy cho mọi span khớp.",
+          "trace": "Chọn một hoặc nhiều bộ chấm điểm để chạy cho mọi trace đủ điều kiện.",
           "session": "Chọn một hoặc nhiều bộ chấm điểm để chạy cho mỗi phiên đủ điều kiện."
         },
         "meta": "{type} · v{version}",
@@ -11482,21 +11989,37 @@
       },
       "filter": {
         "title": "Điều kiện lọc",
-        "hint": {}
+        "hint": {
+          "span": "Chỉ những span khớp điều kiện này mới được đưa vào lấy mẫu và chấm điểm.",
+          "trace": "Một trace sẽ được đưa vào lấy mẫu và chấm điểm nếu bất kỳ span nào của nó khớp với điều kiện này.",
+          "session": "Một session sẽ được đưa vào lấy mẫu và chấm điểm nếu bất kỳ span nào của nó khớp với điều kiện này."
+        }
       },
       "selector": {
-        "hint": {}
+        "title": "Lựa chọn Span (Tùy chọn)",
+        "hint": {
+          "trace": "Để trống để bao gồm mọi span trong trace."
+        }
       },
       "endSignal": {
         "title": "Tín hiệu kết thúc (tùy chọn)",
-        "hint": {}
+        "hint": {
+          "trace": "Xác định điều kiện span để đóng trace ngay khi bất kỳ span nào khớp với điều kiện đó.",
+          "session": "Xác định điều kiện span để đóng session ngay khi bất kỳ span nào khớp với điều kiện đó."
+        }
       },
       "inputMapping": {
         "title": "Biến prompt",
-        "hint": {},
+        "hint": {
+          "span": "Ánh xạ từng biến tới một thuộc tính span.",
+          "trace": "Ánh xạ từng biến tới giá trị do hệ thống cung cấp hoặc thuộc tính span.",
+          "session": "Ánh xạ từng biến tới giá trị do hệ thống cung cấp hoặc thuộc tính span."
+        },
         "placeholder": "Chọn một giá trị",
+        "searchPlaceholder": "Tìm kiếm giá trị hệ thống và thuộc tính span…",
         "groups": {
-          "systemProvided": "Giá trị do hệ thống cung cấp · Đối với mỗi {scope} mà công việc này đánh giá"
+          "systemProvided": "Giá trị do hệ thống cung cấp · Đối với mỗi {scope} mà công việc này đánh giá",
+          "spanAttributes": "Thuộc tính span"
         },
         "selectScorers": "Chọn người chấm điểm để cấu hình ánh xạ của họ.",
         "noVariables": "Người chấm điểm này không có biến mẫu nào để ánh xạ.",
@@ -11506,38 +12029,72 @@
           "title": "Giá trị hệ thống của {scope}",
           "description": "OpenObserve xây dựng các giá trị này riêng biệt cho mỗi {scope} mà công việc này đánh giá. Sử dụng chúng làm nguồn khi ánh xạ các biến prompt của bộ chấm điểm.",
           "badge": "Hệ thống cung cấp",
+          "selectorRequired": "Span Selector là bắt buộc.",
           "columns": {
+            "variable": "Giá trị",
             "source": "Nguồn",
             "description": "Giá trị được cung cấp"
           },
           "variables": {
-            "input": {},
-            "output": {},
-            "statistics": {},
-            "spans": {},
-            "steps": {}
+            "input": {
+              "trace": "Đầu vào từ span gốc của trace."
+            },
+            "output": {
+              "trace": "Đầu ra từ span gốc của trace."
+            },
+            "statistics": {
+              "trace": "Số liệu trace: số span, thời lượng, số lần gọi LLM và công cụ, lỗi, token và chi phí.",
+              "session": "Số liệu session: số lượng trace và lượt, thời lượng và lỗi."
+            },
+            "spans": {
+              "trace": "Một tập con span đã lọc, được chọn bởi Span Selector của công việc."
+            },
+            "steps": {
+              "trace": "Các span theo thứ tự thời gian; phần giữa được thu gọn khi trace rất dài.",
+              "session": "Các trace theo thứ tự thời gian, được biểu diễn dưới dạng các lượt hội thoại."
+            }
           }
         }
       },
       "spanSelector": {
+        "select": "Chọn Span Selector",
+        "bindingHelp": "Một trace có thể có hàng trăm span. Hãy chọn những span mà bộ chấm điểm này cần xem xét.",
         "createForScorer": "Tạo cho bộ chấm điểm",
+        "createForScorerTitle": "Tạo Span Selector cho bộ chấm điểm này",
+        "editorTitle": "Span Selector",
         "name": "Tên bộ chọn",
         "schemaMode": "Trường cần đọc",
         "defaultSchema": "Trường GenAI Chuẩn",
         "customSchema": "Trường Tùy chỉnh",
+        "defaultSchemaHelp": "Tám trường này được đọc từ mọi span khớp. Trường nào thiếu sẽ có giá trị rỗng.",
         "fields": "Trường",
         "fieldsHelp": "Chỉ các trường này được đọc — không có gì khác được gửi đến bộ chấm điểm.",
+        "maximumSpans": "Số Span tối đa",
+        "budget": "Giới hạn số span được chọn từ trace.",
         "validation": {
           "name": "Nhập tên bộ chọn.",
           "duplicateName": "Tên bộ chọn phải là duy nhất trong công việc này.",
           "filter": "Hoàn thành hoặc xóa điều kiện lọc chưa hoàn thành.",
-          "fields": "Chọn ít nhất một trường cho schema tùy chỉnh."
+          "fields": "Chọn ít nhất một trường cho schema tùy chỉnh.",
+          "maximumSpans": "Số span tối đa phải là một số nguyên dương.",
+          "budget": "Quá nhiều span cho các trường đã chọn. Hãy giảm số span hoặc đọc ít trường hơn.",
+          "binding": "Chọn một Span Selector cho mỗi bộ chấm điểm sử dụng span của trace."
         }
       },
       "preview": {
         "scopes": {
-          "span": {},
-          "trace": {},
+          "span": {
+            "title": "Các span khớp",
+            "hint": "Khi bạn đã chọn stream và bộ lọc, bảng này sẽ hiển thị số span mà công việc của bạn sẽ khớp.",
+            "matchedSuffix": "span khớp · 1 giờ qua",
+            "matchedLoading": "Đang đếm span khớp…"
+          },
+          "trace": {
+            "title": "Các trace khớp",
+            "hint": "Khi bạn đã chọn stream và bộ lọc, bảng này sẽ hiển thị số trace mà công việc của bạn sẽ khớp.",
+            "matchedSuffix": "trace khớp · 1 giờ qua",
+            "matchedLoading": "Đang đếm trace khớp…"
+          },
           "session": {
             "title": "Các Phiên Khớp",
             "hint": "Khi bạn đã chọn một luồng và bộ lọc, bảng này sẽ hiển thị số lượng phiên mà công việc của bạn sẽ khớp.",
@@ -11565,7 +12122,9 @@
         "nameRequired": "Tên công việc là bắt buộc",
         "streamRequired": "Một luồng là bắt buộc",
         "idleWindowMinimum": "Cửa sổ không hoạt động phải ít nhất 1 giây",
+        "idleWindowMaximumTrace": "Cửa sổ không hoạt động của trace không được vượt quá 30 phút.",
         "idleWindowMaximumSession": "Cửa sổ chờ của phiên không được vượt quá 4 giờ",
+        "maxAgeMaximumTrace": "Tuổi tối đa của trace không được vượt quá 2 giờ.",
         "maxAgeMaximumSession": "Tuổi tối đa của phiên không được vượt quá 24 giờ",
         "samplingValueRequired": "Một giá trị lấy mẫu là bắt buộc"
       }
@@ -11628,6 +12187,7 @@
       "curlDesc": "Cách nhanh nhất — dán một lệnh và nhật ký bắt đầu chảy",
       "shippers": "Sử dụng trình gửi nhật ký",
       "shippersDesc": "{product1}, {product2}, {product3}, {product4}, {product5} và nhiều hơn nữa",
+      "otelDesc": "Tiếp nhận OTLP không phụ thuộc nhà cung cấp cho nhật ký, trace và chỉ số.",
       "or": "Hoặc:",
       "aws": "AWS / CloudWatch",
       "askAi": "Hỏi AI thiết lập tiếp nhận"
@@ -11636,11 +12196,13 @@
       "title": "Chọn một luồng để bắt đầu khám phá",
       "description": "Chọn một luồng, sau đó nhấn <strong>Chạy truy vấn</strong>. Bạn có thể tinh chỉnh với bộ lọc, hàm VRL và phạm vi thời gian tùy chỉnh khi có kết quả.",
       "selectStream": "Chọn một luồng",
+      "selectStreamDesc": "Duyệt các stream nhật ký, trace, chỉ số và RUM",
       "queryGuide": "Đọc hướng dẫn truy vấn",
       "queryGuideDesc": "Bộ lọc, chế độ SQL, VRL & chế độ xem đã lưu",
       "recent": "Gần đây:"
     },
     "noEvents": {
+      "title": "Không tìm thấy sự kiện nào",
       "descNoFilters": "Không tìm thấy sự kiện nào trong {range}.",
       "descWithFilters": "Không có gì khớp với <strong>truy vấn này</strong> trong cửa sổ đã chọn. Luồng có dữ liệu ở đây — hãy thử nới lỏng bộ lọc trên thanh truy vấn.",
       "descOutOfRange": "Khung thời gian của bạn không chứa bất kỳ dữ liệu nào từ luồng này. Chuyển đến thời điểm dữ liệu được thấy lần cuối.",
@@ -11731,11 +12293,13 @@
       "scannedEventsForQuery": "Sự kiện đã quét cho truy vấn này",
       "timeTaken": "Thời gian thực hiện",
       "noData": "Không có dữ liệu",
+      "traceId": "Trace ID",
       "viewQuery": "Xem truy vấn",
       "sqlQuery": "Truy vấn SQL",
       "copied": "Đã sao chép!",
       "sql": "SQL",
       "noSqlAvailable": "Không có truy vấn SQL",
+      "fullTraceId": "Trace ID đầy đủ",
       "columnDuration": "Thời lượng",
       "columnNodeName": "Tên nút",
       "columnRole": "Vai trò",
@@ -11748,6 +12312,7 @@
       "goodResponse": "Phản hồi tốt",
       "moderateResponse": "Phản hồi trung bình",
       "slowResponse": "Phản hồi chậm",
+      "failedToCopyTraceId": "Không thể sao chép Trace ID vào bộ nhớ tạm",
       "failedToCopySql": "Không thể sao chép SQL vào clipboard"
     },
     "searchResult": {
@@ -11766,7 +12331,8 @@
       "unableToRetrieveCorrelation": "Không thể truy xuất dữ liệu tương quan",
       "noMetricStreams": "Không tìm thấy luồng chỉ số nào cho dịch vụ \"{service}\"",
       "correlationError": "Lỗi tương quan: {error}",
-      "contentCopied": "Đã sao chép nội dung thành công!"
+      "contentCopied": "Đã sao chép nội dung thành công!",
+      "noTraceIdForInspection": "Không có Trace ID để kiểm tra"
     },
     "searchBar": {
       "customRangeAlt": "Phạm vi tùy chỉnh",
@@ -11930,6 +12496,7 @@
     "expandRangeDesc": "Dữ liệu có thể truy cập nằm trong một khung thời gian khác",
     "copyError": "Sao chép chi tiết lỗi",
     "copied": "Đã sao chép!",
+    "traceId": "Trace ID:",
     "askAi": "Yêu cầu AI sửa truy vấn của tôi",
     "showDetail": "Hiển thị chi tiết",
     "hideDetail": "Ẩn chi tiết"
@@ -11994,6 +12561,7 @@
       "addVariable": "Thêm biến",
       "cookieDomainPlaceholder": "Miền",
       "cookieNamePlaceholder": "Tên",
+      "cookieValuePlaceholder": "Giá trị",
       "customHeaders": "Tiêu đề tùy chỉnh",
       "headerKeyPlaceholder": "Khóa tiêu đề",
       "headerValuePlaceholder": "Giá trị tiêu đề",
@@ -12009,6 +12577,7 @@
       "variableNamePlaceholder": "Tên",
       "variableSecureTooltipHide": "Che giá trị này như dữ liệu nhạy cảm.",
       "variableSecureTooltipShow": "Giá trị đã bị che. Nhấp để hiển thị.",
+      "variableValuePlaceholder": "Giá trị",
       "variables": "Biến"
     },
     "variablesPanel": {
@@ -12358,6 +12927,7 @@
       "stopping": "Đang dừng…",
       "timeoutBelowDefaultWarning": "Dưới mức mặc định {default} ms cho bước này. Thời gian chờ ngắn hơn thời gian phản hồi thực tế của ứng dụng là nguyên nhân phổ biến nhất gây ra lỗi sai.",
       "timeoutLabel": "Thời gian chờ (ms)",
+      "valueFallback": "Giá trị",
       "showSetupSteps": "Hiển thị các bước thiết lập",
       "waitingForActions": "Đang chờ hành động trong trình duyệt…"
     },
@@ -12503,6 +13073,7 @@
       "http": {
         "addAssertion": "Thêm khẳng định",
         "addHeader": "Thêm tiêu đề",
+        "assertionValue": "Giá trị",
         "assertions": "Khẳng định",
         "body": "Nội dung yêu cầu",
         "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
@@ -12513,6 +13084,7 @@
         },
         "followRedirects": "Theo chuyển hướng",
         "headerName": "Tên",
+        "headerValue": "Giá trị",
         "headers": "Tiêu đề",
         "method": "Phương thức",
         "operators": {
@@ -12696,6 +13268,7 @@
       "maxDuration": "Thời lượng tối đa",
       "noExecutionData": "Không tìm thấy dữ liệu thực thi",
       "noExecutionDataDesc": "Dữ liệu luồng cho lần chạy {runId} không được tìm thấy trong cửa sổ +/-5 phút xung quanh thời gian đã lên lịch.",
+      "openTrace": "Mở dấu vết Playwright",
       "runId": "ID lần chạy",
       "screenshotAlt": "Ảnh chụp màn hình bước",
       "screenshotPlaceholder": "Giữ chỗ ảnh chụp màn hình",
@@ -12781,6 +13354,7 @@
       "errorPatternsWindowDesc": "Chuẩn hóa qua {window} · nhấp vào một hàng để lọc các lần chạy"
     },
     "scheduleAlert": {
+      "addNewDestination": "Thêm điểm đến mới",
       "alertedIfFails": "Cảnh báo nếu kiểm tra thất bại",
       "alertedIfFailsSuffix": "lần.",
       "alerts": "Cảnh báo",
@@ -12796,6 +13370,8 @@
         "weeks": "Tuần"
       },
       "customIntervalValue": "Lặp lại mỗi",
+      "destinationRequired": "Cần ít nhất một điểm đến.",
+      "destinations": "Điểm đến",
       "frequency": "Tần suất",
       "frequencyOptions": {
         "15min": "15 phút",
@@ -12807,6 +13383,8 @@
         "custom": "Tùy chỉnh"
       },
       "minutes": "phút",
+      "noDestinations": "Không có điểm đến nào khả dụng",
+      "refreshDestinations": "Làm mới điểm đến",
       "retries": "Số lần thử lại",
       "retriesOnFailure": "Số lần thử lại khi thất bại",
       "retriesOnFailureSuffix": "lần.",
@@ -13064,9 +13642,12 @@
       "logs": "Nhật ký",
       "dashboards": "Bảng điều khiển",
       "metrics": "Chỉ số",
+      "traces": "Dấu vết",
       "alerts": "Cảnh báo",
+      "streams": "Streams",
       "pipelines": "Đường ống",
       "functions": "Hàm",
+      "reports": "Báo cáo",
       "iam": "IAM",
       "settings": "Cài đặt",
       "onlineEvals": "Đánh giá trực tuyến",
@@ -13081,20 +13662,26 @@
       "dashboards": "Chế độ xem bảng điều khiển",
       "dashboardsPanel": "Bảng điều khiển — Bảng (di chuột qua bảng)",
       "metrics": "Chỉ số",
+      "traces": "Dấu vết",
       "alerts": "Cảnh báo",
+      "streams": "Streams",
       "pipelines": "Đường ống",
       "functions": "Hàm",
+      "reports": "Báo cáo",
       "iamUsers": "IAM — Người dùng",
       "iamRoles": "IAM — Vai trò",
       "iamGroups": "IAM — Nhóm",
       "iamServiceAccounts": "IAM — Tài khoản dịch vụ",
+      "alertDestinations": "Cảnh báo — Điểm đến",
       "alertSources": "Cảnh báo — Nguồn bên ngoài",
       "alertTemplates": "Cảnh báo — Mẫu",
       "panelEditor": "Trình chỉnh sửa bảng",
+      "traceDetail": "Chi tiết dấu vết",
       "runningQueries": "Truy vấn đang chạy",
       "ingestionTokens": "IAM — Mã thông báo thu thập",
       "syntheticsTokens": "IAM — Token tổng hợp",
       "alertIncidents": "Cảnh báo — Sự cố",
+      "pipelineDestinations": "Pipeline — Điểm đến",
       "enrichmentTables": "Bảng làm giàu",
       "iamInvitations": "IAM — Lời mời",
       "iamOrganizations": "IAM — Tổ chức",
@@ -13170,6 +13757,7 @@
       "iamGroupsRefresh": "Làm mới danh sách",
       "iamServiceAccountsAdd": "Thêm tài khoản dịch vụ mới",
       "iamServiceAccountsRefresh": "Làm mới danh sách",
+      "alertDestinationsAdd": "Thêm điểm đến mới",
       "alertDestinationsRefresh": "Làm mới danh sách",
       "alertSourcesAdd": "Thêm nguồn cảnh báo mới",
       "alertSourcesRefresh": "Làm mới danh sách",
@@ -13180,6 +13768,8 @@
       "panelEditorRun": "Chạy / áp dụng truy vấn",
       "panelEditorSave": "Lưu bảng",
       "panelEditorBack": "Hủy và quay lại",
+      "traceNextSpan": "Span tiếp theo",
+      "tracePrevSpan": "Span trước đó",
       "runningQueriesRefresh": "Làm mới danh sách truy vấn",
       "ingestionTokensAdd": "Tạo token mới",
       "ingestionTokensRefresh": "Làm mới danh sách token",
@@ -13190,6 +13780,7 @@
       "aiChatExpand": "Mở rộng/thu gọn trò chuyện AI",
       "logsSaveView": "Lưu dưới dạng chế độ xem đã lưu",
       "logsExport": "Xuất kết quả dưới dạng CSV",
+      "tracesCopyUrl": "Sao chép URL chia sẻ dấu vết",
       "alertIncidentsRefresh": "Làm mới danh sách",
       "pipelineDestinationsRefresh": "Làm mới danh sách",
       "enrichmentTablesRefresh": "Làm mới danh sách",
@@ -13456,6 +14047,7 @@
       "alertState": {
         "ok": "OK",
         "normal": "Bình thường",
+        "firing": "Đang kích hoạt",
         "notifyfailed": "Thông báo thất bại",
         "flapping": "Dao động",
         "anomaly": "Bất thường",
@@ -13486,6 +14078,7 @@
         "error": "Lỗi"
       },
       "crossLinkSource": {
+        "stream": "Stream",
         "global": "Toàn cục"
       },
       "themeApplied": {
@@ -13540,6 +14133,7 @@
       },
       "eventStatus": {
         "failed": "Thất bại",
+        "firing": "Đang kích hoạt",
         "anomaly": "Bất thường"
       },
       "featureStatus": {
@@ -13554,6 +14148,7 @@
         "array": "Mảng"
       },
       "incidentStatus": {
+        "firing": "Đang kích hoạt",
         "closed": "Đã đóng"
       },
       "invoiceStatus": {
@@ -13565,12 +14160,14 @@
         "pending": "Đang chờ"
       },
       "logLevel": {
+        "trace": "Trace",
         "debug": "Gỡ lỗi",
         "info": "Thông tin",
         "warn": "CẢNH BÁO",
         "fatal": "Nghiêm trọng"
       },
       "pipelineRunOutcome": {
+        "firing": "Đang kích hoạt",
         "normal": "Bình thường",
         "succeeded": "Thành công",
         "skipped": "Đã bỏ qua",
@@ -13712,11 +14309,21 @@
       "pleaseSelectStreamType": "Vui lòng chọn loại luồng ",
       "anomalyDetectionClonedSuccessfully": "Đã nhân bản phát hiện bất thường thành công",
       "errorWhileFetchingTemplates": "Lỗi khi tải các mẫu.",
+      "errorWhileFetchingDestinations": "Lỗi khi tải điểm đến.",
       "failedToLoadAlertForEditing": "Không thể tải cảnh báo để chỉnh sửa",
       "pleaseWaitWhileLoadingAlert": "Vui lòng đợi trong khi tải cảnh báo...",
       "errorWhilePullingAlerts": "Lỗi khi lấy cảnh báo.",
       "pleaseWaitWhileLoadingAlerts": "Vui lòng đợi trong khi tải cảnh báo...",
+      "destinationsDeletedSuccessfully": "{count} điểm đến đã được xóa thành công | {count} điểm đến đã được xóa thành công",
+      "failedToDeleteDestinations": "Không thể xóa {count} điểm đến | Không thể xóa {count} điểm đến",
+      "destinationsDeletedWithFailures": "Đã xóa thành công {count} điểm đến, {failed} điểm thất bại | Đã xóa thành công {count} điểm đến, {failed} điểm thất bại",
+      "noDestinationsSelectedForDeletion": "Chưa chọn điểm đến nào để xóa",
+      "deletingDestinations": "Đang xóa điểm đến...",
+      "destinationDeletedSuccessfully": "Điểm đến {name} đã được xóa thành công",
+      "errorWhilePullingDestinations": "Lỗi khi tải điểm đến.",
+      "pleaseWaitWhileLoadingDestinations": "Vui lòng đợi trong khi tải điểm đến...",
       "errorWhileLoadingActions": "Lỗi khi tải hành động.",
+      "pleaseWaitWhileLoadingAlertDestination": "Vui lòng đợi trong khi tải điểm đến cảnh báo...",
       "errorImportingAlertPleaseCheck": "Lỗi khi nhập cảnh báo. Vui lòng kiểm tra JSON.",
       "alertsImportedSuccessfully": "Đã nhập thành công {count} cảnh báo | Đã nhập thành công {count} cảnh báo",
       "invalidJson": "JSON không hợp lệ: {error}",
@@ -13735,6 +14342,8 @@
       "incidentsRefreshed": "Đã làm mới sự cố",
       "failedToPostComment": "Không thể đăng bình luận",
       "commentPostedSuccessfully": "Đã đăng bình luận thành công",
+      "destinationUpdatedSuccessfully": "Điểm đến \"{name}\" đã được cập nhật thành công.",
+      "destinationCreatedSuccessfully": "Điểm đến \"{name}\" đã được tạo thành công.",
       "failedToDeleteTemplates": "Không thể xóa {count} mẫu | Không thể xóa {count} mẫu",
       "templatesDeletedWithFailures": "Đã xóa {count} mẫu, nhưng {failed} mẫu không thành công | Đã xóa {count} mẫu, nhưng {failed} mẫu không thành công",
       "successfullyDeletedTemplates": "Đã xóa thành công {count} mẫu | Đã xóa thành công {count} mẫu",
@@ -13784,13 +14393,16 @@
       "resources": {
         "dashboards": "Bảng điều khiển",
         "alerts": "Cảnh báo",
+        "streams": "Streams",
         "functions": "Hàm",
         "savedviews": "Chế độ xem đã lưu",
         "users": "Người dùng",
         "roles": "Vai trò",
         "organizations": "Tổ chức",
         "pipelines": "Đường ống",
+        "destinations": "Điểm đến",
         "templates": "Mẫu",
+        "reports": "Báo cáo",
         "llmModelPricing": "Giá mô hình LLM"
       },
       "noPermissionToChangeFavorites": "Bạn không có quyền thay đổi mục yêu thích",
@@ -13952,6 +14564,8 @@
       "errorWhileUpdating": "Lỗi khi cập nhật báo cáo."
     },
     "correlation": {
+      "refreshingTraceData": "Đang làm mới dữ liệu dấu vết...",
+      "traceDetailViewComingSoon": "Chế độ xem chi tiết dấu vết sắp ra mắt",
       "columnIsAlreadyVisible": "Cột \"{name}\" đã hiển thị",
       "columnAddedToTable": "Cột \"{name}\" đã được thêm vào bảng"
     },
@@ -13991,6 +14605,7 @@
       "isNotASupportedFileType": "\"{fileName}\" không phải là loại tệp được hỗ trợ. Chỉ cho phép các tệp {allowed}."
     },
     "workflows": {
+      "thisBranchAlreadyEndsInA": "Nhánh này đã kết thúc tại một điểm đến.",
       "chooseATriggerNodeToStart": "Chọn nút kích hoạt để bắt đầu quy trình làm việc của bạn",
       "thisConnectionWouldCreateALoop": "Kết nối này sẽ tạo ra một vòng lặp",
       "onlyOneIncomingConnectionToA": "Chỉ cho phép một kết nối đến cho mỗi bước"
@@ -13998,6 +14613,8 @@
     "views": {
       "youAreNotAuthorizedToManage": "Bạn không có quyền quản lý giấy phép.",
       "copiedToClipboard": "Đã sao chép vào bộ nhớ tạm",
+      "noDestinationsFoundPleaseCreateA": "Không tìm thấy điểm đến nào. Vui lòng tạo điểm đến trước.",
+      "errorWhilePullingDestinations": "Lỗi khi tải điểm đến.",
       "rumTokenUpdatedSuccessfully": "Đã cập nhật mã thông báo RUM thành công.",
       "rumTokenGeneratedSuccessfully": "Đã tạo mã thông báo RUM thành công.",
       "tokenResetSuccessfully": "Đã đặt lại mã thông báo thành công.",
@@ -14014,6 +14631,7 @@
       "pleaseWaitWhileLoadingStreams": "Vui lòng đợi trong khi tải danh sách luồng...",
       "errorWhilePullingSummary": "Lỗi khi tải tóm tắt.",
       "pleaseWaitWhileLoadingSummary": "Vui lòng đợi trong khi tải tóm tắt...",
+      "noDestinationsCreateOneBeforeSaving": "Không tìm thấy điểm đến nào. Hãy tạo một điểm đến trước khi lưu cảnh báo này.",
       "errorWhileLoadingAlert": "Lỗi khi tải cảnh báo."
     },
     "RUM": {
@@ -14142,6 +14760,7 @@
       "tags": "Thẻ",
       "tagsPlaceholder": "Thêm thẻ và nhấn Enter",
       "streamType": "Loại luồng",
+      "stream": "Stream",
       "queryLanguage": "Ngôn ngữ truy vấn",
       "scope": "Phạm vi",
       "scopeHint": "Bộ lọc tùy chọn áp dụng cho mẫu số. Để trống để áp dụng cho tất cả các hàng.",
@@ -14211,6 +14830,7 @@
         "noHistory": "Chưa có lịch sử đánh giá cho cảnh báo này. Việc đo lường bắt đầu sau khi nó chạy.",
         "loadFailed": "Không thể tải lịch sử đánh giá",
         "legendGood": "OK",
+        "legendBad": "Đang kích hoạt",
         "legendUnmeasured": "Không được đo"
       }
     },
@@ -14388,6 +15008,7 @@
     "loginCallback": "Callback đăng nhập",
     "emptyStateDemo": "Demo trạng thái trống",
     "searchScheduler": "Trình lập lịch tìm kiếm",
+    "traceDetails": "Chi tiết Trace",
     "sessionDetails": "Chi tiết phiên",
     "streamExplorer": "Trình khám phá luồng",
     "viewDashboard": "Xem bảng tổng quan",
@@ -14739,17 +15360,20 @@
         "failed": "Thất bại"
       },
       "columnHints": {
+        "calls": "Số lần truy vấn này được thực thi. Số đếm của cơ sở dữ liệu của bạn ở nơi nó báo cáo — bao gồm mọi máy khách, không chỉ các phần của hệ thống gửi trace. Các hàng được đánh dấu client-observed được đếm từ trace, vì cơ sở dữ liệu của bạn không báo cáo chúng.",
         "p50": "Một nửa số cuộc gọi hoàn thành nhanh hơn mức này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
         "p95": "Đuôi chậm — 1 trong 20 cuộc gọi mất ít nhất khoảng thời gian này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
         "p99": "1% cuộc gọi tệ nhất mất ít nhất khoảng thời gian này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
         "max": "Cuộc gọi chậm nhất duy nhất trong cửa sổ này — một cuộc gọi thực sự, không phải trung bình.",
         "errors": "Có bao nhiêu cuộc gọi trong số này trả về lỗi.",
-        "perTrace": "Số lần điều này chạy bên trong một yêu cầu. Số cao thường có nghĩa là một vòng lặp."
+        "perTrace": "Số lần điều này chạy bên trong một yêu cầu. Số cao thường có nghĩa là một vòng lặp.",
+        "load": "Tổng thời gian truy vấn này dành cho cơ sở dữ liệu. Số liệu của chính cơ sở dữ liệu của bạn ở nơi nó báo cáo: thời gian thực thi trên Postgres, nhưng thời gian CHỜ trên MySQL và MariaDB — mỗi hàng cho biết loại nào. Các hàng được đánh dấu client-observed được đo từ trace, vì vậy chúng bao gồm cả thời gian khứ hồi mạng."
       },
       "errorsNone": "không có",
       "errorsAll": "tất cả",
       "actions": {
         "open": "Mở chi tiết",
+        "traces": "Xem các trace mẫu",
         "copy": "Sao chép truy vấn",
         "copied": "Đã sao chép truy vấn",
         "copyFailed": "Không thể sao chép truy vấn.",
@@ -14780,7 +15404,8 @@
       },
       "n-plus-one": {
         "title": "Chạy ít nhất {multiplier}× mỗi yêu cầu",
-        "body": "{share} thời gian cơ sở dữ liệu · {service}"
+        "body": "{share} thời gian cơ sở dữ liệu · {service}",
+        "rule": "Hiển thị vì truy vấn này chạy ít nhất {ratio} lần trong một yêu cầu duy nhất, trên ít nhất {traces} yêu cầu. Đây là giới hạn dưới, vì vậy con số thực tế có thể cao hơn. Công việc xử lý theo lô hợp lệ cũng có thể trông giống như vậy."
       },
       "volume-shift": {
         "title": "Bận hơn, không chậm hơn",
@@ -14854,6 +15479,7 @@
       "subtitleCounts": "{pass} đạt, {fail} không. | {pass} đạt, {fail} không.",
       "checklistTitle": "Những gì chúng tôi đã kiểm tra",
       "showMeHow": "Chỉ cho tôi cách thêm đo lường",
+      "checkTrace": "Kiểm tra một trace của tôi",
       "checks": {
         "enabled": {
           "ok": "Tính năng theo dõi cơ sở dữ liệu đã được bật",
@@ -14862,15 +15488,21 @@
           "noDetail": "Quản trị viên có thể bật nó cho tổ chức này, sau đó khởi động lại bộ thu thập."
         },
         "traces": {
-          "okDetail": "{count} bản ghi trong khoảng thời gian này"
+          "ok": "Các trace của bạn đang đến",
+          "okDetail": "{count} bản ghi trong khoảng thời gian này",
+          "no": "Chưa có trace nào được gửi đến",
+          "noDetail": "Giám sát cơ sở dữ liệu được xây dựng từ trace, và tổ chức này chưa gửi bất kỳ trace nào."
         },
         "permission": {
           "ok": "Bạn có quyền truy cập dữ liệu này",
           "okDetail": "bạn là quản trị viên của {org}",
-          "no": "Bạn không có quyền truy cập dữ liệu này"
+          "no": "Bạn không có quyền truy cập dữ liệu này",
+          "noDetail": "Giám sát cơ sở dữ liệu đọc các trace của bạn, và vai trò của bạn không có quyền truy cập chúng. Hãy yêu cầu quản trị viên cấp quyền đọc."
         },
         "dbSpans": {
+          "ok": "Các trace của bạn đề cập đến một cơ sở dữ liệu",
           "okDetail": "các lệnh gọi cơ sở dữ liệu đang được ghi lại",
+          "no": "Không có trace nào của bạn đề cập đến cơ sở dữ liệu",
           "noDetail": "Các ứng dụng của bạn đang được theo dõi, nhưng phần giao tiếp với cơ sở dữ liệu thì không. Hãy thêm công cụ đo lường cơ sở dữ liệu cho ngôn ngữ của bạn và các truy vấn sẽ hiển thị ở đây."
         },
         "counted": {
@@ -14901,6 +15533,7 @@
         "plans": "Kế hoạch thực thi truy vấn",
         "plansHint": "Các bước cơ sở dữ liệu của bạn đã thực hiện để chạy truy vấn này. Bắt đầu từ đây để tìm hiểu tại sao nó chậm.",
         "callers": "Bên gọi và ví dụ",
+        "callersHint": "Những phần nào của ứng dụng của bạn đã chạy truy vấn này, và các lần chạy chậm riêng lẻ bạn có thể mở dưới dạng một trace.",
         "callersLocked": "Các lần chạy riêng lẻ có được từ việc theo dõi. Không có trace nào ghi nhận truy vấn này trong khoảng thời gian này."
       },
       "notFound": {
@@ -14926,6 +15559,10 @@
       "noSamples": "Không có lần thực thi riêng lẻ nào được tải cho khoảng thời gian này.",
       "noSeries": "Không có lịch sử cho truy vấn này trong khoảng thời gian bạn đã chọn.",
       "liveSeries": "Các điểm gần đây nhất vẫn đang được tính và có thể thay đổi.",
+      "noStream": "Chúng tôi không thể xác định luồng trace nào chứa truy vấn này, vì vậy không thể tải caller và ví dụ của nó.",
+      "ambiguousStream": "Tổ chức này có nhiều hơn một luồng trace, và chúng tôi không thể biết truy vấn này chạy trên luồng nào. Hãy chọn một luồng để tải caller và trace mẫu.",
+      "pickStream": "Chọn một luồng trace",
+      "invalidStream": "Tên luồng trace đó không được chúng tôi nhận diện, nên chúng tôi đã không chạy tìm kiếm.",
       "firstSeen": "LẦN ĐẦU XUẤT HIỆN TRONG DANH SÁCH NÀY LÚC {time}",
       "firstSeenHint": "Điểm sớm nhất trong khoảng thời gian này mà truy vấn này đủ nặng để theo dõi riêng.",
       "lastSeen": "LẦN CUỐI XUẤT HIỆN LÚC {time}",
@@ -14956,6 +15593,7 @@
       "sampleOk": "OK",
       "sampleError": "Thất bại",
       "viewTrace": "Xem yêu cầu →",
+      "viewTraces": "Xem các trace mẫu",
       "copySummary": "Sao chép",
       "copySummaryHint": "Mọi con số ở đây đã có trên trang này — thao tác này chỉ viết câu văn, vì vậy phút thứ 13 của một sự cố sẽ tạo ra thông báo thay vì không có gì.",
       "summaryCopied": "Đã sao chép tóm tắt",
@@ -15047,7 +15685,8 @@
         "unjoinable": "Không hiển thị — câu lệnh này chạy trên nhiều loại cơ sở dữ liệu ở đây, và việc khớp các bên gọi mà không biết loại nào sẽ chỉ định sai dịch vụ.",
         "tracedCalls": "{calls} cuộc gọi được truy vết",
         "coverage": "{count} dịch vụ xuất hiện trong {traced} trên tổng số {executions} lần thực thi ở trên. Phần còn lại đến từ các bên gọi chưa được truy vết.",
-        "coverageUnknown": "{count} dịch vụ xuất hiện trong {traced} cuộc gọi được truy vết. Cơ sở dữ liệu của bạn không báo cáo tổng cho câu lệnh này, vì vậy không có tỷ lệ nào để hiển thị."
+        "coverageUnknown": "{count} dịch vụ xuất hiện trong {traced} cuộc gọi được truy vết. Cơ sở dữ liệu của bạn không báo cáo tổng cho câu lệnh này, vì vậy không có tỷ lệ nào để hiển thị.",
+        "noneNamed": "{traced} cuộc gọi đã được trace, nhưng không cuộc gọi nào có thể liên kết với một dịch vụ — trace của chúng bắt đầu ngoài khoảng thời gian này."
       },
       "callersEmpty": {
         "title": "Chưa có cuộc gọi được truy vết nào cho truy vấn này",
@@ -15113,7 +15752,9 @@
       "failedWithCode": "Thất bại · {code}",
       "viewTrace": "Mở yêu cầu chứa cuộc gọi này",
       "scatterOk": "Hoàn thành",
+      "partial": "Một số dữ liệu trace của bạn không thể đọc được, vì vậy các cuộc gọi có thể bị thiếu trong danh sách này.",
       "disclosureShort": "Mỗi hàng là một cuộc gọi đã hoàn thành thực tế",
+      "disclosureDetail": "Được đo bởi ứng dụng thực hiện cuộc gọi, từ các trace bạn gửi. Chỉ những cuộc gọi đã hoàn thành có ở đây — một truy vấn đang chạy, hoặc một truy vấn bị treo và không bao giờ trở lại, không tạo ra phép đo nào.",
       "counts": {
         "complete": "Hiển thị tất cả {count} cuộc gọi cơ sở dữ liệu trong cửa sổ này, chậm nhất trước.",
         "truncated": "{count} cuộc gọi chậm nhất trong cửa sổ này — có nhiều cuộc gọi hơn số hiển thị ở đây.",
@@ -15318,6 +15959,8 @@
         "blocking": "Đang chặn"
       },
       "coverage": {
+        "summary": "Thời gian chờ dài nhất là {longest}. Mỗi lần chờ đều bắt nguồn từ {roots} đang giữ khóa mở.",
+        "summaryCapped": "Có nhiều phiên đang chờ hơn mức chúng tôi có thể đọc cùng lúc. Trong số các phiên chúng tôi có, thời gian chờ dài nhất là {longest} và chúng bắt nguồn từ {roots} đang giữ khóa mở.",
         "summaryOneRoot": "một phiên",
         "summaryManyRoots": "{count} phiên",
         "checked": "Kiểm tra mỗi {interval} giây; lần kiểm tra cuối {time}.",

@@ -43,6 +43,7 @@
     "allCaughtUp": "Вы всё прочитали",
     "noPanels": {
       "title": "Здесь пока нет панелей",
+      "description": "Добавьте панель, чтобы приступить к визуализации логов, метрик и трейсов.",
       "action": "Добавить панель",
       "actionDesc": "Диаграммы, таблицы и другое"
     },
@@ -77,6 +78,7 @@
     },
     "noDashboards": {
       "title": "Создайте свою первую панель мониторинга",
+      "description": "Дашборды объединяют ваши метрики, логи и трейсы в одном представлении. Создайте дашборд, чтобы начать.",
       "action": "Новая панель мониторинга",
       "actionDesc": "Начать с пустого холста",
       "import": "Импортировать панель мониторинга",
@@ -122,6 +124,7 @@
     },
     "noIngestionTokens": {
       "title": "Токенов приема пока нет",
+      "description": "Токены приема данных аутентифицируют источники данных при отправке логов, метрик и трейсов.",
       "action": "Новый токен",
       "actionDesc": "Сгенерировать токен приема"
     },
@@ -130,7 +133,11 @@
       "description": "Организации объединяют ваших пользователей и данные. Создайте одну, чтобы начать."
     },
     "noAlertDestinations": {
+      "title": "Пока нет получателей",
+      "description": "Получатели определяют, куда отправляются уведомления об оповещениях — Slack, электронная почта, вебхуки и многое другое.",
+      "action": "Новый получатель",
       "actionDesc": "Подключить канал уведомлений",
+      "import": "Импортировать получателя",
       "importDesc": "Импортировать из JSON-файла"
     },
     "noAlertSources": {
@@ -140,7 +147,10 @@
       "actionDesc": "Создайте URL вебхука и токен"
     },
     "noPipelineDestinations": {
-      "description": "Внешние цели для вывода конвейера — HTTP-конечные точки и цели удаленной записи."
+      "title": "Пока нет получателей",
+      "description": "Внешние цели для вывода конвейера — HTTP-конечные точки и цели удаленной записи.",
+      "action": "Новый получатель",
+      "actionDesc": "Подключите получателя конвейера"
     },
     "noAlertTemplates": {
       "title": "Шаблонов пока нет",
@@ -181,7 +191,8 @@
       "actionDesc": "Настроить поставщика LLM"
     },
     "noDiscoveredServices": {
-      "title": "Сервисы не обнаружены"
+      "title": "Сервисы не обнаружены",
+      "description": "Сервисы появятся здесь автоматически, как только начнут поступать трейсы."
     },
     "noNodes": {
       "title": "Нет доступных узлов",
@@ -237,6 +248,7 @@
     },
     "noDatasets": {
       "title": "Создайте свой первый набор данных",
+      "description": "Эталонные наборы данных собирают аннотированные трейсы и отзывы в версионированные наборы для оценки. Создайте один, чтобы начать курирование.",
       "action": "Новый набор данных",
       "actionDesc": "Создать пустой набор данных"
     },
@@ -276,11 +288,15 @@
     },
     "noLLMInsights": {
       "title": "Активность LLM пока отсутствует",
-      "action": "Инструментировать с OpenTelemetry"
+      "description": "Инструментируйте свои сервисы с помощью семантических соглашений OpenTelemetry Gen-AI и примите хотя бы один трейс, чтобы заполнить этот дашборд.",
+      "action": "Инструментировать с OpenTelemetry",
+      "actionDesc": "Фиксируйте атрибуты gen_ai_* в ваших трейсах."
     },
     "noLLMSessions": {
       "title": "Сеансы LLM пока отсутствуют",
-      "action": "Инструментировать с OpenTelemetry"
+      "description": "Сессии группируются по gen_ai_conversation_id. Инструментируйте свои сервисы, чтобы каждый диалог помечал свои трейсы, и сессии появятся здесь.",
+      "action": "Инструментировать с OpenTelemetry",
+      "actionDesc": "Помечайте spans тегом gen_ai_conversation_id."
     },
     "noScorers": {
       "title": "Оценщики пока отсутствуют",
@@ -324,9 +340,13 @@
       "title": "Здесь нет нездоровых элементов",
       "description": "В этом окне нет нездоровых элементов. Расширьте временной диапазон или измените фильтр очереди, чтобы увидеть уже рассмотренные элементы."
     },
-    "noTraces": {},
+    "noTraces": {
+      "title": "Трейсы не найдены",
+      "description": "Ни один трейс не соответствует выбранному сервису и временному диапазону. Попробуйте расширить временной диапазон или выбрать другой сервис."
+    },
     "noServiceGraph": {
-      "title": "Нет данных графа служб"
+      "title": "Нет данных графа служб",
+      "description": "Попробуйте выбрать более длинный временной диапазон или убедитесь, что ваши сервисы отправляют метрики span."
     },
     "noServicesCatalog": {
       "title": "Службы не найдены",
@@ -386,13 +406,16 @@
       "pipelines": "конвейеры",
       "workflows": "рабочие процессы",
       "functions": "функции",
+      "streams": "потоки",
       "alerts": "оповещения",
       "incidents": "инциденты",
+      "traces": "трейсы",
       "discoveryItems": "нездоровые элементы",
       "datasetItems": "элементы",
       "searches": "поиски",
       "searchJobs": "задания поиска",
       "users": "пользователи",
+      "reports": "отчеты",
       "queries": "запросы",
       "serviceAccounts": "учетные записи служб",
       "invitations": "приглашения",
@@ -403,7 +426,9 @@
       "roleLimits": "лимиты ролей",
       "ingestionTokens": "токены приема",
       "organizations": "организации",
+      "alertDestinations": "получатели",
       "alertSources": "источники оповещений",
+      "pipelineDestinations": "получатели",
       "alertTemplates": "шаблоны",
       "evalTemplates": "шаблоны оценки",
       "enrichmentTables": "таблицы обогащения",
@@ -455,6 +480,7 @@
       "noSearchResults": "Нет результатов поиска",
       "noServiceAccounts": "Нет сервисных учётных записей",
       "noStreams": "Нет принятых данных",
+      "noTraces": "Нет трейсов",
       "noUsers": "Нет пользователей"
     },
     "noExperiments": {
@@ -497,6 +523,8 @@
     "relatedEvents": "Связанные события",
     "on": "вкл",
     "event": "событие",
+    "viewTraceDetails": "Просмотреть детали трейса",
+    "viewTrace": "Просмотреть трейс",
     "networkRequests": "Сетевые запросы",
     "noNetworkRequestsFound": "Для этого события не найдены сетевые запросы",
     "consoleLogsComingSoon": "Логи консоли скоро появятся",
@@ -547,6 +575,7 @@
     "list": "Список",
     "condition": "Условие",
     "operator": "Оператор",
+    "value": "Значение",
     "filters": "Фильтры",
     "selectFilter": "Выбрать фильтр",
     "confirm": "Подтвердить",
@@ -715,6 +744,7 @@
     "nameIsRequired": "Имя обязательно",
     "streamTypeIsRequired": "Тип потока обязателен",
     "functionNameIsRequired": "Имя функции обязательно",
+    "remoteDestinationIsRequired": "Требуется удаленный получатель",
     "timezoneIsRequired": "Часовой пояс обязателен",
     "idPrefix": "ID: {id}",
     "unchangedCount": "Без изменений ({count})",
@@ -773,6 +803,7 @@
     "relativeTimeAgo": "{value} {unit} назад",
     "relativeTimePast": "Последние {value} {unit}",
     "metrics": "Метрики",
+    "traces": "Трейсы",
     "browserTime": "Время браузера",
     "invalidCredentials": "Неверные учётные данные",
     "notFound": "Не найдено",
@@ -813,7 +844,11 @@
       "loading": "Загрузка условий...",
       "loadError": "Сохраненное условие не удалось прочитать и оно было сброшено. Сохранение сейчас перезапишет его."
     },
-    "destination": {},
+    "destination": {
+      "createNew": "Создать нового получателя",
+      "select": "Получатель",
+      "loadError": "Ошибка при загрузке получателей."
+    },
     "function": {
       "createNew": "Создать новую функцию",
       "createNewNoteWorkflow": "Примечание: Функция будет создана, после чего вы будете перенаправлены на предыдущую форму для связывания новой функции с рабочим процессом.",
@@ -872,6 +907,7 @@
     "of": "из",
     "rowDetail": "Сведения об источнике",
     "sourceName": "Имя",
+    "sourceValue": "Значение",
     "showHistogramLabel": "Гистограмма",
     "hideHistogram": "Скрыть гистограмму",
     "showPatternsLabel": "Шаблоны",
@@ -1025,7 +1061,10 @@
     "regionFilterMsg": "Поиск региона/кластера",
     "queryRangeRestrictionMsg": "Диапазон запроса ограничен {range}. Пожалуйста, измените диапазон дат соответственно. В противном случае дата начала будет автоматически скорректирована в соответствии с допустимым лимитом.",
     "cancel": "Отменить запрос",
+    "viewTrace": "Просмотреть трейс",
+    "viewTraceUnavailable": "Не удалось открыть трейс для этой записи лога.",
     "viewRelated": "Просмотр связанного",
+    "viewRelatedTooltip": "Просмотреть связанные трейсы и метрики",
     "flattened": "Уплощённый",
     "original": "Исходный",
     "resetFilters": "Сбросить фильтры",
@@ -1107,6 +1146,8 @@
     "selectFunctionNamePlaceholder": "Выбрать имя функции",
     "confirmFunctionUpdateTitle": "Подтвердить обновление",
     "confirmFunctionUpdateMsg": "Вы уверены, что хотите обновить функцию {name}?",
+    "traceIdLabel": "ID трейса:",
+    "enterTraceIdPlaceholder": "Введите ID трейса",
     "changeQueryModeTitle": "Изменить режим запроса",
     "changeQueryModeConfirm": "Вы уверены, что хотите изменить режим запроса? Данные, сохраненные для оси X, оси Y и фильтров, будут удалены.",
     "patternExampleLog": "Пример лога",
@@ -1156,7 +1197,9 @@
     "upgradeToProPlan": "Перейти на план PRO",
     "home": "Главная",
     "about": "О продукте",
+    "index": "Потоки",
     "search": "Логи",
+    "traces": "Трейсы",
     "serviceGraph": "Граф сервисов",
     "services": "Каталог сервисов",
     "aiObservability": "ИИ",
@@ -1174,6 +1217,7 @@
     "rum": "RUM",
     "settings": "Настройки",
     "iam": "IAM",
+    "report": "Отчеты",
     "pipeline": "Конвейеры",
     "workflows": "Рабочие процессы",
     "language": "Язык",
@@ -1339,6 +1383,8 @@
     "loadingMsg": "Держитесь, мы загружаем данные RUM.",
     "breadcrumbs": "Хлебные крошки",
     "tags": "Теги",
+    "traces": "Трейсы",
+    "searchEvents": "Поиск событий",
     "loadingSessions": "Держитесь, мы загружаем сессии.",
     "errorStack": "Стек ошибки",
     "sessionReplay": "Воспроизведение сессии",
@@ -1348,6 +1394,11 @@
     "discoverSessionMessage": "Воспроизведение сессии захватывает и воспроизводит взаимодействия пользователей на вашем веб-сайте или приложении. Это позволяет визуально просмотреть, как пользователи перемещаются, куда они нажимают, что вводят и как взаимодействуют с вашим контентом",
     "loadingErrorDetails": "Держитесь, мы загружаем детали ошибки.",
     "eventID": "ID события",
+    "noCorrelatedTraces": "Для этой сессии не найдено связанных трейсов.",
+    "span": "span",
+    "spans": "spans",
+    "errorTraces": "трейсы с ошибками",
+    "failedToFetchTraces": "Не удалось получить данные трейсов. Попробуйте снова.",
     "seekToMoment": "Перейти к этому моменту в сессии",
     "route": "Маршрут",
     "duration": "Длительность",
@@ -1434,6 +1485,7 @@
     "frustrationErrorClick": "Клик вызвал ошибку JavaScript",
     "frustrationRageTap": "Пользователь быстро нажал несколько раз (3+) — указывает на фрустрацию",
     "frustrationErrorTap": "Касание вызвало ошибку JavaScript",
+    "fetchTraceMetadataFailed": "Не удалось получить метаданные трейса.",
     "frustrationEventTooltip": "⚠️ ФРУСТРАЦИЯ: {types}\n{name}",
     "errorEventTooltip": "⛔ ОШИБКА: {name}",
     "frustrationSignalType": "Сигнал фрустрации: {type}"
@@ -1485,8 +1537,10 @@
     "feature_column_name": "Функция",
     "feature_logs": "Логи",
     "feature_metrics": "Метрики",
+    "feature_traces": "Трейсы",
     "feature_alerts": "Оповещения",
     "feature_dashboards": "Дашборды",
+    "feature_reports": "Отчеты",
     "feature_vrl_functions": "Функции VRL",
     "feature_pipelines": "Конвейеры",
     "feature_high_availability": "Высокая доступность",
@@ -1507,6 +1561,7 @@
     "feature_license": "Лицензия",
     "feature_support": "Поддержка",
     "feature_cost": "Стоимость",
+    "feature_pipelines_external": "Конвейеры — Внешние назначения",
     "feature_extreme_performance": "Экстремальная производительность (улучшение в 100 раз для многих запросов)",
     "feature_query_optimizer": "Оптимизатор запросов",
     "value_license_agpl": "AGPL",
@@ -1608,6 +1663,7 @@
       },
       "core_features": {
         "logs_metrics_traces": {
+          "name": "Логи, Метрики, Трейсы",
           "note": "Полный прием и анализ данных наблюдаемости"
         },
         "rum": {
@@ -1622,6 +1678,7 @@
           "note": "Настраиваемые панели визуализации"
         },
         "reports": {
+          "name": "Отчеты",
           "note": "Плановые отчеты и отчеты по запросу"
         },
         "vrl_functions": {
@@ -1678,7 +1735,10 @@
           "name": "Маскирование конфиденциальных данных",
           "note": "Защита персональных данных и конфиденциальной информации"
         },
-        "pipeline_remote_destinations": {},
+        "pipeline_remote_destinations": {
+          "name": "Удаленные назначения конвейеров",
+          "note": "Отправка данных в удаленные назначения"
+        },
         "query_optimizer": {
           "name": "Оптимизатор запросов / Кэш агрегации",
           "note": "Агрегация TopK и оптимизация запросов"
@@ -1720,6 +1780,7 @@
           "note": "Оптимизированные распределенные операции соединения"
         },
         "logs_metrics_traces_correlation": {
+          "name": "Корреляция логов, метрик и трейсов",
           "note": "Автоматическое обнаружение и корреляция"
         },
         "service_maps": {
@@ -2403,6 +2464,7 @@
       "secondaryIndexCount": "Вторичный индекс ({count})"
     },
     "deleteField": "Удалить поле",
+    "header": "Потоки",
     "subtitle": "Управление индексами и настройка потока",
     "streamNameHelpText": "Используйте только буквенно-цифровые символы, подчеркивания и двоеточия.",
     "search": "Поиск потока",
@@ -2442,6 +2504,7 @@
     "deleteDatesMessage": "Вы уверены, что хотите удалить выбранные даты? Это действие нельзя отменить.",
     "labelLogs": "Логи",
     "labelMetrics": "Метрики",
+    "labelTraces": "Трейсы",
     "labelMetadata": "Метаданные",
     "add": "Новый поток",
     "dataRetention": "Срок хранения данных (в днях)",
@@ -2483,6 +2546,7 @@
   },
   "workflow": {
     "header": "Рабочие процессы",
+    "subtitle": "Автоматизируйте действия с помощью триггеров, логики и назначений",
     "create": "Новый workflow",
     "createSuccess": "Рабочий процесс успешно создан",
     "name": "Название рабочего процесса",
@@ -2563,6 +2627,7 @@
     },
     "triggerMeta": {
       "orgId": "Идентификатор организации, к которой относится оповещение.",
+      "streamType": "Тип потока — логи, метрики или трейсы.",
       "streamName": "Поток, который отслеживает оповещение.",
       "alertName": "Имя сработавшего оповещения.",
       "alertType": "Тип оповещения — реальное время или по расписанию.",
@@ -2599,6 +2664,8 @@
         "input": "Ввод",
         "output": "Вывод",
         "noInput": "На последнем запуске этот шаг не получил записей.",
+        "sentExternally": "Отправлено во внешнее назначение",
+        "destinationNoRecords": "До этого назначения не дошло ни одной записи — ничего не отправлено.",
         "branchFiltered": "0 записей — в эту ветку ничего не передано.",
         "conditionNoMatch": "Ни одна запись не соответствовала этому условию — дальше по конвейеру ничего не пошло.",
         "errorHeading": "Ошибка",
@@ -2647,12 +2714,15 @@
       "kindAction": "Действие",
       "condition": "Условие",
       "function": "Функция",
+      "sendToDestination": "Назначение",
       "configComingSoon": "Конфигурация {node} появится на следующем шаге",
       "sectionTransform": "Преобразование",
+      "sectionDestination": "Назначение",
       "stepSearchPlaceholder": "Поиск шагов...",
       "stepNoMatch": "Нет шагов, соответствующих вашему запросу.",
       "conditionDesc": "Ветвление по правилу",
       "functionDesc": "Изменить структуру данных с помощью функции",
+      "destinationDesc": "Отправить в назначение",
       "triggerBody": "Запускается при срабатывании связанного оповещения",
       "triggerDataExampleNote": "Только пример — фактические столбцы берутся из запроса вашего оповещения.",
       "incidentEventTypeLabel": "Тип события",
@@ -2671,7 +2741,12 @@
       "functionCreateNew": "Создать новую функцию",
       "functionRequired": "Функция обязательна",
       "functionLoadError": "Не удалось загрузить функции",
+      "destinationBody": "Отправить в назначение",
       "destinationBodySet": "Отправляет в {name}",
+      "destinationSelect": "Назначение",
+      "destinationCreateNew": "Создать новое назначение",
+      "destinationRequired": "Пожалуйста, выберите назначение",
+      "destinationLoadError": "Не удалось загрузить назначения",
       "namePlaceholder": "Назовите этот шаг (необязательно)",
       "commentLabel": "Комментарий (необязательно)",
       "commentPlaceholder": "Добавьте заметку об этом шаге...",
@@ -2681,6 +2756,8 @@
       "disabledBadge": "Отключено",
       "incompleteBadge": "Настроить позже",
       "destinationSetUpLater": "Настроить позже",
+      "destinationSetUpLaterPrompt": "Еще нет назначения? Включите эту опцию, чтобы настроить его позже — вы можете сохранить черновик и протестировать сейчас.",
+      "destinationSetUpLaterActive": "Назначение пока пропускается — имя и комментарий сохраняются. Перед публикацией вам потребуется назначение.",
       "functionSetUpLater": "Настроить позже",
       "functionSetUpLaterPrompt": "Ещё нет функции? Включите это, чтобы настроить её позже — вы можете сохранить черновик и протестировать сейчас.",
       "functionSetUpLaterActive": "Функция пока пропускается — имя и комментарий всё равно сохраняются. Вам понадобится функция перед публикацией."
@@ -2738,6 +2815,8 @@
       "functionNodeEmptyName": "У узла функции {id} пустое имя функции",
       "functionNodeInvalidName": "У узла функции {id} недопустимое имя функции \"{name}\". Должно быть одним из доступных функций.",
       "outputStreamNodeEmptyName": "У узла выходного потока {id} пустое имя потока",
+      "remoteStreamNodeEmptyDestination": "У удаленного узла потока {id} не указано имя назначения.",
+      "remoteStreamNodeInvalidDestination": "У удаленного узла потока {id} недопустимое назначение \"{destination}\". Оно должно быть одним из доступных назначений конвейера.",
       "edgeMissingSourceNode": "Ребро {id} ссылается на несуществующий исходный узел {source}",
       "edgeMissingTargetNode": "Ребро {id} ссылается на несуществующий целевой узел {target}",
       "inputNodeHasIncomingEdges": "Входной узел {id} не должен иметь входящих ребер. Найдено {count} входящих ребер.",
@@ -2752,6 +2831,7 @@
     "importErrors": {
       "unknownError": "Неизвестная ошибка",
       "nameRequired": "Конвейер - {index}: требуется имя",
+      "streamTypeInvalid": "Конвейер - {index}: Тип потока обязателен и должен быть одним из: 'logs', 'metrics', 'traces'.",
       "sourceStreamNameRequired": "Конвейер - {index}: требуется имя исходного потока ",
       "sqlQueryRequired": "Конвейер - {index}: требуется SQL-запрос",
       "timezoneRequired": "Конвейер - {index}: требуется часовой пояс",
@@ -2764,6 +2844,7 @@
       "v0ConditionFields": "Конвейер - {index}, узел {nodeIndex}: формат V0 - каждое условие должно содержать column, operator и value.",
       "v1ConditionInvalid": "Конвейер - {index}, узел {nodeIndex}: неверный формат условия V1.",
       "conditionFormatUnrecognized": "Конвейер - {index}, узел {nodeIndex}: нераспознанный формат условия.",
+      "remoteDestinationRequired": "Конвейер - {index}: Требуется удаленное назначение",
       "createSuccess": "Конвейер - {index}: \\\"{name}\\\" успешно создан \\\\nПримечание: удалите созданный объект конвейера {name} из json-файла",
       "createFailed": "Конвейер - {index}: создание \\\"{name}\\\" не удалось --> \\\\n Причина: {reason}",
       "sqlQueryMismatch": "Pipeline - {index}: SQL-запрос должен быть одинаковым во всех узлах, а также постарайтесь сопоставить запрос в узлах \n\n          input.sql_query: {sqlQuery} \n\n          input.source.query_condition.sql: {sourceSql} \n",
@@ -2864,8 +2945,10 @@
     "defaultDelayTooltip": "По умолчанию: 5 секунд",
     "deleteDataBeforeBackfill": "Удалить существующие данные перед обратным заполнением",
     "irreversibleDeletionWarning": "Предупреждение: Необратимое удаление данных",
+    "deleteBackfillWarningMessage": "Это приведет к безвозвратному удалению всех данных в целевом потоке за указанный диапазон времени перед запуском backfill. Это действие не может быть отменено.",
     "timeAlignmentRequirements": "Требования к выравниванию времени (UTC):",
     "logsHourBoundaryNote": "потоки: Время должно совпадать с границами часов в UTC (например, 10:00:00, а не 10:15:00)",
+    "metricsTracesLabel": "Метрики/Трейсы",
     "dayBoundaryNote": "потоки: Время должно совпадать с границами суток в UTC (например, 00:00:00)",
     "estimatedProcessingTime": "Примерное время обработки:",
     "estimatedChunks": "Примерное количество чанков:",
@@ -2888,6 +2971,8 @@
       "statusUnknown": "Неизвестно",
       "phaseInitializing": "Инициализация"
     },
+    "deleteBackfillConfirmMessage": "Вы выбрали удаление существующих данных перед backfill. Это приведет к безвозвратному удалению всех данных в целевом потоке за указанный диапазон времени.",
+    "editBackfillDeleteConfirmMessage": "Вы выбрали удаление существующих данных перед backfill. Это приведет к безвозвратному удалению всех данных в целевом потоке за указанный диапазон времени. Это действие НЕ может быть отменено или прервано после обновления задания. Вы уверены, что хотите продолжить?",
     "actionCannotBeUndone": "Это действие НЕЛЬЗЯ отменить или прекратить после создания задачи.",
     "areYouSureProceed": "Вы уверены, что хотите продолжить?",
     "clearFilters": "Очистить фильтры",
@@ -2908,6 +2993,7 @@
     "chunkPeriodDefaultPlaceholder": "60",
     "organizationId": "Идентификатор организации",
     "functionName": "Имя функции",
+    "remoteDestination": "Удаленное назначение",
     "failedToLoadPipeline": "Не удалось загрузить конвейер",
     "header": "Конвейеры",
     "subtitle": "Трансформируйте, обогащайте и маршрутизируйте данные в процессе",
@@ -2935,6 +3021,7 @@
     "trigger": "Триггер",
     "aggregation": "Агрегация",
     "selectColumn": "Выберите столбец",
+    "value": "Значение",
     "fieldRequired": "Поле обязательно!",
     "sqlQuery": "SQL-запрос",
     "promqlQuery": "PromQL-запрос",
@@ -2949,11 +3036,15 @@
     "sourceQueryTooltip": "Источник: узел запроса",
     "functionTooltip": "Узел функции",
     "conditionTooltip": "Узел условия",
+    "destinationStreamTooltip": "Назначение: узел потока",
+    "destinationExternalTooltip": "Назначение: узел внешнего назначения",
     "pipelineNotFound": "Конвейер не найден",
     "pipelineNameRequired": "Имя конвейера обязательно",
     "sourceNodeRequired": "Узел источника обязателен",
+    "destinationNodeRequired": "Узел назначения обязателен",
     "connectAllNodes": "Пожалуйста, соедините все узлы перед сохранением",
     "connectAllNodesShort": "Пожалуйста, соедините все узлы",
+    "enrichmentTablesScheduledOnly": "Таблицы обогащения в качестве целевого потока доступны только для конвейеров по расписанию",
     "savingPipeline": "Сохранение конвейера...",
     "pipelineUpdated": "Конвейер успешно обновлен",
     "pipelineSaved": "Конвейер успешно сохранен",
@@ -2985,6 +3076,7 @@
     "functionAlreadyAssociated": "Функция уже связана",
     "atLeastOneCondition": "Добавьте хотя бы одно условие",
     "fillAllConditionFields": "Заполните все поля условия (столбец, оператор и значение обязательны)",
+    "selectExternalDestination": "Пожалуйста, выберите внешнее назначение из списка",
     "backfillNumericRange": "Должно быть от {min} до {max}",
     "selectValidTimeRange": "Выберите допустимый временной диапазон",
     "startBeforeEndTime": "Время начала должно быть раньше времени окончания",
@@ -3000,9 +3092,11 @@
       "streamType": "Тип потока *"
     },
     "sourceNode": "Источник",
+    "streamNode": "Поток",
     "queryNode": "Запрос",
     "transformNode": "Преобразование",
     "functionNode": "Функция",
+    "destinationNode": "Назначение",
     "remoteNode": "Удаленный",
     "conditionsNode": "Условия",
     "editorFunctionTooltip": "Преобразовать полезную нагрузку с помощью функции",
@@ -3061,7 +3155,8 @@
       "customStep4": "Настройте необходимые заголовки для аутентификации",
       "customStep5": "Выберите формат вывода (JSON или NDJSON)",
       "customStep6": "Проверьте подключение, чтобы убедиться, что оно работает",
-      "defaultTitle": "Сведения о подключении"
+      "defaultTitle": "Сведения о подключении",
+      "defaultStep1": "Выберите тип назначения, чтобы увидеть конкретные инструкции"
     },
     "deleteFunctionAssociationConfirm": "Вы уверены, что хотите удалить привязку функции?",
     "deleteStreamRoutingConfirm": "Вы уверены, что хотите удалить маршрутизацию потока?",
@@ -3087,6 +3182,7 @@
     "noJobSelected": "Задача не выбрана",
     "updateBackfillJobFailed": "Не удалось обновить задачу обратного заполнения",
     "fetchPipelineHistoryFailed": "Не удалось получить историю конвейера",
+    "defaultDestinationNodeWarning": "Удаление узла назначения по умолчанию останавливает прием данных в него. Исходный поток будет направлять данные только в добавленный целевой поток. Данные, не направленные ни в один целевой поток, будут отброшены.",
     "confirmBulkDeleteMsg": "Вы уверены, что хотите удалить {count} конвейер(ов)?",
     "confirmPauseBackfillJob": "Вы уверены, что хотите приостановить задачу обратного заполнения для \"{name}\"? Вы сможете возобновить её позже.",
     "confirmResumeBackfillJob": "Вы уверены, что хотите возобновить задачу обратного заполнения для \"{name}\"?",
@@ -3196,6 +3292,10 @@
     "analyzingDimensions": "Анализ измерений...",
     "arrowSeparator": "→",
     "computingDistributions": "Вычисление распределений частот по {count} измерениям",
+    "dashboardDescError": "Сравнение процента ошибок трейсов в период всплеска ошибок с базовым уровнем по измерениям",
+    "dashboardDescLatency": "Сравнение перцентильной задержки выбранных трейсов (длительность {start}-{end}µs) с базовым уровнем по измерениям",
+    "dashboardDescVolume": "Сравнение распределения количества трейсов с базовым уровнем по измерениям",
+    "dashboardDescVolumeRate": "Сравнение распределения количества трейсов выбранных периодов (интенсивность {start}-{end} трейсов) с базовым уровнем по измерениям",
     "dashboardTitleError": "Анализ ошибок",
     "dashboardTitleLatency": "Анализ задержек",
     "dashboardTitleVolume": "Анализ объемов",
@@ -3203,6 +3303,8 @@
     "durationLabel": "Длительность:",
     "failedToLoad": "Не удалось загрузить анализ",
     "panelDescErrorComparison": "Сравнение процента ошибок для измерения: {dimension}. Более высокие выбранные столбцы указывают, что это значение измерения имеет больше ошибок в период всплеска ошибок.",
+    "panelDescLatencyComparison": "Сравнение перцентильной задержки для измерения: {dimension}. Более высокие выбранные столбцы указывают, что это значение измерения коррелирует с более медленными трейсами.",
+    "panelDescVolumeComparison": "Сравнение количества трейсов для измерения: {dimension}. Более высокие выбранные столбцы указывают, что это значение измерения встречается чаще в периоды высокой нагрузки.",
     "panelDescVolumeTopValues": "Топ значений по количеству для измерения: {dimension}.",
     "refreshTooltip": "Обновить анализ с обновленным процентилем",
     "retryButton": "Повторить",
@@ -3213,6 +3315,7 @@
     "title": "Инсайты",
     "tabLabel": "Скорость",
     "analyzeTooltipLogs": "Просмотреть инсайты для текущего временного диапазона",
+    "analyzeTooltipTraces": "Анализировать измерения трейсов по интенсивности, задержке и паттернам ошибок",
     "rateLabel": "Скорость:",
     "searchInspectionsLabel": "Просмотреть детали выполнения задания поиска",
     "inspectBtnLabel": "Просмотреть",
@@ -3315,6 +3418,7 @@
       "singleTargetTitle": "Одиночная цель удалённой записи",
       "fanoutTitle": "Разветвление на несколько бэкендов",
       "tipPrefix": "Совет: `vmagent` может дублировать записи, повторяя",
+      "tipSuffix": "флаг, чтобы вы могли сохранить существующий приемник VictoriaMetrics, одновременно пересылая метрики в OpenObserve.",
       "docLinkText": "чтобы узнать больше о настройке целей удалённой записи vmagent."
     },
     "ai": {
@@ -3337,6 +3441,7 @@
     "customLabel": "Пользовательский",
     "logsLabel": "Логи",
     "metricsLabel": "Метрики",
+    "tracesLabel": "Трейсы",
     "redirectionIngestionMsg": "Примечание: Для доступа к страницам, кроме IAM, необходимо инициировать прием данных в рамках текущей организации.",
     "databaseLabel": "Базы данных",
     "securityLabel": "Безопасность",
@@ -3361,6 +3466,7 @@
     "dotnettracing": ".Net Tracing",
     "dotnetlogs": ".Net Logs",
     "macos": "macOS",
+    "tracesotlp": "Трейсы ({product})",
     "rum": "Мониторинг реальных пользователей",
     "openvpn": "OpenVPN",
     "nginx": "Nginx",
@@ -3385,6 +3491,7 @@
       "diagnosticSettingsPath": "Параметры диагностики → + Добавить параметр диагностики",
       "enterNameCheckCategories": "Введите имя, выберите категории журналов, которые нужно включить",
       "underPrefix": "В разделе",
+      "destinationDetails": "Сведения о назначении",
       "chooseSuffix": ", выберите",
       "streamToEventHub": "Потоковая передача в Event Hub",
       "selectEventHubPrefix": "Выберите пространство имён Event Hub и Event Hub, созданные на шаге 1 (префикс:",
@@ -3522,17 +3629,21 @@
       "anyWindowsHostNote": "Любой сервер или виртуальная машина Windows.",
       "arrow": "→",
       "askOnSlack": "Спросите в Slack",
+      "autoInstrumentTracesDesc": "Необязательно. Оператор OpenTelemetry внедряет инструментирование в аннотированные рабочие нагрузки, так что вы получаете **распределенные трейсы без изменения кода приложения или пересборки образов**. Выберите язык, затем аннотируйте пространство имен, в котором он работает.",
+      "autoInstrumentTracesTitle": "Автоматическое инструментирование приложений для трейсов",
       "cassandraJmxNote": "Включите удалённый доступ JMX на Cassandra, чтобы приёмник мог подключиться.",
       "cassandraTagline": "Собирайте метрики Cassandra через JMX-приёмник OpenTelemetry Collector и отправляйте их в OpenObserve.",
       "checking": "Проверка…",
       "checkingForLogs": "Проверка логов…",
       "checkingForMetrics": "Проверка метрик…",
+      "checkingForSpans": "Проверяем спаны…",
       "chipEditor": "Редактор",
       "chipInstall": "Установить",
       "chipLogs": "Логи",
       "chipMetrics": "Метрики",
       "chipRun": "Запустить",
       "chipTerminal": "Терминал",
+      "chipTraces": "Трейсы",
       "clusterNameHelp": "Идентифицирует этот кластер в ваших журналах, метриках и на панелях мониторинга.",
       "clusterNameLabel": "Имя кластера",
       "collectorInstallDesc": "Приёмник есть только в сборке Contrib — выберите вашу платформу.",
@@ -3543,11 +3654,14 @@
       "configureCollectorTitle": "Настройка OpenTelemetry Collector",
       "connectedLogsHeadline": "Подключено — логи поступают",
       "connectedMetricsHeadline": "Подключено — метрики поступают",
+      "connectedTracesHeadline": "Подключено — трейсы поступают",
       "countLogs": "{count} журнал | {count} журналов",
       "countMetricStreams": "{count} метрический поток | {count} метрических потоков",
+      "countSpans": "{count} спан | {count} спанов",
       "downloadEnvTooltip": "Скачать .env",
       "downloadJmxJarDesc": "Приёмник JMX запускает этот вспомогательный jar-файл (требуется Java на хосте коллектора).",
       "downloadJmxJarTitle": "Скачать JMX Metrics Jar",
+      "dynamodbFirehoseEndpointDesc": "Используйте их как назначение **HTTP Endpoint** при создании потока доставки Kinesis Data Firehose.",
       "dynamodbFirehoseEndpointTitle": "Конечная точка Firehose OpenObserve",
       "dynamodbPipelineDesc": "Включите **DynamoDB Streams** для вашей таблицы, подключите её к **Kinesis Data Stream**, затем направьте поток доставки **Kinesis Data Firehose** на HTTP endpoint выше.",
       "dynamodbPipelineTitle": "Поток DynamoDB → Firehose",
@@ -3561,6 +3675,7 @@
       "gcpFixBody": "GCP сообщает об ошибках доставки на самой подписке. Если приёмник публикует данные, но сюда ничего не поступает, обычно это push-конечная точка отклоняет запрос:",
       "gcpFixTitle": "Проверьте push-подписку",
       "gcpPushUrlNote": "Держите этот URL в секрете — он содержит ключ приёма данных. Если он утёк, перевыпустите его в шапке этой страницы.",
+      "gcpSinkDesc": "В консоли GCP создайте **приемник Log Router** (Logging → Log Router → Создать приемник) с Pub/Sub в качестве назначения и позвольте ему создать тему. Фильтр включения приемника определяет, какие логи попадают в OpenObserve.",
       "gcpSinkTitle": "Направьте логи в тему Pub/Sub",
       "gcpSinkWriterNote": "Предоставьте пишущему субъекту приёмника роль Pub/Sub Publisher в теме, иначе он молча ничего не опубликует.",
       "gcpStreamHelp": "Используется в URL-адресе отправки выше и отслеживается проверкой ниже. Выделенный поток позволяет хранить журналы GCP отдельно.",
@@ -3599,6 +3714,7 @@
       "k8sInstallerNote": "Это автоматически устанавливает cert-manager, оператор OpenTelemetry и коллектор OpenObserve.",
       "k8sInternalEndpointNote": "Используйте это, когда OpenObserve работает в этом же кластере — трафик не выходит за его пределы.",
       "k8sTroubleAnnotationA": "Внедрение происходит при создании пода, поэтому существующие поды не изменяются до перезапуска — выполните `kubectl rollout restart deployment -n my-namespace`. Убедитесь, что аннотация применилась, с помощью `kubectl get ns my-namespace -o yaml`, и проверьте, что значение соответствует `openobserve-collector/openobserve-<language>`. Для Go `otel-go-auto-target-exe` должен указывать на путь к бинарному файлу **внутри** контейнера.",
+      "k8sTroubleAnnotationQ": "Я аннотировал пространство имен, но трейсы не появляются",
       "k8sTroubleEndpointA": "Используйте **In-Cluster** только когда OpenObserve работает в этом кластере; тогда трафик остаётся внутри кластера и не выходит в сеть. URL: `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — по умолчанию предполагается релиз `o2` в пространстве имён `openobserve`, поэтому отредактируйте его, если ваши значения отличаются. Все остальные используют внешнюю конечную точку.",
       "k8sTroubleEndpointQ": "Какую конечную точку мне использовать — внешнюю или внутрикластерную?",
       "k8sTroubleExampleA": "Да — **HOT commerce** — это пример приложения, настроенного по полному циклу, а документация **OpenTelemetry Operator** содержит полный справочник по аннотациям. Обе ссылки находятся внизу этой страницы.",
@@ -3632,6 +3748,7 @@
       "mysqlTagline": "Собирайте метрики MySQL с помощью OpenTelemetry Collector и отправляйте их в OpenObserve.",
       "noLogsFoundYet": "Журналы пока не найдены",
       "noMetricsFoundYet": "Метрики пока не найдены",
+      "noSpansFoundYet": "Спаны пока не найдены",
       "nothingOnStream": "ничего в {stream} — запустите ваше приложение и проверьте снова",
       "notTestedYet": "Ещё не проверено",
       "onStream": "в {stream}",
@@ -3640,13 +3757,16 @@
       "oracleTagline": "Собирайте метрики Oracle DB с помощью OpenTelemetry Collector и отправляйте их в OpenObserve.",
       "otlpFixBody": "Определение экспортера недостаточно — он должен быть указан в конвейере. Это самая частая причина, по которой внешне правильная конфигурация ничего не отправляет:",
       "otlpFixTitle": "Проверьте, что экспортер действительно подключен к конвейеру",
+      "otlpGrpcNote": "Меньше накладных расходов, чем HTTP, при больших объемах спанов. Порт 5081 должен быть доступен из коллектора.",
       "otlpHttpNote": "По умолчанию для OpenTelemetry Collector — работает везде, включая прокси и балансировщики нагрузки.",
       "otlpSdkEnvNote": "Стандартные переменные окружения OTEL_* — каждый OpenTelemetry SDK читает их, поэтому не требуется изменений в коде.",
       "otlpTracesStreamHelp": "Записывается в конфигурацию выше как `stream-name` и отслеживается проверкой ниже.",
       "otlpTrouble401A": "Заголовок `Authorization` должен быть `Basic <token>` с использованием токена приема этой организации — значение выше уже корректно. Если он был ротирован, скопируйте его заново с этой страницы.",
       "otlpTrouble401Q": "Коллектор фиксирует 401 или 403",
+      "otlpTroubleHttpGrpcA": "HTTP — безопасный вариант по умолчанию и без проблем проходит через прокси и балансировщики нагрузки. gRPC имеет меньшие накладные расходы при большом объеме спанов, но требует, чтобы порт 5081 был доступен на всем пути.",
       "otlpTroubleHttpGrpcQ": "Что использовать: HTTP или gRPC?",
       "otlpTroubleStreamA": "Заголовок `stream-name` определяет поток. Установите его в то же имя, что и поле выше, иначе проверка ниже будет отслеживать поток, в который ничего не записывается.",
+      "otlpTroubleStreamQ": "Спаны приходят, но попадают не в тот поток",
       "otlpTroubleTlsA": "Флаг `tls.insecure` должен соответствовать схеме конечной точки — выше он установлен в `{insecure}` на основе URL этого развертывания. Для конечной точки по обычному HTTP требуется `insecure: true`; для HTTPS — `false`.",
       "otlpTroubleTlsQ": "gRPC-соединение завершается ошибкой TLS",
       "pillActiveBackends": "Активные бэкенды",
@@ -3704,6 +3824,7 @@
       "pillServiceMap": "Карта сервисов",
       "pillSessions": "Сеансы",
       "pillSetup": "Настройка",
+      "pillSpans": "Спаны",
       "pillSqlCompilationRate": "Частота компиляции SQL",
       "pillStorageBytes": "Байты в хранилище",
       "pillSystem": "Система",
@@ -3735,6 +3856,7 @@
       "preparePostgresqlTitle": "Подготовка PostgreSQL",
       "prepareSqlServerDesc": "Создайте учётную запись мониторинга — выполните в SQL-клиенте, **а не** в вашей оболочке.",
       "prepareSqlServerTitle": "Подготовка SQL Server",
+      "providerNameOtlpTraces": "Трейсы (OpenTelemetry)",
       "providerNameRum": "Мониторинг реальных пользователей",
       "quickInstallDesc": "Установите коллектор OpenObserve с помощью **одной команды** — просто укажите имя кластера и запустите. Имя помечает каждую запись, поэтому вы сможете различать кластеры, когда несколько начнут отправлять данные.",
       "quickInstallTitle": "Быстрая установка (рекомендуется)",
@@ -3847,16 +3969,19 @@
       "sqlServerTagline": "Собирайте метрики SQL Server с помощью OpenTelemetry Collector и отправляйте их в OpenObserve.",
       "startIngestingTestForLogs": "начните приём данных, затем проверьте логи",
       "startIngestingTestForMetrics": "начните приём данных, затем проверьте метрики",
+      "startIngestingTestForSpans": "начните прием данных, затем проверьте спаны",
       "streamNameError": "Используйте только буквы, цифры и знак подчёркивания _.",
       "streamNameLabel": "Имя потока",
       "stuck": "Застряли?",
       "taglineDatabricks": "Отправляйте логи блокнотов Databricks в OpenObserve через API логов.",
       "taglineGcp": "Передавайте логи Google Cloud в OpenObserve с помощью push-подписки Pub/Sub — не нужно запускать агент или коллектор.",
+      "taglineKubernetes": "Разверните коллектор OpenObserve в вашем кластере — логи контейнеров, события Kubernetes и метрики кластера, а также трейсы без написания кода для ваших рабочих нагрузок.",
       "taglineLinux": "Установите агент OpenObserve на любой Linux-хост — системные и journald логи, а также метрики CPU, памяти, диска и сети.",
       "taglineMacos": "Установите агент OpenObserve на любой Mac — единый журнал и стандартные файлы журналов, а также метрики CPU, памяти, диска и сети.",
       "taglineOtlpTraces": "Направьте любой экспортер OpenTelemetry на OpenObserve — коллектор или SDK, HTTP или gRPC. Ваша конечная точка и токен заполнены ниже.",
       "taglineWindows": "Установите агент OpenObserve на любой Windows-хост — журнал событий, счетчики производительности и метрики хоста.",
       "testAgain": "Проверить снова",
+      "tracesStreamNameLabel": "Имя потока трейсов",
       "trackScreensDesc": "Если вы используете React Navigation, передайте SDK ссылку на вашу навигацию, и каждое изменение маршрута будет записано как представление RUM — без кода на каждый экран.",
       "trackScreensTitle": "Отслеживать экраны автоматически (необязательно)",
       "troubleshooting": "Устранение неполадок",
@@ -3876,6 +4001,7 @@
       "verifyMongodbMetricsDesc": "Нажмите «Тест» ниже или проверьте потоки на наличие метрик `mongodb_*`.",
       "verifyMysqlMetricsDesc": "Нажмите «Тест» ниже или проверьте потоки на наличие метрик `mysql_*`.",
       "verifyOracledbMetricsDesc": "Нажмите «Тест» ниже или проверьте потоки на наличие метрик `oracledb_*`.",
+      "verifyOtlpTracesDesc": "Перезапустите коллектор (или ваше приложение), выполните запрос, который создает спан, затем нажмите «Тест».",
       "verifyPostgresqlMetricsDesc": "Нажмите «Тест» ниже или проверьте потоки на наличие метрик `postgresql_*`.",
       "verifyReactNativeRumDesc": "Запустите приложение на симуляторе, эмуляторе или устройстве, перейдите между несколькими экранами, затем нажмите «Проверить» — события React Native попадают в поток `_rumdata`.",
       "verifyRedisMetricsDesc": "Нажмите «Тест» ниже или проверьте потоки на наличие метрик `redis_*`.",
@@ -3886,6 +4012,7 @@
       "verifyZookeeperMetricsDesc": "Нажмите «Тест» ниже или проверьте потоки на наличие метрик `zookeeper_*`.",
       "viewLogs": "Просмотреть логи",
       "viewStreams": "Просмотреть потоки",
+      "viewTraces": "Просмотреть трейсы",
       "whatTheInstallerDoes": "Что делает установщик",
       "windowsAgentFixBody": "Установщик регистрирует агент как службу Windows. Если данные не поступают, убедитесь, что она запущена, и прочитайте последние записи в её журнале:",
       "windowsTroubleScriptA": "PowerShell по умолчанию блокирует неподписанные скрипты. Запустите консоль **от имени администратора** и, при необходимости, разрешите выполнение скрипта для этой сессии с помощью `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.",
@@ -3909,8 +4036,11 @@
       "verifyAndroidRumDesc": "Запустите приложение на эмуляторе или устройстве, переместитесь между несколькими экранами, затем нажмите «Тест» — события нативного Android попадают в поток `_rumdata`.",
       "verifyIosRumDesc": "Запустите приложение на симуляторе или устройстве, переместитесь между несколькими экранами, затем нажмите «Тест» — события нативного iOS попадают в поток `_rumdata`.",
       "dbmPreparePostgresTitle": "Мониторинг базы данных · Предоставление доступа (необязательно)",
+      "dbmPreparePostgresDesc": "**Все вышеперечисленное работает само по себе** — время выполнения запросов уже попадает в «Базы данных» из трейсов вашего приложения, и здесь ничего настраивать не нужно. Эти последние шаги добавляют то, что трейс никогда не увидит: взаимоблокировки и заблокированные запросы, которые записывает только сама база данных. Выдайте `pg_monitor`, чтобы коллектор мог читать запросы других сессий — выполните это в SQL-клиенте, а **не** в оболочке.",
       "dbmPrepareMysqlTitle": "Мониторинг базы данных · Хранение истории взаимоблокировок (необязательно)",
       "dbmPrepareMariadbTitle": "Мониторинг базы данных · Хранение истории взаимоблокировок (необязательно)",
+      "dbmPrepareMysqlDesc": "**Все вышеперечисленное работает само по себе** — время выполнения запросов уже попадает в «Базы данных» из трейсов вашего приложения, и здесь ничего настраивать не нужно. Эти последние шаги добавляют то, что трейс никогда не увидит: взаимоблокировки и заблокированные запросы, которые записывает только сама база данных. Включите полную историю взаимоблокировок — выполните это в SQL-клиенте, а **не** в оболочке.",
+      "dbmPrepareMariadbDesc": "**Все вышеперечисленное работает само по себе** — время выполнения запросов уже попадает в «Базы данных» из трейсов вашего приложения, и здесь ничего настраивать не нужно. Эти последние шаги добавляют то, что трейс никогда не увидит: взаимоблокировки и заблокированные запросы, которые записывает только сама база данных. Включите полную историю взаимоблокировок — выполните это в SQL-клиенте, а **не** в оболочке.",
       "dbmPgLoggingTitle": "Мониторинг базы данных · Пусть Postgres записывает взаимоблокировки (необязательно)",
       "dbmPgLoggingDesc": "Взаимоблокировки записываются только в журнал Postgres и только при включенных настройках ниже — поэтому именно этот шаг наполняет вкладку «Взаимоблокировки». Строка префикса должна совпадать точно: коллектор читает её, чтобы определить участников, а другой префикс означает, что он ничего не находит, хотя продолжает сообщать о здоровом состоянии.",
       "dbmPgLoggingVerifyTitle": "Мониторинг базы данных · Проверка применения настроек (необязательно)",
@@ -3936,6 +4066,7 @@
       "dbmMysqlLogPathHelp": "Коллектор должен иметь возможность читать этот файл. Найдите его с помощью: SHOW VARIABLES LIKE 'log_error';",
       "dbmMariadbLogPathHelp": "Коллектор должен иметь возможность читать этот файл. Найдите его с помощью: SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "Мониторинг баз данных · Предоставить доступ (необязательно)",
+      "dbmPrepareMssqlDesc": "**Все вышеперечисленное работает само по себе** — время выполнения запросов уже попадает в «Базы данных» из трейсов вашего приложения, и здесь ничего настраивать не нужно. Эта последняя группа добавляет то, что трейс никогда не увидит: взаимоблокировки и заблокированные запросы, которые записывает только сама база данных. Нужны обе привилегии — одна позволяет коллектору читать другие сессии, другая — историю взаимоблокировок. Выполните их в SQL-клиенте, а **не** в оболочке.",
       "dbmConfigureMssqlDesc": "Записывает `dbm-config.yaml` — укажите базу данных для подключения ниже. SQL Server получает здесь взаимоблокировки, заблокированные запросы, образцы активности, топовые запросы и планы выполнения. Приёмник sqlserver читает данные со всего экземпляра, поэтому активность и топовые запросы не ограничиваются базой данных, указанной выше.",
       "dbmRunMssqlDesc": "Запускает обе конфигурации вместе. Используйте те же логин и пароль, которые вы создали на шаге 1.",
       "dbmVerifyBlockingDesc": "Откройте **Инфра → Базы данных → Заблокированные запросы**. Сеансы, ожидающие блокировку, появляются, как только один из них попадает в выборку; пустая вкладка подскажет, ничего не заблокировано или ничего не собирается.",
@@ -3945,6 +4076,7 @@
       "dbmVerifyTableHealthDesc": "Откройте **Инфра → Базы данных** и выберите вкладку ниже. Взаимоблокировки и заблокированные запросы появляются, как только база данных сообщает о них; пустая вкладка подскажет, ничего не произошло или ничего не собирается. Состояние таблиц заполняется после первого 60-секундного снимка."
     },
     "instrumentBeforeImportTitle": "Инструментируйте перед импортом клиента",
+    "instrumentBeforeImportBody": "Если ваше приложение работает, но спаны не поступают, вероятно, инструментирование загрузилось после импорта клиента. Измените порядок, чтобы инициализация выполнялась первой:",
     "launchCloudFormationStack": "Запустить стек CloudFormation",
     "openStackSetsConsole": "Открыть консоль StackSets",
     "integrations": {
@@ -4107,6 +4239,7 @@
       "streamOverview": "Обзор {stream}"
     },
     "selectField": "Поле",
+    "selectIndex": "Поток",
     "selectStreamType": "Тип потока",
     "toggleFunctionEditor": "Переключить редактор функций",
     "useSavedFunction": "Использовать сохраненную функцию",
@@ -4220,6 +4353,7 @@
     "extraOptions": "Параметры",
     "nameOfVariable": "Имя",
     "labelOfVariable": "Метка (необязательно)",
+    "ValueOfVariable": "Значение",
     "DefaultValue": "Значение по умолчанию (необязательно)",
     "typeOfVariable": "Тип переменной",
     "DefaultSize": "Максимальный размер записи по умолчанию (необязательно)",
@@ -4289,6 +4423,7 @@
     "alignRight": "Справа",
     "sectionStyling": "Стилизация",
     "sectionConditionalStyling": "Условное форматирование",
+    "conditionThreshold": "Значение",
     "conditionAddRule": "+ Добавить правило",
     "conditionNoRules": "Правил пока нет.",
     "conditionIfValue": "Если значение",
@@ -4351,6 +4486,7 @@
     "unsavedMessage": "У вас есть несохранённые изменения. Вы уверены, что хотите уйти?",
     "currentFolderLabel": "Текущая папка",
     "selectFolderLabel": "Выбрать папку",
+    "selectFolderPlaceholder": "Выберите папку назначения",
     "selectDashboardLabel": "Выбрать панель",
     "selectTabLabel": "Выбрать вкладку",
     "layerType": "Тип слоя",
@@ -4510,6 +4646,7 @@
     "markLinesTooltip": "Показать линии пороговых значений на диаграмме.",
     "markLineType": "Тип",
     "markLineLabel": "Метка",
+    "markLineValue": "Значение",
     "markLineAdd": "+ Добавить",
     "markLineAverage": "Среднее",
     "markLineMedian": "Медиана",
@@ -4611,6 +4748,7 @@
     "editValueMapping": "Редактировать сопоставление значений",
     "valueMappingsTitle": "Сопоставления значений",
     "valueMappingType": "Тип",
+    "valueMappingValue": "Значение",
     "valueMappingRegex": "Регулярное выражение",
     "valueMappingFrom": "От",
     "valueMappingTo": "До",
@@ -4778,6 +4916,7 @@
         "storage": "Хранилище",
         "dashboard": "Дашборд"
       },
+      "selectFolderTitle": "Выберите папку назначения",
       "back": "Назад",
       "addDashboard": "Добавить панель",
       "folder": "Папка",
@@ -4965,6 +5104,7 @@
       "configuration": "Конфигурация",
       "having": "Имеющий",
       "add": "Добавить",
+      "value": "Значение",
       "markAsNonTimestamp": "Отметить это поле как не временную метку",
       "renderDataAsJson": "Отображать данные как JSON / массив",
       "sortBy": "Сортировать по",
@@ -5414,6 +5554,7 @@
     "deletePanelTitle": "Удалить панель",
     "deletePanelMessage": "Вы уверены, что хотите удалить эту панель?",
     "movePanelTitle": "Переместить панель на другую вкладку",
+    "movePanelMessage": "Выберите вкладку назначения",
     "noQueriesToCreateAlert": "Эта панель не содержит запросов для создания оповещения",
     "panelQueryMustHaveStream": "Запрос панели должен иметь настроенный поток",
     "unsupportedPanelTypeAlert": "Создание оповещений из панелей типа {type} может работать не так, как ожидалось",
@@ -5421,6 +5562,7 @@
     "panelDuplicationFailed": "Не удалось дублировать панель",
     "firstColumn": "Первый столбец",
     "zAxis": "Ось Z",
+    "breakdown": "Разбивка",
     "pivotField": "Поле сводной таблицы",
     "pivotFieldTooltip": "Перетащите сюда поле измерения. Его уникальные значения станут заголовками столбцов в сводной таблице. Допускается до 3 полей для многоуровневой сводки.",
     "breakdownTooltipHBar": "Используйте эти поля для разделения данных на разные секции по оси Y для более четкого представления.",
@@ -5468,6 +5610,7 @@
         "anomalyHint": "{n} событий отобрано",
         "colField": "Поле",
         "colRarity": "Редкость",
+        "colValue": "Значение",
         "rarity": {
           "anomalous": "Аномальное",
           "rare": "Редкое",
@@ -5506,12 +5649,15 @@
     "longitude": "Долгота",
     "weight": "Вес",
     "mapname": "Имя",
+    "mapvalue": "Значение",
     "source": "Источник",
-    "target": "Цель"
+    "target": "Цель",
+    "value": "Значение"
   },
   "home": {
     "alertsOverviewSection": "Раздел обзора оповещений",
     "pipelinesOverviewSection": "Раздел обзора конвейеров",
+    "streams": "Потоки",
     "totalDataIngested": "Размер полученных данных",
     "totalDataCompressed": "Размер сжатых данных",
     "viewButton": "Просмотр",
@@ -5523,6 +5669,7 @@
       "description": "Эта организация еще не получила данные, поэтому нечего отображать. Как только начнут поступать события, ваш <strong>объем приема, хранилище и использование запросов</strong> появятся здесь автоматически.",
       "logs": "Отправить логи",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} и другие",
+      "traces": "Отправить трейсы",
       "tracesDesc": "{product1} / {product2} / {product3} распределённая трассировка",
       "metrics": "Отправить метрики",
       "metricsDesc": "{product1}, {product2}, {product3} и другие",
@@ -5532,6 +5679,7 @@
       "shippers": "Отправители логов"
     },
     "indexSizeLbl": "Размер индекса",
+    "docsCountLbl": "События",
     "functionTitle": "Функции",
     "schedulePipelineTitle": "По расписанию",
     "rtPipelineTitle": "В реальном времени",
@@ -5569,6 +5717,8 @@
     "emptyActionAlertsDesc": "Просмотр настроенных оповещений и порогов",
     "emptyActionLogs": "Исследовать логи",
     "emptyActionLogsDesc": "Поиск и фильтрация потоков логов",
+    "emptyActionTraces": "Исследовать трейсы",
+    "emptyActionTracesDesc": "Просматривайте распределенные трейсы и задержки сервисов",
     "anomalyDetectedTitle": "Обнаружена аномалия — {name}",
     "anomalyDetectedDescription": "Поток: {stream} · {count} аномальных точек",
     "secondsAgo": "{count} сек. назад",
@@ -5617,6 +5767,7 @@
     "stderr": "Стандартный поток ошибок",
     "truncatedLabel": "обрезано",
     "copyQuery": "Копировать запрос",
+    "stream": "Поток",
     "start": "Начало",
     "end": "Конец",
     "from": "От",
@@ -5655,6 +5806,7 @@
       "taglineTail": ". Я могу написать ваш",
       "taglineSql": "SQL",
       "taglineVrl": "VRL",
+      "taglineAnd": "и проведет вас по вашим логам, трейсам, метрикам и инцидентам.",
       "signedInAs": "Вошли как",
       "role": "Роль",
       "tryOneOfThese": "Или попробуйте один из этих"
@@ -5662,10 +5814,12 @@
     "capabilities": {
       "query": {
         "title": "Написать запрос",
+        "description": "SQL для логов, трейсов, RUM или PromQL для метрик.",
         "prompt": "Помогите написать запрос"
       },
       "incident": {
         "title": "Расследовать инциденты",
+        "description": "Анализ первопричин по логам, трейсам и оповещениям — например, «Почему сработал gateway-5xx?»",
         "prompt": "Помогите расследовать инцидент"
       },
       "dashboard": {
@@ -5762,7 +5916,9 @@
         "alert": "оповещение",
         "dashboard": "дашборд",
         "pipeline": "конвейер",
+        "report": "отчёт",
         "function": "функция",
+        "stream": "поток",
         "folder": "папка",
         "panel": "панель",
         "user": "пользователь",
@@ -5806,6 +5962,7 @@
     "features": "ВОЗМОЖНОСТИ",
     "included": "Что входит?",
     "proPlanSubtitle": "Индивидуальные решения для небольших команд",
+    "unlimitedNote": "Неограниченные пользователи, логи, метрики, трейсы и многое другое.",
     "paymentNote": "Оплата рассчитывается на основе использования в конце ежемесячного расчетного периода.",
     "proPlanLabel": "Оплата по мере использования",
     "contactLabel": "Связаться с отделом продаж",
@@ -5988,10 +6145,13 @@
       "anomalyImportFailed": "Anomaly Detection - {index}: импорт \\\"{name}\\\" не удался — {reason}",
       "nameRequired": "Alert - {index}: Имя обязательно и должно быть допустимой строкой.",
       "orgIdInvalid": "Alert - {index}: Идентификатор организации обязателен, должен существовать в списке организаций и должен быть равен {orgId}.",
+      "streamTypeInvalid": "Оповещение - {index}: тип потока обязателен и должен быть одним из: 'logs', 'metrics', 'traces'.",
       "streamNameInvalid": "Alert - {index}: Имя потока обязательно, должно существовать в списке потоков и должно быть допустимой строкой.",
+      "destinationsRequired": "Оповещение - {index}: приёмники обязательны и должны быть массивом.",
       "enabledBoolean": "Alert - {index}: Enabled должен быть логическим значением.",
       "tzOffsetNumber": "Alert - {index}: Смещение часового пояса должно быть числом.",
       "timezoneRequiredForCron": "Alert - {index}: Часовой пояс обязателен, когда тип частоты — 'cron'.",
+      "destinationNotExist": "Оповещение - {index}: приёмник \"{destination}\" не существует",
       "createSuccess": "Alert - {index}: \"{name}\" успешно создан \nПримечание: удалите созданный объект оповещения {name} из json-файла",
       "createFailed": "Alert - {index}: не удалось создать \"{name}\" --> \n Причина: {reason}",
       "unknownError": "Неизвестная ошибка",
@@ -6101,6 +6261,7 @@
       "noChildren": "Пока нет под-оповещений. Добавьте как минимум два.",
       "wouldTrigger": "Сработало бы",
       "wouldNotTrigger": "Не сработало бы",
+      "firing": "Сработало",
       "normal": "Нормально",
       "stepByStep": "Пошагово",
       "result": "Результат",
@@ -6127,6 +6288,7 @@
     "exportDialogSubtitle": "Проверьте определение, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve.",
     "jsonFilesOnlyHint": "только файлы .json",
     "outputMessages": "Выходные сообщения",
+    "destinationsRequiredLabel": "Приёмники *",
     "timezoneRequiredLabel": "Часовой пояс *",
     "organizationIdLabel": "Идентификатор организации",
     "alertCreationTitle": "Создание оповещения",
@@ -6166,11 +6328,13 @@
     "guidelinesLabel": "Рекомендации:",
     "selectStreamGuideline": "Выберите существующий поток из списка или введите имя для создания нового",
     "enrichmentTablesTerm": "Таблицы обогащения",
+    "enrichmentTablesDestinationNote": "В качестве целевого потока доступно только для запланированных конвейеров.",
     "useCurlyBracesNote": "Используйте фигурные скобки",
     "configureStreamNameDynamicNote": "для динамической настройки имени потока, например.",
     "staticTextBeforeAfterNote": ". Статический текст до/после",
     "isOptionalNote": "необязательно",
     "noTriggersLoaded": "Нет загруженных триггеров",
+    "externalDestinationTitle": "Внешний приёмник",
     "serviceGraphLegendTitle": "Легенда графика",
     "serviceGraphRootCause": "Красный = потенциальная первопричина",
     "serviceGraphHighFrequency": "Оранжевый = высокая частота",
@@ -6198,6 +6362,7 @@
     "pendingBatches": "Ожидающие пакеты",
     "pendingBatchesTooltip": "Оповещения, ожидающие группировки",
     "historyTimeline": {
+      "firing": "Сработало",
       "ok": "Ок",
       "error": "Ошибка",
       "skipped": "Пропущено",
@@ -6216,6 +6381,7 @@
     "duration": "Длительность",
     "retries": "Повторы",
     "dedup": "Дедуп",
+    "noDestinations": "Нет доступных приёмников",
     "validation": {
       "streamTypeRequired": "Тип потока обязателен.",
       "streamNameRequired": "Имя потока обязательно.",
@@ -6226,6 +6392,7 @@
       "validEmails": "Добавьте корректные email-адреса!",
       "silenceNonNegative": "Уведомление о тишине должно быть больше или равно 0",
       "periodPositive": "Период должен быть больше 0",
+      "destinationRequired": "Требуется как минимум один приёмник.",
       "thresholdPositive": "Порог должен быть больше 0",
       "frequencyPositive": "Частота должна быть больше 0",
       "aggregationColumnRequired": "Колонка обязательна при использовании агрегатной функции.",
@@ -6236,6 +6403,7 @@
       "minimumFrequency": "Минимальная частота должна составлять {minutes} минут",
       "nameMandatoryString": "Имя обязательно и должно быть корректной строкой",
       "orgIdMismatch": "Идентификатор организации должен быть равен {orgId}",
+      "streamTypeMandatory": "Тип потока обязателен и должен быть одним из: logs, metrics, traces",
       "streamNameMandatoryString": "Имя потока обязательно и должно быть корректной строкой",
       "streamNotInList": "Поток \"{streamName}\" отсутствует в списке потоков",
       "isRealTimeMandatoryBoolean": "Поле 'В реальном времени' обязательно и должно быть логическим значением",
@@ -6267,6 +6435,10 @@
       "cronRequiredForCronType": "Cron-выражение обязательно, если тип частоты cron",
       "timezoneRequiredForCronType": "Часовой пояс обязателен, если тип частоты cron",
       "triggerConditionRequired": "Условие триггера обязательно",
+      "destinationsArray": "Приёмники должны быть массивом",
+      "destinationRequiredPlain": "Требуется как минимум один приёмник",
+      "noDestinationsInSystem": "В системе не найдено доступных приёмников",
+      "invalidDestinations": "Недопустимые приёмники: {destinations} — должны быть из списка доступных приёмников.",
       "enabledFlagBoolean": "Флаг включения должен быть логическим значением",
       "silenceNotificationRequired": "Уведомление о тишине не должно быть пустым",
       "thresholdNotEmpty": "Порог не должен быть пустым",
@@ -6287,6 +6459,8 @@
     "searchAllFolders": "Все папки",
     "streamConfig": "Конфигурация потоков",
     "alertRules": "Правила оповещений",
+    "noTemplatesMsg": "Для создания оповещения вам нужен как минимум один шаблон и один приёмник. Шаблоны определяют формат сообщения уведомления — начните с создания шаблона.",
+    "noDestinationsMsg": "Для создания оповещения вам нужен как минимум один приёмник и один шаблон. Приёмники определяют, куда отправляются уведомления — начните с создания приёмника.",
     "add": "Новое оповещение",
     "edit": "Редактировать",
     "clone": "Клонировать оповещение",
@@ -6337,25 +6511,37 @@
     "frequency": "Проверять каждые",
     "threshold": "Оповещать если ",
     "silenceNotification": "Период ожидания",
+    "destination": "Приёмник",
+    "destinationOrWorkflowRequired": "Добавьте хотя бы один приёмник или рабочий процесс.",
+    "customDestination": "Пользовательский приёмник",
+    "customDestinationDescription": "Настройте пользовательский HTTP endpoint или почтовый приёмник.",
+    "testIdleMessage": "Нажмите «Тест», чтобы проверить конфигурацию приёмника.",
+    "destinationPreview": "Предпросмотр приёмника",
     "template": "Переопределение шаблона",
     "additionalVariables": "Дополнительные переменные",
+    "testSuccessMessage": "Тест выполнен успешно! Ваш приёмник настроен правильно.",
     "testFailedMessage": "Тест не пройден. Проверьте конфигурацию и попробуйте снова.",
     "testFailedWithReason": "Тест не пройден: {reason}",
+    "testInProgress": "Проверка приёмника...",
     "sendingNotification": "Отправка тестового уведомления для проверки подключения",
     "testErrorDNS": "Ошибка разрешения DNS. Проверьте URL вебхука или имя хоста.",
     "testErrorConnection": "Соединение отклонено. Проверьте URL и убедитесь, что сервис доступен.",
+    "testErrorTimeout": "Время ожидания запроса истекло. Сервис приёмника может быть медленным или недоступным.",
     "testErrorSSL": "Ошибка сертификата SSL/TLS. Проверьте сертификат или отключите проверку SSL.",
     "testErrorClientError": "Ошибка клиента (4xx). Проверьте учетные данные и конфигурацию.",
+    "testErrorServerError": "Ошибка сервера (5xx). Сервис приёмника испытывает проблемы.",
     "viewDetails": "Просмотреть детали",
     "error": "Ошибка",
     "httpStatus": "HTTP статус",
     "responseBody": "Тело ответа",
     "retry": "Повторить",
     "suggestCheckUrl": "Пожалуйста, проверьте, что URL вебхука правильный и доступен.",
+    "suggestCheckFirewall": "Проверьте настройки брандмауэра и убедитесь, что сервис приёмника доступен.",
     "suggestCheckCredentials": "Пожалуйста, проверьте правильность учетных данных API.",
     "suggestCheckPermissions": "Убедитесь, что у ваших учетных данных есть необходимые разрешения.",
     "suggestCheckEndpoint": "Пожалуйста, проверьте правильность URL конечной точки.",
     "suggestRateLimit": "Превышен лимит запросов. Пожалуйста, подождите перед повторной попыткой.",
+    "suggestServerIssue": "Сервис приёмника испытывает проблемы. Повторите попытку позже.",
     "description": "Описание",
     "stream_name": "Имя потока",
     "cloneTitle": "Клонировать оповещение",
@@ -6415,6 +6601,7 @@
       "notEqualTo": "не равно",
       "eventsDetected": "событий обнаружено",
       "sendsTo": "Отправлять в",
+      "noDestination": "Нет приёмника",
       "notSetupYet": "(еще не настроено)",
       "cooldown": "Тайм-аут",
       "betweenAlerts": "между оповещениями",
@@ -6462,6 +6649,7 @@
     },
     "placeholders": {
       "typeSomething": "Введите что-нибудь",
+      "value": "Значение",
       "selectColumn": "Выберите столбец",
       "savedFunctions": "Сохраненные функции",
       "autoUsesCheckInterval": "Авто (использует интервал проверки)",
@@ -6544,6 +6732,7 @@
       "ifPrefix": "если",
       "noConditionsDefined": "Условия не определены",
       "loadingCorrelatedMetrics": "Загрузка коррелированных метрик...",
+      "loadingCorrelatedTraces": "Загрузка коррелированных трейсов...",
       "disambiguationChangedMessage": "Конфигурация обнаружения сервисов (поля устранения неоднозначности) была изменена после создания этого инцидента.",
       "noActivityYet": "Пока нет активности",
       "eventsAndCommentsAppearHere": "События и комментарии появятся здесь",
@@ -6577,6 +6766,7 @@
       "correlatedAlertsCount": "Оповещения: {count} коррелированных оповещений",
       "noCorrelatedLogs": "Коррелированные логи не найдены",
       "noCorrelatedMetrics": "Не найдено коррелированных метрик",
+      "noCorrelatedTraces": "Коррелированные трейсы не найдены",
       "lastAlertAt": "Последнее оповещение",
       "title_field": "Заголовок",
       "stableDimensions": "Измерения",
@@ -6589,6 +6779,7 @@
       "acknowledge": "Подтвердить",
       "resolve": "Разрешить",
       "reopen": "Открыть заново",
+      "statusOpen": "Открыт",
       "statusAcknowledged": "Подтверждено",
       "statusResolved": "Разрешено",
       "correlationServiceDiscovery": "Обнаружение сервисов",
@@ -6653,6 +6844,7 @@
       "noAlertDetailsAvailable": "Нет доступных деталей оповещения",
       "clickOnTriggerToViewDetails": "Нажмите на срабатывание в таблице, чтобы просмотреть детали",
       "refreshCorrelatedData": "Обновить коррелированные данные",
+      "showingCorrelatedTraces": "Отображаются коррелированные трейсы за время инцидента",
       "incidentTitleUpdatedSuccess": "Заголовок инцидента успешно обновлен",
       "markAsAcknowledgedTooltip": "Отметить инцидент как подтвержденный и в работе",
       "markAsResolvedTooltip": "Отметить инцидент как разрешенный и закрыть его",
@@ -6772,10 +6964,16 @@
       "helpLegendLiveExample": "Высокая загрузка ЦП",
       "helpLegendSampleExample": "42",
       "sectionTitle": "Настройки",
+      "noDestinationsAvailable": "Нет доступных приёмников",
+      "noTargetsAvailable": "Нет доступных приёмников или рабочих процессов",
+      "targetsDestinationsGroup": "Приёмники",
       "targetsWorkflowsGroup": "Рабочие процессы",
+      "refreshDestinations": "Обновить список приёмников",
+      "addNewDestination": "Добавить приёмник",
       "cooldownTooltip": "Если оповещение сработало, как долго ждать перед отправкой следующего уведомления. Например, если оповещение сработало в 16:00, а период тишины установлен на 10 минут, то следующее уведомление не будет отправлено до 16:10, даже если оповещение все еще активно через 1 минуту. Это сделано для предотвращения спама уведомлениями.",
       "periodTooltip": "Период, за который должен выполняться запрос. Например, 10 минут означает, что при каждом выполнении запроса будут использоваться последние 10 минут данных.",
       "timezoneWarning": "Предупреждение: Отображаемый часовой пояс является приблизительным. Проверьте и выберите правильный часовой пояс вручную.",
+      "destinationsTooltip": "Выберите один или несколько приёмников для отправки уведомлений об оповещениях.",
       "createsIncident": "Создаёт инцидент",
       "createsIncidentTooltip": "Если оповещение может создать инцидент, оно не отправляет специальное уведомление. Вместо этого уведомление об инциденте отправляется при создании нового инцидента или когда новый тип оповещения присоединяется к существующему инциденту.",
       "helpTemplateTitle": "Переопределение шаблона",
@@ -6787,7 +6985,11 @@
       "helpLegendLive": "реальные значения вашего оповещения",
       "helpLegendSample": "пример — реальное значение устанавливается при срабатывании оповещения",
       "helpLegendOpaque": "добавляется автоматически при срабатывании оповещения",
+      "helpTemplateExplain": "Шаблон — это сообщение уведомления, которое отправляется: текст плюс переменные, такие как {'{'}alert_name{'}'}. Выбор шаблона здесь переопределяет собственный шаблон каждого приёмника только для этого оповещения.",
       "helpCurrentHeading": "Что это оповещение отправляет сейчас",
+      "helpCurrentNoOverride": "Переопределение не задано — каждый приёмник использует собственный шаблон:",
+      "helpCurrentNoDestinations": "Приёмники ещё не выбраны. Каждый приёмник будет использовать собственный настроенный шаблон.",
+      "helpCurrentOverrideHeading": "Все приёмники используют этот шаблон:",
       "helpPreviewHeading": "Предварительный просмотр шаблона",
       "helpPreviewSelectPlaceholder": "Выберите шаблон для предварительного просмотра",
       "helpApplyToAlert": "Применить к оповещению",
@@ -6799,6 +7001,7 @@
       "helpYourVariablesEmpty": "Вы еще не добавили ни одной переменной.",
       "helpRowTemplateExplain": "Оповещение может соответствовать многим строкам. Шаблон строки определяет, как выглядит одна строка. Затем {'{'}rows{'}'} в вашем основном шаблоне вставляет все соответствующие строки, уже отформатированные.",
       "helpRowTemplateTypeHeading": "Строка против JSON",
+      "helpRowTemplateTypeExplain": "String создаёт обычный текст для каждой строки. JSON создаёт объект JSON для каждой строки, подходящий для структурированных приёмников.",
       "helpRowTemplateTypeCurrent": "Текущий выбор:",
       "helpPreviewHeadingShort": "Предварительный просмотр",
       "helpWhyHeading": "Зачем использовать переменную?",
@@ -6811,6 +7014,7 @@
       "helpVariablesExampleCaption": "Добавьте severity и team как переменные, затем используйте их в любом месте шаблона:",
       "helpExampleResultLabel": "Что отправляется",
       "helpTemplateWhenHeading": "Когда следует переопределить?",
+      "helpTemplateWhenDesc": "Оставьте это пустым, и каждый получатель будет использовать свой собственный шаблон. Установите переопределение, когда вы хотите, чтобы это оповещение отправляло одинаковое, единообразное сообщение каждому получателю — без изменения шаблона каждого получателя.",
       "helpRowTemplateWhyHeading": "Зачем нужен шаблон строки?",
       "helpRowTemplateWhyDesc": "Оповещение может соответствовать множеству записей. Шаблон строки форматирует одну запись; затем {'{'}rows{'}'} вставляет все отформатированные записи в основной шаблон — так вы перечисляете все совпадения без написания цикла.",
       "helpRowTemplateExampleCaption": "Каждая соответствующая строка форматируется шаблоном строки, затем {'{'}rows{'}'} вставляет их все в основной шаблон:",
@@ -6819,8 +7023,10 @@
       "helpRowTemplatePreviewEmpty": "Шаблона строки еще нет — введите его на вкладке Дополнительные настройки, чтобы просмотреть его здесь.",
       "helpPreviewSelectEmpty": "Выберите шаблон выше, чтобы просмотреть сообщение, которое он отправит.",
       "helpCurrentBodyEmpty": "У этого шаблона нет тела для предварительного просмотра.",
+      "helpDestinationNoTemplate": "Использует форматирование по умолчанию для этого получателя.",
       "builtInVars": {
         "orgName": "Название вашей организации",
+        "streamType": "Тип потока (логи, метрики, трейсы)",
         "streamName": "Имя потока, за которым следит оповещение",
         "alertName": "Название оповещения",
         "alertType": "Тип оповещения (например, по расписанию, в реальном времени)",
@@ -6842,6 +7048,7 @@
     },
     "advanced": {
       "addVariable": "Добавить переменную",
+      "variablesTooltip": "Переменные используются для передачи данных из оповещения получателю.",
       "templateType": "Тип шаблона:",
       "noTemplatesAvailable": "Нет доступных шаблонов",
       "refreshTemplates": "Обновить последние шаблоны",
@@ -6926,10 +7133,12 @@
     },
     "anomaly": {
       "addFilter": "Добавить фильтр",
+      "addNewDestination": "Добавить нового получателя",
       "anomalyScoreRange": "Диапазон оценки аномалий:",
       "checkEvery": "Проверять каждые",
       "checkEveryTooltip": "Как часто выполняется задание обнаружения. Может быть больше периода выборки (например, выборка каждые 5 мин, обнаружение каждый час).",
       "clickLoadDataHint": "Нажмите «Загрузить данные» для предварительного просмотра временного ряда",
+      "destinationRequired": "Требуется хотя бы один получатель!",
       "detectionResolution": "Разрешение обнаружения",
       "detectionResolutionTooltip": "Насколько детальна каждая точка данных. Например, \"5m\" означает, что аномалии обнаруживаются с разрешением 5 минут.",
       "disabled": "Отключено",
@@ -6944,8 +7153,10 @@
       "lookBackWindowTooltip": "Как далеко назад запрашивает каждое выполнение обнаружения. Ограничивает окно даже после длительной паузы. По умолчанию равно интервалу проверки.",
       "maxThresholdMarkLine": "максимальный порог",
       "minThresholdMarkLine": "минимальный порог",
+      "noDestinationsFound": "Получатели не найдены",
       "noFieldsFound": "Поля не найдены",
       "notifications": "Уведомления",
+      "notificationsTooltip": "При включении уведомление будет отправлено выбранному получателю при обнаружении аномалии.",
       "retrainEvery": "Переобучать каждые",
       "retrainEveryTooltip": "Как часто автоматически переобучать модель. «Никогда» — обучить один раз и сохранять модель до ручного переобучения.",
       "retrainFourteenDays": "14 дней",
@@ -6960,12 +7171,14 @@
       "sqlColumnsHint": "Запрос должен возвращать два столбца: {timeBucket} и {valueColumn}.",
       "sqlRequired": "Требуется SQL в режиме пользовательского SQL",
       "summaryAlerting": "✓ Оповещение: {status}",
+      "summaryAlertingEnabled": "✓ Оповещение: включено → {destinations}",
       "summaryAlertingNoDestination": "✓ Оповещение: Включено ⚠️ {warning}",
       "summaryConfiguring": "Настройка обнаружения аномалий для потока {streamType} \"{stream}\"",
       "summaryDataSource": "✓ Источник данных: {type} — {name}",
       "summaryDetectionFunction": "✓ Функция обнаружения: {fn}",
       "summaryDetectionWindow": "✓ Окно обнаружения: последние {window}",
       "summaryMonitoring": "Мониторинг \"{stream}\" каждые {schedule} для аномалий {fn}, обучено на {trainingDays} дней истории",
+      "summaryNoDestinationSet": "Получатель не задан",
       "summaryQueryMode": "✓ Режим запроса: {mode}",
       "summaryResolution": "✓ Разрешение: {resolution}",
       "summaryRetrain": "✓ Переобучение: {retrain}",
@@ -7091,14 +7304,21 @@
       "triggerAlertFailed": "Не удалось запустить оповещение",
       "triggerRetrainingFailed": "Не удалось запустить переобучение",
       "bulkDeleteAlertsFailed": "Ошибка при удалении оповещений. Пожалуйста, попробуйте еще раз.",
+      "deleteDestinationFailed": "Ошибка при удалении получателя",
+      "bulkDeleteDestinationsFailed": "Ошибка при удалении получателей. Пожалуйста, попробуйте еще раз.",
       "bulkDeleteTemplatesFailed": "Ошибка при удалении шаблонов. Пожалуйста, попробуйте еще раз."
     },
     "prebuilt": {
+      "conversionSuccess": "Получатель успешно преобразован",
       "validationError": "Ошибка проверки: {error}",
+      "invalidDestinationType": "Недопустимый тип получателя",
       "invalidTargetType": "Некорректный тип цели",
+      "unknownDestinationType": "Неизвестный тип получателя",
       "testFailedUnknownError": "Тест не пройден с неизвестной ошибкой"
     },
     "confirmDeleteAlerts": "Вы уверены, что хотите удалить {count} оповещение? | Вы уверены, что хотите удалить {count} оповещений?",
+    "confirmDeleteDestinations": "Вы уверены, что хотите удалить {count} получателя? | Вы уверены, что хотите удалить {count} получателей?",
+    "prebuiltDestination": "Готовый получатель {type}",
     "errorValidations": "Ошибки валидации",
     "outputMessagesLabel": "Выходные сообщения",
     "incidentSingular": "Инцидент",
@@ -7154,6 +7374,7 @@
       "critical": "Критический",
       "warning": "Предупреждение",
       "ok": "ОК",
+      "firingTotal": "Сработавшие",
       "observedTotal": "Группы",
       "nOfMFiring": "{firing} из {observed} групп срабатывают",
       "groupedBy": "сгруппировано по {columns}",
@@ -7167,6 +7388,7 @@
       "when": "Когда",
       "change": "Изменение уровня",
       "outcome": "Результат",
+      "value": "Значение",
       "rollupRow": "Все группы (сводно)",
       "noHistoryTitle": "Нет записанных переходов",
       "noHistoryDescription": "Изменения уровней появляются здесь, когда группы начинают срабатывать, повышаться или восстанавливаться.",
@@ -7214,6 +7436,7 @@
       "dialog": {
         "title": "Создать оповещение",
         "continue": "Перейти к оповещению",
+        "streamLabel": "Поток",
         "thresholdLabel": "Оповещение по",
         "thresholdMatchingRows": "Совпадающие строки",
         "thresholdCount": "Количество строк",
@@ -7300,22 +7523,26 @@
     "actionOpen": "Открыть",
     "actionDelete": "Удалить",
     "deleteTitle": "Удалить {name}?",
+    "deleteMessage": "Это удалит его безвозвратно. Удаление блокируется, если оповещение или получатель по-прежнему используют его.",
     "deletedToast": "{name} удален",
     "deleteFailedToast": "Не удалось удалить {name}",
     "loading": "Построение графа зависимостей…",
     "failedToLoad": "Не удалось загрузить зависимости: {error}",
     "usedBy": "{count} оповещение | {count} оповещений",
+    "countDestinations": "{count} получатель | {count} получателей",
     "usedByColumn": "Используется",
     "searchPlaceholder": "Поиск",
     "noDependencies": "Нет зависимостей.",
     "noMatches": "Нет совпадений.",
     "laneEmpty": "Нет оповещений",
     "directOverrides": "Использует этот шаблон напрямую",
+    "sectionDestinations": "Получатели",
     "sectionAlerts": "Оповещения",
     "orphanTag": "Не используется",
     "missingTag": "Отсутствует",
     "enabled": "Включено",
     "paused": "Приостановлено",
+    "impactTemplate": "Используется {destinations} · {alerts}",
     "impactDestination": "Используется {alerts}"
   },
   "alert_library": {
@@ -7360,6 +7587,7 @@
       "noDescription": "В библиотеке нет описания.",
       "needsDataCallout": "Это оповещение запрашивает поток {stream}, который эта организация не получает. Его установка сейчас создаст оповещение, которое никогда не сработает.",
       "query": "Запрос",
+      "stream": "Поток",
       "streamType": "Тип потока",
       "metricCondition": "Условие метрики",
       "matchCount": "Требуется совпадающих строк",
@@ -7381,11 +7609,18 @@
     "install": {
       "title": "Установить из библиотеки",
       "subtitle": "Выберите, куда оповещения будут отправлять уведомления, какие оповещения установить и где они будут храниться.",
+      "stepDestination": "Получатель",
       "stepAlerts": "Оповещения",
       "stepFolder": "Папка",
       "stepTune": "Настройка",
       "stepInstall": "Установить",
+      "destinationIntro": "Каждое оповещение в этом наборе уведомляет получателя, выбранного вами здесь. Файлы библиотеки содержат имена получателей организации, из которой они были экспортированы, и в вашей организации таких нет.",
+      "destinationLabel": "Получатель",
+      "destinationPlaceholder": "Выберите получателя",
+      "destinationsLoadFailed": "Не удалось загрузить существующих получателей.",
       "retry": "Попробуйте снова",
+      "destinationsNoneBody": "В этой организации еще нет получателей оповещений, поэтому этим оповещениям некуда отправлять уведомления. Создайте получателя на странице «Получатели», а затем вернитесь и выберите его здесь.",
+      "openDestinations": "Открыть получателей",
       "selectAll": "Выбрать все",
       "clear": "Очистить",
       "selectedCount": "Выбрано {count} из {total}",
@@ -7440,6 +7675,7 @@
     "importBodyLabel": "Тело шаблона *",
     "importTypeLabel": "Тип шаблона *",
     "importTitleLabel": "Заголовок шаблона *",
+    "header": "Шаблоны получателей",
     "add": "Новый шаблон",
     "edit": "Редактировать",
     "name": "Имя",
@@ -7499,6 +7735,7 @@
     "chartPreviewPlaceholder": "Диаграмма появляется здесь в реальных уведомлениях — она строится из истории оценки самого оповещения, которой нет в предварительном просмотре.",
     "channelTitlesDescription": "Используйте другое название для конкретных каналов — например, более короткую тему для email.",
     "namePlaceholder": "например, высокая частота ошибок",
+    "nameLockedHint": "Оповещения и получатели ссылаются на этот шаблон по имени, поэтому его нельзя переименовать. Клонируйте шаблон, чтобы создать копию под новым именем.",
     "rawBodyCaption": "Отправляется точно как написано, с подстановкой {'{'}variables{'}'}. См. руководство по переменным для получения полного списка.",
     "contentTitlePlaceholder": "{'{'}alert_name{'}'} · {'{'}stream_name{'}'}",
     "fieldLabelPlaceholder": "например, значение",
@@ -7512,6 +7749,7 @@
     "moveUp": "Переместить вверх",
     "moveDown": "Переместить вниз",
     "fieldLabel": "Метка",
+    "fieldValue": "Значение",
     "linkLabel": "Метка",
     "linkUrl": "URL",
     "channelTitleSlack": "Slack",
@@ -7571,10 +7809,12 @@
     "channelSns": "SNS",
     "testSendGroupLabel": "Отправить реальное тестовое сообщение",
     "testSend": "Отправить тест",
+    "testSendDestinationLabel": "Получатель",
     "testSendConfirmTitle": "Отправить реальное тестовое сообщение?",
     "testSendConfirm": "Это отправит реальное сообщение в выбранный канал с пометкой [TEST].",
     "testSendSuccess": "Тестовое сообщение отправлено",
-    "testSendRateLimited": "Слишком много тестовых отправок — подождите немного и попробуйте снова"
+    "testSendRateLimited": "Слишком много тестовых отправок — подождите немного и попробуйте снова",
+    "testSendNoDestination": "Сначала выберите получателя"
   },
   "alert_sources": {
     "header": "Внешние источники оповещений",
@@ -7612,8 +7852,10 @@
     "editTitle": "Изменить источник алертов",
     "name": "Название",
     "nameHint": "Просто метка — для всех источников используется одна и та же настройка.",
+    "incidentDestination": "Получатель инцидентов",
     "incidentDestinationPlaceholder": "Использовать настройку организации по умолчанию",
     "incidentDestinationHint": "Сюда отправляются уведомления, когда алерты этого источника создают инцидент или присоединяются к нему. Оставьте пустым, чтобы использовать настройку организации по умолчанию — если не задано ничего, подходящие инциденты срабатывают молча.",
+    "noDestinationSet": "Получатель инцидентов не задан",
     "setupStep1Title": "1. Создайте вебхук",
     "setupStep1Body": "В Grafana, Alertmanager или любом инструменте, который умеет отправлять JSON методом POST, создайте контактную точку/получателя вебхука.",
     "setupRemainingStepsHint": "Сохраните этот источник, чтобы получить его URL и токен, затем вставьте их в конфигурацию вебхука.",
@@ -7636,10 +7878,13 @@
     "createdSuccess": "Источник оповещений создан",
     "updatedSuccess": "Источник оповещений обновлен",
     "error": "Ошибка загрузки источников оповещений",
-    "senderError": "Ошибка загрузки статуса источника"
+    "senderError": "Ошибка загрузки статуса источника",
+    "destinationsLoadError": "Ошибка загрузки получателей"
   },
   "alert_destinations": {
+    "sectionTab": "Получатели",
     "chooseTypeTitle": "Выберите тип",
+    "selectDestinationType": "Выберите тип получателя",
     "connectionStepTitle": "Подключение",
     "connectionDetailsTitle": "Детали подключения",
     "urlHelpText": "Базовый URL без завершающего слеша (например, https://your-domain.com)",
@@ -7658,6 +7903,10 @@
     "datadogHostnameHelpText": "Имя хоста для логов Datadog",
     "exampleLabel": "Пример:",
     "subtitle": "Куда доставляются сработавшие оповещения",
+    "exportDestination": "Экспортировать получателя",
+    "deleteDestinationTitle": "Удалить получателя",
+    "deleteDestinationMessage": "Вы уверены, что хотите удалить получателя?",
+    "deleteDestinationsTitle": "Удалить получателей",
     "selected": "выбрано",
     "organizationLabel": "Организация",
     "defaultPlaceholder": "например, default",
@@ -7676,18 +7925,25 @@
     "ddTagsPlaceholder": "Введите теги (например, env:prod,version:1.0)",
     "serviceLabel": "Сервис",
     "servicePlaceholder": "Введите имя сервиса (например, api-gateway)",
+    "header": "Получатели уведомлений",
+    "add": "Новый получатель",
     "edit": "Редактировать",
+    "search": "Поиск получателя",
     "filterAll": "Все",
     "filterPrebuilt": "Встроенный",
     "filterCustom": "Пользовательский",
     "templateDefaultBadge": "По умолчанию",
     "name": "Имя",
+    "destination_type": "Тип получателя",
     "template": "Шаблон",
     "actions": "Действия",
+    "addTitle": "Новый получатель",
+    "updateTitle": "Обновить получателя",
     "delete": "Удалить",
     "method": "Метод",
     "url": "URL",
     "api_header": "Заголовок",
+    "api_header_value": "Значение",
     "skip_tls_verify": "Пропустить проверку TLS",
     "action": "Действие",
     "output_format": "Формат вывода",
@@ -7696,6 +7952,7 @@
     "custom_headers": "Пользовательские заголовки (необязательно)",
     "preview": "Предпросмотр",
     "test": "Тест",
+    "saved": "Получатель успешно сохранен",
     "customWebhook": "Пользовательский (Webhook)",
     "customEmail": "Пользовательский (Email)",
     "customAction": "Пользовательский (Действие)",
@@ -7705,6 +7962,7 @@
     "separator_hint": "Строка-разделитель между записями (допускаются пробелы)",
     "templateDefaultOption": "По умолчанию ({name})",
     "templateHelp": "Оставьте по умолчанию, чтобы использовать стандартный шаблон {type} ({name}), или выберите пользовательский.",
+    "loadingData": "Загрузка данных получателя...",
     "noEmailTemplates": "Похоже, вы еще не создали ни одного шаблона электронной почты.",
     "createEmailTemplate": "Создать шаблон электронной почты",
     "headers": "Заголовки",
@@ -7719,14 +7977,40 @@
       "servicenowDescription": "Создавать инциденты в ServiceNow"
     },
     "import": {
+      "title": "Импорт получателя",
       "errorValidations": "Проверка ошибок",
       "outputMessages": "Выходные сообщения",
+      "destinationName": "Имя получателя",
+      "destinationUrl": "URL получателя",
+      "destinationMethod": "Метод получателя",
       "templates": "Шаблоны",
       "emails": "Электронные письма (через запятую)",
       "actions": "Действия",
+      "destinationCreation": "Создание получателя",
       "jsonStringEmpty": "Строка JSON пуста",
       "invalidJsonFormat": "Неверный формат JSON",
-      "unknownError": "Неизвестная ошибка"
+      "importSuccess": "Получатели успешно импортированы",
+      "importError": "Ошибка импорта получателя, проверьте JSON",
+      "unknownError": "Неизвестная ошибка",
+      "nameRequired": "Получатель - {index}: поле \"name\" обязательно и должно быть допустимой строкой.",
+      "nameExists": "Получатель - {index}: \"{name}\" уже существует",
+      "typeInvalid": "Получатель - {index}: поле \"type\" должно быть либо \"email\", либо \"http\", либо \"action\"",
+      "actionTypeNotSupported": "Получатель - {index}: тип 'action' не поддерживается.",
+      "actionNotFound": "Получатель - {index}: действие \"{actionId}\" не существует для типа \"{type}\"",
+      "urlRequired": "Получатель - {index}: поле \"url\" обязательно для получателей типа http.",
+      "methodInvalid": "Получатель - {index}: поле \"method\" должно быть одним из \"post\", \"get\" или \"put\"",
+      "templateRequiredHttp": "Получатель - {index}: поле \"template\" обязательно для получателей типа http.",
+      "skipTlsVerifyRequired": "Получатель - {index}: поле \"skip_tls_verify\" обязательно и должно быть логическим значением",
+      "headersMustBeObject": "Получатель - {index}: 'headers' должен быть объектом для типа http",
+      "urlNotAllowedEmail": "Получатель - {index}: 'url' не должен указываться для типа email",
+      "headersNotAllowedEmail": "Получатель - {index}: 'headers' не должен указываться для типа email",
+      "emailsRequired": "Получатель - {index}: поле \"emails\" обязательно и должно быть массивом для получателей типа email.",
+      "emailsMustBeStrings": "Получатель - {index}: 'emails' должен быть массивом строк для типа email",
+      "templateRequiredEmail": "Получатель - {index}: поле \"template\" обязательно для получателей типа email.",
+      "templateNotFound": "Получатель - {index}: шаблон \"{template}\" не существует для типа \"{type}\"",
+      "actionIdInvalid": "Получатель - {index}: поле \"action_id\" должно быть допустимой строкой.",
+      "createSuccess": "Получатель - {index}: \"{name}\" успешно создан \nПримечание: удалите созданный объект получателя {name} из JSON-файла ",
+      "createFailed": "Получатель - {index}: создание \"{name}\" не удалось --> \n Причина: {reason}"
     },
     "priorityP1Description": "Оповещения наивысшего приоритета",
     "priorityP2Description": "Оповещения высокого приоритета",
@@ -7738,7 +8022,10 @@
     "severityWarningDescription": "Инциденты уровня предупреждения",
     "severityInfoDescription": "Информационные инциденты"
   },
-  "pipeline_destinations": {},
+  "pipeline_destinations": {
+    "header": "Получатели конвейера",
+    "search": "Поиск получателя"
+  },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
     "tabLabel": "BYOB",
@@ -7947,6 +8234,7 @@
     },
     "metricCard": {
       "lastRefreshed": "Последнее обновление:",
+      "traceId": "Trace ID: {id}",
       "metricLabel": "Метрика: {name}",
       "queryLabel": "Запрос: {query}",
       "errorLabel": "Ошибка: {error}",
@@ -7979,6 +8267,7 @@
       "loadingLabels": "Загрузка меток...",
       "noLabelsFound": "Метки не найдены",
       "operator": "Оператор",
+      "value": "Значение",
       "selectLabelFirst": "Сначала выберите метку",
       "noValuesFound": "Значения не найдены",
       "addLabelFilter": "Добавить фильтр метки",
@@ -8069,6 +8358,7 @@
     "generalLabel": "Общие настройки",
     "groupGeneral": "Общие",
     "groupAccessSecurity": "Доступ и безопасность",
+    "groupDestinations": "Получатели",
     "groupDataAI": "Данные и ИИ",
     "groupOperations": "Операции",
     "groupSynthetics": "Синтетика",
@@ -8097,6 +8387,8 @@
     "customLogoText": "Текст пользовательского логотипа",
     "orgLabel": "Параметры организации",
     "logDetails": "Детали логов",
+    "traceIdFieldName": "Имя поля Trace ID",
+    "spanIdFieldName": "Имя поля Span ID",
     "toggleIngestionLogsLabel": "Переключить логи приема",
     "usageStreamEnabledLabel": "Включить поток использования",
     "claimParserFunction": "Парсер утверждений SSO",
@@ -8222,6 +8514,7 @@
     "genAiAgentMapping": {
       "tabLabel": "Сопоставление агентов GenAI",
       "title": "Сопоставление агентов GenAI",
+      "description": "Настройте резервные атрибуты телеметрии, используемые для нормализации идентичности агента для LLM-трассировок и оценок.",
       "agentNameFields": "Резервные поля имени агента",
       "agentNameHelp": "Входящие атрибуты, используемые в качестве резервных для gen_ai.agent.name.",
       "agentNameInfo": "Проверяется только при отсутствии или пустоте стандартного атрибута gen_ai.agent.name. Добавьте по одному входящему атрибуту телеметрии на строку.",
@@ -8239,6 +8532,7 @@
       "resetToEmpty": "Сбросить до пустого",
       "clearRegistry": "Очистить реестр",
       "clearRegistryTitle": "Очистить реестр агентов?",
+      "clearRegistryDescription": "Это удаляет все обнаруженные записи реестра агентов GenAI для этой организации. Новые подходящие трассировки будут повторно заполнять реестр во время приема данных.",
       "clearRegistryConfirm": "Очистить реестр",
       "saved": "Сопоставление агентов GenAI успешно сохранено",
       "clearRegistrySuccess": "Реестр агентов GenAI очищен. Удалено {deletedCount} сохраненных агентов и {bufferCount} ожидающих наблюдений.",
@@ -8258,6 +8552,7 @@
       "fieldAliasesSaveError": "Не удалось сохранить псевдонимы полей",
       "fieldAliasesUnsavedConfirm": "У вас есть несохранённые изменения сопоставления полей. Отбросить их и выйти?",
       "discoveredServicesTitle": "Обнаруженные службы",
+      "discoveredServicesDescription": "Сервисы автоматически обнаруживаются в ваших данных телеметрии и группируются по их имени сервиса для корреляции. Сервисы с одинаковым именем сервиса коррелируются вместе в журналах, трассировках и метриках.",
       "noServicesYet": "Службы ещё не обнаружены",
       "noServicesDescription": "Службы появятся здесь по мере поступления телеметрических данных с атрибутами идентификации служб (например, k8s-deployment, имя службы и т.д.)",
       "searchServiceName": "Поиск имени службы или потока...",
@@ -8265,6 +8560,7 @@
       "serviceName": "Имя службы",
       "service": "Служба",
       "logs": "Логи",
+      "traces": "Трассировки",
       "metrics": "Метрики",
       "lastSeen": "Последнее появление",
       "retry": "Повторить",
@@ -8276,6 +8572,7 @@
       "fieldMappingDialogHelp": "Добавьте или удалите имена полей, которые должны распознаваться как имя сервиса в ваших телеметрических данных.",
       "fieldMappingPlaceholder": "Введите имя поля и нажмите Enter",
       "foundInLogs": "Найдено в логах",
+      "foundInTraces": "Найдено в трассировках",
       "foundInMetrics": "Найдено в метриках",
       "distinguishByLabel": "Различать сервисы по",
       "distinguishByHelp": "Выберите поля, определяющие, где работают ваши сервисы. Например, кластер + пространство имен + развертывание вместе создают уникальную идентичность для каждого сервиса. Не более 5 полей.",
@@ -8311,11 +8608,13 @@
       "instancesCount": "({count} экземпляров)",
       "noDimensions": "нет измерений",
       "defaultSetWarningTitle": "Корреляция может быть ненадежной.",
+      "defaultSetWarningBody": "Этот экземпляр не имеет уточнения — он был обнаружен без сопоставления рабочих нагрузок (без контекста кластера, пространства имен или окружения). Журналы и трассировки могут поступать из разных развертываний с одним и тем же именем сервиса.",
       "instanceIdentity": "Идентичность экземпляра",
       "noDimensionsCatchAll": "Нет измерений — экземпляр для всех случаев",
       "streamSources": "Источники потоков",
       "fieldNameMapping": "Сопоставление имен полей",
       "logsWithCount": "Логи ({count})",
+      "tracesWithCount": "Трассировки ({count})",
       "metricsWithCount": "Метрики ({count})"
     },
     "addRegexPattern": {
@@ -8428,7 +8727,9 @@
       "importPatternFailed": "Не удалось импортировать шаблон \"{name}\": {error}",
       "createFailed": "Регулярное выражение - {index}: \"{name}\" не удалось создать --> \n Причина: {error}"
     },
-    "index": {},
+    "index": {
+      "genAiAgentMappingDesc": "Сопоставление GenAI Span с идентификаторами агентов"
+    },
     "organizationManagementPage": {
       "setAiCredits": "Установить AI-кредиты",
       "setAiCreditsSubtitle": "Установите общий лимит AI-кредитов организации.",
@@ -8562,6 +8863,8 @@
       "noValues": "Нет значений",
       "cardinality": "Кардинальность:",
       "uniqueValues": "{n} уникальных значений",
+      "streams": "Потоки",
+      "streamsSubtext": "потоки",
       "noAdditionalDimensions": "Дополнительные измерения не обнаружены.",
       "noSampleData": "Нет образцов данных для этого поля.",
       "uniqueValuesDetected": "{n} уникальных значений обнаружено",
@@ -8628,6 +8931,7 @@
     "cachedReportHint": "Примечание: кэшированные отчеты хранятся для быстрого доступа к панелям мониторинга; общий доступ для этих отчетов отключен.",
     "selectDashboardStep": "Выберите панель мониторинга",
     "timeRangeDescription": "Создает отчет с данными за указанный период времени",
+    "pngPageLimitNote": "PNG захватывает только первую видимую страницу дашборда. Используйте PDF, если дашборд занимает несколько страниц.",
     "widthPlaceholder": "напр., 1440",
     "heightPlaceholder": "напр., 900",
     "dimensionsDefaultHint": "Оставьте пустым, чтобы использовать настройки сервера по умолчанию",
@@ -8643,6 +8947,7 @@
     "searchAllFoldersTitle": "Искать во всех папках",
     "never": "Никогда",
     "startDate": "Дата начала",
+    "header": "Отчеты",
     "subtitle": "Запланированные отчёты и экспорт",
     "searchThisFolder": "Эта папка",
     "searchAllFolders": "Все папки",
@@ -8745,6 +9050,7 @@
     "totalTimeRange": "Общий диапазон запроса",
     "searchType": "Тип поиска",
     "querySource": "Источник запроса",
+    "traceId": "ID трейса",
     "userId": "ID пользователя",
     "orgId": "ID организации",
     "streamType": "Тип потока",
@@ -8831,10 +9137,16 @@
     },
     "openInFullView": "Открыть в полном виде",
     "viewLogs": "Просмотр логов",
+    "viewLogsUnavailable": "Не удалось открыть логи для этого спана.",
     "backToLogs": "Назад к логам",
+    "openInTraces": "Открыть в трейсах",
     "loadingStream": "Загрузка потока...",
     "noLogsAvailableForService": "Нет доступных логов для этого сервиса",
+    "noCorrelatedLogsFound": "Не найдено связанных логов для этого спана",
     "noData": {
+      "title": "Начните отправлять трейсы в {product}",
+      "description": "В этой организации пока нет потоков трейсов. Внедрите инструментирование в свои сервисы, и трейсы появятся здесь автоматически.",
+      "otlp": "Отправляйте трейсы через {product}",
       "otlpDesc": "{product1}, {product2} и любой {product3}-совместимый SDK",
       "otelCollectorDesc": "Направляйте все телеметрические сигналы через {product}",
       "or": "Или:",
@@ -8843,12 +9155,21 @@
     "configureFullTextSearch": "для настройки поля полнотекстового поиска в потоке.",
     "collapseFields": "Свернуть поля",
     "openFields": "Открыть поля",
+    "timeRangeUpdated": "Выбранный временной диапазон не включал этот трейс. Временной диапазон был обновлён, чтобы соответствовать временной метке трейса.",
+    "errorRetrievingTraces": "Произошла ошибка при получении трейсов.",
+    "fetchingTraces": "Загрузка трейсов...",
     "noStream": {
       "title": "Выберите поток для начала исследования",
+      "description": "Выберите поток трейсов, затем нажмите <strong>Выполнить запрос</strong>. После загрузки результатов вы сможете фильтровать по сервису, длительности, статусу спана и другим параметрам.",
       "selectStream": "Выберите поток",
+      "selectStreamDesc": "Просмотрите доступные потоки трейсов в этой организации",
+      "queryGuide": "Ознакомьтесь с руководством по трейсам",
+      "queryGuideDesc": "Граф сервисов, фильтрация спанов, RED-метрики и другое",
       "recent": "Недавние:"
     },
     "noEvents": {
+      "title": "Трейсы не найдены",
+      "descNoFilters": "В диапазоне {range} трейсы не найдены.",
       "descWithFilters": "В выбранном окне ничего не соответствует <strong>этому запросу</strong>. В потоке есть данные — попробуйте ослабить фильтр в строке запроса.",
       "descOutOfRange": "Ваш временной интервал не содержит данных из этого потока. Перейдите к моменту, когда данные были видны в последний раз.",
       "jumpToData": "Перейти к последним данным",
@@ -8856,19 +9177,38 @@
       "askAi": "Попросить ИИ исправить мой запрос",
       "selectedRange": "выбранный диапазон"
     },
+    "tracesFound": "Найдено трейсов",
+    "spansFound": "Найдено спанов",
+    "errorTraces": "Трейсы с ошибками",
+    "errorSpans": "Спаны с ошибками",
     "filterByErrors": "Фильтр по ошибкам",
     "clearErrorFilter": "Очистить фильтр ошибок",
     "error": "ОШИБКА",
     "errorCount": "{n} ОШИБКА | {n} ОШИБКИ",
     "success": "УСПЕХ",
+    "applyPendingFilters": "Применить ожидающие фильтры и выполнить поиск трейсов",
+    "backToTraces": "Назад к трейсам",
     "loadingTrace": "Загрузка...",
+    "traceId": "ID трейса",
+    "copyTraceId": "Копировать ID трейса",
     "viewFilters": "Посмотреть фильтры",
+    "reviewAndApplyFilters": "Просмотреть и применить фильтры к трейсам",
+    "spansLabel": "спаны",
     "errorsLabel": "ошибки",
     "previousMatch": "Предыдущее совпадение",
     "nextMatch": "Следующее совпадение",
+    "searchInSpans": "Искать в спанах",
+    "spansTableView": "Табличное представление спанов",
     "comingSoon": "Скоро...",
+    "fetchingTrace": "Загрузка вашего трейса.",
+    "traceFilters": "Фильтры трейсов",
+    "showTraces": "Показать трейсы",
     "applyAndSearch": "Применить и искать",
     "timestamp": "Временная метка",
+    "noErrorPresent": "Для этого спана ошибок нет",
+    "noEventsPresent": "Для этого спана нет событий",
+    "noLinksPresent": "Для этого спана нет ссылок",
+    "loadingTraceDag": "Загрузка DAG трейса...",
     "exceptionsWithCount": "Исключения ({count})",
     "typeLabel": "Тип:",
     "messageLabel": "Сообщение:",
@@ -8882,6 +9222,7 @@
       "templateBadge": "шаблон"
     },
     "sessionsList": {
+      "streamLabel": "Поток",
       "sessions": "сессии",
       "failedToLoad": "Не удалось загрузить сессии",
       "retry": "Повторить",
@@ -8899,6 +9240,7 @@
         "cost": "Стоимость",
         "status": "Статус"
       },
+      "stream": "Поток",
       "agent": "Агент",
       "noAgentsTitle": "Нет агентов в этом диапазоне",
       "noAgentsDescription": "Не обнаружено агентов GenAI за выбранный временной интервал. Попробуйте более широкий диапазон или переключитесь обратно на просмотр потока.",
@@ -8912,9 +9254,12 @@
       "failedToLoad": "Не удалось загрузить сессию",
       "retry": "Повторить",
       "sessionNotFound": "Сессия не найдена",
+      "noSpansFound": "Не найдено спанов для {id} в текущем временном диапазоне.",
+      "searchPlaceholder": "Поиск трейсов в этой сессии…",
       "turn": "виток",
       "turns": "витков",
       "turnCount": "{count} {unit}",
+      "openInTraceExplorer": "Просмотреть трейс",
       "filters": {
         "status": "Статус",
         "model": "Модель",
@@ -9003,6 +9348,7 @@
         "warning": "Предупреждение",
         "critical": "Критический"
       },
+      "viewTraces": "Просмотреть трейсы",
       "types": {
         "all": "Все",
         "service": "Сервисы",
@@ -9016,15 +9362,20 @@
         "title": "Частота ошибок"
       }
     },
+    "spansTab": "Спаны",
+    "tracesTab": "Трейсы",
     "serviceGraphTab": "Граф сервисов",
     "serviceGraphSubtitle": "Посмотрите, как ваши сервисы взаимодействуют друг с другом — зависимости, пропускная способность и уровень ошибок",
+    "servicesCatalogSubtitle": "Каждый сервис, отправляющий трейсы, с задержкой, пропускной способностью и частотой ошибок",
     "treeView": "Древовидное представление",
     "graphView": "Графическое представление",
     "layoutHorizontal": "Горизонтально",
     "layoutVertical": "Вертикально",
     "layoutForce": "Принудительная компоновка",
+    "exportTraces": "Экспорт трейсов",
     "waterfall": "Водопад",
     "flameGraph": "Пламенный график",
+    "traceGraph": "Граф трейса",
     "thread": "Поток",
     "dbSpanDetails": {
       "dbSystem": "СУБД",
@@ -9034,6 +9385,7 @@
       "host": "Хост",
       "user": "Пользователь",
       "storedProcedure": "Хранимая процедура",
+      "noQueryText": "Для этого спана не записано текста запроса.",
       "performance": "Производительность",
       "rowsReturned": "Возвращено строк",
       "batchSize": "Размер пакета",
@@ -9046,11 +9398,13 @@
       "changeStreamTitle": "Изменить поток?",
       "switchStream": "Переключить поток",
       "cancel": "Отмена",
+      "changeStreamMessage": "Это также обновит поток на вкладке «Трейсы/Спаны» и сбросит текущий запрос.",
       "errorGettingFunctions": "Ошибка при получении функций",
       "errorPullingIndex": "Ошибка при загрузке индекса для выбранной организации{message}",
       "errorGettingStreams": "Ошибка при получении потоков",
       "errorLoadingStreams": "Ошибка при загрузке потоков",
       "errorConstructingQuery": "Произошла ошибка при построении поискового запроса.",
+      "traceNotFound": "Трейс {traceId} не найден",
       "errorProcessingRequest": "Ошибка при обработке запроса",
       "searchRequestFailed": "Поисковый запрос не удался"
     },
@@ -9071,6 +9425,9 @@
       "service": "Сервис",
       "operationName": "Название операции",
       "duration": "Длительность",
+      "spans": "Спаны",
+      "spanKind": "Тип спана",
+      "spanStatus": "Статус спана",
       "status": "Статус",
       "serviceLatency": "Задержка сервиса",
       "inputTokens": "Входные токены",
@@ -9082,9 +9439,11 @@
       "noErrorsInRange": "Нет ошибок в этом временном диапазоне",
       "time": "Время",
       "service": "Сервис",
-      "operation": "Операция"
+      "operation": "Операция",
+      "traceId": "ID трейса"
     },
     "lLMInsightsDashboard": {
+      "stream": "Поток",
       "agent": "Агент",
       "compareEntry": "Сравнить версии",
       "compareEntryHint": "Сравнить две версии этого агента бок о бок",
@@ -9095,6 +9454,7 @@
       "viewByStream": "Просмотр по потоку",
       "totalCost": "Общая стоимость",
       "totalTokens": "Всего токенов",
+      "totalTraces": "Всего трейсов",
       "p95Latency": "P95 задержка",
       "errorRate": "Частота ошибок",
       "timeAxis": "Время",
@@ -9106,10 +9466,13 @@
     "serviceGraphNodeSidePanel": {
       "viewRelated": "Посмотреть связанное",
       "logs": "Логи",
+      "traces": "Трейсы",
       "databases": "Базы данных",
+      "viewTraces": "Просмотреть трейсы",
       "operations": "Операции",
       "metrics": "Метрики",
       "noOperationsFound": "Операции не найдены",
+      "viewInTraces": "Просмотреть в трейсах",
       "noResourceDataFound": "Данные {resource} не найдены",
       "retry": "Повторить",
       "noMetricsAvailable": "Нет метрик для этого сервиса.",
@@ -9133,11 +9496,13 @@
       "tabHosts": "Хосты",
       "tabDatabases": "Базы данных",
       "tabQueries": "Запросы",
+      "tabDestinations": "Получатели",
       "tabRpcServices": "RPC-сервисы",
       "tabUrls": "URL-адреса",
       "colHost": "Хост",
       "colDatabase": "База данных",
       "colDbOperation": "Операция БД",
+      "colDestination": "Получатель",
       "colRpcService": "RPC-сервис",
       "colUrl": "URL",
       "envHost": "Хост",
@@ -9152,11 +9517,14 @@
       "dbResponseStatusCode": "Статус код ответа БД",
       "processExitCode": "Код завершения процесса"
     },
-    "traceLatencyCell": {},
+    "traceLatencyCell": {
+      "spansAcrossServices": "{spans} спанов в {services} сервисах"
+    },
     "threadToolCalls": {
       "toolCall": "вызов инструмента",
       "toolCalls": "вызовы инструментов",
       "showCalls": "Показать вызовы",
+      "openSpanDetails": "Открыть детали спана",
       "arguments": "Аргументы",
       "result": "Результат",
       "empty": "(пусто)"
@@ -9170,13 +9538,17 @@
       "cost": "Стоимость",
       "model": "Модель",
       "errors": "Ошибки",
+      "noSpansLoaded": "Спаны для этого трейса не загружены.",
+      "noLlmTurns": "Не обнаружено LLM-ходов. Трейс не содержит спанов с",
       "system": "Система",
+      "historicalMessage": "{count} более раннее сообщение из этой сессии — обработано в предыдущих трейсах. | {count} более ранних сообщений из этой сессии — обработано в предыдущих трейсах.",
       "user": "Пользователь",
       "startedAt": "Начато в {time}",
       "unknown": "неизвестно",
       "tokens": "Токены",
       "tokensSuffix": "токенов",
-      "error": "Ошибка"
+      "error": "Ошибка",
+      "viewSpan": "Просмотреть спан"
     },
     "traceHeader": {
       "operationName": "Имя операции"
@@ -9194,6 +9566,7 @@
       "start": "Начало",
       "requestResent": "Запрос повторно отправлен {count} раз | Запрос повторно отправлен {count} раз",
       "resends": "Повторы",
+      "spanIdTitle": "ID спана: {id}",
       "inputTokens": "Входные токены",
       "in": "Вх",
       "outputTokens": "Выходные токены",
@@ -9211,8 +9584,11 @@
       "modelParameters": "Параметры модели",
       "table": "Таблица",
       "field": "Поле",
+      "value": "Значение",
       "timestamp": "Временная метка",
       "enterpriseLicenseRequired": "Функция корреляции требует лицензии Enterprise",
+      "missingSpanOrStream": "Отсутствует имя спана или потока",
+      "spanIdCopied": "ID спана скопирован в буфер обмена",
       "attributesCopied": "Атрибуты скопированы в буфер обмена",
       "copiedToClipboard": "{type} скопирован в буфер обмена",
       "failedToCopyClipboard": "Не удалось скопировать в буфер обмена",
@@ -9225,20 +9601,26 @@
       "filterAdded": "Фильтр добавлен: {field} {operator} '{value}'",
       "timeline": "Временная шкала",
       "serviceMap": "Карта сервисов",
+      "traceNotFound": "Трейс {traceId} не найден",
+      "spanNotFound": "Спан {spanId} не найден в трейсе",
       "unknownOperation": "Неизвестная операция",
       "unknownService": "Неизвестный сервис",
+      "traceIdCopied": "ID трейса скопирован в буфер обмена",
       "sessionIdCopied": "ID сессии скопирован в буфер обмена"
     },
     "traceTree": {
       "clickToExpand": "Нажмите, чтобы развернуть",
       "clickToCollapse": "Нажмите, чтобы свернуть",
-      "httpStatus": "HTTP {status}"
+      "errorSpan": "Спан с ошибкой",
+      "httpStatus": "HTTP {status}",
+      "spanEvent": "{count} событие спана | {count} событий спана"
     },
     "tracesAnalysisDashboard": {
       "baseline": "Базовый уровень:",
       "selected": "Выбрано:",
       "dimensions": "Измерения",
-      "collapseDimensions": "Свернуть измерения"
+      "collapseDimensions": "Свернуть измерения",
+      "tracesPerInterval": "трейсов/интервал"
     },
     "sessionDetails": {
       "missingSessionInfo": "Отсутствует ID сессии или поток в URL",
@@ -9246,21 +9628,36 @@
       "copied": "Скопировано"
     },
     "flameGraphView": {
+      "spans": "Спаны",
       "depth": "глубина",
+      "noSpansToDisplay": "Нет спанов для отображения",
       "service": "Сервис:",
       "duration": "Длительность:",
+      "percentOfTrace": "% трейса:",
       "hasErrors": "⚠ Есть ошибки"
     },
     "tracesNoEventsState": {
       "lastData": "Последние данные: {formatted} ({zone})"
     },
     "correlation": {
+      "distributedTrace": "Распределённый трейс",
+      "loadingTraceData": "Загрузка данных трейса...",
+      "noTraceInfoAvailable": "Нет информации о трейсе для этого события",
+      "traceIdLabel": "ID трейса:",
+      "copyTraceId": "Скопировать ID трейса",
+      "spanIdLabel": "ID спана:",
+      "spanHierarchy": "Иерархия спанов:",
+      "applicationSpan": "Спан приложения",
+      "browserSdkSpanPrefix": "Спан Browser SDK (",
       "closingParen": ")",
+      "backendSpansPrefix": "Спаны бэкенда (",
       "performanceBreakdown": "Разбивка по производительности:",
       "totalDuration": "Общая длительность:",
       "browserLabel": "Браузер:",
       "networkLabel": "Сеть:",
-      "backendLabel": "Сервер:"
+      "backendLabel": "Сервер:",
+      "viewTraceDetails": "Просмотреть детали трейса",
+      "backendTraceNotAvailable": "Данные бэкенд-трейса пока недоступны. Прием данных трейса может занять до 30 секунд."
     },
     "failedToAnalyzeDimensions": "Не удалось проанализировать измерения",
     "failedToFetchCorrelatedLogs": "Не удалось получить коррелированные логи",
@@ -9288,6 +9685,7 @@
     "serviceDiscoveryNotEnabled": "Обнаружение сервисов не включено. Это функция корпоративной версии.",
     "startTime": "Время начала",
     "streamNameRequiredForCorrelation": "Для корреляции требуется имя потока",
+    "trace": "Трейс",
     "unableToConnectToServer": "Не удается подключиться к серверу. Проверьте, запущено ли приложение.",
     "unknownService": "Неизвестный сервис",
     "unknownPattern": "Неизвестный паттерн",
@@ -9298,6 +9696,7 @@
       "requestsLabel": "Запросы:",
       "errorsLabel": "Ошибки:",
       "errorRateLabel": "Процент ошибок:",
+      "spansLabel": "Спаны:",
       "callsLabel": "Вызовы:",
       "averageLabel": "Среднее:",
       "minimumLabel": "Минимум:",
@@ -9306,8 +9705,10 @@
       "p75Label": "P75:",
       "p95Label": "P95:",
       "p99Label": "P99:",
+      "averageOfTrace": "{avg} мс ({percent}% трейса)",
       "requestCount": "{count} запр."
     },
+    "spanEventTimeline": "Хронология событий спана",
     "eventClusterTooltip": "{count} событий",
     "spanEventCount": "{count} событие",
     "spanEventCountPlural": "{count} событий",
@@ -9318,7 +9719,8 @@
     "eventClusterAriaLabel": "{count} событий, {errors} ошибка",
     "eventClusterAriaLabelPlural": "{count} событий, {errors} ошибок",
     "eventMarkerTooltip": "Событие: {name}",
-    "exceptionMarkerTooltip": "Исключение: {type}"
+    "exceptionMarkerTooltip": "Исключение: {type}",
+    "spanEventFallback": "событие спана"
   },
   "actions": {
     "realTime": "Реальное время",
@@ -9392,6 +9794,7 @@
     "requiresConfirmation": "Запрашивать подтверждение перед выполнением",
     "envVars": "Переменные окружения",
     "envKey": "Имя переменной",
+    "envValue": "Значение",
     "addEnvVar": "Добавить переменную",
     "credentialFiles": "Файлы учётных данных",
     "credEnvVar": "Имя переменной окружения",
@@ -9614,9 +10017,11 @@
     "selectMetrics": "Выберите потоки метрик",
     "correlatedLogs": "Логи",
     "correlatedMetrics": "Метрики",
+    "correlatedTraces": "Трейсы",
     "loadingCorrelation": "Загрузка данных корреляции...",
     "clickToLoadLogs": "Нажмите, чтобы загрузить коррелированные логи",
     "clickToLoadMetrics": "Нажмите, чтобы загрузить коррелированные метрики",
+    "clickToLoadTraces": "Нажмите, чтобы загрузить связанные трейсы",
     "logs": {
       "filtersLabel": "Фильтры",
       "allValues": "Все значения",
@@ -9635,11 +10040,19 @@
     "noLogsFound": "Логи не найдены",
     "noDataFound": "Данные не найдены",
     "noLogsDescription": "Не найдены логи для этой корреляции в выбранном временном диапазоне.",
+    "correlatedTracesFor": "Связанные трейсы для сервиса: {service}",
     "all": "Все",
+    "loadingTraces": "Загрузка трейсов...",
+    "tracesError": "Не удалось загрузить трейсы",
+    "tracesErrorDetails": "Произошла ошибка при получении данных трейсов. Попробуйте еще раз.",
     "metricsError": "Не удалось загрузить метрики",
     "metricsErrorDetails": "Произошла ошибка при получении данных метрик. Пожалуйста, попробуйте снова.",
     "noMetricsDescription": "Выберите метрики на боковой панели для просмотра графиков.",
     "dimensionBasedCorrelation": "Корреляция на основе измерений",
+    "tracesFromService": "Трейсы из сервиса: {service}",
+    "noTracesFound": "Трейсы не найдены",
+    "noTracesDescription": "Трейсы не найдены для этой корреляции в выбранном временном диапазоне.",
+    "viewInTraces": "Просмотреть в трейсах",
     "filters": "Фильтры",
     "semanticFieldGroupsCaption": "Сопоставьте имена полей телеметрии с общими группами, чтобы OpenObserve мог коррелировать их между потоками.",
     "exportToJson": "Экспорт в JSON",
@@ -9772,8 +10185,10 @@
     "editCrossLink": "Редактировать перекрестную ссылку",
     "name": "Имя",
     "nameRequired": "Имя обязательно",
+    "namePlaceholder": "например, Просмотреть детали трейса",
     "urlTemplate": "Шаблон URL",
     "urlRequired": "URL обязателен",
+    "urlPlaceholder": "например, https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
     "urlInvalid": "Введите корректный http(s) URL",
     "urlHint": "Используйте {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Поля",
@@ -9866,6 +10281,7 @@
     "colPattern": "Шаблон",
     "colPricingSimple": "Ценообразование",
     "testMatchTitle": "Тест сопоставления модели",
+    "testMatchSubtitle": "Смоделируйте, как имя модели из ваших спанов будет сопоставляться с правилами ценообразования.",
     "modelNameInput": "Имя модели",
     "modelNameHint": "Имя модели в ваших генерациях.",
     "enterModelName": "Введите имя модели для тестирования сопоставления",
@@ -9961,7 +10377,8 @@
         "errorRate": "Уровень ошибок",
         "p50": "Задержка P50",
         "p95": "Задержка P95",
-        "p99": "Задержка P99"
+        "p99": "Задержка P99",
+        "cost": "Стоимость / трейс"
       },
       "insufficientLabel": "ориентировочный",
       "tooltip": {
@@ -10028,8 +10445,11 @@
       "sessions": "Просматривайте и анализируйте сессии агентов пошагово",
       "agentGraph": "Узнайте, с чем взаимодействуют ваши агенты — инструменты, модели, сервисы и хранилища данных",
       "agentBehavior": "Выявляйте агентов, застрявших в циклах, и ошибки, приводящие к их сбою",
+      "discovery": "Найдите проблемные трейсы, которые стоит просмотреть",
       "queues": "Списки задач для ревью с сохранением состояния",
+      "datasets": "Составляйте золотые наборы данных из аннотированных трейсов и отзывов",
       "experiments": "Предварительный просмотр и создание неизменяемых автономных прогонов оценки",
+      "quality": "Отслеживайте качество оценок для спанов, трейсов и сессий",
       "evalJobs": "Запускайте и отслеживайте задачи оценки по вашим сессиям",
       "scorers": "Создавайте и управляйте оценщиками, которые оценивают выходные данные LLM",
       "scoreConfigs": "Настройте рубрики оценки, используемые в ваших оценках"
@@ -10038,6 +10458,8 @@
       "button": "Аннотировать",
       "title": "Аннотировать · {scope}",
       "scope": {
+        "span": "Спан",
+        "trace": "Трейс",
         "session": "Сессия"
       },
       "viaAnnotation": "Аннотация",
@@ -10071,6 +10493,7 @@
       "dataset": {
         "button": "Добавить в набор данных",
         "title": "Добавить в набор данных",
+        "hint": "Превратите {ref} в эталон. Входные данные считываются из трейса — вы указываете ожидаемый результат.",
         "errors": {
           "dataset": "Выберите набор данных",
           "expectedOutput": "Укажите ожидаемый результат"
@@ -10079,6 +10502,7 @@
         "datasetPlaceholder": "Выберите набор данных...",
         "noDatasets": "Наборов данных пока нет — сначала создайте один на странице «Наборы данных».",
         "inputLabel": "Входные данные",
+        "inputReadOnly": "считано из трейса",
         "expectedLabel": "Ожидаемый результат",
         "expectedPlaceholder": "Напишите результат, который должен был быть получен...",
         "confirm": "Добавить в набор данных",
@@ -10092,9 +10516,13 @@
       "searchPlaceholder": "Поиск: сервис, входные данные, качество...",
       "searchFooter": "Совпадений на этой странице: {matched} из {loaded}",
       "scope": {
+        "span": "Спаны",
+        "trace": "Трейсы",
         "session": "Сессии"
       },
       "scopeNoun": {
+        "span": "спаны",
+        "trace": "трейсы",
         "session": "сессии"
       },
       "inQueueFilter": {
@@ -10110,8 +10538,10 @@
         "started": "Начато",
         "type": "Тип",
         "kind": "Вид",
+        "span": "Спан",
         "session": "Сессия",
         "topic": "Топик",
+        "traces": "Трейсы",
         "duration": "Длительность",
         "service": "Сервис",
         "input": "Ввод",
@@ -10119,6 +10549,7 @@
         "inQueue": "В очереди?",
         "actions": "Действия"
       },
+      "spanParent": "В {trace}",
       "quality": {
         "issue": "Проблема",
         "multiple": "Несколько",
@@ -10191,6 +10622,7 @@
         "operatorIs": "равно",
         "operatorIsNot": "не равно",
         "conditionScorePlaceholder": "Конфигурация оценок",
+        "conditionValuePlaceholder": "Значение",
         "pin": "Закрепить версию",
         "versionLatest": "v{version} (последняя)",
         "success": "Очередь создана",
@@ -10206,8 +10638,10 @@
         "searchPlaceholder": "Поиск элементов...",
         "footerTitle": "Элементы",
         "allItems": "Все",
+        "inTrace": "В трейсе {traceId}",
         "reviewAgain": "Проверить снова",
         "emptyTitle": "Нечего проверять",
+        "emptyBody": "Добавляйте трейсы, спаны или сессии в эту очередь из Discovery или представления трейса.",
         "columns": {
           "refType": "Ссылка",
           "refId": "Ссылка",
@@ -10226,6 +10660,8 @@
         "next": "Следующий элемент",
         "collapseNav": "Свернуть список элементов",
         "expandNav": "Развернуть список элементов",
+        "openTrace": "Открыть полный трейс",
+        "openTraceSoon": "Полный просмотр трейса появится в следующем обновлении.",
         "input": "Вход",
         "output": "Выход",
         "retrievedContext": "Извлечённый контекст",
@@ -10256,6 +10692,7 @@
         "distill": {
           "title": "Дистиллировать в набор данных",
           "action": "Набор данных",
+          "hint": "Укажите ответ, который этот элемент ДОЛЖЕН был дать. Он станет эталонным выводом; входные данные берутся из проверенного трейса.",
           "datasetLabel": "Набор данных",
           "datasetPlaceholder": "Выберите набор данных...",
           "noDatasets": "Наборов данных пока нет — сначала создайте его на странице «Наборы данных».",
@@ -10267,6 +10704,7 @@
           "updated": "Эталон обновлён — этот элемент уже был в этом наборе данных.",
           "openDataset": "Открыть датасет",
           "needsReview": "Сначала завершите проверку — золотому требуется арбитражное решение",
+          "sessionUnsupported": "Элементы сессий нельзя дистиллировать — только трейсы и спаны.",
           "loadError": "Не удалось загрузить датасеты",
           "error": "Не удалось добавить этот элемент в датасет"
         },
@@ -10292,10 +10730,12 @@
       "trial": "испытание {index}",
       "summary": "Набор данных v{version} · {trials} испытаний · {scorers} оценщиков",
       "previewCounts": "{rows} строк × {trials} испытаний = {slots} слотов",
+      "viewTrace": "Просмотреть трейс выполнения",
       "scoresTitle": "Оценки",
       "taskProgress": "Задачи: {completed}/{total} выполнено · {skipped} пропущено",
       "scoringProgress": "Оценки: {completed}/{total} выполнено · {skipped} пропущено",
       "skipTiers": "Пропущено строк: {full} полностью · {partial} частично",
+      "scoreEvidence": "{scorer} · v{version}: {samples} образцов, {noReference} без эталона, {noTrace} без трейса",
       "scorerApplicability": "{scorer} · v{version}: {eligible} доступных слотов, {noReference} без эталона",
       "loadError": "Не удалось загрузить эксперименты",
       "previewError": "Не удалось предпросмотреть слоты эксперимента",
@@ -10341,6 +10781,7 @@
         "sourcesPlaceholder": "Все источники",
         "sourcesHelp": "Оставьте пустым, чтобы выполнить каждую строку в наборе данных.",
         "sources": {
+          "trace": "Трейс",
           "annotation": "Аннотация",
           "manual": "Вручную"
         },
@@ -10471,6 +10912,7 @@
         "trials": "Попытки",
         "trial": "Попытка {index}",
         "retryFailedSlot": "Повторить неудачный слот",
+        "viewTrace": "Просмотреть трейс",
         "scores": "Оценки",
         "dimension": "Измерение",
         "unknownDimension": "Неизвестное измерение",
@@ -10557,6 +10999,7 @@
         "actions": "Действия"
       },
       "source": {
+        "trace": "трейс",
         "annotation": "аннотация",
         "manual": "вручную"
       },
@@ -10612,6 +11055,8 @@
           },
           "versionPill": "v{version} · {count} версия | v{version} · {count} версий",
           "sourceSection": "Источник",
+          "sourceTrace": "Трейс",
+          "sourceSpan": "Спан",
           "sourceReview": "Проверка отправки",
           "sourceImport": "Импортировано из",
           "inputSection": "Входные данные",
@@ -10652,8 +11097,10 @@
       "version": "Версия"
     },
     "agentGraph": {
+      "stream": "Поток",
       "agent": "Агент",
       "noAgentsTitle": "Агенты не найдены",
+      "noAgentsDescription": "В этом временном диапазоне агенты не обнаружены. Попробуйте расширить временной диапазон или проверьте, что ваши трейсы содержат атрибуты агентов gen_ai.",
       "versionAgnosticHint": "Топология одинакова во всех версиях — график привязан к окружению, а не к версии. Используйте сравнение версий, чтобы сравнивать версии."
     },
     "panels": {
@@ -10665,7 +11112,10 @@
         "title": "Тенденция токенов",
         "subtitle": "токены по модели"
       },
-      "spanTrend": {},
+      "spanTrend": {
+        "title": "Тренд спанов",
+        "subtitle": "количество спанов по типу"
+      },
       "latencyByModel": {
         "title": "Задержка по модели",
         "subtitle": "p50 / p90 / p95 / p99"
@@ -10679,6 +11129,7 @@
         "subtitle": "количество ошибок"
       },
       "spansByModel": {
+        "title": "Спаны по моделям",
         "subtitle": "количество вызовов на модель"
       },
       "tokensByModel": {
@@ -10686,7 +11137,8 @@
         "subtitle": "всего токенов на модель"
       },
       "recentErrors": {
-        "title": "Последние ошибки"
+        "title": "Последние ошибки",
+        "subtitle": "последние 10 ошибочных спанов"
       }
     },
     "behavior": {
@@ -10696,6 +11148,7 @@
         "disabled": "Сигналы поведения агента отключены для этого развертывания"
       },
       "loopsTitle": "Зацикленные агенты",
+      "loopsHint": "Агенты повторно запускают один и тот же инструмент много раз за трейс",
       "summaryLoops": "Зацикленные агенты",
       "summaryFailures": "Таксономия сбоев",
       "summaryAgents": "Затронутые агенты",
@@ -10710,7 +11163,9 @@
       "unknownAgent": "(неизвестный агент)",
       "colAgent": "Агент",
       "colTool": "Инструмент",
+      "colRatio": "Вызовы / трейс",
       "colCalls": "Вызовы",
+      "colTraces": "Трейсы",
       "colFailClass": "Класс сбоя",
       "colCount": "Количество",
       "colCost": "Стоимость ($)",
@@ -10718,18 +11173,32 @@
       "colErrors": "Ошибки",
       "detail": {
         "title": "Детали сигнала",
+        "tracesTitle": "Трейсы",
+        "tracesHint": "Нажмите на трейс, чтобы открыть его",
+        "worstLoopTraces": "Худшие трейсы (сначала с наибольшим числом повторов)",
+        "topCostTraces": "Самые дорогие трейсы",
+        "noTraces": "Для этого сигнала трейсы не найдены",
         "errorsTitle": "Что говорят ошибки",
+        "noErrors": "Сообщения об ошибках не записаны — откройте трейс для просмотра",
+        "colTraceId": "Трейс",
+        "colSpans": "Спаны",
         "colRepeats": "Повторы",
+        "openInNewTab": "Открывает трейс в новой вкладке",
         "showFull": "Показать полную ошибку",
         "showLess": "Показать меньше",
         "colError": "Сообщение об ошибке",
         "colOccurrences": "Раз",
+        "loopHeadline": "{agent} вызывает {tool} {ratio}× в среднем на трейс ({calls} вызовов на {traces} трейсов)",
         "failHeadline": "{agent} получил {count} ошибок “{cls}”.",
-        "costHeadline": "{agent}: ${cost} расход · {tokens} токенов · {errors} ошибок."
+        "costHeadline": "{agent}: ${cost} расход · {tokens} токенов · {errors} ошибок.",
+        "loopExplain": "Высокая частота повторов обычно означает, что агент не кэширует результаты или повторяет попытки. Откройте худшие трейсы ниже, чтобы увидеть повторяющиеся вызовы.",
+        "failExplain": "Это фактические сообщения об ошибках, стоящие за этим классом сбоев — прочитайте их, чтобы найти решение, или откройте трейс, чтобы увидеть, где это произошло.",
+        "costExplain": "Эти трейсы сформировали расходы агента. Откройте самые дорогие, чтобы увидеть, что выполнялось."
       }
     },
     "versionCompare": {
       "datePickerDisabled": "В этом режиме окна задаются для каждой версии",
+      "sampledNote": "Интервалы задержки и стоимости вычисляются по не более чем {cap} случайно выбранным трейсам для каждой версии.",
       "bar": {
         "versionA": "Версия A",
         "versionB": "Версия B",
@@ -10747,7 +11216,9 @@
         "partial": "Эти версии работали частично одновременно — различия могут частично объясняться тем, когда каждая из них работала."
       },
       "windowCard": {
-        "clamp": "Базовая версия работала только {duration} — сравниваются первые {duration} каждой версии."
+        "label": "{env} · {version} — {window} · {count} трейсов",
+        "clamp": "Базовая версия работала только {duration} — сравниваются первые {duration} каждой версии.",
+        "labelNoEnv": "{version} — {window} · {count} трейсов"
       }
     }
   },
@@ -10808,18 +11279,25 @@
     },
     "manualEvaluation": {
       "titles": {
+        "span": "Оценить спан",
+        "trace": "Оценить трейс",
         "session": "Оценить session"
       },
       "targetLabels": {
+        "span": "Span ID",
+        "trace": "Trace ID",
         "session": "ID сессии"
       },
       "scopes": {
+        "span": "спан",
+        "trace": "трейс",
         "session": "session"
       },
       "description": "Выберите задание оценки для запуска против этой цели. Исполнитель оценки загрузит исходную телеметрию из временного диапазона этой страницы.",
       "jobLabel": "Задание оценки",
       "jobPlaceholder": "Выберите задание оценки",
       "jobRequired": "Выберите задание оценки",
+      "noCompatibleJobs": "Ни один {scope} Eval Job не использует поток трассировки {stream}.",
       "loadJobsError": "Не удалось загрузить задания оценки.",
       "run": "Запустить оценку",
       "queued": "В очередь поставлена {count} задача оценки. | В очередь поставлено {count} задач оценки.",
@@ -10845,6 +11323,8 @@
         "filterLabel": "Область оценки",
         "filterHint": "Сравните эту конфигурацию оценок по разным областям оценки.",
         "all": "Все",
+        "span": "Спан",
+        "trace": "Трейс",
         "session": "Session"
       },
       "kpis": {
@@ -10913,6 +11393,7 @@
       },
       "runs": {
         "title": "Оценки",
+        "hint": "Оценки и обоснование берутся из _llm_scores. Выберите запуск, чтобы открыть его оценочный трейс для дальнейшего исследования.",
         "filterLabel": "Фильтровать оценки",
         "footerTitle": "Оценки",
         "noThresholdHint": "Установите порог здоровья в этой конфигурации оценок, чтобы классифицировать и выделять нездоровые оценки.",
@@ -11046,6 +11527,7 @@
         "dataTypeLabel": "Тип данных",
         "rangeLabel": "Диапазон",
         "categoriesLabel": "Категории",
+        "valuesLabel": "Значения",
         "thresholdSection": "Порог здоровья",
         "thresholdHint": "Считает оценку здоровой",
         "noThreshold": "Не объявлен",
@@ -11106,6 +11588,7 @@
       "booleanInfo": "Булевы конфигурации принимают значения {trueLabel} / {falseLabel}. Дополнительная настройка не требуется.",
       "healthyThresholdTitle": "Порог здоровья",
       "optional": "Необязательно",
+      "healthyThresholdIntro": "Определите, когда оценки по этому измерению считаются нормальными. Оценки вне этого диапазона будут вызывать проблемы с качеством в списках трейсов, сеансах и других представлениях.",
       "healthyWhenValueIs": "Здоров, когда значение:",
       "healthyCategories": "Здоровые категории:",
       "healthyCategoriesHint": "Отметьте все значения, которые считаются здоровыми.",
@@ -11184,6 +11667,8 @@
           "col": {
             "time": "Время",
             "job": "Задание",
+            "spanId": "Span ID",
+            "traceId": "Trace ID",
             "score": "Оценка",
             "latency": "Задержка",
             "status": "Статус"
@@ -11321,7 +11806,9 @@
       "remoteHeaders": {
         "subtitle": "Отправляется с каждым запросом.",
         "colName": "Имя",
+        "colValue": "Значение",
         "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "значение",
         "addButton": "+ Добавить заголовок"
       },
       "requestBodyLabel": "Шаблон тела запроса",
@@ -11367,11 +11854,13 @@
         "eyebrow": "Задача оценки",
         "refresh": "Обновить",
         "targetSection": "Цель оценки",
+        "streamLabel": "Поток",
         "streamTypeLabel": "Тип потока",
         "targetScopeLabel": "Оценивать каждый",
         "idleWindowLabel": "Окно бездействия",
         "maxAgeLabel": "Максимальный возраст",
         "filterLabel": "Фильтр",
+        "filterEmpty": "Фильтра нет — оценивается каждый спан",
         "scorersSection": "Оценщики",
         "scorersEmpty": "К этому заданию ещё не прикреплено оценщиков.",
         "scorerUnknown": "(удалённый оценщик)",
@@ -11381,6 +11870,7 @@
         "viewScorerHint": "Просмотр",
         "samplingSection": "Выборка",
         "samplingModeLabel": "Режим",
+        "samplingValueLabel": "Значение",
         "samplingAll": "Оценивать каждое совпадение",
         "samplingRate": "Случайная выборка по доле",
         "samplingCount": "Первые N совпадений",
@@ -11406,6 +11896,8 @@
           "col": {
             "time": "Время",
             "scorer": "Оценщик",
+            "spanId": "Span ID",
+            "traceId": "Trace ID",
             "score": "Оценка",
             "latency": "Задержка",
             "status": "Статус"
@@ -11426,6 +11918,7 @@
       "columns": {
         "name": "Имя",
         "status": "Статус",
+        "stream": "Поток",
         "targetScope": "Область действия",
         "scorers": "Оценщики",
         "created": "Создан",
@@ -11451,18 +11944,30 @@
       "scorersSection": "Оценщики и сопоставление",
       "nameLabel": "Имя",
       "namePlaceholder": "Монитор точности продуктивной среды",
+      "streamLabel": "Поток",
       "streamPlaceholder": "Выберите поток",
       "targetScopeLabel": "Оценивать каждый",
       "targetScopes": {
+        "span": "Спан",
+        "trace": "Трейс",
         "session": "Сессия"
       },
-      "targetScopeHelp": {},
+      "targetScopeHelp": {
+        "span": "Оценивайте каждый подходящий спан независимо.",
+        "trace": "Оценивайте весь трейс после закрытия окна завершения.",
+        "session": "Оценивайте сеанс по всем трейсам после закрытия окна завершения."
+      },
       "completionSection": "Критерии завершения",
       "completionHelp": {
+        "trace": "Трейс оценивается, как только выполняется первое из этих условий.",
         "session": "Сессия оценивается сразу после выполнения первого из них."
       },
       "idleWindowLabel": "Окно бездействия (секунды)",
+      "idleWindowHelp": "Оценивается через {duration} без новых спанов.",
+      "idleWindowHelpEmpty": "Оценивается, когда не поступает новых спанов.",
       "maxAgeLabel": "Максимальный возраст (секунды)",
+      "maxAgeHelp": "Оценивается через {duration} после первого спана.",
+      "maxAgeHelpEmpty": "Оценивается по достижении фиксированного возраста, даже если спаны ещё поступают.",
       "descriptionLabel": "Описание",
       "samplingModeLabel": "Режим выборки",
       "samplingValueLabel": "Частота дискретизации",
@@ -11473,6 +11978,8 @@
       "scorerPicker": {
         "title": "Оценщики",
         "hint": {
+          "span": "Выберите один или несколько оценщиков для выполнения для каждого подходящего спана.",
+          "trace": "Выберите один или несколько оценщиков для выполнения для каждого подходящего трейса.",
           "session": "Выберите один или несколько оценщиков для выполнения для каждой подходящей сессии."
         },
         "meta": "{type} · v{version}",
@@ -11482,21 +11989,37 @@
       },
       "filter": {
         "title": "Условие фильтра",
-        "hint": {}
+        "hint": {
+          "span": "Только спаны, соответствующие этому условию, попадают в выборку и оценку.",
+          "trace": "Трейс попадает в выборку и получает оценку, если хотя бы один из его спанов соответствует этому условию.",
+          "session": "Сессия попадает в выборку и получает оценку, если хотя бы один из её спанов соответствует этому условию."
+        }
       },
       "selector": {
-        "hint": {}
+        "title": "Какие спаны (необязательно)",
+        "hint": {
+          "trace": "Оставьте пустым, чтобы включить все спаны трейса."
+        }
       },
       "endSignal": {
         "title": "Сигнал завершения (необязательно)",
-        "hint": {}
+        "hint": {
+          "trace": "Задайте условие для спана, которое немедленно закрывает трейс, когда любой спан ему соответствует.",
+          "session": "Задайте условие для спана, которое немедленно закрывает сессию, когда любой спан ему соответствует."
+        }
       },
       "inputMapping": {
         "title": "Переменные запроса",
-        "hint": {},
+        "hint": {
+          "span": "Сопоставьте каждую переменную с атрибутом спана.",
+          "trace": "Сопоставьте каждую переменную с системным значением или атрибутом спана.",
+          "session": "Сопоставьте каждую переменную с системным значением или атрибутом спана."
+        },
         "placeholder": "Выберите значение",
+        "searchPlaceholder": "Поиск системных значений и атрибутов спанов…",
         "groups": {
-          "systemProvided": "Системные значения · Для каждого {scope}, оцениваемого этим заданием"
+          "systemProvided": "Системные значения · Для каждого {scope}, оцениваемого этим заданием",
+          "spanAttributes": "Атрибуты спанов"
         },
         "selectScorers": "Выберите скореры для настройки их сопоставлений.",
         "noVariables": "У этого скорера нет переменных шаблона для сопоставления.",
@@ -11506,38 +12029,72 @@
           "title": "Системные значения для {scope}",
           "description": "OpenObserve формирует эти значения отдельно для каждого {scope}, оцениваемого этим заданием. Используйте их как источники при сопоставлении переменных промпта оценщика.",
           "badge": "Предоставлено системой",
+          "selectorRequired": "Требуется селектор спанов",
           "columns": {
+            "variable": "Значение",
             "source": "Источник",
             "description": "Предоставленное значение"
           },
           "variables": {
-            "input": {},
-            "output": {},
-            "statistics": {},
-            "spans": {},
-            "steps": {}
+            "input": {
+              "trace": "Входные данные из корневого спана трейса."
+            },
+            "output": {
+              "trace": "Выходные данные из корневого спана трейса."
+            },
+            "statistics": {
+              "trace": "Метрики трейса: количество спанов, длительность, вызовы LLM и инструментов, ошибки, токены и стоимость.",
+              "session": "Метрики сессии: количество трейсов и ходов, длительность и ошибки."
+            },
+            "spans": {
+              "trace": "Отфильтрованное подмножество спанов, выбранное селектором спанов задания."
+            },
+            "steps": {
+              "trace": "Спаны в хронологическом порядке; средняя часть сворачивается, когда трейс очень длинный.",
+              "session": "Трейсы в хронологическом порядке, представленные как ходы разговора."
+            }
           }
         }
       },
       "spanSelector": {
+        "select": "Выбрать селектор спанов",
+        "bindingHelp": "Трейсы могут содержать сотни спанов. Выберите те, которые должен просматривать этот оценщик.",
         "createForScorer": "Создать для оценщика",
+        "createForScorerTitle": "Создать селектор спанов для этого оценщика",
+        "editorTitle": "Селектор спанов",
         "name": "Имя селектора",
         "schemaMode": "Поля для чтения",
         "defaultSchema": "Стандартные поля GenAI",
         "customSchema": "Пользовательские поля",
+        "defaultSchemaHelp": "Эти восемь полей считываются из каждого подходящего спана. Любые отсутствующие значения приходят пустыми.",
         "fields": "Поля",
         "fieldsHelp": "Считываются только эти поля — больше ничего не отправляется оценщику.",
+        "maximumSpans": "Максимум спанов",
+        "budget": "Ограничивает количество спанов, выбираемых из трейса.",
         "validation": {
           "name": "Введите имя селектора.",
           "duplicateName": "Имена селекторов должны быть уникальными в рамках этой задачи.",
           "filter": "Завершите или удалите незавершённое условие фильтра.",
-          "fields": "Выберите хотя бы одно поле для пользовательской схемы."
+          "fields": "Выберите хотя бы одно поле для пользовательской схемы.",
+          "maximumSpans": "Максимальное количество спанов должно быть целым положительным числом.",
+          "budget": "Слишком много спанов для выбранных полей. Уменьшите количество спанов или читайте меньше полей.",
+          "binding": "Выберите селектор спанов для каждого оценщика, который использует спаны трейса."
         }
       },
       "preview": {
         "scopes": {
-          "span": {},
-          "trace": {},
+          "span": {
+            "title": "Совпавшие спаны",
+            "hint": "После выбора потока и фильтра эта панель покажет, сколько спанов будет соответствовать вашему заданию.",
+            "matchedSuffix": "спанов совпало · за последний 1 ч",
+            "matchedLoading": "Подсчёт совпавших спанов…"
+          },
+          "trace": {
+            "title": "Совпавшие трейсы",
+            "hint": "После выбора потока и фильтра эта панель покажет, сколько трейсов будет соответствовать вашему заданию.",
+            "matchedSuffix": "трейсов совпало · за последний 1 ч",
+            "matchedLoading": "Подсчёт совпавших трейсов…"
+          },
           "session": {
             "title": "Совпавшие сеансы",
             "hint": "После выбора потока и фильтра эта панель покажет, сколько сеансов будет соответствовать вашей задаче.",
@@ -11565,7 +12122,9 @@
         "nameRequired": "Имя задачи обязательно",
         "streamRequired": "Необходимо указать поток",
         "idleWindowMinimum": "Период простоя должен быть не менее 1 секунды",
+        "idleWindowMaximumTrace": "Окно бездействия трейса не может превышать 30 минут",
         "idleWindowMaximumSession": "Окно бездействия сессии не может превышать 4 часа",
+        "maxAgeMaximumTrace": "Максимальный возраст трейса не может превышать 2 часа",
         "maxAgeMaximumSession": "Максимальный возраст сессии не может превышать 24 часа",
         "samplingValueRequired": "Необходимо указать значение семплирования"
       }
@@ -11628,6 +12187,7 @@
       "curlDesc": "Самый быстрый способ — вставьте одну команду, и логи начнут поступать",
       "shippers": "Использовать сборщик логов",
       "shippersDesc": "{product1}, {product2}, {product3}, {product4}, {product5} и другие",
+      "otelDesc": "Вендор-нейтральный прием данных OTLP для логов, трейсов и метрик",
       "or": "Или:",
       "aws": "AWS / CloudWatch",
       "askAi": "Попросить AI настроить приём"
@@ -11636,11 +12196,13 @@
       "title": "Выберите поток для начала исследования",
       "description": "Выберите поток, затем нажмите <strong>Выполнить запрос</strong>. После получения результатов вы можете уточнить их с помощью фильтров, функции VRL и пользовательского временного диапазона.",
       "selectStream": "Выберите поток",
+      "selectStreamDesc": "Просматривайте потоки логов, трейсов, метрик и RUM",
       "queryGuide": "Прочитать руководство по запросам",
       "queryGuideDesc": "Фильтры, режим SQL, VRL и сохранённые представления",
       "recent": "Недавние:"
     },
     "noEvents": {
+      "title": "События не найдены",
       "descNoFilters": "В {range} события не найдены.",
       "descWithFilters": "Ничего не соответствует <strong>этому запросу</strong> в выбранном окне. В этом потоке есть данные — попробуйте ослабить фильтр в строке запроса.",
       "descOutOfRange": "Ваш временной интервал не содержит данных из этого потока. Перейдите к моменту, когда данные были видны в последний раз.",
@@ -11731,11 +12293,13 @@
       "scannedEventsForQuery": "Просканированные события для этого запроса",
       "timeTaken": "Затраченное время",
       "noData": "Нет данных",
+      "traceId": "Trace ID",
       "viewQuery": "Просмотреть запрос",
       "sqlQuery": "SQL-запрос",
       "copied": "Скопировано!",
       "sql": "SQL",
       "noSqlAvailable": "Нет доступного SQL-запроса",
+      "fullTraceId": "Полный Trace ID",
       "columnDuration": "Длительность",
       "columnNodeName": "Имя узла",
       "columnRole": "Роль",
@@ -11748,6 +12312,7 @@
       "goodResponse": "Хороший ответ",
       "moderateResponse": "Умеренный ответ",
       "slowResponse": "Медленный ответ",
+      "failedToCopyTraceId": "Не удалось скопировать Trace ID в буфер обмена",
       "failedToCopySql": "Не удалось скопировать SQL в буфер обмена"
     },
     "searchResult": {
@@ -11766,7 +12331,8 @@
       "unableToRetrieveCorrelation": "Не удалось получить данные корреляции",
       "noMetricStreams": "Для сервиса \"{service}\" не найдено потоков метрик",
       "correlationError": "Ошибка корреляции: {error}",
-      "contentCopied": "Содержимое успешно скопировано!"
+      "contentCopied": "Содержимое успешно скопировано!",
+      "noTraceIdForInspection": "Нет доступного Trace ID для просмотра"
     },
     "searchBar": {
       "customRangeAlt": "Пользовательский диапазон",
@@ -11930,6 +12496,7 @@
     "expandRangeDesc": "Доступные данные могут находиться в другом временном окне",
     "copyError": "Скопировать сведения об ошибке",
     "copied": "Скопировано!",
+    "traceId": "Trace ID:",
     "askAi": "Попросить ИИ исправить мой запрос",
     "showDetail": "Показать подробности",
     "hideDetail": "Скрыть подробности"
@@ -11994,6 +12561,7 @@
       "addVariable": "Добавить переменную",
       "cookieDomainPlaceholder": "Домен",
       "cookieNamePlaceholder": "Имя",
+      "cookieValuePlaceholder": "Значение",
       "customHeaders": "Пользовательские заголовки",
       "headerKeyPlaceholder": "Ключ заголовка",
       "headerValuePlaceholder": "Значение заголовка",
@@ -12009,6 +12577,7 @@
       "variableNamePlaceholder": "Имя",
       "variableSecureTooltipHide": "Скрыть это значение как конфиденциальные данные.",
       "variableSecureTooltipShow": "Значение скрыто. Нажмите, чтобы показать.",
+      "variableValuePlaceholder": "Значение",
       "variables": "Переменные"
     },
     "variablesPanel": {
@@ -12358,6 +12927,7 @@
       "stopping": "Остановка…",
       "timeoutBelowDefaultWarning": "Ниже значения по умолчанию {default} мс для этого шага. Тайм-аут короче реального времени ответа приложения — наиболее распространенная причина ложных сбоев.",
       "timeoutLabel": "Тайм-аут (мс)",
+      "valueFallback": "Значение",
       "showSetupSteps": "Показать шаги настройки",
       "waitingForActions": "Ожидание действий в браузере…"
     },
@@ -12503,6 +13073,7 @@
       "http": {
         "addAssertion": "Добавить утверждение",
         "addHeader": "Добавить заголовок",
+        "assertionValue": "Значение",
         "assertions": "Утверждения",
         "body": "Тело запроса",
         "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
@@ -12513,6 +13084,7 @@
         },
         "followRedirects": "Следовать перенаправлениям",
         "headerName": "Имя",
+        "headerValue": "Значение",
         "headers": "Заголовки",
         "method": "Метод",
         "operators": {
@@ -12696,6 +13268,7 @@
       "maxDuration": "Макс. длительность",
       "noExecutionData": "Данные выполнения не найдены",
       "noExecutionDataDesc": "Потоковые данные для запуска {runId} не найдены в окне +/-5 мин вокруг запланированного времени.",
+      "openTrace": "Открыть трассировку Playwright",
       "runId": "ID запуска",
       "screenshotAlt": "Скриншот шага",
       "screenshotPlaceholder": "Заполнитель скриншота",
@@ -12781,6 +13354,7 @@
       "errorPatternsWindowDesc": "Нормализовано по {window} · нажмите на строку для фильтрации прогонов"
     },
     "scheduleAlert": {
+      "addNewDestination": "Добавить нового получателя",
       "alertedIfFails": "Оповещать при сбое",
       "alertedIfFailsSuffix": "раз.",
       "alerts": "Оповещения",
@@ -12796,6 +13370,8 @@
         "weeks": "Недели"
       },
       "customIntervalValue": "Повторять каждые",
+      "destinationRequired": "Требуется хотя бы один получатель",
+      "destinations": "Получатели",
       "frequency": "Частота",
       "frequencyOptions": {
         "15min": "15 мин",
@@ -12807,6 +13383,8 @@
         "custom": "Пользовательский"
       },
       "minutes": "минут",
+      "noDestinations": "Нет доступных получателей",
+      "refreshDestinations": "Обновить получателей",
       "retries": "Повторные попытки",
       "retriesOnFailure": "Повторные попытки при сбое",
       "retriesOnFailureSuffix": "раз.",
@@ -13064,9 +13642,12 @@
       "logs": "Логи",
       "dashboards": "Панели управления",
       "metrics": "Метрики",
+      "traces": "Трассировки",
       "alerts": "Оповещения",
+      "streams": "Потоки",
       "pipelines": "Конвейеры",
       "functions": "Функции",
+      "reports": "Отчёты",
       "iam": "IAM",
       "settings": "Настройки",
       "onlineEvals": "Онлайн-оценки",
@@ -13081,20 +13662,26 @@
       "dashboards": "Просмотр панели управления",
       "dashboardsPanel": "Панель управления — Панель (наведите курсор на панель)",
       "metrics": "Метрики",
+      "traces": "Трассировки",
       "alerts": "Оповещения",
+      "streams": "Потоки",
       "pipelines": "Конвейеры",
       "functions": "Функции",
+      "reports": "Отчёты",
       "iamUsers": "IAM — Пользователи",
       "iamRoles": "IAM — Роли",
       "iamGroups": "IAM — Группы",
       "iamServiceAccounts": "IAM — Сервисные аккаунты",
+      "alertDestinations": "Оповещения — Получатели",
       "alertSources": "Оповещения — Внешние источники",
       "alertTemplates": "Оповещения — Шаблоны",
       "panelEditor": "Редактор панелей",
+      "traceDetail": "Детали трассировки",
       "runningQueries": "Выполняемые запросы",
       "ingestionTokens": "IAM — Токены приёма данных",
       "syntheticsTokens": "IAM — Токены Synthetics",
       "alertIncidents": "Оповещения — Инциденты",
+      "pipelineDestinations": "Конвейеры — Получатели",
       "enrichmentTables": "Таблицы обогащения",
       "iamInvitations": "IAM — Приглашения",
       "iamOrganizations": "IAM — Организации",
@@ -13170,6 +13757,7 @@
       "iamGroupsRefresh": "Обновить список",
       "iamServiceAccountsAdd": "Добавить новую учётную запись службы",
       "iamServiceAccountsRefresh": "Обновить список",
+      "alertDestinationsAdd": "Добавить нового получателя",
       "alertDestinationsRefresh": "Обновить список",
       "alertSourcesAdd": "Добавить новый источник оповещений",
       "alertSourcesRefresh": "Обновить список",
@@ -13180,6 +13768,8 @@
       "panelEditorRun": "Выполнить / применить запрос",
       "panelEditorSave": "Сохранить панель",
       "panelEditorBack": "Отменить и вернуться",
+      "traceNextSpan": "Следующий span",
+      "tracePrevSpan": "Предыдущий span",
       "runningQueriesRefresh": "Обновить список запросов",
       "ingestionTokensAdd": "Создать новый токен",
       "ingestionTokensRefresh": "Обновить список токенов",
@@ -13190,6 +13780,7 @@
       "aiChatExpand": "Развернуть/свернуть чат ИИ",
       "logsSaveView": "Сохранить как сохранённое представление",
       "logsExport": "Экспортировать результаты в CSV",
+      "tracesCopyUrl": "Скопировать общую ссылку на трассировку",
       "alertIncidentsRefresh": "Обновить список",
       "pipelineDestinationsRefresh": "Обновить список",
       "enrichmentTablesRefresh": "Обновить список",
@@ -13456,6 +14047,7 @@
       "alertState": {
         "ok": "ОК",
         "normal": "Норма",
+        "firing": "Активно",
         "notifyfailed": "Ошибка уведомления",
         "flapping": "Флаппинг",
         "anomaly": "Аномалия",
@@ -13486,6 +14078,7 @@
         "error": "Ошибка"
       },
       "crossLinkSource": {
+        "stream": "Поток",
         "global": "Глобально"
       },
       "themeApplied": {
@@ -13540,6 +14133,7 @@
       },
       "eventStatus": {
         "failed": "Ошибка",
+        "firing": "Активно",
         "anomaly": "Аномалия"
       },
       "featureStatus": {
@@ -13554,6 +14148,7 @@
         "array": "Массив"
       },
       "incidentStatus": {
+        "firing": "Активно",
         "closed": "Закрыто"
       },
       "invoiceStatus": {
@@ -13565,12 +14160,14 @@
         "pending": "В ожидании"
       },
       "logLevel": {
+        "trace": "Трассировка",
         "debug": "Отладка",
         "info": "Инфо",
         "warn": "Предупреждение",
         "fatal": "Фатальный"
       },
       "pipelineRunOutcome": {
+        "firing": "Активно",
         "normal": "Норма",
         "succeeded": "Успешно",
         "skipped": "Пропущено",
@@ -13712,11 +14309,21 @@
       "pleaseSelectStreamType": "Пожалуйста, выберите тип потока ",
       "anomalyDetectionClonedSuccessfully": "Обнаружение аномалий успешно клонировано",
       "errorWhileFetchingTemplates": "Ошибка при получении шаблонов.",
+      "errorWhileFetchingDestinations": "Ошибка при получении получателей.",
       "failedToLoadAlertForEditing": "Не удалось загрузить оповещение для редактирования",
       "pleaseWaitWhileLoadingAlert": "Пожалуйста, подождите, идет загрузка оповещения...",
       "errorWhilePullingAlerts": "Ошибка при получении оповещений.",
       "pleaseWaitWhileLoadingAlerts": "Пожалуйста, подождите, идет загрузка оповещений...",
+      "destinationsDeletedSuccessfully": "{count} получатель удален успешно | {count} получателей удалено успешно",
+      "failedToDeleteDestinations": "Не удалось удалить {count} получателя | Не удалось удалить {count} получателей",
+      "destinationsDeletedWithFailures": "{count} получатель удален успешно, {failed} с ошибкой | {count} получателей удалено успешно, {failed} с ошибкой",
+      "noDestinationsSelectedForDeletion": "Не выбрано получателей для удаления",
+      "deletingDestinations": "Удаление получателей...",
+      "destinationDeletedSuccessfully": "Получатель {name} успешно удален",
+      "errorWhilePullingDestinations": "Ошибка при получении получателей.",
+      "pleaseWaitWhileLoadingDestinations": "Пожалуйста, подождите, пока загружаются получатели...",
       "errorWhileLoadingActions": "Ошибка при загрузке действий.",
+      "pleaseWaitWhileLoadingAlertDestination": "Пожалуйста, подождите, пока загружается получатель оповещений...",
       "errorImportingAlertPleaseCheck": "Ошибка импорта оповещения. Проверьте JSON.",
       "alertsImportedSuccessfully": "{count} оповещение успешно импортировано | {count} оповещений успешно импортировано",
       "invalidJson": "Недопустимый JSON: {error}",
@@ -13735,6 +14342,8 @@
       "incidentsRefreshed": "Инциденты обновлены",
       "failedToPostComment": "Не удалось опубликовать комментарий",
       "commentPostedSuccessfully": "Комментарий успешно опубликован",
+      "destinationUpdatedSuccessfully": "Получатель \"{name}\" успешно обновлен.",
+      "destinationCreatedSuccessfully": "Получатель \"{name}\" успешно создан.",
       "failedToDeleteTemplates": "Не удалось удалить {count} шаблон | Не удалось удалить {count} шаблонов",
       "templatesDeletedWithFailures": "Удалён {count} шаблон, но {failed} не удалось | Удалено {count} шаблонов, но {failed} не удалось",
       "successfullyDeletedTemplates": "Успешно удалён {count} шаблон | Успешно удалено {count} шаблонов",
@@ -13784,13 +14393,16 @@
       "resources": {
         "dashboards": "Дашборды",
         "alerts": "Оповещения",
+        "streams": "Потоки",
         "functions": "Функции",
         "savedviews": "Сохранённые представления",
         "users": "Пользователи",
         "roles": "Роли",
         "organizations": "Организации",
         "pipelines": "Конвейеры",
+        "destinations": "Получатели",
         "templates": "Шаблоны",
+        "reports": "Отчёты",
         "llmModelPricing": "Цены на модели LLM"
       },
       "noPermissionToChangeFavorites": "У вас нет разрешения изменять избранное",
@@ -13952,6 +14564,8 @@
       "errorWhileUpdating": "Ошибка при обновлении отчета."
     },
     "correlation": {
+      "refreshingTraceData": "Обновление данных трассировки...",
+      "traceDetailViewComingSoon": "Просмотр деталей трассировки скоро будет доступен",
       "columnIsAlreadyVisible": "Столбец \"{name}\" уже виден",
       "columnAddedToTable": "Столбец \"{name}\" добавлен в таблицу"
     },
@@ -13991,6 +14605,7 @@
       "isNotASupportedFileType": "\"{fileName}\" не является поддерживаемым типом файла. Разрешены только файлы {allowed}."
     },
     "workflows": {
+      "thisBranchAlreadyEndsInA": "Эта ветвь уже заканчивается получателем.",
       "chooseATriggerNodeToStart": "Выберите узел-триггер для запуска рабочего процесса",
       "thisConnectionWouldCreateALoop": "Это соединение создаст цикл",
       "onlyOneIncomingConnectionToA": "К одному шагу разрешено только одно входящее соединение"
@@ -13998,6 +14613,8 @@
     "views": {
       "youAreNotAuthorizedToManage": "Вы не авторизованы для управления лицензией.",
       "copiedToClipboard": "Скопировано в буфер обмена",
+      "noDestinationsFoundPleaseCreateA": "Получатели не найдены. Пожалуйста, сначала создайте получателя.",
+      "errorWhilePullingDestinations": "Ошибка при получении получателей.",
       "rumTokenUpdatedSuccessfully": "RUM-токен успешно обновлен.",
       "rumTokenGeneratedSuccessfully": "RUM-токен успешно создан.",
       "tokenResetSuccessfully": "Токен успешно сброшен.",
@@ -14014,6 +14631,7 @@
       "pleaseWaitWhileLoadingStreams": "Пожалуйста, подождите, пока загружаются потоки...",
       "errorWhilePullingSummary": "Ошибка при получении сводки.",
       "pleaseWaitWhileLoadingSummary": "Пожалуйста, подождите, пока загружается сводка...",
+      "noDestinationsCreateOneBeforeSaving": "Получатели не найдены. Создайте получателя перед сохранением этого оповещения.",
       "errorWhileLoadingAlert": "Ошибка при загрузке оповещения."
     },
     "RUM": {
@@ -14142,6 +14760,7 @@
       "tags": "Теги",
       "tagsPlaceholder": "Добавьте тег и нажмите Enter",
       "streamType": "Тип потока",
+      "stream": "Поток",
       "queryLanguage": "Язык запросов",
       "scope": "Область",
       "scopeHint": "Необязательный фильтр, применяемый к знаменателю. Оставьте пустым для всех строк.",
@@ -14211,6 +14830,7 @@
         "noHistory": "Истории оценок для этого оповещения ещё нет. Измерение начнётся после его первого запуска.",
         "loadFailed": "Не удалось загрузить историю оценок",
         "legendGood": "ОК",
+        "legendBad": "Срабатывание",
         "legendUnmeasured": "Не измерено"
       }
     },
@@ -14388,6 +15008,7 @@
     "loginCallback": "Обратный вызов входа",
     "emptyStateDemo": "Демо пустого состояния",
     "searchScheduler": "Планировщик поиска",
+    "traceDetails": "Детали трейса",
     "sessionDetails": "Детали сессии",
     "streamExplorer": "Обозреватель потоков",
     "viewDashboard": "Просмотреть дашборд",
@@ -14739,17 +15360,20 @@
         "failed": "Сбои"
       },
       "columnHints": {
+        "calls": "Сколько раз выполнялся этот запрос. Собственное число базы данных, если она его сообщает, — охватывает всех клиентов, а не только те части вашей системы, которые отправляют трейсы. Строки с пометкой «наблюдается клиентом» подсчитываются из трейсов, поскольку база данных их не сообщала.",
         "p50": "Половина всех вызовов завершилась быстрее этого. Учитываются только завершённые вызовы — запрос, который всё ещё выполняется или так и не вернулся, здесь не измеряется.",
         "p95": "Медленный хвост — 1 из 20 вызовов занял не меньше этого времени. Учитываются только завершённые вызовы — запрос, который всё ещё выполняется или так и не вернулся, здесь не измеряется.",
         "p99": "Худшие 1% вызовов заняли не меньше этого времени. Учитываются только завершённые вызовы — запрос, который всё ещё выполняется или так и не вернулся, здесь не измеряется.",
         "max": "Самый медленный вызов в этом окне — один реальный вызов, а не среднее.",
         "errors": "Сколько из этих вызовов завершились ошибкой.",
-        "perTrace": "Сколько раз это выполняется в рамках одного запроса. Большое число обычно означает цикл."
+        "perTrace": "Сколько раз это выполняется в рамках одного запроса. Большое число обычно означает цикл.",
+        "load": "Общее время, которое этот запрос провёл в базе данных. Собственное значение базы данных, если она его сообщает: время выполнения в Postgres, но время ОЖИДАНИЯ в MySQL и MariaDB — в каждой строке указано, какое именно. Строки с пометкой «наблюдается клиентом» измеряются по трейсам, поэтому включают время сетевого обмена."
       },
       "errorsNone": "нет",
       "errorsAll": "все",
       "actions": {
         "open": "Открыть подробности",
+        "traces": "Посмотреть примеры трейсов",
         "copy": "Скопировать запрос",
         "copied": "Запрос скопирован",
         "copyFailed": "Не удалось скопировать запрос.",
@@ -14780,7 +15404,8 @@
       },
       "n-plus-one": {
         "title": "Выполняется не менее {multiplier}× на запрос",
-        "body": "{share} времени базы данных · {service}"
+        "body": "{share} времени базы данных · {service}",
+        "rule": "Показано, потому что этот запрос выполняется как минимум {ratio} раз в рамках одного запроса и как минимум в {traces} запросах. Это нижняя граница, поэтому реальное число может быть больше. Законная пакетная обработка может выглядеть так же."
       },
       "volume-shift": {
         "title": "Чаще, но не медленнее",
@@ -14854,6 +15479,7 @@
       "subtitleCounts": "{pass} пройдено, {fail} не пройдено. | {pass} пройдено, {fail} не пройдено.",
       "checklistTitle": "Что мы проверили",
       "showMeHow": "Покажите, как настроить инструментирование",
+      "checkTrace": "Проверить один из моих трейсов",
       "checks": {
         "enabled": {
           "ok": "Мониторинг баз данных включён",
@@ -14862,15 +15488,21 @@
           "noDetail": "Администратор может включить его для этой организации, а затем перезапустить коллектор."
         },
         "traces": {
-          "okDetail": "{count} записано в этом временном диапазоне"
+          "ok": "Ваши трейсы поступают",
+          "okDetail": "{count} записано в этом временном диапазоне",
+          "no": "Трейсы ещё не поступали",
+          "noDetail": "Мониторинг базы данных строится на трейсах, а эта организация ещё не отправляла их."
         },
         "permission": {
           "ok": "У вас есть доступ к этим данным",
           "okDetail": "вы администратор в {org}",
-          "no": "У вас нет доступа к этим данным"
+          "no": "У вас нет доступа к этим данным",
+          "noDetail": "Мониторинг базы данных читает ваши трейсы, а ваша роль не включает их. Попросите администратора предоставить доступ на чтение."
         },
         "dbSpans": {
+          "ok": "Ваши трейсы упоминают базу данных",
           "okDetail": "вызовы к базе данных записываются",
+          "no": "Ни один из ваших трейсов не упоминает базу данных",
           "noDetail": "Ваши приложения трассируются, но часть, которая обращается к базе данных, — нет. Добавьте инструментирование базы данных для вашего языка, и запросы появятся здесь."
         },
         "counted": {
@@ -14901,6 +15533,7 @@
         "plans": "Планы запросов",
         "plansHint": "Шаги, которые ваша база данных выполнила для этого запроса. Начните здесь, чтобы понять, почему он медленный.",
         "callers": "Вызывающие и примеры",
+        "callersHint": "Какие части вашего приложения выполняли этот запрос, а также отдельные медленные выполнения, которые можно открыть как трейс.",
         "callersLocked": "Отдельные выполнения получаются из трассировки. Ни один трейс не зафиксировал этот запрос в этом временном диапазоне."
       },
       "notFound": {
@@ -14926,6 +15559,10 @@
       "noSamples": "Для этого диапазона не загружено ни одного отдельного выполнения.",
       "noSeries": "Нет истории для этого запроса в выбранном вами диапазоне.",
       "liveSeries": "Самые последние точки все еще подсчитываются и могут измениться.",
+      "noStream": "Не удалось определить, какой поток трейсов содержит этот запрос, поэтому его вызывающие стороны и примеры не могут быть загружены.",
+      "ambiguousStream": "В этой организации более одного потока трейсов, и мы не можем определить, в каком из них выполняется этот запрос. Выберите поток, чтобы загрузить его вызывающие стороны и примеры трейсов.",
+      "pickStream": "Выберите поток трейсов",
+      "invalidStream": "Это имя потока трейсов нам не знакомо, поэтому мы не выполнили поиск.",
       "firstSeen": "ВПЕРВЫЕ ПОЯВИЛСЯ В ЭТОМ СПИСКЕ В {time}",
       "firstSeenHint": "Самая ранняя точка в этом диапазоне, где этот запрос был достаточно тяжелым, чтобы отслеживаться отдельно.",
       "lastSeen": "ПОСЛЕДНИЙ РАЗ ПОЯВИЛСЯ В {time}",
@@ -14956,6 +15593,7 @@
       "sampleOk": "ОК",
       "sampleError": "Сбой",
       "viewTrace": "Посмотреть запрос →",
+      "viewTraces": "Посмотреть примеры трейсов",
       "copySummary": "Скопировать",
       "copySummaryHint": "Каждое число здесь уже есть на этой странице — это просто составляет предложение, так что 13-я минута инцидента создаёт сообщение вместо пустоты.",
       "summaryCopied": "Сводка скопирована",
@@ -15047,7 +15685,8 @@
         "unjoinable": "Не показано — этот оператор выполняется на нескольких типах баз данных здесь, и сопоставление вызывающих без знания того, какой именно, привело бы к указанию неверных сервисов.",
         "tracedCalls": "{calls} вызовов отслежено",
         "coverage": "{count} сервисов замечено в {traced} из {executions} выполнений выше. Остальные поступили от вызывающих, которых вы ещё не трассируете.",
-        "coverageUnknown": "{count} сервисов замечено в {traced} отслеженных вызовах. Ваша база данных не сообщила общее количество для этого оператора, поэтому долю указать нельзя."
+        "coverageUnknown": "{count} сервисов замечено в {traced} отслеженных вызовах. Ваша база данных не сообщила общее количество для этого оператора, поэтому долю указать нельзя.",
+        "noneNamed": "Было отслежено {traced} вызовов, но ни один из них не удалось привязать к сервису — их трейсы начинаются за пределами этого временного диапазона."
       },
       "callersEmpty": {
         "title": "Отслеженных вызовов для этого запроса пока нет",
@@ -15113,7 +15752,9 @@
       "failedWithCode": "Ошибка · {code}",
       "viewTrace": "Открыть запрос, частью которого был этот вызов",
       "scatterOk": "Завершено",
+      "partial": "Часть данных ваших трейсов не удалось прочитать, поэтому некоторые вызовы могут отсутствовать в этом списке.",
       "disclosureShort": "Каждая строка — это один реальный завершённый вызов",
+      "disclosureDetail": "Измерено приложением, которое выполнило вызов, на основе отправляемых вами трейсов. Здесь только завершившиеся вызовы — запрос, который всё ещё выполняется или завис и не вернулся, не даёт измерения.",
       "counts": {
         "complete": "Показаны все {count} вызовов к базе данных за этот период, сначала самые медленные.",
         "truncated": "{count} самых медленных вызовов за этот период — выполнялось больше, чем показано.",
@@ -15318,6 +15959,8 @@
         "blocking": "Блокирует"
       },
       "coverage": {
+        "summary": "Самое длительное ожидание — {longest}. Каждое ожидание восходит к {roots}, удерживающим блокировку открытой.",
+        "summaryCapped": "Ожидающих сеансов было больше, чем мы могли прочитать за раз. Среди тех, что у нас есть, самое длительное ожидание — {longest}, и они восходят к {roots}, удерживающим блокировку открытой.",
         "summaryOneRoot": "один сеанс",
         "summaryManyRoots": "{count} сеансов",
         "checked": "Проверка каждые {interval} секунд; последняя проверка: {time}.",
