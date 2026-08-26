@@ -39,20 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-center gap-1.5">
         <OTag
           type="severity"
-          size="xs"
           :value="severityValue"
           :label="severityText"
           data-test="alert-library-drawer-severity"
         />
         <OTag
           variant="default-soft"
-          size="xs"
           :label="queryTypeLabelText"
           data-test="alert-library-drawer-query-type"
         />
         <OTag
           :variant="availability.variant"
-          size="xs"
           :icon="availability.icon"
           :label="availability.label"
           data-test="alert-library-drawer-availability"

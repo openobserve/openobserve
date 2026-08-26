@@ -57,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </h3>
       <OTag
         type="severity"
-        size="xs"
         :value="severityValue"
         :label="severityText"
         class="shrink-0"
@@ -75,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              would colour the norm. -->
         <OTag
           variant="default-soft"
-          size="xs"
           :label="queryTypeLabelText"
           data-test="alert-library-card-query-type"
         />
@@ -104,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="!ready"
         variant="warning-quiet"
-        size="xs"
         class="max-w-full min-w-0 self-start"
         :title="t('alert_library.notIngestedHint', { stream: entry.stream })"
         data-test="alert-library-card-needs-data"
