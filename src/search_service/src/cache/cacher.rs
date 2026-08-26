@@ -887,8 +887,9 @@ pub async fn delete_cache(
         if !should_delete_cache_file(&file, &criteria) {
             continue;
         }
-        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
-            Ok(_) => remove_files.push(file),
+        let file_key = file.strip_prefix(&prefix).unwrap().to_string();
+        match disk::remove(&file_key).await {
+            Ok(_) => remove_files.push(file_key),
             Err(e) => {
                 log::error!("Error deleting cache: {:?}", e);
                 return Err(std::io::Error::other("Error deleting cache"));
@@ -904,29 +905,13 @@ pub async fn delete_cache(
         if !should_delete_cache_file(&file, &criteria) {
             continue;
         }
-        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
-            Ok(_) => remove_files.push(file),
-            Err(e) => {
-                log::error!("Error deleting cache: {:?}", e);
-                return Err(std::io::Error::other("Error deleting cache"));
-            }
+        if let Err(e) = disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+            log::error!("Error deleting cache: {:?}", e);
+            return Err(std::io::Error::other("Error deleting cache"));
         }
     }
 
-    for file in remove_files {
-        let columns = file
-            .strip_prefix(&prefix)
-            .unwrap()
-            .split('/')
-            .collect::<Vec<&str>>();
-
-        let query_key = format!(
-            "{}_{}_{}_{}",
-            columns[1], columns[2], columns[3], columns[4]
-        );
-        let mut r = QUERY_RESULT_CACHE.write().await;
-        r.remove(&query_key);
-    }
+    disk::remove_result_cache_metas(&remove_files).await;
     Ok(true)
 }
 
