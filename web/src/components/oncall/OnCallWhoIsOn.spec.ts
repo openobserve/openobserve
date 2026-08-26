@@ -115,12 +115,10 @@ describe("OnCallWhoIsOn", () => {
     expect(wrapper.find('[data-test="oncall-who-is-on-primary-reach"]').exists()).toBe(false);
   });
 
-  /// **`next_user_email` is display only.** It is the calendar's "up next", not
-  /// a position — it used to double as the secondary, which is exactly how one
-  /// team got two different people both correctly labelled that. It is set
-  /// below the rule, apart from the roster, so it cannot be read as a seat
-  /// somebody is sitting in.
-  it("shows who takes over next without listing them as on call", () => {
+  /// `next_user_email` used to draw its own "Up next" row, which named the
+  /// same person the Handover row already does — a second copy of one fact,
+  /// not a second fact. The roster stays a single row per rotation either way.
+  it("does not draw a separate row for the rotation's next holder", () => {
     const wrapper = render({
       positions: [
         {
@@ -132,20 +130,25 @@ describe("OnCallWhoIsOn", () => {
         },
       ],
     });
-    expect(wrapper.text()).toContain("Up next");
-    expect(wrapper.text()).toContain("cy@o2.ai");
-    // One roster row, not two: the up-next person is not a second position.
-    expect(wrapper.findAll("dd").filter((d) => d.text().includes("cy@o2.ai"))).toHaveLength(1);
+    expect(wrapper.text()).not.toContain("Up next");
+    expect(wrapper.findAll("dd").filter((d) => d.text().includes("cy@o2.ai"))).toHaveLength(0);
   });
 
+  /// Handover is one row — who, and how long until they have it — not the
+  /// person's name beside a separate "Up next" line naming them again.
   it("says when the pager changes hands, and to whom", () => {
+    // A few minutes past the exact 5-day mark: the clock ticks between this
+    // line and the component's own `useOnCallClock()` read, and landing
+    // exactly on the hour boundary would round down to "4d 23h" on the
+    // slowest CI runs.
+    const fiveDaysMicros = (Date.now() + 5 * 24 * 60 * 60 * 1000 + 60_000) * 1000;
     const wrapper = render({
       positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" }],
-      handoverAt: 1_700_000_000_000_000,
+      handoverAt: fiveDaysMicros,
       handoverTo: "yuki@o2.ai",
     });
-    expect(wrapper.text()).toContain("1700000000000000");
     expect(wrapper.text()).toContain("yuki@o2.ai");
+    expect(wrapper.text()).toContain("(5d)");
   });
 
   /// A closed record is history. The roster it is given was resolved as of the
@@ -160,21 +163,20 @@ describe("OnCallWhoIsOn", () => {
 
     it("speaks about the shift in the past tense", () => {
       const wrapper = render(closedProps);
-      expect(wrapper.text()).toContain("Who was on this");
       expect(wrapper.text()).toContain("On call at the time");
       expect(wrapper.text()).not.toContain("On call right now");
       expect(wrapper.text()).toContain("ana@o2.ai");
     });
 
-    /// Both rows are advice about a pager somebody still has to carry.
-    it("drops the handover and the rotation's next seat", () => {
+    /// The handover row is advice about a pager somebody still has to carry.
+    it("drops the handover row", () => {
       const wrapper = render({
         ...closedProps,
         handoverAt: 1_700_000_000_000_000,
         handoverTo: "yuki@o2.ai",
       });
       expect(wrapper.text()).not.toContain("yuki@o2.ai");
-      expect(wrapper.text()).not.toContain("further down the rotation");
+      expect(wrapper.text()).not.toContain("Handover");
     });
 
     /// An unstaffed rotation is an emergency while a page is open and a plain

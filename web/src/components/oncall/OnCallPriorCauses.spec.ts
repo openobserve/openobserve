@@ -29,6 +29,7 @@ const stubs = {
     emits: ["click"],
     template: `<button @click="$emit('click')"><slot /></button>`,
   },
+  OEmptyState: { name: "OEmptyState", props: ["title"], template: "<p>{{ title }}</p>" },
 };
 
 function render(groups: CauseGroup[], loading = false) {
@@ -56,14 +57,14 @@ describe("OnCallPriorCauses", () => {
     expect(row.text()).toContain("rolled back the 14:02 deploy");
   });
 
-  /// An org with no history is told how history gets made — an empty box it
-  /// cannot act on would read as something being broken.
-  it("explains itself when nothing has been recorded", () => {
+  /// An org with no history yet is told plainly, not shown an empty box it
+  /// cannot act on — the same inline empty state the deliveries ledger uses.
+  it("gives a simple message when nothing has been recorded", () => {
     const wrapper = render([]);
     const empty = wrapper.find('[data-test="oncall-prior-causes-empty"]');
 
     expect(empty.exists()).toBe(true);
-    expect(empty.text()).toContain("first responder");
+    expect(empty.text()).toBe("No causes recorded yet.");
   });
 
   it("links to the firing behind a cause", async () => {

@@ -26,35 +26,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OCard variant="glass" data-test="oncall-about-page">
     <OCardSection role="header" dense>
-      <OText variant="card-title">{{ t("oncall.aboutThisPage") }}</OText>
+      <OText variant="card-title">{{ t("oncall.routingDetails") }}</OText>
     </OCardSection>
 
     <OCardSection role="body" dense>
       <ODescriptionList dense>
         <!-- The engine records why it picked this team. It was only ever
              readable by scrolling the timeline, which is not where somebody
-             asks "why me". Stacked: it is a sentence with a ksuid in it, and a
-             sentence rationed to two thirds of a rail column wraps to four
-             lines beside a label that needed one. -->
-        <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBecause')" stacked>
+             asks "why me". The winning rule draws as the same key|value chips
+             the routing tab draws it with, not a hand-built equation, so a
+             dimension reads the same wherever it appears. -->
+        <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
           <span class="flex flex-col items-start gap-1">
-            <!-- The mechanism in the UI's own words, then the rule as the same
-                 key|value chips the routing tab draws it with. The server's
-                 sentence spelled the winning rule as a path and the team as a
-                 ksuid — the team is the row below this one, and a path is the
-                 one thing on this card nobody reads as a sentence. -->
-            <span class="text-text-body" data-test="oncall-about-routing-reason">
-              {{ mechanismLine }}
-            </span>
-
-            <!-- Chips and the way out on one wrap row. Stacked, this single
-                 row stood three lines tall and towered over every other row on
-                 the card; the rule is the thing worth looking at, so the link
-                 trails it rather than claiming a line of its own. -->
-            <span class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <span class="text-sm" data-test="oncall-about-routing-reason">
+              <!-- A sentence parseRoutingReason doesn't recognise ("...as an
+                   impacted caller of the failing service") still opens
+                   "routed to <id>" — the id is the one fact worth trusting;
+                   the prose around it is not, so it is dropped rather than
+                   shown verbatim. -->
+              <router-link
+                v-if="fallbackRoutedId"
+                class="text-accent font-medium"
+                :to="{
+                  name: 'onCallTeamDetail',
+                  params: { teamId, tab: 'overview' },
+                  query: { org_identifier: orgId },
+                }"
+                data-test="oncall-about-routing-id-link"
+              >
+                {{ raw(fallbackRoutedId) }}
+              </router-link>
               <span
-                v-if="routingDimensions.length"
-                class="flex flex-wrap gap-1.5"
+                v-else-if="routingDimensions.length"
+                class="flex flex-wrap items-center gap-1.5"
                 data-test="oncall-about-routing-dimensions"
               >
                 <ODimensionChip
@@ -64,15 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :value="dimension.value"
                   tooltip
                 />
+                <span class="text-text-secondary">→</span>
+                <span class="text-text-body font-medium">{{ raw(teamName) }}</span>
               </span>
-
-              <router-link
-                class="text-accent text-xs"
-                :to="{ name: 'onCallRouting', query: { org_identifier: orgId } }"
-                data-test="oncall-about-open-routing"
-              >
-                {{ t("oncall.openRouting") }}
-              </router-link>
+              <span v-else class="text-text-body font-medium">{{ routedByPrimary }}</span>
             </span>
 
             <!-- What routing considered and passed over on the way. Absent from
@@ -107,7 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              useful thing to know before starting to look, and it used to be a
              tab away. -->
         <ODescriptionItem :label="t('oncall.history')">
-          <span data-test="oncall-about-history">{{ historyLine }}</span>
+          <span class="flex flex-col items-start gap-1" data-test="oncall-about-history">
+            <span class="text-text-body text-sm font-medium">{{ historyPrimary }}</span>
+            <span v-if="historySecondary" class="text-text-secondary text-xs">{{
+              historySecondary
+            }}</span>
+          </span>
         </ODescriptionItem>
 
         <ODescriptionItem v-if="subjectStream" :label="t('oncall.subjectStream')">
@@ -125,75 +129,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-if="causeNote" class="text-text-secondary">{{ raw(causeNote) }}</span>
           </span>
         </ODescriptionItem>
-      </ODescriptionList>
 
-      <!-- Below the rule are the two ids somebody pastes into a channel, not
-           more prose about the page. The same key|value chip the routing rules
-           are read as: the chip carries its own label, so the id gets the
-           card's whole width rather than the value third of a description
-           list, and a rail this narrow was truncating it to uselessness. -->
-      <OSeparator class="my-3" />
-
-      <!-- Stacked, not side by side: two 27-character ksuids sharing one
-           narrow rail truncate each other into uselessness. -->
-      <span class="flex flex-col items-start gap-2">
-        <router-link
-          v-if="incidentId"
-          class="min-w-0"
-          :to="{
-            name: 'incidentDetail',
-            params: { id: incidentId },
-            query: { org_identifier: orgId },
-          }"
-          data-test="oncall-about-incident-link"
-        >
-          <ODimensionChip
-            dim-key="incident"
-            :key-label="incidentKeyLabel"
-            :value="incidentId"
-            tooltip
-          />
-        </router-link>
-
-        <span class="flex w-full min-w-0 items-center gap-1">
-          <!-- The id a responder reads here is the rule they then go and change
-               — the threshold that woke them at 3am. It was a chip you could
-               only copy, so the trip to the editor was a paste into the alert
-               list's search box. -->
-          <router-link
-            v-if="alertEditRoute"
-            class="min-w-0"
-            :to="alertEditRoute"
-            data-test="oncall-about-subject-link"
+        <!-- The ids somebody pastes into a channel, boxed with their own copy
+             control — the same shape the Incident Details card uses, so an id
+             reads and copies the same way on both pages. -->
+        <ODescriptionItem v-if="incidentId" :label="t('oncall.incident')">
+          <span
+            class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
           >
-            <ODimensionChip
-              dim-key="alert-id"
-              :key-label="subjectKeyLabel"
-              :value="sourceId"
-              tooltip
-              data-test="oncall-about-subject-id"
+            <router-link
+              class="text-accent min-w-0 flex-1 truncate font-mono"
+              :to="{
+                name: 'incidentDetail',
+                params: { id: incidentId },
+                query: { org_identifier: orgId },
+              }"
+              data-test="oncall-about-incident-link"
+            >
+              {{ raw(incidentId) }}
+            </router-link>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="content-copy"
+              :aria-label="t('common.copyToClipboard')"
+              data-test="oncall-about-copy-incident"
+              @click="copyIncidentId"
             />
-          </router-link>
-          <ODimensionChip
-            v-else
-            dim-key="alert-id"
-            :key-label="subjectKeyLabel"
-            :value="sourceId"
-            tooltip
+          </span>
+        </ODescriptionItem>
+
+        <ODescriptionItem :label="subjectLabel">
+          <span
+            class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
             data-test="oncall-about-subject-id"
-          />
-          <!-- The id is here to be pasted somewhere, and the chip truncates it
-               on a narrow rail — so the copy stays whatever the width. -->
-          <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="content-copy"
-            :aria-label="t('common.copyToClipboard')"
-            data-test="oncall-about-copy-subject"
-            @click="copySubjectId"
-          />
-        </span>
-      </span>
+          >
+            <!-- The id a responder reads here is the rule they then go and
+                 change — the threshold that woke them at 3am. It links
+                 straight to the editor rather than a paste into the alert
+                 list's search box. -->
+            <router-link
+              v-if="alertEditRoute"
+              class="text-accent min-w-0 flex-1 truncate font-mono"
+              :to="alertEditRoute"
+              data-test="oncall-about-subject-link"
+            >
+              {{ raw(sourceId) }}
+            </router-link>
+            <span v-else class="text-text-body min-w-0 flex-1 truncate font-mono">
+              {{ raw(sourceId) }}
+            </span>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="content-copy"
+              :aria-label="t('common.copyToClipboard')"
+              data-test="oncall-about-copy-subject"
+              @click="copySubjectId"
+            />
+          </span>
+        </ODescriptionItem>
+      </ODescriptionList>
     </OCardSection>
   </OCard>
 </template>
@@ -206,7 +202,6 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
@@ -274,6 +269,28 @@ const routingDimensions = computed(() =>
 
 const routingNotes = computed(() => routing.value?.notes ?? []);
 
+/// Text fallback for a recognised mechanism with no dimensions to draw as
+/// chips — `context` naming a team, or the mechanism sentence itself.
+const routedByPrimary = computed<I18nText>(() => {
+  const parsed = routing.value;
+  if (!parsed) return raw(props.routingReason);
+  if (parsed.mechanism === "context" && parsed.namedTeam) {
+    return raw(`team = ${parsed.namedTeam} → ${props.teamName}`);
+  }
+  return mechanismLine.value;
+});
+
+/// The id out of a routing sentence `parseRoutingReason` doesn't recognise —
+/// every branch it DOES recognise opens "routed to <id>" too, so an
+/// unrecognised one almost always still yields an id worth linking, without
+/// the guesswork of interpreting prose the server might change at any time.
+const fallbackRoutedId = computed(() => {
+  if (!props.routingReason || routing.value) return null;
+  const decision = props.routingReason.split("; ").pop()?.trim() ?? "";
+  const match = /^routed to (\S+)/.exec(decision);
+  return match ? match[1] : null;
+});
+
 /// A page routed `explicit` was not routed at all — the alert names its team,
 /// no rule was consulted and none could have changed the outcome. With no
 /// dimensions and no notes to show, the row is a label, a sentence that says
@@ -292,8 +309,6 @@ const subjectLabel = computed(() =>
   props.subjectType === "alert" ? t("oncall.alertId") : t("oncall.subject"),
 );
 
-/// The chip's key segment takes a plain display string, not translated text —
-/// its other callers pass a dimension name straight off a rule.
 /// The alert's editor, which lives on the LIST route behind `action=update`
 /// rather than on a route of its own — `AlertDetail.editAlert` navigates the
 /// same way, including the "default" folder, because neither screen is told
@@ -312,23 +327,29 @@ const alertEditRoute = computed<RouteLocationRaw | null>(() =>
     : null,
 );
 
-const subjectKeyLabel = computed(() => String(subjectLabel.value));
-const incidentKeyLabel = computed(() => String(t("oncall.incident")));
-
 async function copySubjectId() {
   await copyToClipboard(props.sourceId, t);
 }
 
-/// One line rather than a panel: "this has fired six times and four of them
-/// were a deploy" is the whole answer; the per-firing detail lives below.
-const historyLine = computed(() => {
+async function copyIncidentId() {
+  if (props.incidentId) await copyToClipboard(props.incidentId, t);
+}
+
+/// The fact, then the detail behind it — "this has fired six times" is the
+/// whole answer on its own; the dominant cause is the clarifying line under
+/// it, not folded into the same sentence.
+const historyPrimary = computed(() => {
   if (!props.priorFirings) return t("oncall.historyFirstPage");
+  return t("oncall.historyFirings", { count: props.priorFirings }, props.priorFirings);
+});
+
+const historySecondary = computed<I18nText | null>(() => {
+  if (!props.priorFirings) return t("oncall.historyNoCauses");
   const top = [...props.priorCauses].sort((a, b) => b.count - a.count)[0];
-  if (!top) return t("oncall.historyFirings", { count: props.priorFirings }, props.priorFirings);
-  return t("oncall.historyFiringsCause", {
-    count: props.priorFirings,
-    cause: t(`oncall.cause_${top.cause}`),
+  if (!top) return null;
+  return t("oncall.historyTopCauseLine", {
     causeCount: top.count,
+    cause: t(`oncall.cause_${top.cause}`),
   });
 });
 </script>

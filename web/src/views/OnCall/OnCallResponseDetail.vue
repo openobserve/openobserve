@@ -111,17 +111,22 @@
 
         <!-- Escalate keeps this yours; hand off makes it theirs. Both verbs
              have existed server-side since the ladder did, and only one of
-             them had a button. -->
-        <OButton
-          variant="outline"
-          size="sm-action"
-          :loading="escalatingNow"
-          :disabled="escalation?.exhausted"
-          data-test="oncall-response-escalate-btn"
-          @click="escalateNow"
-        >
-          {{ t("oncall.escalate") }}
-        </OButton>
+             them had a button. A disabled button that does not say why is a
+             dead end — the ladder's own explanation for why there is nobody
+             left to escalate to belongs right where the button went grey. -->
+        <span class="inline-flex">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :loading="escalatingNow"
+            :disabled="escalation?.exhausted"
+            data-test="oncall-response-escalate-btn"
+            @click="escalateNow"
+          >
+            {{ t("oncall.escalate") }}
+          </OButton>
+          <OTooltip v-if="escalation?.exhausted" :content="t('oncall.ladderExhausted')" />
+        </span>
 
         <OButton
           variant="outline"
@@ -237,29 +242,40 @@
              that were never optional, and the rail's answers — who this is
              reaching, what fires next, why this team — are the ones people
              opened the tabs to find. -->
-        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div class="flex flex-col gap-4 lg:col-span-2">
-            <OnCallWhatFired
-              :org-id="orgId"
-              :subject-type="response.subject.subject_type"
-              :source-id="response.subject.source_id"
-              :alert="subjectAlert"
-              :runbook-url="response.runbook_url"
-              :observed="latestEvaluation"
-              :opened-at="response.opened_at"
-            />
-
             <!-- Renders nothing until a verdict event exists (§G.7) — the
                  default deployment has no agent and must not show an
                  analysis panel that sits empty forever. -->
             <OnCallVerdictCard :events="events" />
 
-            <OCard variant="glass" data-test="oncall-response-activity">
-              <!-- Every other pane on this page names itself; this one did not,
-                   so the thread began mid-air under a bare border. -->
-              <OCardSection role="header" dense>
-                <OText variant="card-title">{{ t("oncall.tabActivity") }}</OText>
+            <!-- Activity, deliveries and prior causes used to be a card and two
+                 collapsibles stacked on top of each other — only the first was
+                 visible without a click, and the other two hid behind their
+                 own expand toggle with no hint of what was inside. Tabs put
+                 all three labels on screen at once, so which one has the
+                 answer is a glance, not three clicks to find out. -->
+            <OCard variant="glass" data-test="oncall-response-tabs">
+              <OCardSection role="header" dense class="flex-wrap items-center gap-2">
+                <OTabs v-model="activeDetailTab" dense data-test="oncall-response-tabs-strip">
+                  <OTab
+                    name="activity"
+                    :label="t('oncall.tabActivity')"
+                    data-test="oncall-response-tab-activity"
+                  />
+                  <OTab
+                    name="deliveries"
+                    :label="t('oncall.deliveriesTitle')"
+                    data-test="oncall-response-tab-deliveries"
+                  />
+                  <OTab
+                    name="causes"
+                    :label="t('oncall.tabPriorCauses')"
+                    data-test="oncall-response-tab-causes"
+                  />
+                </OTabs>
                 <OButton
+                  v-if="activeDetailTab === 'activity'"
                   variant="ghost-primary"
                   size="sm"
                   class="ml-auto"
@@ -275,43 +291,43 @@
               </OCardSection>
 
               <OCardSection role="body" dense>
-                <OnCallActivityTimeline
-                  :events="events"
-                  v-model:comment-text="noteBody"
-                  v-model:show-all="showAllActivity"
-                  :submitting="addingNote"
-                  @submit="addNote"
-                />
+                <OTabPanels v-model="activeDetailTab">
+                  <OTabPanel name="activity" data-test="oncall-response-activity">
+                    <OnCallActivityTimeline
+                      :events="events"
+                      v-model:comment-text="noteBody"
+                      v-model:show-all="showAllActivity"
+                      :submitting="addingNote"
+                      @submit="addNote"
+                    />
+                  </OTabPanel>
+
+                  <!-- The receipt behind the ladder's claims. -->
+                  <OTabPanel name="deliveries" data-test="oncall-response-deliveries">
+                    <OnCallDeliveryLedger
+                      :records="deliveries"
+                      :total="deliveriesTotal"
+                      :loading="deliveriesLoading"
+                    />
+                  </OTabPanel>
+
+                  <!-- The history behind the rail's one-line summary. -->
+                  <OTabPanel name="causes" data-test="oncall-response-causes">
+                    <OnCallPriorCauses
+                      :groups="priorCauses"
+                      :loading="priorCausesLoading"
+                      @open="openResponse"
+                    />
+                    <OnCallFiringHistory
+                      class="mt-4"
+                      :firings="firingHistory"
+                      :loading="priorCausesLoading"
+                      @open="openResponse"
+                    />
+                  </OTabPanel>
+                </OTabPanels>
               </OCardSection>
             </OCard>
-
-            <!-- The receipt behind the ladder's claims, and the history behind
-                 the rail's one-line summary. Both are evidence a reader asks
-                 for second, so they open rather than occupy the fold. -->
-            <OCollapsible
-              :label="t('oncall.deliveriesTitle')"
-              data-test="oncall-response-deliveries"
-            >
-              <OnCallDeliveryLedger
-                :records="deliveries"
-                :total="deliveriesTotal"
-                :loading="deliveriesLoading"
-              />
-            </OCollapsible>
-
-            <OCollapsible :label="t('oncall.tabPriorCauses')" data-test="oncall-response-causes">
-              <OnCallPriorCauses
-                :groups="priorCauses"
-                :loading="priorCausesLoading"
-                @open="openResponse"
-              />
-              <OnCallFiringHistory
-                class="mt-4"
-                :firings="firingHistory"
-                :loading="priorCausesLoading"
-                @open="openResponse"
-              />
-            </OCollapsible>
           </div>
 
           <div class="flex flex-col gap-4">
@@ -581,13 +597,14 @@ import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import OnCallEscalation from "@/components/oncall/OnCallEscalation.vue";
 import OnCallEscalationSkeleton from "@/components/oncall/OnCallEscalationSkeleton.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
-import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
-import OText from "@/lib/core/Typography/OText.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -755,6 +772,10 @@ const escalatingNow = ref(false);
 const ABSENT = raw("—");
 const noteBody = ref("");
 const showAllActivity = ref(false);
+/// Activity, deliveries and prior causes as tabs of one card rather than a
+/// card plus two collapsibles — the toggle-all button in the header only
+/// makes sense while activity is the one showing.
+const activeDetailTab = ref("activity");
 const resolveCause = ref<ResolutionCause | "">("");
 const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
@@ -779,9 +800,6 @@ const policy = ref<OnCallPolicy | null>(null);
 /// the usual reason every row of the ledger failed. `null` is "not answered",
 /// which is not the same thing and must never be rendered as a cause.
 const smtpConfigured = ref<boolean | null>(null);
-/// The alert's most recent evaluation, so the page can print the value that
-/// crossed the threshold rather than only the threshold.
-const latestEvaluation = ref<Record<string, unknown> | null>(null);
 const handoffMode = ref<"person" | "team">("person");
 const handoffPerson = ref("");
 const handoffTeam = ref("");
@@ -958,7 +976,6 @@ async function fetchResponse() {
     await fetchEscalation();
     await fetchDeliveries();
     await fetchTeamContext();
-    await fetchLatestEvaluation();
   } catch (err: any) {
     toast({
       variant: "error",
@@ -1252,29 +1269,6 @@ async function fetchHandover() {
     handoverTo.value = segments[currentIndex + 1]?.user_email ?? null;
   } catch {
     // A team with no resolved schedule simply has no handover row.
-  }
-}
-
-/// What the rule last observed. The record stores the threshold that fired but
-/// never the number, and "7.4% against a 2% threshold" is the first thing a
-/// responder wants to see.
-async function fetchLatestEvaluation() {
-  latestEvaluation.value = null;
-  const r = response.value;
-  if (r?.subject.subject_type !== "alert") return;
-  try {
-    const res = await alertsService.getHistory(orgId.value, {
-      alert_id: r.subject.source_id,
-      start_time: r.opened_at - 60 * 60 * 1_000_000,
-      end_time: r.opened_at + 60 * 1_000_000,
-      from: 0,
-      size: 1,
-      sort_by: "timestamp",
-      sort_order: "desc",
-    });
-    latestEvaluation.value = res.data?.hits?.[0] ?? null;
-  } catch {
-    latestEvaluation.value = null;
   }
 }
 

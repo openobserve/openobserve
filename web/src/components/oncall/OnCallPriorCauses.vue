@@ -31,15 +31,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton type="text" class="h-4 w-1/2" />
       </div>
 
-      <!-- An org with no history yet is told how the history gets made, rather
-           than being shown an empty box it cannot act on. -->
-      <p
+      <!-- An org with no history yet is told plainly rather than being shown
+           an empty box it cannot act on — the same inline empty state the
+           deliveries ledger uses, so "nothing here yet" reads the same way
+           in both places. -->
+      <OEmptyState
         v-else-if="!groups.length"
-        class="text-text-secondary text-sm"
+        size="inline"
+        variant="no-results"
+        :title="t('oncall.priorCausesEmpty')"
+        hide-action
         data-test="oncall-prior-causes-empty"
-      >
-        {{ t("oncall.priorCausesEmpty") }}
-      </p>
+      />
 
       <ul v-else class="flex flex-col">
         <li
@@ -76,6 +79,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { CauseGroup, ResolutionCause } from "@/ts/interfaces/oncall";

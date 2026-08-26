@@ -8,114 +8,112 @@
   team's climb — that exact misreading caused both handoff P0s server-side.
   Absent `ladder_run` means the first run; the groups render only when there is
   more than one, since "Run 1" over everything is a header with no question.
+
+  Content only — no card chrome or title of its own. It lives inside the
+  "Deliveries" tab of the parent's activity card, which already carries the
+  "Deliveries" label; a second one in here was the same title rendered twice.
 -->
 <template>
-  <OCard variant="glass" data-test="oncall-delivery-ledger">
-    <OCardSection role="header" dense class="flex-wrap items-baseline">
-      <OText variant="card-title">{{ t("oncall.deliveriesTitle") }}</OText>
-      <OText variant="meta">{{ t("oncall.deliveriesHint") }}</OText>
-    </OCardSection>
+  <div class="flex flex-col gap-2" data-test="oncall-delivery-ledger">
+    <p class="text-text-secondary text-xs">{{ t("oncall.deliveriesHint") }}</p>
 
-    <OCardSection role="body" dense class="flex flex-col gap-2">
-      <OInnerLoading v-if="loading" showing />
+    <OInnerLoading v-if="loading" showing />
 
-      <p
-        v-else-if="!records.length"
-        class="text-text-secondary text-sm"
-        data-test="oncall-deliveries-empty"
-      >
-        {{ t("oncall.deliveriesNone") }}
-      </p>
+    <OEmptyState
+      v-else-if="!records.length"
+      size="inline"
+      variant="no-results"
+      :title="t('oncall.deliveriesNone')"
+      hide-action
+      data-test="oncall-deliveries-empty"
+    />
 
-      <template v-else>
-        <div v-for="group in groups" :key="group.run" class="flex flex-col gap-1">
-          <!-- The boundary is the fact worth a header: everything under it was
-               sent by a DIFFERENT team's ladder than the group above. -->
+    <template v-else>
+      <div v-for="group in groups" :key="group.run" class="flex flex-col gap-1">
+        <!-- The boundary is the fact worth a header: everything under it was
+             sent by a DIFFERENT team's ladder than the group above. -->
+        <span
+          v-if="groups.length > 1"
+          class="text-text-secondary text-xs"
+          :data-test="`oncall-deliveries-run-${group.run}`"
+        >
+          {{ t("oncall.deliveriesRun", { run: group.run }) }}
+        </span>
+
+        <div
+          v-for="(row, index) in group.people"
+          :key="index"
+          class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
+          :data-test="`oncall-delivery-row-${group.run}-${index}`"
+        >
+          <OTag :variant="row.delivered ? 'success-soft' : 'error-soft'" size="sm">
+            {{ row.delivered ? t("oncall.deliveryLanded") : t("oncall.deliveryFailed") }}
+          </OTag>
+          <OUserCell v-if="row.recipient" :value="row.recipient" />
+          <OTag v-if="row.channel" variant="default-soft" size="sm">
+            {{ t(`oncall.channel_${row.channel}`) }}
+          </OTag>
           <span
-            v-if="groups.length > 1"
+            v-if="row.rung_micros !== null && row.rung_micros !== undefined"
             class="text-text-secondary text-xs"
-            :data-test="`oncall-deliveries-run-${group.run}`"
           >
-            {{ t("oncall.deliveriesRun", { run: group.run }) }}
+            {{ t("oncall.atRung", { delay: formatMicrosDuration(row.rung_micros) }) }}
           </span>
+          <OTimeCell :value="row.at" unit="us" class="ms-auto" />
+        </div>
 
-          <div
-            v-for="(row, index) in group.people"
-            :key="index"
-            class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
-            :data-test="`oncall-delivery-row-${group.run}-${index}`"
+        <!-- B10: a room post is a broadcast, not a fallback for reaching a
+             person — it fires once per rung outside the recipient loop, and a
+             broadcast that fails never marks the rung as a delivery failure,
+             because nobody was being reached. Folding these into the rows
+             above would report a page as undelivered when the page landed
+             fine. Chat and webhook resolve to a destination the whole team
+             watches; that split is the engine's own (`is_broadcast`). -->
+        <template v-if="group.posts.length">
+          <span
+            class="text-text-secondary text-xs"
+            :data-test="`oncall-deliveries-posts-${group.run}`"
           >
-            <OTag :variant="row.delivered ? 'success-soft' : 'error-soft'" size="sm">
-              {{ row.delivered ? t("oncall.deliveryLanded") : t("oncall.deliveryFailed") }}
+            {{ t("oncall.deliveriesRoomPosts") }}
+          </span>
+          <div
+            v-for="(row, index) in group.posts"
+            :key="`post-${index}`"
+            class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
+            :data-test="`oncall-delivery-post-${group.run}-${index}`"
+          >
+            <OTag :variant="row.delivered ? 'success-soft' : 'warning-soft'" size="sm">
+              {{ row.delivered ? t("oncall.roomPosted") : t("oncall.roomPostFailed") }}
             </OTag>
-            <OUserCell v-if="row.recipient" :value="row.recipient" />
+            <!-- A room, not a person — a user cell would imply an inbox. -->
+            <span class="text-text-body text-sm">{{ raw(row.recipient ?? "") }}</span>
             <OTag v-if="row.channel" variant="default-soft" size="sm">
               {{ t(`oncall.channel_${row.channel}`) }}
             </OTag>
-            <span
-              v-if="row.rung_micros !== null && row.rung_micros !== undefined"
-              class="text-text-secondary text-xs"
-            >
-              {{ t("oncall.atRung", { delay: formatMicrosDuration(row.rung_micros) }) }}
-            </span>
             <OTimeCell :value="row.at" unit="us" class="ms-auto" />
           </div>
+        </template>
+      </div>
 
-          <!-- B10: a room post is a broadcast, not a fallback for reaching a
-               person — it fires once per rung outside the recipient loop, and a
-               broadcast that fails never marks the rung as a delivery failure,
-               because nobody was being reached. Folding these into the rows
-               above would report a page as undelivered when the page landed
-               fine. Chat and webhook resolve to a destination the whole team
-               watches; that split is the engine's own (`is_broadcast`). -->
-          <template v-if="group.posts.length">
-            <span
-              class="text-text-secondary text-xs"
-              :data-test="`oncall-deliveries-posts-${group.run}`"
-            >
-              {{ t("oncall.deliveriesRoomPosts") }}
-            </span>
-            <div
-              v-for="(row, index) in group.posts"
-              :key="`post-${index}`"
-              class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
-              :data-test="`oncall-delivery-post-${group.run}-${index}`"
-            >
-              <OTag :variant="row.delivered ? 'success-soft' : 'warning-soft'" size="sm">
-                {{ row.delivered ? t("oncall.roomPosted") : t("oncall.roomPostFailed") }}
-              </OTag>
-              <!-- A room, not a person — a user cell would imply an inbox. -->
-              <span class="text-text-body text-sm">{{ raw(row.recipient ?? "") }}</span>
-              <OTag v-if="row.channel" variant="default-soft" size="sm">
-                {{ t(`oncall.channel_${row.channel}`) }}
-              </OTag>
-              <OTimeCell :value="row.at" unit="us" class="ms-auto" />
-            </div>
-          </template>
-        </div>
-
-        <!-- The server truncates; the count must not pretend otherwise. -->
-        <span
-          v-if="total > records.length"
-          class="text-text-secondary text-xs"
-          data-test="oncall-deliveries-truncated"
-        >
-          {{ t("oncall.deliveriesTruncated", { shown: records.length, total }) }}
-        </span>
-      </template>
-    </OCardSection>
-  </OCard>
+      <!-- The server truncates; the count must not pretend otherwise. -->
+      <span
+        v-if="total > records.length"
+        class="text-text-secondary text-xs"
+        data-test="oncall-deliveries-truncated"
+      >
+        {{ t("oncall.deliveriesTruncated", { shown: records.length, total }) }}
+      </span>
+    </template>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import type { Channel, DeliveryRecord } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";

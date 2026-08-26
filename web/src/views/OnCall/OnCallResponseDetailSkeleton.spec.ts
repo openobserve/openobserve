@@ -50,11 +50,11 @@ describe("OnCallResponseDetailSkeleton", () => {
     expect(wrapper.findAll(".basis-52").length).toBe(4);
   });
 
-  /// Two cards on the left (What fired, Activity), three on the right (Who is
-  /// on, Escalation, About this page) — the real page's `lg:col-span-2` split.
-  it("reserves five cards across the two-column body", () => {
+  /// One card on the left (Activity), three on the right (On-call details,
+  /// Escalation, Routing details) — the real page's `lg:col-span-2` split.
+  it("reserves four cards across the two-column body", () => {
     const wrapper = render();
 
-    expect(wrapper.findAllComponents({ name: "OCard" }).length).toBe(5);
+    expect(wrapper.findAllComponents({ name: "OCard" }).length).toBe(4);
   });
 });

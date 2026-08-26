@@ -49,7 +49,7 @@ vi.mock("@/services/oncall", () => ({
 }));
 
 vi.mock("@/services/alerts", () => ({
-  default: { get_by_alert_id: vi.fn(), getHistory: vi.fn() },
+  default: { get_by_alert_id: vi.fn() },
 }));
 
 /// Escalate's whole point is what it reports back, and the report is a toast.
@@ -106,9 +106,12 @@ const stubs = {
   },
   OContent: { name: "OContent", template: "<div><slot /></div>" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
-  // Always open: the tests are about what the page holds, not about whether
-  // the disclosure widget animates.
-  OCollapsible: { name: "OCollapsible", props: ["label"], template: "<div><slot /></div>" },
+  // Every panel renders regardless of which tab is "active": the tests are
+  // about what each panel holds, not about the tab-switching mechanic.
+  OTabs: { name: "OTabs", template: "<div><slot /></div>" },
+  OTab: { name: "OTab", props: ["name", "label"], template: "<button>{{ label }}</button>" },
+  OTabPanels: { name: "OTabPanels", template: "<div><slot /></div>" },
+  OTabPanel: { name: "OTabPanel", props: ["name"], template: "<div><slot /></div>" },
   OnCallFiringHistory: {
     name: "OnCallFiringHistory",
     props: ["firings"],
@@ -123,11 +126,6 @@ const stubs = {
   OnCallReachAlarm: {
     name: "OnCallReachAlarm",
     props: ["state", "deliveries", "deliveriesTotal", "progress", "smtpConfigured"],
-    template: "<div />",
-  },
-  OnCallWhatFired: {
-    name: "OnCallWhatFired",
-    props: ["orgId", "subjectType", "sourceId", "alert", "runbookUrl", "observed", "openedAt"],
     template: "<div />",
   },
   OnCallWhoIsOn: {
@@ -265,7 +263,6 @@ describe("OnCallResponseDetail", () => {
     service.getPolicy.mockResolvedValue({ data: null } as any);
     service.teamReachability.mockResolvedValue({ data: { smtp_configured: true } } as any);
     service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
-    alerts.getHistory.mockResolvedValue({ data: { hits: [] } } as any);
   });
 
   /// "Why did this page me" was answerable only by scrolling the timeline.
@@ -326,15 +323,12 @@ describe("OnCallResponseDetail", () => {
     expect(wrapper.findComponent({ name: "OnCallFiringHistory" }).props("firings")).toEqual([]);
   });
 
-  /// The subject row was an unclickable ksuid, so the rule that fired — the
-  /// first thing anybody wants to open — was reachable only by searching for it.
-  it("links the subject to the alert that fired", async () => {
+  /// The subject alert is still fetched for the stream it names — the only
+  /// place left that reads it since the What-fired card was removed.
+  it("resolves the subject alert's stream onto the routing rail", async () => {
     const wrapper = await renderWith();
 
-    const fired = wrapper.findComponent({ name: "OnCallWhatFired" });
-    expect(fired.props("subjectType")).toBe("alert");
-    expect(fired.props("sourceId")).toBe("al_ckt");
-    expect(fired.props("alert")).toMatchObject({ name: "checkout_error_ratio" });
+    expect(alerts.get_by_alert_id).toHaveBeenCalled();
     expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("subjectStream")).toBe(
       "default (logs)",
     );
@@ -346,21 +340,15 @@ describe("OnCallResponseDetail", () => {
     alerts.get_by_alert_id.mockRejectedValue({ response: { status: 404 } });
     const wrapper = await renderWith();
 
-    expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("alert")).toBe(null);
-    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("subjectStream")).toBe(
-      null,
-    );
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("subjectStream")).toBe(null);
   });
 
-  // A synthetic has no alert to open, so it must not render a dead link.
-  it("does not link a subject that is not an alert", async () => {
-    const wrapper = await renderWith({
+  // A synthetic subject names no alert, so nothing is fetched for it.
+  it("does not fetch an alert for a subject that is not one", async () => {
+    await renderWith({
       subject: { subject_type: "synthetic", source_id: "sy_login", firing: 1 },
     });
 
-    expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("subjectType")).toBe(
-      "synthetic",
-    );
     expect(alerts.get_by_alert_id).not.toHaveBeenCalled();
   });
 
@@ -854,6 +842,16 @@ describe("OnCallResponseDetail", () => {
         wrapper.find('[data-test="oncall-response-escalate-btn"]').attributes("disabled"),
       ).toBeDefined();
     });
+
+    /// A disabled button that does not say why is a dead end.
+    it("explains why escalate is disabled once the ladder is exhausted", async () => {
+      service.escalationProgress.mockResolvedValue({
+        data: { fired: [], next_targets: [], next_at: null, exhausted: true },
+      } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.text()).toContain("The ladder is finished");
+    });
   });
 
   /// The tagline: team, which firing this is, and when it opened — read once,
@@ -881,7 +879,7 @@ describe("OnCallResponseDetail", () => {
       const firing = wrapper.find('[data-test="oncall-response-firing"]');
 
       expect(firing.text()).toContain("#2");
-      expect(firing.text()).toContain("first page from this subject");
+      expect(firing.text()).toContain("First page from this subject");
     });
 
     it("shows the earlier-firings count in the same tooltip once there is history", async () => {
@@ -1004,30 +1002,6 @@ describe("OnCallResponseDetail", () => {
     });
   });
 
-  /// `runbook_url` is hoisted onto the record by the API precisely so this
-  /// screen can show it, and it was read by nothing in `web/src`.
-  it("hands the runbook the API hoisted onto the record to the What-fired card", async () => {
-    const wrapper = await renderWith({ runbook_url: "https://wiki/checkout" });
-    expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("runbookUrl")).toBe(
-      "https://wiki/checkout",
-    );
-  });
-
-  /// The value that crossed the threshold lives on the alert's own history and
-  /// nowhere on the record, so it is fetched around the firing rather than
-  /// around now — by the time somebody opens this, now is not when it happened.
-  it("fetches the evaluation around the firing, not around now", async () => {
-    alerts.getHistory.mockResolvedValue({ data: { hits: [{ actual_value: 7.4 }] } } as any);
-    const wrapper = await renderWith();
-
-    expect(alerts.getHistory).toHaveBeenCalledWith(
-      store.state.selectedOrganization.identifier,
-      expect.objectContaining({ alert_id: "al_ckt", end_time: 1_700_000_060_000_000 }),
-    );
-    expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("observed")).toEqual({
-      actual_value: 7.4,
-    });
-  });
   /// The rail read "— —" on exactly the page that needs it: an open record
   /// has no ack or resolve duration yet. Each row now says its own version of
   /// what is actually true, and both moved off the page's own stat strip into

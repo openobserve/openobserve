@@ -55,32 +55,58 @@ function render(props: Record<string, unknown> = {}) {
 
 describe("OnCallAboutPage", () => {
   /// "Why did this page me" was answerable only by scrolling the timeline,
-  /// which is not where somebody asks it.
-  it("states why this team was picked, and links to the rules", () => {
+  /// which is not where somebody asks it. A sentence with no recognisable "routed
+  /// to <id>" opening (and no separate id to fall back to) prints verbatim
+  /// rather than a half-parsed guess.
+  it("states why this team was picked", () => {
     const wrapper = render({ routingReason: "matched ownership rule namespace = envoy" });
     expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).toBe(
       "matched ownership rule namespace = envoy",
     );
-    expect(wrapper.find('[data-test="oncall-about-open-routing"]').exists()).toBe(true);
+  });
+
+  /// `parseRoutingReason` only understands today's four sentence shapes. A
+  /// fifth one the server starts sending ("...as an impacted caller of the
+  /// failing service") still opens "routed to <id>" — that id is trustworthy
+  /// even when the prose around it isn't, so it is kept and linked to the
+  /// team rather than dumping the whole sentence on the card.
+  it("keeps just the id, linked, from a routing sentence it doesn't recognise", () => {
+    const wrapper = render({
+      routingReason: "routed to tm_9 as an impacted caller of the failing service",
+      teamId: "tm_9",
+    });
+
+    const reason = wrapper.find('[data-test="oncall-about-routing-reason"]');
+    expect(reason.text()).toBe("tm_9");
+    expect(reason.text()).not.toContain("impacted caller");
+
+    const link = wrapper
+      .findAllComponents({ name: "RouterLink" })
+      .find((c) => c.attributes("data-test") === "oncall-about-routing-id-link");
+    expect(link?.props("to")).toEqual({
+      name: "onCallTeamDetail",
+      params: { teamId: "tm_9", tab: "overview" },
+      query: { org_identifier: "default" },
+    });
   });
 
   /// The winning rule was spelled as a path and the team as a ksuid — neither
-  /// is read as prose. The rule now draws as the same key|value chips the
-  /// routing tab uses, so a dimension looks the same wherever it is read.
-  it("draws the winning ownership rule as dimension chips", () => {
+  /// is read as prose. It now draws as the same key|value dimension chips the
+  /// routing tab uses, pointing at the team NAME rather than the id.
+  it("draws the winning ownership rule as dimension chips pointing at the team", () => {
     const wrapper = render({
       routingReason: "routed to tm_9 by ownership rule k8s-cluster=introspection/service=search",
+      teamName: "Gateway",
     });
 
-    expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).toBe(
-      "Matched an ownership rule",
-    );
+    const reason = wrapper.find('[data-test="oncall-about-routing-reason"]');
     const chips = wrapper.find('[data-test="oncall-about-routing-dimensions"]').text();
     expect(chips).toContain("k8s-cluster=introspection");
     expect(chips).toContain("service=search");
+    expect(reason.text()).toContain("Gateway");
     // The ksuid belongs to the Team row below, which links; repeating it here
     // was the noisiest thing on the card.
-    expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).not.toContain("tm_9");
+    expect(reason.text()).not.toContain("tm_9");
   });
 
   /// What routing passed over on the way is the half that answers "why not the
@@ -94,7 +120,8 @@ describe("OnCallAboutPage", () => {
     expect(wrapper.find('[data-test="oncall-about-routing-note-0"]').text()).toContain("paymnets");
   });
 
-  /// A mechanism with no rule behind it says so in words and draws no chips.
+  /// A mechanism with no rule behind it says so in words, not invented
+  /// dimensions.
   it("says when the default team took it, without inventing a rule", () => {
     const wrapper = render({
       routingReason: "no ownership rule matched, so it went to the default team tm_9",
@@ -102,7 +129,6 @@ describe("OnCallAboutPage", () => {
     expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).toContain(
       "default team",
     );
-    expect(wrapper.find('[data-test="oncall-about-routing-dimensions"]').exists()).toBe(false);
   });
 
   // No decision recorded leaves the row out rather than rendering an empty one.
@@ -116,7 +142,6 @@ describe("OnCallAboutPage", () => {
   it("omits the routing row when the alert named the team itself", () => {
     const wrapper = render({ routingReason: "routed to tm_9 by the alert's own setting" });
     expect(wrapper.find('[data-test="oncall-about-routing-reason"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-about-open-routing"]').exists()).toBe(false);
   });
 
   /// The id here IS the rule that woke somebody, and the trip to change it was
@@ -162,9 +187,9 @@ describe("OnCallAboutPage", () => {
   });
 
   it("says outright when this is the first page from the subject", () => {
-    expect(render().find('[data-test="oncall-about-history"]').text()).toContain(
-      "first page from this subject",
-    );
+    const text = render().find('[data-test="oncall-about-history"]').text();
+    expect(text).toContain("First page from this subject");
+    expect(text).toContain("No prior causes recorded yet");
   });
 
   /// A firing with history but no recorded cause is not the same as no
@@ -176,21 +201,26 @@ describe("OnCallAboutPage", () => {
     );
   });
 
-  it("links an incident once the page has been promoted into one", () => {
+  it("links an incident once the page has been promoted into one, with its own copy control", () => {
     expect(render().find('[data-test="oncall-about-incident-link"]').exists()).toBe(false);
 
-    const chip = render({ incidentId: "inc_9" }).find('[data-test="oncall-about-incident-link"]');
-    expect(chip.text()).toContain("inc_9");
-    // The chip labels itself, so the row above it no longer has to.
-    expect(chip.text()).toContain("Incident");
+    const wrapper = render({ incidentId: "inc_9" });
+    const link = wrapper.find('[data-test="oncall-about-incident-link"]');
+    expect(link.text()).toContain("inc_9");
+    // The label lives in the row's own dt, the same shape the Incident
+    // Details card uses — not repeated inside the value.
+    expect(link.text()).not.toContain("Incident");
+    expect(wrapper.text()).toContain("Incident");
+    expect(wrapper.find('[data-test="oncall-about-copy-incident"]').exists()).toBe(true);
   });
 
   /// The id is here to be pasted into a channel, so it keeps its copy control
-  /// even though the chip truncates it on a narrow rail.
+  /// — the same boxed value + copy icon shape the Incident Details card uses,
+  /// so an alert id and an incident id copy the same way.
   it("names and copies the subject id", () => {
     const wrapper = render();
     expect(wrapper.find('[data-test="oncall-about-subject-id"]').text()).toContain("al_ckt");
-    expect(wrapper.find('[data-test="oncall-about-subject-id"]').text()).toContain("Alert ID");
+    expect(wrapper.text()).toContain("Alert ID");
     expect(wrapper.find('[data-test="oncall-about-copy-subject"]').exists()).toBe(true);
   });
 });

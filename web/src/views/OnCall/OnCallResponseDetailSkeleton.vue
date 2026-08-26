@@ -50,9 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div class="flex flex-col gap-4 lg:col-span-2">
-        <OCard v-for="card in 2" :key="card" variant="glass">
+        <OCard variant="glass">
           <OCardSection role="header" dense>
             <OSkeleton type="text" class="h-4 w-24" />
           </OCardSection>

@@ -32,9 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OCard variant="glass" data-test="oncall-who-is-on">
     <OCardSection role="header" dense>
-      <OText variant="card-title">{{
-        closed ? t("oncall.whoWasOnThis") : t("oncall.whoIsOnThis")
-      }}</OText>
+      <OText variant="card-title">{{ t("oncall.onCallDetails") }}</OText>
     </OCardSection>
 
     <OCardSection role="body" dense>
@@ -93,38 +91,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionList>
 
         <!-- Below the rule is the schedule around those people, not more
-             people — the two were one run of rows, and the handover read as
-             another seat somebody is sitting in. -->
-        <template v-if="!closed && (handoverAt || upNext)">
-          <OSeparator class="my-3" />
-
-          <ODescriptionList dense>
-            <!-- When the pager changes hands. A page still open at handover is one
-                 the next person inherits without being told, unless a screen says
-                 so before it happens. -->
-            <ODescriptionItem v-if="handoverAt" :label="t('oncall.shiftHandover')">
-              <span class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
-                <OTimeCell :value="handoverAt" unit="us" />
-                <template v-if="handoverTo">
-                  <span class="text-text-secondary text-xs">{{ raw("→") }}</span>
-                  <OUserCell class="min-w-0 truncate" :value="handoverTo" />
-                </template>
+             people — the two were one run of rows, and a separator between
+             them read as a boundary the roster and its own handover don't
+             have. `next_user_email` used to get its own row ("Up next"), but
+             it names the same person `handoverTo` does, so the row was a
+             second copy of this one rather than a second fact. -->
+        <ODescriptionList v-if="!closed && handoverAt" dense>
+          <!-- When the pager changes hands. A page still open at handover is one
+               the next person inherits without being told, unless a screen says
+               so before it happens. -->
+          <ODescriptionItem :label="t('oncall.shiftHandover')">
+            <span class="flex w-full flex-wrap items-center gap-x-1 gap-y-1">
+              <OUserCell v-if="handoverTo" class="min-w-0 truncate" :value="handoverTo" />
+              <span class="text-text-secondary text-xs whitespace-nowrap">
+                {{ raw(`(${handoverInLabel})`) }}
               </span>
-            </ODescriptionItem>
-
-            <!-- Who takes the pager at the next handover. **Display only** —
-                 nothing pages them, and they are not cover. It is set in the
-                 quieter type below the rule because it is a fact about the
-                 schedule, not another seat somebody is sitting in. This field
-                 used to double as the secondary, which is exactly how one team
-                 got two different people both correctly labelled that. -->
-            <ODescriptionItem v-if="upNext" :label="t('oncall.upNextAfterHandover')">
-              <span class="flex items-center gap-2">
-                <OUserCell class="text-text-secondary min-w-0 truncate text-xs" :value="upNext" />
-              </span>
-            </ODescriptionItem>
-          </ODescriptionList>
-        </template>
+            </span>
+          </ODescriptionItem>
+        </ODescriptionList>
       </template>
 
       <!-- How this page has gone so far: whether it moved, and how far up the
@@ -134,6 +118,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator class="my-3" />
 
       <ODescriptionList dense>
+        <ODescriptionItem :label="resolveLabel">
+          <span data-test="oncall-who-is-on-resolve-value">{{ resolveValue }}</span>
+        </ODescriptionItem>
+
         <ODescriptionItem :label="ackLabel">
           <span class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
             <span data-test="oncall-who-is-on-ack-value">{{ ackValue }}</span>
@@ -143,10 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="ackedBy"
             />
           </span>
-        </ODescriptionItem>
-
-        <ODescriptionItem :label="resolveLabel">
-          <span data-test="oncall-who-is-on-resolve-value">{{ resolveValue }}</span>
         </ODescriptionItem>
 
         <!-- How deep the ladder actually went. It was in every payload this
@@ -168,13 +152,14 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
+import { useOnCallClock } from "@/composables/useOnCallClock";
 import type { DeliveryRecord, OnCallPosition } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
   defineProps<{
@@ -220,6 +205,7 @@ const props = withDefaults(
 );
 
 const { t } = useI18nTyped();
+const nowMicros = useOnCallClock();
 
 const closed = computed(() => Boolean(props.closedAt));
 
@@ -239,8 +225,12 @@ const primary = computed<OnCallPosition>(
 
 const others = computed(() => props.positions.filter((p) => p !== primary.value));
 
-/// Who takes over at the next handover. Display only — nothing pages it.
-const upNext = computed(() => primary.value.next_user_email ?? null);
+/// How long until the pager changes hands, in the same compact form the rest
+/// of the page uses ("5d", "3h 12m"). `next_user_email` used to render this
+/// same fact as a second row ("Up next") — one clock, one name, one row.
+const handoverInLabel = computed(() =>
+  props.handoverAt !== null ? formatMicrosDuration(props.handoverAt - nowMicros.value) : "",
+);
 
 /// What this page's own sends did for one address — never the team's general
 /// reachability, which answers a different question and would contradict the
