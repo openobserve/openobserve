@@ -585,7 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          case, so no feature flag is needed. -->
                     <div
                       v-if="oncallResponse"
-                      class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden border"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex min-h-0 shrink flex-col overflow-hidden border"
                       data-test="incident-oncall-panel"
                     >
                       <div class="px-4 pt-2 pb-1">
@@ -593,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t("alerts.incidents.onCall") }}
                         </div>
                       </div>
-                      <div class="flex flex-col gap-2 px-4 pb-3">
+                      <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pb-3">
                         <!-- Which team is carrying this, at what priority. The
                              panel used to answer neither, so an incident named
                              no owner while the record behind it did. -->
