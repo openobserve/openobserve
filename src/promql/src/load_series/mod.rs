@@ -35,7 +35,7 @@ use config::{
 };
 use datafusion::{
     arrow::{
-        array::{Array, AsArray, Float64Array, Int64Array, RecordBatch},
+        array::{Array, AsArray, RecordBatch},
         datatypes::{DataType, Float64Type, Int64Type, Schema, UInt64Type},
     },
     error::{DataFusionError, Result},
@@ -294,8 +294,8 @@ pub(super) async fn load_samples_from_datafusion(
                         append_batch_samples(
                             &mut metrics,
                             &hashes,
-                            time_values,
-                            value_values,
+                            time_values.values(),
+                            value_values.values(),
                             fragment_hint,
                             query_duration,
                         );
@@ -338,21 +338,22 @@ pub(super) async fn load_samples_from_datafusion(
 fn append_batch_samples(
     metrics: &mut HashMap<u64, RangeValue>,
     hashes: &[u64],
-    time_values: &Int64Array,
-    value_values: &Float64Array,
+    timestamps: &[i64],
+    values: &[f64],
     fragment_hint: usize,
     query_duration: i64,
 ) {
-    for (i, &hash) in hashes.iter().enumerate() {
-        let entry = match metrics.entry(hash) {
+    let mut i = 0;
+    while i < hashes.len() {
+        let run_len = batch_run_len(hashes, i);
+        let entry = match metrics.entry(hashes[i]) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => {
-                let run_len = batch_run_len(hashes, i);
                 let capacity = initial_series_capacity(
                     run_len,
                     fragment_hint,
-                    time_values.value(i),
-                    time_values.value(i + run_len - 1),
+                    timestamps[i],
+                    timestamps[i + run_len - 1],
                     query_duration,
                 );
                 entry.insert(RangeValue {
@@ -363,9 +364,13 @@ fn append_batch_samples(
                 })
             }
         };
-        entry
-            .samples
-            .push(Sample::new(time_values.value(i), value_values.value(i)));
+        entry.samples.extend(
+            timestamps[i..i + run_len]
+                .iter()
+                .zip(&values[i..i + run_len])
+                .map(|(&timestamp, &value)| Sample::new(timestamp, value)),
+        );
+        i += run_len;
     }
 }
 
