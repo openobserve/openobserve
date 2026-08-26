@@ -203,7 +203,6 @@ describe("OnCallMembers", () => {
     const wrapper = render();
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-members-level-select"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-members-next-step"]').text()).toContain("Schedule");
   });
 
   it("cannot submit with nobody selected", async () => {
@@ -234,29 +233,6 @@ describe("OnCallMembers", () => {
     );
   });
 
-  /// The single-team org is the usual starting point, and picking the same
-  /// eight people one at a time was the whole of its setup.
-  it("adds every org user who is not already on the team", async () => {
-    const wrapper = render([member("ana@o2.ai")]);
-    await flushPromises();
-
-    const btn = wrapper.find('[data-test="oncall-members-add-everyone"]');
-    expect(btn.text()).toContain("2");
-
-    await btn.trigger("click");
-    await flushPromises();
-
-    expect(oncall.addMembers).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { user_emails: ["bob@o2.ai", "cara@o2.ai"] } }),
-    );
-  });
-
-  // Nothing left to add is not a disabled button, it is no button.
-  it("hides the button once everybody is on the team", async () => {
-    const wrapper = render([member("ana@o2.ai"), member("bob@o2.ai"), member("cara@o2.ai")]);
-    await flushPromises();
-    expect(wrapper.find('[data-test="oncall-members-add-everyone"]').exists()).toBe(false);
-  });
   /// C5/C6: the rota already SKIPS an away member; the table says so where
   /// the people are listed, before somebody asks why the order changed.
   describe("absences", () => {
@@ -354,119 +330,6 @@ describe("OnCallMembers", () => {
 
       expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-email"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-sms"]').exists()).toBe(true);
-    });
-
-    /// Somebody on the team that no page can reach is a paging outage nobody
-    /// gets told about, so it is said once, in the server's own words.
-    it("warns about a member no page can reach", async () => {
-      const wrapper = render({
-        members: [ana],
-        reachability: {
-          team_id: "team_1",
-          team_name: "T",
-          smtp_configured: true,
-          reachable: 0,
-          total: 1,
-          unreachable_members: ["ana@o2.ai"],
-          members: [
-            {
-              user_email: "ana@o2.ai",
-              is_org_user: true,
-              mailbox_shaped: false,
-              deliverable_channels: [],
-              configured_but_unverified: [],
-              would_a_page_land: false,
-              why_not: "root@example is not a mailbox",
-              channels: [],
-            },
-          ],
-        },
-      });
-      await flushPromises();
-
-      const banner = wrapper.find('[data-test="oncall-members-unreachable-banner"]');
-      expect(banner.exists()).toBe(true);
-      expect(banner.text()).toContain("root@example is not a mailbox");
-    });
-
-    /// One `false` on the deployment explains every unreachable row, so the
-    /// per-person warning must give way to it rather than repeat it.
-    it("blames the deployment, not the people, when no transport exists", async () => {
-      const wrapper = render({
-        members: [ana],
-        reachability: {
-          team_id: "team_1",
-          team_name: "T",
-          smtp_configured: false,
-          reachable: 0,
-          total: 1,
-          unreachable_members: ["ana@o2.ai"],
-          members: [
-            {
-              user_email: "ana@o2.ai",
-              is_org_user: true,
-              mailbox_shaped: true,
-              deliverable_channels: [],
-              configured_but_unverified: [],
-              would_a_page_land: false,
-              channels: [],
-            },
-          ],
-        },
-      });
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="oncall-members-no-transport"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-members-unreachable-banner"]').exists()).toBe(false);
-    });
-
-    /// The load verdict sits next to the only control that changes it.
-    it("calls out a lopsided pager share and points at the schedule", async () => {
-      const wrapper = render({
-        members: [ana, bob],
-        load: {
-          team_id: "team_1",
-          from: 0,
-          to: 0,
-          days: 30,
-          upcoming_from: 0,
-          upcoming_to: 0,
-          rotations: [],
-          members: [
-            { user_email: "ana@o2.ai", pages: 12, nights: 4, acks: 12 },
-            { user_email: "bob@o2.ai", pages: 2, nights: 0, acks: 2 },
-          ],
-        },
-      });
-      await flushPromises();
-
-      const load = wrapper.find('[data-test="oncall-members-load"]');
-      expect(load.text()).toContain("Load is uneven");
-      await wrapper.find('[data-test="oncall-members-rebalance"]').trigger("click");
-      expect(wrapper.emitted("open-schedule")).toBeTruthy();
-    });
-
-    /// An even split is not a finding. Colouring it teaches people to ignore
-    /// the line that matters.
-    it("says nothing when the split is even", async () => {
-      const wrapper = render({
-        members: [ana, bob],
-        load: {
-          team_id: "team_1",
-          from: 0,
-          to: 0,
-          days: 30,
-          upcoming_from: 0,
-          upcoming_to: 0,
-          rotations: [],
-          members: [
-            { user_email: "ana@o2.ai", pages: 5, nights: 1, acks: 5 },
-            { user_email: "bob@o2.ai", pages: 5, nights: 1, acks: 5 },
-          ],
-        },
-      });
-      await flushPromises();
-      expect(wrapper.find('[data-test="oncall-members-load"]').exists()).toBe(false);
     });
 
     /// A failed schedule fetch must cost the shift column, not the table.

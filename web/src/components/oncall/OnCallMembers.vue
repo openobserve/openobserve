@@ -1,13 +1,12 @@
 <template>
-  <div class="flex flex-col gap-3" data-test="oncall-members">
+  <div class="m-4 flex flex-col gap-3" data-test="oncall-members">
     <OTable
       :data="rows"
       :columns="columns"
       row-key="id"
-      :frame="false"
+      :frame="true"
       pagination="client"
       :show-global-filter="false"
-      :row-rail-tone="railTone"
       :row-class="rowClass"
       table-id="oncall-team-members"
       data-test="oncall-members-table"
@@ -53,19 +52,6 @@
           >
             {{ t("oncall.membersOfOrg", { onTeam: onTeamCount, total: orgTotal }) }}
           </span>
-          <!-- The single-team org is the usual starting point, and picking the
-               same eight people one at a time is the whole of its setup. Shown
-               only while somebody is still missing. -->
-          <OButton
-            v-if="everyoneCount"
-            variant="ghost"
-            size="sm-action"
-            :loading="adding"
-            data-test="oncall-members-add-everyone"
-            @click="addEveryone"
-          >
-            {{ t("oncall.addEveryoneCta", { count: everyoneCount }) }}
-          </OButton>
         </div>
       </template>
 
@@ -168,61 +154,6 @@
       </template>
     </OTable>
 
-    <!-- The load verdict sits under the people it is about, next to the only
-         control that fixes it. It used to be a separate panel below the table,
-         which made "who is overloaded" and "who is in the rota" two screens. -->
-    <div
-      v-if="loadSummary || fairness.length"
-      class="border-border-subtle px-page-edge flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-3"
-      data-test="oncall-members-load"
-    >
-      <template v-if="loadSummary">
-        <OText variant="meta">{{ t("oncall.loadUnevenLabel") }}</OText>
-        <span class="text-text-heading text-xs font-medium">{{ loadSummary }}</span>
-      </template>
-      <OText variant="meta"
-        v-for="line in fairness"
-        :key="line.rotation"
-        :data-test="`oncall-members-fairness-${line.rotation}`">
-        {{ raw(`${line.rotation}: ${line.summary}`) }}
-      </OText>
-      <OButton
-        variant="ghost"
-        size="xs"
-        class="ms-auto"
-        icon-right="arrow-forward"
-        data-test="oncall-members-rebalance"
-        @click="emit('open-schedule')"
-      >
-        {{ t("oncall.rebalanceInSchedule") }}
-      </OButton>
-    </div>
-
-    <!-- One `false` on the deployment explains every unreachable row, so it is
-         said once instead of once per person. -->
-    <OBanner v-if="transportMissing" variant="warning" data-test="oncall-members-no-transport">
-      {{ t("oncall.contactNoTransport") }}
-    </OBanner>
-    <OBanner
-      v-else-if="unreachableRow"
-      variant="warning"
-      data-test="oncall-members-unreachable-banner"
-    >
-      {{ unreachableWarning }}
-      <template v-if="canConfigure" #actions>
-        <OButton
-          variant="ghost"
-          size="xs"
-          icon-right="arrow-forward"
-          :loading="testing"
-          data-test="oncall-members-test-page"
-          @click="emit('test-page')"
-        >
-          {{ t("oncall.contactSendTest") }}
-        </OButton>
-      </template>
-    </OBanner>
-
     <ODialog
       :open="awayOpen"
       @update:open="(v: boolean) => (awayOpen = v)"
@@ -272,10 +203,6 @@
         </div>
       </template>
     </ODialog>
-
-    <p class="text-text-muted text-xs" data-test="oncall-members-next-step">
-      {{ t("oncall.membersNextStep") }}
-    </p>
   </div>
 </template>
 
@@ -283,14 +210,12 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
-import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef, RowRailTone } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
@@ -578,9 +503,6 @@ const medianPages = computed(() => {
 });
 const heavyLoad = computed(() => medianPages.value * UNEVEN_FACTOR);
 
-const railTone = (row: MemberRow): RowRailTone | null =>
-  row.unreachable ? "error" : row.state === "on_call" ? "success" : null;
-
 /// Only the person actually holding the pager is tinted. Tinting every state
 /// turns the table into a legend nobody reads.
 const rowClass = (row: MemberRow) => (row.state === "on_call" ? "bg-status-success-bg" : "");
@@ -623,48 +545,6 @@ function shiftLine(row: MemberRow): I18nText {
   }
   return t("oncall.notInRotation");
 }
-
-// ── Load verdict ──────────────────────────────────────────────────
-
-/// One sentence, only when the split is actually lopsided. Below the threshold
-/// the server's per-rotation verdict is the more honest thing to show, because
-/// a weighted rota is uneven on purpose.
-const loadSummary = computed<I18nText | null>(() => {
-  const top = rows.value.reduce<MemberRow | null>(
-    (best, r) => (!best || r.pages > best.pages ? r : best),
-    null,
-  );
-  if (!top || !top.pages || medianPages.value <= 0) return null;
-  const factor = top.pages / medianPages.value;
-  if (factor < UNEVEN_FACTOR) return null;
-  return t("oncall.loadUneven", {
-    name: raw(top.name),
-    factor: raw(factor.toFixed(1)),
-    days: props.load?.days ?? 30,
-  });
-});
-
-const fairness = computed(() => (loadSummary.value ? [] : (props.load?.rotations ?? [])));
-
-// ── Reachability warning ──────────────────────────────────────────
-
-const transportMissing = computed(
-  () => Boolean(props.reachability) && props.reachability?.smtp_configured === false,
-);
-
-const unreachableRows = computed(() => rows.value.filter((r) => r.unreachable));
-const unreachableRow = computed(() => unreachableRows.value[0] ?? null);
-
-/// The server's own sentence for the first one, and a count for the rest — a
-/// banner that stacks four finished sentences is a paragraph nobody finishes.
-const unreachableWarning = computed<I18nText>(() => {
-  const first = unreachableRow.value;
-  const rest = unreachableRows.value.length - 1;
-  const why = first?.reach?.why_not ? raw(first.reach.why_not) : t("oncall.contactNoChannel");
-  return rest > 0
-    ? t("oncall.membersUnreachableMore", { name: raw(first?.name ?? ""), why, count: rest }, rest)
-    : t("oncall.membersUnreachableOne", { name: raw(first?.name ?? ""), why });
-});
 
 // ── Columns ───────────────────────────────────────────────────────
 
@@ -765,14 +645,6 @@ async function fetchOrgUsers() {
   } finally {
     loadingUsers.value = false;
   }
-}
-
-/// Everybody in the org who is not already on the team — the count the button
-/// promises, so it can never add a number different from the one it showed.
-const everyoneCount = computed(() => (userLookupFailed.value ? 0 : userOptions.value.length));
-
-function addEveryone() {
-  void commitMembers(userOptions.value.map((option) => option.value));
 }
 
 /// Takes the list explicitly rather than defaulting to the picker: `@click`
