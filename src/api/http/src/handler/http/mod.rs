@@ -14,5 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use openobserve_api_common::auth;
+pub mod password_policy;
 pub mod request;
 pub mod router;

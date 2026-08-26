@@ -18,6 +18,7 @@ pub mod billing_group;
 pub mod es;
 pub mod ingestion_tokens;
 pub mod org;
+pub mod password_policy;
 pub mod settings;
 #[cfg(feature = "enterprise")]
 pub mod storage;

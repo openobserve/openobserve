@@ -64,7 +64,13 @@ async fn set_locked(policy: &PasswordPolicy) -> Result<u64, anyhow::Error> {
     // Sweep before the write. Flagging against a policy that then fails to land is recoverable
     // friction; a landed policy with nobody flagged is a silent enforcement gap.
     let flagged = if policy.is_stricter_than(&previous) {
-        users::flag_all_for_password_reset(PasswordResetReason::PolicyTightened.as_str()).await?
+        let flagged =
+            users::flag_all_for_password_reset(PasswordResetReason::PolicyTightened.as_str())
+                .await?;
+        // The sweep is a bulk UPDATE and emits no per-user event, so without this every node keeps
+        // serving must_reset_password = false from cache and the flag enforces nothing.
+        crate::user::broadcast_bulk_refresh().await?;
+        flagged
     } else {
         0
     };

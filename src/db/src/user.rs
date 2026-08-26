@@ -39,6 +39,44 @@ pub fn is_root_user(user_id: &str) -> bool {
 }
 
 pub const USER_RECORD_KEY: &str = "/user_record/";
+
+/// Broadcast marker for a bulk update that touched many user rows at once.
+///
+/// The per-row events behind [`USER_RECORD_KEY`] do not scale to a sweep that can touch every user
+/// on the instance, so a sweep publishes one event here and each node rebuilds its cache instead.
+pub const USER_BULK_REFRESH_KEY: &str = "/user_bulk_refresh/";
+
+/// Tell every node its users cache is stale.
+///
+/// Callers that bypass the per-user write path — bulk `UPDATE`s straight to the table — must call
+/// this, or the change stays invisible to every node until the next restart.
+pub async fn broadcast_bulk_refresh() -> Result<(), anyhow::Error> {
+    put_into_db_coordinator(USER_BULK_REFRESH_KEY, Bytes::new(), true, None)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error broadcasting a users cache refresh: {e}"))
+}
+
+/// Rebuild the users cache whenever a bulk update announces itself.
+pub async fn watch_bulk_refresh() -> Result<(), anyhow::Error> {
+    let cluster_coordinator = db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(USER_BULK_REFRESH_KEY).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching user bulk refresh");
+    loop {
+        let Some(ev) = events.recv().await else {
+            log::error!("watch_user_bulk_refresh: event channel closed");
+            break;
+        };
+        // The key carries no payload; its arrival is the whole message.
+        if matches!(ev, db::Event::Put(_))
+            && let Err(e) = cache().await
+        {
+            log::error!("Error refreshing the users cache after a bulk update: {e}");
+        }
+    }
+    Ok(())
+}
+
 pub async fn get_user_record(email: &str) -> Result<users::UserRecord, anyhow::Error> {
     users::get(email)
         .await
@@ -174,6 +212,20 @@ pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     super_cluster::add_user_to_super_cluster(db_user).await?;
 
+    Ok(())
+}
+
+/// Clear a user's forced-reset flag and restart their rotation clock, then refresh the caches.
+///
+/// Separate from [`update`] and called after it: the flag lives on columns `update` does not touch,
+/// and this emits its own event so a node cannot serve a stale `must_reset_password` and keep
+/// blocking a user who has already complied.
+pub async fn record_password_change(user_email: &str) -> Result<(), anyhow::Error> {
+    let key = format!("{USER_RECORD_KEY}{user_email}");
+    users::record_password_change(user_email)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error recording password change: {e}"))?;
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     Ok(())
 }
 

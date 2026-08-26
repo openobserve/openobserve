@@ -271,6 +271,19 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                     .unwrap_or_else(|_| header::HeaderValue::from_static("")),
             );
 
+            // Policy enforcement sits after authentication, not before it: a flagged user is
+            // still who they say they are, they just may not reach resources until they set a
+            // compliant password.
+            if let Some(blocked) = crate::handler::http::password_policy::check_request(
+                &result.user_email,
+                &req_data.uri,
+                &req_data.method,
+            )
+            .await
+            {
+                return blocked;
+            }
+
             // Handle Prometheus POST hack - add content-type if missing
             if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
                 parts.headers.insert(
@@ -741,6 +754,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/settings/v2/{key}", get(organization::system_settings::get_setting).delete(organization::system_settings::delete_org_setting))
         .route("/{org_id}/settings/v2/user/{user_id}", post(organization::system_settings::set_user_setting))
         .route("/{org_id}/settings/v2/user/{user_id}/{key}", delete(organization::system_settings::delete_user_setting))
+
+        // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
+        .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
+        // Complexity requirements only: readable by any authenticated user, including one the
+        // policy middleware has blocked, who needs to know what password will satisfy it
+        .route("/{org_id}/password_complexity", get(organization::password_policy::get_password_complexity))
 
         // Announcement banners: read by every org, authored on the meta org
         .route("/{org_id}/announcements", get(announcements::get_announcements))
@@ -1643,6 +1662,84 @@ mod tests {
     // Registration is therefore pinned two ways that DO discriminate: the route
     // appears in the OpenAPI surface, and a minimal router carrying only this
     // route dispatches GET to the handler and rejects other methods.
+
+    #[tokio::test]
+    async fn password_policy_read_is_refused_outside_the_meta_org() {
+        // The full policy carries lockout thresholds and history depth. Gating only the write
+        // would leave those readable by any org-level settings holder — and in an OSS build,
+        // where check_permissions is a no-op, by any authenticated user at all.
+        let app = Router::new().route(
+            "/{org_id}/settings/password_policy",
+            get(organization::password_policy::get_policy),
+        );
+
+        // auth_middleware injects this header before the handler runs; the minimal router here
+        // bypasses that, so the test supplies it.
+        let refused = app
+            .oneshot(
+                Request::builder()
+                    .uri("/acme/settings/password_policy")
+                    .header("user_id", "someone@example.com")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Returns before touching the database, which is what makes this assertable here.
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn password_policy_read_is_refused_for_a_non_admin_on_the_meta_org() {
+        // Belonging to _meta is not enough. With OpenFGA off — or in an OSS build, where
+        // check_permissions is an unconditional true — membership would otherwise be the only
+        // gate, so the role check has to hold on its own.
+        let app = Router::new().route(
+            "/{org_id}/settings/password_policy",
+            get(organization::password_policy::get_policy),
+        );
+
+        let refused = app
+            .oneshot(
+                Request::builder()
+                    .uri("/_meta/settings/password_policy")
+                    // Not present in ORG_USERS, so the role lookup finds nothing to admit.
+                    .header("user_id", "not-a-meta-admin@example.invalid")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn password_complexity_route_is_readable_by_any_org() {
+        // The counterpart to the test above: the projection is deliberately not org-gated, since
+        // a user blocked for a forced reset holds no settings grant anywhere.
+        let app = Router::new().route(
+            "/{org_id}/password_complexity",
+            get(organization::password_policy::get_password_complexity),
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/acme/password_complexity")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_ne!(
+            response.status(),
+            StatusCode::FORBIDDEN,
+            "complexity must stay readable outside _meta"
+        );
+    }
 
     #[tokio::test]
     async fn query_functions_route_dispatches_get_and_rejects_other_methods() {

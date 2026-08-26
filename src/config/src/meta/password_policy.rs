@@ -89,6 +89,25 @@ pub struct PasswordPolicy {
     pub enforcement_mode: EnforcementMode,
 }
 
+/// The subset of the policy safe to show a non-admin: what a password must look like, and nothing
+/// about how the instance defends itself.
+///
+/// Lockout thresholds and history depth are deliberately absent. A brute-forcer who can read
+/// `lockout.threshold` and `lockout.start_secs` knows exactly how to pace attempts to stay under
+/// them, which turns a defence into a published rate limit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct PasswordComplexity {
+    pub min_length: u32,
+    /// `0` means unbounded.
+    pub max_length: u32,
+    pub require_uppercase: bool,
+    pub require_lowercase: bool,
+    pub require_digit: bool,
+    pub require_special: bool,
+    /// Empty means any non-alphanumeric character counts as special.
+    pub special_char_set: String,
+}
+
 impl LockoutBackoff {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -203,6 +222,20 @@ impl Default for PasswordPolicy {
             history_max_retained: 30,
             lockout: LockoutPolicy::default(),
             enforcement_mode: EnforcementMode::HardBlock,
+        }
+    }
+}
+
+impl From<&PasswordPolicy> for PasswordComplexity {
+    fn from(policy: &PasswordPolicy) -> Self {
+        Self {
+            min_length: policy.min_length,
+            max_length: policy.max_length,
+            require_uppercase: policy.require_uppercase,
+            require_lowercase: policy.require_lowercase,
+            require_digit: policy.require_digit,
+            require_special: policy.require_special,
+            special_char_set: policy.special_char_set.clone(),
         }
     }
 }
@@ -408,6 +441,40 @@ mod tests {
         p.lockout.bucket_size = 2;
         assert_eq!(p.lockout_bucket(0), 5);
         assert_eq!(p.lockout_bucket(1), 2);
+    }
+
+    #[test]
+    fn test_complexity_projection_exposes_only_complexity() {
+        let mut p = base();
+        p.rotation_days = 90;
+        p.history_count = 5;
+        p.lockout.threshold = 3;
+        p.lockout.start_secs = 300;
+        p.min_length = 12;
+        p.require_digit = true;
+        p.special_char_set = "!@#".to_string();
+
+        let json = serde_json::to_value(PasswordComplexity::from(&p)).unwrap();
+        // Sorted explicitly rather than relying on serde_json's map ordering, which changes if the
+        // preserve_order feature is ever enabled.
+        let mut keys: Vec<_> = json.as_object().unwrap().keys().cloned().collect();
+        keys.sort();
+
+        // Pinned exactly: a new PasswordPolicy field must not reach non-admins by default.
+        assert_eq!(
+            keys,
+            vec![
+                "max_length",
+                "min_length",
+                "require_digit",
+                "require_lowercase",
+                "require_special",
+                "require_uppercase",
+                "special_char_set",
+            ]
+        );
+        assert_eq!(json["min_length"], 12);
+        assert_eq!(json["special_char_set"], "!@#");
     }
 
     #[test]

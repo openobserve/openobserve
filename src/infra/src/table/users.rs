@@ -50,6 +50,10 @@ impl From<Model> for UserRecord {
             user_type: model.user_type.into(),
             created_at: model.created_at,
             updated_at: model.updated_at,
+            must_reset_password: model.must_reset_password,
+            password_reset_reason: model.password_reset_reason,
+            flagged_at: model.flagged_at,
+            password_updated_at: model.password_updated_at,
         }
     }
 }
@@ -67,6 +71,18 @@ pub struct UserRecord {
     pub user_type: UserType,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Set by the policy sweep; read by the access-time middleware straight from the users cache,
+    /// which is why it lives here rather than only on the entity model.
+    #[serde(default)]
+    pub must_reset_password: bool,
+    #[serde(default)]
+    pub password_reset_reason: Option<String>,
+    #[serde(default)]
+    pub flagged_at: Option<i64>,
+    /// NULL only between the schema migration and this user's first password change; the rotation
+    /// check reads that as never-expired rather than as the epoch.
+    #[serde(default)]
+    pub password_updated_at: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -99,6 +115,12 @@ impl From<&DBUser> for UserRecord {
             },
             created_at: 0,
             updated_at: 0,
+            // DBUser is the API-facing shape and carries no policy state. A record built from one
+            // is only ever used to insert or look up, never to overwrite these columns.
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
         }
     }
 }
@@ -188,6 +210,34 @@ pub async fn update(
         .col_expr(Column::PasswordExt, Expr::value(password_ext))
         .col_expr(
             Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(result.rows_affected)
+}
+
+/// Clear the forced-reset flag and restart the rotation clock.
+///
+/// Called only after a new password has passed validation against the current policy — clearing on
+/// any other path would let a user escape a tightened policy by changing nothing.
+pub async fn record_password_change(email: &str) -> Result<u64, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let result = Entity::update_many()
+        .col_expr(Column::MustResetPassword, Expr::value(false))
+        .col_expr(
+            Column::PasswordResetReason,
+            Expr::value(Option::<String>::None),
+        )
+        .col_expr(Column::FlaggedAt, Expr::value(Option::<i64>::None))
+        .col_expr(
+            Column::PasswordUpdatedAt,
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))

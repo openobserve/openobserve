@@ -27,7 +27,7 @@ use common::meta::user::UserList;
 use config::{
     Config, get_config,
     meta::user::UserRole,
-    utils::{base64, json, password::validate_password_strength},
+    utils::{base64, json, password::validate_password_strength_with_policy},
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
@@ -170,17 +170,19 @@ pub async fn save(
     let mut user = UserRequest::from(&user);
     user.email = user.email.trim().to_lowercase();
 
-    let bad_req_msg = if let Err(msg) = validate_password_strength(&user.password) {
-        Some(msg)
-    } else if user.role.base_role == UserRole::Root {
-        Some("Not allowed")
-    } else if user.role.base_role == UserRole::SreAgent {
-        Some("SRE Agent role cannot be assigned via API")
-    } else if !is_valid_email(user.email.as_str()) {
-        Some("Invalid Email address")
-    } else {
-        None
-    };
+    let policy = db::password_policy::get_effective_policy().await;
+    let bad_req_msg =
+        if let Err(msg) = validate_password_strength_with_policy(&user.password, &policy) {
+            Some(msg)
+        } else if user.role.base_role == UserRole::Root {
+            Some("Not allowed".to_string())
+        } else if user.role.base_role == UserRole::SreAgent {
+            Some("SRE Agent role cannot be assigned via API".to_string())
+        } else if !is_valid_email(user.email.as_str()) {
+            Some("Invalid Email address".to_string())
+        } else {
+            None
+        };
     if let Some(msg) = bad_req_msg {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
@@ -256,7 +258,10 @@ pub async fn update(
     }
     if user.change_password
         && let Some(new_pw) = user.new_password.as_deref()
-        && let Err(msg) = validate_password_strength(new_pw)
+        && let Err(msg) = validate_password_strength_with_policy(
+            new_pw,
+            &db::password_policy::get_effective_policy().await,
+        )
     {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)

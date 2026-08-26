@@ -30,7 +30,7 @@ use config::meta::ratelimit::CachedUserRoles;
 use config::{
     DEFAULT_ORG, META_ORG_ID, get_config, ider,
     meta::user::{DBUser, User, UserOrg, UserRole},
-    utils::rand::generate_random_string,
+    utils::{password::validate_password_strength_with_policy, rand::generate_random_string},
 };
 use db::{self, user::is_root_user};
 use hashbrown::HashMap;
@@ -312,6 +312,7 @@ pub async fn update_user(
     if let Ok(existing_user) = existing_user {
         let mut new_user;
         let mut is_updated = false;
+        let mut password_changed = false;
         let mut is_org_updated = false;
         let mut message = "";
         #[cfg(feature = "enterprise")]
@@ -368,10 +369,20 @@ pub async fn update_user(
                         .password
                         .eq(&get_hash(old_pass, &local_user.salt))
                     {
+                        // Validated here, not only at the HTTP layer: this is the single funnel
+                        // every password change passes through, and clearing the reset flag below
+                        // must never happen for a password the current policy would reject.
+                        if let Err(msg) = validate_password_strength_with_policy(
+                            new_pass,
+                            &db::password_policy::get_effective_policy().await,
+                        ) {
+                            return Ok(MetaHttpResponse::bad_request(msg));
+                        }
                         new_user.password = get_hash(new_pass, &local_user.salt);
                         new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
                         log::info!("Password self updated for user: {email}");
                         is_updated = true;
+                        password_changed = true;
                     } else {
                         message = "Existing/old password mismatch, please provide valid existing password";
                         return Ok(MetaHttpResponse::bad_request(message));
@@ -386,11 +397,18 @@ pub async fn update_user(
                     && !local_user.is_external
                     && let Some(new_pass) = user.new_password
                 {
+                    if let Err(msg) = validate_password_strength_with_policy(
+                        &new_pass,
+                        &db::password_policy::get_effective_policy().await,
+                    ) {
+                        return Ok(MetaHttpResponse::bad_request(msg));
+                    }
                     new_user.password = get_hash(&new_pass, &local_user.salt);
                     new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
                     log::info!("Password by root updated for user: {email}");
 
                     is_updated = true;
+                    password_changed = true;
                 } else if user.new_password.is_some() {
                     message = "You are not authorised to change the password";
                 }
@@ -465,6 +483,13 @@ pub async fn update_user(
                     .is_err()
                 {
                     return Ok(MetaHttpResponse::internal_error("Failed to update user"));
+                }
+
+                // The new password satisfies the current policy, so whatever the user was flagged
+                // for is now resolved. A failure here would leave them blocked despite having
+                // complied, so it is logged rather than reported as a failed update.
+                if password_changed && let Err(e) = db::user::record_password_change(email).await {
+                    log::error!("Failed to clear the password reset flag for {email}: {e}");
                 }
 
                 // Update the organization membership
@@ -1325,6 +1350,12 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
         user_type: config::meta::user::UserType::Internal,
         created_at: now,
         updated_at: now,
+        // Service accounts are excluded from the policy sweep and have no interactive password,
+        // so they are never flagged; the timestamp is set anyway to keep the column non-NULL.
+        must_reset_password: false,
+        password_reset_reason: None,
+        flagged_at: None,
+        password_updated_at: Some(now),
     };
 
     infra::table::users::add(user_record).await?;
@@ -1444,6 +1475,10 @@ mod tests {
                 is_root: false,
                 created_at: 0,
                 updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
             },
         );
         ORG_USERS.insert(
