@@ -36,10 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   reasoning. The destructive action is copyable SQL, never an execution.
 -->
 <template>
-  <DbmPageChrome
-    title-data-test="dbm-blocked-title"
-    :tab-counts="tabCounts"
-  >
+  <DbmPageChrome title-data-test="dbm-blocked-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         :enable-column-resize="true"
@@ -48,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="rowKey"
         :loading="loading"
         :frame="false"
+        :toolbar-bordered="false"
         :error="error"
         sorting="client"
         :show-global-filter="false"

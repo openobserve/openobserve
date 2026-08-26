@@ -51,10 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   from the parent they belong to.
 -->
 <template>
-  <DbmPageChrome
-    title-data-test="dbm-databases-title"
-    :tab-counts="tabCounts"
-  >
+  <DbmPageChrome title-data-test="dbm-databases-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         :data="treeRows"
@@ -71,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :persist-columns="true"
         table-id="dbm-databases"
         :enable-column-resize="true"
+        :toolbar-bordered="false"
         :get-row-style="rowStyle"
         tree
         :get-row-warning="hasShortfall"

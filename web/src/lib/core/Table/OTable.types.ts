@@ -356,6 +356,12 @@ export interface OTableProps<TData = any> {
    * (e.g. a page card) so it renders flush without a double border.
    */
   frame?: boolean;
+  /**
+   * Draws the hairline divider under the toolbar row. Default true. Set false
+   * when a full-width subheader (e.g. a summary strip) sits directly below the
+   * toolbar and the extra divider reads as a heavy double line.
+   */
+  toolbarBordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;

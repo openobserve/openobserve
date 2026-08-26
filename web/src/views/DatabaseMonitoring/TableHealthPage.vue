@@ -42,10 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   deliberately not gated on `ai_enabled`/`isEnterprise`: DBM is all-OSS.
 -->
 <template>
-  <DbmPageChrome
-    title-data-test="dbm-table-health-title"
-    :tab-counts="tabCounts"
-  >
+  <DbmPageChrome title-data-test="dbm-table-health-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- W11 · Recommendations. Deterministic checks, each showing the
            arithmetic that fired it. The rule line is one hover away rather
@@ -144,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         :error="error"
         :frame="false"
+        :toolbar-bordered="false"
         sorting="client"
         :show-global-filter="false"
         table-id="dbm-table-health"
