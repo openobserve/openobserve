@@ -45,7 +45,9 @@ pub(super) fn initial_series_capacity(
     query_duration: i64,
 ) -> usize {
     let run_based = first_run_len.saturating_mul(fragment_hint);
-    let interval_based = if first_run_len > 1 && run_last_ts > run_first_ts {
+    // At least two intervals, so a single anomalous gap (adjacent
+    // near-duplicate rows in time-sorted input) cannot dictate the estimate.
+    let interval_based = if first_run_len >= 3 && run_last_ts > run_first_ts {
         let sample_interval =
             ((run_last_ts - run_first_ts) / (first_run_len - 1) as i64).max(1) as u64;
         let samples = (query_duration.max(0) as u64)
@@ -89,6 +91,11 @@ mod tests {
         );
         assert_eq!(initial_series_capacity(1024, 4, 0, 0, 0), 2048);
         assert_eq!(initial_series_capacity(4096, 4, 0, 0, 0), 4096);
+        // A 2-row run must not infer an interval from its single gap.
+        assert_eq!(
+            initial_series_capacity(2, 4, 0, 1_000, 11_100 * 1_000_000),
+            8
+        );
     }
 
     #[test]
