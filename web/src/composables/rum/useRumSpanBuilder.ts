@@ -19,7 +19,13 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
-import { rumField, hasRumField, rumFieldEqualsSql } from "@/utils/rum/fields";
+import {
+  rumField,
+  hasRumField,
+  rumFieldEqualsAnySql,
+  normalizeTraceId,
+  traceIdLookupVariants,
+} from "@/utils/rum/fields";
 import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
@@ -170,11 +176,15 @@ export default function useRumSpanBuilder(
       const rumStream = await getStream("_rumdata", "logs", true);
       // Match the trace id under whichever spellings this stream actually carries.
       // Naming a column the stream lacks fails the entire query, so the predicate is
-      // built from the schema rather than assuming one namespace.
-      const traceIdPredicate = rumFieldEqualsSql(
+      // built from the schema rather than assuming one namespace. The id is matched
+      // in both its padded canonical form and the zero-stripped form SDK 0.4.x
+      // stored; non-hex ids fall back to an exact match.
+      const sanitized = sanitizeTraceId(traceId);
+      const idVariants = traceIdLookupVariants(sanitized);
+      const traceIdPredicate = rumFieldEqualsAnySql(
         rumStream?.schema,
         "trace_id",
-        sanitizeTraceId(traceId),
+        idVariants.length ? idVariants : [sanitized],
       );
       if (!traceIdPredicate) return empty;
 
@@ -284,7 +294,8 @@ export default function useRumSpanBuilder(
         ? String(rumField(event, "span_id"))
         : `rum_${event.type}_${event[`${event.type}_id`] || event.date}`,
       reference_parent_span_id: parentSpanId,
-      trace_id: rumField(event, "trace_id") || undefined,
+      trace_id:
+        normalizeTraceId(rumField(event, "trace_id")) || rumField(event, "trace_id") || undefined,
       operation_name: operationName,
       service_name: event.service || "Frontend",
       span_status:
@@ -563,7 +574,8 @@ export default function useRumSpanBuilder(
     if (!allViewEvents.length) return [];
 
     const firstTracedResource = tracedResources[0];
-    const traceId = rumField<string>(firstTracedResource, "trace_id") || "";
+    const rawTraceId = rumField<string>(firstTracedResource, "trace_id") || "";
+    const traceId = normalizeTraceId(rawTraceId) || rawTraceId;
     const tracedTimestamp = firstTracedResource?.date || 0;
 
     const { staticAssets, apiCalls, errors, longTasks } = classifyLeafEvents(allViewEvents);

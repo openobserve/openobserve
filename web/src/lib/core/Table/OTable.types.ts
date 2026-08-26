@@ -315,6 +315,13 @@ export interface OTableProps<TData = any> {
    * a column with id `"#"`.
    */
   showIndex?: boolean;
+  /**
+   * Render the header's select-all checkbox. Set false when selection is
+   * bounded (e.g. a comparison that accepts exactly two rows), where
+   * "select all" cannot mean anything. The header cell itself is still
+   * rendered so the body's selection gutter stays aligned.
+   */
+  showSelectAll?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   /**

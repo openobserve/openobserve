@@ -741,6 +741,38 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(false);
     });
 
+    it("hides the header select-all but keeps its cell when showSelectAll is false", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          selection: "multiple",
+          showSelectAll: false,
+        },
+      });
+      const header = wrapper.find('[data-test="o2-table-th-select"]');
+      // The cell stays so the body's selection gutter keeps its width; only the
+      // checkbox goes.
+      expect(header.exists()).toBe(true);
+      expect(header.find('[data-test="o2-table-select-all"]').exists()).toBe(false);
+    });
+
+    it("renders the header select-all by default", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          selection: "multiple",
+        },
+      });
+      expect(
+        wrapper
+          .find('[data-test="o2-table-th-select"]')
+          .find('[data-test="o2-table-select-all"]')
+          .exists(),
+      ).toBe(true);
+    });
+
     it("emits update:selectedIds when a row checkbox is toggled", async () => {
       wrapper = mount(OTable, {
         props: {

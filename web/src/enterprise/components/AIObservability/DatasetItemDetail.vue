@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-border-default bg-code-bg rounded-default text-text-body h-40 overflow-auto border px-3 py-2 font-mono text-xs wrap-break-word whitespace-pre-wrap"
               data-test="ai-dataset-item-detail-expected"
             >
-              {{ item.expectedOutput }}
+              {{ item.expectedOutput ?? "—" }}
             </div>
           </section>
 
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <!-- The raw stored payload, not the reading preview: a version is
                    only meaningful next to what actually changed. -->
-              <OCode block>{{ version.expectedOutput }}</OCode>
+              <OCode block>{{ version.expectedOutput ?? "—" }}</OCode>
             </li>
           </ul>
         </template>

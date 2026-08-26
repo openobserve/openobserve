@@ -24,6 +24,7 @@ use usage::{TriggerData, UsageData};
 
 pub mod error;
 pub mod evaluator;
+pub mod llm_experiments;
 pub mod llm_scores;
 pub mod usage;
 
