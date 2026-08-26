@@ -574,16 +574,17 @@ export const logsUtils = () => {
   }
 
   // validate if timestamp column alias is used for any field
+  //
+  // Ordered cheapest-first: astify() is a full parse of the query, and the SQL
+  // grammar backtracks catastrophically on deeply parenthesized WHERE chains —
+  // a real customer's 4.9KB query took 30s of blocked main thread PER PANEL,
+  // wedging any large dashboard on entry. The parse must be the last resort.
   const checkTimestampAlias = (query: string): boolean => {
     const tsCol = timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
-    const parsedSQL = fnParsedSQL(query);
 
-    const columns = parsedSQL?.columns;
-    if (Array.isArray(columns)) {
-      const invalid = columns.some((field: any) => field.as === tsCol);
-      if (invalid) {
-        return false;
-      }
+    // A query that never mentions the timestamp column cannot alias it.
+    if (!query || !query.toLowerCase().includes(tsCol.toLowerCase())) {
+      return true;
     }
 
     // Escape special regex characters in timestamp column name
@@ -598,6 +599,16 @@ export const logsUtils = () => {
 
     if (patterns.some((p) => p.test(query))) {
       return false;
+    }
+
+    const parsedSQL = fnParsedSQL(query);
+
+    const columns = parsedSQL?.columns;
+    if (Array.isArray(columns)) {
+      const invalid = columns.some((field: any) => field.as === tsCol);
+      if (invalid) {
+        return false;
+      }
     }
 
     return true;
