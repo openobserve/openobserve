@@ -43,7 +43,6 @@
     "allCaughtUp": "すべて確認済みです",
     "noPanels": {
       "title": "ここにはパネルがまだありません",
-      "description": "パネルを追加して、ログ、メトリクス、トレースの可視化を開始します。",
       "action": "パネルを追加",
       "actionDesc": "チャート、テーブルなど"
     },
@@ -78,7 +77,6 @@
     },
     "noDashboards": {
       "title": "はじめてのダッシュボードを作成",
-      "description": "ダッシュボードでは、メトリクス、ログ、トレースが 1 つのビューにまとめられます。作成して始めましょう。",
       "action": "新しいダッシュボード",
       "actionDesc": "空のキャンバスから始める",
       "import": "ダッシュボードをインポート",
@@ -124,7 +122,6 @@
     },
     "noIngestionTokens": {
       "title": "インジェストトークンはまだありません",
-      "description": "取り込みトークンは、ログ、メトリクス、トレースを送信する際にデータソースを認証します。",
       "action": "新しいトークン",
       "actionDesc": "取り込みトークンを生成する"
     },
@@ -133,11 +130,7 @@
       "description": "組織はユーザーとデータをグループ化します。作成して始めましょう。"
     },
     "noAlertDestinations": {
-      "title": "目的地はまだありません",
-      "description": "送信先は、アラート通知の送信先 (Slack、メール、Webhook など) を定義します。",
-      "action": "新しい目的地",
       "actionDesc": "通知チャネルを接続する",
-      "import": "インポート先",
       "importDesc": "JSON ファイルからのインポート"
     },
     "noAlertSources": {
@@ -147,10 +140,7 @@
       "actionDesc": "Webhook URLとトークンを作成"
     },
     "noPipelineDestinations": {
-      "title": "目的地はまだありません",
-      "description": "パイプライン出力の外部ターゲット — HTTP エンドポイントとリモート書き込みターゲット。",
-      "action": "新しい目的地",
-      "actionDesc": "パイプラインデスティネーションの接続"
+      "description": "パイプライン出力の外部ターゲット — HTTP エンドポイントとリモート書き込みターゲット。"
     },
     "noAlertTemplates": {
       "title": "テンプレートはまだありません",
@@ -191,8 +181,7 @@
       "actionDesc": "LLM プロバイダーの設定"
     },
     "noDiscoveredServices": {
-      "title": "サービスが見つかりませんでした",
-      "description": "トレースが到着し始めると、サービスが自動的にここに表示されます。"
+      "title": "サービスが見つかりませんでした"
     },
     "noNodes": {
       "title": "使用可能なノードはありません",
@@ -248,7 +237,6 @@
     },
     "noDatasets": {
       "title": "最初のデータセットを作成",
-      "description": "ゴールデンデータセットは、注釈付きのトレースとレビューをバージョン管理された評価セットに収集します。作成してキュレーションを始めましょう。",
       "action": "新しいデータセット",
       "actionDesc": "空のデータセットを開始"
     },
@@ -288,15 +276,11 @@
     },
     "noLLMInsights": {
       "title": "LLM アクティビティはまだありません",
-      "description": "OpenTelemetry Gen-AI セマンティック規約を使用してサービスをインストルメントし、少なくとも 1 つのトレースを取り込んでこのダッシュボードに入力してください。",
-      "action": "オープンテレメトリー搭載機器",
-      "actionDesc": "トレースの gen_ai_* 属性をキャプチャ"
+      "action": "オープンテレメトリー搭載機器"
     },
     "noLLMSessions": {
       "title": "LLM セッションはまだありません",
-      "description": "セッションは gen_ai_conversation_id でグループ化されます。各会話がトレースにタグ付けされるようにサービスをインストルメントすると、セッションがここに表示されます。",
-      "action": "オープンテレメトリー搭載機器",
-      "actionDesc": "gen_ai_conversation_id でスパンにタグを付ける"
+      "action": "オープンテレメトリー搭載機器"
     },
     "noScorers": {
       "title": "スコアラーはまだいません",
@@ -340,13 +324,9 @@
       "title": "問題のあるアイテムはありません",
       "description": "このウィンドウには問題のあるアイテムはありません。時間範囲を広げるか、キュー フィルターを切り替えて、すでにトリアージしたアイテムを確認してください。"
     },
-    "noTraces": {
-      "title": "トレースが見つかりません",
-      "description": "選択したサービスと時間範囲に一致するトレースはありません。より広い時間範囲または別のサービスを試してください。"
-    },
+    "noTraces": {},
     "noServiceGraph": {
-      "title": "サービスグラフデータなし",
-      "description": "より長い時間範囲をクエリしてみるか、サービスがスパンメトリクスを出力していることを確認してください。"
+      "title": "サービスグラフデータなし"
     },
     "noServicesCatalog": {
       "title": "サービスが見つかりません",
@@ -406,16 +386,13 @@
       "pipelines": "パイプライン",
       "workflows": "ワークフロー",
       "functions": "機能",
-      "streams": "ストリーム",
       "alerts": "アラート",
       "incidents": "事件",
-      "traces": "トレース",
       "discoveryItems": "問題のあるアイテム",
       "datasetItems": "アイテム",
       "searches": "検索",
       "searchJobs": "検索ジョブ",
       "users": "ユーザー",
-      "reports": "レポート",
       "queries": "クエリ",
       "serviceAccounts": "サービスアカウント",
       "invitations": "招待状",
@@ -426,9 +403,7 @@
       "roleLimits": "ロール制限",
       "ingestionTokens": "取り込みトークン",
       "organizations": "組織",
-      "alertDestinations": "宛先",
       "alertSources": "アラートソース",
-      "pipelineDestinations": "宛先",
       "alertTemplates": "テンプレート",
       "evalTemplates": "評価テンプレート",
       "enrichmentTables": "エンリッチメントテーブル",
@@ -480,7 +455,6 @@
       "noSearchResults": "検索結果がありません",
       "noServiceAccounts": "サービスアカウントがありません",
       "noStreams": "データが取り込まれていません",
-      "noTraces": "トレースがありません",
       "noUsers": "ユーザーがいません"
     },
     "noExperiments": {
@@ -523,8 +497,6 @@
     "relatedEvents": "関連イベント",
     "on": "オン",
     "event": "イベント",
-    "viewTraceDetails": "トレース詳細を表示",
-    "viewTrace": "トレースを表示",
     "networkRequests": "ネットワークリクエスト",
     "noNetworkRequestsFound": "このイベントのネットワークリクエストは見つかりませんでした",
     "consoleLogsComingSoon": "コンソールログは近日公開予定",
@@ -575,7 +547,6 @@
     "list": "リスト",
     "condition": "条件",
     "operator": "演算子",
-    "value": "値",
     "filters": "フィルター",
     "selectFilter": "フィルタを選択",
     "confirm": "確認",
@@ -744,7 +715,6 @@
     "nameIsRequired": "名前は必須です",
     "streamTypeIsRequired": "ストリームタイプは必須です",
     "functionNameIsRequired": "関数名は必須です",
-    "remoteDestinationIsRequired": "リモート接続先は必須です",
     "timezoneIsRequired": "タイムゾーンは必須です",
     "idPrefix": "ID: {id}",
     "unchangedCount": "変更なし ({count})",
@@ -803,7 +773,6 @@
     "relativeTimeAgo": "{value}{unit}前",
     "relativeTimePast": "過去{value}{unit}",
     "metrics": "メトリクス",
-    "traces": "トレース",
     "browserTime": "ブラウザ時間",
     "invalidCredentials": "認証情報が無効です",
     "notFound": "見つかりません",
@@ -844,11 +813,7 @@
       "loading": "条件を読み込み中...",
       "loadError": "保存された条件を読み取れなかったため、リセットされました。今保存すると上書きされます。"
     },
-    "destination": {
-      "createNew": "新しい宛先を作成",
-      "select": "宛先",
-      "loadError": "宛先の取得中にエラーが発生しました。"
-    },
+    "destination": {},
     "function": {
       "createNew": "新しい関数を作成",
       "createNewNoteWorkflow": "注：関数が作成され、その後、以前のフォームにリダイレクトされて、新しく作成された関数をワークフローに関連付けます。",
@@ -907,7 +872,6 @@
     "of": "の",
     "rowDetail": "ソース詳細",
     "sourceName": "名前",
-    "sourceValue": "値",
     "showHistogramLabel": "ヒストグラム",
     "hideHistogram": "ヒストグラムを非表示",
     "showPatternsLabel": "パターン",
@@ -1061,10 +1025,7 @@
     "regionFilterMsg": "リージョン/クラスターの検索",
     "queryRangeRestrictionMsg": "クエリの範囲は {range} に制限されています。それに応じて日付範囲を調整してください。そうしないと、開始日は許可された制限内に収まるように自動的に調整されます。",
     "cancel": "クエリをキャンセル",
-    "viewTrace": "トレースを表示",
-    "viewTraceUnavailable": "このログレコードのトレースを開けませんでした。",
     "viewRelated": "関連を表示",
-    "viewRelatedTooltip": "関連するトレースとメトリクスを表示する",
     "flattened": "平坦化",
     "original": "オリジナル",
     "resetFilters": "フィルターをリセット",
@@ -1146,8 +1107,6 @@
     "selectFunctionNamePlaceholder": "関数名を選択",
     "confirmFunctionUpdateTitle": "更新を確認",
     "confirmFunctionUpdateMsg": "関数 {name} を更新してよろしいですか?",
-    "traceIdLabel": "トレース ID:",
-    "enterTraceIdPlaceholder": "トレース ID を入力",
     "changeQueryModeTitle": "クエリーモードを変更",
     "changeQueryModeConfirm": "クエリモードを変更してもよろしいですか?X 軸、Y 軸、フィルターに保存されたデータは消去されます。",
     "patternExampleLog": "ログの例",
@@ -1197,9 +1156,7 @@
     "upgradeToProPlan": "PROプランにアップグレード",
     "home": "ホーム",
     "about": "概要",
-    "index": "ストリーム",
     "search": "ログ",
-    "traces": "トレース",
     "serviceGraph": "サービスグラフ",
     "services": "サービスカタログ",
     "aiObservability": "AI オブザーバビリティ",
@@ -1217,7 +1174,6 @@
     "rum": "RUM",
     "settings": "設定",
     "iam": "IAM",
-    "report": "レポート",
     "pipeline": "パイプライン",
     "workflows": "ワークフロー",
     "language": "言語",
@@ -1383,8 +1339,6 @@
     "loadingMsg": "ちょっと待ってください。RUMデータをロードしています。",
     "breadcrumbs": "ブレッドクラム",
     "tags": "[タグ]",
-    "traces": "トレース",
-    "searchEvents": "イベント検索",
     "loadingSessions": "しっかりつかまって。セッションを引っ張ってるから。",
     "errorStack": "エラースタック",
     "sessionReplay": "セッションリプレイ",
@@ -1394,11 +1348,6 @@
     "discoverSessionMessage": "セッションリプレイは、ウェブサイトまたはアプリケーションでのユーザーインタラクションをキャプチャして再生します。これにより、ユーザーがどのようにナビゲートしたか、どこをクリックしたか、何を入力したか、コンテンツにどのように反応したかを視覚的に確認できます。",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
     "eventID": "イベント ID",
-    "noCorrelatedTraces": "このセッションの相関トレースは見つかりませんでした。",
-    "span": "スパン",
-    "spans": "スパン",
-    "errorTraces": "エラートレース",
-    "failedToFetchTraces": "トレースデータを取得できませんでした。もう一度試してください。",
     "seekToMoment": "セッションの今この瞬間を探して",
     "route": "ルート",
     "duration": "所要時間",
@@ -1485,7 +1434,6 @@
     "frustrationErrorClick": "クリックでJavaScriptエラーが発生",
     "frustrationRageTap": "ユーザーが短時間に複数回(3回以上)タップ - フラストレーションを示唆",
     "frustrationErrorTap": "タップでJavaScriptエラーが発生",
-    "fetchTraceMetadataFailed": "トレースメタデータの取得に失敗しました",
     "frustrationEventTooltip": "⚠️ フラストレーション: {types}\n{name}",
     "errorEventTooltip": "⛔ エラー: {name}",
     "frustrationSignalType": "フラストレーションシグナル: {type}"
@@ -1537,10 +1485,8 @@
     "feature_column_name": "機能",
     "feature_logs": "ログ",
     "feature_metrics": "指標",
-    "feature_traces": "トレース",
     "feature_alerts": "アラート",
     "feature_dashboards": "ダッシュボード",
-    "feature_reports": "レポート",
     "feature_vrl_functions": "VRL ファンクション",
     "feature_pipelines": "パイプライン",
     "feature_high_availability": "高可用性",
@@ -1561,7 +1507,6 @@
     "feature_license": "ライセンス",
     "feature_support": "サポート",
     "feature_cost": "費用",
-    "feature_pipelines_external": "パイプライン-外部宛先",
     "feature_extreme_performance": "究極のパフォーマンス (多くのクエリで100倍向上)",
     "feature_query_optimizer": "クエリオプティマイザー",
     "value_license_agpl": "AGPL",
@@ -1663,7 +1608,6 @@
       },
       "core_features": {
         "logs_metrics_traces": {
-          "name": "ログ、メトリックス、トレース",
           "note": "完全なオブザーバビリティデータの取り込みと分析"
         },
         "rum": {
@@ -1678,7 +1622,6 @@
           "note": "カスタマイズ可能な視覚化ダッシュボード"
         },
         "reports": {
-          "name": "レポート",
           "note": "定期レポートとオンデマンドレポート"
         },
         "vrl_functions": {
@@ -1735,10 +1678,7 @@
           "name": "機密データの編集",
           "note": "PII と機密情報の保護"
         },
-        "pipeline_remote_destinations": {
-          "name": "パイプラインのリモート送信先",
-          "note": "リモート宛先へのデータ送信"
-        },
+        "pipeline_remote_destinations": {},
         "query_optimizer": {
           "name": "クエリー・オプティマイザー/アグリゲーション・キャッシュ",
           "note": "TopK アグリゲーションとクエリの最適化"
@@ -1780,7 +1720,6 @@
           "note": "最適化された分散結合操作"
         },
         "logs_metrics_traces_correlation": {
-          "name": "ログ、指標、トレースの相関関係",
           "note": "自動検出および関連づけ"
         },
         "service_maps": {
@@ -2464,7 +2403,6 @@
       "secondaryIndexCount": "セカンダリインデックス ({count})"
     },
     "deleteField": "フィールドを削除",
-    "header": "ストリーム",
     "subtitle": "インデックス管理とストリーム構成",
     "streamNameHelpText": "英数字、アンダースコア、コロンのみを使用してください。",
     "search": "ストリームを検索",
@@ -2504,7 +2442,6 @@
     "deleteDatesMessage": "選択した日付を削除してもよろしいですか?このアクションは元に戻せません。",
     "labelLogs": "ログ",
     "labelMetrics": "メトリックス",
-    "labelTraces": "トレース",
     "labelMetadata": "メタデータ",
     "add": "ストリームを追加",
     "dataRetention": "データ保持期間 (日数)",
@@ -2546,7 +2483,6 @@
   },
   "workflow": {
     "header": "ワークフロー",
-    "subtitle": "トリガー、ロジック、宛先でアクションを自動化",
     "create": "新しいワークフロー",
     "createSuccess": "ワークフローが正常に作成されました",
     "name": "ワークフロー名",
@@ -2627,7 +2563,6 @@
     },
     "triggerMeta": {
       "orgId": "アラートが属する組織ID。",
-      "streamType": "ストリームタイプ — ログ、メトリクス、トレース。",
       "streamName": "アラートが監視するストリーム。",
       "alertName": "発動したアラートの名前。",
       "alertType": "アラートタイプ — リアルタイムまたはスケジュール。",
@@ -2664,8 +2599,6 @@
         "input": "入力",
         "output": "出力",
         "noInput": "このステップは前回の実行でレコードを受け取りませんでした。",
-        "sentExternally": "外部宛先に送信しました",
-        "destinationNoRecords": "この宛先にレコードが届きませんでした — 何も送信されませんでした。",
         "branchFiltered": "0 レコード — このブランチには何も渡されませんでした。",
         "conditionNoMatch": "この条件に一致するレコードはありませんでした — 後続には何も進みませんでした。",
         "errorHeading": "エラー",
@@ -2714,15 +2647,12 @@
       "kindAction": "アクション",
       "condition": "条件",
       "function": "関数",
-      "sendToDestination": "宛先",
       "configComingSoon": "{node} の設定は後続のステップで行います",
       "sectionTransform": "変換",
-      "sectionDestination": "宛先",
       "stepSearchPlaceholder": "ステップを検索...",
       "stepNoMatch": "検索に一致するステップがありません。",
       "conditionDesc": "ルールで分岐",
       "functionDesc": "関数でペイロードを再整形",
-      "destinationDesc": "宛先に送信",
       "triggerBody": "関連付けられたアラートが発生したときに実行",
       "triggerDataExampleNote": "これは例です。実際の列はアラートのクエリから取得されます。",
       "incidentEventTypeLabel": "イベントタイプ",
@@ -2741,12 +2671,7 @@
       "functionCreateNew": "新しい関数を作成",
       "functionRequired": "関数が必要です",
       "functionLoadError": "関数を読み込めません",
-      "destinationBody": "送信先に送信",
       "destinationBodySet": "{name} に送信",
-      "destinationSelect": "送信先",
-      "destinationCreateNew": "新しい送信先を作成",
-      "destinationRequired": "送信先を選択してください",
-      "destinationLoadError": "送信先を読み込めません",
       "namePlaceholder": "ステップ名 (任意)",
       "commentLabel": "コメント (任意)",
       "commentPlaceholder": "このステップに関するメモを追加...",
@@ -2756,8 +2681,6 @@
       "disabledBadge": "無効",
       "incompleteBadge": "後で設定",
       "destinationSetUpLater": "後で設定",
-      "destinationSetUpLaterPrompt": "まだ送信先がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
-      "destinationSetUpLaterActive": "今のところ送信先はスキップされます — 名前とコメントは保存されます。公開前に送信先が必要です。",
       "functionSetUpLater": "後で設定",
       "functionSetUpLaterPrompt": "まだ関数がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
       "functionSetUpLaterActive": "今のところ関数はスキップされます — 名前とコメントは保存されます。公開前に関数が必要です。"
@@ -2815,8 +2738,6 @@
       "functionNodeEmptyName": "関数ノード {id} の関数名が空です。",
       "functionNodeInvalidName": "関数ノード {id} の関数名 \"{name}\" が無効です。利用可能な関数のいずれかである必要があります。",
       "outputStreamNodeEmptyName": "出力ストリームノード {id} のストリーム名が空です。",
-      "remoteStreamNodeEmptyDestination": "リモートストリームノード {id} の宛先名が空です。",
-      "remoteStreamNodeInvalidDestination": "リモートストリームノード {id} の宛先 \"{destination}\" が無効です。利用可能なパイプライン宛先のいずれかである必要があります。",
       "edgeMissingSourceNode": "エッジ {id} が存在しないソースノード {source} を参照しています。",
       "edgeMissingTargetNode": "エッジ {id} が存在しないターゲットノード {target} を参照しています。",
       "inputNodeHasIncomingEdges": "入力ノード {id} には入ってくるエッジがあってはなりません。入ってくるエッジが {count} 件見つかりました。",
@@ -2831,7 +2752,6 @@
     "importErrors": {
       "unknownError": "不明なエラー",
       "nameRequired": "パイプライン - {index}: 名前は必須です",
-      "streamTypeInvalid": "パイプライン - {index}: ストリームタイプは必須で、'logs'、'metrics'、'traces' のいずれかである必要があります。",
       "sourceStreamNameRequired": "パイプライン - {index}: ソースストリーム名は必須です ",
       "sqlQueryRequired": "パイプライン - {index}: SQLクエリは必須です",
       "timezoneRequired": "パイプライン - {index}: タイムゾーンは必須です",
@@ -2844,7 +2764,6 @@
       "v0ConditionFields": "パイプライン - {index}、ノード {nodeIndex}: V0形式 - 各条件にはcolumn、operator、valueが必要です。",
       "v1ConditionInvalid": "パイプライン - {index}、ノード {nodeIndex}: 無効なV1条件形式です。",
       "conditionFormatUnrecognized": "パイプライン - {index}、ノード {nodeIndex}: 認識できない条件形式です。",
-      "remoteDestinationRequired": "パイプライン - {index}: リモート宛先は必須です",
       "createSuccess": "パイプライン - {index}: \"{name}\" が正常に作成されました \n注: 作成されたパイプラインオブジェクト {name} をjsonファイルから削除してください",
       "createFailed": "パイプライン - {index}: \"{name}\" の作成に失敗しました --> \n 理由: {reason}",
       "sqlQueryMismatch": "パイプライン - {index}: SQLクエリはすべてのノードで同じである必要があります。また、ノード内のクエリと一致するようにしてください。\n\n          input.sql_query: {sqlQuery} \n\n          input.source.query_condition.sql: {sourceSql} \n",
@@ -2945,10 +2864,8 @@
     "defaultDelayTooltip": "デフォルト: 5 秒",
     "deleteDataBeforeBackfill": "バックフィル前に既存データを削除",
     "irreversibleDeletionWarning": "警告: 元に戻せないデータ削除",
-    "deleteBackfillWarningMessage": "これは、バックフィルを実行する前に、指定された期間の宛先ストリーム内のすべてのデータを完全に削除します。この操作は元に戻せません。",
     "timeAlignmentRequirements": "時間アライメント要件（UTC）:",
     "logsHourBoundaryNote": "ストリーム: 時間はUTCの1時間境界に合わせる必要があります（例: 10:00:00、10:15:00ではない）",
-    "metricsTracesLabel": "メトリクス/トレース",
     "dayBoundaryNote": "ストリーム: 時間はUTCの日境界に合わせる必要があります（例: 00:00:00）",
     "estimatedProcessingTime": "推定処理時間:",
     "estimatedChunks": "推定チャンク数:",
@@ -2971,8 +2888,6 @@
       "statusUnknown": "不明",
       "phaseInitializing": "初期化中"
     },
-    "deleteBackfillConfirmMessage": "バックフィル前に既存データを削除することを選択しました。これにより、指定された期間の宛先ストリーム内のすべてのデータが完全に削除されます。",
-    "editBackfillDeleteConfirmMessage": "バックフィル前に既存データを削除することを選択しました。これにより、指定された期間の宛先ストリーム内のすべてのデータが完全に削除されます。この操作は、ジョブが更新されると取り消しやキャンセルはできません。続行してもよろしいですか？",
     "actionCannotBeUndone": "この操作は、ジョブが作成されると取り消しやキャンセルはできません。",
     "areYouSureProceed": "続行してもよろしいですか？",
     "clearFilters": "フィルターをクリア",
@@ -2993,7 +2908,6 @@
     "chunkPeriodDefaultPlaceholder": "60",
     "organizationId": "組織ID",
     "functionName": "関数名",
-    "remoteDestination": "リモート宛先",
     "failedToLoadPipeline": "パイプラインを読み込めませんでした",
     "header": "パイプライン",
     "subtitle": "転送中のデータの変換、強化、ルーティング",
@@ -3021,7 +2935,6 @@
     "trigger": "トリガー",
     "aggregation": "アグリゲーション",
     "selectColumn": "列を選択",
-    "value": "価値",
     "fieldRequired": "フィールドは必須です！",
     "sqlQuery": "SQL クエリー",
     "promqlQuery": "プロムQL クエリ",
@@ -3036,15 +2949,11 @@
     "sourceQueryTooltip": "ソース:クエリノード",
     "functionTooltip": "ファンクションノード",
     "conditionTooltip": "条件ノード",
-    "destinationStreamTooltip": "宛先:ストリームノード",
-    "destinationExternalTooltip": "送信先:外部送信先ノード",
     "pipelineNotFound": "パイプラインが見つかりません",
     "pipelineNameRequired": "パイプライン名が必要です",
     "sourceNodeRequired": "ソースノードが必要です",
-    "destinationNodeRequired": "デスティネーションノードが必要です",
     "connectAllNodes": "保存する前にすべてのノードを接続してください",
     "connectAllNodesShort": "すべてのノードを接続してください",
-    "enrichmentTablesScheduledOnly": "宛先ストリームとしてのエンリッチメントテーブルは、スケジュールされたパイプラインでのみ使用できます",
     "savingPipeline": "パイプラインを保存中...",
     "pipelineUpdated": "パイプラインは正常に更新されました",
     "pipelineSaved": "パイプラインは正常に保存されました",
@@ -3076,7 +2985,6 @@
     "functionAlreadyAssociated": "関数はすでに関連付けられています",
     "atLeastOneCondition": "少なくとも 1 つの条件を追加してください",
     "fillAllConditionFields": "すべての条件フィールドを入力してください（列、演算子、値は必須です）",
-    "selectExternalDestination": "リストから外部宛先を選択してください",
     "backfillNumericRange": "{min} から {max} の間で指定してください",
     "selectValidTimeRange": "有効な時間範囲を選択してください",
     "startBeforeEndTime": "開始時刻は終了時刻より前でなければなりません",
@@ -3092,11 +3000,9 @@
       "streamType": "ストリームタイプ *"
     },
     "sourceNode": "[ソース]",
-    "streamNode": "ストリーム",
     "queryNode": "クエリ",
     "transformNode": "トランスフォーム",
     "functionNode": "ファンクション",
-    "destinationNode": "目的地",
     "remoteNode": "リモート",
     "conditionsNode": "条件",
     "editorFunctionTooltip": "関数でペイロードを再形成する",
@@ -3155,8 +3061,7 @@
       "customStep4": "認証に必要なヘッダーを設定します",
       "customStep5": "出力形式（JSONまたはNDJSON）を選択します",
       "customStep6": "動作を確認するため接続をテストします",
-      "defaultTitle": "接続詳細",
-      "defaultStep1": "特定の手順を表示するには、宛先タイプを選択します"
+      "defaultTitle": "接続詳細"
     },
     "deleteFunctionAssociationConfirm": "関数の関連付けを削除してもよろしいですか？",
     "deleteStreamRoutingConfirm": "ストリームルーティングを削除してもよろしいですか？",
@@ -3182,7 +3087,6 @@
     "noJobSelected": "ジョブが選択されていません",
     "updateBackfillJobFailed": "バックフィルジョブの更新に失敗しました",
     "fetchPipelineHistoryFailed": "パイプライン履歴の取得に失敗しました",
-    "defaultDestinationNodeWarning": "デフォルトの宛先ノードを削除すると、そこへのデータの取り込みが停止します。ソースストリームは、新しく追加された宛先ストリームのみにルーティングされるようになります。どの宛先ストリームにもルーティングされないデータは破棄されます。",
     "confirmBulkDeleteMsg": "パイプラインを {count} 件削除してもよろしいですか？",
     "confirmPauseBackfillJob": "バックフィルジョブ「{name}」を一時停止してもよろしいですか？後で再開できます。",
     "confirmResumeBackfillJob": "バックフィルジョブ「{name}」を再開してもよろしいですか？",
@@ -3292,10 +3196,6 @@
     "analyzingDimensions": "ディメンションを解析中...",
     "arrowSeparator": "→",
     "computingDistributions": "{count} 次元にわたる度数分布の計算",
-    "dashboardDescError": "エラースパイク期間中のトレースのエラー率を、ディメンション全体でベースラインと比較",
-    "dashboardDescLatency": "選択したトレースのパーセンタイルレイテンシ（所要時間 {start}-{end}µs）をベースラインとディメンション全体で比較",
-    "dashboardDescVolume": "トレース数の分布をベースラインとディメンション全体で比較",
-    "dashboardDescVolumeRate": "選択した期間のトレース数分布（レート {start}-{end} トレース）をベースラインとディメンション全体で比較",
     "dashboardTitleError": "エラーインサイト",
     "dashboardTitleLatency": "レイテンシインサイト",
     "dashboardTitleVolume": "ボリュームインサイト",
@@ -3303,8 +3203,6 @@
     "durationLabel": "所要時間:",
     "failedToLoad": "分析を読み込めませんでした",
     "panelDescErrorComparison": "ディメンション {dimension} のエラー率比較。選択バーが高いほど、このディメンション値がエラースパイク期間中に多くのエラーを持つことを示します。",
-    "panelDescLatencyComparison": "ディメンション {dimension} のパーセンタイルレイテンシ比較。選択バーが高いほど、このディメンション値が遅いトレースと関連していることを示します。",
-    "panelDescVolumeComparison": "ディメンション {dimension} のトレース数比較。選択バーが高いほど、このディメンション値が高ボリューム期間中により頻繁に出現することを示します。",
     "panelDescVolumeTopValues": "ディメンション {dimension} の件数上位値。",
     "refreshTooltip": "パーセンタイルを更新して分析を更新",
     "retryButton": "リトライ",
@@ -3315,7 +3213,6 @@
     "title": "インサイト",
     "tabLabel": "レート",
     "analyzeTooltipLogs": "現在の時間範囲のディメンション分布を分析",
-    "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
     "rateLabel": "レート:",
     "searchInspectionsLabel": "検索ジョブの実行詳細を検査する",
     "inspectBtnLabel": "検査",
@@ -3418,7 +3315,6 @@
       "singleTargetTitle": "単一のリモート書き込みターゲット",
       "fanoutTitle": "複数のバックエンドへのファンアウト",
       "tipPrefix": "ヒント: `vmagent`はフラグを繰り返すことで書き込みを複製できます",
-      "tipSuffix": "そのため、既存のVictoriaMetrics宛先を維持しながらメトリクスをOpenObserveに転送できます。",
       "docLinkText": "vmagentのリモート書き込みターゲットの設定について詳しく学ぶ。"
     },
     "ai": {
@@ -3441,7 +3337,6 @@
     "customLabel": "カスタム",
     "logsLabel": "ログ",
     "metricsLabel": "メトリクス",
-    "tracesLabel": "トレース",
     "redirectionIngestionMsg": "注: IAM以外のページにアクセスするには、現在の組織でデータの取り込みを開始する必要があります。",
     "databaseLabel": "データベース",
     "securityLabel": "セキュリティ",
@@ -3466,7 +3361,6 @@
     "dotnettracing": ".NETトレース",
     "dotnetlogs": ".NETログ",
     "macos": "macOS",
-    "tracesotlp": "トレース ({product})",
     "rum": "リアルユーザーモニタリング（RUM）",
     "openvpn": "OpenVPN",
     "nginx": "Nginx",
@@ -3491,7 +3385,6 @@
       "diagnosticSettingsPath": "診断設定 → + 診断設定の追加",
       "enterNameCheckCategories": "名前を入力し、有効にするログ カテゴリをオンにします",
       "underPrefix": "以下の",
-      "destinationDetails": "宛先の詳細",
       "chooseSuffix": "、選択",
       "streamToEventHub": "Event Hub へのストリーム",
       "selectEventHubPrefix": "手順 1 で作成した Event Hub 名前空間と Event Hub を選択します (プレフィックス:",
@@ -3629,21 +3522,17 @@
       "anyWindowsHostNote": "任意の Windows サーバーまたは VM。",
       "arrow": "→",
       "askOnSlack": "Slack で質問する",
-      "autoInstrumentTracesDesc": "省略可能。OpenTelemetry オペレーターはアノテーション付きワークロードに計測を挿入するため、**アプリケーション コードに触れたりイメージを再ビルドしたりせずに分散トレース**を取得できます。言語を選択し、実行中の名前空間にアノテーションを付けます。",
-      "autoInstrumentTracesTitle": "アプリケーションをトレース用に自動インストルメント化する",
       "cassandraJmxNote": "レシーバーが接続できるように、Cassandra で JMX リモートアクセスを有効にします。",
       "cassandraTagline": "OpenTelemetry Collector の JMX レシーバーを使用して Cassandra メトリクスを収集し、OpenObserve に送信します。",
       "checking": "確認中…",
       "checkingForLogs": "ログを確認中…",
       "checkingForMetrics": "メトリクスを確認中…",
-      "checkingForSpans": "スパンを確認中…",
       "chipEditor": "エディター",
       "chipInstall": "インストール",
       "chipLogs": "ログ",
       "chipMetrics": "メトリクス",
       "chipRun": "実行",
       "chipTerminal": "ターミナル",
-      "chipTraces": "トレース",
       "clusterNameHelp": "このクラスターをログ、メトリック、ダッシュボードで識別します。",
       "clusterNameLabel": "クラスター名",
       "collectorInstallDesc": "レシーバーは Contrib ビルドにのみ含まれています — プラットフォームを選択してください。",
@@ -3654,14 +3543,11 @@
       "configureCollectorTitle": "OpenTelemetry Collector の設定",
       "connectedLogsHeadline": "接続済み — ログが流れています",
       "connectedMetricsHeadline": "接続済み — メトリクスが流れています",
-      "connectedTracesHeadline": "接続済み — トレースが流れています",
       "countLogs": "{count} ログ | {count} ログ",
       "countMetricStreams": "{count} メトリック ストリーム | {count} メトリック ストリーム",
-      "countSpans": "{count} スパン | {count} スパン",
       "downloadEnvTooltip": ".env をダウンロード",
       "downloadJmxJarDesc": "JMX レシーバーはこのヘルパー JAR を実行します（コレクターホストに Java が必要です）。",
       "downloadJmxJarTitle": "JMX メトリクス JAR をダウンロード",
-      "dynamodbFirehoseEndpointDesc": "Kinesis Data Firehose 配信ストリームを作成する際に、これらを **HTTP エンドポイント** 宛先として使用します。",
       "dynamodbFirehoseEndpointTitle": "OpenObserve Firehose エンドポイント",
       "dynamodbPipelineDesc": "テーブルで **DynamoDB Streams** を有効にし、**Kinesis Data Stream** に接続して、上記の HTTP エンドポイントを指す **Kinesis Data Firehose** 配信ストリームを設定します。",
       "dynamodbPipelineTitle": "DynamoDB → Firehose をストリーミング",
@@ -3675,7 +3561,6 @@
       "gcpFixBody": "GCPはサブスクリプション自体の配信失敗を報告します。シンクがパブリッシュしているのにここに何も届かない場合、通常はプッシュエンドポイントがリクエストを拒否しています：",
       "gcpFixTitle": "プッシュサブスクリプションを確認",
       "gcpPushUrlNote": "このURLは秘密にしてください — 取り込みキーが埋め込まれています。漏洩した場合はこのページのヘッダーからローテーションしてください。",
-      "gcpSinkDesc": "GCP コンソールで、Pub/Sub を宛先として **Log Router シンク** を作成し（Logging → Log Router → Create sink）、トピックを自動作成させます。シンクの包含フィルターによって、OpenObserve に到達するログが決まります。",
       "gcpSinkTitle": "ログを Pub/Sub トピックにルーティングする",
       "gcpSinkWriterNote": "シンクのライターIDにトピックのPub/Subパブリッシャーロールを付与してください。そうしないと、静かに何もパブリッシュされません。",
       "gcpStreamHelp": "上記のプッシュ URL で使用され、下のチェックで監視されます。専用のストリームにより GCP ログを分離できます。",
@@ -3714,7 +3599,6 @@
       "k8sInstallerNote": "これにより、cert-manager、OpenTelemetryオペレーター、OpenObserveコレクターが自動的にインストールされます。",
       "k8sInternalEndpointNote": "OpenObserveがこの同じクラスター内で実行される場合にこれを使用してください — トラフィックはクラスター外に出ることはありません。",
       "k8sTroubleAnnotationA": "インジェクションはポッド作成時に行われるため、既存のポッドは再起動するまで影響を受けません — `kubectl rollout restart deployment -n my-namespace`を実行してください。アノテーションが適用されたことを`kubectl get ns my-namespace -o yaml`で確認し、値が`openobserve-collector/openobserve-<language>`と一致することを確認してください。Goの場合、`otel-go-auto-target-exe`はコンテナ**内**のバイナリのパスである必要があります。",
-      "k8sTroubleAnnotationQ": "名前空間にアノテーションを付けましたが、トレースが表示されません",
       "k8sTroubleEndpointA": "**In-Cluster**は、OpenObserve自体がこのクラスター内で実行されている場合にのみ使用してください。その場合、トラフィックはクラスター内に留まり、ネットワークを越えることはありません。URLは`http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080`です — デフォルトでは名前空間`openobserve`のリリース`o2`を想定しているため、異なる場合は編集してください。それ以外の場合は外部エンドポイントを使用します。",
       "k8sTroubleEndpointQ": "どちらのエンドポイントを使用すべきですか — 外部ですか、それともクラスター内ですか？",
       "k8sTroubleExampleA": "はい — **HOTコマース**はエンドツーエンドで接続されたサンプルアプリケーションであり、**OpenTelemetryオペレーター**のドキュメントには完全なアノテーションリファレンスが記載されています。両方ともこのページの下部にリンクされています。",
@@ -3748,7 +3632,6 @@
       "mysqlTagline": "OpenTelemetry Collector で MySQL メトリクスを収集し、OpenObserve に送信してください。",
       "noLogsFoundYet": "まだログが見つかりません",
       "noMetricsFoundYet": "まだメトリクスが見つかりません",
-      "noSpansFoundYet": "まだスパンが見つかりません",
       "nothingOnStream": "{stream}には何もありません — アプリを実行してもう一度テストしてください",
       "notTestedYet": "まだテストされていません",
       "onStream": "{stream}上",
@@ -3757,16 +3640,13 @@
       "oracleTagline": "OpenTelemetry Collector で Oracle DB メトリクスを収集し、OpenObserve に送信してください。",
       "otlpFixBody": "エクスポーターを定義するだけでは不十分です — パイプラインにリストされる必要があります。これは、正しく見える設定が何も送信しない最も一般的な理由です：",
       "otlpFixTitle": "エクスポーターが実際にパイプラインに配線されているか確認",
-      "otlpGrpcNote": "高スパン量の場合、HTTPよりもオーバーヘッドが低くなります。ポート5081はコレクターから到達可能である必要があります。",
       "otlpHttpNote": "OpenTelemetry Collectorのデフォルトであり、プロキシやロードバランサーの背後を含むどこでも動作します。",
       "otlpSdkEnvNote": "標準のOTEL_*環境変数 — すべてのOpenTelemetry SDKがこれらを読み取るため、コードの変更は不要です。",
       "otlpTracesStreamHelp": "上記の構成に `stream-name` として書き込まれ、下のチェックで監視されます。",
       "otlpTrouble401A": "`Authorization`ヘッダーは、この組織の取り込みトークンを使用した`Basic <token>`である必要があります — 上記の値はすでに正しいです。ローテーションされた場合は、このページから再コピーしてください。",
       "otlpTrouble401Q": "コレクターが401または403をログに記録する",
-      "otlpTroubleHttpGrpcA": "HTTPは安全なデフォルトであり、プロキシやロードバランサーを問題なく通過します。gRPCは高スパン量でのオーバーヘッドが低いですが、ポート5081がエンドツーエンドで到達可能である必要があります。",
       "otlpTroubleHttpGrpcQ": "HTTPとgRPCのどちらを使用すべきですか？",
       "otlpTroubleStreamA": "`stream-name`ヘッダーがストリームを決定します。上記のフィールドと同じ名前に設定してください。そうしないと、以下のチェックでは何も書き込まれないストリームを監視します。",
-      "otlpTroubleStreamQ": "スパンは到着するが、間違ったストリームに配置される",
       "otlpTroubleTlsA": "`tls.insecure`フラグはエンドポイントのスキームと一致している必要があります — このデプロイメントのURLに基づいて、上記では`{insecure}`に設定されています。平文のHTTPエンドポイントでは`insecure: true`が必要で、HTTPSでは`false`が必要です。",
       "otlpTroubleTlsQ": "TLSエラーでgRPC接続が失敗する",
       "pillActiveBackends": "アクティブなバックエンド",
@@ -3824,7 +3704,6 @@
       "pillServiceMap": "サービスマップ",
       "pillSessions": "セッション",
       "pillSetup": "セットアップ",
-      "pillSpans": "スパン",
       "pillSqlCompilationRate": "SQLコンパイルレート",
       "pillStorageBytes": "ストレージバイト",
       "pillSystem": "システム",
@@ -3856,7 +3735,6 @@
       "preparePostgresqlTitle": "PostgreSQL の準備",
       "prepareSqlServerDesc": "監視ログインを作成してください — SQL クライアントで実行してください。**シェルではなく**。",
       "prepareSqlServerTitle": "SQL Server の準備",
-      "providerNameOtlpTraces": "トレース (OpenTelemetry)",
       "providerNameRum": "リアルユーザーモニタリング",
       "quickInstallDesc": "**1 つのコマンド** で OpenObserve コレクターをインストールします — クラスター名を設定して実行するだけです。名前はすべてのレコードにタグ付けされるため、複数が報告されるとクラスターを区別できます。",
       "quickInstallTitle": "クイックインストール（推奨）",
@@ -3969,19 +3847,16 @@
       "sqlServerTagline": "OpenTelemetry Collector で SQL Server メトリクスを収集し、OpenObserve に送信してください。",
       "startIngestingTestForLogs": "取り込みを開始し、ログをテストしてください",
       "startIngestingTestForMetrics": "取り込みを開始し、メトリクスをテストしてください",
-      "startIngestingTestForSpans": "取り込みを開始し、スパンをテストしてください",
       "streamNameError": "使用できるのは文字、数字、_ のみです。",
       "streamNameLabel": "ストリーム名",
       "stuck": "行き詰まっていますか？",
       "taglineDatabricks": "ログ API を使用して Databricks ノートブックのログを OpenObserve に送信します。",
       "taglineGcp": "Pub/Sub プッシュサブスクリプションを使用して Google Cloud ログを OpenObserve にストリーミングします — エージェントやコレクターを実行する必要はありません。",
-      "taglineKubernetes": "OpenObserve Collector をクラスターにデプロイします — コンテナログ、Kubernetes イベント、クラスターメトリクスに加え、ワークロード向けのコード不要のトレースも取得できます。",
       "taglineLinux": "任意の Linux ホストに OpenObserve エージェントをインストールします — システムログと journald ログに加え、CPU、メモリ、ディスク、ネットワークのメトリクスを収集します。",
       "taglineMacos": "任意の Mac に OpenObserve エージェントをインストールします — 統合ログと標準ログファイルに加え、CPU、メモリ、ディスク、ネットワークのメトリクスを収集します。",
       "taglineOtlpTraces": "任意の OpenTelemetry エクスポーターを OpenObserve に向けます — コレクターまたは SDK、HTTP または gRPC。エンドポイントとトークンは下に入力されています。",
       "taglineWindows": "任意の Windows ホストに OpenObserve エージェントをインストールします — イベントログ、パフォーマンスカウンター、ホストメトリクスを収集します。",
       "testAgain": "再テスト",
-      "tracesStreamNameLabel": "トレースストリーム名",
       "trackScreensDesc": "React Navigation を使用している場合、SDK にナビゲーション ref を渡すと、すべてのルート変更が RUM ビューとして記録されます。画面ごとのコードは不要です。",
       "trackScreensTitle": "画面を自動的に追跡する（オプション）",
       "troubleshooting": "トラブルシューティング",
@@ -4001,7 +3876,6 @@
       "verifyMongodbMetricsDesc": "下の Test をクリックするか、Streams で `mongodb_*` メトリクスを確認してください。",
       "verifyMysqlMetricsDesc": "下の Test をクリックするか、Streams で `mysql_*` メトリクスを確認してください。",
       "verifyOracledbMetricsDesc": "下の Test をクリックするか、Streams で `oracledb_*` メトリクスを確認してください。",
-      "verifyOtlpTracesDesc": "コレクター（またはアプリ）を再起動し、スパンを生成するリクエストを実行してから、Test をクリックしてください。",
       "verifyPostgresqlMetricsDesc": "下の Test をクリックするか、Streams で `postgresql_*` メトリクスを確認してください。",
       "verifyReactNativeRumDesc": "シミュレーター、エミュレーター、またはデバイスでアプリを実行し、いくつかの画面を移動してから Test を押してください。React Native イベントは `_rumdata` ストリームに格納されます。",
       "verifyRedisMetricsDesc": "下の Test をクリックするか、Streams で `redis_*` メトリクスを確認してください。",
@@ -4012,7 +3886,6 @@
       "verifyZookeeperMetricsDesc": "下の Test をクリックするか、Streams で `zookeeper_*` メトリクスを確認してください。",
       "viewLogs": "ログを表示",
       "viewStreams": "ストリームを表示",
-      "viewTraces": "トレースを表示",
       "whatTheInstallerDoes": "インストーラーの動作",
       "windowsAgentFixBody": "インストーラーはエージェントをWindowsサービスとして登録します。何も届かない場合は、サービスが実行されていることを確認し、そのログの最新エントリを参照してください。",
       "windowsTroubleScriptA": "PowerShellは既定で署名なしスクリプトをブロックします。コンソールを**管理者として実行**し、必要に応じて、そのセッションで `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` を使用してスクリプトを許可してください。",
@@ -4036,11 +3909,8 @@
       "verifyAndroidRumDesc": "エミュレーターまたはデバイスでアプリを実行し、いくつかの画面を移動してからTestを押します — ネイティブAndroidイベントは `_rumdata` ストリームに届きます。",
       "verifyIosRumDesc": "シミュレーターまたはデバイスでアプリを実行し、いくつかの画面を移動してからTestを押します — ネイティブiOSイベントは `_rumdata` ストリームに届きます。",
       "dbmPreparePostgresTitle": "データベースモニタリング · アクセス権の付与（オプション）",
-      "dbmPreparePostgresDesc": "**上記の操作は単独で完結しています** — クエリのタイミングは、ここでの設定なしに、アプリケーションのトレースからデータベースにすでに届いています。これらの最後の手順では、トレースでは決して確認できないもの（デッドロックとブロックされたクエリ）を追加します。これらはデータベース自体だけが記録します。`pg_monitor` を付与して、コレクターが他のセッションのクエリを読み取れるようにします — SQL クライアントで実行してください。**シェルではなく**。",
       "dbmPrepareMysqlTitle": "データベースモニタリング · デッドロック履歴の保持（オプション）",
       "dbmPrepareMariadbTitle": "データベースモニタリング · デッドロック履歴の保持（オプション）",
-      "dbmPrepareMysqlDesc": "**上記の操作は単独で完結しています** — クエリのタイミングは、ここでの設定なしに、アプリケーションのトレースからデータベースにすでに届いています。これらの最後の手順では、トレースでは決して確認できないもの（デッドロックとブロックされたクエリ）を追加します。これらはデータベース自体だけが記録します。完全なデッドロック履歴を有効にします — SQL クライアントで実行してください。**シェルではなく**。",
-      "dbmPrepareMariadbDesc": "**上記の操作は単独で完結しています** — クエリのタイミングは、ここでの設定なしに、アプリケーションのトレースからデータベースにすでに届いています。これらの最後の手順では、トレースでは決して確認できないもの（デッドロックとブロックされたクエリ）を追加します。これらはデータベース自体だけが記録します。完全なデッドロック履歴を有効にします — SQL クライアントで実行してください。**シェルではなく**。",
       "dbmPgLoggingTitle": "データベースモニタリング · Postgres にデッドロックを記録させる（オプション）",
       "dbmPgLoggingDesc": "デッドロックは、下記の設定がオンの場合にのみ、Postgres ログに書き込まれます。したがって、この手順によって Deadlocks タブが埋まるようになります。プレフィックス行は正確に一致する必要があります。コレクターはその行を読み取って関係者を特定します。プレフィックスが異なると、コレクターは正常に報告しながらも何も見つけられません。",
       "dbmPgLoggingVerifyTitle": "データベースモニタリング · 設定が有効になったことを確認（オプション）",
@@ -4066,7 +3936,6 @@
       "dbmMysqlLogPathHelp": "コレクターがこのファイルを読み取れる必要があります。次のコマンドで確認できます: SHOW VARIABLES LIKE 'log_error';",
       "dbmMariadbLogPathHelp": "コレクターがこのファイルを読み取れる必要があります。次のコマンドで確認できます: SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "データベースモニタリング · アクセス権限を付与（オプション）",
-      "dbmPrepareMssqlDesc": "**上記はすべて単独で完結しています** — クエリのタイミングは、ここでの設定なしでアプリケーションのトレースからデータベースにすでに到達しています。この最後のグループは、トレースでは決して見えないもの、つまりデッドロックとブロックされたクエリを追加します。これらはデータベース自体だけが記録します。両方の権限が必要です。1つはコレクタが他のセッションを読み取るため、もう1つはデッドロック履歴を読み取るためです。SQLクライアントで実行してください。**シェルではありません**。",
       "dbmConfigureMssqlDesc": "`dbm-config.yaml` を書き込みます — 接続するデータベースを以下に設定してください。SQL Server はここでデッドロック、ブロックされたクエリ、アクティビティサンプル、トップクエリ、実行プランを取得します。sqlserver レシーバーはインスタンス全体を読み取るため、アクティビティとトップクエリは上記で指定したデータベースに限定されません。",
       "dbmRunMssqlDesc": "両方の設定を一緒に実行します。ステップ1で作成したログインとパスワードを使用してください。",
       "dbmVerifyBlockingDesc": "**インフラ → データベース → ブロックされたクエリ** を開きます。ロックを待っているセッションは、サンプリングされるとすぐに表示されます。空のタブは、何もブロックされていないか、何も収集されていないかを示します。",
@@ -4076,7 +3945,6 @@
       "dbmVerifyTableHealthDesc": "**インフラ → データベース** を開き、以下のタブを選択します。デッドロックとブロックされたクエリは、データベースが報告するとすぐに表示されます。空のタブは、何も発生していないか、何も収集されていないかを示します。テーブルのヘルスは最初の60秒のスナップショット後に埋まります。"
     },
     "instrumentBeforeImportTitle": "クライアントをインポートする前に計測する",
-    "instrumentBeforeImportBody": "アプリは実行されるがスパンが届かない場合、計測がクライアントのインポート後に読み込まれた可能性があります。initが最初に実行されるように順序を変更してください:",
     "launchCloudFormationStack": "CloudFormationスタックを起動",
     "openStackSetsConsole": "StackSetsコンソールを開く",
     "integrations": {
@@ -4239,7 +4107,6 @@
       "streamOverview": "{stream} の概要"
     },
     "selectField": "フィールド",
-    "selectIndex": "ストリーム",
     "selectStreamType": "ストリームタイプ",
     "toggleFunctionEditor": "関数エディターの切り替え",
     "useSavedFunction": "保存済み関数を使う",
@@ -4353,7 +4220,6 @@
     "extraOptions": "オプション",
     "nameOfVariable": "名前",
     "labelOfVariable": "ラベル (オプション)",
-    "ValueOfVariable": "値",
     "DefaultValue": "デフォルト値 (オプション)",
     "typeOfVariable": "変数のタイプ",
     "DefaultSize": "デフォルトの最大レコードサイズ (オプション)",
@@ -4423,7 +4289,6 @@
     "alignRight": "Right",
     "sectionStyling": "スタイリング",
     "sectionConditionalStyling": "条件付きスタイリング",
-    "conditionThreshold": "価値",
     "conditionAddRule": "+ ルールを追加",
     "conditionNoRules": "まだルールはありません。",
     "conditionIfValue": "値が",
@@ -4486,7 +4351,6 @@
     "unsavedMessage": "保存されていない変更があります。本当に終了してもよろしいですか？",
     "currentFolderLabel": "現在のフォルダー",
     "selectFolderLabel": "フォルダを選択",
-    "selectFolderPlaceholder": "移動先フォルダーを選択",
     "selectDashboardLabel": "ダッシュボードを選択",
     "selectTabLabel": "タブを選択",
     "layerType": "レイヤータイプ",
@@ -4646,7 +4510,6 @@
     "markLinesTooltip": "チャートに閾値線を表示します。",
     "markLineType": "タイプ",
     "markLineLabel": "[ラベル]",
-    "markLineValue": "価値",
     "markLineAdd": "+ 追加",
     "markLineAverage": "アベレージ",
     "markLineMedian": "中央値",
@@ -4748,7 +4611,6 @@
     "editValueMapping": "値マッピングを編集",
     "valueMappingsTitle": "バリューマッピング",
     "valueMappingType": "タイプ",
-    "valueMappingValue": "価値",
     "valueMappingRegex": "正規表現",
     "valueMappingFrom": "から",
     "valueMappingTo": "に",
@@ -4916,7 +4778,6 @@
         "storage": "ストレージ",
         "dashboard": "ダッシュボード"
       },
-      "selectFolderTitle": "保存先フォルダを選択",
       "back": "戻る",
       "addDashboard": "ダッシュボードを追加",
       "folder": "フォルダ",
@@ -5104,7 +4965,6 @@
       "configuration": "設定",
       "having": "HAVING",
       "add": "追加",
-      "value": "値",
       "markAsNonTimestamp": "このフィールドを非タイムスタンプとしてマーク",
       "renderDataAsJson": "データをJSON/配列としてレンダリング",
       "sortBy": "並べ替え",
@@ -5554,7 +5414,6 @@
     "deletePanelTitle": "パネルを削除",
     "deletePanelMessage": "このパネルを削除してよろしいですか?",
     "movePanelTitle": "パネルを別のタブに移動",
-    "movePanelMessage": "「送信先を選択」タブ",
     "noQueriesToCreateAlert": "このパネルには、アラートを作成するクエリはありません",
     "panelQueryMustHaveStream": "パネルクエリにはストリームが設定されている必要があります",
     "unsupportedPanelTypeAlert": "{type} パネルからアラートを作成すると、期待どおりに動作しない場合があります",
@@ -5562,7 +5421,6 @@
     "panelDuplicationFailed": "パネルを複製できませんでした",
     "firstColumn": "先頭列",
     "zAxis": "Z 軸",
-    "breakdown": "ブレークダウン",
     "pivotField": "ピボットフィールド",
     "pivotFieldTooltip": "ここにディメンションフィールドをドラッグします。その個別の値はピボットテーブルの列ヘッダーになります。最大 3 つのフィールドでマルチレベルピボットが可能です。",
     "breakdownTooltipHBar": "これらのフィールドを使用してデータを Y 軸上のさまざまなセクションに分割すると、見やすくなります。",
@@ -5610,7 +5468,6 @@
         "anomalyHint": "{n} 件のイベントをサンプリング",
         "colField": "フィールド",
         "colRarity": "希少度",
-        "colValue": "値",
         "rarity": {
           "anomalous": "異常",
           "rare": "希少",
@@ -5649,15 +5506,12 @@
     "longitude": "経度",
     "weight": "重み",
     "mapname": "名前",
-    "mapvalue": "値",
     "source": "ソース",
-    "target": "ターゲット",
-    "value": "値"
+    "target": "ターゲット"
   },
   "home": {
     "alertsOverviewSection": "アラート概要セクション",
     "pipelinesOverviewSection": "パイプライン概要セクション",
-    "streams": "ストリーム",
     "totalDataIngested": "取り込みサイズ",
     "totalDataCompressed": "圧縮後サイズ",
     "viewButton": "ビュー",
@@ -5669,7 +5523,6 @@
       "description": "この組織はまだデータを受け取っていないため、グラフ化するものはありません。イベントが流れ始めると、<strong>取り込み量、ストレージ、クエリ使用量が自動的にここに表示されます</strong>。",
       "logs": "ログを送信",
       "logsDesc": "{product1}、{product2}、{product3}、{product4}など",
-      "traces": "トレースを送信",
       "tracesDesc": "{product1} / {product2} / {product3} 分散トレーシング",
       "metrics": "指標を送信",
       "metricsDesc": "{product1}、{product2}、{product3}など",
@@ -5679,7 +5532,6 @@
       "shippers": "ログシッパー"
     },
     "indexSizeLbl": "インデックスサイズ",
-    "docsCountLbl": "イベント数",
     "functionTitle": "関数",
     "schedulePipelineTitle": "スケジュール",
     "rtPipelineTitle": "リアルタイム",
@@ -5717,8 +5569,6 @@
     "emptyActionAlertsDesc": "設定したアラートと閾値を確認",
     "emptyActionLogs": "ログを見る",
     "emptyActionLogsDesc": "ログストリームの検索とフィルタリング",
-    "emptyActionTraces": "トレースを調べる",
-    "emptyActionTracesDesc": "分散型トレースとサービスレイテンシーの検査",
     "anomalyDetectedTitle": "異常を検出 — {name}",
     "anomalyDetectedDescription": "ストリーム: {stream} · {count} 異常ポイント",
     "secondsAgo": "{count}秒前",
@@ -5767,7 +5617,6 @@
     "stderr": "標準エラー出力",
     "truncatedLabel": "省略済み",
     "copyQuery": "クエリをコピー",
-    "stream": "ストリーム",
     "start": "開始",
     "end": "終了",
     "from": "開始",
@@ -5806,7 +5655,6 @@
       "taglineTail": "。君を書けるよ",
       "taglineSql": "SQL",
       "taglineVrl": "VRL",
-      "taglineAnd": "ログ、トレース、メトリクス、インシデントを順を追って確認できます。",
       "signedInAs": "としてサインイン",
       "role": "役割",
       "tryOneOfThese": "または、次のいずれかを試してください"
@@ -5814,12 +5662,10 @@
     "capabilities": {
       "query": {
         "title": "クエリーを書く",
-        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。",
         "prompt": "クエリーの作成を手伝ってください"
       },
       "incident": {
         "title": "インシデントを調査",
-        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」",
         "prompt": "インシデントの調査を手伝ってください"
       },
       "dashboard": {
@@ -5916,9 +5762,7 @@
         "alert": "アラート",
         "dashboard": "ダッシュボード",
         "pipeline": "パイプライン",
-        "report": "レポート",
         "function": "関数",
-        "stream": "ストリーム",
         "folder": "フォルダ",
         "panel": "パネル",
         "user": "ユーザー",
@@ -5962,7 +5806,6 @@
     "features": "特徴",
     "included": "何が含まれていますか？",
     "proPlanSubtitle": "小規模チーム向けのカスタムソリューション",
-    "unlimitedNote": "無制限のユーザー、ログ、メトリクス、トレースなど。",
     "paymentNote": "支払いは、毎月の請求サイクル終了時の使用量に基づいて計算されます。",
     "proPlanLabel": "従量課金制",
     "contactLabel": "セールスに問い合わせる",
@@ -6145,13 +5988,10 @@
       "anomalyImportFailed": "異常検出 - {index}: \"{name}\" のインポートに失敗しました — {reason}",
       "nameRequired": "アラート - {index}: 名前は必須であり、有効な文字列である必要があります。",
       "orgIdInvalid": "アラート - {index}: 組織IDは必須であり、組織リストに存在し、{orgId} と等しい必要があります。",
-      "streamTypeInvalid": "アラート - {index}: ストリームタイプは必須であり、'logs'、'metrics'、'traces' のいずれかである必要があります。",
       "streamNameInvalid": "アラート - {index}: ストリーム名は必須であり、ストリームリストに存在し、有効な文字列である必要があります。",
-      "destinationsRequired": "アラート - {index}: 送信先は必須であり、配列である必要があります。",
       "enabledBoolean": "アラート - {index}: Enabled はブール値である必要があります。",
       "tzOffsetNumber": "アラート - {index}: タイムゾーンオフセットは数値である必要があります。",
       "timezoneRequiredForCron": "アラート - {index}: 頻度タイプが'cron'の場合、タイムゾーンが必要です。",
-      "destinationNotExist": "アラート - {index}: 宛先 \"{destination}\" は存在しません",
       "createSuccess": "アラート - {index}: \"{name}\" が正常に作成されました \n注: 作成されたアラートオブジェクト {name} をjsonファイルから削除してください。",
       "createFailed": "アラート - {index}: \"{name}\" の作成に失敗しました --> \n 理由: {reason}",
       "unknownError": "不明なエラー",
@@ -6261,7 +6101,6 @@
       "noChildren": "まだサブアラートがありません。少なくとも2つ追加してください。",
       "wouldTrigger": "トリガーする",
       "wouldNotTrigger": "トリガーしない",
-      "firing": "発火中",
       "normal": "正常",
       "stepByStep": "ステップバイステップ",
       "result": "結果",
@@ -6288,7 +6127,6 @@
     "exportDialogSubtitle": "定義を確認して、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。",
     "jsonFilesOnlyHint": ".json ファイルのみ",
     "outputMessages": "出力メッセージ",
-    "destinationsRequiredLabel": "宛先 *",
     "timezoneRequiredLabel": "タイムゾーン *",
     "organizationIdLabel": "組織ID",
     "alertCreationTitle": "アラートの作成",
@@ -6328,13 +6166,11 @@
     "guidelinesLabel": "ガイドライン:",
     "selectStreamGuideline": "リストから既存のストリームを選択するか、名前を入力して新しいストリームを作成してください。",
     "enrichmentTablesTerm": "Enrichment_tables",
-    "enrichmentTablesDestinationNote": "宛先ストリームとして利用できるのは、スケジュールされたパイプラインのみです。",
     "useCurlyBracesNote": "波括弧を使用",
     "configureStreamNameDynamicNote": "ストリーム名を動的に設定するには。例：",
     "staticTextBeforeAfterNote": ". 静的テキスト前後",
     "isOptionalNote": "任意",
     "noTriggersLoaded": "トリガーが読み込まれていません",
-    "externalDestinationTitle": "外部宛先",
     "serviceGraphLegendTitle": "グラフ凡例",
     "serviceGraphRootCause": "赤 = 潜在的な根本原因",
     "serviceGraphHighFrequency": "オレンジ = 高頻度",
@@ -6362,7 +6198,6 @@
     "pendingBatches": "保留中のバッチ",
     "pendingBatchesTooltip": "グループ化待ちのアラート",
     "historyTimeline": {
-      "firing": "発火中",
       "ok": "OK",
       "error": "エラー",
       "skipped": "スキップ",
@@ -6381,7 +6216,6 @@
     "duration": "期間",
     "retries": "再試行",
     "dedup": "重複排除",
-    "noDestinations": "利用可能な宛先がありません",
     "validation": {
       "streamTypeRequired": "Streamタイプは必須です。",
       "streamNameRequired": "Stream名は必須です。",
@@ -6392,7 +6226,6 @@
       "validEmails": "有効なメールアドレスを追加してください！",
       "silenceNonNegative": "通知のサイレンスは0以上である必要があります",
       "periodPositive": "期間は0より大きい必要があります",
-      "destinationRequired": "少なくとも1つの宛先が必要です。",
       "thresholdPositive": "しきい値は0より大きい必要があります",
       "frequencyPositive": "頻度は0より大きい必要があります",
       "aggregationColumnRequired": "集計関数を使用する場合は列が必要です。",
@@ -6403,7 +6236,6 @@
       "minimumFrequency": "最小頻度は {minutes} 分にする必要があります",
       "nameMandatoryString": "名前は必須で、有効な文字列である必要があります",
       "orgIdMismatch": "組織IDは {orgId} と等しい必要があります",
-      "streamTypeMandatory": "ストリームタイプは必須で、logs、metrics、traces のいずれかである必要があります",
       "streamNameMandatoryString": "ストリーム名は必須で、有効な文字列である必要があります",
       "streamNotInList": "ストリーム \"{streamName}\" はストリームリストに存在しません",
       "isRealTimeMandatoryBoolean": "リアルタイムかどうかは必須で、ブール値である必要があります",
@@ -6435,10 +6267,6 @@
       "cronRequiredForCronType": "頻度タイプが cron の場合、cron 式が必要です",
       "timezoneRequiredForCronType": "頻度タイプが cron の場合、タイムゾーンが必要です",
       "triggerConditionRequired": "トリガー条件が必要です",
-      "destinationsArray": "送信先は配列である必要があります",
-      "destinationRequiredPlain": "少なくとも1つの送信先が必要です",
-      "noDestinationsInSystem": "システムで利用可能な送信先が見つかりません",
-      "invalidDestinations": "無効な送信先: {destinations} - 利用可能な送信先リストから選択する必要があります",
       "enabledFlagBoolean": "有効フラグはブール値である必要があります",
       "silenceNotificationRequired": "サイレンス通知は空にできません",
       "thresholdNotEmpty": "しきい値は空にできません",
@@ -6459,8 +6287,6 @@
     "searchAllFolders": "すべてのフォルダー",
     "streamConfig": "ストリーム構成",
     "alertRules": "アラートルール",
-    "noTemplatesMsg": "アラートを作成するには、少なくとも 1 つのテンプレートと 1 つの宛先が必要です。テンプレートは通知メッセージの形式を定義します。まずはテンプレートを作成します。",
-    "noDestinationsMsg": "アラートを作成するには、少なくとも 1 つの宛先と 1 つのテンプレートが必要です。送信先は通知の送信先を定義します。まずは通知を作成します。",
     "add": "アラートを追加",
     "edit": "編集",
     "clone": "アラートを複製",
@@ -6511,37 +6337,25 @@
     "frequency": "周波数",
     "threshold": "閾値",
     "silenceNotification": "サイレント通知",
-    "destination": "送信先",
-    "destinationOrWorkflowRequired": "少なくとも1つの宛先またはワークフローを追加してください。",
-    "customDestination": "カスタム目的地",
-    "customDestinationDescription": "カスタム HTTP エンドポイントまたは E メール送信先を設定する",
-    "testIdleMessage": "[テスト] をクリックして、送信先の設定を確認します",
-    "destinationPreview": "デスティネーションプレビュー",
     "template": "テンプレートオーバーライド",
     "additionalVariables": "その他の変数",
-    "testSuccessMessage": "テストが成功しました！目的地は正しく設定されています。",
     "testFailedMessage": "テストが失敗しました。設定を確認して、もう一度試してください。",
     "testFailedWithReason": "テスト失敗: {reason}",
-    "testInProgress": "送信先をテスト中...",
     "sendingNotification": "接続を確認するためのテスト通知の送信",
     "testErrorDNS": "DNS 解決が失敗しました。ウェブフック URL またはホスト名を確認してください。",
     "testErrorConnection": "接続が拒否されました。URL を確認し、サービスにアクセスできることを確認してください。",
-    "testErrorTimeout": "リクエストがタイムアウトしました。送信先のサービスが遅いか、アクセスできない可能性があります。",
     "testErrorSSL": "SSL/TLS 証明書エラーです。証明書を確認するか、SSL 検証を無効にしてください。",
     "testErrorClientError": "クライアントエラー (4xx)。認証情報と設定を確認してください。",
-    "testErrorServerError": "サーバーエラー (5xx)。送信先サービスで問題が発生しています。",
     "viewDetails": "詳細を表示",
     "error": "[エラー]",
     "httpStatus": "HTTP ステータス",
     "responseBody": "レスポンスボディ",
     "retry": "リトライ",
     "suggestCheckUrl": "Webhook URL が正しく、アクセス可能であることを確認してください。",
-    "suggestCheckFirewall": "ファイアウォールの設定を確認して、宛先サービスにアクセスできることを確認してください。",
     "suggestCheckCredentials": "API 認証情報が正しいことを確認してください。",
     "suggestCheckPermissions": "認証情報に必要な権限があることを確認してください。",
     "suggestCheckEndpoint": "エンドポイント URL が正しいことを確認してください。",
     "suggestRateLimit": "レート制限を超えました。しばらく待ってから再試行してください。",
-    "suggestServerIssue": "送信先サービスで問題が発生しています。後でもう一度試してください。",
     "description": "説明",
     "stream_name": "ストリーム名",
     "cloneTitle": "アラートを複製",
@@ -6601,7 +6415,6 @@
       "notEqualTo": "等しくない",
       "eventsDetected": "イベントが検出されました",
       "sendsTo": "送信先",
-      "noDestination": "目的地なし",
       "notSetupYet": "(まだ設定されていません)",
       "cooldown": "クールダウン",
       "betweenAlerts": "アラート間",
@@ -6649,7 +6462,6 @@
     },
     "placeholders": {
       "typeSomething": "何かを入力してください",
-      "value": "価値",
       "selectColumn": "列を選択",
       "savedFunctions": "保存済み機能",
       "autoUsesCheckInterval": "自動 (チェック間隔を使用)",
@@ -6732,7 +6544,6 @@
       "ifPrefix": "もし",
       "noConditionsDefined": "条件が定義されていません",
       "loadingCorrelatedMetrics": "関連メトリクスを読み込み中...",
-      "loadingCorrelatedTraces": "関連トレースを読み込み中...",
       "disambiguationChangedMessage": "このインシデントの作成後に、サービスディスカバリ設定（曖昧性解消フィールド）が変更されました。",
       "noActivityYet": "まだアクティビティがありません",
       "eventsAndCommentsAppearHere": "イベントとコメントがここに表示されます",
@@ -6766,7 +6577,6 @@
       "correlatedAlertsCount": "アラート: {count} 件の関連アラート",
       "noCorrelatedLogs": "関連するログが見つかりません",
       "noCorrelatedMetrics": "相関するメトリクスが見つかりません",
-      "noCorrelatedTraces": "相関するトレースが見つかりません",
       "lastAlertAt": "最終アラート",
       "title_field": "タイトル",
       "stableDimensions": "ディメンション",
@@ -6779,7 +6589,6 @@
       "acknowledge": "確認する",
       "resolve": "解決",
       "reopen": "[再開]",
-      "statusOpen": "[開く]",
       "statusAcknowledged": "確認済み",
       "statusResolved": "解決済み",
       "correlationServiceDiscovery": "サービスディスカバリー",
@@ -6844,7 +6653,6 @@
       "noAlertDetailsAvailable": "利用可能なアラート詳細がありません",
       "clickOnTriggerToViewDetails": "詳細を表示するには、テーブル内のトリガーをクリックしてください",
       "refreshCorrelatedData": "相関データを更新",
-      "showingCorrelatedTraces": "インシデント期間の相関トレースを表示中",
       "incidentTitleUpdatedSuccess": "インシデントタイトルが正常に更新されました",
       "markAsAcknowledgedTooltip": "インシデントを確認済みかつ対応中としてマーク",
       "markAsResolvedTooltip": "インシデントを解決済みとしてマークしてクローズ",
@@ -6964,16 +6772,10 @@
       "helpLegendLiveExample": "CPU 高負荷",
       "helpLegendSampleExample": "42",
       "sectionTitle": "設定",
-      "noDestinationsAvailable": "利用可能な宛先がありません",
-      "noTargetsAvailable": "利用可能な宛先またはワークフローはありません",
-      "targetsDestinationsGroup": "宛先",
       "targetsWorkflowsGroup": "ワークフロー",
-      "refreshDestinations": "最新の宛先を更新",
-      "addNewDestination": "新しい目的地を追加",
       "cooldownTooltip": "アラートがトリガーされた場合、次の通知を送信するまでどのくらい待つ必要があります。たとえば、アラートが午後 4 時にトリガーされ、サイレンス通知が 10 分に設定されている場合、アラートが 1 分経っても午後 4 時 10 分まで別の通知は送信されません。これは、ユーザーに迷惑メールが送信されないようにするためです。",
       "periodTooltip": "クエリの実行期間。たとえば、10 分ということは、クエリが実行されるたびに、直近の 10 分間のデータが使用されることを意味します。",
       "timezoneWarning": "警告:表示されているタイムゾーンはおおよそのものです。正しいタイムゾーンを手動で確認して選択してください。",
-      "destinationsTooltip": "アラート通知を送信する宛先を 1 つ以上選択します。",
       "createsIncident": "インシデントを作成",
       "createsIncidentTooltip": "アラートがインシデントを作成できる場合、専用の通知は送信されません。代わりに、新しいインシデントが作成されたとき、または新しいアラートタイプが既存のインシデントに加わったときに、インシデントの通知が送信されます。",
       "helpTemplateTitle": "テンプレートオーバーライド",
@@ -6985,11 +6787,7 @@
       "helpLegendLive": "アラートの実際の値",
       "helpLegendSample": "サンプル — 実際の値はアラートが発生したときに設定されます",
       "helpLegendOpaque": "アラートが発生すると自動的に追加されます",
-      "helpTemplateExplain": "テンプレートとは、送信される通知メッセージです。テキストに {'{'} alert_name {'}'} などの変数を加えたものです。ここで選択すると、このアラートの場合のみ各送信先独自のテンプレートが上書きされます。",
       "helpCurrentHeading": "このアラートが現在送信する内容",
-      "helpCurrentNoOverride": "オーバーライド設定なし — 各宛先は独自のテンプレートを使用します。",
-      "helpCurrentNoDestinations": "目的地はまだ選択されていません。各目的地は独自の構成済みテンプレートを使用します。",
-      "helpCurrentOverrideHeading": "すべての宛先にこのテンプレートが使用されます。",
       "helpPreviewHeading": "テンプレートをプレビューする",
       "helpPreviewSelectPlaceholder": "プレビューするテンプレートを選択してください",
       "helpApplyToAlert": "アラートに適用",
@@ -7001,7 +6799,6 @@
       "helpYourVariablesEmpty": "変数はまだ追加されていません。",
       "helpRowTemplateExplain": "アラートは複数の行と一致する可能性があります。行テンプレートは 1 つの行の表示方法を決定します。次に、メインテンプレートの {'{'} rows {'}'} は、既にフォーマットされているマッチしたすべての行にドロップされます。",
       "helpRowTemplateTypeHeading": "文字列とJSON",
-      "helpRowTemplateTypeExplain": "String は行ごとにプレーンテキストを生成します。JSON は行ごとに JSON オブジェクトを生成するので、構造化された宛先に適しています。",
       "helpRowTemplateTypeCurrent": "現在選択されているもの:",
       "helpPreviewHeadingShort": "プレビュー",
       "helpWhyHeading": "なぜ変数を使うの？",
@@ -7014,7 +6811,6 @@
       "helpVariablesExampleCaption": "重要度とチームを変数として追加し、テンプレート内の任意の場所で使用できます。",
       "helpExampleResultLabel": "送信される内容",
       "helpTemplateWhenHeading": "いつオーバーライドすればいいですか？",
-      "helpTemplateWhenDesc": "空のままにしておくと、各宛先は独自のテンプレートを使用します。各送信先のテンプレートを編集せずに、この 1 つのアラートですべての宛先に同じ一貫したメッセージを送信したい場合は、オーバーライドを設定します。",
       "helpRowTemplateWhyHeading": "なぜ行テンプレートなのか？",
       "helpRowTemplateWhyDesc": "アラートは多数のレコードを照合できます。行テンプレートは 1 つのレコードをフォーマットし、{'{'} rows {'}'} はフォーマットされたすべてのレコードをメインテンプレートにドロップします。そのため、ループを作成せずに一致したレコードをすべて一覧表示できます。",
       "helpRowTemplateExampleCaption": "一致する各行は行テンプレートによってフォーマットされ、{'{'} rows {'}'} はそれらをすべてメインテンプレートにドロップします。",
@@ -7023,10 +6819,8 @@
       "helpRowTemplatePreviewEmpty": "行テンプレートはまだありません。[その他の設定] タブに行テンプレートを入力すると、ここでプレビューできます。",
       "helpPreviewSelectEmpty": "上のテンプレートを選択して、送信されるメッセージをプレビューしてください。",
       "helpCurrentBodyEmpty": "このテンプレートにはプレビューできる本文がありません。",
-      "helpDestinationNoTemplate": "この宛先のデフォルトフォーマットを使用します。",
       "builtInVars": {
         "orgName": "あなたの組織名",
-        "streamType": "ストリームタイプ（ログ、メトリクス、トレース）",
         "streamName": "アラートが監視するストリーム名",
         "alertName": "アラートの名前",
         "alertType": "アラートタイプ（例: スケジュール、リアルタイム）",
@@ -7048,7 +6842,6 @@
     },
     "advanced": {
       "addVariable": "[変数を追加]",
-      "variablesTooltip": "変数は、アラートから宛先にデータを渡すために使用されます。",
       "templateType": "テンプレートタイプ:",
       "noTemplatesAvailable": "利用可能なテンプレートがありません",
       "refreshTemplates": "最新のテンプレートを更新",
@@ -7133,12 +6926,10 @@
     },
     "anomaly": {
       "addFilter": "フィルターを追加",
-      "addNewDestination": "新しい目的地を追加",
       "anomalyScoreRange": "異常スコア範囲:",
       "checkEvery": "すべてチェック",
       "checkEveryTooltip": "検出ジョブの実行頻度。サンプル期間より長くてもかまいません (例:5 m ごとにサンプリングし、1 時間ごとに検出を実行する)。",
       "clickLoadDataHint": "[データをロード] をクリックして時系列をプレビューします",
-      "destinationRequired": "少なくとも 1 つの目的地が必要です!",
       "detectionResolution": "検出解像度",
       "detectionResolutionTooltip": "各データポイントの細かさ。たとえば、「5m」は、5 分の解像度で異常が検出されたことを意味します。",
       "disabled": "無効",
@@ -7153,10 +6944,8 @@
       "lookBackWindowTooltip": "各検出でクエリが実行されるまでの時間。しばらく待ってもウィンドウをキャップします。デフォルトは [間隔ごとにチェック] です。",
       "maxThresholdMarkLine": "最大しきい値",
       "minThresholdMarkLine": "最小しきい値",
-      "noDestinationsFound": "目的地が見つかりません",
       "noFieldsFound": "フィールドが見つかりません",
       "notifications": "通知",
-      "notificationsTooltip": "有効にすると、異常が検出されるたびに、選択した宛先に通知が送信されます。",
       "retrainEvery": "毎回再トレーニング",
       "retrainEveryTooltip": "モデルを自動的に再トレーニングする頻度。「しない」とは、一度トレーニングを行って、手動で再トレーニングするまでモデルを維持することを意味します。",
       "retrainFourteenDays": "14日",
@@ -7171,14 +6960,12 @@
       "sqlColumnsHint": "クエリは{timeBucket}と{valueColumn}の2つの列を返す必要があります。",
       "sqlRequired": "カスタム SQL モードでは SQL が必要です",
       "summaryAlerting": "✓ アラート: {status}",
-      "summaryAlertingEnabled": "✓ アラート: 有効 → {destinations}",
       "summaryAlertingNoDestination": "✓ アラート: 有効 ⚠️ {warning}",
       "summaryConfiguring": "{streamType} ストリーム「{stream}」の異常検知を設定中",
       "summaryDataSource": "✓ データソース: {type} — {name}",
       "summaryDetectionFunction": "✓ 検知関数: {fn}",
       "summaryDetectionWindow": "✓ 検知ウィンドウ: 過去 {window}",
       "summaryMonitoring": "「{stream}」を {schedule} ごとに監視し、{fn} の異常を検知（{trainingDays} 日分の履歴で学習）",
-      "summaryNoDestinationSet": "宛先が設定されていません",
       "summaryQueryMode": "✓ クエリモード: {mode}",
       "summaryResolution": "✓ 解像度: {resolution}",
       "summaryRetrain": "✓ 再学習: {retrain}",
@@ -7304,21 +7091,14 @@
       "triggerAlertFailed": "アラートのトリガーに失敗しました",
       "triggerRetrainingFailed": "再学習のトリガーに失敗しました",
       "bulkDeleteAlertsFailed": "アラートの削除中にエラーが発生しました。もう一度お試しください。",
-      "deleteDestinationFailed": "宛先の削除中にエラーが発生しました",
-      "bulkDeleteDestinationsFailed": "宛先の削除中にエラーが発生しました。もう一度お試しください。",
       "bulkDeleteTemplatesFailed": "テンプレートの削除中にエラーが発生しました。もう一度お試しください。"
     },
     "prebuilt": {
-      "conversionSuccess": "宛先が正常に変換されました",
       "validationError": "検証エラー: {error}",
-      "invalidDestinationType": "無効な宛先タイプ",
       "invalidTargetType": "無効なターゲットタイプ",
-      "unknownDestinationType": "不明な宛先タイプ",
       "testFailedUnknownError": "テストが不明なエラーで失敗しました"
     },
     "confirmDeleteAlerts": "{count} 個のアラートを削除してもよろしいですか？ | {count} 個のアラートを削除してもよろしいですか？",
-    "confirmDeleteDestinations": "{count} 個の宛先を削除してもよろしいですか？ | {count} 個の宛先を削除してもよろしいですか？",
-    "prebuiltDestination": "組み込み{type}宛先",
     "errorValidations": "エラーバリデーション",
     "outputMessagesLabel": "出力メッセージ",
     "incidentSingular": "インシデント",
@@ -7374,7 +7154,6 @@
       "critical": "クリティカル",
       "warning": "警告",
       "ok": "OK",
-      "firingTotal": "発火中",
       "observedTotal": "グループ",
       "nOfMFiring": "{firing} / {observed} グループが発火中",
       "groupedBy": "{columns} でグループ化",
@@ -7388,7 +7167,6 @@
       "when": "日時",
       "change": "レベル変更",
       "outcome": "結果",
-      "value": "値",
       "rollupRow": "全グループ（ロールアップ）",
       "noHistoryTitle": "記録された遷移はありません",
       "noHistoryDescription": "レベル変更は、グループが発火、エスカレーション、または回復するとここに表示されます。",
@@ -7436,7 +7214,6 @@
       "dialog": {
         "title": "アラートを作成",
         "continue": "アラートに進む",
-        "streamLabel": "ストリーム",
         "thresholdLabel": "アラート対象",
         "thresholdMatchingRows": "一致する行",
         "thresholdCount": "行数",
@@ -7523,26 +7300,22 @@
     "actionOpen": "開く",
     "actionDelete": "削除",
     "deleteTitle": "{name} を削除しますか？",
-    "deleteMessage": "これにより完全に削除されます。アラートまたは宛先がまだ使用している場合、削除はブロックされます。",
     "deletedToast": "{name} を削除しました",
     "deleteFailedToast": "{name} を削除できませんでした",
     "loading": "依存関係グラフを構築中…",
     "failedToLoad": "依存関係の読み込みに失敗しました: {error}",
     "usedBy": "{count} アラート | {count} アラート",
-    "countDestinations": "{count} 宛先 | {count} 宛先",
     "usedByColumn": "使用元",
     "searchPlaceholder": "検索",
     "noDependencies": "依存関係はありません。",
     "noMatches": "一致するものがありません。",
     "laneEmpty": "アラートなし",
     "directOverrides": "このテンプレートを直接使用",
-    "sectionDestinations": "宛先",
     "sectionAlerts": "アラート",
     "orphanTag": "未使用",
     "missingTag": "欠落",
     "enabled": "有効",
     "paused": "一時停止",
-    "impactTemplate": "使用元 {destinations} · {alerts}",
     "impactDestination": "使用元 {alerts}"
   },
   "alert_library": {
@@ -7587,7 +7360,6 @@
       "noDescription": "ライブラリに説明がありません。",
       "needsDataCallout": "このアラートは {stream} をクエリしますが、この組織はそれを受信していません。今インストールすると、決して発動しないアラートが作成されます。",
       "query": "クエリ",
-      "stream": "ストリーム",
       "streamType": "ストリームタイプ",
       "metricCondition": "メトリクス条件",
       "matchCount": "一致行数が必要",
@@ -7609,18 +7381,11 @@
     "install": {
       "title": "ライブラリからインストール",
       "subtitle": "アラートの通知先、インストールするアラート、および保存場所を選択してください。",
-      "stepDestination": "宛先",
       "stepAlerts": "アラート",
       "stepFolder": "フォルダー",
       "stepTune": "調整",
       "stepInstall": "インストール",
-      "destinationIntro": "このバッチのすべてのアラートは、ここで選択した宛先に通知します。ライブラリファイルには、エクスポート元の組織の宛先が指定されていますが、それらはこの組織には存在しません。",
-      "destinationLabel": "宛先",
-      "destinationPlaceholder": "宛先を選択",
-      "destinationsLoadFailed": "既存の宛先を読み込めませんでした。",
       "retry": "再試行",
-      "destinationsNoneBody": "この組織にはまだアラート宛先がないため、これらのアラートの通知先がありません。「宛先」ページで作成し、ここに戻って選択してください。",
-      "openDestinations": "宛先を開く",
       "selectAll": "すべて選択",
       "clear": "クリア",
       "selectedCount": "{count} / {total} 選択中",
@@ -7675,7 +7440,6 @@
     "importBodyLabel": "テンプレート本文 *",
     "importTypeLabel": "テンプレートタイプ *",
     "importTitleLabel": "テンプレートタイトル *",
-    "header": "宛先テンプレート",
     "add": "テンプレートを追加",
     "edit": "編集",
     "name": "名前",
@@ -7735,7 +7499,6 @@
     "chartPreviewPlaceholder": "実際の通知ではチャートがここに表示されます — これはアラート自身の評価履歴から描画されるため、プレビューにはありません。",
     "channelTitlesDescription": "特定のチャネルで異なるタイトルを使用 — 例: メールの短い件名。",
     "namePlaceholder": "例: 高エラー率",
-    "nameLockedHint": "アラートと宛先はこのテンプレートを名前で参照するため、名前を変更できません。新しい名前でコピーを開始するには、テンプレートを複製してください。",
     "rawBodyCaption": "記述されたとおりに送信され、{'{'}variables{'}'} が置き換えられます。利用可能なすべての変数については変数ガイドを参照してください。",
     "contentTitlePlaceholder": "{'{'}alert_name{'}'} · {'{'}stream_name{'}'}",
     "fieldLabelPlaceholder": "例: 値",
@@ -7749,7 +7512,6 @@
     "moveUp": "上に移動",
     "moveDown": "下に移動",
     "fieldLabel": "ラベル",
-    "fieldValue": "値",
     "linkLabel": "ラベル",
     "linkUrl": "URL",
     "channelTitleSlack": "Slack",
@@ -7809,12 +7571,10 @@
     "channelSns": "SNS",
     "testSendGroupLabel": "実際のテストメッセージを送信",
     "testSend": "テスト送信",
-    "testSendDestinationLabel": "宛先",
     "testSendConfirmTitle": "実際のテストメッセージを送信しますか？",
     "testSendConfirm": "これにより、選択したチャネルに [TEST] とマークされた実際のメッセージが投稿されます。",
     "testSendSuccess": "テストメッセージを送信しました",
-    "testSendRateLimited": "テスト送信が多すぎます。しばらく待ってから再試行してください",
-    "testSendNoDestination": "先に宛先を選択してください"
+    "testSendRateLimited": "テスト送信が多すぎます。しばらく待ってから再試行してください"
   },
   "alert_sources": {
     "header": "外部アラートソース",
@@ -7852,10 +7612,8 @@
     "editTitle": "アラートソースを編集",
     "name": "名前",
     "nameHint": "単なるラベルです。すべてのソースが同じセットアップを使用します。",
-    "incidentDestination": "インシデント送信先",
     "incidentDestinationPlaceholder": "組織のデフォルトを使用",
     "incidentDestinationHint": "このソースのアラートがインシデントを作成または参加したときに通知が送信される場所。空のままにすると組織のデフォルトを使用します。どちらも設定されていない場合、一致するインシデントは通知なしで発生します。",
-    "noDestinationSet": "インシデント送信先が設定されていません",
     "setupStep1Title": "1. ウェブフックを作成",
     "setupStep1Body": "Grafana、Alertmanager、またはJSONをPOSTできる任意のツールで、ウェブフックの連絡先/レシーバーを作成します。",
     "setupRemainingStepsHint": "このソースを保存してURLとトークンを取得し、そのウェブフック設定に貼り付けます。",
@@ -7878,13 +7636,10 @@
     "createdSuccess": "アラートソースが作成されました",
     "updatedSuccess": "アラートソースが更新されました",
     "error": "アラートソースの読み込みエラー",
-    "senderError": "ソースステータスの読み込みエラー",
-    "destinationsLoadError": "宛先の読み込みエラー"
+    "senderError": "ソースステータスの読み込みエラー"
   },
   "alert_destinations": {
-    "sectionTab": "宛先",
     "chooseTypeTitle": "タイプを選択",
-    "selectDestinationType": "宛先タイプを選択",
     "connectionStepTitle": "接続",
     "connectionDetailsTitle": "接続詳細",
     "urlHelpText": "末尾スラッシュなしのベースURL（例: https://your-domain.com）",
@@ -7903,10 +7658,6 @@
     "datadogHostnameHelpText": "Datadog ログ用のホスト名",
     "exampleLabel": "例:",
     "subtitle": "トリガーされたアラートの配信先",
-    "exportDestination": "宛先をエクスポート",
-    "deleteDestinationTitle": "宛先を削除",
-    "deleteDestinationMessage": "宛先を削除してもよろしいですか？",
-    "deleteDestinationsTitle": "宛先を削除",
     "selected": "選択済み",
     "organizationLabel": "組織",
     "defaultPlaceholder": "例: default",
@@ -7925,25 +7676,18 @@
     "ddTagsPlaceholder": "タグを入力（例：env:prod,version:1.0）",
     "serviceLabel": "サービス",
     "servicePlaceholder": "サービス名を入力（例：api-gateway）",
-    "header": "アラート送信先",
-    "add": "送信先を追加",
     "edit": "編集",
-    "search": "送信先を検索",
     "filterAll": "[すべて]",
     "filterPrebuilt": "構築済み",
     "filterCustom": "カスタム",
     "templateDefaultBadge": "デフォルト",
     "name": "名前",
-    "destination_type": "デスティネーションタイプ",
     "template": "テンプレート",
     "actions": "操作",
-    "addTitle": "送信先を追加",
-    "updateTitle": "送信先を更新",
     "delete": "削除",
     "method": "送信方法",
     "url": "URL",
     "api_header": "ヘッダー",
-    "api_header_value": "値",
     "skip_tls_verify": "TLS検証をスキップ",
     "action": "アクション",
     "output_format": "出力フォーマット",
@@ -7952,7 +7696,6 @@
     "custom_headers": "カスタムヘッダー (オプション)",
     "preview": "プレビュー",
     "test": "テスト",
-    "saved": "目的地は正常に保存されました",
     "customWebhook": "カスタム (ウェブフック)",
     "customEmail": "カスタム (電子メール)",
     "customAction": "カスタム (アクション)",
@@ -7962,7 +7705,6 @@
     "separator_hint": "レコード間に使用する区切り文字列 (スペース可)",
     "templateDefaultOption": "Default ({name})",
     "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one.",
-    "loadingData": "宛先データを読み込み中...",
     "noEmailTemplates": "まだメールテンプレートを作成していないようです。",
     "createEmailTemplate": "メールテンプレートを作成",
     "headers": "ヘッダー",
@@ -7977,40 +7719,14 @@
       "servicenowDescription": "ServiceNowでインシデントを作成"
     },
     "import": {
-      "title": "宛先をインポート",
       "errorValidations": "エラー検証",
       "outputMessages": "出力メッセージ",
-      "destinationName": "宛先名",
-      "destinationUrl": "宛先URL",
-      "destinationMethod": "宛先メソッド",
       "templates": "テンプレート",
       "emails": "メールアドレス（カンマ区切り）",
       "actions": "アクション",
-      "destinationCreation": "宛先作成",
       "jsonStringEmpty": "JSON文字列が空です",
       "invalidJsonFormat": "無効なJSON形式",
-      "importSuccess": "宛先のインポートに成功しました",
-      "importError": "宛先のインポート中にエラーが発生しました。JSONを確認してください",
-      "unknownError": "不明なエラー",
-      "nameRequired": "宛先 - {index}: \"name\" フィールドは必須で、有効な文字列である必要があります。",
-      "nameExists": "宛先 - {index}: \"{name}\" は既に存在します",
-      "typeInvalid": "宛先 - {index}: \"type\" フィールドは \"email\"、\"http\"、\"action\" のいずれかでなければなりません",
-      "actionTypeNotSupported": "宛先 - {index}: 'action' タイプはサポートされていません。",
-      "actionNotFound": "宛先 - {index}: タイプ \"{type}\" に対してアクション \"{actionId}\" が存在しません",
-      "urlRequired": "宛先 - {index}: httpタイプの宛先には \"url\" フィールドが必要です。",
-      "methodInvalid": "宛先 - {index}: \"method\" フィールドは \"post\"、\"get\"、\"put\" のいずれかでなければなりません",
-      "templateRequiredHttp": "宛先 - {index}: httpタイプの宛先には \"template\" フィールドが必要です。",
-      "skipTlsVerifyRequired": "宛先 - {index}: \"skip_tls_verify\" フィールドは必須で、ブール値である必要があります",
-      "headersMustBeObject": "宛先 - {index}: httpタイプの場合、'headers' はオブジェクトである必要があります",
-      "urlNotAllowedEmail": "宛先 - {index}: emailタイプの場合、'url' は指定しないでください",
-      "headersNotAllowedEmail": "宛先 - {index}: emailタイプの場合、'headers' は指定しないでください",
-      "emailsRequired": "宛先 - {index}: emailタイプの宛先には \"emails\" フィールドが必要で、配列である必要があります。",
-      "emailsMustBeStrings": "宛先 - {index}: emailタイプの場合、'emails' は文字列の配列である必要があります",
-      "templateRequiredEmail": "宛先 - {index}: emailタイプの宛先には \"template\" フィールドが必要です。",
-      "templateNotFound": "宛先 - {index}: タイプ \"{type}\" に対してテンプレート \"{template}\" が存在しません",
-      "actionIdInvalid": "宛先 - {index}: \"action_id\" フィールドは有効な文字列である必要があります。",
-      "createSuccess": "宛先 - {index}: \"{name}\" が正常に作成されました \n注意: 作成された宛先オブジェクト {name} をJSONファイルから削除してください ",
-      "createFailed": "宛先 - {index}: \"{name}\" の作成に失敗しました --> \n 理由: {reason}"
+      "unknownError": "不明なエラー"
     },
     "priorityP1Description": "最優先アラート",
     "priorityP2Description": "高優先度アラート",
@@ -8022,10 +7738,7 @@
     "severityWarningDescription": "警告レベルのインシデント",
     "severityInfoDescription": "情報インシデント"
   },
-  "pipeline_destinations": {
-    "header": "パイプライン送信先",
-    "search": "検索先"
-  },
+  "pipeline_destinations": {},
   "storage_settings": {
     "heroBrand": "OpenObserve.",
     "tabLabel": "組織ストレージ",
@@ -8234,7 +7947,6 @@
     },
     "metricCard": {
       "lastRefreshed": "最終更新:",
-      "traceId": "トレースID: {id}",
       "metricLabel": "メトリクス: {name}",
       "queryLabel": "クエリ: {query}",
       "errorLabel": "エラー: {error}",
@@ -8267,7 +7979,6 @@
       "loadingLabels": "ラベルを読み込み中...",
       "noLabelsFound": "ラベルが見つかりません",
       "operator": "演算子",
-      "value": "値",
       "selectLabelFirst": "最初にラベルを選択してください",
       "noValuesFound": "値が見つかりません",
       "addLabelFilter": "ラベルフィルタを追加",
@@ -8358,7 +8069,6 @@
     "generalLabel": "一般設定",
     "groupGeneral": "一般",
     "groupAccessSecurity": "アクセスとセキュリティ",
-    "groupDestinations": "宛先",
     "groupDataAI": "データとAI",
     "groupOperations": "運用",
     "groupSynthetics": "合成モニタリング",
@@ -8387,8 +8097,6 @@
     "customLogoText": "カスタムロゴテキスト",
     "orgLabel": "組織パラメーター",
     "logDetails": "ログ詳細",
-    "traceIdFieldName": "トレース ID フィールド名",
-    "spanIdFieldName": "スパン ID フィールド名",
     "toggleIngestionLogsLabel": "取り込みログの切り替え",
     "usageStreamEnabledLabel": "使用ストリームを有効にする",
     "claimParserFunction": "SSO クレームパーサー",
@@ -8514,7 +8222,6 @@
     "genAiAgentMapping": {
       "tabLabel": "GenAI エージェントマッピング",
       "title": "GenAI エージェントマッピング",
-      "description": "LLM トレースと評価のエージェント ID を正規化するために使用されるフォールバックテレメトリ属性を設定します。",
       "agentNameFields": "エージェント名フォールバックフィールド",
       "agentNameHelp": "gen_ai.agent.name のフォールバックとして使用する受信アトリビュート。",
       "agentNameInfo": "標準の gen_ai.agent.name 属性が欠落しているか、空の場合にのみチェックされます。1 行に 1 つの受信テレメトリ属性を追加します。",
@@ -8532,7 +8239,6 @@
       "resetToEmpty": "空にリセット",
       "clearRegistry": "レジストリをクリア",
       "clearRegistryTitle": "エージェントレジストリを消去しますか?",
-      "clearRegistryDescription": "これにより、この組織で検出されたすべての GenAI エージェントレジストリ行が削除されます。新しく一致するトレースは、取り込み中にレジストリに再入力されます。",
       "clearRegistryConfirm": "レジストリをクリア",
       "saved": "GenAI エージェントマッピングが正常に保存されました",
       "clearRegistrySuccess": "GenAI エージェントレジストリをクリアしました。保存されたエージェント {deletedCount} 件と、キューに入った観測 {bufferCount} 件を削除しました。",
@@ -8552,7 +8258,6 @@
       "fieldAliasesSaveError": "フィールドエイリアスの保存に失敗しました",
       "fieldAliasesUnsavedConfirm": "保存されていないフィールドマッピングの変更があります。破棄して移動しますか？",
       "discoveredServicesTitle": "検出されたサービス",
-      "discoveredServicesDescription": "サービスはテレメトリデータから自動的に検出され、サービス名別にグループ化されて関連付けられます。同じサービス名を共有するサービスは、ログ、トレース、メトリックス間で相互に関連付けられます。",
       "noServicesYet": "まだサービスが見つかりませんでした",
       "noServicesDescription": "テレメトリデータがサービス識別属性 (k8s-deployment、サービス名など) とともに取り込まれると、サービスがここに表示されます。",
       "searchServiceName": "サービスまたはストリーム名を検索...",
@@ -8560,7 +8265,6 @@
       "serviceName": "[サービス名]",
       "service": "サービス",
       "logs": "ログ",
-      "traces": "トレース",
       "metrics": "指標",
       "lastSeen": "最終確認",
       "retry": "リトライ",
@@ -8572,7 +8276,6 @@
       "fieldMappingDialogHelp": "テレメトリデータ全体でサービス名として認識されるべきフィールド名を追加または削除します。",
       "fieldMappingPlaceholder": "フィールド名を入力してEnterキーを押してください",
       "foundInLogs": "ログ内で発見",
-      "foundInTraces": "トレース内で発見",
       "foundInMetrics": "メトリクス内で発見",
       "distinguishByLabel": "サービスの区別基準",
       "distinguishByHelp": "サービスが稼働する場所を定義するフィールドを選択します。たとえば、cluster + namespace + deployment を組み合わせると、各サービスに一意のアイデンティティが作成されます。最大5フィールド。",
@@ -8608,13 +8311,11 @@
       "instancesCount": "（{count}インスタンス）",
       "noDimensions": "ディメンションなし",
       "defaultSetWarningTitle": "相関が信頼できない可能性があります。",
-      "defaultSetWarningBody": "このインスタンスには曖昧性解消がありません — ワークロードの一致なし（cluster、namespace、environment のコンテキストなし）で検出されました。ログとトレースは同じサービス名の異なるデプロイメントから来ている可能性があります。",
       "instanceIdentity": "インスタンスアイデンティティ",
       "noDimensionsCatchAll": "ディメンションなし — キャッチオールインスタンス",
       "streamSources": "ストリームソース",
       "fieldNameMapping": "フィールド名マッピング",
       "logsWithCount": "ログ（{count}）",
-      "tracesWithCount": "トレース（{count}）",
       "metricsWithCount": "メトリクス（{count}）"
     },
     "addRegexPattern": {
@@ -8727,9 +8428,7 @@
       "importPatternFailed": "パターン \"{name}\" のインポートに失敗しました: {error}",
       "createFailed": "正規表現パターン - {index}: \"{name}\" の作成に失敗しました --> \n 理由: {error}"
     },
-    "index": {
-      "genAiAgentMappingDesc": "GenAIスパンをエージェント識別子にマッピング"
-    },
+    "index": {},
     "organizationManagementPage": {
       "setAiCredits": "AIクレジットを設定",
       "setAiCreditsSubtitle": "組織の生涯AIクレジット許容量を設定します。",
@@ -8863,8 +8562,6 @@
       "noValues": "値なし",
       "cardinality": "カーディナリティ:",
       "uniqueValues": "{n} の一意の値",
-      "streams": "ストリーム",
-      "streamsSubtext": "ストリーム",
       "noAdditionalDimensions": "追加のディメンションは検出されませんでした。",
       "noSampleData": "このフィールドのサンプルデータはありません。",
       "uniqueValuesDetected": "{n} の一意の値が検出されました",
@@ -8931,7 +8628,6 @@
     "cachedReportHint": "注: キャッシュされたレポートはダッシュボードへのクイックアクセス用に保存されます。これらのレポートでは共有は無効です。",
     "selectDashboardStep": "ダッシュボードを選択",
     "timeRangeDescription": "指定した時間範囲のデータでレポートを生成します",
-    "pngPageLimitNote": "PNG はダッシュボードの最初の表示ページのみをキャプチャします。ダッシュボードが複数ページにわたる場合は PDF を使用してください。",
     "widthPlaceholder": "例: 1440",
     "heightPlaceholder": "例: 900",
     "dimensionsDefaultHint": "空白のままにするとサーバーのデフォルトが使用されます",
@@ -8947,7 +8643,6 @@
     "searchAllFoldersTitle": "すべてのフォルダを検索",
     "never": "なし",
     "startDate": "開始日",
-    "header": "レポート",
     "subtitle": "定期レポートとエクスポート",
     "searchThisFolder": "このフォルダー",
     "searchAllFolders": "すべてのフォルダー",
@@ -9050,7 +8745,6 @@
     "totalTimeRange": "合計クエリ範囲",
     "searchType": "検索タイプ",
     "querySource": "クエリーソース",
-    "traceId": "トレース ID",
     "userId": "ユーザー ID",
     "orgId": "組織 ID",
     "streamType": "ストリームタイプ",
@@ -9137,16 +8831,10 @@
     },
     "openInFullView": "フルビューで開く",
     "viewLogs": "ログを表示",
-    "viewLogsUnavailable": "このスパンのログを開けませんでした。",
     "backToLogs": "ログに戻る",
-    "openInTraces": "トレースで開く",
     "loadingStream": "ストリームをロード中...",
     "noLogsAvailableForService": "このサービスで利用できるログはありません",
-    "noCorrelatedLogsFound": "このスパンに関連するログが見つかりません",
     "noData": {
-      "title": "{product} にトレースの送信を開始",
-      "description": "この組織にはまだトレースストリームが見つかりません。インストゥルメントされたサービスとトレースがここに自動的に表示されます。",
-      "otlp": "{product} 経由でトレースを送信",
       "otlpDesc": "{product1}、{product2}、および任意の {product3} 互換 SDK",
       "otelCollectorDesc": "すべてのテレメトリ信号を {product} 経由でルーティング",
       "or": "または:",
@@ -9155,21 +8843,12 @@
     "configureFullTextSearch": "ストリームに全文検索フィールドを設定します。",
     "collapseFields": "フィールドを折りたたむ",
     "openFields": "オープンフィールド",
-    "timeRangeUpdated": "選択した時間範囲にはこのトレースが含まれていません。時間範囲はトレースのタイムスタンプと一致するように更新されました。",
-    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。",
-    "fetchingTraces": "しっかりつかまって足跡を掴んでる",
     "noStream": {
       "title": "ストリームを選んで探索を始めましょう",
-      "description": "トレースストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が読み込まれたら、サービス、期間、スパンステータスなどでフィルタリングできます。",
       "selectStream": "ストリームを選択する",
-      "selectStreamDesc": "この組織で利用可能なトレースストリームを閲覧する",
-      "queryGuide": "トレースガイドを読む",
-      "queryGuideDesc": "サービスグラフ、スパンフィルタリング、RED メトリクスなど",
       "recent": "最近:"
     },
     "noEvents": {
-      "title": "トレースが見つかりません",
-      "descNoFilters": "{range} にはトレースが見つかりませんでした。結果を読み込むには、時間範囲を広げてみてください。",
       "descWithFilters": "選択したウィンドウには、<strong>このクエリと一致するものはありません</strong>。時間範囲を広げるか、フィルターを削除してみてください。",
       "descOutOfRange": "選択した時間ウィンドウには、このストリームのデータが含まれていません。データが最後に確認された時点へジャンプしてください。",
       "jumpToData": "最新のデータへジャンプ",
@@ -9177,38 +8856,19 @@
       "askAi": "AI にクエリの修正を依頼する",
       "selectedRange": "選択した範囲"
     },
-    "tracesFound": "トレースが見つかりました",
-    "spansFound": "スパンが見つかりました",
-    "errorTraces": "エラートレース",
-    "errorSpans": "エラースパン",
     "filterByErrors": "エラーで絞り込む",
     "clearErrorFilter": "エラーフィルターをクリア",
     "error": "エラー",
     "errorCount": "{n} エラー | {n} エラー",
     "success": "成功",
-    "applyPendingFilters": "保留中のフィルターの適用とトレースの検索",
-    "backToTraces": "トレースに戻る",
     "loadingTrace": "読み込み中...",
-    "traceId": "トレース ID",
-    "copyTraceId": "トレース ID をコピー",
     "viewFilters": "フィルターを表示",
-    "reviewAndApplyFilters": "フィルターを確認してトレースに適用する",
-    "spansLabel": "スパン",
     "errorsLabel": "エラー",
     "previousMatch": "前の試合",
     "nextMatch": "次の試合",
-    "searchInSpans": "スパンで検索",
-    "spansTableView": "スパンテーブルビュー",
     "comingSoon": "近日公開予定...",
-    "fetchingTrace": "トレースを取得しています。",
-    "traceFilters": "トレースフィルター",
-    "showTraces": "トレースを表示",
     "applyAndSearch": "応募と検索",
     "timestamp": "タイムスタンプ",
-    "noErrorPresent": "このスパンにはエラーはありません",
-    "noEventsPresent": "このスパンにイベントはありません",
-    "noLinksPresent": "このスパンにリンクはありません",
-    "loadingTraceDag": "トレースDAGを読み込み中...",
     "exceptionsWithCount": "例外 ({count})",
     "typeLabel": "タイプ:",
     "messageLabel": "メッセージ:",
@@ -9222,7 +8882,6 @@
       "templateBadge": "テンプレート"
     },
     "sessionsList": {
-      "streamLabel": "ストリーム",
       "sessions": "セッション",
       "failedToLoad": "セッションを読み込めませんでした",
       "retry": "リトライ",
@@ -9240,7 +8899,6 @@
         "cost": "費用",
         "status": "ステータス"
       },
-      "stream": "ストリーム",
       "agent": "エージェント",
       "noAgentsTitle": "この範囲内にエージェントはありません",
       "noAgentsDescription": "選択した時間枠ではGenAIエージェントは検出されませんでした。範囲を広げるか、ストリームビューに切り替えてください。",
@@ -9254,12 +8912,9 @@
       "failedToLoad": "セッションを読み込めませんでした",
       "retry": "リトライ",
       "sessionNotFound": "セッションが見つかりません",
-      "noSpansFound": "現在の時間範囲では {id} のスパンが見つかりません。",
-      "searchPlaceholder": "このセッションのトレースを検索...",
       "turn": "順番",
       "turns": "ターン",
       "turnCount": "{count} {unit}",
-      "openInTraceExplorer": "トレースを表示",
       "filters": {
         "status": "ステータス",
         "model": "モデル",
@@ -9348,7 +9003,6 @@
         "warning": "警告",
         "critical": "重大"
       },
-      "viewTraces": "トレースを表示",
       "types": {
         "all": "[すべて]",
         "service": "サービス",
@@ -9362,20 +9016,15 @@
         "title": "エラー率"
       }
     },
-    "spansTab": "スパン",
-    "tracesTab": "トレース",
     "serviceGraphTab": "サービスグラフ",
     "serviceGraphSubtitle": "サービスがどのように相互に呼び出すかを確認 — 依存関係、スループット、エラー率",
-    "servicesCatalogSubtitle": "トレースを送信するすべてのサービス、レイテンシー、スループット、エラー率",
     "treeView": "ツリービュー",
     "graphView": "グラフビュー",
     "layoutHorizontal": "水平",
     "layoutVertical": "垂直",
     "layoutForce": "フォースレイアウト",
-    "exportTraces": "トレースをエクスポート",
     "waterfall": "ウォーターフォール",
     "flameGraph": "フレームグラフ",
-    "traceGraph": "トレースグラフ",
     "thread": "スレッド",
     "dbSpanDetails": {
       "dbSystem": "DBシステム",
@@ -9385,7 +9034,6 @@
       "host": "ホスト",
       "user": "ユーザー",
       "storedProcedure": "ストアドプロシージャ",
-      "noQueryText": "このスパンに対してクエリテキストが記録されていません。",
       "performance": "パフォーマンス",
       "rowsReturned": "返された行数",
       "batchSize": "バッチサイズ",
@@ -9398,13 +9046,11 @@
       "changeStreamTitle": "ストリームを変更しますか？",
       "switchStream": "ストリームを切り替え",
       "cancel": "キャンセル",
-      "changeStreamMessage": "これにより、トレース/スパンタブのストリームも更新され、既存のクエリがリセットされます。",
       "errorGettingFunctions": "関数の取得中にエラーが発生しました",
       "errorPullingIndex": "選択した組織のインデックスをプル中にエラーが発生しました{message}",
       "errorGettingStreams": "ストリームの取得中にエラーが発生しました",
       "errorLoadingStreams": "ストリームの読み込み中にエラーが発生しました",
       "errorConstructingQuery": "検索クエリの構築中にエラーが発生しました。",
-      "traceNotFound": "トレース {traceId} が見つかりません",
       "errorProcessingRequest": "リクエスト処理中にエラーが発生しました",
       "searchRequestFailed": "検索リクエストが失敗しました"
     },
@@ -9425,9 +9071,6 @@
       "service": "サービス",
       "operationName": "オペレーション名",
       "duration": "所要時間",
-      "spans": "スパン",
-      "spanKind": "スパン種別",
-      "spanStatus": "スパンステータス",
       "status": "ステータス",
       "serviceLatency": "サービスレイテンシー",
       "inputTokens": "入力トークン",
@@ -9439,11 +9082,9 @@
       "noErrorsInRange": "この時間範囲にエラーはありません",
       "time": "時間",
       "service": "サービス",
-      "operation": "操作",
-      "traceId": "トレースID"
+      "operation": "操作"
     },
     "lLMInsightsDashboard": {
-      "stream": "ストリーム",
       "agent": "エージェント",
       "compareEntry": "バージョンを比較",
       "compareEntryHint": "このエージェントの2つのバージョンを並べて比較",
@@ -9454,7 +9095,6 @@
       "viewByStream": "ストリームで表示",
       "totalCost": "総コスト",
       "totalTokens": "総トークン数",
-      "totalTraces": "総トレース数",
       "p95Latency": "P95レイテンシ",
       "errorRate": "エラー率",
       "timeAxis": "時刻",
@@ -9466,13 +9106,10 @@
     "serviceGraphNodeSidePanel": {
       "viewRelated": "関連を表示",
       "logs": "ログ",
-      "traces": "トレース",
       "databases": "データベース",
-      "viewTraces": "トレースを表示",
       "operations": "操作",
       "metrics": "メトリクス",
       "noOperationsFound": "操作が見つかりません",
-      "viewInTraces": "トレースで表示",
       "noResourceDataFound": "{resource}のデータが見つかりません",
       "retry": "再試行",
       "noMetricsAvailable": "このサービスに利用可能なメトリクスはありません。",
@@ -9496,13 +9133,11 @@
       "tabHosts": "ホスト",
       "tabDatabases": "データベース",
       "tabQueries": "クエリ",
-      "tabDestinations": "宛先",
       "tabRpcServices": "RPCサービス",
       "tabUrls": "URL",
       "colHost": "ホスト",
       "colDatabase": "データベース",
       "colDbOperation": "DB操作",
-      "colDestination": "宛先",
       "colRpcService": "RPCサービス",
       "colUrl": "URL",
       "envHost": "ホスト",
@@ -9517,14 +9152,11 @@
       "dbResponseStatusCode": "DBレスポンスステータスコード",
       "processExitCode": "プロセス終了コード"
     },
-    "traceLatencyCell": {
-      "spansAcrossServices": "{spans} スパンが {services} サービスにまたがる"
-    },
+    "traceLatencyCell": {},
     "threadToolCalls": {
       "toolCall": "ツール呼び出し",
       "toolCalls": "ツール呼び出し",
       "showCalls": "呼び出しを表示",
-      "openSpanDetails": "スパン詳細を開く",
       "arguments": "引数",
       "result": "結果",
       "empty": "(空)"
@@ -9538,17 +9170,13 @@
       "cost": "コスト",
       "model": "モデル",
       "errors": "エラー",
-      "noSpansLoaded": "このトレースにスパンが読み込まれていません。",
-      "noLlmTurns": "LLMターンが検出されませんでした。このトレースには次のようなスパンが含まれていません:",
       "system": "システム",
-      "historicalMessage": "{count} このセッションの以前のメッセージ — 以前のトレースで処理されました。 | {count} このセッションの以前のメッセージ — 以前のトレースで処理されました。",
       "user": "ユーザー",
       "startedAt": "{time} に開始",
       "unknown": "不明",
       "tokens": "トークン",
       "tokensSuffix": "トークン",
-      "error": "エラー",
-      "viewSpan": "スパンを表示"
+      "error": "エラー"
     },
     "traceHeader": {
       "operationName": "操作名"
@@ -9566,7 +9194,6 @@
       "start": "開始",
       "requestResent": "リクエストを{count}回再送しました | リクエストを{count}回再送しました",
       "resends": "再送回数",
-      "spanIdTitle": "スパンID: {id}",
       "inputTokens": "入力トークン",
       "in": "入力",
       "outputTokens": "出力トークン",
@@ -9584,11 +9211,8 @@
       "modelParameters": "モデルパラメータ",
       "table": "テーブル",
       "field": "フィールド",
-      "value": "値",
       "timestamp": "タイムスタンプ",
       "enterpriseLicenseRequired": "相関機能にはエンタープライズライセンスが必要です",
-      "missingSpanOrStream": "スパンまたはストリーム名が不足しています",
-      "spanIdCopied": "スパンIDをクリップボードにコピーしました",
       "attributesCopied": "属性をクリップボードにコピーしました",
       "copiedToClipboard": "{type}をクリップボードにコピーしました",
       "failedToCopyClipboard": "クリップボードへのコピーに失敗しました",
@@ -9601,26 +9225,20 @@
       "filterAdded": "フィルター追加: {field} {operator} '{value}'",
       "timeline": "タイムライン",
       "serviceMap": "サービスマップ",
-      "traceNotFound": "トレース {traceId} が見つかりません",
-      "spanNotFound": "トレース内にスパン {spanId} が見つかりません",
       "unknownOperation": "不明な操作",
       "unknownService": "不明なサービス",
-      "traceIdCopied": "トレースIDをクリップボードにコピーしました",
       "sessionIdCopied": "セッションIDをクリップボードにコピーしました"
     },
     "traceTree": {
       "clickToExpand": "クリックして展開",
       "clickToCollapse": "クリックして折りたたみ",
-      "errorSpan": "エラースパン",
-      "httpStatus": "HTTP {status}",
-      "spanEvent": "{count} スパンイベント | {count} スパンイベント"
+      "httpStatus": "HTTP {status}"
     },
     "tracesAnalysisDashboard": {
       "baseline": "ベースライン:",
       "selected": "選択中:",
       "dimensions": "ディメンション",
-      "collapseDimensions": "ディメンションを折りたたむ",
-      "tracesPerInterval": "トレース/間隔"
+      "collapseDimensions": "ディメンションを折りたたむ"
     },
     "sessionDetails": {
       "missingSessionInfo": "URLにセッションIDまたはストリームがありません",
@@ -9628,36 +9246,21 @@
       "copied": "コピーしました"
     },
     "flameGraphView": {
-      "spans": "スパン",
       "depth": "深さ",
-      "noSpansToDisplay": "表示するスパンがありません",
       "service": "サービス:",
       "duration": "期間:",
-      "percentOfTrace": "トレースの%:",
       "hasErrors": "⚠ エラーあります"
     },
     "tracesNoEventsState": {
       "lastData": "最終データ: {formatted} ({zone})"
     },
     "correlation": {
-      "distributedTrace": "分散トレース",
-      "loadingTraceData": "トレースデータを読み込んでいます...",
-      "noTraceInfoAvailable": "このイベントのトレース情報はありません",
-      "traceIdLabel": "トレースID:",
-      "copyTraceId": "トレースIDをコピー",
-      "spanIdLabel": "スパンID:",
-      "spanHierarchy": "スパン階層:",
-      "applicationSpan": "アプリケーションスパン",
-      "browserSdkSpanPrefix": "ブラウザSDKスパン (",
       "closingParen": ")",
-      "backendSpansPrefix": "バックエンドスパン (",
       "performanceBreakdown": "パフォーマンス内訳:",
       "totalDuration": "合計時間:",
       "browserLabel": "ブラウザ:",
       "networkLabel": "ネットワーク:",
-      "backendLabel": "バックエンド:",
-      "viewTraceDetails": "トレース詳細を表示",
-      "backendTraceNotAvailable": "バックエンドのトレースデータはまだ利用できません。トレースデータの取り込みには最大30秒かかる場合があります."
+      "backendLabel": "バックエンド:"
     },
     "failedToAnalyzeDimensions": "ディメンションの分析に失敗しました",
     "failedToFetchCorrelatedLogs": "関連ログの取得に失敗しました",
@@ -9685,7 +9288,6 @@
     "serviceDiscoveryNotEnabled": "サービスディスカバリが有効になっていません。これはエンタープライズ機能です。",
     "startTime": "開始時刻",
     "streamNameRequiredForCorrelation": "相関にはストリーム名が必要です",
-    "trace": "トレース",
     "unableToConnectToServer": "サーバーに接続できません。アプリケーションが実行されているか確認してください。",
     "unknownService": "不明なサービス",
     "unknownPattern": "不明なパターン",
@@ -9696,7 +9298,6 @@
       "requestsLabel": "リクエスト:",
       "errorsLabel": "エラー:",
       "errorRateLabel": "エラーレート:",
-      "spansLabel": "スパン:",
       "callsLabel": "呼び出し:",
       "averageLabel": "平均:",
       "minimumLabel": "最小:",
@@ -9705,10 +9306,8 @@
       "p75Label": "P75:",
       "p95Label": "P95:",
       "p99Label": "P99:",
-      "averageOfTrace": "{avg}ms（トレースの{percent}%）",
       "requestCount": "{count} リクエスト"
     },
-    "spanEventTimeline": "スパンイベントタイムライン",
     "eventClusterTooltip": "{count} イベント",
     "spanEventCount": "{count} イベント",
     "spanEventCountPlural": "{count} イベント",
@@ -9719,8 +9318,7 @@
     "eventClusterAriaLabel": "{count} イベント, {errors} エラー",
     "eventClusterAriaLabelPlural": "{count} イベント, {errors} エラー",
     "eventMarkerTooltip": "イベント: {name}",
-    "exceptionMarkerTooltip": "例外: {type}",
-    "spanEventFallback": "スパンイベント"
+    "exceptionMarkerTooltip": "例外: {type}"
   },
   "actions": {
     "realTime": "リアルタイム",
@@ -9794,7 +9392,6 @@
     "requiresConfirmation": "実行前に確認が必要",
     "envVars": "環境変数",
     "envKey": "変数名",
-    "envValue": "価値",
     "addEnvVar": "[変数を追加]",
     "credentialFiles": "認証情報ファイル",
     "credEnvVar": "環境変数名",
@@ -10017,11 +9614,9 @@
     "selectMetrics": "メトリックスストリームの選択",
     "correlatedLogs": "相関ログ",
     "correlatedMetrics": "相関指標",
-    "correlatedTraces": "相関トレース",
     "loadingCorrelation": "相関データを読み込んでいます...",
     "clickToLoadLogs": "クリックして相関ログを読み込む",
     "clickToLoadMetrics": "クリックして相関指標を読み込む",
-    "clickToLoadTraces": "クリックして相関トレースを読み込む",
     "logs": {
       "filtersLabel": "フィルター",
       "allValues": "すべての値",
@@ -10040,19 +9635,11 @@
     "noLogsFound": "相関ログが見つかりません",
     "noDataFound": "データが見つかりません",
     "noLogsDescription": "選択した時間範囲では、この相関関係のログは見つかりませんでした。",
-    "correlatedTracesFor": "サービスの相関トレース:{service}",
     "all": "[すべて]",
-    "loadingTraces": "相関トレースをロード中...",
-    "tracesError": "トレースを読み込めませんでした",
-    "tracesErrorDetails": "トレースデータの取得中にエラーが発生しました。もう一度試してください。",
     "metricsError": "メトリクスを読み込めません",
     "metricsErrorDetails": "メトリックスデータの取得中にエラーが発生しました。もう一度試してください。",
     "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。",
     "dimensionBasedCorrelation": "ディメンションベースの相関",
-    "tracesFromService": "サービスからのトレース:{service}",
-    "noTracesFound": "相関トレースは見つかりませんでした",
-    "noTracesDescription": "選択した時間範囲でこの相関のトレースが見つかりません。",
-    "viewInTraces": "トレースで表示",
     "filters": "フィルター",
     "semanticFieldGroupsCaption": "相関と重複排除のためのフィールド名マッピングを定義します (例:ホスト、ホスト名、ノード →「ホスト」グループ)",
     "exportToJson": "JSON へのエクスポート",
@@ -10185,10 +9772,8 @@
     "editCrossLink": "クロスリンクを編集",
     "name": "[名前]",
     "nameRequired": "名前が必要です",
-    "namePlaceholder": "例:トレースの詳細を表示",
     "urlTemplate": "URL テンプレート",
     "urlRequired": "URL が必要です",
-    "urlPlaceholder": "例: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
     "urlInvalid": "有効な http(s) URL を入力してください",
     "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} を使用",
     "fields": "フィールド",
@@ -10281,7 +9866,6 @@
     "colPattern": "パターン",
     "colPricingSimple": "価格設定",
     "testMatchTitle": "テストモデルマッチ",
-    "testMatchSubtitle": "スパンのモデル名が価格設定ルールとどのように一致するかをシミュレートします。",
     "modelNameInput": "[モデル名]",
     "modelNameHint": "あなたの世代のモデル名。",
     "enterModelName": "モデル名を入力してマッチングをテストしてください",
@@ -10377,8 +9961,7 @@
         "errorRate": "エラー率",
         "p50": "P50レイテンシ",
         "p95": "P95レイテンシ",
-        "p99": "P99レイテンシ",
-        "cost": "コスト / トレース"
+        "p99": "P99レイテンシ"
       },
       "insufficientLabel": "参考",
       "tooltip": {
@@ -10445,11 +10028,8 @@
       "sessions": "エージェントセッションを順番に閲覧して確認する",
       "agentGraph": "エージェントが操作するもの（ツール、モデル、サービス、データストア）を確認",
       "agentBehavior": "ループにはまったエージェントと、それらを失敗させるエラーを特定します",
-      "discovery": "レビューに値する問題のあるトレースを見つける",
       "queues": "ステートフルなレビュー用TODOリスト",
-      "datasets": "注釈付きトレースとレビューからゴールデンデータセットをキュレーションする",
       "experiments": "不変のオフライン評価実行をプレビューして作成",
-      "quality": "スパン、トレース、セッション評価全体でスコア品質を追跡します",
       "evalJobs": "セッション全体で評価ジョブを実行および監視する",
       "scorers": "LLM アウトプットを採点するスコアラーの作成と管理",
       "scoreConfigs": "評価に使用するスコアリングルーブリックを設定します"
@@ -10458,8 +10038,6 @@
       "button": "注釈",
       "title": "注釈 · {scope}",
       "scope": {
-        "span": "スパン",
-        "trace": "トレース",
         "session": "セッション"
       },
       "viaAnnotation": "アノテーション",
@@ -10493,7 +10071,6 @@
       "dataset": {
         "button": "データセットに追加",
         "title": "データセットに追加",
-        "hint": "{ref} をゴールデンにします。入力はトレースから読み戻されます — 期待される出力を記述してください。",
         "errors": {
           "dataset": "データセットを選択",
           "expectedOutput": "期待される出力を記述"
@@ -10502,7 +10079,6 @@
         "datasetPlaceholder": "データセットを選択...",
         "noDatasets": "データセットがまだありません — 先に「データセット」ページから作成してください。",
         "inputLabel": "入力",
-        "inputReadOnly": "トレースから読み取り",
         "expectedLabel": "期待される出力",
         "expectedPlaceholder": "このアイテムが生成すべきだった出力を記述...",
         "confirm": "データセットに追加",
@@ -10516,13 +10092,9 @@
       "searchPlaceholder": "サービス、入力、品質を検索...",
       "searchFooter": "このページの {loaded} 件中 {matched} 件が一致",
       "scope": {
-        "span": "スパン",
-        "trace": "トレース",
         "session": "セッション"
       },
       "scopeNoun": {
-        "span": "スパン",
-        "trace": "トレース",
         "session": "セッション"
       },
       "inQueueFilter": {
@@ -10538,10 +10110,8 @@
         "started": "開始時刻",
         "type": "タイプ",
         "kind": "種類",
-        "span": "スパン",
         "session": "セッション",
         "topic": "トピック",
-        "traces": "トレース",
         "duration": "所要時間",
         "service": "サービス",
         "input": "入力",
@@ -10549,7 +10119,6 @@
         "inQueue": "キュー内？",
         "actions": "アクション"
       },
-      "spanParent": "{trace} 内",
       "quality": {
         "issue": "問題",
         "multiple": "複数",
@@ -10622,7 +10191,6 @@
         "operatorIs": "等しい",
         "operatorIsNot": "等しくない",
         "conditionScorePlaceholder": "スコア設定",
-        "conditionValuePlaceholder": "値",
         "pin": "バージョンを固定",
         "versionLatest": "v{version}（最新）",
         "success": "キューが作成されました",
@@ -10638,10 +10206,8 @@
         "searchPlaceholder": "アイテムを検索...",
         "footerTitle": "アイテム",
         "allItems": "すべて",
-        "inTrace": "トレース {traceId} 内",
         "reviewAgain": "再レビュー",
         "emptyTitle": "レビュー対象がありません",
-        "emptyBody": "Discoveryまたはトレースビューから、トレース、スパン、セッションをこのキューに追加してください。",
         "columns": {
           "refType": "参照",
           "refId": "参照",
@@ -10660,8 +10226,6 @@
         "next": "次の項目",
         "collapseNav": "項目リストを折りたたむ",
         "expandNav": "項目リストを展開",
-        "openTrace": "完全なトレースを開く",
-        "openTraceSoon": "完全なトレース表示は次のアップデートで提供されます。",
         "input": "入力",
         "output": "出力",
         "retrievedContext": "取得コンテキスト",
@@ -10692,7 +10256,6 @@
         "distill": {
           "title": "データセットへ抽出",
           "action": "データセット",
-          "hint": "この項目が生成すべきだった回答を書いてください。それがゴールデン出力となり、入力はレビュー済みトレースから取得されます。",
           "datasetLabel": "データセット",
           "datasetPlaceholder": "データセットを選択...",
           "noDatasets": "まだデータセットがありません — まずデータセットページから作成してください。",
@@ -10704,7 +10267,6 @@
           "updated": "ゴールデン出力が更新されました — この項目は既にそのデータセットに含まれていました",
           "openDataset": "データセットを開く",
           "needsReview": "まずレビューを完了してください — ゴールデンには裁定判断が必要です",
-          "sessionUnsupported": "セッション項目は蒸留できません — トレースとスパンのみ可能です",
           "loadError": "データセットの読み込みに失敗しました",
           "error": "この項目をデータセットに追加できませんでした"
         },
@@ -10730,12 +10292,10 @@
       "trial": "試行 {index}",
       "summary": "データセット v{version} · {trials} 試行 · {scorers} スコアラー",
       "previewCounts": "{rows} 行 × {trials} 試行 = {slots} スロット",
-      "viewTrace": "実行トレースを表示",
       "scoresTitle": "スコア",
       "taskProgress": "タスク: {completed}/{total} 完了 · {skipped} スキップ",
       "scoringProgress": "スコア: {completed}/{total} 完了 · {skipped} スキップ",
       "skipTiers": "スキップされた行: {full} 完全スキップ · {partial} 部分スキップ",
-      "scoreEvidence": "{scorer} · v{version}: {samples} サンプル, {noReference} 参照なし, {noTrace} トレースなし",
       "scorerApplicability": "{scorer} · v{version}: {eligible} 対象スロット, {noReference} 参照なし",
       "loadError": "実験の読み込みに失敗しました",
       "previewError": "実験スロットのプレビューに失敗しました",
@@ -10781,7 +10341,6 @@
         "sourcesPlaceholder": "すべてのソース",
         "sourcesHelp": "空のままにすると、データセット内のすべての行が実行されます。",
         "sources": {
-          "trace": "トレース",
           "annotation": "アノテーション",
           "manual": "手動"
         },
@@ -10912,7 +10471,6 @@
         "trials": "試行",
         "trial": "試行 {index}",
         "retryFailedSlot": "失敗したスロットを再試行",
-        "viewTrace": "トレースを表示",
         "scores": "スコア",
         "dimension": "ディメンション",
         "unknownDimension": "不明なディメンション",
@@ -10999,7 +10557,6 @@
         "actions": "アクション"
       },
       "source": {
-        "trace": "トレース",
         "annotation": "アノテーション",
         "manual": "手動"
       },
@@ -11055,8 +10612,6 @@
           },
           "versionPill": "v{version} · {count} バージョン | v{version} · {count} バージョン",
           "sourceSection": "ソース",
-          "sourceTrace": "トレース",
-          "sourceSpan": "スパン",
           "sourceReview": "レビュー提出",
           "sourceImport": "インポート元",
           "inputSection": "入力",
@@ -11097,10 +10652,8 @@
       "version": "バージョン"
     },
     "agentGraph": {
-      "stream": "ストリーム",
       "agent": "エージェント",
       "noAgentsTitle": "エージェントが見つかりません",
-      "noAgentsDescription": "この時間範囲ではエージェントが見つかりませんでした。時間範囲を広げるか、トレースにgen_aiエージェント属性が含まれていることを確認してください。",
       "versionAgnosticHint": "トポロジーはバージョン間で同じです — グラフは環境でスコープされ、バージョンではスコープされません。バージョン比較を使用してバージョンを比較してください。"
     },
     "panels": {
@@ -11112,10 +10665,7 @@
         "title": "トークントレンド",
         "subtitle": "モデル別トークン"
       },
-      "spanTrend": {
-        "title": "スパントレンド",
-        "subtitle": "種類別のスパンカウント"
-      },
+      "spanTrend": {},
       "latencyByModel": {
         "title": "モデル別のレイテンシー",
         "subtitle": "p50/p90/p95/p99"
@@ -11129,7 +10679,6 @@
         "subtitle": "エラー数"
       },
       "spansByModel": {
-        "title": "モデル別のスパン",
         "subtitle": "モデルごとのコール数"
       },
       "tokensByModel": {
@@ -11137,8 +10686,7 @@
         "subtitle": "モデルごとの合計トークン"
       },
       "recentErrors": {
-        "title": "最近のエラー",
-        "subtitle": "直近10回失敗したスパン"
+        "title": "最近のエラー"
       }
     },
     "behavior": {
@@ -11148,7 +10696,6 @@
         "disabled": "このデプロイメントではエージェントの動作シグナルがオフになっています"
       },
       "loopsTitle": "ループしているエージェント",
-      "loopsHint": "トレースごとに同じツールを何度も再実行するエージェント",
       "summaryLoops": "ループエージェント",
       "summaryFailures": "障害分類",
       "summaryAgents": "影響を受けたエージェント",
@@ -11163,9 +10710,7 @@
       "unknownAgent": "(不明なエージェント)",
       "colAgent": "エージェント",
       "colTool": "ツール",
-      "colRatio": "呼び出し数 / トレース",
       "colCalls": "呼び出し数",
-      "colTraces": "トレース",
       "colFailClass": "障害クラス",
       "colCount": "件数",
       "colCost": "コスト ($)",
@@ -11173,32 +10718,18 @@
       "colErrors": "エラー",
       "detail": {
         "title": "シグナルの詳細",
-        "tracesTitle": "トレース",
-        "tracesHint": "トレースをクリックして開く",
-        "worstLoopTraces": "最悪のトレース（繰り返しが多い順）",
-        "topCostTraces": "最もコストの高いトレース",
-        "noTraces": "このシグナルのトレースが見つかりません",
         "errorsTitle": "エラーの内容",
-        "noErrors": "エラーメッセージは取得されていません — トレースを開いて確認",
-        "colTraceId": "トレース",
-        "colSpans": "スパン",
         "colRepeats": "繰り返し",
-        "openInNewTab": "新しいタブでトレースを開く",
         "showFull": "エラー全文を表示",
         "showLess": "表示を減らす",
         "colError": "エラーメッセージ",
         "colOccurrences": "回数",
-        "loopHeadline": "{agent} が {tool} をトレースあたり平均 {ratio} 回呼び出し（{calls} 回の呼び出し、{traces} トレース）。",
         "failHeadline": "{agent} が {count} 件の “{cls}” エラーを発生。",
-        "costHeadline": "{agent}: ${cost} 消費 · {tokens} トークン · {errors} エラー。",
-        "loopExplain": "繰り返し率が高い場合は、通常エージェントが結果をキャッシュしていないか、再試行していることを意味します。以下の最悪のトレースを開いて繰り返し呼び出しを確認してください。",
-        "failExplain": "これらがこの障害クラスの実際のエラーメッセージです — 修正方法を見つけるために読むか、トレースを開いて発生場所を確認してください。",
-        "costExplain": "これらのトレースがこのエージェントのコストを押し上げました。最もコストの高いものを開いて何が実行されたか確認してください。"
+        "costHeadline": "{agent}: ${cost} 消費 · {tokens} トークン · {errors} エラー。"
       }
     },
     "versionCompare": {
       "datePickerDisabled": "このモードではウィンドウはバージョンごとです",
-      "sampledNote": "レイテンシとコストの間隔は、バージョンごとにランダムサンプリングされた最大 {cap} 個のトレースから計算されます。",
       "bar": {
         "versionA": "バージョン A",
         "versionB": "バージョン B",
@@ -11216,9 +10747,7 @@
         "partial": "これらのバージョンは部分的に同時実行されました — 差異は各実行時期によって部分的に説明される可能性があります。"
       },
       "windowCard": {
-        "label": "{env} · {version} — {window} · {count} トレース",
-        "clamp": "ベースラインは {duration} しか実行されませんでした — 各バージョンの最初の {duration} を比較しています。",
-        "labelNoEnv": "{version} — {window} · {count} トレース"
+        "clamp": "ベースラインは {duration} しか実行されませんでした — 各バージョンの最初の {duration} を比較しています。"
       }
     }
   },
@@ -11279,25 +10808,18 @@
     },
     "manualEvaluation": {
       "titles": {
-        "span": "スパンを評価",
-        "trace": "トレースを評価",
         "session": "セッションを評価"
       },
       "targetLabels": {
-        "span": "スパン ID",
-        "trace": "トレース ID",
         "session": "セッション ID"
       },
       "scopes": {
-        "span": "スパン",
-        "trace": "トレース",
         "session": "セッション"
       },
       "description": "このターゲットに対して実行する評価ジョブを選択してください。評価ワーカーは、このページの時間範囲からソーステレメトリを読み込みます。",
       "jobLabel": "評価ジョブ",
       "jobPlaceholder": "評価ジョブを選択",
       "jobRequired": "評価ジョブを選択",
-      "noCompatibleJobs": "{scope} の評価ジョブには {stream} トレースストリームを使用するものはありません。",
       "loadJobsError": "評価ジョブの読み込みに失敗しました。",
       "run": "評価を実行",
       "queued": "{count} 件の評価タスクをキューに追加しました。 | {count} 件の評価タスクをキューに追加しました。",
@@ -11323,8 +10845,6 @@
         "filterLabel": "スコア範囲",
         "filterHint": "このスコア設定を評価ターゲットスコープ間で比較します。",
         "all": "すべて",
-        "span": "スパン",
-        "trace": "トレース",
         "session": "セッション"
       },
       "kpis": {
@@ -11393,7 +10913,6 @@
       },
       "runs": {
         "title": "評価スコア",
-        "hint": "スコアと推論は_llm_scoresから取得されます。実行を選択して、その評価者トレースを開いて詳細を調査してください。",
         "filterLabel": "評価スコアをフィルター",
         "footerTitle": "評価スコア",
         "noThresholdHint": "このスコア設定に健全性しきい値を設定して、不健全なスコアを分類および強調表示します。",
@@ -11527,7 +11046,6 @@
         "dataTypeLabel": "データ型",
         "rangeLabel": "範囲",
         "categoriesLabel": "カテゴリ",
-        "valuesLabel": "値",
         "thresholdSection": "健全性しきい値",
         "thresholdHint": "スコアを健全としてカウント",
         "noThreshold": "未宣言",
@@ -11588,7 +11106,6 @@
       "booleanInfo": "ブール型の設定は {trueLabel} / {falseLabel} の値を受け付けます。追加の設定は不要です。",
       "healthyThresholdTitle": "健全性しきい値",
       "optional": "任意",
-      "healthyThresholdIntro": "このディメンションのスコアが健全とみなされる条件を定義します。この範囲外のスコアは、トレース一覧、セッション、その他のビューで品質の問題をトリガーします。",
       "healthyWhenValueIs": "値が次の場合に健全:",
       "healthyCategories": "健全なカテゴリ:",
       "healthyCategoriesHint": "健全とみなすすべての値にチェックを入れてください。",
@@ -11667,8 +11184,6 @@
           "col": {
             "time": "時刻",
             "job": "ジョブ",
-            "spanId": "スパン ID",
-            "traceId": "トレース ID",
             "score": "スコア",
             "latency": "レイテンシー",
             "status": "ステータス"
@@ -11806,9 +11321,7 @@
       "remoteHeaders": {
         "subtitle": "すべてのリクエストとともに送信されます。",
         "colName": "名前",
-        "colValue": "値",
         "keyPlaceholder": "X-Custom-Header",
-        "valuePlaceholder": "値",
         "addButton": "+ ヘッダーを追加"
       },
       "requestBodyLabel": "リクエスト本文テンプレート",
@@ -11854,13 +11367,11 @@
         "eyebrow": "評価ジョブ",
         "refresh": "更新",
         "targetSection": "評価ターゲット",
-        "streamLabel": "ストリーム",
         "streamTypeLabel": "ストリームタイプ",
         "targetScopeLabel": "各評価",
         "idleWindowLabel": "アイドルウィンドウ",
         "maxAgeLabel": "最大経過時間",
         "filterLabel": "フィルター",
-        "filterEmpty": "フィルターなし — すべてのスパンが評価されます",
         "scorersSection": "スコアラー",
         "scorersEmpty": "このジョブにはまだスコアラーが付与されていません。",
         "scorerUnknown": "（削除されたスコアラー）",
@@ -11870,7 +11381,6 @@
         "viewScorerHint": "表示",
         "samplingSection": "サンプリング",
         "samplingModeLabel": "モード",
-        "samplingValueLabel": "値",
         "samplingAll": "一致するものをすべて評価",
         "samplingRate": "レートによるランダムサンプリング",
         "samplingCount": "最初のN件の一致",
@@ -11896,8 +11406,6 @@
           "col": {
             "time": "時刻",
             "scorer": "スコアラー",
-            "spanId": "スパン ID",
-            "traceId": "トレース ID",
             "score": "スコア",
             "latency": "レイテンシー",
             "status": "ステータス"
@@ -11918,7 +11426,6 @@
       "columns": {
         "name": "名前",
         "status": "ステータス",
-        "stream": "ストリーム",
         "targetScope": "スコープ",
         "scorers": "スコアラー",
         "created": "作成日",
@@ -11944,30 +11451,18 @@
       "scorersSection": "スコアラーとマッピング",
       "nameLabel": "[名前]",
       "namePlaceholder": "プロダクション・フィフネス・モニター",
-      "streamLabel": "ストリーム",
       "streamPlaceholder": "ストリームを選択",
       "targetScopeLabel": "各評価",
       "targetScopes": {
-        "span": "スパン",
-        "trace": "トレース",
         "session": "セッション"
       },
-      "targetScopeHelp": {
-        "span": "一致するスパンをそれぞれ個別に評価します。",
-        "trace": "完了ウィンドウが閉じた後にトレース全体を評価します。",
-        "session": "完了ウィンドウが閉じた後にトレースをまたいでセッション全体を評価します。"
-      },
+      "targetScopeHelp": {},
       "completionSection": "完了条件",
       "completionHelp": {
-        "trace": "これらのいずれかが最初に満たされた時点でトレースが評価されます。",
         "session": "これらのいずれかが最初に満たされた時点でセッションが評価されます。"
       },
       "idleWindowLabel": "アイドルウィンドウ（秒）",
-      "idleWindowHelp": "新しいスパンがない状態で{duration}後に評価されます。",
-      "idleWindowHelpEmpty": "新しいスパンが到着しなくなったら評価されます。",
       "maxAgeLabel": "最大経過時間（秒）",
-      "maxAgeHelp": "最初のスパンから{duration}後に評価されます。",
-      "maxAgeHelpEmpty": "スパンがまだ到着していても、固定された経過時間で評価されます。",
       "descriptionLabel": "[説明]",
       "samplingModeLabel": "サンプリングモード",
       "samplingValueLabel": "サンプリングレート",
@@ -11978,8 +11473,6 @@
       "scorerPicker": {
         "title": "スコアラー",
         "hint": {
-          "span": "一致するスパンごとに実行するスコアラーを1つ以上選択します。",
-          "trace": "対象となるトレースごとに実行するスコアラーを1つ以上選択します。",
           "session": "対象となるセッションごとに実行するスコアラーを1つ以上選択します。"
         },
         "meta": "{type} · v{version}",
@@ -11989,37 +11482,21 @@
       },
       "filter": {
         "title": "フィルター条件",
-        "hint": {
-          "span": "この条件に一致するスパンのみがサンプリングとスコアリングの対象になります。",
-          "trace": "スパンのいずれかがこの条件に一致する場合、トレースがサンプリングとスコアリングの対象になります。",
-          "session": "スパンのいずれかがこの条件に一致する場合、セッションがサンプリングとスコアリングの対象になります。"
-        }
+        "hint": {}
       },
       "selector": {
-        "title": "対象スパン（オプション）",
-        "hint": {
-          "trace": "空のままにすると、トレース内のすべてのスパンが含まれます。"
-        }
+        "hint": {}
       },
       "endSignal": {
         "title": "終了シグナル（オプション）",
-        "hint": {
-          "trace": "いずれかのスパンが一致したときにトレースを即座に閉じるスパン条件を定義します。",
-          "session": "いずれかのスパンが一致したときにセッションを即座に閉じるスパン条件を定義します。"
-        }
+        "hint": {}
       },
       "inputMapping": {
         "title": "プロンプト変数",
-        "hint": {
-          "span": "各変数をスパン属性にマップします。",
-          "trace": "各変数をシステム提供の値またはスパン属性にマップします。",
-          "session": "各変数をシステム提供の値またはスパン属性にマップします。"
-        },
+        "hint": {},
         "placeholder": "値を選択",
-        "searchPlaceholder": "システム値とスパン属性を検索…",
         "groups": {
-          "systemProvided": "システム提供の値 · このジョブが評価する各 {scope} について",
-          "spanAttributes": "スパン属性"
+          "systemProvided": "システム提供の値 · このジョブが評価する各 {scope} について"
         },
         "selectScorers": "スコアラーを選択してマッピングを設定します。",
         "noVariables": "このスコアラーには、マップするテンプレート変数がありません。",
@@ -12029,72 +11506,38 @@
           "title": "{scope} システム値",
           "description": "OpenObserve は、このジョブが評価する各 {scope} について、これらの値を個別に構築します。スコアラーのプロンプト変数をマッピングする際にソースとして使用してください。",
           "badge": "システム提供",
-          "selectorRequired": "スパンセレクターが必要",
           "columns": {
-            "variable": "値",
             "source": "ソース",
             "description": "提供される値"
           },
           "variables": {
-            "input": {
-              "trace": "トレースのルートスパンからの入力。"
-            },
-            "output": {
-              "trace": "トレースのルートスパンからの出力。"
-            },
-            "statistics": {
-              "trace": "トレースメトリクス：スパン数、期間、LLMとツールの呼び出し、エラー、トークン、コスト。",
-              "session": "セッションメトリクス：トレース数とターン数、期間、エラー。"
-            },
-            "spans": {
-              "trace": "ジョブのスパンセレクターによって選択された、フィルタリングされたスパンのサブセット。"
-            },
-            "steps": {
-              "trace": "時間順に並べられたスパン。トレースが非常に長い場合は中央が折り畳まれます。",
-              "session": "時間順に並べられたトレース。会話のターンとして表現されます。"
-            }
+            "input": {},
+            "output": {},
+            "statistics": {},
+            "spans": {},
+            "steps": {}
           }
         }
       },
       "spanSelector": {
-        "select": "スパンセレクターを選択",
-        "bindingHelp": "トレースには数百のスパンが含まれる場合があります。このスコアラーが確認するスパンを選択してください。",
         "createForScorer": "スコアラー用に作成",
-        "createForScorerTitle": "このスコアラー用のスパンセレクターを作成",
-        "editorTitle": "スパンセレクター",
         "name": "セレクター名",
         "schemaMode": "読み取るフィールド",
         "defaultSchema": "標準のGenAIフィールド",
         "customSchema": "カスタムフィールド",
-        "defaultSchemaHelp": "これら8つのフィールドは、一致するすべてのスパンから読み取られます。不足しているものは空で渡されます。",
         "fields": "フィールド",
         "fieldsHelp": "これらのフィールドのみが読み取られます — それ以外はスコアラーに送信されません。",
-        "maximumSpans": "最大スパン数",
-        "budget": "トレースから選択されるスパンの数を制限します。",
         "validation": {
           "name": "セレクター名を入力してください。",
           "duplicateName": "セレクター名はこのジョブ内で一意である必要があります。",
           "filter": "未完了のフィルター条件を完了するか削除してください。",
-          "fields": "カスタムスキーマには少なくとも1つのフィールドを選択してください。",
-          "maximumSpans": "最大スパン数は正の整数である必要があります。",
-          "budget": "選択されたフィールドに対してスパンが多すぎます。スパン数を減らすか、読み取るフィールドを減らしてください。",
-          "binding": "トレーススパンを使用する各スコアラーにスパンセレクターを選択してください。"
+          "fields": "カスタムスキーマには少なくとも1つのフィールドを選択してください。"
         }
       },
       "preview": {
         "scopes": {
-          "span": {
-            "title": "一致したスパン",
-            "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するスパンの数が表示されます。",
-            "matchedSuffix": "スパン一致 · 過去1時間",
-            "matchedLoading": "一致したスパンをカウント中…"
-          },
-          "trace": {
-            "title": "一致したトレース",
-            "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するトレースの数が表示されます。",
-            "matchedSuffix": "トレース一致 · 過去1時間",
-            "matchedLoading": "一致したトレースをカウント中…"
-          },
+          "span": {},
+          "trace": {},
           "session": {
             "title": "一致したセッション",
             "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するセッションの数が表示されます。",
@@ -12122,9 +11565,7 @@
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
         "idleWindowMinimum": "アイドルウィンドウは少なくとも1秒以上である必要があります",
-        "idleWindowMaximumTrace": "トレースのアイドルウィンドウは30分を超えることはできません",
         "idleWindowMaximumSession": "セッションのアイドルウィンドウは4時間を超えることはできません",
-        "maxAgeMaximumTrace": "トレースの最大保持時間は2時間を超えることはできません",
         "maxAgeMaximumSession": "セッションの最大保持時間は24時間を超えることはできません",
         "samplingValueRequired": "A sampling value is required"
       }
@@ -12187,7 +11628,6 @@
       "curlDesc": "一番手っ取り早い方法 — コマンドを1つ貼り付けるとログが流れ始める",
       "shippers": "ログシッパーを使う",
       "shippersDesc": "{product1}、{product2}、{product3}、{product4}、{product5}など",
-      "otelDesc": "ログ、トレース、メトリクスのベンダーに依存しないOTLPインジェスト",
       "or": "または:",
       "aws": "AWS/CloudWatch",
       "askAi": "AIにインジェストの設定を依頼"
@@ -12196,13 +11636,11 @@
       "title": "ストリームを選んで探索を始めましょう",
       "description": "ストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が出たら、フィルター、VRL 関数、カスタム時間範囲を使用して絞り込むことができます。",
       "selectStream": "ストリームを選択する",
-      "selectStreamDesc": "ログ、トレース、メトリクス、RUM ストリームを閲覧",
       "queryGuide": "クエリガイドを読む",
       "queryGuideDesc": "フィルター、SQL モード、VRL、保存済みビュー",
       "recent": "最近:"
     },
     "noEvents": {
-      "title": "イベントが見つかりません",
       "descNoFilters": "{range} にはイベントが見つかりませんでした。結果を読み込むには、時間範囲を広げてみてください。",
       "descWithFilters": "選択したウィンドウには、<strong>このクエリと一致するものはありません</strong>。時間範囲を広げるか、フィルターを緩めるか、クエリをリセットしてみてください。",
       "descOutOfRange": "選択した時間ウィンドウには、このストリームのデータが含まれていません。データが最後に確認された時点へジャンプしてください。",
@@ -12293,13 +11731,11 @@
       "scannedEventsForQuery": "このクエリのスキャンされたイベント",
       "timeTaken": "所要時間",
       "noData": "データなし",
-      "traceId": "トレースID",
       "viewQuery": "クエリを表示",
       "sqlQuery": "SQLクエリ",
       "copied": "コピーしました！",
       "sql": "SQL",
       "noSqlAvailable": "利用可能なSQLクエリはありません",
-      "fullTraceId": "完全なトレースID",
       "columnDuration": "期間",
       "columnNodeName": "ノード名",
       "columnRole": "ロール",
@@ -12312,7 +11748,6 @@
       "goodResponse": "良好な応答",
       "moderateResponse": "中程度の応答",
       "slowResponse": "低速応答",
-      "failedToCopyTraceId": "トレースIDのクリップボードへのコピーに失敗しました",
       "failedToCopySql": "SQLのクリップボードへのコピーに失敗しました"
     },
     "searchResult": {
@@ -12331,8 +11766,7 @@
       "unableToRetrieveCorrelation": "相関データを取得できません",
       "noMetricStreams": "サービス \"{service}\" のメトリックストリームが見つかりません",
       "correlationError": "相関エラー: {error}",
-      "contentCopied": "コンテンツのコピーに成功しました！",
-      "noTraceIdForInspection": "検査に使用できるトレースIDがありません"
+      "contentCopied": "コンテンツのコピーに成功しました！"
     },
     "searchBar": {
       "customRangeAlt": "カスタム範囲",
@@ -12496,7 +11930,6 @@
     "expandRangeDesc": "アクセス可能なデータは別のタイムウィンドウにある可能性があります",
     "copyError": "エラーの詳細をコピー",
     "copied": "コピーされました！",
-    "traceId": "トレース ID:",
     "askAi": "AI にクエリの修正を依頼する",
     "showDetail": "詳細を表示",
     "hideDetail": "詳細を非表示にする"
@@ -12561,7 +11994,6 @@
       "addVariable": "変数を追加",
       "cookieDomainPlaceholder": "ドメイン",
       "cookieNamePlaceholder": "名前",
-      "cookieValuePlaceholder": "値",
       "customHeaders": "カスタムヘッダー",
       "headerKeyPlaceholder": "ヘッダーキー",
       "headerValuePlaceholder": "ヘッダー値",
@@ -12577,7 +12009,6 @@
       "variableNamePlaceholder": "名前",
       "variableSecureTooltipHide": "この値を機密データとしてマスクする。",
       "variableSecureTooltipShow": "値はマスクされています。クリックして表示。",
-      "variableValuePlaceholder": "値",
       "variables": "変数"
     },
     "variablesPanel": {
@@ -12927,7 +12358,6 @@
       "stopping": "停止中…",
       "timeoutBelowDefaultWarning": "このステップのデフォルト {default} ms を下回っています。アプリケーションの実際の応答時間より短いタイムアウトは、誤った失敗の最も一般的な原因です。",
       "timeoutLabel": "タイムアウト（ms）",
-      "valueFallback": "値",
       "showSetupSteps": "セットアップ手順を表示",
       "waitingForActions": "ブラウザでのアクションを待機中..."
     },
@@ -13073,7 +12503,6 @@
       "http": {
         "addAssertion": "アサーションを追加",
         "addHeader": "ヘッダーを追加",
-        "assertionValue": "値",
         "assertions": "アサーション",
         "body": "リクエストボディ",
         "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
@@ -13084,7 +12513,6 @@
         },
         "followRedirects": "リダイレクトをフォロー",
         "headerName": "名前",
-        "headerValue": "値",
         "headers": "ヘッダー",
         "method": "メソッド",
         "operators": {
@@ -13268,7 +12696,6 @@
       "maxDuration": "最大時間",
       "noExecutionData": "実行データが見つかりません",
       "noExecutionDataDesc": "実行{runId}のストリームデータが、予定時刻の前後5分のウィンドウ内に見つかりませんでした。",
-      "openTrace": "Playwrightトレースを開く",
       "runId": "実行ID",
       "screenshotAlt": "ステップスクリーンショット",
       "screenshotPlaceholder": "スクリーンショットのプレースホルダー",
@@ -13354,7 +12781,6 @@
       "errorPatternsWindowDesc": "{window}で正規化 · 行をクリックして実行をフィルタリング"
     },
     "scheduleAlert": {
-      "addNewDestination": "新しい目的地を追加",
       "alertedIfFails": "テストが失敗した場合はアラートを通知します",
       "alertedIfFailsSuffix": "回。",
       "alerts": "アラート",
@@ -13370,8 +12796,6 @@
         "weeks": "週"
       },
       "customIntervalValue": "繰り返し間隔",
-      "destinationRequired": "少なくとも 1 つの目的地が必要です",
-      "destinations": "目的地",
       "frequency": "周波数",
       "frequencyOptions": {
         "15min": "15 分",
@@ -13383,8 +12807,6 @@
         "custom": "カスタム"
       },
       "minutes": "分",
-      "noDestinations": "目的地はありません",
-      "refreshDestinations": "デスティネーションを更新",
       "retries": "リトライ",
       "retriesOnFailure": "失敗時に再試行",
       "retriesOnFailureSuffix": "回。",
@@ -13642,12 +13064,9 @@
       "logs": "ログ",
       "dashboards": "ダッシュボード",
       "metrics": "指標",
-      "traces": "トレース",
       "alerts": "アラート",
-      "streams": "ストリーム",
       "pipelines": "パイプライン",
       "functions": "機能",
-      "reports": "レポート",
       "iam": "IAM",
       "settings": "[設定]",
       "onlineEvals": "オンライン評価",
@@ -13662,26 +13081,20 @@
       "dashboards": "ダッシュボードビュー",
       "dashboardsPanel": "ダッシュボード — パネル (パネルにカーソルを合わせる)",
       "metrics": "指標",
-      "traces": "トレース",
       "alerts": "アラート",
-      "streams": "ストリーム",
       "pipelines": "パイプライン",
       "functions": "機能",
-      "reports": "レポート",
       "iamUsers": "IAM — ユーザー",
       "iamRoles": "IAM — ロール",
       "iamGroups": "IAM — グループ",
       "iamServiceAccounts": "IAM — サービスアカウント",
-      "alertDestinations": "アラート — 宛先",
       "alertSources": "アラート — 外部ソース",
       "alertTemplates": "アラート — テンプレート",
       "panelEditor": "パネルエディター",
-      "traceDetail": "トレースの詳細",
       "runningQueries": "クエリの実行",
       "ingestionTokens": "IAM — インジェストトークン",
       "syntheticsTokens": "IAM — Synthetics トークン",
       "alertIncidents": "アラート — インシデント",
-      "pipelineDestinations": "パイプライン — 目的地",
       "enrichmentTables": "エンリッチメントテーブル",
       "iamInvitations": "IAM — 招待状",
       "iamOrganizations": "IAM — 組織",
@@ -13757,7 +13170,6 @@
       "iamGroupsRefresh": "リストを更新",
       "iamServiceAccountsAdd": "新しいサービスアカウントを追加",
       "iamServiceAccountsRefresh": "リストを更新",
-      "alertDestinationsAdd": "新しい目的地を追加",
       "alertDestinationsRefresh": "リストを更新",
       "alertSourcesAdd": "新しいアラートソースを追加",
       "alertSourcesRefresh": "リストを更新",
@@ -13768,8 +13180,6 @@
       "panelEditorRun": "クエリの実行/適用",
       "panelEditorSave": "[保存] パネル",
       "panelEditorBack": "破棄して戻る",
-      "traceNextSpan": "次のスパン",
-      "tracePrevSpan": "前のスパン",
       "runningQueriesRefresh": "クエリリストを更新",
       "ingestionTokensAdd": "新しいトークンを作成",
       "ingestionTokensRefresh": "トークンリストを更新",
@@ -13780,7 +13190,6 @@
       "aiChatExpand": "AI チャットを展開/折りたたむ",
       "logsSaveView": "保存済みビューとして保存",
       "logsExport": "結果を CSV としてエクスポート",
-      "tracesCopyUrl": "トレース共有 URL をコピー",
       "alertIncidentsRefresh": "リストを更新",
       "pipelineDestinationsRefresh": "リストを更新",
       "enrichmentTablesRefresh": "リストを更新",
@@ -14047,7 +13456,6 @@
       "alertState": {
         "ok": "OK",
         "normal": "正常",
-        "firing": "発火中",
         "notifyfailed": "通知失敗",
         "flapping": "フラッピング",
         "anomaly": "異常",
@@ -14078,7 +13486,6 @@
         "error": "エラー"
       },
       "crossLinkSource": {
-        "stream": "ストリーム",
         "global": "グローバル"
       },
       "themeApplied": {
@@ -14133,7 +13540,6 @@
       },
       "eventStatus": {
         "failed": "失敗",
-        "firing": "発火中",
         "anomaly": "異常"
       },
       "featureStatus": {
@@ -14148,7 +13554,6 @@
         "array": "配列"
       },
       "incidentStatus": {
-        "firing": "発火中",
         "closed": "クローズ"
       },
       "invoiceStatus": {
@@ -14160,14 +13565,12 @@
         "pending": "保留中"
       },
       "logLevel": {
-        "trace": "トレース",
         "debug": "デバッグ",
         "info": "情報",
         "warn": "警告",
         "fatal": "致命的"
       },
       "pipelineRunOutcome": {
-        "firing": "発火中",
         "normal": "正常",
         "succeeded": "成功",
         "skipped": "スキップ",
@@ -14309,21 +13712,11 @@
       "pleaseSelectStreamType": "ストリームタイプを選択してください ",
       "anomalyDetectionClonedSuccessfully": "異常検知が正常に複製されました",
       "errorWhileFetchingTemplates": "テンプレートの取得中にエラーが発生しました。",
-      "errorWhileFetchingDestinations": "宛先の取得中にエラーが発生しました。",
       "failedToLoadAlertForEditing": "編集用のアラートを読み込めませんでした",
       "pleaseWaitWhileLoadingAlert": "アラートを読み込んでいます。お待ちください...",
       "errorWhilePullingAlerts": "アラートの取得中にエラーが発生しました。",
       "pleaseWaitWhileLoadingAlerts": "アラートを読み込んでいます。お待ちください...",
-      "destinationsDeletedSuccessfully": "宛先を{count}件正常に削除しました | 宛先を{count}件正常に削除しました",
-      "failedToDeleteDestinations": "宛先を{count}件削除できませんでした | 宛先を{count}件削除できませんでした",
-      "destinationsDeletedWithFailures": "宛先を{count}件正常に削除しましたが、{failed}件失敗しました | 宛先を{count}件正常に削除しましたが、{failed}件失敗しました",
-      "noDestinationsSelectedForDeletion": "削除する宛先が選択されていません",
-      "deletingDestinations": "宛先を削除しています...",
-      "destinationDeletedSuccessfully": "宛先{name}が正常に削除されました",
-      "errorWhilePullingDestinations": "宛先の取得中にエラーが発生しました。",
-      "pleaseWaitWhileLoadingDestinations": "宛先を読み込んでいます。お待ちください...",
       "errorWhileLoadingActions": "アクションの読み込み中にエラーが発生しました。",
-      "pleaseWaitWhileLoadingAlertDestination": "アラート宛先を読み込んでいます。お待ちください...",
       "errorImportingAlertPleaseCheck": "アラートのインポート中にエラーが発生しました。JSONを確認してください。",
       "alertsImportedSuccessfully": "アラートを{count}件正常にインポートしました | アラートを{count}件正常にインポートしました",
       "invalidJson": "無効なJSON: {error}",
@@ -14342,8 +13735,6 @@
       "incidentsRefreshed": "インシデントを更新しました",
       "failedToPostComment": "コメントの投稿に失敗しました",
       "commentPostedSuccessfully": "コメントが正常に投稿されました",
-      "destinationUpdatedSuccessfully": "宛先 \"{name}\" が正常に更新されました。",
-      "destinationCreatedSuccessfully": "宛先 \"{name}\" が正常に作成されました。",
       "failedToDeleteTemplates": "{count} 個のテンプレートの削除に失敗しました | {count} 個のテンプレートの削除に失敗しました",
       "templatesDeletedWithFailures": "{count} 個のテンプレートを削除しましたが、{failed} 件が失敗しました | {count} 個のテンプレートを削除しましたが、{failed} 件が失敗しました",
       "successfullyDeletedTemplates": "{count} 個のテンプレートを正常に削除しました | {count} 個のテンプレートを正常に削除しました",
@@ -14393,16 +13784,13 @@
       "resources": {
         "dashboards": "ダッシュボード",
         "alerts": "アラート",
-        "streams": "ストリーム",
         "functions": "関数",
         "savedviews": "保存済みビュー",
         "users": "ユーザー",
         "roles": "ロール",
         "organizations": "組織",
         "pipelines": "パイプライン",
-        "destinations": "宛先",
         "templates": "テンプレート",
-        "reports": "レポート",
         "llmModelPricing": "LLMモデルの価格設定"
       },
       "noPermissionToChangeFavorites": "お気に入りを変更する権限がありません",
@@ -14564,8 +13952,6 @@
       "errorWhileUpdating": "レポートの更新中にエラーが発生しました。"
     },
     "correlation": {
-      "refreshingTraceData": "トレースデータを更新中...",
-      "traceDetailViewComingSoon": "トレース詳細ビューは近日公開予定",
       "columnIsAlreadyVisible": "列 \"{name}\" は既に表示されています",
       "columnAddedToTable": "列 \"{name}\" がテーブルに追加されました"
     },
@@ -14605,7 +13991,6 @@
       "isNotASupportedFileType": "\"{fileName}\" はサポートされていないファイルタイプです。許可されているのは {allowed} ファイルのみです。"
     },
     "workflows": {
-      "thisBranchAlreadyEndsInA": "このブランチは既に宛先で終わっています。",
       "chooseATriggerNodeToStart": "ワークフローを開始するにはトリガーノードを選択してください",
       "thisConnectionWouldCreateALoop": "この接続はループを作成します",
       "onlyOneIncomingConnectionToA": "ステップへの受信接続は1つのみ許可されています"
@@ -14613,8 +13998,6 @@
     "views": {
       "youAreNotAuthorizedToManage": "ライセンスを管理する権限がありません。",
       "copiedToClipboard": "クリップボードにコピーしました",
-      "noDestinationsFoundPleaseCreateA": "宛先が見つかりません。先に宛先を作成してください。",
-      "errorWhilePullingDestinations": "宛先の取得中にエラーが発生しました。",
       "rumTokenUpdatedSuccessfully": "RUMトークンが正常に更新されました。",
       "rumTokenGeneratedSuccessfully": "RUMトークンが正常に生成されました。",
       "tokenResetSuccessfully": "トークンが正常にリセットされました。",
@@ -14631,7 +14014,6 @@
       "pleaseWaitWhileLoadingStreams": "ストリームを読み込み中です。お待ちください...",
       "errorWhilePullingSummary": "サマリーの取得中にエラーが発生しました。",
       "pleaseWaitWhileLoadingSummary": "サマリーを読み込み中です。お待ちください...",
-      "noDestinationsCreateOneBeforeSaving": "宛先が見つかりません。このアラートを保存する前に作成してください。",
       "errorWhileLoadingAlert": "アラートの読み込み中にエラーが発生しました。"
     },
     "RUM": {
@@ -14760,7 +14142,6 @@
       "tags": "タグ",
       "tagsPlaceholder": "タグを追加してEnterを押す",
       "streamType": "ストリームタイプ",
-      "stream": "ストリーム",
       "queryLanguage": "クエリ言語",
       "scope": "スコープ",
       "scopeHint": "分母に適用されるオプションのフィルター。すべての行の場合は空のままにします。",
@@ -14830,7 +14211,6 @@
         "noHistory": "このアラートの評価履歴はまだありません。実行されると測定が始まります。",
         "loadFailed": "評価履歴を読み込めませんでした",
         "legendGood": "OK",
-        "legendBad": "発火中",
         "legendUnmeasured": "未測定"
       }
     },
@@ -15008,7 +14388,6 @@
     "loginCallback": "ログインコールバック",
     "emptyStateDemo": "空状態デモ",
     "searchScheduler": "検索スケジューラ",
-    "traceDetails": "トレース詳細",
     "sessionDetails": "セッション詳細",
     "streamExplorer": "ストリームエクスプローラー",
     "viewDashboard": "ダッシュボードを表示",
@@ -15360,20 +14739,17 @@
         "failed": "失敗"
       },
       "columnHints": {
-        "calls": "このクエリが実行された回数。データベースが報告する場合はデータベース自身のカウントです — それはトレースを送信するシステムの部分だけでなく、すべてのクライアントを対象とします。「クライアント観測」とマークされた行は、データベースが報告しなかったため、代わりにトレースからカウントされます。",
         "p50": "すべてのコールの半分がこれよりも速く完了しました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
         "p95": "遅いテール — 20回に1回のコールが少なくともこの時間かかりました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
         "p99": "最悪の1%のコールが少なくともこの時間かかりました。完了したコールのみをカウントします — まだ実行中のクエリや、戻ってこなかったクエリはここでは測定されません。",
         "max": "この時間枠内で最も遅い単一のコール — 実測の1回のコールであり、平均ではありません。",
         "errors": "これらのコールのうち、エラーで返ってきたものの数。",
-        "perTrace": "これが単一のリクエスト内で実行される回数。数値が高い場合は通常ループを意味します。",
-        "load": "このクエリがデータベース内で費やした合計時間。データベースが報告する場合はデータベース自身の数値: Postgresでは実行時間、MySQLとMariaDBでは待機時間 — 各行にどちらかが示されています。「クライアント観測」とマークされた行はトレースから測定されるため、ネットワークの往復が含まれます。"
+        "perTrace": "これが単一のリクエスト内で実行される回数。数値が高い場合は通常ループを意味します。"
       },
       "errorsNone": "なし",
       "errorsAll": "すべて",
       "actions": {
         "open": "詳細を開く",
-        "traces": "サンプルトレースを見る",
         "copy": "クエリをコピー",
         "copied": "クエリをコピーしました",
         "copyFailed": "クエリをコピーできませんでした。",
@@ -15404,8 +14780,7 @@
       },
       "n-plus-one": {
         "title": "リクエストごとに少なくとも{multiplier}回実行",
-        "body": "データベース時間の{share}・{service}",
-        "rule": "このクエリが1つのリクエスト内で少なくとも{ratio}回実行され、それが少なくとも{traces}リクエストにわたって見られるため表示されています。これは下限値なので、実際の数値はより高い可能性があります。正当なバッチ処理も同じように見えることがあります。"
+        "body": "データベース時間の{share}・{service}"
       },
       "volume-shift": {
         "title": "呼び出し回数が増加、速度は同じ",
@@ -15479,7 +14854,6 @@
       "subtitleCounts": "{pass} 件成功、{fail} 件失敗。 | {pass} 件成功、{fail} 件失敗。",
       "checklistTitle": "確認した内容",
       "showMeHow": "計装方法を表示",
-      "checkTrace": "自分のトレースの1つを確認",
       "checks": {
         "enabled": {
           "ok": "データベースモニタリングはオンになっています",
@@ -15488,21 +14862,15 @@
           "noDetail": "管理者がこの組織でこれをオンにして、コレクターを再起動できます。"
         },
         "traces": {
-          "ok": "トレースが届いています",
-          "okDetail": "この時間範囲で{count}件記録されました",
-          "no": "トレースはまだ届いていません",
-          "noDetail": "データベースモニタリングはトレースから構築されますが、この組織はまだトレースを送信していません。"
+          "okDetail": "この時間範囲で{count}件記録されました"
         },
         "permission": {
           "ok": "このデータにアクセスできます",
           "okDetail": "あなたは{org}の管理者です",
-          "no": "このデータにアクセスできません",
-          "noDetail": "データベースモニタリングはトレースを読み取りますが、あなたのロールにはその権限が含まれていません。読み取りアクセスについて管理者に問い合わせてください。"
+          "no": "このデータにアクセスできません"
         },
         "dbSpans": {
-          "ok": "トレースにデータベースが含まれています",
           "okDetail": "データベース呼び出しが記録されています",
-          "no": "どのトレースにもデータベースが含まれていません",
           "noDetail": "アプリケーションはトレースされていますが、データベースと通信する部分はトレースされていません。お使いの言語のデータベース計装を追加すると、クエリがここに表示されます。"
         },
         "counted": {
@@ -15533,7 +14901,6 @@
         "plans": "クエリプラン",
         "plansHint": "このクエリを実行するためにデータベースが実行した手順。遅い原因を調べるにはここから始めてください。",
         "callers": "呼び出し元と例",
-        "callersHint": "アプリケーションのどの部分がこのクエリを実行したか、およびトレースとして開くことができる個々の遅い実行。",
         "callersLocked": "個々の実行はトレースから取得されます。この時間範囲では、このクエリはトレースされていません。"
       },
       "notFound": {
@@ -15559,10 +14926,6 @@
       "noSamples": "この期間の個別の実行は読み込まれていません。",
       "noSeries": "選択した期間には、このクエリの履歴がありません。",
       "liveSeries": "最新のポイントはまだ集計中で、変更される可能性があります。",
-      "noStream": "このクエリがどのトレースストリームに含まれるかを特定できなかったため、呼び出し元と例を読み込めません。",
-      "ambiguousStream": "この組織には複数のトレースストリームがあり、このクエリがどのストリームで実行されるかを特定できません。ストリームを選択して、呼び出し元とサンプルトレースを読み込んでください。",
-      "pickStream": "トレースストリームを選択",
-      "invalidStream": "そのトレースストリーム名は認識できなかったため、検索を実行しませんでした。",
       "firstSeen": "このリストに最初に表示されたのは {time} です",
       "firstSeenHint": "この期間内で、このクエリが単独で追跡するほど重かった最も早い時点。",
       "lastSeen": "このリストに最後に表示されたのは {time} です",
@@ -15593,7 +14956,6 @@
       "sampleOk": "正常",
       "sampleError": "失敗",
       "viewTrace": "リクエストを表示 →",
-      "viewTraces": "サンプルトレースを表示",
       "copySummary": "コピー",
       "copySummaryHint": "ここにあるすべての数値はすでにこのページに表示されています。これは単に文を書き出すだけで、インシデントの13分目には何もない代わりにメッセージが生成されます。",
       "summaryCopied": "要約をコピーしました",
@@ -15685,8 +15047,7 @@
         "unjoinable": "非表示 — このステートメントはここでは複数種類のデータベースで実行されるため、どれかを特定せずに呼び出し元を照合すると、誤ったサービスを指し示すことになります。",
         "tracedCalls": "{calls} 件の呼び出しをトレース",
         "coverage": "{count} 件のサービスが {traced} 回のトレース済み実行で確認されました（上記の実行 {executions} 回のうち）。残りはまだトレースしていない呼び出し元からのものです。",
-        "coverageUnknown": "{count} 件のサービスが {traced} 件のトレース済み呼び出しで確認されました。データベースがこのステートメントの合計を報告していないため、割合を表示できません。",
-        "noneNamed": "{traced} 件の呼び出しがトレースされましたが、そのどれもサービスに結び付けることができませんでした — それらのトレースはこの時間範囲の外で開始されています。"
+        "coverageUnknown": "{count} 件のサービスが {traced} 件のトレース済み呼び出しで確認されました。データベースがこのステートメントの合計を報告していないため、割合を表示できません。"
       },
       "callersEmpty": {
         "title": "このクエリのトレース済み呼び出しはまだありません",
@@ -15752,9 +15113,7 @@
       "failedWithCode": "失敗 · {code}",
       "viewTrace": "このコールが含まれていたリクエストを開く",
       "scatterOk": "完了",
-      "partial": "一部のトレースデータを読み取れなかったため、このリストからコールが欠落している可能性があります。",
       "disclosureShort": "各行は実際に完了した1つのコールです",
-      "disclosureDetail": "送信したトレースから、コールを行ったアプリケーションによって測定されます。完了したコールのみがここに表示されます — まだ実行中のクエリや、ハングして応答が返らなかったクエリは測定されません。",
       "counts": {
         "complete": "このウィンドウ内のすべての{count}データベースコールを、遅い順に表示しています。",
         "truncated": "このウィンドウ内の{count}件の最も遅いコール — ここに表示されているよりも多く実行されました。",
@@ -15959,8 +15318,6 @@
         "blocking": "ブロック中"
       },
       "coverage": {
-        "summary": "最長待ち時間は{longest}です。すべての待機は、ロックを保持したままの{roots}に遡ります。",
-        "summaryCapped": "一度に読み取れるより多くのセッションが待機していました。取得できたセッションの中で、最長待ち時間は{longest}で、ロックを保持したままの{roots}に遡ります。",
         "summaryOneRoot": "1セッション",
         "summaryManyRoots": "{count} セッション",
         "checked": "{interval}秒ごとにチェック。最終確認は{time}。",

@@ -43,7 +43,6 @@
     "allCaughtUp": "Je bent weer helemaal bij",
     "noPanels": {
       "title": "Nog geen panelen hier",
-      "description": "Voeg een paneel toe om logs, metrieken en traces te visualiseren.",
       "action": "Paneel toevoegen",
       "actionDesc": "Grafieken, tabellen & meer"
     },
@@ -78,7 +77,6 @@
     },
     "noDashboards": {
       "title": "Maak je eerste dashboard",
-      "description": "Dashboards brengen je statistieken, logboeken en sporen samen in één weergave. Bouw er een om aan de slag te gaan.",
       "action": "Nieuw dashboard",
       "actionDesc": "Begin met een leeg canvas",
       "import": "Dashboard importeren",
@@ -124,7 +122,6 @@
     },
     "noIngestionTokens": {
       "title": "Nog geen innametokens",
-      "description": "Ingestietokens authenticeren gegevensbronnen bij het verzenden van logboeken, statistieken en sporen.",
       "action": "Nieuw token",
       "actionDesc": "Genereer een innametoken"
     },
@@ -133,11 +130,7 @@
       "description": "Organisaties groeperen je gebruikers en gegevens. Maak er een om aan de slag te gaan."
     },
     "noAlertDestinations": {
-      "title": "Nog geen bestemmingen",
-      "description": "Bestemmingen bepalen waar waarschuwingsmeldingen worden verzonden: Slack, e-mail, webhooks en meer.",
-      "action": "Nieuwe bestemming",
       "actionDesc": "Een meldingskanaal koppelen",
-      "import": "Bestemming importeren",
       "importDesc": "Importeren vanuit een JSON-bestand"
     },
     "noAlertSources": {
@@ -147,10 +140,7 @@
       "actionDesc": "Maak een webhook-URL en token aan"
     },
     "noPipelineDestinations": {
-      "title": "Nog geen bestemmingen",
-      "description": "Externe doelen voor pijplijnuitvoer — HTTP-eindpunten en schrijfdoelen op afstand.",
-      "action": "Nieuwe bestemming",
-      "actionDesc": "Een pijplijnbestemming aansluiten"
+      "description": "Externe doelen voor pijplijnuitvoer — HTTP-eindpunten en schrijfdoelen op afstand."
     },
     "noAlertTemplates": {
       "title": "Nog geen sjablonen",
@@ -191,8 +181,7 @@
       "actionDesc": "Configureer een LLM-provider"
     },
     "noDiscoveredServices": {
-      "title": "Geen services ontdekt",
-      "description": "Services verschijnen hier automatisch zodra er sporen binnenkomen."
+      "title": "Geen services ontdekt"
     },
     "noNodes": {
       "title": "Geen nodes beschikbaar",
@@ -248,7 +237,6 @@
     },
     "noDatasets": {
       "title": "Maak je eerste dataset",
-      "description": "Gouden datasets verzamelen geannoteerde traces en reviews in versiebeheerde evaluatiesets. Maak er een om te beginnen met cureren.",
       "action": "Nieuwe dataset",
       "actionDesc": "Start een lege dataset"
     },
@@ -288,15 +276,11 @@
     },
     "noLLMInsights": {
       "title": "Nog geen LLM-activiteit",
-      "description": "Instrument uw services met de OpenTelemetry Gen-AI semantische conventies en gebruik ten minste één spoor om dit dashboard te vullen.",
-      "action": "Instrument met OpenTelemetrie",
-      "actionDesc": "Leg gen_ai_* attributen vast op je sporen"
+      "action": "Instrument met OpenTelemetrie"
     },
     "noLLMSessions": {
       "title": "Nog geen LLM-sessies",
-      "description": "Sessies worden gegroepeerd op gen_ai_conversation_id. Instrumenteer uw services zodat elk gesprek zijn sporen tagt, en sessies worden hier weergegeven.",
-      "action": "Instrument met OpenTelemetrie",
-      "actionDesc": "Tag omspant met gen_ai_conversation_id"
+      "action": "Instrument met OpenTelemetrie"
     },
     "noScorers": {
       "title": "Nog geen scorers",
@@ -340,13 +324,9 @@
       "title": "Niets ongezonds hier",
       "description": "Geen ongezonde items in dit venster. Verbreed het tijdbereik of wijzig het wachtrijfilter om items te zien die je al hebt getriageerd."
     },
-    "noTraces": {
-      "title": "Geen sporen gevonden",
-      "description": "Er komen geen sporen overeen met de geselecteerde service en het geselecteerde tijdbereik. Probeer een groter tijdsbereik of een andere service."
-    },
+    "noTraces": {},
     "noServiceGraph": {
-      "title": "Geen servicegrafiekgegevens",
-      "description": "Probeer een groter tijdsbereik op te vragen, of zorg ervoor dat uw services span-statistieken uitzenden."
+      "title": "Geen servicegrafiekgegevens"
     },
     "noServicesCatalog": {
       "title": "Geen services gevonden",
@@ -406,16 +386,13 @@
       "pipelines": "pijpleidingen",
       "workflows": "workflows",
       "functions": "functioneert",
-      "streams": "stromen",
       "alerts": "waarschuwingen",
       "incidents": "incidenten",
-      "traces": "sporen",
       "discoveryItems": "ongezonde items",
       "datasetItems": "items",
       "searches": "zoekopdrachten",
       "searchJobs": "zoekopdrachten",
       "users": "gebruikers",
-      "reports": "rapporten",
       "queries": "vragen",
       "serviceAccounts": "serviceaccounts",
       "invitations": "uitnodigingen",
@@ -426,9 +403,7 @@
       "roleLimits": "rollimieten",
       "ingestionTokens": "ingestietokens",
       "organizations": "organisaties",
-      "alertDestinations": "bestemmingen",
       "alertSources": "waarschuwingsbronnen",
-      "pipelineDestinations": "bestemmingen",
       "alertTemplates": "sjablonen",
       "evalTemplates": "evaluatiesjablonen",
       "enrichmentTables": "verrijkingstabellen",
@@ -480,7 +455,6 @@
       "noSearchResults": "Geen zoekresultaten",
       "noServiceAccounts": "Geen serviceaccounts",
       "noStreams": "Geen data opgenomen",
-      "noTraces": "Geen traces",
       "noUsers": "Geen gebruikers"
     },
     "noExperiments": {
@@ -523,8 +497,6 @@
     "relatedEvents": "Gerelateerde gebeurtenissen",
     "on": "op",
     "event": "gebeurtenis",
-    "viewTraceDetails": "Trace-details bekijken",
-    "viewTrace": "Trace bekijken",
     "networkRequests": "Netwerkverzoeken",
     "noNetworkRequestsFound": "Geen netwerkverzoeken gevonden voor deze gebeurtenis",
     "consoleLogsComingSoon": "Consolelogs binnenkort beschikbaar",
@@ -575,7 +547,6 @@
     "list": "Lijst",
     "condition": "Conditie",
     "operator": "Operator",
-    "value": "Waarde",
     "filters": "Filters",
     "selectFilter": "Filter selecteren",
     "confirm": "Bevestigen",
@@ -744,7 +715,6 @@
     "nameIsRequired": "Naam is verplicht",
     "streamTypeIsRequired": "Streamtype is verplicht",
     "functionNameIsRequired": "Functienaam is verplicht",
-    "remoteDestinationIsRequired": "Externe bestemming is verplicht",
     "timezoneIsRequired": "Tijdzone is verplicht",
     "idPrefix": "ID: {id}",
     "unchangedCount": "Ongewijzigd ({count})",
@@ -803,7 +773,6 @@
     "relativeTimeAgo": "{value} {unit} geleden",
     "relativeTimePast": "Laatste {value} {unit}",
     "metrics": "Metrieken",
-    "traces": "Traces",
     "browserTime": "Browsertijd",
     "invalidCredentials": "Ongeldige inloggegevens",
     "notFound": "Niet gevonden",
@@ -844,11 +813,7 @@
       "loading": "Voorwaarden laden...",
       "loadError": "De opgeslagen voorwaarde kon niet worden gelezen en is gereset. Opslaan zal deze nu overschrijven."
     },
-    "destination": {
-      "createNew": "Nieuwe bestemming aanmaken",
-      "select": "Bestemming",
-      "loadError": "Fout bij het ophalen van bestemmingen."
-    },
+    "destination": {},
     "function": {
       "createNew": "Nieuwe functie aanmaken",
       "createNewNoteWorkflow": "Opmerking: De functie wordt aangemaakt, waarna u wordt doorgestuurd naar het vorige formulier om de nieuw aangemaakte functie aan de workflow te koppelen.",
@@ -907,7 +872,6 @@
     "of": "van",
     "rowDetail": "Details van de bron",
     "sourceName": "Naam",
-    "sourceValue": "Waarde",
     "showHistogramLabel": "Histogram",
     "hideHistogram": "Histogram verbergen",
     "showPatternsLabel": "Patronen",
@@ -1061,10 +1025,7 @@
     "regionFilterMsg": "Zoek regio/cluster",
     "queryRangeRestrictionMsg": "Het zoekbereik is beperkt tot {range}. Pas het datumbereik dienovereenkomstig aan. Anders wordt de startdatum automatisch aangepast zodat deze binnen de toegestane limiet past.",
     "cancel": "Zoekopdracht annuleren",
-    "viewTrace": "Trace bekijken",
-    "viewTraceUnavailable": "Kon de trace voor dit logrecord niet openen.",
     "viewRelated": "Gerelateerd bekijken",
-    "viewRelatedTooltip": "Gerelateerde sporen en statistieken bekijken",
     "flattened": "Afgevlakt",
     "original": "Origineel",
     "resetFilters": "Filters opnieuw instellen",
@@ -1146,8 +1107,6 @@
     "selectFunctionNamePlaceholder": "Functienaam selecteren",
     "confirmFunctionUpdateTitle": "Update bevestigen",
     "confirmFunctionUpdateMsg": "Weet je zeker dat je de functie {name} wilt updaten?",
-    "traceIdLabel": "Traceer-ID:",
-    "enterTraceIdPlaceholder": "Voer de trace-ID in",
     "changeQueryModeTitle": "Query-modus wijzigen",
     "changeQueryModeConfirm": "Weet u zeker dat u de querymodus wilt wijzigen? De gegevens die zijn opgeslagen voor de X-as, Y-as en filters worden verwijderd.",
     "patternExampleLog": "Voorbeeldlog",
@@ -1197,9 +1156,7 @@
     "upgradeToProPlan": "Upgrade naar PRO Plan",
     "home": "Home",
     "about": "Over",
-    "index": "Streams",
     "search": "Logboeken",
-    "traces": "Sporen",
     "serviceGraph": "Servicegrafiek",
     "services": "Servicecatalogus",
     "aiObservability": "AI-waarneembaarheid",
@@ -1217,7 +1174,6 @@
     "rum": "Monitoring van echte gebruikers",
     "settings": "Instellingen",
     "iam": "IAM",
-    "report": "Rapporten",
     "pipeline": "Pijpleidingen",
     "workflows": "Workflows",
     "language": "taal",
@@ -1383,8 +1339,6 @@
     "loadingMsg": "Wacht even, we zijn RUM-gegevens aan het laden.",
     "breadcrumbs": "Broodkruimels",
     "tags": "Labels",
-    "traces": "Sporen",
-    "searchEvents": "Gebeurtenissen zoeken",
     "loadingSessions": "Wacht even, we zijn bezig met het ophalen van sessies.",
     "errorStack": "Foutstapel",
     "sessionReplay": "Sessie opnieuw afspelen",
@@ -1394,11 +1348,6 @@
     "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
     "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
     "eventID": "ID van het evenement",
-    "noCorrelatedTraces": "Geen gecorreleerde sporen gevonden voor deze sessie.",
-    "span": "span",
-    "spans": "overspant",
-    "errorTraces": "foutsporen",
-    "failedToFetchTraces": "Het ophalen van traceergegevens is mislukt. Probeer het opnieuw.",
     "seekToMoment": "Streef naar dit moment in de sessie",
     "route": "Route",
     "duration": "Duur",
@@ -1485,7 +1434,6 @@
     "frustrationErrorClick": "Klik veroorzaakte een JavaScript-fout",
     "frustrationRageTap": "Gebruiker tikte snel meerdere keren (3+) - duidt op frustratie",
     "frustrationErrorTap": "Tik veroorzaakte een JavaScript-fout",
-    "fetchTraceMetadataFailed": "Kan trace-metagegevens niet ophalen",
     "frustrationEventTooltip": "⚠️ FRUSTRATIE: {types}\n{name}",
     "errorEventTooltip": "⛔ FOUT: {name}",
     "frustrationSignalType": "Frustratiesignaal: {type}"
@@ -1537,10 +1485,8 @@
     "feature_column_name": "Functie",
     "feature_logs": "Logboeken",
     "feature_metrics": "Metrieken",
-    "feature_traces": "Sporen",
     "feature_alerts": "Waarschuwingen",
     "feature_dashboards": "Dashboards",
-    "feature_reports": "Rapporten",
     "feature_vrl_functions": "VRL-functies",
     "feature_pipelines": "Pijpleidingen",
     "feature_high_availability": "Hoge beschikbaarheid",
@@ -1561,7 +1507,6 @@
     "feature_license": "Licentie",
     "feature_support": "Ondersteuning",
     "feature_cost": "Kost",
-    "feature_pipelines_external": "Pijpleidingen - Externe bestemmingen",
     "feature_extreme_performance": "Extreme prestaties (100x verbetering voor veel vragen)",
     "feature_query_optimizer": "Optimizer voor query's",
     "value_license_agpl": "AGPL",
@@ -1663,7 +1608,6 @@
       },
       "core_features": {
         "logs_metrics_traces": {
-          "name": "Logboeken, statistieken, sporen",
           "note": "Inname en analyse van volledige waarneembaarheidsgegevens"
         },
         "rum": {
@@ -1678,7 +1622,6 @@
           "note": "Aanpasbare visualisatiedashboards"
         },
         "reports": {
-          "name": "Rapporten",
           "note": "Geplande en on-demand rapportage"
         },
         "vrl_functions": {
@@ -1735,10 +1678,7 @@
           "name": "Redactie van gevoelige gegevens",
           "note": "Bescherm PII en gevoelige informatie"
         },
-        "pipeline_remote_destinations": {
-          "name": "Afgelegen bestemmingen via pijplijn",
-          "note": "Gegevens naar afgelegen bestemmingen verzenden"
-        },
+        "pipeline_remote_destinations": {},
         "query_optimizer": {
           "name": "Query Optimizer/Aggregatiecache",
           "note": "TopK-aggregatie en query-optimalisatie"
@@ -1780,7 +1720,6 @@
           "note": "Geoptimaliseerde gedistribueerde join-activiteiten"
         },
         "logs_metrics_traces_correlation": {
-          "name": "Correlatie tussen logboeken, statistieken en sporen",
           "note": "Geautomatiseerde detectie en correlatie"
         },
         "service_maps": {
@@ -2464,7 +2403,6 @@
       "secondaryIndexCount": "Secundaire index ({count})"
     },
     "deleteField": "Veld verwijderen",
-    "header": "Streams",
     "subtitle": "Indexbeheer en streamconfiguratie",
     "streamNameHelpText": "Gebruik alleen alfanumerieke tekens, onderstrepingstekens en dubbele punten.",
     "search": "Stream zoeken",
@@ -2504,7 +2442,6 @@
     "deleteDatesMessage": "Weet je zeker dat je de geselecteerde datums wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
     "labelLogs": "Logboeken",
     "labelMetrics": "Metrieken",
-    "labelTraces": "Sporen",
     "labelMetadata": "Metagegevens",
     "add": "Stream toevoegen",
     "dataRetention": "Bewaring van gegevens (in dagen)",
@@ -2546,7 +2483,6 @@
   },
   "workflow": {
     "header": "Workflows",
-    "subtitle": "Automatiseer acties met triggers, logica en bestemmingen",
     "create": "Nieuwe workflow",
     "createSuccess": "Workflow succesvol aangemaakt",
     "name": "Workflownaam",
@@ -2627,7 +2563,6 @@
     },
     "triggerMeta": {
       "orgId": "Organisatie-ID waartoe de waarschuwing behoort.",
-      "streamType": "Streamtype — logs, metrics of traces.",
       "streamName": "Stream die de waarschuwing bewaakt.",
       "alertName": "Naam van de geactiveerde waarschuwing.",
       "alertType": "Waarschuwingstype — realtime of gepland.",
@@ -2664,8 +2599,6 @@
         "input": "Invoer",
         "output": "Uitvoer",
         "noInput": "Deze stap heeft geen records ontvangen tijdens de laatste run.",
-        "sentExternally": "Verzonden naar de externe bestemming",
-        "destinationNoRecords": "Er zijn geen records bij deze bestemming aangekomen — er is niets verzonden.",
         "branchFiltered": "0 records — er is niets doorgegeven aan deze tak.",
         "conditionNoMatch": "Geen records voldeden aan deze voorwaarde — er is niets downstream doorgegaan.",
         "errorHeading": "Fout",
@@ -2714,15 +2647,12 @@
       "kindAction": "Actie",
       "condition": "Voorwaarde",
       "function": "Functie",
-      "sendToDestination": "Bestemming",
       "configComingSoon": "Configuratie van {node} komt in een latere stap",
       "sectionTransform": "Transformeren",
-      "sectionDestination": "Bestemming",
       "stepSearchPlaceholder": "Stappen zoeken...",
       "stepNoMatch": "Geen stappen die overeenkomen met uw zoekopdracht.",
       "conditionDesc": "Vertakken op basis van een regel",
       "functionDesc": "Payload hervormen met een functie",
-      "destinationDesc": "Naar een bestemming sturen",
       "triggerBody": "Wordt uitgevoerd wanneer een gekoppelde melding wordt geactiveerd",
       "triggerDataExampleNote": "Alleen voorbeeld — de werkelijke kolommen komen uit de query van uw waarschuwing.",
       "incidentEventTypeLabel": "Gebeurtenistype",
@@ -2741,12 +2671,7 @@
       "functionCreateNew": "Nieuwe functie maken",
       "functionRequired": "Functie is vereist",
       "functionLoadError": "Kan functies niet laden",
-      "destinationBody": "Verzenden naar een bestemming",
       "destinationBodySet": "Verzendt naar {name}",
-      "destinationSelect": "Bestemming",
-      "destinationCreateNew": "Nieuwe bestemming maken",
-      "destinationRequired": "Selecteer een bestemming",
-      "destinationLoadError": "Kan bestemmingen niet laden",
       "namePlaceholder": "Geef deze stap een naam (optioneel)",
       "commentLabel": "Opmerking (optioneel)",
       "commentPlaceholder": "Voeg een notitie toe over deze stap...",
@@ -2756,8 +2681,6 @@
       "disabledBadge": "Uitgeschakeld",
       "incompleteBadge": "Stel later in",
       "destinationSetUpLater": "Stel later in",
-      "destinationSetUpLaterPrompt": "Nog geen bestemming? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
-      "destinationSetUpLaterActive": "De bestemming wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een bestemming nodig voordat u publiceert.",
       "functionSetUpLater": "Stel later in",
       "functionSetUpLaterPrompt": "Nog geen functie? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
       "functionSetUpLaterActive": "De functie wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een functie nodig voordat u publiceert."
@@ -2815,8 +2738,6 @@
       "functionNodeEmptyName": "Functieknooppunt {id} heeft een lege functienaam.",
       "functionNodeInvalidName": "Functieknooppunt {id} heeft een ongeldige functienaam \"{name}\". Moet een van de beschikbare functies zijn.",
       "outputStreamNodeEmptyName": "Uitvoerstream-knooppunt {id} heeft een lege streamnaam.",
-      "remoteStreamNodeEmptyDestination": "Externe stream-knooppunt {id} heeft een lege bestemmingsnaam.",
-      "remoteStreamNodeInvalidDestination": "Externe stream-knooppunt {id} heeft een ongeldige bestemming \"{destination}\". Moet een van de beschikbare pijplijnbestemmingen zijn.",
       "edgeMissingSourceNode": "Rand {id} verwijst naar niet-bestaand bronknooppunt {source}.",
       "edgeMissingTargetNode": "Rand {id} verwijst naar niet-bestaand doelknooppunt {target}.",
       "inputNodeHasIncomingEdges": "Invoerknooppunt {id} mag geen binnenkomende randen hebben. {count} binnenkomende randen gevonden.",
@@ -2831,7 +2752,6 @@
     "importErrors": {
       "unknownError": "Onbekende fout",
       "nameRequired": "Pijplijn - {index}: Naam is verplicht",
-      "streamTypeInvalid": "Pijplijn - {index}: Streamtype is verplicht en moet een van de volgende zijn: 'logs', 'metrics', 'traces'.",
       "sourceStreamNameRequired": "Pijplijn - {index}: Bronstreamnaam is verplicht ",
       "sqlQueryRequired": "Pijplijn - {index}: SQL-query is verplicht",
       "timezoneRequired": "Pijplijn - {index}: Tijdzone is verplicht",
@@ -2844,7 +2764,6 @@
       "v0ConditionFields": "Pijplijn - {index}, Knooppunt {nodeIndex}: V0-formaat - elke voorwaarde moet kolom, operator en waarde hebben.",
       "v1ConditionInvalid": "Pijplijn - {index}, Knooppunt {nodeIndex}: Ongeldige V1-voorwaarde-indeling.",
       "conditionFormatUnrecognized": "Pijplijn - {index}, Knooppunt {nodeIndex}: Onherkende voorwaarde-indeling.",
-      "remoteDestinationRequired": "Pijplijn - {index}: Externe bestemming is verplicht",
       "createSuccess": "Pijplijn - {index}: \"{name}\" succesvol aangemaakt \nOpmerking: verwijder het aangemaakte pijplijnobject {name} uit het json-bestand",
       "createFailed": "Pijplijn - {index}: \"{name}\" aanmaken mislukt --> \n Reden: {reason}",
       "sqlQueryMismatch": "Pipeline - {index}: SQL-query moet in alle knooppunten hetzelfde zijn en probeer ook de query in de knooppunten te matchen \n\n          input.sql_query: {sqlQuery} \n\n          input.source.query_condition.sql: {sourceSql} \n",
@@ -2945,10 +2864,8 @@
     "defaultDelayTooltip": "Standaard: 5 seconden",
     "deleteDataBeforeBackfill": "Bestaande gegevens verwijderen vóór backfill",
     "irreversibleDeletionWarning": "Waarschuwing: onomkeerbare gegevensverwijdering",
-    "deleteBackfillWarningMessage": "Hiermee worden alle gegevens in de doelstream voor het opgegeven tijdsbereik permanent verwijderd voordat de backfill wordt uitgevoerd. Deze actie kan niet ongedaan worden gemaakt.",
     "timeAlignmentRequirements": "Tijdafstemmingsvereisten (UTC):",
     "logsHourBoundaryNote": "streams: Tijden moeten uitgelijnd zijn op uurgrenzen in UTC (bijv. 10:00:00, niet 10:15:00)",
-    "metricsTracesLabel": "Metrics/Traces",
     "dayBoundaryNote": "streams: Tijden moeten uitgelijnd zijn op daggrenzen in UTC (bijv. 00:00:00)",
     "estimatedProcessingTime": "Geschatte verwerkingstijd:",
     "estimatedChunks": "Geschatte chunks:",
@@ -2971,8 +2888,6 @@
       "statusUnknown": "Onbekend",
       "phaseInitializing": "Initialiseren"
     },
-    "deleteBackfillConfirmMessage": "U heeft geselecteerd om bestaande gegevens vóór de backfill te verwijderen. Hiermee worden alle gegevens in de doelstream voor het opgegeven tijdsbereik permanent verwijderd.",
-    "editBackfillDeleteConfirmMessage": "U heeft geselecteerd om bestaande gegevens vóór de backfill te verwijderen. Hiermee worden alle gegevens in de doelstream voor het opgegeven tijdsbereik permanent verwijderd. Deze actie kan NIET ongedaan worden gemaakt of worden geannuleerd zodra de taak is bijgewerkt. Weet u zeker dat u wilt doorgaan?",
     "actionCannotBeUndone": "Deze actie kan NIET ongedaan worden gemaakt of worden geannuleerd zodra de taak is gemaakt.",
     "areYouSureProceed": "Weet u zeker dat u wilt doorgaan?",
     "clearFilters": "Filters wissen",
@@ -2993,7 +2908,6 @@
     "chunkPeriodDefaultPlaceholder": "60",
     "organizationId": "Organisatie-ID",
     "functionName": "Functienaam",
-    "remoteDestination": "Externe bestemming",
     "failedToLoadPipeline": "Pipeline laden mislukt",
     "header": "Pijpleidingen",
     "subtitle": "Transformeer, verrijk en routeer gegevens tijdens de vlucht",
@@ -3021,7 +2935,6 @@
     "trigger": "Trigger",
     "aggregation": "Aggregatie",
     "selectColumn": "Kolom selecteren",
-    "value": "Waarde",
     "fieldRequired": "Veld is verplicht!",
     "sqlQuery": "SQL-zoekopdracht",
     "promqlQuery": "ProMQL-zoekopdracht",
@@ -3036,15 +2949,11 @@
     "sourceQueryTooltip": "Bron: Query Node",
     "functionTooltip": "Functieknooppunt",
     "conditionTooltip": "Knooppunt toestand",
-    "destinationStreamTooltip": "Bestemming: Stream Node",
-    "destinationExternalTooltip": "Bestemming: extern bestemmingsknooppunt",
     "pipelineNotFound": "Pipeline niet gevonden",
     "pipelineNameRequired": "De naam van de pijplijn is vereist",
     "sourceNodeRequired": "Bronknooppunt is vereist",
-    "destinationNodeRequired": "Het bestemmingsknooppunt is vereist",
     "connectAllNodes": "Verbind alle knooppunten voordat u ze opslaat",
     "connectAllNodesShort": "Verbind alstublieft alle knooppunten",
-    "enrichmentTablesScheduledOnly": "Verrijkingstabellen als doelstream zijn alleen beschikbaar voor geplande pijplijnen",
     "savingPipeline": "Pijplijn opslaan...",
     "pipelineUpdated": "Pipeline succesvol bijgewerkt",
     "pipelineSaved": "Pipeline succesvol opgeslagen",
@@ -3076,7 +2985,6 @@
     "functionAlreadyAssociated": "Functie is al gekoppeld",
     "atLeastOneCondition": "Voeg minstens één voorwaarde toe",
     "fillAllConditionFields": "Vul alle voorwaardevelden in (kolom, operator en waarde zijn verplicht)",
-    "selectExternalDestination": "Selecteer een externe bestemming uit de lijst",
     "backfillNumericRange": "Moet tussen {min} en {max} liggen",
     "selectValidTimeRange": "Selecteer een geldig tijdsbereik",
     "startBeforeEndTime": "De starttijd moet vóór de eindtijd liggen",
@@ -3092,11 +3000,9 @@
       "streamType": "Streamtype *"
     },
     "sourceNode": "Bron",
-    "streamNode": "Streamen",
     "queryNode": "Zoekopdracht",
     "transformNode": "Transformeren",
     "functionNode": "Functie",
-    "destinationNode": "Bestemming",
     "remoteNode": "Op afstand",
     "conditionsNode": "Voorwaarden",
     "editorFunctionTooltip": "Payload hervormen met een functie",
@@ -3155,8 +3061,7 @@
       "customStep4": "Configureer de vereiste headers voor authenticatie",
       "customStep5": "Kies het uitvoerformaat (JSON of NDJSON)",
       "customStep6": "Test de verbinding om te controleren of deze werkt",
-      "defaultTitle": "Verbindingsgegevens",
-      "defaultStep1": "Selecteer een doeltype om specifieke instructies te zien"
+      "defaultTitle": "Verbindingsgegevens"
     },
     "deleteFunctionAssociationConfirm": "Weet u zeker dat u de functiekoppeling wilt verwijderen?",
     "deleteStreamRoutingConfirm": "Weet u zeker dat u de streamroutering wilt verwijderen?",
@@ -3182,7 +3087,6 @@
     "noJobSelected": "Geen taak geselecteerd",
     "updateBackfillJobFailed": "Backfilltaak bijwerken mislukt",
     "fetchPipelineHistoryFailed": "Ophalen van pijplijnhistorie mislukt",
-    "defaultDestinationNodeWarning": "Als u het standaard doelknooppunt verwijdert, worden er geen gegevens meer in opgenomen. De bronstroom routeert dan alleen naar de nieuw toegevoegde doelstroom. Gegevens die niet naar een doelstroom worden gerouteerd, worden verwijderd.",
     "confirmBulkDeleteMsg": "Weet u zeker dat u {count} pijplijn(en) wilt verwijderen?",
     "confirmPauseBackfillJob": "Weet u zeker dat u de backfilltaak voor \"{name}\" wilt pauzeren? U kunt deze later hervatten.",
     "confirmResumeBackfillJob": "Weet u zeker dat u de backfilltaak voor \"{name}\" wilt hervatten?",
@@ -3292,10 +3196,6 @@
     "analyzingDimensions": "Dimensies analyseren...",
     "arrowSeparator": "→",
     "computingDistributions": "Frequentieverdelingen berekenen over {count} dimensies",
-    "dashboardDescError": "Vergelijking van foutpercentage van traces tijdens de foutpiekperiode versus de basislijn over dimensies",
-    "dashboardDescLatency": "Vergelijking van percentiellatentie van geselecteerde traces (duur {start}-{end}µs) versus basislijn over dimensies",
-    "dashboardDescVolume": "Vergelijking van trace-aantaldistributie versus basislijn over dimensies",
-    "dashboardDescVolumeRate": "Vergelijking van trace-aantaldistributie van geselecteerde perioden (snelheid {start}-{end} traces) versus basislijn over dimensies",
     "dashboardTitleError": "Foutinzichten",
     "dashboardTitleLatency": "Latentie-inzichten",
     "dashboardTitleVolume": "Volume-inzichten",
@@ -3303,8 +3203,6 @@
     "durationLabel": "Duur:",
     "failedToLoad": "Het laden van de analyse is mislukt",
     "panelDescErrorComparison": "Vergelijking van foutpercentage voor dimensie: {dimension}. Hogere geselecteerde balken geven aan dat deze dimensiewaarde meer fouten heeft in de foutpiekperiode.",
-    "panelDescLatencyComparison": "Vergelijking van percentiellatentie voor dimensie: {dimension}. Hogere geselecteerde balken geven aan dat deze dimensiewaarde verband houdt met tragere traces.",
-    "panelDescVolumeComparison": "Vergelijking van trace-aantallen voor dimensie: {dimension}. Hogere geselecteerde balken geven aan dat deze dimensiewaarde vaker voorkomt in perioden met veel volume.",
     "panelDescVolumeTopValues": "Topwaarden op aantal voor dimensie: {dimension}.",
     "refreshTooltip": "Analyse vernieuwen met bijgewerkt percentiel",
     "retryButton": "Probeer het opnieuw",
@@ -3315,7 +3213,6 @@
     "title": "Inzichten",
     "tabLabel": "Tarief",
     "analyzeTooltipLogs": "Analyseer de dimensieverdeling voor het huidige tijdbereik",
-    "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
     "rateLabel": "Tarief:",
     "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht",
     "inspectBtnLabel": "Inspecteer",
@@ -3418,7 +3315,6 @@
       "singleTargetTitle": "Eén remote write-target",
       "fanoutTitle": "Fan-out naar meerdere backends",
       "tipPrefix": "Tip: `vmagent` kan schrijfbewerkingen dupliceren door de",
-      "tipSuffix": "flag, zodat u een bestaande VictoriaMetrics-bestemming kunt behouden terwijl u ook metrieken naar OpenObserve doorstuurt.",
       "docLinkText": "om meer te leren over het configureren van vmagent remote write-targets."
     },
     "ai": {
@@ -3441,7 +3337,6 @@
     "customLabel": "Op maat",
     "logsLabel": "Logboeken",
     "metricsLabel": "Metrieken",
-    "tracesLabel": "Sporen",
     "redirectionIngestionMsg": "Opmerking: Om toegang te krijgen tot andere pagina's dan de IAM, moet de gegevensinvoer binnen de huidige organisatie worden gestart.",
     "databaseLabel": "Databanken",
     "securityLabel": "Beveiliging",
@@ -3466,7 +3361,6 @@
     "dotnettracing": ".Net traceren",
     "dotnetlogs": ".NET-logboeken",
     "macos": "macOS",
-    "tracesotlp": "Traces ({product})",
     "rum": "Monitoring van echte gebruikers",
     "openvpn": "OpenVPN",
     "nginx": "Nginx",
@@ -3491,7 +3385,6 @@
       "diagnosticSettingsPath": "Diagnostische instellingen → + Diagnostische instelling toevoegen",
       "enterNameCheckCategories": "Voer een naam in, vink de logcategorieën aan die u wilt inschakelen",
       "underPrefix": "Onder",
-      "destinationDetails": "Doelgegevens",
       "chooseSuffix": ", kies",
       "streamToEventHub": "Naar een event hub streamen",
       "selectEventHubPrefix": "Selecteer de Event Hub-naamruimte en Event Hub die in stap 1 zijn gemaakt (voorvoegsel:",
@@ -3629,21 +3522,17 @@
       "anyWindowsHostNote": "Elke Windows-server of VM.",
       "arrow": "→",
       "askOnSlack": "Vraag het op Slack",
-      "autoInstrumentTracesDesc": "Optioneel. De OpenTelemetry-operator injecteert instrumentatie in geannoteerde workloads, zodat u **gedistribueerde traces krijgt zonder de applicatiecode aan te raken of images opnieuw te bouwen**. Kies een taal en annoteer vervolgens de namespace waarin deze wordt uitgevoerd.",
-      "autoInstrumentTracesTitle": "Instrumenteer uw applicaties automatisch voor traces",
       "cassandraJmxNote": "Schakel externe JMX-toegang op Cassandra in zodat de ontvanger verbinding kan maken.",
       "cassandraTagline": "Verzamel Cassandra-metrieken via de JMX-receiver van de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "checking": "Controleren…",
       "checkingForLogs": "Controleren op logs…",
       "checkingForMetrics": "Controleren op metrics…",
-      "checkingForSpans": "Controleren op spans…",
       "chipEditor": "Editor",
       "chipInstall": "Installeren",
       "chipLogs": "Logs",
       "chipMetrics": "Metrieken",
       "chipRun": "Uitvoeren",
       "chipTerminal": "Terminal",
-      "chipTraces": "Traces",
       "clusterNameHelp": "Identificeert dit cluster in uw logs, metrieken en dashboards.",
       "clusterNameLabel": "Clusternaam",
       "collectorInstallDesc": "De receiver zit alleen in de Contrib-build — kies je platform.",
@@ -3654,14 +3543,11 @@
       "configureCollectorTitle": "Configureer de OpenTelemetry Collector",
       "connectedLogsHeadline": "Verbonden — logs stromen",
       "connectedMetricsHeadline": "Verbonden — metrics stromen",
-      "connectedTracesHeadline": "Verbonden — traces stromen",
       "countLogs": "{count} log | {count} logs",
       "countMetricStreams": "{count} metrische stream | {count} metrische streams",
-      "countSpans": "{count} span | {count} spans",
       "downloadEnvTooltip": ".env downloaden",
       "downloadJmxJarDesc": "De JMX-ontvanger voert deze helper-JAR uit (vereist Java op de collectorhost).",
       "downloadJmxJarTitle": "Download de JMX-metrieken-JAR",
-      "dynamodbFirehoseEndpointDesc": "Gebruik deze als de **HTTP Endpoint**-bestemming bij het maken van je Kinesis Data Firehose-leveringsstream.",
       "dynamodbFirehoseEndpointTitle": "OpenObserve Firehose-endpoint",
       "dynamodbPipelineDesc": "Schakel **DynamoDB Streams** in op je tabel, verbind het met een **Kinesis Data Stream** en richt dan een **Kinesis Data Firehose**-leveringsstream op het bovenstaande HTTP-endpoint.",
       "dynamodbPipelineTitle": "Stream DynamoDB → Firehose",
@@ -3675,7 +3561,6 @@
       "gcpFixBody": "GCP rapporteert afleveringsfouten op het abonnement zelf. Als de sink publiceert maar er niets hier terechtkomt, wijst het push-eindpunt het verzoek meestal af:",
       "gcpFixTitle": "Controleer het push-abonnement",
       "gcpPushUrlNote": "Houd deze URL geheim — deze bevat de ingestiesleutel. Roteer deze via de koptekst van deze pagina als deze lekt.",
-      "gcpSinkDesc": "Maak in de GCP-console een **Log Router-sink** (Logging → Log Router → Create sink) met Pub/Sub als bestemming en laat deze het topic aanmaken. Het inclusiefilter van de sink bepaalt welke logs OpenObserve bereiken.",
       "gcpSinkTitle": "Stuur logs naar een Pub/Sub-topic",
       "gcpSinkWriterNote": "Verleen de schrijversidentiteit van de sink de Pub/Sub Publisher-rol op het onderwerp, anders publiceert deze stilletjes niets.",
       "gcpStreamHelp": "Gebruikt in de push-URL hierboven en bewaakt door de check hieronder. Een speciale stream houdt GCP-logs gescheiden.",
@@ -3714,7 +3599,6 @@
       "k8sInstallerNote": "Dit installeert automatisch cert-manager, de OpenTelemetry-operator en de OpenObserve-collector.",
       "k8sInternalEndpointNote": "Gebruik dit wanneer OpenObserve in hetzelfde cluster draait — verkeer verlaat het dan nooit.",
       "k8sTroubleAnnotationA": "Injectie vindt plaats bij het aanmaken van de pod, dus bestaande pods worden niet beïnvloed tot ze opnieuw opstarten — voer `kubectl rollout restart deployment -n my-namespace` uit. Bevestig dat de annotatie is geplaatst met `kubectl get ns my-namespace -o yaml` en controleer dat de waarde overeenkomt met `openobserve-collector/openobserve-<language>`. Voor Go moet `otel-go-auto-target-exe` het pad van de binary **binnen** de container zijn.",
-      "k8sTroubleAnnotationQ": "Ik heb een namespace geannoteerd, maar er verschijnen geen traces",
       "k8sTroubleEndpointA": "Gebruik **In-Cluster** alleen wanneer OpenObserve zelf in dit cluster draait; verkeer blijft dan binnen en gaat nooit over het netwerk. De URL is `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — de standaardwaarde gaat uit van release `o2` in namespace `openobserve`, dus pas deze aan als die van jou afwijkt. Alle anderen gebruiken het externe eindpunt.",
       "k8sTroubleEndpointQ": "Welk eindpunt moet ik gebruiken — extern of in-cluster?",
       "k8sTroubleExampleA": "Ja — **HOT commerce** is een voorbeeldtoepassing die end-to-end is gekoppeld, en de documentatie van de **OpenTelemetry Operator** bevat de volledige annotatiereferentie. Beide zijn onderaan deze pagina gekoppeld.",
@@ -3748,7 +3632,6 @@
       "mysqlTagline": "Verzamel MySQL-metrics met de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "noLogsFoundYet": "Nog geen logs gevonden",
       "noMetricsFoundYet": "Nog geen metrics gevonden",
-      "noSpansFoundYet": "Nog geen spans gevonden",
       "nothingOnStream": "niets op {stream} — voer je app uit en test opnieuw",
       "notTestedYet": "Nog niet getest",
       "onStream": "op {stream}",
@@ -3757,16 +3640,13 @@
       "oracleTagline": "Verzamel Oracle DB-metrics met de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "otlpFixBody": "Een exporter definiëren is niet voldoende — deze moet in een pipeline worden opgenomen. Dit is de meest voorkomende reden dat een correct uitziende configuratie niets verzendt:",
       "otlpFixTitle": "Controleer of de exporter daadwerkelijk in de pipeline is opgenomen",
-      "otlpGrpcNote": "Lagere overhead dan HTTP voor hoge span-volumes. Poort 5081 moet bereikbaar zijn vanaf de collector.",
       "otlpHttpNote": "De standaard voor de OpenTelemetry Collector — werkt overal, ook achter proxies en load balancers.",
       "otlpSdkEnvNote": "Standaard OTEL_*-omgevingsvariabelen — elke OpenTelemetry-SDK leest deze, dus er is geen codewijziging nodig.",
       "otlpTracesStreamHelp": "Geschreven in de config hierboven als `stream-name` en bewaakt door de check hieronder.",
       "otlpTrouble401A": "De `Authorization`-header moet `Basic <token>` zijn met behulp van het ingestietoken van deze organisatie — de waarde hierboven is al correct. Als het is geroteerd, kopieer het opnieuw van deze pagina.",
       "otlpTrouble401Q": "De collector logt 401 of 403",
-      "otlpTroubleHttpGrpcA": "HTTP is de veilige standaard en passeert proxies en load balancers probleemloos. gRPC heeft lagere overhead bij hoge span-volumes, maar vereist dat poort 5081 end-to-end bereikbaar is.",
       "otlpTroubleHttpGrpcQ": "Moet ik HTTP of gRPC gebruiken?",
       "otlpTroubleStreamA": "De `stream-name`-header bepaalt de stream. Stel deze in op dezelfde naam als het veld hierboven, anders bekijkt de onderstaande controle een stream waar niets naartoe wordt geschreven.",
-      "otlpTroubleStreamQ": "Spans komen aan, maar belanden in de verkeerde stream",
       "otlpTroubleTlsA": "De `tls.insecure`-vlag moet overeenkomen met het schema van het endpoint — deze is hierboven ingesteld op `{insecure}` op basis van de URL van deze implementatie. Een plain-HTTP-endpoint heeft `insecure: true` nodig; een HTTPS-endpoint `false`.",
       "otlpTroubleTlsQ": "gRPC-verbinding mislukt met een TLS-fout",
       "pillActiveBackends": "Actieve backends",
@@ -3824,7 +3704,6 @@
       "pillServiceMap": "Servicekaart",
       "pillSessions": "Sessies",
       "pillSetup": "Configuratie",
-      "pillSpans": "Spans",
       "pillSqlCompilationRate": "SQL-compilatiesnelheid",
       "pillStorageBytes": "Opslagbytes",
       "pillSystem": "Systeem",
@@ -3856,7 +3735,6 @@
       "preparePostgresqlTitle": "PostgreSQL voorbereiden",
       "prepareSqlServerDesc": "Maak de monitoringlogin aan — voer dit uit in een SQL-client, **niet** in je shell.",
       "prepareSqlServerTitle": "SQL Server voorbereiden",
-      "providerNameOtlpTraces": "Traces (OpenTelemetry)",
       "providerNameRum": "Real User Monitoring",
       "quickInstallDesc": "Installeer de OpenObserve-collector met **één opdracht** — stel gewoon uw clusternaam in en voer deze uit. De naam labelt elke record, zodat u clusters van elkaar kunt onderscheiden zodra er meerdere rapporteren.",
       "quickInstallTitle": "Snelle installatie (aanbevolen)",
@@ -3969,19 +3847,16 @@
       "sqlServerTagline": "Verzamel SQL Server-metrics met de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "startIngestingTestForLogs": "start met opnemen en test dan op logs",
       "startIngestingTestForMetrics": "start met opnemen en test dan op metrics",
-      "startIngestingTestForSpans": "start met opnemen en test dan op spans",
       "streamNameError": "Gebruik alleen letters, cijfers en _.",
       "streamNameLabel": "Streamnaam",
       "stuck": "Vastgelopen?",
       "taglineDatabricks": "Stuur Databricks-notebooklogs naar OpenObserve via de logs-API.",
       "taglineGcp": "Stream Google Cloud-logs naar OpenObserve met een Pub/Sub-pushabonnement — geen agent of collector om te draaien.",
-      "taglineKubernetes": "Implementeer de OpenObserve-collector in je cluster — containerlogs, Kubernetes-gebeurtenissen en clustermetrieken, plus zero-code-traces voor je workloads.",
       "taglineLinux": "Installeer de OpenObserve-agent op elke Linux-host — systeem- en journald-logs plus CPU-, geheugen-, schijf- en netwerkmetrieken.",
       "taglineMacos": "Installeer de OpenObserve-agent op elke Mac — de unified log en standaardlogbestanden plus CPU-, geheugen-, schijf- en netwerkmetrieken.",
       "taglineOtlpTraces": "Richt elke OpenTelemetry-exporter op OpenObserve — collector of SDK, HTTP of gRPC. Je endpoint en token zijn hieronder ingevuld.",
       "taglineWindows": "Installeer de OpenObserve-agent op elke Windows-host — Event Log, prestatiemeters en hostmetrieken.",
       "testAgain": "Opnieuw testen",
-      "tracesStreamNameLabel": "Traces-streamnaam",
       "trackScreensDesc": "Als u React Navigation gebruikt, geef de SDK uw navigatiereferentie en elke routewijziging wordt als een RUM-weergave vastgelegd — geen code per scherm nodig.",
       "trackScreensTitle": "Schermen automatisch volgen (optioneel)",
       "troubleshooting": "Probleemoplossing",
@@ -4001,7 +3876,6 @@
       "verifyMongodbMetricsDesc": "Klik hieronder op Test, of controleer Streams op de `mongodb_*`-metrics.",
       "verifyMysqlMetricsDesc": "Klik hieronder op Test, of controleer Streams op de `mysql_*`-metrics.",
       "verifyOracledbMetricsDesc": "Klik hieronder op Test, of controleer Streams op de `oracledb_*`-metrics.",
-      "verifyOtlpTracesDesc": "Herstart de collector (of je app), voer een verzoek uit dat een span produceert, en klik dan op Test.",
       "verifyPostgresqlMetricsDesc": "Klik hieronder op Test, of controleer Streams op de `postgresql_*`-metrics.",
       "verifyReactNativeRumDesc": "Voer de app uit op een simulator, emulator of apparaat, navigeer tussen een paar schermen en klik dan op Test — React Native-gebeurtenissen komen in de `_rumdata`-stream terecht.",
       "verifyRedisMetricsDesc": "Klik hieronder op Test, of controleer Streams op de `redis_*`-metrics.",
@@ -4012,7 +3886,6 @@
       "verifyZookeeperMetricsDesc": "Klik hieronder op Test, of controleer Streams op de `zookeeper_*`-metrics.",
       "viewLogs": "Bekijk logs",
       "viewStreams": "Bekijk streams",
-      "viewTraces": "Bekijk traces",
       "whatTheInstallerDoes": "Wat het installatieprogramma doet",
       "windowsAgentFixBody": "Het installatieprogramma registreert de agent als een Windows-service. Als er niets binnenkomt, controleer dan of deze actief is en lees de meest recente vermeldingen uit het logboek:",
       "windowsTroubleScriptA": "PowerShell blokkeert standaard niet-ondertekende scripts. Voer de console **uit als administrator** en sta, indien nodig, het script voor die sessie toe met `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.",
@@ -4036,11 +3909,8 @@
       "verifyAndroidRumDesc": "Voer de app uit op een emulator of apparaat, beweeg tussen een paar schermen en klik vervolgens op Test — native Android-gebeurtenissen komen terecht in de `_rumdata`-stroom.",
       "verifyIosRumDesc": "Voer de app uit op een simulator of apparaat, beweeg tussen een paar schermen en klik vervolgens op Test — native iOS-gebeurtenissen komen terecht in de `_rumdata`-stroom.",
       "dbmPreparePostgresTitle": "Databasemonitoring · Toegang verlenen (optioneel)",
-      "dbmPreparePostgresDesc": "**Alles hierboven is op zichzelf compleet** — querytijden bereiken Databases al via de traces van je applicatie, zonder dat je hier iets hoeft in te stellen. Deze laatste stappen voegen toe wat een trace nooit kan zien: deadlocks en geblokkeerde queries, die alleen de database zelf registreert. Verleen `pg_monitor`, zodat de collector de queries van andere sessies kan lezen — voer dit uit in een SQL-client, **niet** in je shell.",
       "dbmPrepareMysqlTitle": "Databasemonitoring · Deadlockgeschiedenis bewaren (optioneel)",
       "dbmPrepareMariadbTitle": "Databasemonitoring · Deadlockgeschiedenis bewaren (optioneel)",
-      "dbmPrepareMysqlDesc": "**Alles hierboven is op zichzelf compleet** — querytijden bereiken Databases al via de traces van je applicatie, zonder dat je hier iets hoeft in te stellen. Deze laatste stappen voegen toe wat een trace nooit kan zien: deadlocks en geblokkeerde queries, die alleen de database zelf registreert. Schakel volledige deadlockgeschiedenis in — voer dit uit in een SQL-client, **niet** in je shell.",
-      "dbmPrepareMariadbDesc": "**Alles hierboven is op zichzelf compleet** — querytijden bereiken Databases al via de traces van je applicatie, zonder dat je hier iets hoeft in te stellen. Deze laatste stappen voegen toe wat een trace nooit kan zien: deadlocks en geblokkeerde queries, die alleen de database zelf registreert. Schakel volledige deadlockgeschiedenis in — voer dit uit in een SQL-client, **niet** in je shell.",
       "dbmPgLoggingTitle": "Databasemonitoring · Laat Postgres deadlocks registreren (optioneel)",
       "dbmPgLoggingDesc": "Deadlocks worden uitsluitend naar het Postgres-logboek geschreven, en alleen als de instellingen hieronder aan staan — dus deze stap is wat ervoor zorgt dat het tabblad Deadlocks überhaupt gevuld wordt. De prefixregel moet exact overeenkomen: de collector leest deze om te achterhalen wie erbij betrokken was, en een andere prefix betekent dat hij niets vindt terwijl hij toch gezond rapporteert.",
       "dbmPgLoggingVerifyTitle": "Databasemonitoring · Controleer of de instellingen effect hebben gehad (optioneel)",
@@ -4066,7 +3936,6 @@
       "dbmMysqlLogPathHelp": "De collector moet dit bestand kunnen lezen. Vind het met: SHOW VARIABLES LIKE 'log_error';",
       "dbmMariadbLogPathHelp": "De collector moet dit bestand kunnen lezen. Vind het met: SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "Databasebewaking · Toegang verlenen (optioneel)",
-      "dbmPrepareMssqlDesc": "**Alles hierboven is op zichzelf compleet** — querytijden bereiken Databases al vanuit de traces van uw applicatie, zonder dat u hier iets hoeft in te stellen. Deze laatste groep voegt toe wat een trace nooit kan zien: deadlocks en geblokkeerde queries, die alleen de database zelf registreert. Beide rechten zijn nodig — de ene laat de collector andere sessies lezen, de andere laat hem de deadlockgeschiedenis lezen. Voer ze uit in een SQL-client, **niet** in uw shell.",
       "dbmConfigureMssqlDesc": "Schrijft `dbm-config.yaml` — stel hieronder de database in waarmee verbinding moet worden gemaakt. SQL Server ontvangt hier deadlocks, geblokkeerde queries, activiteitsamples, topqueries en uitvoeringsplannen. De sqlserver-receiver leest over de hele instantie, dus activiteit en topqueries zijn niet beperkt tot de database die u hierboven noemt.",
       "dbmRunMssqlDesc": "Voert beide configuraties samen uit. Gebruik dezelfde gebruikersnaam en hetzelfde wachtwoord die u in stap 1 hebt aangemaakt.",
       "dbmVerifyBlockingDesc": "Open **Infra → Databases → Geblokkeerde queries**. Sessies die op een vergrendeling wachten, verschijnen zodra er een wordt gesampled — een leeg tabblad daar vertelt u of er niets is geblokkeerd of dat er niets wordt verzameld.",
@@ -4076,7 +3945,6 @@
       "dbmVerifyTableHealthDesc": "Open **Infra → Databases** en kies hieronder een tabblad. Deadlocks en geblokkeerde queries verschijnen zodra uw database er een meldt — een leeg tabblad daar vertelt u of er niets is gebeurd of dat er niets wordt verzameld. Tabelgezondheid vult zich na de eerste momentopname van 60 seconden."
     },
     "instrumentBeforeImportTitle": "Instrumenteer vóór het importeren van de client",
-    "instrumentBeforeImportBody": "Als uw app draait maar er geen spans aankomen, is de instrumentatie waarschijnlijk geladen nadat de client is geïmporteerd. Herschik de volgorde zodat de init eerst wordt uitgevoerd:",
     "launchCloudFormationStack": "CloudFormation-stack lanceren",
     "openStackSetsConsole": "StackSets-console openen",
     "integrations": {
@@ -4239,7 +4107,6 @@
       "streamOverview": "{stream} overzicht"
     },
     "selectField": "Veld",
-    "selectIndex": "Streamen",
     "selectStreamType": "Streamtype",
     "toggleFunctionEditor": "Functie-editor in- en uitschakelen",
     "useSavedFunction": "Gebruik de functie Opgeslagen",
@@ -4353,7 +4220,6 @@
     "extraOptions": "Opties",
     "nameOfVariable": "Naam",
     "labelOfVariable": "Label (optioneel)",
-    "ValueOfVariable": "Waarde",
     "DefaultValue": "Standaardwaarde (optioneel)",
     "typeOfVariable": "Soort variabele",
     "DefaultSize": "Standaard maximale recordgrootte (optioneel)",
@@ -4423,7 +4289,6 @@
     "alignRight": "Right",
     "sectionStyling": "Styling",
     "sectionConditionalStyling": "Voorwaardelijke styling",
-    "conditionThreshold": "Waarde",
     "conditionAddRule": "+ Regel toevoegen",
     "conditionNoRules": "Nog geen regels.",
     "conditionIfValue": "Als de waarde is",
@@ -4486,7 +4351,6 @@
     "unsavedMessage": "Je hebt de wijzigingen niet opgeslagen. Weet je zeker dat je weg wilt?",
     "currentFolderLabel": "Huidige map",
     "selectFolderLabel": "Selecteer een map",
-    "selectFolderPlaceholder": "Kies een doelmap",
     "selectDashboardLabel": "Selecteer Dashboard",
     "selectTabLabel": "Tabblad selecteren",
     "layerType": "Laagtype",
@@ -4646,7 +4510,6 @@
     "markLinesTooltip": "Drempellijnen op de grafiek weergeven.",
     "markLineType": "Typ",
     "markLineLabel": "Etiket",
-    "markLineValue": "Waarde",
     "markLineAdd": "+ Toevoegen",
     "markLineAverage": "Gemiddeld",
     "markLineMedian": "Mediaan",
@@ -4748,7 +4611,6 @@
     "editValueMapping": "Waardetoewijzing bewerken",
     "valueMappingsTitle": "Waardetoewijzingen",
     "valueMappingType": "Typ",
-    "valueMappingValue": "Waarde",
     "valueMappingRegex": "Regex",
     "valueMappingFrom": "Van",
     "valueMappingTo": "Naar",
@@ -4916,7 +4778,6 @@
         "storage": "Opslag",
         "dashboard": "Dashboard"
       },
-      "selectFolderTitle": "Doelmap selecteren",
       "back": "Terug",
       "addDashboard": "Dashboard toevoegen",
       "folder": "Map",
@@ -5104,7 +4965,6 @@
       "configuration": "Configuratie",
       "having": "Having",
       "add": "Toevoegen",
-      "value": "Waarde",
       "markAsNonTimestamp": "Markeer dit veld als niet-tijdstempel",
       "renderDataAsJson": "Gegevens weergeven als JSON / Array",
       "sortBy": "Sorteer op",
@@ -5554,7 +5414,6 @@
     "deletePanelTitle": "Paneel verwijderen",
     "deletePanelMessage": "Weet je zeker dat je dit paneel wilt verwijderen?",
     "movePanelTitle": "Paneel naar een ander tabblad verplaatsen",
-    "movePanelMessage": "Tabblad van bestemming selecteren",
     "noQueriesToCreateAlert": "Dit paneel bevat geen vragen om een waarschuwing te maken van",
     "panelQueryMustHaveStream": "Paneelquery moet een stream hebben geconfigureerd",
     "unsupportedPanelTypeAlert": "Het aanmaken van meldingen vanuit {type} panels werkt mogelijk niet zoals verwacht",
@@ -5562,7 +5421,6 @@
     "panelDuplicationFailed": "Het dupliceren van het paneel is mislukt",
     "firstColumn": "Eerste kolom",
     "zAxis": "Z-as",
-    "breakdown": "Indeling",
     "pivotField": "Draaiveld",
     "pivotFieldTooltip": "Sleep een dimensieveld hierheen. De verschillende waarden worden kolomkoppen in de draaitabel. Er zijn maximaal 3 velden toegestaan voor draaien op meerdere niveaus.",
     "breakdownTooltipHBar": "Gebruik deze velden om de gegevens op te splitsen in verschillende secties op de Y-as voor een duidelijker beeld.",
@@ -5610,7 +5468,6 @@
         "anomalyHint": "{n} gebeurtenissen gesampled",
         "colField": "Veld",
         "colRarity": "Zeldzaamheid",
-        "colValue": "Waarde",
         "rarity": {
           "anomalous": "Afwijkend",
           "rare": "Zeldzaam",
@@ -5649,15 +5506,12 @@
     "longitude": "Lengtegraad",
     "weight": "Gewicht",
     "mapname": "Naam",
-    "mapvalue": "Waarde",
     "source": "Bron",
-    "target": "Doelwit",
-    "value": "Waarde"
+    "target": "Doelwit"
   },
   "home": {
     "alertsOverviewSection": "Sectie overzicht van waarschuwingen",
     "pipelinesOverviewSection": "Sectie overzicht van pipelines",
-    "streams": "Streams",
     "totalDataIngested": "Totaal aantal opgenomen gegevens",
     "totalDataCompressed": "Gecomprimeerde grootte",
     "viewButton": "Bekijken",
@@ -5669,7 +5523,6 @@
       "description": "Deze organisatie heeft geen gegevens ontvangen, dus er is niets om in kaart te brengen. Zodra de gebeurtenissen beginnen te verlopen, worden hier automatisch uw <strong>opnamevolume, opslag en querygebruik</strong> weergegeven.",
       "logs": "Logboeken verzenden",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} en meer",
-      "traces": "Sporen verzenden",
       "tracesDesc": "{product1} / {product2} / {product3} gedistribueerde tracing",
       "metrics": "Statistieken verzenden",
       "metricsDesc": "{product1}, {product2}, {product3} en meer",
@@ -5679,7 +5532,6 @@
       "shippers": "Verzenders van logboeken"
     },
     "indexSizeLbl": "Indexgrootte",
-    "docsCountLbl": "Evenementen",
     "functionTitle": "Functies",
     "schedulePipelineTitle": "Gepland",
     "rtPipelineTitle": "Real-time",
@@ -5717,8 +5569,6 @@
     "emptyActionAlertsDesc": "Bekijk de geconfigureerde waarschuwingen en drempels",
     "emptyActionLogs": "Logboeken bekijken",
     "emptyActionLogsDesc": "Zoek en filter je logstreams",
-    "emptyActionTraces": "Sporen ontdekken",
-    "emptyActionTracesDesc": "Inspecteer gedistribueerde sporen en servicelatentie",
     "anomalyDetectedTitle": "Anomalie gedetecteerd — {name}",
     "anomalyDetectedDescription": "Stream: {stream} · {count} afwijkend(e) punt(en)",
     "secondsAgo": "{count} sec geleden",
@@ -5767,7 +5617,6 @@
     "stderr": "Stderr",
     "truncatedLabel": "afgekapt",
     "copyQuery": "Query kopiëren",
-    "stream": "Stream",
     "start": "Start",
     "end": "Einde",
     "from": "Van",
@@ -5806,7 +5655,6 @@
       "taglineTail": ". Ik kan jouw schrijven",
       "taglineSql": "SQL",
       "taglineVrl": "VRL",
-      "taglineAnd": "en je door je logboeken, sporen, statistieken en incidenten leiden.",
       "signedInAs": "Ingelogd als",
       "role": "Rol",
       "tryOneOfThese": "Of probeer een van deze"
@@ -5814,12 +5662,10 @@
     "capabilities": {
       "query": {
         "title": "Een vraag schrijven",
-        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken.",
         "prompt": "Help me een vraag te schrijven"
       },
       "incident": {
         "title": "Incidenten onderzoeken",
-        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”",
         "prompt": "Help me incidenten te onderzoeken"
       },
       "dashboard": {
@@ -5916,9 +5762,7 @@
         "alert": "alarm",
         "dashboard": "dashboard",
         "pipeline": "pijplijn",
-        "report": "rapport",
         "function": "functie",
-        "stream": "stream",
         "folder": "map",
         "panel": "paneel",
         "user": "gebruiker",
@@ -5962,7 +5806,6 @@
     "features": "FUNCTIES",
     "included": "Wat is inbegrepen?",
     "proPlanSubtitle": "Oplossingen op maat voor kleine teams",
-    "unlimitedNote": "Onbeperkt aantal gebruikers, logboeken, statistieken, sporen en meer.",
     "paymentNote": "De betaling wordt berekend op basis van het verbruik aan het einde van de maandelijkse factureringscyclus.",
     "proPlanLabel": "Betaal terwijl je onderweg bent",
     "contactLabel": "Neem contact op met Sales",
@@ -6145,13 +5988,10 @@
       "anomalyImportFailed": "Anomaliedetectie - {index}: import van \"{name}\" mislukt — {reason}",
       "nameRequired": "Alert - {index}: Naam is verplicht en moet een geldige tekenreeks zijn.",
       "orgIdInvalid": "Alert - {index}: Organisatie-ID is verplicht, moet in de organisatielijst voorkomen en moet gelijk zijn aan {orgId}.",
-      "streamTypeInvalid": "Alert - {index}: Streamtype is verplicht en moet een van de volgende zijn: 'logs', 'metrics', 'traces'.",
       "streamNameInvalid": "Alert - {index}: Streamnaam is verplicht, moet in de streamlijst voorkomen en moet een geldige tekenreeks zijn.",
-      "destinationsRequired": "Alert - {index}: Bestemmingen zijn vereist en moeten een array zijn.",
       "enabledBoolean": "Alert - {index}: Ingeschakeld moet een Booleaanse waarde zijn.",
       "tzOffsetNumber": "Alert - {index}: Tijdzone-offset moet een getal zijn.",
       "timezoneRequiredForCron": "Waarschuwing - {index}: Tijdzone is vereist wanneer het frequentie type 'cron' is.",
-      "destinationNotExist": "Waarschuwing - {index}: bestemming \"{destination}\" bestaat niet.",
       "createSuccess": "Waarschuwing - {index}: \"{name}\" succesvol aangemaakt \nOpmerking: verwijder het aangemaakte waarschuwingsobject {name} uit het json-bestand.",
       "createFailed": "Waarschuwing - {index}: \"{name}\" aanmaken mislukt --> \n Reden: {reason}",
       "unknownError": "Onbekende fout",
@@ -6261,7 +6101,6 @@
       "noChildren": "Nog geen sub-alerts. Voeg er ten minste twee toe.",
       "wouldTrigger": "Zou triggeren",
       "wouldNotTrigger": "Zou niet triggeren",
-      "firing": "Actief",
       "normal": "Normaal",
       "stepByStep": "Stap voor stap",
       "result": "Resultaat",
@@ -6288,7 +6127,6 @@
     "exportDialogSubtitle": "Bekijk de definitie en download deze als JSON of als Terraform voor de OpenObserve-provider.",
     "jsonFilesOnlyHint": "Alleen .json-bestanden",
     "outputMessages": "Uitvoerberichten",
-    "destinationsRequiredLabel": "Bestemmingen *",
     "timezoneRequiredLabel": "Tijdzone *",
     "organizationIdLabel": "Organisatie-ID",
     "alertCreationTitle": "Waarschuwing maken",
@@ -6328,13 +6166,11 @@
     "guidelinesLabel": "Richtlijnen:",
     "selectStreamGuideline": "Selecteer een bestaande stream uit de lijst of voer de naam in om een nieuwe te maken",
     "enrichmentTablesTerm": "Verrijkingstabellen",
-    "enrichmentTablesDestinationNote": "aangezien de bestemmingsstream alleen beschikbaar is voor geplande pipelines",
     "useCurlyBracesNote": "Gebruik accolades",
     "configureStreamNameDynamicNote": "om de streamnaam dynamisch te configureren. bijv.",
     "staticTextBeforeAfterNote": ". Statische tekst voor/na",
     "isOptionalNote": "is optioneel",
     "noTriggersLoaded": "Geen triggers geladen",
-    "externalDestinationTitle": "Externe bestemming",
     "serviceGraphLegendTitle": "Grafieklegenda",
     "serviceGraphRootCause": "Rood = Mogelijke hoofdoorzaak",
     "serviceGraphHighFrequency": "Oranje = Hoge frequentie",
@@ -6362,7 +6198,6 @@
     "pendingBatches": "Batches in afwachting",
     "pendingBatchesTooltip": "Meldingen die wachten op groepering",
     "historyTimeline": {
-      "firing": "Actief",
       "ok": "Ok",
       "error": "Fout",
       "skipped": "Overgeslagen",
@@ -6381,7 +6216,6 @@
     "duration": "Duur",
     "retries": "Pogingen",
     "dedup": "Dedup",
-    "noDestinations": "Geen bestemmingen beschikbaar",
     "validation": {
       "streamTypeRequired": "Stream-type is vereist.",
       "streamNameRequired": "Stream-naam is vereist.",
@@ -6392,7 +6226,6 @@
       "validEmails": "Voeg geldige e-mailadressen toe!",
       "silenceNonNegative": "Meldingsdemping moet groter dan of gelijk aan 0 zijn",
       "periodPositive": "Periode moet groter dan 0 zijn",
-      "destinationRequired": "Ten minste één bestemming is vereist.",
       "thresholdPositive": "Drempelwaarde moet groter dan 0 zijn",
       "frequencyPositive": "Frequentie moet groter dan 0 zijn",
       "aggregationColumnRequired": "Kolom is vereist bij gebruik van een aggregatiefunctie.",
@@ -6403,7 +6236,6 @@
       "minimumFrequency": "Minimumfrequentie moet {minutes} minuten zijn",
       "nameMandatoryString": "Naam is verplicht en moet een geldige string zijn",
       "orgIdMismatch": "Organisatie-ID moet gelijk zijn aan {orgId}",
-      "streamTypeMandatory": "Streamtype is verplicht en moet een van de volgende zijn: logs, metrics, traces",
       "streamNameMandatoryString": "Streamnaam is verplicht en moet een geldige string zijn",
       "streamNotInList": "Stream \"{streamName}\" bestaat niet in de streamlijst",
       "isRealTimeMandatoryBoolean": "Is realtime is verplicht en moet een booleanwaarde zijn",
@@ -6435,10 +6267,6 @@
       "cronRequiredForCronType": "Cron-expressie is vereist wanneer frequentie type cron is",
       "timezoneRequiredForCronType": "Tijdzone is vereist wanneer frequentie type cron is",
       "triggerConditionRequired": "Triggerconditie is vereist",
-      "destinationsArray": "Bestemmingen moeten een array zijn",
-      "destinationRequiredPlain": "Ten minste één bestemming is vereist",
-      "noDestinationsInSystem": "Geen beschikbare bestemmingen gevonden in het systeem",
-      "invalidDestinations": "Ongeldige bestemmingen: {destinations} - moet uit de lijst met beschikbare bestemmingen komen",
       "enabledFlagBoolean": "Ingeschakelde vlag moet een boolean zijn",
       "silenceNotificationRequired": "Stille melding mag niet leeg zijn",
       "thresholdNotEmpty": "Drempelwaarde mag niet leeg zijn",
@@ -6459,8 +6287,6 @@
     "searchAllFolders": "Alle mappen",
     "streamConfig": "Configuratie van de stream",
     "alertRules": "Regels voor waarschuwingen",
-    "noTemplatesMsg": "Om een waarschuwing aan te maken heb je minstens één sjabloon en één bestemming nodig. Sjablonen bepalen de indeling van het meldingsbericht — begin met het aanmaken van een bericht.",
-    "noDestinationsMsg": "Om een waarschuwing aan te maken heb je minstens één bestemming en één sjabloon nodig. Bestemmingen bepalen waar meldingen worden verzonden — begin door er een aan te maken.",
     "add": "Waarschuwing toevoegen",
     "edit": "Bewerken",
     "clone": "Klonenwaarschuwing",
@@ -6511,37 +6337,25 @@
     "frequency": "Frequentie",
     "threshold": "Drempel",
     "silenceNotification": "Stiltemelding voor",
-    "destination": "Bestemming",
-    "destinationOrWorkflowRequired": "Voeg ten minste één bestemming of werkstroom toe.",
-    "customDestination": "Bestemming op maat",
-    "customDestinationDescription": "Configureer een aangepast HTTP-eindpunt of e-mailbestemming",
-    "testIdleMessage": "Klik op 'Test' om de configuratie van uw bestemming te verifiëren",
-    "destinationPreview": "Voorbeeld van de bestemming",
     "template": "Sjabloon overschrijven",
     "additionalVariables": "Aanvullende variabelen",
-    "testSuccessMessage": "Test geslaagd! Je bestemming is correct geconfigureerd.",
     "testFailedMessage": "De test is mislukt. Controleer je configuratie en probeer het opnieuw.",
     "testFailedWithReason": "Test mislukt: {reason}",
-    "testInProgress": "Bestemming van de test...",
     "sendingNotification": "Testmeldingen verzenden om de connectiviteit te verifiëren",
     "testErrorDNS": "DNS-resolutie is mislukt. Controleer de webhook-URL of hostnaam.",
     "testErrorConnection": "De verbinding is geweigerd. Controleer de URL en zorg ervoor dat de service bereikbaar is.",
-    "testErrorTimeout": "Er is een time-out opgetreden voor het verzoek. De bestemmingsdienst is mogelijk traag of onbereikbaar.",
     "testErrorSSL": "SSL/TLS-certificaatfout. Verifieer het certificaat of schakel SSL-verificatie uit.",
     "testErrorClientError": "Klantfout (4xx). Controleer uw inloggegevens en configuratie.",
-    "testErrorServerError": "Serverfout (5xx). Er zijn problemen met de bestemmingsservice.",
     "viewDetails": "Details bekijken",
     "error": "Fout",
     "httpStatus": "HTTP-status",
     "responseBody": "Reactielichaam",
     "retry": "Probeer het opnieuw",
     "suggestCheckUrl": "Controleer of de webhook-URL correct en bereikbaar is.",
-    "suggestCheckFirewall": "Controleer de instellingen van uw firewall en zorg ervoor dat de doelservice toegankelijk is.",
     "suggestCheckCredentials": "Controleer of je API-inloggegevens correct zijn.",
     "suggestCheckPermissions": "Controleer of uw inloggegevens over de vereiste machtigingen beschikken.",
     "suggestCheckEndpoint": "Controleer of de URL van het eindpunt juist is.",
     "suggestRateLimit": "Je hebt de tarieflimiet overschreden. Een ogenblik geduld a.u.b. voordat u het opnieuw probeert.",
-    "suggestServerIssue": "Er zijn problemen met de bestemmingsservice. Probeer het later opnieuw.",
     "description": "Omschrijving",
     "stream_name": "Naam van de stream",
     "cloneTitle": "Klonenwaarschuwing",
@@ -6601,7 +6415,6 @@
       "notEqualTo": "niet gelijk aan",
       "eventsDetected": "gedetecteerde gebeurtenissen",
       "sendsTo": "Verstuurt naar",
-      "noDestination": "Geen bestemming",
       "notSetupYet": "(nog niet ingesteld)",
       "cooldown": "Afkoelen",
       "betweenAlerts": "tussen waarschuwingen",
@@ -6649,7 +6462,6 @@
     },
     "placeholders": {
       "typeSomething": "Typ iets",
-      "value": "Waarde",
       "selectColumn": "Kolom selecteren",
       "savedFunctions": "Opgeslagen functies",
       "autoUsesCheckInterval": "Auto (maakt gebruik van controle-interval)",
@@ -6732,7 +6544,6 @@
       "ifPrefix": "als",
       "noConditionsDefined": "Geen voorwaarden gedefinieerd",
       "loadingCorrelatedMetrics": "Gecorreleerde metrieken laden...",
-      "loadingCorrelatedTraces": "Gecorreleerde traces laden...",
       "disambiguationChangedMessage": "De service discovery-configuratie (disambiguatievelden) is gewijzigd nadat dit incident is aangemaakt.",
       "noActivityYet": "Nog geen activiteit",
       "eventsAndCommentsAppearHere": "Gebeurtenissen en opmerkingen verschijnen hier",
@@ -6766,7 +6577,6 @@
       "correlatedAlertsCount": "Waarschuwingen: {count} gecorreleerde waarschuwingen",
       "noCorrelatedLogs": "Geen gecorreleerde logs gevonden",
       "noCorrelatedMetrics": "Geen gecorreleerde metrieken gevonden",
-      "noCorrelatedTraces": "Geen gecorreleerde traces gevonden",
       "lastAlertAt": "Laatste waarschuwing",
       "title_field": "Titel",
       "stableDimensions": "Dimensies",
@@ -6779,7 +6589,6 @@
       "acknowledge": "Erken",
       "resolve": "Oplossen",
       "reopen": "Heropenen",
-      "statusOpen": "Open",
       "statusAcknowledged": "Erkend",
       "statusResolved": "Opgelost",
       "correlationServiceDiscovery": "Ontdekking van diensten",
@@ -6844,7 +6653,6 @@
       "noAlertDetailsAvailable": "Geen waarschuwingsdetails beschikbaar",
       "clickOnTriggerToViewDetails": "Klik op een trigger in de tabel om details te bekijken",
       "refreshCorrelatedData": "Gecorreleerde gegevens vernieuwen",
-      "showingCorrelatedTraces": "Gecorreleerde traces uit het incidenttijdvak worden weergegeven",
       "incidentTitleUpdatedSuccess": "Incidenttitel is bijgewerkt",
       "markAsAcknowledgedTooltip": "Incident markeren als bevestigd en in behandeling",
       "markAsResolvedTooltip": "Incident markeren als opgelost en sluiten",
@@ -6964,16 +6772,10 @@
       "helpLegendLiveExample": "Hoge CPU",
       "helpLegendSampleExample": "42",
       "sectionTitle": "Instellingen",
-      "noDestinationsAvailable": "Geen bestemmingen beschikbaar",
-      "noTargetsAvailable": "Geen bestemmingen of werkstromen beschikbaar",
-      "targetsDestinationsGroup": "Bestemmingen",
       "targetsWorkflowsGroup": "Werkstromen",
-      "refreshDestinations": "Nieuwste bestemmingen vernieuwen",
-      "addNewDestination": "Nieuwe bestemming toevoegen",
       "cooldownTooltip": "Als de waarschuwing wordt geactiveerd, hoe lang moet het dan wachten voordat een nieuwe melding wordt verzonden. Als de waarschuwing bijvoorbeeld om 16.00 uur wordt geactiveerd en de stiltemelding is ingesteld op 10 minuten, dan wordt er pas om 16.10 uur nog een melding gestuurd, zelfs als de waarschuwing na 1 minuut nog steeds duurt. Dit is om te voorkomen dat de gebruiker wordt gespamd met meldingen.",
       "periodTooltip": "Periode gedurende welke de query moet worden uitgevoerd. Bijvoorbeeld 10 minuten betekent dat telkens wanneer de query wordt uitgevoerd, de laatste 10 minuten aan gegevens worden gebruikt.",
       "timezoneWarning": "Waarschuwing: De weergegeven tijdzone is bij benadering. Controleer en selecteer handmatig de juiste tijdzone.",
-      "destinationsTooltip": "Selecteer een of meer bestemmingen om waarschuwingsmeldingen te verzenden.",
       "createsIncident": "Maakt incident aan",
       "createsIncidentTooltip": "Als een waarschuwing een incident kan aanmaken, verstuurt deze geen aparte melding. In plaats daarvan wordt een melding voor het incident verzonden wanneer een nieuw incident wordt aangemaakt of wanneer een nieuw waarschuwingstype zich bij een bestaand incident voegt.",
       "helpTemplateTitle": "Sjabloon overschrijven",
@@ -6985,11 +6787,7 @@
       "helpLegendLive": "de werkelijke waarden van uw waarschuwing",
       "helpLegendSample": "een voorbeeld — de werkelijke waarde wordt ingesteld wanneer het alarm afgaat",
       "helpLegendOpaque": "automatisch toegevoegd wanneer de waarschuwing afgaat",
-      "helpTemplateExplain": "Een sjabloon is het meldingsbericht dat wordt verzonden — de tekst plus variabelen zoals {'{'} alert_name {'}'}. Als u hier één kiest, wordt de eigen sjabloon van elke bestemming overschreven, alleen voor deze waarschuwing.",
       "helpCurrentHeading": "Wat deze waarschuwing nu verzendt",
-      "helpCurrentNoOverride": "Geen overschrijvingsset — elke bestemming gebruikt zijn eigen sjabloon:",
-      "helpCurrentNoDestinations": "Nog geen bestemmingen geselecteerd. Elke bestemming gebruikt zijn eigen geconfigureerde sjabloon.",
-      "helpCurrentOverrideHeading": "Alle bestemmingen gebruiken dit sjabloon:",
       "helpPreviewHeading": "Een sjabloon bekijken",
       "helpPreviewSelectPlaceholder": "Selecteer een sjabloon om een voorbeeld te bekijken",
       "helpApplyToAlert": "Op waarschuwing toepassen",
@@ -7001,7 +6799,6 @@
       "helpYourVariablesEmpty": "Je hebt nog geen variabelen toegevoegd.",
       "helpRowTemplateExplain": "Een waarschuwing kan met veel rijen overeenkomen. De rijsjabloon bepaalt hoe een enkele rij eruitziet. Vervolgens worden {'{'} rijen {'}'} in je hoofdsjabloon weergegeven in elke overeenkomende rij, die al is opgemaakt.",
       "helpRowTemplateTypeHeading": "String versus JSON",
-      "helpRowTemplateTypeExplain": "String produceert platte tekst per rij. JSON produceert een JSON-object per rij, geschikt voor gestructureerde bestemmingen.",
       "helpRowTemplateTypeCurrent": "Momenteel geselecteerd:",
       "helpPreviewHeadingShort": "voorsmaak",
       "helpWhyHeading": "Waarom een variabele gebruiken?",
@@ -7014,7 +6811,6 @@
       "helpVariablesExampleCaption": "Voeg de ernst en het team toe als variabelen en gebruik ze vervolgens overal in de sjabloon:",
       "helpExampleResultLabel": "Wat wordt er verzonden",
       "helpTemplateWhenHeading": "Wanneer moet ik overschrijven?",
-      "helpTemplateWhenDesc": "Laat dit leeg en elke bestemming gebruikt zijn eigen sjabloon. Stel een overschrijving in als u wilt dat deze ene waarschuwing hetzelfde, consistente bericht naar elke bestemming stuurt, zonder de sjabloon van elke bestemming te bewerken.",
       "helpRowTemplateWhyHeading": "Waarom een rijsjabloon?",
       "helpRowTemplateWhyDesc": "Een waarschuwing kan veel records evenaren. Het rijsjabloon formatteert één record; {'{'} rows {'}'} plaatst vervolgens elk opgemaakte record in de hoofdsjabloon, zodat je alle overeenkomsten opsomt zonder een lus te schrijven.",
       "helpRowTemplateExampleCaption": "Elke overeenkomende rij wordt opgemaakt volgens het rijsjabloon, en in {'{'} rows {'}'} worden ze vervolgens allemaal in de hoofdsjabloon geplaatst:",
@@ -7023,10 +6819,8 @@
       "helpRowTemplatePreviewEmpty": "Nog geen rijsjabloon — typ er een op het tabblad Aanvullende instellingen om het hier te bekijken.",
       "helpPreviewSelectEmpty": "Kies hierboven een sjabloon om een voorbeeld te bekijken van het bericht dat zou worden verzonden.",
       "helpCurrentBodyEmpty": "Dit sjabloon heeft geen hoofdtekst om vooraf te bekijken.",
-      "helpDestinationNoTemplate": "Gebruikt de standaardindeling van deze bestemming.",
       "builtInVars": {
         "orgName": "Jouw organisatienaam",
-        "streamType": "Streamtype (logs, metrics, traces)",
         "streamName": "Naam van de stream waar de alert op let",
         "alertName": "De naam van de alert",
         "alertType": "Alerttype (bijv. gepland, real-time)",
@@ -7048,7 +6842,6 @@
     },
     "advanced": {
       "addVariable": "Variabele toevoegen",
-      "variablesTooltip": "Variabelen worden gebruikt om gegevens van de waarschuwing naar de bestemming door te geven.",
       "templateType": "Sjabloontype:",
       "noTemplatesAvailable": "Geen sjablonen beschikbaar",
       "refreshTemplates": "Nieuwste sjablonen vernieuwen",
@@ -7133,12 +6926,10 @@
     },
     "anomaly": {
       "addFilter": "Filter toevoegen",
-      "addNewDestination": "Nieuwe bestemming toevoegen",
       "anomalyScoreRange": "Scorebereik voor afwijkingen:",
       "checkEvery": "Controleer elke",
       "checkEveryTooltip": "Hoe vaak de detectieopdracht wordt uitgevoerd. Kan groter zijn dan de steekproefperiode (bijv. monster elke 5 meter, detectie elke 1 uur uitvoeren).",
       "clickLoadDataHint": "Klik op Gegevens laden om een voorbeeld van de tijdreeks te bekijken",
-      "destinationRequired": "Er is minstens één bestemming vereist!",
       "detectionResolution": "Resolutie van de detectie",
       "detectionResolutionTooltip": "Hoe gedetailleerd elk gegevenspunt is. Bijvoorbeeld „\" 5m \"” betekent dat afwijkingen worden gedetecteerd met een resolutie van 5 minuten.”",
       "disabled": "Uitgeschakeld",
@@ -7153,10 +6944,8 @@
       "lookBackWindowTooltip": "Hoe ver terug elke detectie voert query's uit. Sluit het venster af, zelfs na een lange pauze. De standaardinstelling is om elk interval te controleren.",
       "maxThresholdMarkLine": "max drempel",
       "minThresholdMarkLine": "min drempel",
-      "noDestinationsFound": "Geen bestemmingen gevonden",
       "noFieldsFound": "Geen velden gevonden",
       "notifications": "Meldingen",
-      "notificationsTooltip": "Indien ingeschakeld, wordt er een melding naar de geselecteerde bestemming gestuurd wanneer een anomalie wordt gedetecteerd.",
       "retrainEvery": "Elke opnieuw trainen",
       "retrainEveryTooltip": "Hoe vaak moet het model automatisch worden bijgeschoold. „Nooit” betekent één keer trainen en het model bewaren totdat het handmatig wordt bijgeschoold.",
       "retrainFourteenDays": "14 dagen",
@@ -7171,14 +6960,12 @@
       "sqlColumnsHint": "Query moet twee kolommen retourneren: {timeBucket} en {valueColumn}.",
       "sqlRequired": "SQL is vereist in aangepaste SQL-modus",
       "summaryAlerting": "✓ Alerting: {status}",
-      "summaryAlertingEnabled": "✓ Alerting: Ingeschakeld → {destinations}",
       "summaryAlertingNoDestination": "✓ Alerting: Ingeschakeld ⚠️ {warning}",
       "summaryConfiguring": "Anomaliedetectie configureren voor {streamType}-stream \"{stream}\"",
       "summaryDataSource": "✓ Gegevensbron: {type} — {name}",
       "summaryDetectionFunction": "✓ Detectiefunctie: {fn}",
       "summaryDetectionWindow": "✓ Detectievenster: laatste {window}",
       "summaryMonitoring": "Monitor \"{stream}\" elke {schedule} op {fn}-anomalieën, getraind op {trainingDays} dagen geschiedenis",
-      "summaryNoDestinationSet": "Geen bestemming ingesteld",
       "summaryQueryMode": "✓ Querymodus: {mode}",
       "summaryResolution": "✓ Resolutie: {resolution}",
       "summaryRetrain": "✓ Opnieuw trainen: {retrain}",
@@ -7304,21 +7091,14 @@
       "triggerAlertFailed": "Kan alert niet activeren",
       "triggerRetrainingFailed": "Kan hertraining niet activeren",
       "bulkDeleteAlertsFailed": "Fout bij het verwijderen van alerts. Probeer het opnieuw.",
-      "deleteDestinationFailed": "Fout bij het verwijderen van bestemming",
-      "bulkDeleteDestinationsFailed": "Fout bij het verwijderen van bestemmingen. Probeer het opnieuw.",
       "bulkDeleteTemplatesFailed": "Fout bij het verwijderen van templates. Probeer het opnieuw."
     },
     "prebuilt": {
-      "conversionSuccess": "Bestemming succesvol geconverteerd",
       "validationError": "Validatiefout: {error}",
-      "invalidDestinationType": "Ongeldig bestemmingstype",
       "invalidTargetType": "Ongeldig doeltype",
-      "unknownDestinationType": "Onbekend bestemmingstype",
       "testFailedUnknownError": "Test mislukt met onbekende fout"
     },
     "confirmDeleteAlerts": "Weet je zeker dat je {count} waarschuwing wilt verwijderen? | Weet je zeker dat je {count} waarschuwingen wilt verwijderen?",
-    "confirmDeleteDestinations": "Weet je zeker dat je {count} bestemming wilt verwijderen? | Weet je zeker dat je {count} bestemmingen wilt verwijderen?",
-    "prebuiltDestination": "Vooraf ingestelde {type}-bestemming",
     "errorValidations": "Foutvalidaties",
     "outputMessagesLabel": "Uitvoerberichten",
     "incidentSingular": "Incident",
@@ -7374,7 +7154,6 @@
       "critical": "Kritiek",
       "warning": "Waarschuwing",
       "ok": "Ok",
-      "firingTotal": "Actief",
       "observedTotal": "Groepen",
       "nOfMFiring": "{firing} van {observed} groepen actief",
       "groupedBy": "gegroepeerd op {columns}",
@@ -7388,7 +7167,6 @@
       "when": "Wanneer",
       "change": "Niveauverandering",
       "outcome": "Uitkomst",
-      "value": "Waarde",
       "rollupRow": "Alle groepen (rollup)",
       "noHistoryTitle": "Geen overgangen geregistreerd",
       "noHistoryDescription": "Niveauwijzigingen verschijnen hier wanneer groepen beginnen te activeren, escaleren of herstellen.",
@@ -7436,7 +7214,6 @@
       "dialog": {
         "title": "Alert maken",
         "continue": "Doorgaan naar alert",
-        "streamLabel": "Stream",
         "thresholdLabel": "Alert op",
         "thresholdMatchingRows": "Overeenkomende rijen",
         "thresholdCount": "Aantal rijen",
@@ -7523,26 +7300,22 @@
     "actionOpen": "Openen",
     "actionDelete": "Verwijderen",
     "deleteTitle": "Verwijder {name}?",
-    "deleteMessage": "Dit verwijdert het permanent. Verwijderen is geblokkeerd als een waarschuwing of bestemming het nog gebruikt.",
     "deletedToast": "{name} verwijderd",
     "deleteFailedToast": "Kon {name} niet verwijderen",
     "loading": "Bezig met het opbouwen van de afhankelijkheidsgrafiek…",
     "failedToLoad": "Laden van afhankelijkheden mislukt: {error}",
     "usedBy": "{count} waarschuwing | {count} waarschuwingen",
-    "countDestinations": "{count} bestemming | {count} bestemmingen",
     "usedByColumn": "Gebruikt door",
     "searchPlaceholder": "Zoeken",
     "noDependencies": "Geen afhankelijkheden.",
     "noMatches": "Geen overeenkomsten.",
     "laneEmpty": "Geen waarschuwingen",
     "directOverrides": "Gebruikt deze sjabloon rechtstreeks",
-    "sectionDestinations": "Bestemmingen",
     "sectionAlerts": "Waarschuwingen",
     "orphanTag": "Ongebruikt",
     "missingTag": "Ontbrekend",
     "enabled": "Ingeschakeld",
     "paused": "Gepauzeerd",
-    "impactTemplate": "Gebruikt door {destinations} · {alerts}",
     "impactDestination": "Gebruikt door {alerts}"
   },
   "alert_library": {
@@ -7587,7 +7360,6 @@
       "noDescription": "Geen beschrijving in de bibliotheek.",
       "needsDataCallout": "Deze alert bevraagt {stream}, die deze organisatie niet ontvangt. Als je deze nu installeert, wordt er een alert gemaakt die nooit afgaat.",
       "query": "Query",
-      "stream": "Stream",
       "streamType": "Streamtype",
       "metricCondition": "Metrische conditie",
       "matchCount": "Overeenkomende rijen vereist",
@@ -7609,18 +7381,11 @@
     "install": {
       "title": "Installeren vanuit de bibliotheek",
       "subtitle": "Kies waar alerts meldingen sturen, welke alerts je installeert en waar ze worden opgeslagen.",
-      "stepDestination": "Bestemming",
       "stepAlerts": "Alerts",
       "stepFolder": "Map",
       "stepTune": "Afstemmen",
       "stepInstall": "Installeren",
-      "destinationIntro": "Elke alert in deze batch stuurt meldingen naar de bestemming die je hier kiest. Bibliotheekbestanden vermelden de bestemmingen van de organisatie waaruit ze zijn geëxporteerd, die niet bestaan in de jouwe.",
-      "destinationLabel": "Bestemming",
-      "destinationPlaceholder": "Kies een bestemming",
-      "destinationsLoadFailed": "Je bestaande bestemmingen konden niet worden geladen.",
       "retry": "Probeer opnieuw",
-      "destinationsNoneBody": "Deze organisatie heeft nog geen alertbestemmingen, dus er is geen plek waar deze alerts meldingen naartoe kunnen sturen. Maak er een aan op de pagina Bestemmingen en kom daarna terug om deze hier te selecteren.",
-      "openDestinations": "Bestemmingen openen",
       "selectAll": "Alles selecteren",
       "clear": "Wissen",
       "selectedCount": "{count} van {total} geselecteerd",
@@ -7675,7 +7440,6 @@
     "importBodyLabel": "Template-inhoud *",
     "importTypeLabel": "Templatetype *",
     "importTitleLabel": "Templatetitel *",
-    "header": "Bestemmingssjablonen",
     "add": "Sjabloon toevoegen",
     "edit": "Bewerken",
     "name": "Naam",
@@ -7735,7 +7499,6 @@
     "chartPreviewPlaceholder": "Grafiek verschijnt hier in echte meldingen — het wordt getrokken uit de eigen evaluatiegeschiedenis van de alert, die een voorbeeld niet heeft.",
     "channelTitlesDescription": "Gebruik een andere titel op specifieke kanalen — bijvoorbeeld een kortere onderwerpregel voor e-mail.",
     "namePlaceholder": "bijv. Hoge foutfrequentie",
-    "nameLockedHint": "Alerts en bestemmingen verwijzen naar deze sjabloon op naam, dus deze kan niet worden hernoemd. Kloon de sjabloon om een kopie onder een nieuwe naam te starten.",
     "rawBodyCaption": "Verzonden precies zoals geschreven, met {'{'}variables{'}'} gesubstitueerd. Zie de Variabelengids voor alles wat beschikbaar is.",
     "contentTitlePlaceholder": "{'{'}alert_name{'}'} · {'{'}stream_name{'}'}",
     "fieldLabelPlaceholder": "bijv. Waarde",
@@ -7749,7 +7512,6 @@
     "moveUp": "Naar boven verplaatsen",
     "moveDown": "Naar beneden verplaatsen",
     "fieldLabel": "Label",
-    "fieldValue": "Waarde",
     "linkLabel": "Label",
     "linkUrl": "URL",
     "channelTitleSlack": "Slack",
@@ -7809,12 +7571,10 @@
     "channelSns": "SNS",
     "testSendGroupLabel": "Verstuur een echt testbericht",
     "testSend": "Verstuur test",
-    "testSendDestinationLabel": "Bestemming",
     "testSendConfirmTitle": "Een echt testbericht verzenden?",
     "testSendConfirm": "Hiermee wordt een echt bericht naar het geselecteerde kanaal verzonden, gemarkeerd met [TEST].",
     "testSendSuccess": "Testbericht verzonden",
-    "testSendRateLimited": "Te veel testverzendingen — wacht even en probeer het opnieuw",
-    "testSendNoDestination": "Selecteer eerst een bestemming"
+    "testSendRateLimited": "Te veel testverzendingen — wacht even en probeer het opnieuw"
   },
   "alert_sources": {
     "header": "Externe waarschuwingsbronnen",
@@ -7852,10 +7612,8 @@
     "editTitle": "Alertbron bewerken",
     "name": "Naam",
     "nameHint": "Gewoon een label — elke bron gebruikt dezelfde configuratie.",
-    "incidentDestination": "Incidentbestemming",
     "incidentDestinationPlaceholder": "Organisatiestandaard gebruiken",
     "incidentDestinationHint": "Waar meldingen naartoe gaan wanneer alerts van deze bron een incident creëren of eraan deelnemen. Laat leeg om de organisatiestandaard te gebruiken — als geen van beide is ingesteld, worden overeenkomende incidenten stil geactiveerd.",
-    "noDestinationSet": "Geen incidentbestemming ingesteld",
     "setupStep1Title": "1. Maak een webhook",
     "setupStep1Body": "Maak in Grafana, Alertmanager of een tool die JSON kan POSTEN, een webhook-contactpunt / -receiver.",
     "setupRemainingStepsHint": "Sla deze bron op om de URL en token te krijgen en plak ze vervolgens in die webhook-configuratie.",
@@ -7878,13 +7636,10 @@
     "createdSuccess": "Waarschuwingsbron gemaakt",
     "updatedSuccess": "Waarschuwingsbron bijgewerkt",
     "error": "Fout bij het laden van waarschuwingsbronnen",
-    "senderError": "Fout bij het laden van de bronstatus",
-    "destinationsLoadError": "Fout bij het laden van bestemmingen"
+    "senderError": "Fout bij het laden van de bronstatus"
   },
   "alert_destinations": {
-    "sectionTab": "Bestemmingen",
     "chooseTypeTitle": "Kies type",
-    "selectDestinationType": "Selecteer bestemmingstype",
     "connectionStepTitle": "Verbinding",
     "connectionDetailsTitle": "Verbindingsdetails",
     "urlHelpText": "Basis-URL zonder slash aan het einde (bijv. https://your-domain.com)",
@@ -7903,10 +7658,6 @@
     "datadogHostnameHelpText": "Hostnaam voor Datadog-logs",
     "exampleLabel": "Voorbeeld:",
     "subtitle": "Waar geactiveerde waarschuwingen worden afgeleverd",
-    "exportDestination": "Exportbestemming",
-    "deleteDestinationTitle": "Bestemming verwijderen",
-    "deleteDestinationMessage": "Weet je zeker dat je de bestemming wilt verwijderen?",
-    "deleteDestinationsTitle": "Bestemmingen verwijderen",
     "selected": "geselecteerd",
     "organizationLabel": "Organisatie",
     "defaultPlaceholder": "bijv. default",
@@ -7925,25 +7676,18 @@
     "ddTagsPlaceholder": "Voer tags in (bijv. env:prod,version:1.0)",
     "serviceLabel": "Service",
     "servicePlaceholder": "Voer servicenaam in (bijv. api-gateway)",
-    "header": "Bestemmingen",
-    "add": "Bestemming toevoegen",
     "edit": "Bewerken",
-    "search": "Bestemming zoeken",
     "filterAll": "Alles",
     "filterPrebuilt": "Voorgebouwd",
     "filterCustom": "Op maat",
     "templateDefaultBadge": "Standaard",
     "name": "Naam",
-    "destination_type": "Soort bestemming",
     "template": "Sjabloon",
     "actions": "Acties",
-    "addTitle": "Bestemming toevoegen",
-    "updateTitle": "Bestemming bijwerken",
     "delete": "Verwijderen",
     "method": "Methode",
     "url": "URL",
     "api_header": "Koptekst",
-    "api_header_value": "Waarde",
     "skip_tls_verify": "TLS-verificatie overslaan",
     "action": "Actie",
     "output_format": "Uitvoerformaat",
@@ -7952,7 +7696,6 @@
     "custom_headers": "Aangepaste kopteksten (optioneel)",
     "preview": "voorsmaak",
     "test": "Test",
-    "saved": "Bestemming succesvol opgeslagen",
     "customWebhook": "Op maat (Webhook)",
     "customEmail": "Aangepast (e-mail)",
     "customAction": "Aangepast (actie)",
@@ -7962,7 +7705,6 @@
     "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)",
     "templateDefaultOption": "Default ({name})",
     "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one.",
-    "loadingData": "Bestemmingsgegevens laden...",
     "noEmailTemplates": "Het lijkt erop dat u nog geen e-mailsjablonen heeft aangemaakt.",
     "createEmailTemplate": "E-mailsjabloon aanmaken",
     "headers": "Kopteksten",
@@ -7977,40 +7719,14 @@
       "servicenowDescription": "Maak incidenten aan in ServiceNow"
     },
     "import": {
-      "title": "Bestemming importeren",
       "errorValidations": "Foutvalidaties",
       "outputMessages": "Uitvoerberichten",
-      "destinationName": "Bestemmingsnaam",
-      "destinationUrl": "Bestemmings-URL",
-      "destinationMethod": "Bestemmingsmethode",
       "templates": "Sjablonen",
       "emails": "E-mails (komma gescheiden)",
       "actions": "Acties",
-      "destinationCreation": "Bestemmingscreatie",
       "jsonStringEmpty": "JSON-tekenreeks is leeg",
       "invalidJsonFormat": "Ongeldig JSON-formaat",
-      "importSuccess": "Bestemmingen succesvol geïmporteerd",
-      "importError": "Fout bij importeren bestemming, controleer de JSON",
-      "unknownError": "Onbekende fout",
-      "nameRequired": "Bestemming - {index}: Het veld \"name\" is vereist en moet een geldige tekenreeks zijn.",
-      "nameExists": "Bestemming - {index}: \"{name}\" bestaat al",
-      "typeInvalid": "Bestemming - {index}: Het veld \"type\" moet \"email\", \"http\" of \"action\" zijn",
-      "actionTypeNotSupported": "Bestemming - {index}: Type 'action' wordt niet ondersteund.",
-      "actionNotFound": "Bestemming - {index}: actie \"{actionId}\" bestaat niet voor type \"{type}\"",
-      "urlRequired": "Bestemming - {index}: Het veld \"url\" is vereist voor bestemmingen van het type http.",
-      "methodInvalid": "Bestemming - {index}: Het veld \"method\" moet een van \"post\", \"get\" of \"put\" zijn",
-      "templateRequiredHttp": "Bestemming - {index}: Het veld \"template\" is vereist voor bestemmingen van het type http.",
-      "skipTlsVerifyRequired": "Bestemming - {index}: Het veld \"skip_tls_verify\" is vereist en moet een booleaanse waarde zijn",
-      "headersMustBeObject": "Bestemming - {index}: 'headers' moet een object zijn voor het type http",
-      "urlNotAllowedEmail": "Bestemming - {index}: 'url' mag niet worden opgegeven voor het type e-mail",
-      "headersNotAllowedEmail": "Bestemming - {index}: 'headers' mag niet worden opgegeven voor het type e-mail",
-      "emailsRequired": "Bestemming - {index}: Het veld \"emails\" is vereist en moet een array zijn voor bestemmingen van het type e-mail.",
-      "emailsMustBeStrings": "Bestemming - {index}: 'emails' moet een array van tekenreeksen zijn voor het type e-mail",
-      "templateRequiredEmail": "Bestemming - {index}: Het veld \"template\" is vereist voor bestemmingen van het type e-mail.",
-      "templateNotFound": "Bestemming - {index}: sjabloon \"{template}\" bestaat niet voor type \"{type}\"",
-      "actionIdInvalid": "Bestemming - {index}: Het veld \"action_id\" moet een geldige tekenreeks zijn.",
-      "createSuccess": "Bestemming - {index}: \"{name}\" succesvol aangemaakt \nOpmerking: verwijder het aangemaakte bestemmingsobject {name} uit het json-bestand ",
-      "createFailed": "Bestemming - {index}: \"{name}\" aanmaken mislukt --> \n Reden: {reason}"
+      "unknownError": "Onbekende fout"
     },
     "priorityP1Description": "Waarschuwingen met hoogste prioriteit",
     "priorityP2Description": "Waarschuwingen met hoge prioriteit",
@@ -8022,10 +7738,7 @@
     "severityWarningDescription": "Incidenten op waarschuwingsniveau",
     "severityInfoDescription": "Informatieve incidenten"
   },
-  "pipeline_destinations": {
-    "header": "Bestemmingen voor pijpleidingen",
-    "search": "Bestemming zoeken"
-  },
+  "pipeline_destinations": {},
   "storage_settings": {
     "heroBrand": "OpenObserve.",
     "tabLabel": "Opslag van de organisatie",
@@ -8234,7 +7947,6 @@
     },
     "metricCard": {
       "lastRefreshed": "Laatst vernieuwd:",
-      "traceId": "Trace ID: {id}",
       "metricLabel": "Metriek: {name}",
       "queryLabel": "Query: {query}",
       "errorLabel": "Fout: {error}",
@@ -8267,7 +7979,6 @@
       "loadingLabels": "Labels laden...",
       "noLabelsFound": "Geen labels gevonden",
       "operator": "Operator",
-      "value": "Waarde",
       "selectLabelFirst": "Selecteer eerst een label",
       "noValuesFound": "Geen waarden gevonden",
       "addLabelFilter": "Labelfilter toevoegen",
@@ -8358,7 +8069,6 @@
     "generalLabel": "Generaal",
     "groupGeneral": "Algemeen",
     "groupAccessSecurity": "Toegang en beveiliging",
-    "groupDestinations": "Bestemmingen",
     "groupDataAI": "Data en AI",
     "groupOperations": "Operaties",
     "groupSynthetics": "Synthetics",
@@ -8387,8 +8097,6 @@
     "customLogoText": "Aangepaste logotekst",
     "orgLabel": "Organisatieparameters",
     "logDetails": "Gegevens van het logboek",
-    "traceIdFieldName": "Naam van het Trace ID-veld",
-    "spanIdFieldName": "Span ID-veldnaam",
     "toggleIngestionLogsLabel": "Logboeken voor opname in- en uitschakelen",
     "usageStreamEnabledLabel": "Usage Stream inschakelen",
     "claimParserFunction": "SSO-claimparser",
@@ -8514,7 +8222,6 @@
     "genAiAgentMapping": {
       "tabLabel": "In kaart brengen van GenAI-agenten",
       "title": "In kaart brengen van GenAI-agenten",
-      "description": "Configureer de telemetriekenmerken die worden gebruikt om de identiteit van agenten te normaliseren voor LLM-traceringen en evaluaties.",
       "agentNameFields": "Terugvalvelden voor de naam van de agent",
       "agentNameHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.name.",
       "agentNameInfo": "Alleen aangevinkt als het standaardattribuut gen_ai.agent.name ontbreekt of leeg is. Voeg één inkomend telemetriekenmerk per regel toe.",
@@ -8532,7 +8239,6 @@
       "resetToEmpty": "Terugzetten naar leeg",
       "clearRegistry": "Register wissen",
       "clearRegistryTitle": "Register van agenten wissen?",
-      "clearRegistryDescription": "Hiermee worden alle ontdekte registratielijnen van de GenAI-agent voor deze organisatie verwijderd. Nieuwe overeenkomende sporen zullen het register opnieuw vullen tijdens de opname.",
       "clearRegistryConfirm": "Register wissen",
       "saved": "De toewijzing van GenAI-agenten is met succes opgeslagen",
       "clearRegistrySuccess": "GenAI-agentregister gewist. {deletedCount} opgeslagen agents en {bufferCount} gebufferde observaties verwijderd.",
@@ -8552,7 +8258,6 @@
       "fieldAliasesSaveError": "Opslaan van veldaliassen mislukt",
       "fieldAliasesUnsavedConfirm": "Je hebt niet-opgeslagen wijzigingen in veldtoewijzingen. Wil je deze verwijderen en vertrekken?",
       "discoveredServicesTitle": "Ontdekte services",
-      "discoveredServicesDescription": "Services worden automatisch ontdekt op basis van uw telemetriegegevens en gegroepeerd op basis van hun Fully Qualified Name (FQN) voor correlatie. Services die dezelfde FQN delen, worden aan elkaar gekoppeld in logboeken, traceringen en statistieken.",
       "noServicesYet": "Nog geen services ontdekt",
       "noServicesDescription": "Services worden hier weergegeven wanneer telemetriegegevens worden opgenomen met service-identificatiekenmerken (zoals k8s-deployment, servicenaam, enz.)",
       "searchServiceName": "Naam van de zoekservice...",
@@ -8560,7 +8265,6 @@
       "serviceName": "Naam van de service",
       "service": "Service",
       "logs": "Logboeken",
-      "traces": "Sporen",
       "metrics": "Metrieken",
       "lastSeen": "Laatst gezien",
       "retry": "Probeer het opnieuw",
@@ -8572,7 +8276,6 @@
       "fieldMappingDialogHelp": "Voeg veldnamen toe of verwijder ze die moeten worden herkend als de servicenaam in je telemetriegegevens.",
       "fieldMappingPlaceholder": "Typ een veldnaam en druk op Enter",
       "foundInLogs": "Gevonden in Logs",
-      "foundInTraces": "Gevonden in Traces",
       "foundInMetrics": "Gevonden in Metrics",
       "distinguishByLabel": "Services onderscheiden op",
       "distinguishByHelp": "Kies velden die bepalen waar je services draaien. Bijvoorbeeld: cluster + namespace + deployment vormen samen een unieke identiteit voor elke service. Maximaal 5 velden.",
@@ -8608,13 +8311,11 @@
       "instancesCount": "({count} instanties)",
       "noDimensions": "geen dimensies",
       "defaultSetWarningTitle": "Correlatie is mogelijk onbetrouwbaar.",
-      "defaultSetWarningBody": "Deze instantie heeft geen disambiguatie — deze is ontdekt zonder enige workload-matching (geen cluster-, namespace- of omgevingscontext). Logs en traces kunnen afkomstig zijn van verschillende deployments van dezelfde servicenaam.",
       "instanceIdentity": "Instantie-identiteit",
       "noDimensionsCatchAll": "Geen dimensies — catch-all-instantie",
       "streamSources": "Streambronnen",
       "fieldNameMapping": "Toewijzing veldnamen",
       "logsWithCount": "Logs ({count})",
-      "tracesWithCount": "Traces ({count})",
       "metricsWithCount": "Metrics ({count})"
     },
     "addRegexPattern": {
@@ -8727,9 +8428,7 @@
       "importPatternFailed": "Importeren patroon \"{name}\" mislukt: {error}",
       "createFailed": "Regexpatroon - {index}: aanmaken \"{name}\" mislukt --> \n Reden: {error}"
     },
-    "index": {
-      "genAiAgentMappingDesc": "GenAI-spans toewijzen aan agent-id's"
-    },
+    "index": {},
     "organizationManagementPage": {
       "setAiCredits": "Stel AI-tegoed in",
       "setAiCreditsSubtitle": "Stel de levenslange AI-tegoedtoewijzing van de organisatie in.",
@@ -8863,8 +8562,6 @@
       "noValues": "Geen waarden",
       "cardinality": "Kardinaliteit:",
       "uniqueValues": "{n} unieke waarden",
-      "streams": "Stromen",
-      "streamsSubtext": "streams",
       "noAdditionalDimensions": "Geen extra dimensies gedetecteerd.",
       "noSampleData": "Geen voorbeeldgegevens beschikbaar voor dit veld.",
       "uniqueValuesDetected": "{n} unieke waarden gedetecteerd",
@@ -8931,7 +8628,6 @@
     "cachedReportHint": "Let op: Gecachte rapporten worden opgeslagen voor snelle toegang tot dashboards; delen is uitgeschakeld voor deze rapporten.",
     "selectDashboardStep": "Selecteer dashboard",
     "timeRangeDescription": "Genereert een rapport met de gegevens van het opgegeven tijdsbereik",
-    "pngPageLimitNote": "PNG legt alleen de eerste zichtbare pagina van het dashboard vast. Gebruik PDF als het dashboard meerdere pagina's beslaat.",
     "widthPlaceholder": "bijv. 1440",
     "heightPlaceholder": "bijv. 900",
     "dimensionsDefaultHint": "Leeg laten om serverstandaarden te gebruiken",
@@ -8947,7 +8643,6 @@
     "searchAllFoldersTitle": "In alle mappen zoeken",
     "never": "Nooit",
     "startDate": "Startdatum",
-    "header": "Rapporten",
     "subtitle": "Geplande rapporten en exports",
     "searchThisFolder": "Deze map",
     "searchAllFolders": "Alle mappen",
@@ -9050,7 +8745,6 @@
     "totalTimeRange": "Totaal aantal zoekopdrachten",
     "searchType": "Soort zoekopdracht",
     "querySource": "Bron van de zoekopdracht",
-    "traceId": "Trace-ID",
     "userId": "Gebruikers-ID",
     "orgId": "Organisatie-ID",
     "streamType": "Streamtype",
@@ -9137,16 +8831,10 @@
     },
     "openInFullView": "In volledige weergave openen",
     "viewLogs": "Logboeken bekijken",
-    "viewLogsUnavailable": "Kan de logs voor deze span niet openen.",
     "backToLogs": "Terug naar de logboeken",
-    "openInTraces": "Openen in Traces",
     "loadingStream": "Stream wordt geladen...",
     "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service",
-    "noCorrelatedLogsFound": "Geen gecorreleerde logs gevonden voor deze span",
     "noData": {
-      "title": "Begin met het verzenden van traces naar {product}",
-      "description": "Er zijn nog geen tracestreams gevonden in deze organisatie. Instrument uw diensten en sporen verschijnen hier automatisch.",
-      "otlp": "Verzend traces via {product}",
       "otlpDesc": "{product1}, {product2} en elke {product3}-compatibele SDK",
       "otelCollectorDesc": "Stuur alle telemetriesignalen via {product}",
       "or": "Of:",
@@ -9155,21 +8843,12 @@
     "configureFullTextSearch": "om een volledig tekstzoekveld voor de stream in te stellen.",
     "collapseFields": "Velden samenvouwen",
     "openFields": "Open velden",
-    "timeRangeUpdated": "Dit spoor is niet opgenomen in het geselecteerde tijdbereik. Het tijdbereik is bijgewerkt zodat het overeenkomt met de tijdstempel van de trace.",
-    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen.",
-    "fetchingTraces": "Hou je vast, we halen je sporen op.",
     "noStream": {
       "title": "Kies een stream om te beginnen met verkennen",
-      "description": "Kies een traceerstream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt filteren op service, duur, bereikstatus en meer zodra de resultaten zijn geladen.",
       "selectStream": "Selecteer een stream",
-      "selectStreamDesc": "Bekijk beschikbare tracestreams in deze organisatie",
-      "queryGuide": "Lees de traces-gids",
-      "queryGuideDesc": "Servicegrafiek, spanfiltering, RED-statistieken en meer",
       "recent": "Recent:"
     },
     "noEvents": {
-      "title": "Geen sporen gevonden",
-      "descNoFilters": "Er zijn geen sporen gevonden in {range}. Probeer het tijdbereik te vergroten om de resultaten te laden.",
       "descWithFilters": "Er kwam niets overeen met <strong>deze zoekopdracht</strong> in het geselecteerde venster. Probeer het tijdbereik te vergroten of een filter te verwijderen.",
       "descOutOfRange": "Je tijdvenster bevat geen gegevens uit deze stream. Spring naar het moment waarop de gegevens voor het laatst zijn gezien.",
       "jumpToData": "Naar nieuwste gegevens springen",
@@ -9177,38 +8856,19 @@
       "askAi": "Vraag AI om mijn vraag op te lossen",
       "selectedRange": "het geselecteerde bereik"
     },
-    "tracesFound": "Sporen gevonden",
-    "spansFound": "Overspanningen gevonden",
-    "errorTraces": "Foutsporen",
-    "errorSpans": "Foutspanne",
     "filterByErrors": "Filteren op fouten",
     "clearErrorFilter": "Foutfilter wissen",
     "error": "FOUT",
     "errorCount": "{n} FOUT | {n} FOUTEN",
     "success": "SUCCES",
-    "applyPendingFilters": "Filters in behandeling en zoeksporen toepassen",
-    "backToTraces": "Terug naar Traces",
     "loadingTrace": "Aan het laden...",
-    "traceId": "Traceer-ID",
-    "copyTraceId": "Trace-ID kopiëren",
     "viewFilters": "Filters bekijken",
-    "reviewAndApplyFilters": "Filters bekijken en toepassen op Traces",
-    "spansLabel": "overspant",
     "errorsLabel": "fouten",
     "previousMatch": "Vorige wedstrijd",
     "nextMatch": "Volgende wedstrijd",
-    "searchInSpans": "Zoek in spanen",
-    "spansTableView": "Overspant de tabelweergave",
     "comingSoon": "Binnenkort beschikbaar...",
-    "fetchingTrace": "Je spoor ophalen.",
-    "traceFilters": "Traceerfilters",
-    "showTraces": "Sporen weergeven",
     "applyAndSearch": "Solliciteer en zoek",
     "timestamp": "Tijdstempel",
-    "noErrorPresent": "Geen fout aanwezig voor deze reeks",
-    "noEventsPresent": "Geen gebeurtenissen voor deze span",
-    "noLinksPresent": "Geen koppelingen voor deze span",
-    "loadingTraceDag": "Trace DAG laden...",
     "exceptionsWithCount": "Uitzonderingen ({count})",
     "typeLabel": "Typ:",
     "messageLabel": "Bericht:",
@@ -9222,7 +8882,6 @@
       "templateBadge": "sjabloon"
     },
     "sessionsList": {
-      "streamLabel": "Stream",
       "sessions": "sessies",
       "failedToLoad": "Laden van sessies is mislukt",
       "retry": "Probeer het opnieuw",
@@ -9240,7 +8899,6 @@
         "cost": "Kost",
         "status": "Status"
       },
-      "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "Geen agenten in dit bereik",
       "noAgentsDescription": "Er zijn geen GenAI-agenten gedetecteerd voor het geselecteerde tijdsvenster. Probeer een groter bereik of schakel terug naar streamweergave.",
@@ -9254,12 +8912,9 @@
       "failedToLoad": "Laden van de sessie is mislukt",
       "retry": "Probeer het opnieuw",
       "sessionNotFound": "Sessie niet gevonden",
-      "noSpansFound": "Er zijn geen spans gevonden voor {id} in de huidige periode.",
-      "searchPlaceholder": "Zoek naar sporen in deze sessie...",
       "turn": "beurt",
       "turns": "omdraaien",
       "turnCount": "{count} {unit}",
-      "openInTraceExplorer": "Trace bekijken",
       "filters": {
         "status": "Status",
         "model": "Model",
@@ -9348,7 +9003,6 @@
         "warning": "Waarschuwing",
         "critical": "Kritiek"
       },
-      "viewTraces": "Bekijk de sporen",
       "types": {
         "all": "Alles",
         "service": "Diensten",
@@ -9362,20 +9016,15 @@
         "title": "Foutpercentage"
       }
     },
-    "spansTab": "Overspant",
-    "tracesTab": "Sporen",
     "serviceGraphTab": "Servicegrafiek",
     "serviceGraphSubtitle": "Bekijk hoe uw services elkaar aanroepen — afhankelijkheden, doorvoer en foutpercentages",
-    "servicesCatalogSubtitle": "Elke service die traces verzendt, met latentie, doorvoer en foutpercentage",
     "treeView": "Uitzicht op de boom",
     "graphView": "Grafiekweergave",
     "layoutHorizontal": "Horizontaal",
     "layoutVertical": "Verticaal",
     "layoutForce": "Indeling van de kracht",
-    "exportTraces": "Sporen exporteren",
     "waterfall": "Waterval",
     "flameGraph": "Vlamgrafiek",
-    "traceGraph": "Spoorgrafiek",
     "thread": "Draad",
     "dbSpanDetails": {
       "dbSystem": "DB-systeem",
@@ -9385,7 +9034,6 @@
       "host": "Host",
       "user": "Gebruiker",
       "storedProcedure": "Opgeslagen procedure",
-      "noQueryText": "Geen querytekst geregistreerd voor deze span.",
       "performance": "Prestaties",
       "rowsReturned": "Teruggegeven rijen",
       "batchSize": "Batchgrootte",
@@ -9398,13 +9046,11 @@
       "changeStreamTitle": "Stream wijzigen?",
       "switchStream": "Stream wisselen",
       "cancel": "Annuleren",
-      "changeStreamMessage": "Dit werkt ook de stream bij in het tabblad Traces/Spans en reset de bestaande query.",
       "errorGettingFunctions": "Fout bij ophalen van functies",
       "errorPullingIndex": "Fout bij ophalen van index voor geselecteerde organisatie{message}",
       "errorGettingStreams": "Fout bij ophalen van streams",
       "errorLoadingStreams": "Fout bij laden van streams",
       "errorConstructingQuery": "Er is een fout opgetreden bij het opstellen van de zoekquery.",
-      "traceNotFound": "Trace {traceId} niet gevonden",
       "errorProcessingRequest": "Fout bij verwerken van verzoek",
       "searchRequestFailed": "Zoekverzoek mislukt"
     },
@@ -9425,9 +9071,6 @@
       "service": "Service",
       "operationName": "Operatienaam",
       "duration": "Duur",
-      "spans": "Spans",
-      "spanKind": "Spansoort",
-      "spanStatus": "Spanstatus",
       "status": "Status",
       "serviceLatency": "Servicelatentie",
       "inputTokens": "Invoertokens",
@@ -9439,11 +9082,9 @@
       "noErrorsInRange": "Geen fouten in dit tijdsbereik",
       "time": "Tijd",
       "service": "Service",
-      "operation": "Operatie",
-      "traceId": "Trace-ID"
+      "operation": "Operatie"
     },
     "lLMInsightsDashboard": {
-      "stream": "Stream",
       "agent": "Agent",
       "compareEntry": "Versies vergelijken",
       "compareEntryHint": "Vergelijk twee versies van deze agent naast elkaar",
@@ -9454,7 +9095,6 @@
       "viewByStream": "Bekijk op stream",
       "totalCost": "Totale kosten",
       "totalTokens": "Totaal aantal tokens",
-      "totalTraces": "Totaal aantal traces",
       "p95Latency": "P95-latentie",
       "errorRate": "Foutpercentage",
       "timeAxis": "Tijd",
@@ -9466,13 +9106,10 @@
     "serviceGraphNodeSidePanel": {
       "viewRelated": "Gerelateerd bekijken",
       "logs": "Logboeken",
-      "traces": "Traces",
       "databases": "Databases",
-      "viewTraces": "Traces bekijken",
       "operations": "Operaties",
       "metrics": "Metrieken",
       "noOperationsFound": "Geen operaties gevonden",
-      "viewInTraces": "Bekijken in traces",
       "noResourceDataFound": "Geen {resource}-gegevens gevonden",
       "retry": "Opnieuw proberen",
       "noMetricsAvailable": "Geen metrieken beschikbaar voor deze service.",
@@ -9496,13 +9133,11 @@
       "tabHosts": "Hosts",
       "tabDatabases": "Databases",
       "tabQueries": "Queries",
-      "tabDestinations": "Bestemmingen",
       "tabRpcServices": "RPC-services",
       "tabUrls": "URL's",
       "colHost": "Host",
       "colDatabase": "Database",
       "colDbOperation": "DB-bewerking",
-      "colDestination": "Bestemming",
       "colRpcService": "RPC-service",
       "colUrl": "URL",
       "envHost": "Host",
@@ -9517,14 +9152,11 @@
       "dbResponseStatusCode": "DB-responsstatuscode",
       "processExitCode": "Procesafsluitcode"
     },
-    "traceLatencyCell": {
-      "spansAcrossServices": "{spans} spans over {services} services"
-    },
+    "traceLatencyCell": {},
     "threadToolCalls": {
       "toolCall": "toolaanroep",
       "toolCalls": "toolaanroepen",
       "showCalls": "Toon aanroepen",
-      "openSpanDetails": "Spandetails openen",
       "arguments": "Argumenten",
       "result": "Resultaat",
       "empty": "(leeg)"
@@ -9538,17 +9170,13 @@
       "cost": "Kosten",
       "model": "Model",
       "errors": "Fouten",
-      "noSpansLoaded": "Geen spans geladen voor deze trace.",
-      "noLlmTurns": "Geen LLM-beurten gedetecteerd. De trace bevat geen spans met",
       "system": "Systeem",
-      "historicalMessage": "{count} eerder bericht uit deze sessie — verwerkt in eerdere traces. | {count} eerdere berichten uit deze sessie — verwerkt in eerdere traces.",
       "user": "Gebruiker",
       "startedAt": "Gestart om {time}",
       "unknown": "onbekend",
       "tokens": "Tokens",
       "tokensSuffix": "tokens",
-      "error": "Fout",
-      "viewSpan": "Span bekijken"
+      "error": "Fout"
     },
     "traceHeader": {
       "operationName": "Operatienaam"
@@ -9566,7 +9194,6 @@
       "start": "Start",
       "requestResent": "Verzoek {count} keer opnieuw verzonden | Verzoek {count} keer opnieuw verzonden",
       "resends": "Opnieuw verzonden",
-      "spanIdTitle": "Span-ID: {id}",
       "inputTokens": "Invoertokens",
       "in": "In",
       "outputTokens": "Uitvoertokens",
@@ -9584,11 +9211,8 @@
       "modelParameters": "Modelparameters",
       "table": "Tabel",
       "field": "Veld",
-      "value": "Waarde",
       "timestamp": "Tijdstempel",
       "enterpriseLicenseRequired": "Correlatiefunctie vereist enterprise-licentie",
-      "missingSpanOrStream": "Ontbrekende span- of streamnaam",
-      "spanIdCopied": "Span-ID gekopieerd naar klembord",
       "attributesCopied": "Attributen gekopieerd naar klembord",
       "copiedToClipboard": "{type} gekopieerd naar klembord",
       "failedToCopyClipboard": "Kopiëren naar klembord mislukt",
@@ -9601,26 +9225,20 @@
       "filterAdded": "Filter toegevoegd: {field} {operator} '{value}'",
       "timeline": "Tijdlijn",
       "serviceMap": "Servicekaart",
-      "traceNotFound": "Trace {traceId} niet gevonden",
-      "spanNotFound": "Span {spanId} niet gevonden in trace",
       "unknownOperation": "Onbekende bewerking",
       "unknownService": "Onbekende service",
-      "traceIdCopied": "Trace-ID gekopieerd naar klembord",
       "sessionIdCopied": "Sessie-ID gekopieerd naar klembord"
     },
     "traceTree": {
       "clickToExpand": "Klik om uit te vouwen",
       "clickToCollapse": "Klik om in te vouwen",
-      "errorSpan": "Foutspan",
-      "httpStatus": "HTTP {status}",
-      "spanEvent": "{count} span-gebeurtenis | {count} span-gebeurtenissen"
+      "httpStatus": "HTTP {status}"
     },
     "tracesAnalysisDashboard": {
       "baseline": "Basislijn:",
       "selected": "Geselecteerd:",
       "dimensions": "Dimensies",
-      "collapseDimensions": "Dimensies inklappen",
-      "tracesPerInterval": "traces/interval"
+      "collapseDimensions": "Dimensies inklappen"
     },
     "sessionDetails": {
       "missingSessionInfo": "Ontbrekende sessie-ID of stream in URL",
@@ -9628,36 +9246,21 @@
       "copied": "Gekopieerd"
     },
     "flameGraphView": {
-      "spans": "spans",
       "depth": "diepte",
-      "noSpansToDisplay": "Geen spans om weer te geven",
       "service": "Service:",
       "duration": "Duur:",
-      "percentOfTrace": "% van trace:",
       "hasErrors": "⚠ Heeft fouten"
     },
     "tracesNoEventsState": {
       "lastData": "Laatste gegevens: {formatted} ({zone})"
     },
     "correlation": {
-      "distributedTrace": "Gedistribueerde trace",
-      "loadingTraceData": "Tracegegevens laden...",
-      "noTraceInfoAvailable": "Geen trace-informatie beschikbaar voor dit evenement",
-      "traceIdLabel": "Trace-ID:",
-      "copyTraceId": "Kopieer Trace-ID",
-      "spanIdLabel": "Span-ID:",
-      "spanHierarchy": "Span-hiërarchie:",
-      "applicationSpan": "Applicatie-Span",
-      "browserSdkSpanPrefix": "Browser SDK Span (",
       "closingParen": ")",
-      "backendSpansPrefix": "Backend Spans (",
       "performanceBreakdown": "Prestatie-uitsplitsing:",
       "totalDuration": "Totale duur:",
       "browserLabel": "Browser:",
       "networkLabel": "Netwerk:",
-      "backendLabel": "Backend:",
-      "viewTraceDetails": "Bekijk trace-details",
-      "backendTraceNotAvailable": "Backend-tracegegevens nog niet beschikbaar. Tracegegevens kunnen tot 30 seconden duren om te worden verwerkt."
+      "backendLabel": "Backend:"
     },
     "failedToAnalyzeDimensions": "Kan dimensies niet analyseren.",
     "failedToFetchCorrelatedLogs": "Kan gecorreleerde logs niet ophalen.",
@@ -9685,7 +9288,6 @@
     "serviceDiscoveryNotEnabled": "Servicedetectie is niet ingeschakeld. Dit is een enterprise-functie.",
     "startTime": "Starttijd",
     "streamNameRequiredForCorrelation": "Streamnaam is vereist voor correlatie",
-    "trace": "Trace",
     "unableToConnectToServer": "Kan geen verbinding maken met de server. Controleer of de toepassing draait.",
     "unknownService": "Onbekende service",
     "unknownPattern": "Onbekend patroon",
@@ -9696,7 +9298,6 @@
       "requestsLabel": "Verzoeken:",
       "errorsLabel": "Fouten:",
       "errorRateLabel": "Foutpercentage:",
-      "spansLabel": "Spans:",
       "callsLabel": "Aanroepen:",
       "averageLabel": "Gemiddelde:",
       "minimumLabel": "Minimum:",
@@ -9705,10 +9306,8 @@
       "p75Label": "P75:",
       "p95Label": "P95:",
       "p99Label": "P99:",
-      "averageOfTrace": "{avg}ms ({percent}% van trace)",
       "requestCount": "{count} verzoek"
     },
-    "spanEventTimeline": "Tijdlijn van span-gebeurtenissen",
     "eventClusterTooltip": "{count} gebeurtenissen",
     "spanEventCount": "{count} gebeurtenis",
     "spanEventCountPlural": "{count} gebeurtenissen",
@@ -9719,8 +9318,7 @@
     "eventClusterAriaLabel": "{count} gebeurtenissen, {errors} fout",
     "eventClusterAriaLabelPlural": "{count} gebeurtenissen, {errors} fouten",
     "eventMarkerTooltip": "Gebeurtenis: {name}",
-    "exceptionMarkerTooltip": "Uitzondering: {type}",
-    "spanEventFallback": "span-gebeurtenis"
+    "exceptionMarkerTooltip": "Uitzondering: {type}"
   },
   "actions": {
     "realTime": "Realtime",
@@ -9794,7 +9392,6 @@
     "requiresConfirmation": "Bevestiging vereist vóór uitvoering",
     "envVars": "Omgevingsvariabelen",
     "envKey": "Naam van de variabele",
-    "envValue": "Waarde",
     "addEnvVar": "Variabele toevoegen",
     "credentialFiles": "Referentiebestanden",
     "credEnvVar": "Env var-naam",
@@ -10017,11 +9614,9 @@
     "selectMetrics": "Selecteer Metric Streams",
     "correlatedLogs": "Gecorreleerde logboeken",
     "correlatedMetrics": "Gecorreleerde statistieken",
-    "correlatedTraces": "Gecorreleerde sporen",
     "loadingCorrelation": "Correlatiedata wordt geladen...",
     "clickToLoadLogs": "Klik om gecorreleerde logboeken te laden",
     "clickToLoadMetrics": "Klik om gecorreleerde statistieken te laden",
-    "clickToLoadTraces": "Klik om gecorreleerde sporen te laden",
     "logs": {
       "filtersLabel": "Filters",
       "allValues": "Alle waarden",
@@ -10040,19 +9635,11 @@
     "noLogsFound": "Geen gecorreleerde logboeken gevonden",
     "noDataFound": "Geen gegevens gevonden",
     "noLogsDescription": "Er zijn geen logboeken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
-    "correlatedTracesFor": "Gecorreleerde sporen voor service: {service}",
     "all": "Alles",
-    "loadingTraces": "Gecorreleerde sporen worden geladen...",
-    "tracesError": "Het laden van sporen is mislukt",
-    "tracesErrorDetails": "Er is een fout opgetreden tijdens het ophalen van traceergegevens. Probeer het nog eens.",
     "metricsError": "Kan statistieken niet laden",
     "metricsErrorDetails": "Er is een fout opgetreden tijdens het ophalen van metrische gegevens. Probeer het nog eens.",
     "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
     "dimensionBasedCorrelation": "Correlatie op basis van dimensies",
-    "tracesFromService": "Sporen van service: {service}",
-    "noTracesFound": "Geen gecorreleerde sporen gevonden",
-    "noTracesDescription": "Geen traces gevonden voor deze correlatie in de geselecteerde periode.",
-    "viewInTraces": "Bekijk in Traces",
     "filters": "Filters",
     "semanticFieldGroupsCaption": "Definieer veldnaamtoewijzingen voor correlatie en deduplicatie (bijv. host, hostnaam, knooppunt → 'host'-groep)",
     "exportToJson": "Exporteren naar JSON",
@@ -10185,10 +9772,8 @@
     "editCrossLink": "Cross-link bewerken",
     "name": "Naam",
     "nameRequired": "Naam is verplicht",
-    "namePlaceholder": "bijv. Traceergegevens bekijken",
     "urlTemplate": "URL-sjabloon",
     "urlRequired": "URL is vereist",
-    "urlPlaceholder": "bijv. https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
     "urlInvalid": "Voer een geldige http(s)-URL in",
     "urlHint": "Gebruik {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Velden",
@@ -10281,7 +9866,6 @@
     "colPattern": "Patroon",
     "colPricingSimple": "Prijsstelling",
     "testMatchTitle": "Match tussen testmodellen",
-    "testMatchSubtitle": "Simuleer hoe een modelnaam uit uw reeks zou passen bij de prijsregels.",
     "modelNameInput": "Naam van het model",
     "modelNameHint": "De modelnaam van jouw generaties.",
     "enterModelName": "Voer een modelnaam in om de vergelijking te testen",
@@ -10377,8 +9961,7 @@
         "errorRate": "Foutpercentage",
         "p50": "P50-latentie",
         "p95": "P95-latentie",
-        "p99": "P99-latentie",
-        "cost": "Kosten / trace"
+        "p99": "P99-latentie"
       },
       "insufficientLabel": "indicatief",
       "tooltip": {
@@ -10445,11 +10028,8 @@
       "sessions": "Bekijk en inspecteer de sessies van agenten beurtelings",
       "agentGraph": "Zie waarmee uw agenten interageren — tools, modellen, services en datastores",
       "agentBehavior": "Identificeer agenten die vastzitten in lussen en de fouten die ze laten falen",
-      "discovery": "Vind ongezonde traces die de moeite waard zijn om te reviewen",
       "queues": "Stateful review-to-do-lijsten",
-      "datasets": "Cureer gouden datasets uit geannoteerde traces en reviews",
       "experiments": "Bekijk een voorbeeld en maak onveranderlijke offline evaluatieruns",
-      "quality": "Volg de scorekwaliteit bij span-, trace- en sessie-evaluaties",
       "evalJobs": "Voer evaluatietaken uit en controleer ze tijdens al je sessies",
       "scorers": "Creëer en beheer de scorers die LLM-resultaten beoordelen",
       "scoreConfigs": "Configureer de scorerubrieken die voor uw evaluaties worden gebruikt"
@@ -10458,8 +10038,6 @@
       "button": "Annoteren",
       "title": "Annoteren · {scope}",
       "scope": {
-        "span": "Span",
-        "trace": "Trace",
         "session": "Sessie"
       },
       "viaAnnotation": "Annotatie",
@@ -10493,7 +10071,6 @@
       "dataset": {
         "button": "Toevoegen aan dataset",
         "title": "Toevoegen aan dataset",
-        "hint": "Zet {ref} om in een golden. De invoer wordt teruggelezen uit de trace — jij schrijft de verwachte uitvoer.",
         "errors": {
           "dataset": "Selecteer een dataset",
           "expectedOutput": "Schrijf de verwachte uitvoer"
@@ -10502,7 +10079,6 @@
         "datasetPlaceholder": "Selecteer een dataset...",
         "noDatasets": "Nog geen datasets — maak er eerst een aan op de pagina Datasets.",
         "inputLabel": "Invoer",
-        "inputReadOnly": "gelezen uit de trace",
         "expectedLabel": "Verwachte uitvoer",
         "expectedPlaceholder": "Schrijf de uitvoer die dit had moeten produceren...",
         "confirm": "Toevoegen aan dataset",
@@ -10516,13 +10092,9 @@
       "searchPlaceholder": "Zoek service, invoer, kwaliteit...",
       "searchFooter": "{matched} van {loaded} op deze pagina komen overeen",
       "scope": {
-        "span": "Spans",
-        "trace": "Traces",
         "session": "Sessies"
       },
       "scopeNoun": {
-        "span": "spans",
-        "trace": "traces",
         "session": "sessies"
       },
       "inQueueFilter": {
@@ -10538,10 +10110,8 @@
         "started": "Gestart",
         "type": "Type",
         "kind": "Soort",
-        "span": "Span",
         "session": "Sessie",
         "topic": "Onderwerp",
-        "traces": "Traces",
         "duration": "Duur",
         "service": "Service",
         "input": "Invoer",
@@ -10549,7 +10119,6 @@
         "inQueue": "In wachtrij?",
         "actions": "Acties"
       },
-      "spanParent": "In {trace}",
       "quality": {
         "issue": "Probleem",
         "multiple": "Meerdere",
@@ -10622,7 +10191,6 @@
         "operatorIs": "is",
         "operatorIsNot": "is niet",
         "conditionScorePlaceholder": "Scoreconfiguratie",
-        "conditionValuePlaceholder": "Waarde",
         "pin": "Versie vastzetten",
         "versionLatest": "v{version} (nieuwste)",
         "success": "Wachtrij aangemaakt",
@@ -10638,10 +10206,8 @@
         "searchPlaceholder": "Items zoeken...",
         "footerTitle": "Items",
         "allItems": "Alles",
-        "inTrace": "In Trace {traceId}",
         "reviewAgain": "Opnieuw beoordelen",
         "emptyTitle": "Niets om te beoordelen",
-        "emptyBody": "Voeg traces, spans of sessies toe aan deze wachtrij vanuit Discovery of een trace-weergave.",
         "columns": {
           "refType": "Ref",
           "refId": "Referentie",
@@ -10660,8 +10226,6 @@
         "next": "Volgend item",
         "collapseNav": "Itemslijst samenvouwen",
         "expandNav": "Itemslijst uitvouwen",
-        "openTrace": "Open volledige trace",
-        "openTraceSoon": "De volledige trace-weergave komt in de volgende update.",
         "input": "Invoer",
         "output": "Uitvoer",
         "retrievedContext": "Opgehaalde context",
@@ -10692,7 +10256,6 @@
         "distill": {
           "title": "Destilleren naar dataset",
           "action": "Dataset",
-          "hint": "Schrijf het antwoord dat dit item HAD moeten produceren. Het wordt de gouden uitvoer; de invoer wordt overgenomen uit de beoordeelde trace.",
           "datasetLabel": "Dataset",
           "datasetPlaceholder": "Selecteer een dataset...",
           "noDatasets": "Nog geen datasets — maak er eerst een aan via de Datasets-pagina.",
@@ -10704,7 +10267,6 @@
           "updated": "Gouden uitvoer bijgewerkt — dit item zat al in die dataset.",
           "openDataset": "Dataset openen",
           "needsReview": "Voltooi eerst de beoordeling — een golden heeft een definitief oordeel nodig",
-          "sessionUnsupported": "Sessie-items kunnen niet worden gedistilleerd — alleen traces en spans",
           "loadError": "Kan datasets niet laden",
           "error": "Kan dit item niet aan de dataset toevoegen"
         },
@@ -10730,12 +10292,10 @@
       "trial": "proef {index}",
       "summary": "Dataset v{version} · {trials} proef/proeven · {scorers} scorer(s)",
       "previewCounts": "{rows} rijen × {trials} proeven = {slots} slots",
-      "viewTrace": "Uitvoeringstrace bekijken",
       "scoresTitle": "Scores",
       "taskProgress": "Taken: {completed}/{total} voltooid · {skipped} overgeslagen",
       "scoringProgress": "Scores: {completed}/{total} voltooid · {skipped} overgeslagen",
       "skipTiers": "Overgeslagen rijen: {full} volledig · {partial} gedeeltelijk",
-      "scoreEvidence": "{scorer} · v{version}: {samples} samples, {noReference} geen referentie, {noTrace} geen trace",
       "scorerApplicability": "{scorer} · v{version}: {eligible} geschikte slots, {noReference} zonder referentie",
       "loadError": "Experimenten laden mislukt",
       "previewError": "Voorvertoning van experiment slots mislukt",
@@ -10781,7 +10341,6 @@
         "sourcesPlaceholder": "Alle bronnen",
         "sourcesHelp": "Laat leeg om elke rij in de dataset uit te voeren.",
         "sources": {
-          "trace": "Trace",
           "annotation": "Annotatie",
           "manual": "Handmatig"
         },
@@ -10912,7 +10471,6 @@
         "trials": "Proeven",
         "trial": "Proef {index}",
         "retryFailedSlot": "Mislukt slot opnieuw proberen",
-        "viewTrace": "Trace bekijken",
         "scores": "Scores",
         "dimension": "Dimensie",
         "unknownDimension": "Onbekende dimensie",
@@ -10999,7 +10557,6 @@
         "actions": "Acties"
       },
       "source": {
-        "trace": "trace",
         "annotation": "annotatie",
         "manual": "handmatig"
       },
@@ -11055,8 +10612,6 @@
           },
           "versionPill": "v{version} · {count} versie | v{version} · {count} versies",
           "sourceSection": "Bron",
-          "sourceTrace": "Trace",
-          "sourceSpan": "Span",
           "sourceReview": "Inzending beoordelen",
           "sourceImport": "Geïmporteerd uit",
           "inputSection": "Invoer",
@@ -11097,10 +10652,8 @@
       "version": "Versie"
     },
     "agentGraph": {
-      "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "Geen agents gevonden",
-      "noAgentsDescription": "Er zijn geen agents gevonden in dit tijdsbereik. Probeer het tijdsbereik te vergroten of controleer of uw traces gen_ai agent-attributen bevatten.",
       "versionAgnosticHint": "De topologie is hetzelfde voor alle versies — de grafiek filtert op omgeving, niet op versie. Gebruik versievergelijking om versies te vergelijken."
     },
     "panels": {
@@ -11112,10 +10665,7 @@
         "title": "Een symbolische trend",
         "subtitle": "tokens per model"
       },
-      "spanTrend": {
-        "title": "Spantrend",
-        "subtitle": "aantal spanwijdten per soort"
-      },
+      "spanTrend": {},
       "latencyByModel": {
         "title": "Latentie per model",
         "subtitle": "p50/p90/p95/p99"
@@ -11129,7 +10679,6 @@
         "subtitle": "aantal fouten"
       },
       "spansByModel": {
-        "title": "Overspanningen per model",
         "subtitle": "aantal gesprekken per model"
       },
       "tokensByModel": {
@@ -11137,8 +10686,7 @@
         "subtitle": "totaal aantal tokens per model"
       },
       "recentErrors": {
-        "title": "Recente fouten",
-        "subtitle": "laatste 10 mislukte overspanningen"
+        "title": "Recente fouten"
       }
     },
     "behavior": {
@@ -11148,7 +10696,6 @@
         "disabled": "Agentgedragssignalen zijn uitgeschakeld voor deze implementatie"
       },
       "loopsTitle": "Lussende agenten",
-      "loopsHint": "Agenten die hetzelfde gereedschap vele malen per trace opnieuw uitvoeren",
       "summaryLoops": "Lussende agents",
       "summaryFailures": "Fouttaxonomie",
       "summaryAgents": "Getroffen agents",
@@ -11163,9 +10710,7 @@
       "unknownAgent": "(onbekende agent)",
       "colAgent": "Agent",
       "colTool": "Gereedschap",
-      "colRatio": "Aanroepen / trace",
       "colCalls": "Aanroepen",
-      "colTraces": "Traces",
       "colFailClass": "Foutklasse",
       "colCount": "Aantal",
       "colCost": "Kosten ($)",
@@ -11173,32 +10718,18 @@
       "colErrors": "Fouten",
       "detail": {
         "title": "Signaaldetails",
-        "tracesTitle": "Traces",
-        "tracesHint": "Klik op een trace om deze te openen",
-        "worstLoopTraces": "Slechtste traces (meeste herhalingen eerst)",
-        "topCostTraces": "Duurste traces",
-        "noTraces": "Geen traces gevonden voor dit signaal",
         "errorsTitle": "Wat de fouten zeggen",
-        "noErrors": "Geen foutmeldingen vastgelegd — open een trace om te inspecteren",
-        "colTraceId": "Trace",
-        "colSpans": "Spans",
         "colRepeats": "Herhalingen",
-        "openInNewTab": "Opent de trace in een nieuw tabblad",
         "showFull": "Toon volledige fout",
         "showLess": "Toon minder",
         "colError": "Foutmelding",
         "colOccurrences": "Keren",
-        "loopHeadline": "{agent} riep {tool} gemiddeld {ratio}× per trace aan ({calls} aanroepen over {traces} traces).",
         "failHeadline": "{agent} stuitte op {count} “{cls}” fouten.",
-        "costHeadline": "{agent}: ${cost} uitgave · {tokens} tokens · {errors} fouten.",
-        "loopExplain": "Een hoge herhalingsratio betekent meestal dat de agent resultaten niet in de cache opslaat of opnieuw probeert. Open hieronder de slechtste traces om de herhaalde aanroepen te zien.",
-        "failExplain": "Dit zijn de daadwerkelijke foutmeldingen achter deze foutklasse — lees ze om de oplossing te vinden, of open een trace om te zien waar het gebeurde.",
-        "costExplain": "Deze traces hebben de uitgaven van deze agent veroorzaakt. Open de duurste om te zien wat er werd uitgevoerd."
+        "costHeadline": "{agent}: ${cost} uitgave · {tokens} tokens · {errors} fouten."
       }
     },
     "versionCompare": {
       "datePickerDisabled": "Vensters zijn per versie in deze modus",
-      "sampledNote": "Latentie- en kostenintervallen worden berekend uit maximaal {cap} willekeurig geselecteerde traces per versie.",
       "bar": {
         "versionA": "Versie A",
         "versionB": "Versie B",
@@ -11216,9 +10747,7 @@
         "partial": "Deze versies draaiden gedeeltelijk gelijktijdig — verschillen kunnen deels worden verklaard door wanneer elk draaide."
       },
       "windowCard": {
-        "label": "{env} · {version} — {window} · {count} traces",
-        "clamp": "De baseline draaide slechts {duration} — de eerste {duration} van elke versie wordt vergeleken.",
-        "labelNoEnv": "{version} — {window} · {count} traces"
+        "clamp": "De baseline draaide slechts {duration} — de eerste {duration} van elke versie wordt vergeleken."
       }
     }
   },
@@ -11279,25 +10808,18 @@
     },
     "manualEvaluation": {
       "titles": {
-        "span": "Evalueer span",
-        "trace": "Evalueer trace",
         "session": "Evalueer sessie"
       },
       "targetLabels": {
-        "span": "Span-ID",
-        "trace": "Trace-ID",
         "session": "Sessie-ID"
       },
       "scopes": {
-        "span": "span",
-        "trace": "trace",
         "session": "sessie"
       },
       "description": "Kies een Eval Job om tegen dit doel uit te voeren. De evaluatieworker zal de brontelemetrie laden uit het tijdbereik van deze pagina.",
       "jobLabel": "Eval Job",
       "jobPlaceholder": "Selecteer een Eval Job",
       "jobRequired": "Selecteer een Eval Job",
-      "noCompatibleJobs": "Geen {scope} Eval Jobs gebruiken de {stream} trace-stream.",
       "loadJobsError": "Laden van Eval Jobs mislukt.",
       "run": "Evaluatie uitvoeren",
       "queued": "{count} evaluatietaak in de wachtrij geplaatst. | {count} evaluatietaken in de wachtrij geplaatst.",
@@ -11323,8 +10845,6 @@
         "filterLabel": "Scorebereik",
         "filterHint": "Vergelijk deze Scoreconfiguratie over evaluatiedoelbereiken heen.",
         "all": "Alle",
-        "span": "Span",
-        "trace": "Trace",
         "session": "Sessie"
       },
       "kpis": {
@@ -11393,7 +10913,6 @@
       },
       "runs": {
         "title": "Evaluatiescores",
-        "hint": "Scores en onderbouwing komen van _llm_scores. Selecteer een run om de evaluator-trace te openen voor verder onderzoek.",
         "filterLabel": "Filter evaluatiescores",
         "footerTitle": "Evaluatiescores",
         "noThresholdHint": "Stel een gezonde drempel in op deze Scoreconfiguratie om ongezonde scores te classificeren en te markeren.",
@@ -11527,7 +11046,6 @@
         "dataTypeLabel": "Gegevenstype",
         "rangeLabel": "Bereik",
         "categoriesLabel": "Categorieën",
-        "valuesLabel": "Waarden",
         "thresholdSection": "Gezonde drempelwaarde",
         "thresholdHint": "Telt een score als gezond",
         "noThreshold": "Niet opgegeven",
@@ -11588,7 +11106,6 @@
       "booleanInfo": "Boolean-configuraties accepteren de waarden {trueLabel} / {falseLabel}. Geen aanvullende configuratie nodig.",
       "healthyThresholdTitle": "Gezonde drempelwaarde",
       "optional": "Optioneel",
-      "healthyThresholdIntro": "Bepaal wanneer scores op deze dimensie als gezond worden beschouwd. Scores buiten dit bereik veroorzaken kwaliteitsproblemen in tracelijsten, sessies en andere weergaven.",
       "healthyWhenValueIs": "Gezond wanneer waarde is:",
       "healthyCategories": "Gezonde categorieën:",
       "healthyCategoriesHint": "Vink alle waarden aan die als gezond tellen.",
@@ -11667,8 +11184,6 @@
           "col": {
             "time": "Tijd",
             "job": "Taak",
-            "spanId": "Span-ID",
-            "traceId": "Traceer-ID",
             "score": "Score",
             "latency": "Latentie",
             "status": "Status"
@@ -11806,9 +11321,7 @@
       "remoteHeaders": {
         "subtitle": "Verzonden met elk verzoek.",
         "colName": "Naam",
-        "colValue": "Waarde",
         "keyPlaceholder": "X-Custom-Header",
-        "valuePlaceholder": "waarde",
         "addButton": "+ Header toevoegen"
       },
       "requestBodyLabel": "Bodysjabloon aanvragen",
@@ -11854,13 +11367,11 @@
         "eyebrow": "Evaluatietaak",
         "refresh": "Vernieuwen",
         "targetSection": "Evaluatiedoel",
-        "streamLabel": "Stream",
         "streamTypeLabel": "Streamtype",
         "targetScopeLabel": "Evalueer Elke",
         "idleWindowLabel": "Inactief Venster",
         "maxAgeLabel": "Maximale Leeftijd",
         "filterLabel": "Filter",
-        "filterEmpty": "Geen filter — elke span wordt geëvalueerd",
         "scorersSection": "Scorers",
         "scorersEmpty": "Nog geen scorers gekoppeld aan deze taak.",
         "scorerUnknown": "(verwijderde scorer)",
@@ -11870,7 +11381,6 @@
         "viewScorerHint": "Bekijken",
         "samplingSection": "Sampling",
         "samplingModeLabel": "Modus",
-        "samplingValueLabel": "Waarde",
         "samplingAll": "Elke match evalueren",
         "samplingRate": "Willekeurige steekproef op basis van percentage",
         "samplingCount": "Eerste N matches",
@@ -11896,8 +11406,6 @@
           "col": {
             "time": "Tijd",
             "scorer": "Scorer",
-            "spanId": "Span-ID",
-            "traceId": "Traceer-ID",
             "score": "Score",
             "latency": "Latentie",
             "status": "Status"
@@ -11918,7 +11426,6 @@
       "columns": {
         "name": "Naam",
         "status": "Status",
-        "stream": "Stream",
         "targetScope": "Bereik",
         "scorers": "Scorers",
         "created": "Aangemaakt",
@@ -11944,30 +11451,18 @@
       "scorersSection": "Scorers en kaarten",
       "nameLabel": "Naam",
       "namePlaceholder": "Monitor voor de getrouwheid van de productie",
-      "streamLabel": "Stream",
       "streamPlaceholder": "Selecteer Stream",
       "targetScopeLabel": "Evalueer Elke",
       "targetScopes": {
-        "span": "Span",
-        "trace": "Trace",
         "session": "Sessie"
       },
-      "targetScopeHelp": {
-        "span": "Evalueer elke overeenkomende span onafhankelijk.",
-        "trace": "Evalueer een hele trace nadat het voltooiingsvenster sluit.",
-        "session": "Evalueer een sessie over traces heen nadat het voltooiingsvenster sluit."
-      },
+      "targetScopeHelp": {},
       "completionSection": "Voltooiingscriteria",
       "completionHelp": {
-        "trace": "De trace wordt geëvalueerd zodra aan de eerste van deze criteria is voldaan.",
         "session": "De sessie wordt geëvalueerd zodra aan de eerste van deze criteria is voldaan."
       },
       "idleWindowLabel": "Inactief venster (seconden)",
-      "idleWindowHelp": "Geëvalueerd na {duration} zonder nieuwe spans.",
-      "idleWindowHelpEmpty": "Geëvalueerd zodra er geen nieuwe spans meer binnenkomen.",
       "maxAgeLabel": "Maximale leeftijd (seconden)",
-      "maxAgeHelp": "Geëvalueerd {duration} na de eerste span.",
-      "maxAgeHelpEmpty": "Geëvalueerd op een vaste leeftijd, zelfs als er nog spans binnenkomen.",
       "descriptionLabel": "Omschrijving",
       "samplingModeLabel": "Bemonsteringsmodus",
       "samplingValueLabel": "Samplingfrequentie",
@@ -11978,8 +11473,6 @@
       "scorerPicker": {
         "title": "Scorers",
         "hint": {
-          "span": "Selecteer een of meerdere scorers die voor elke overeenkomende span moeten worden uitgevoerd.",
-          "trace": "Selecteer een of meerdere scorers die voor elke in aanmerking komende trace moeten worden uitgevoerd.",
           "session": "Selecteer een of meerdere scorers die voor elke in aanmerking komende sessie moeten worden uitgevoerd."
         },
         "meta": "{type} · v {version}",
@@ -11989,37 +11482,21 @@
       },
       "filter": {
         "title": "Staat van het filter",
-        "hint": {
-          "span": "Alleen spans die aan deze voorwaarde voldoen, komen in aanmerking voor sampling en scoring.",
-          "trace": "Een trace komt in aanmerking voor sampling en scoring als een van de spans aan deze voorwaarde voldoet.",
-          "session": "Een sessie komt in aanmerking voor sampling en scoring als een van de spans aan deze voorwaarde voldoet."
-        }
+        "hint": {}
       },
       "selector": {
-        "title": "Welke spans (optioneel)",
-        "hint": {
-          "trace": "Laat leeg om elke span in de trace op te nemen."
-        }
+        "hint": {}
       },
       "endSignal": {
         "title": "Eindsignaal (optioneel)",
-        "hint": {
-          "trace": "Definieer een span-voorwaarde die de trace onmiddellijk sluit wanneer een span eraan voldoet.",
-          "session": "Definieer een span-voorwaarde die de sessie onmiddellijk sluit wanneer een span eraan voldoet."
-        }
+        "hint": {}
       },
       "inputMapping": {
         "title": "Promptvariabelen",
-        "hint": {
-          "span": "Wijs elke variabele toe aan een span-attribuut.",
-          "trace": "Wijs elke variabele toe aan een systeemwaarde of span-attribuut.",
-          "session": "Wijs elke variabele toe aan een systeemwaarde of span-attribuut."
-        },
+        "hint": {},
         "placeholder": "Selecteer een waarde",
-        "searchPlaceholder": "Zoek systeemwaarden en span-attributen…",
         "groups": {
-          "systemProvided": "Systeemwaarden · Voor elke {scope} die deze job evalueert",
-          "spanAttributes": "Span-attributen"
+          "systemProvided": "Systeemwaarden · Voor elke {scope} die deze job evalueert"
         },
         "selectScorers": "Selecteer scorers om hun mappings te configureren.",
         "noVariables": "Deze scorer heeft geen sjabloonvariabelen om in kaart te brengen.",
@@ -12029,72 +11506,38 @@
           "title": "{scope} systeemwaarden",
           "description": "OpenObserve bouwt deze waarden afzonderlijk op voor elke {scope} die deze job evalueert. Gebruik ze als bronnen bij het toewijzen van de promptvariabelen van de scorer.",
           "badge": "Systeem geleverd",
-          "selectorRequired": "Span Selector vereist",
           "columns": {
-            "variable": "Waarde",
             "source": "Bron",
             "description": "Waarde geleverd"
           },
           "variables": {
-            "input": {
-              "trace": "Invoer van de root-span van de trace."
-            },
-            "output": {
-              "trace": "Uitvoer van de root-span van de trace."
-            },
-            "statistics": {
-              "trace": "Trace-statistieken: aantal spans, duur, LLM- en toolaanroepen, fouten, tokens en kosten.",
-              "session": "Sessie-statistieken: aantal traces en beurten, duur en fouten."
-            },
-            "spans": {
-              "trace": "Een gefilterde subset van spans, gekozen door de Span Selector van de taak."
-            },
-            "steps": {
-              "trace": "Spans in tijdsvolgorde; het middelste deel wordt ingeklapt als de trace erg lang is.",
-              "session": "Traces in tijdsvolgorde, weergegeven als conversatiebeurten."
-            }
+            "input": {},
+            "output": {},
+            "statistics": {},
+            "spans": {},
+            "steps": {}
           }
         }
       },
       "spanSelector": {
-        "select": "Selecteer Span Selector",
-        "bindingHelp": "Traces kunnen honderden spans bevatten. Kies de spans waar deze scorer naar moet kijken.",
         "createForScorer": "Maak voor scorer",
-        "createForScorerTitle": "Maak een Span Selector voor deze scorer",
-        "editorTitle": "Span Selector",
         "name": "Selectornaam",
         "schemaMode": "Te lezen velden",
         "defaultSchema": "Standaard GenAI-velden",
         "customSchema": "Aangepaste velden",
-        "defaultSchemaHelp": "Deze acht velden worden uitgelezen uit elke overeenkomende span. Ontbrekende gegevens worden leeg doorgegeven.",
         "fields": "Velden",
         "fieldsHelp": "Alleen deze velden worden uitgelezen — er wordt niets anders naar de scorer gestuurd.",
-        "maximumSpans": "Maximum aantal spans",
-        "budget": "Beperkt hoeveel spans uit de trace worden geselecteerd.",
         "validation": {
           "name": "Voer een selectornaam in.",
           "duplicateName": "Selectornamen moeten uniek zijn in deze taak.",
           "filter": "Voltooi of verwijder de onvoltooide filterconditie.",
-          "fields": "Selecteer ten minste één veld voor een aangepast schema.",
-          "maximumSpans": "Maximum aantal spans moet een positief geheel getal zijn.",
-          "budget": "Te veel spans voor de geselecteerde velden. Verlaag het aantal spans of lees minder velden.",
-          "binding": "Selecteer een Span Selector voor elke scorer die trace-spans gebruikt."
+          "fields": "Selecteer ten minste één veld voor een aangepast schema."
         }
       },
       "preview": {
         "scopes": {
-          "span": {
-            "title": "Overeenkomende spans",
-            "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel spans uw taak zal matchen.",
-            "matchedSuffix": "overeenkomende spans · laatste 1 uur",
-            "matchedLoading": "Overeenkomende spans tellen…"
-          },
-          "trace": {
-            "title": "Overeenkomende traces",
-            "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel traces uw taak zal matchen.",
-            "matchedSuffix": "overeenkomende traces · laatste 1 uur",
-            "matchedLoading": "Overeenkomende traces tellen…"
-          },
+          "span": {},
+          "trace": {},
           "session": {
             "title": "Overeenkomende sessies",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel sessies uw taak zal matchen.",
@@ -12122,9 +11565,7 @@
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
         "idleWindowMinimum": "Idle-venster moet minimaal 1 seconde zijn",
-        "idleWindowMaximumTrace": "Trace-inactiviteitsvenster mag niet langer zijn dan 30 minuten",
         "idleWindowMaximumSession": "Sessie-inactiviteitsvenster mag niet langer zijn dan 4 uur",
-        "maxAgeMaximumTrace": "Maximale trace-leeftijd mag niet langer zijn dan 2 uur",
         "maxAgeMaximumSession": "Maximale sessieleeftijd mag niet langer zijn dan 24 uur",
         "samplingValueRequired": "A sampling value is required"
       }
@@ -12187,7 +11628,6 @@
       "curlDesc": "Snelste manier: plak één opdracht en de logboeken beginnen te stromen",
       "shippers": "Gebruik een logboekverzender",
       "shippersDesc": "{product1}, {product2}, {product3}, {product4}, {product5} & meer",
-      "otelDesc": "Leveranciersonafhankelijke OTLP-opname voor logboeken, sporen en statistieken",
       "or": "Of:",
       "aws": "AWS/CloudWatch",
       "askAi": "Vraag AI om de opname in te stellen"
@@ -12196,13 +11636,11 @@
       "title": "Kies een stream om te beginnen met verkennen",
       "description": "Kies een stream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt verfijnen met filters, een VRL-functie en een aangepast tijdbereik zodra de resultaten binnen zijn.",
       "selectStream": "Selecteer een stream",
-      "selectStreamDesc": "Bekijk logboeken, traceringen, statistieken en RUM-streams",
       "queryGuide": "Lees de handleiding voor zoekopdrachten",
       "queryGuideDesc": "Filters, SQL-modus, VRL en opgeslagen weergaven",
       "recent": "Recent:"
     },
     "noEvents": {
-      "title": "Geen evenementen gevonden",
       "descNoFilters": "Er zijn geen evenementen gevonden in {range}. Probeer het tijdbereik te vergroten om de resultaten te laden.",
       "descWithFilters": "Er kwam niets overeen met <strong>deze zoekopdracht</strong> in het geselecteerde venster. Probeer het tijdbereik te vergroten, een filter te vereenvoudigen of de query opnieuw in te stellen.",
       "descOutOfRange": "Je tijdvenster bevat geen gegevens uit deze stream. Spring naar het moment waarop de gegevens voor het laatst zijn gezien.",
@@ -12293,13 +11731,11 @@
       "scannedEventsForQuery": "Gescannde gebeurtenissen voor deze query",
       "timeTaken": "Benodigde tijd",
       "noData": "Geen gegevens",
-      "traceId": "Trace-ID",
       "viewQuery": "Query bekijken",
       "sqlQuery": "SQL-query",
       "copied": "Gekopieerd!",
       "sql": "SQL",
       "noSqlAvailable": "Geen SQL-query beschikbaar",
-      "fullTraceId": "Volledige trace-ID",
       "columnDuration": "Duur",
       "columnNodeName": "Knooppuntnaam",
       "columnRole": "Rol",
@@ -12312,7 +11748,6 @@
       "goodResponse": "Goede respons",
       "moderateResponse": "Matige respons",
       "slowResponse": "Langzame respons",
-      "failedToCopyTraceId": "Kan trace-ID niet naar klembord kopiëren",
       "failedToCopySql": "Kan SQL niet naar klembord kopiëren"
     },
     "searchResult": {
@@ -12331,8 +11766,7 @@
       "unableToRetrieveCorrelation": "Kan correlatiegegevens niet ophalen",
       "noMetricStreams": "Geen metrische streams gevonden voor service \"{service}\"",
       "correlationError": "Correlatiefout: {error}",
-      "contentCopied": "Inhoud succesvol gekopieerd!",
-      "noTraceIdForInspection": "Geen trace-ID beschikbaar voor inspectie"
+      "contentCopied": "Inhoud succesvol gekopieerd!"
     },
     "searchBar": {
       "customRangeAlt": "Aangepast bereik",
@@ -12496,7 +11930,6 @@
     "expandRangeDesc": "Toegankelijke gegevens bevinden zich mogelijk in een ander tijdvenster",
     "copyError": "Foutgegevens kopiëren",
     "copied": "Gekopieerd!",
-    "traceId": "Traceer-ID:",
     "askAi": "Vraag AI om mijn vraag op te lossen",
     "showDetail": "Details weergeven",
     "hideDetail": "Details verbergen"
@@ -12561,7 +11994,6 @@
       "addVariable": "Variabele toevoegen",
       "cookieDomainPlaceholder": "Domein",
       "cookieNamePlaceholder": "Naam",
-      "cookieValuePlaceholder": "Waarde",
       "customHeaders": "Aangepaste headers",
       "headerKeyPlaceholder": "Headersleutel",
       "headerValuePlaceholder": "Headerwaarde",
@@ -12577,7 +12009,6 @@
       "variableNamePlaceholder": "Naam",
       "variableSecureTooltipHide": "Maskeer deze waarde als gevoelige gegevens.",
       "variableSecureTooltipShow": "Waarde is gemaskeerd. Klik om te tonen.",
-      "variableValuePlaceholder": "Waarde",
       "variables": "Variabelen"
     },
     "variablesPanel": {
@@ -12927,7 +12358,6 @@
       "stopping": "Stoppen…",
       "timeoutBelowDefaultWarning": "Onder de {default} ms standaard voor deze stap. Een time-out die korter is dan de werkelijke responstijd van de applicatie is de meest voorkomende oorzaak van onterechte fouten.",
       "timeoutLabel": "Time-out (ms)",
-      "valueFallback": "Waarde",
       "showSetupSteps": "Toon instellingsstappen",
       "waitingForActions": "Wachten op acties in de browser…"
     },
@@ -13073,7 +12503,6 @@
       "http": {
         "addAssertion": "Assertie toevoegen",
         "addHeader": "Header toevoegen",
-        "assertionValue": "Waarde",
         "assertions": "Asserties",
         "body": "Aanvraagtekst",
         "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
@@ -13084,7 +12513,6 @@
         },
         "followRedirects": "Doorverwijzingen volgen",
         "headerName": "Naam",
-        "headerValue": "Waarde",
         "headers": "Headers",
         "method": "Methode",
         "operators": {
@@ -13268,7 +12696,6 @@
       "maxDuration": "Maximale duur",
       "noExecutionData": "Geen uitvoeringsgegevens gevonden",
       "noExecutionDataDesc": "Streamgegevens voor run {runId} zijn niet gevonden in het +/-5 minuten venster rond de geplande tijd.",
-      "openTrace": "Open Playwright Trace",
       "runId": "Run-ID",
       "screenshotAlt": "Stap screenshot",
       "screenshotPlaceholder": "Screenshot placeholder",
@@ -13354,7 +12781,6 @@
       "errorPatternsWindowDesc": "Genormaliseerd over {window} · klik op een rij om runs te filteren"
     },
     "scheduleAlert": {
-      "addNewDestination": "Nieuwe bestemming toevoegen",
       "alertedIfFails": "Wordt gewaarschuwd als de test mislukt",
       "alertedIfFailsSuffix": "keer.",
       "alerts": "Meldingen",
@@ -13370,8 +12796,6 @@
         "weeks": "Weken"
       },
       "customIntervalValue": "Herhaal elke",
-      "destinationRequired": "Er is minstens één bestemming vereist",
-      "destinations": "Bestemmingen",
       "frequency": "Frequentie",
       "frequencyOptions": {
         "15min": "15 minuten",
@@ -13383,8 +12807,6 @@
         "custom": "Aangepast"
       },
       "minutes": "minuten",
-      "noDestinations": "Geen bestemmingen beschikbaar",
-      "refreshDestinations": "Bestemmingen vernieuwen",
       "retries": "Probeert opnieuw",
       "retriesOnFailure": "Probeert opnieuw bij mislukking",
       "retriesOnFailureSuffix": "keer.",
@@ -13642,12 +13064,9 @@
       "logs": "Logboeken",
       "dashboards": "Dashboards",
       "metrics": "Metrieken",
-      "traces": "Sporen",
       "alerts": "Waarschuwingen",
-      "streams": "Streams",
       "pipelines": "Pijpleidingen",
       "functions": "Functies",
-      "reports": "Rapporten",
       "iam": "IAM",
       "settings": "Instellingen",
       "onlineEvals": "Online evaluaties",
@@ -13662,26 +13081,20 @@
       "dashboards": "Dashboard-weergave",
       "dashboardsPanel": "Dashboard — Paneel (plaats de muisaanwijzer op een paneel)",
       "metrics": "Metrieken",
-      "traces": "Sporen",
       "alerts": "Waarschuwingen",
-      "streams": "Streams",
       "pipelines": "Pijpleidingen",
       "functions": "Functies",
-      "reports": "Rapporten",
       "iamUsers": "IAM — Gebruikers",
       "iamRoles": "IAM — Rollen",
       "iamGroups": "IAM — Groepen",
       "iamServiceAccounts": "IAM — Serviceaccounts",
-      "alertDestinations": "Waarschuwingen — Bestemmingen",
       "alertSources": "Waarschuwingen — Externe bronnen",
       "alertTemplates": "Waarschuwingen — Sjablonen",
       "panelEditor": "Paneel-editor",
-      "traceDetail": "Detail traceren",
       "runningQueries": "Zoekopdrachten uitvoeren",
       "ingestionTokens": "IAM — Tokens voor opname",
       "syntheticsTokens": "IAM — Synthetics-tokens",
       "alertIncidents": "Waarschuwingen — Incidenten",
-      "pipelineDestinations": "Pijpleidingen — Bestemmingen",
       "enrichmentTables": "Verrijkingstabellen",
       "iamInvitations": "IAM — Uitnodigingen",
       "iamOrganizations": "IAM — Organisaties",
@@ -13757,7 +13170,6 @@
       "iamGroupsRefresh": "Lijst verversen",
       "iamServiceAccountsAdd": "Nieuw serviceaccount toevoegen",
       "iamServiceAccountsRefresh": "Lijst verversen",
-      "alertDestinationsAdd": "Nieuwe bestemming toevoegen",
       "alertDestinationsRefresh": "Lijst verversen",
       "alertSourcesAdd": "Nieuwe waarschuwingsbron toevoegen",
       "alertSourcesRefresh": "Lijst vernieuwen",
@@ -13768,8 +13180,6 @@
       "panelEditorRun": "Query uitvoeren/toepassen",
       "panelEditorSave": "Paneel opslaan",
       "panelEditorBack": "Gooi weg en ga terug",
-      "traceNextSpan": "Volgende reeks",
-      "tracePrevSpan": "Vorige periode",
       "runningQueriesRefresh": "Lijst met zoekopdrachten vernieuwen",
       "ingestionTokensAdd": "Maak een nieuw token",
       "ingestionTokensRefresh": "Tokenlijst vernieuwen",
@@ -13780,7 +13190,6 @@
       "aiChatExpand": "AI-chat uitvouwen/invouwen",
       "logsSaveView": "Opslaan als opgeslagen weergave",
       "logsExport": "Exporteer resultaten als CSV",
-      "tracesCopyUrl": "Kopieer de URL voor het delen van sporen",
       "alertIncidentsRefresh": "Lijst verversen",
       "pipelineDestinationsRefresh": "Lijst verversen",
       "enrichmentTablesRefresh": "Lijst verversen",
@@ -14047,7 +13456,6 @@
       "alertState": {
         "ok": "Ok",
         "normal": "Normaal",
-        "firing": "Actief",
         "notifyfailed": "Melding mislukt",
         "flapping": "Flapperen",
         "anomaly": "Anomalie",
@@ -14078,7 +13486,6 @@
         "error": "Fout"
       },
       "crossLinkSource": {
-        "stream": "Stream",
         "global": "Globaal"
       },
       "themeApplied": {
@@ -14133,7 +13540,6 @@
       },
       "eventStatus": {
         "failed": "Mislukt",
-        "firing": "In alarm",
         "anomaly": "Anomalie"
       },
       "featureStatus": {
@@ -14148,7 +13554,6 @@
         "array": "Array"
       },
       "incidentStatus": {
-        "firing": "In alarm",
         "closed": "Gesloten"
       },
       "invoiceStatus": {
@@ -14160,14 +13565,12 @@
         "pending": "In afwachting"
       },
       "logLevel": {
-        "trace": "Trace",
         "debug": "Debug",
         "info": "Info",
         "warn": "WARN",
         "fatal": "Fataal"
       },
       "pipelineRunOutcome": {
-        "firing": "Actief",
         "normal": "Normaal",
         "succeeded": "Succesvol",
         "skipped": "Overgeslagen",
@@ -14309,21 +13712,11 @@
       "pleaseSelectStreamType": "Selecteer een streamtype ",
       "anomalyDetectionClonedSuccessfully": "Anomaliedetectie succesvol gekloond",
       "errorWhileFetchingTemplates": "Fout bij het ophalen van sjablonen.",
-      "errorWhileFetchingDestinations": "Fout bij het ophalen van bestemmingen.",
       "failedToLoadAlertForEditing": "Alert laden voor bewerken mislukt",
       "pleaseWaitWhileLoadingAlert": "Een moment geduld terwijl het alert wordt geladen...",
       "errorWhilePullingAlerts": "Fout bij het ophalen van alerts.",
       "pleaseWaitWhileLoadingAlerts": "Een moment geduld terwijl de alerts worden geladen...",
-      "destinationsDeletedSuccessfully": "{count} bestemming succesvol verwijderd | {count} bestemmingen succesvol verwijderd",
-      "failedToDeleteDestinations": "Verwijderen van {count} bestemming mislukt | Verwijderen van {count} bestemmingen mislukt",
-      "destinationsDeletedWithFailures": "{count} bestemming succesvol verwijderd, {failed} mislukt | {count} bestemmingen succesvol verwijderd, {failed} mislukt",
-      "noDestinationsSelectedForDeletion": "Geen bestemmingen geselecteerd voor verwijdering",
-      "deletingDestinations": "Bestemmingen verwijderen...",
-      "destinationDeletedSuccessfully": "Bestemming {name} succesvol verwijderd",
-      "errorWhilePullingDestinations": "Fout bij het ophalen van bestemmingen.",
-      "pleaseWaitWhileLoadingDestinations": "Een moment geduld terwijl de bestemmingen worden geladen...",
       "errorWhileLoadingActions": "Fout bij het laden van acties.",
-      "pleaseWaitWhileLoadingAlertDestination": "Een moment geduld terwijl de alertbestemming wordt geladen...",
       "errorImportingAlertPleaseCheck": "Fout bij het importeren van alert. Controleer de JSON.",
       "alertsImportedSuccessfully": "{count} alert succesvol geïmporteerd | {count} alerts succesvol geïmporteerd",
       "invalidJson": "Ongeldige JSON: {error}",
@@ -14342,8 +13735,6 @@
       "incidentsRefreshed": "Incidenten vernieuwd",
       "failedToPostComment": "Kan reactie niet plaatsen",
       "commentPostedSuccessfully": "Reactie succesvol geplaatst",
-      "destinationUpdatedSuccessfully": "Bestemming \"{name}\" succesvol bijgewerkt.",
-      "destinationCreatedSuccessfully": "Bestemming \"{name}\" succesvol aangemaakt.",
       "failedToDeleteTemplates": "Kan {count} sjabloon niet verwijderen | Kan {count} sjablonen niet verwijderen",
       "templatesDeletedWithFailures": "{count} sjabloon verwijderd, maar {failed} mislukt | {count} sjablonen verwijderd, maar {failed} mislukt",
       "successfullyDeletedTemplates": "Succesvol {count} sjabloon verwijderd | Succesvol {count} sjablonen verwijderd",
@@ -14393,16 +13784,13 @@
       "resources": {
         "dashboards": "Dashboards",
         "alerts": "Waarschuwingen",
-        "streams": "Streams",
         "functions": "Functies",
         "savedviews": "Opgeslagen weergaven",
         "users": "Gebruikers",
         "roles": "Rollen",
         "organizations": "Organisaties",
         "pipelines": "Pijplijnen",
-        "destinations": "Bestemmingen",
         "templates": "Sjablonen",
-        "reports": "Rapporten",
         "llmModelPricing": "LLM-modelprijzen"
       },
       "noPermissionToChangeFavorites": "Je hebt geen toestemming om favorieten te wijzigen",
@@ -14564,8 +13952,6 @@
       "errorWhileUpdating": "Fout bij het bijwerken van rapport."
     },
     "correlation": {
-      "refreshingTraceData": "Tracegegevens vernieuwen...",
-      "traceDetailViewComingSoon": "Trace-detailweergave binnenkort beschikbaar",
       "columnIsAlreadyVisible": "Kolom \"{name}\" is al zichtbaar",
       "columnAddedToTable": "Kolom \"{name}\" toegevoegd aan tabel"
     },
@@ -14605,7 +13991,6 @@
       "isNotASupportedFileType": "Het bestandstype \"{fileName}\" wordt niet ondersteund. Alleen {allowed} bestanden zijn toegestaan."
     },
     "workflows": {
-      "thisBranchAlreadyEndsInA": "Deze tak eindigt al in een bestemming.",
       "chooseATriggerNodeToStart": "Kies een triggernode om uw workflow te starten",
       "thisConnectionWouldCreateALoop": "Deze verbinding zou een lus creëren",
       "onlyOneIncomingConnectionToA": "Er is slechts één inkomende verbinding naar een stap toegestaan"
@@ -14613,8 +13998,6 @@
     "views": {
       "youAreNotAuthorizedToManage": "U bent niet gemachtigd om de licentie te beheren.",
       "copiedToClipboard": "Gekopieerd naar klembord",
-      "noDestinationsFoundPleaseCreateA": "Geen bestemmingen gevonden. Maak eerst een bestemming aan.",
-      "errorWhilePullingDestinations": "Fout bij het ophalen van bestemmingen.",
       "rumTokenUpdatedSuccessfully": "RUM Token succesvol bijgewerkt.",
       "rumTokenGeneratedSuccessfully": "RUM Token succesvol gegenereerd.",
       "tokenResetSuccessfully": "Token succesvol gereset.",
@@ -14631,7 +14014,6 @@
       "pleaseWaitWhileLoadingStreams": "Even geduld terwijl de streams worden geladen...",
       "errorWhilePullingSummary": "Fout bij het ophalen van de samenvatting.",
       "pleaseWaitWhileLoadingSummary": "Even geduld terwijl de samenvatting wordt geladen...",
-      "noDestinationsCreateOneBeforeSaving": "Geen bestemmingen gevonden. Maak er een aan voordat u deze alert opslaat.",
       "errorWhileLoadingAlert": "Fout bij het laden van de alert."
     },
     "RUM": {
@@ -14760,7 +14142,6 @@
       "tags": "Labels",
       "tagsPlaceholder": "Voeg tag toe en druk op Enter",
       "streamType": "Streamtype",
-      "stream": "Stream",
       "queryLanguage": "Querytaal",
       "scope": "Bereik",
       "scopeHint": "Optioneel filter toegepast op de noemer. Laat leeg voor alle rijen.",
@@ -14830,7 +14211,6 @@
         "noHistory": "Nog geen evaluatiegeschiedenis voor deze alert. De meting begint zodra hij heeft gedraaid.",
         "loadFailed": "Kon de evaluatiegeschiedenis niet laden",
         "legendGood": "OK",
-        "legendBad": "Actief",
         "legendUnmeasured": "Ongemeten"
       }
     },
@@ -15008,7 +14388,6 @@
     "loginCallback": "Login-callback",
     "emptyStateDemo": "Lege-statusdemo",
     "searchScheduler": "Zoekplanner",
-    "traceDetails": "Trace-details",
     "sessionDetails": "Sessiedetails",
     "streamExplorer": "Streamverkenner",
     "viewDashboard": "Dashboard bekijken",
@@ -15360,20 +14739,17 @@
         "failed": "Mislukt"
       },
       "columnHints": {
-        "calls": "Hoe vaak deze query is uitgevoerd. De eigen telling van je database als deze er een rapporteert — dat omvat elke client, niet alleen de delen van je systeem die traces sturen. Rijen die als 'client-observed' zijn gemarkeerd, worden in plaats daarvan uit traces geteld, omdat je database ze niet rapporteerde.",
         "p50": "De helft van alle aanroepen was sneller dan dit. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
         "p95": "De langzame staart — 1 op de 20 aanroepen duurde minimaal zo lang. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
         "p99": "De slechtste 1% van de aanroepen duurde minimaal zo lang. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
         "max": "De langzaamste afzonderlijke aanroep in dit venster — één echte aanroep, geen gemiddelde.",
         "errors": "Hoeveel van deze aanroepen eindigden in een fout.",
-        "perTrace": "Hoe vaak dit wordt uitgevoerd binnen één verzoek. Een hoog getal duidt meestal op een lus.",
-        "load": "Totale tijd die deze query in de database doorbracht. Het eigen cijfer van je database als deze er een rapporteert: uitvoeringstijd op Postgres, maar wachttijd op MySQL en MariaDB — elke rij zegt welke. Rijen die als 'client-observed' zijn gemarkeerd, worden gemeten uit traces, dus ze omvatten de netwerkretour."
+        "perTrace": "Hoe vaak dit wordt uitgevoerd binnen één verzoek. Een hoog getal duidt meestal op een lus."
       },
       "errorsNone": "geen",
       "errorsAll": "alle",
       "actions": {
         "open": "Details openen",
-        "traces": "Voorbeeldtraces bekijken",
         "copy": "Query kopiëren",
         "copied": "Query gekopieerd",
         "copyFailed": "De query kon niet worden gekopieerd.",
@@ -15404,8 +14780,7 @@
       },
       "n-plus-one": {
         "title": "Draait ten minste {multiplier}× per verzoek",
-        "body": "{share} van de databasetijd · {service}",
-        "rule": "Getoond omdat deze query ten minste {ratio} keer binnen één verzoek draait, over ten minste {traces} verzoeken. Het is een ondergrens, dus het werkelijke aantal kan hoger zijn. Legitiem batchwerk kan er hetzelfde uitzien."
+        "body": "{share} van de databasetijd · {service}"
       },
       "volume-shift": {
         "title": "Drukker, niet langzamer",
@@ -15479,7 +14854,6 @@
       "subtitleCounts": "{pass} geslaagd, {fail} niet geslaagd. | {pass} geslaagd, {fail} niet geslaagd.",
       "checklistTitle": "Wat we hebben gecontroleerd",
       "showMeHow": "Laat me zien hoe ik het kan instrumenteren",
-      "checkTrace": "Bekijk een van mijn traces",
       "checks": {
         "enabled": {
           "ok": "Databasemonitoring is ingeschakeld",
@@ -15488,21 +14862,15 @@
           "noDetail": "Een beheerder kan het inschakelen voor deze organisatie en vervolgens de collector opnieuw starten."
         },
         "traces": {
-          "ok": "Je traces komen binnen",
-          "okDetail": "{count} geregistreerd in dit tijdsbereik",
-          "no": "Er zijn geen traces aangekomen",
-          "noDetail": "Databasemonitoring is gebouwd op basis van traces, en deze organisatie heeft er nog geen verzonden."
+          "okDetail": "{count} geregistreerd in dit tijdsbereik"
         },
         "permission": {
           "ok": "Je hebt toegang tot deze gegevens",
           "okDetail": "je bent beheerder op {org}",
-          "no": "Je hebt geen toegang tot deze gegevens",
-          "noDetail": "Databasemonitoring leest je traces, en jouw rol omvat deze niet. Vraag een beheerder om leestoegang."
+          "no": "Je hebt geen toegang tot deze gegevens"
         },
         "dbSpans": {
-          "ok": "Je traces vermelden een database",
           "okDetail": "database-aanroepen worden opgenomen",
-          "no": "Geen van je traces vermelden een database",
           "noDetail": "Je applicaties worden getraceerd, maar het onderdeel dat met de database praat niet. Voeg de database-instrumentatie toe voor jouw taal en de query's verschijnen hier."
         },
         "counted": {
@@ -15533,7 +14901,6 @@
         "plans": "Queryplannen",
         "plansHint": "De stappen die je database heeft genomen om deze query uit te voeren. Begin hier om te achterhalen waarom hij traag is.",
         "callers": "Aanroepers en voorbeelden",
-        "callersHint": "Welke onderdelen van je applicatie deze query hebben uitgevoerd, en individuele trage uitvoeringen die je als trace kunt openen.",
         "callersLocked": "Individuele uitvoeringen komen uit tracing. In dit tijdsbereik is deze query door niets getraceerd."
       },
       "notFound": {
@@ -15559,10 +14926,6 @@
       "noSamples": "Geen individuele uitvoeringen geladen voor dit bereik.",
       "noSeries": "Geen geschiedenis voor deze query in het bereik dat je hebt gekozen.",
       "liveSeries": "De meest recente punten worden nog geteld en kunnen veranderen.",
-      "noStream": "We konden niet bepalen welke trace stream deze query draagt, dus de aanroepers en voorbeelden kunnen niet worden geladen.",
-      "ambiguousStream": "Deze organisatie heeft meer dan één trace stream, en we kunnen niet bepalen op welke deze query draait. Kies een stream om de aanroepers en voorbeeld-traces te laden.",
-      "pickStream": "Kies een trace stream",
-      "invalidStream": "Die naam van de trace stream herkennen we niet, dus we hebben de zoekopdracht niet uitgevoerd.",
       "firstSeen": "VOOR HET EERST VERSCHENEN IN DEZE LIJST OM {time}",
       "firstSeenHint": "Het vroegste punt in dit bereik waarop deze query zwaar genoeg was om apart te worden gevolgd.",
       "lastSeen": "LAATST VERSCHENEN OM {time}",
@@ -15593,7 +14956,6 @@
       "sampleOk": "OK",
       "sampleError": "Mislukt",
       "viewTrace": "Bekijk het verzoek →",
-      "viewTraces": "Bekijk voorbeeld-traces",
       "copySummary": "Kopiëren",
       "copySummaryHint": "Elk getal hier staat al op deze pagina — dit schrijft alleen de zin, dus minuut 13 van een incident produceert een bericht in plaats van niets.",
       "summaryCopied": "Samenvatting gekopieerd",
@@ -15685,8 +15047,7 @@
         "unjoinable": "Niet getoond — dit statement draait op meer dan één soort database hier, en het matchen van aanroepers zonder te weten welke, zou de verkeerde services benoemen.",
         "tracedCalls": "{calls} aanroepen getraceerd",
         "coverage": "{count} services gezien in {traced} van de {executions} uitvoeringen hierboven. De rest kwam van aanroepers die u nog niet traceert.",
-        "coverageUnknown": "{count} services gezien in {traced} getraceerde aanroepen. Uw database heeft geen totaal voor dit statement gerapporteerd, dus er is geen aandeel te geven.",
-        "noneNamed": "{traced} aanroepen zijn getraceerd, maar geen ervan kon aan een service worden gekoppeld — hun traces starten buiten dit tijdsbereik."
+        "coverageUnknown": "{count} services gezien in {traced} getraceerde aanroepen. Uw database heeft geen totaal voor dit statement gerapporteerd, dus er is geen aandeel te geven."
       },
       "callersEmpty": {
         "title": "Nog geen getraceerde aanroepen voor deze query",
@@ -15752,9 +15113,7 @@
       "failedWithCode": "Mislukt · {code}",
       "viewTrace": "Open het verzoek waar deze aanroep deel van uitmaakte",
       "scatterOk": "Voltooid",
-      "partial": "Een deel van je tracedata kon niet worden gelezen, dus aanroepen kunnen in deze lijst ontbreken.",
       "disclosureShort": "Elke rij is een echte voltooide aanroep",
-      "disclosureDetail": "Gemeten door de applicatie die de aanroep deed, op basis van de traces die je verzendt. Alleen aanroepen die zijn voltooid staan hier — een query die nog draait, of een die bleef hangen en nooit terugkwam, leverde geen meting op.",
       "counts": {
         "complete": "Toont alle {count} database-aanroepen in dit venster, langzaamste eerst.",
         "truncated": "De {count} langzaamste aanroepen in dit venster — er draaiden er meer dan hier worden getoond.",
@@ -15959,8 +15318,6 @@
         "blocking": "Blokkering"
       },
       "coverage": {
-        "summary": "De langste wachttijd is {longest}. Elke wachttijd is terug te voeren naar {roots} met een open lock.",
-        "summaryCapped": "Er wachtten meer sessies dan we in één keer konden lezen. Van de sessies die we hebben, is de langste wachttijd {longest} en ze zijn terug te voeren naar {roots} met een open lock.",
         "summaryOneRoot": "één sessie",
         "summaryManyRoots": "{count} sessies",
         "checked": "Gecontroleerd elke {interval} seconden; laatste controle {time}.",

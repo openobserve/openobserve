@@ -43,7 +43,6 @@
     "allCaughtUp": "모두 확인했습니다",
     "noPanels": {
       "title": "아직 패널이 없습니다",
-      "description": "로그, 메트릭, 트레이스를 시각화하려면 패널을 추가하세요.",
       "action": "패널 추가",
       "actionDesc": "차트, 테이블 및 더 보기"
     },
@@ -78,7 +77,6 @@
     },
     "noDashboards": {
       "title": "첫 대시보드 만들기",
-      "description": "대시보드는 지표, 로그 및 추적을 하나의 뷰로 제공합니다.하나를 만들어 시작하세요.",
       "action": "새 대시보드",
       "actionDesc": "빈 캔버스에서 시작",
       "import": "대시보드 가져오기",
@@ -124,7 +122,6 @@
     },
     "noIngestionTokens": {
       "title": "아직 통합 토큰이 없습니다.",
-      "description": "통합 토큰은 로그, 지표 및 추적을 전송할 때 데이터 소스를 인증합니다.",
       "action": "새 토큰",
       "actionDesc": "통합 토큰 생성"
     },
@@ -133,11 +130,7 @@
       "description": "조직은 사용자와 데이터를 함께 그룹화합니다.하나를 만들어 시작하세요."
     },
     "noAlertDestinations": {
-      "title": "아직 목적지가 없습니다",
-      "description": "목적지는 Slack, 이메일, 웹후크 등 경고 알림이 전송되는 위치를 정의합니다.",
-      "action": "새 목적지",
       "actionDesc": "알림 채널 연결",
-      "import": "목적지 가져오기",
       "importDesc": "JSON 파일에서 가져오기"
     },
     "noAlertSources": {
@@ -147,10 +140,7 @@
       "actionDesc": "웹훅 URL과 토큰을 생성하세요"
     },
     "noPipelineDestinations": {
-      "title": "아직 목적지가 없습니다",
-      "description": "파이프라인 출력을 위한 외부 대상 — HTTP 엔드포인트 및 원격 쓰기 대상",
-      "action": "새 목적지",
-      "actionDesc": "파이프라인 대상 연결"
+      "description": "파이프라인 출력을 위한 외부 대상 — HTTP 엔드포인트 및 원격 쓰기 대상"
     },
     "noAlertTemplates": {
       "title": "아직 템플릿이 없습니다",
@@ -191,8 +181,7 @@
       "actionDesc": "LLM 공급자 구성"
     },
     "noDiscoveredServices": {
-      "title": "검색된 서비스 없음",
-      "description": "추적이 도착하기 시작하면 서비스가 자동으로 여기에 표시됩니다."
+      "title": "검색된 서비스 없음"
     },
     "noNodes": {
       "title": "사용 가능한 노드 없음",
@@ -248,7 +237,6 @@
     },
     "noDatasets": {
       "title": "첫 번째 데이터셋 만들기",
-      "description": "골든 데이터셋은 주석이 달린 트레이스와 리뷰를 버전 관리되는 평가 세트로 수집합니다. 하나를 만들어 큐레이션을 시작하세요.",
       "action": "새 데이터셋",
       "actionDesc": "빈 데이터셋으로 시작"
     },
@@ -288,15 +276,11 @@
     },
     "noLLMInsights": {
       "title": "LLM 활동이 아직 없습니다",
-      "description": "OpenTelemetry Gen-AI 시맨틱 규칙으로 서비스를 계측하고 최소 하나의 트레이스를 수집하여 이 대시보드를 채웁니다.",
-      "action": "오픈 텔레메트리 기능이 있는 기기",
-      "actionDesc": "트레이스에서 gen_ai_* 어트리뷰트를 캡처하세요"
+      "action": "오픈 텔레메트리 기능이 있는 기기"
     },
     "noLLMSessions": {
       "title": "LLM 세션이 아직 없습니다",
-      "description": "세션은 gen_ai_conversation_id별로 그룹화됩니다. 각 대화에 트레이스에 태그를 지정하도록 서비스를 계측하면 세션이 여기에 표시됩니다.",
-      "action": "오픈 텔레메트리 기능이 있는 기기",
-      "actionDesc": "gen_ai_conversation_id가 포함된 태그 범위"
+      "action": "오픈 텔레메트리 기능이 있는 기기"
     },
     "noScorers": {
       "title": "아직 득점자 없음",
@@ -340,13 +324,9 @@
       "title": "여기에는 비정상 항목이 없습니다",
       "description": "이 창에는 비정상 항목이 없습니다. 시간 범위를 넓히거나 큐 필터를 전환하여 이미 분류한 항목을 확인하세요."
     },
-    "noTraces": {
-      "title": "흔적을 찾을 수 없음",
-      "description": "선택한 서비스 및 시간 범위와 일치하는 추적이 없습니다.더 넓은 시간 범위 또는 다른 서비스를 사용해 보십시오."
-    },
+    "noTraces": {},
     "noServiceGraph": {
-      "title": "서비스 그래프 데이터 없음",
-      "description": "더 긴 시간 범위를 쿼리하거나 서비스에서 스팬 메트릭을 내보내고 있는지 확인하세요."
+      "title": "서비스 그래프 데이터 없음"
     },
     "noServicesCatalog": {
       "title": "서비스를 찾을 수 없음",
@@ -406,16 +386,13 @@
       "pipelines": "파이프라인",
       "workflows": "워크플로우",
       "functions": "기능",
-      "streams": "시냇물",
       "alerts": "민첩한",
       "incidents": "사건",
-      "traces": "추적",
       "discoveryItems": "비정상 항목",
       "datasetItems": "항목",
       "searches": "검색을 수행합니다",
       "searchJobs": "검색 작업",
       "users": "사용자",
-      "reports": "보고서",
       "queries": "의문",
       "serviceAccounts": "서비스 계정",
       "invitations": "초대장",
@@ -426,9 +403,7 @@
       "roleLimits": "역할 제한",
       "ingestionTokens": "수집 토큰",
       "organizations": "조직",
-      "alertDestinations": "대상",
       "alertSources": "알림 소스",
-      "pipelineDestinations": "대상",
       "alertTemplates": "템플릿",
       "evalTemplates": "평가 템플릿",
       "enrichmentTables": "보강 테이블",
@@ -480,7 +455,6 @@
       "noSearchResults": "검색 결과 없음",
       "noServiceAccounts": "서비스 계정 없음",
       "noStreams": "수집된 데이터 없음",
-      "noTraces": "트레이스 없음",
       "noUsers": "사용자 없음"
     },
     "noExperiments": {
@@ -523,8 +497,6 @@
     "relatedEvents": "관련 이벤트",
     "on": "켜짐",
     "event": "이벤트",
-    "viewTraceDetails": "추적 세부정보 보기",
-    "viewTrace": "추적 보기",
     "networkRequests": "네트워크 요청",
     "noNetworkRequestsFound": "이 이벤트에 대한 네트워크 요청을 찾을 수 없습니다.",
     "consoleLogsComingSoon": "콘솔 로그 곧 제공 예정",
@@ -575,7 +547,6 @@
     "list": "리스트",
     "condition": "조건",
     "operator": "운영자",
-    "value": "값",
     "filters": "필터",
     "selectFilter": "필터 선택",
     "confirm": "확인",
@@ -744,7 +715,6 @@
     "nameIsRequired": "이름은 필수입니다",
     "streamTypeIsRequired": "스트림 유형은 필수입니다",
     "functionNameIsRequired": "함수 이름은 필수입니다",
-    "remoteDestinationIsRequired": "원격 대상은 필수입니다",
     "timezoneIsRequired": "시간대는 필수입니다",
     "idPrefix": "ID: {id}",
     "unchangedCount": "변경되지 않음 ({count})",
@@ -803,7 +773,6 @@
     "relativeTimeAgo": "{value} {unit} 전",
     "relativeTimePast": "지난 {value} {unit}",
     "metrics": "메트릭",
-    "traces": "트레이스",
     "browserTime": "브라우저 시간",
     "invalidCredentials": "잘못된 자격 증명",
     "notFound": "찾을 수 없음",
@@ -844,11 +813,7 @@
       "loading": "조건 로딩 중...",
       "loadError": "저장된 조건을 읽을 수 없어 재설정되었습니다. 지금 저장하면 덮어쓰게 됩니다."
     },
-    "destination": {
-      "createNew": "새 대상 생성",
-      "select": "대상",
-      "loadError": "대상 가져오기 중 오류가 발생했습니다."
-    },
+    "destination": {},
     "function": {
       "createNew": "새 함수 생성",
       "createNewNoteWorkflow": "참고: 함수가 생성된 후, 이전 양식으로 리디렉션되어 새로 생성된 함수를 워크플로우에 연결하게 됩니다.",
@@ -907,7 +872,6 @@
     "of": "의",
     "rowDetail": "소스 세부 정보",
     "sourceName": "이름",
-    "sourceValue": "가치",
     "showHistogramLabel": "히스토그램",
     "hideHistogram": "히스토그램 숨기기",
     "showPatternsLabel": "패턴",
@@ -1061,10 +1025,7 @@
     "regionFilterMsg": "검색 지역/클러스터",
     "queryRangeRestrictionMsg": "쿼리 범위는 {range} 로 제한됩니다.날짜 범위를 적절히 조정하세요.그렇지 않으면 시작 날짜가 허용된 한도 내에 맞게 자동으로 조정됩니다.",
     "cancel": "쿼리 취소",
-    "viewTrace": "트레이스 보기",
-    "viewTraceUnavailable": "이 로그 레코드의 트레이스를 열 수 없습니다.",
     "viewRelated": "관련 보기",
-    "viewRelatedTooltip": "관련 추적 및 지표 보기",
     "flattened": "평평하게 합니다",
     "original": "원본",
     "resetFilters": "필터 재설정",
@@ -1146,8 +1107,6 @@
     "selectFunctionNamePlaceholder": "함수 이름 선택",
     "confirmFunctionUpdateTitle": "업데이트 확인",
     "confirmFunctionUpdateMsg": "{name} 함수를 정말로 업데이트하시겠습니까?",
-    "traceIdLabel": "트레이스 ID:",
-    "enterTraceIdPlaceholder": "트레이스 ID 입력",
     "changeQueryModeTitle": "쿼리 모드 변경",
     "changeQueryModeConfirm": "정말 쿼리 모드를 변경하시겠습니까?X축, Y축 및 필터에 대해 저장된 데이터는 지워집니다.",
     "patternExampleLog": "예제 로그",
@@ -1197,9 +1156,7 @@
     "upgradeToProPlan": "PRO 플랜으로 업그레이드",
     "home": "홈",
     "about": "정보",
-    "index": "스트림",
     "search": "로그",
-    "traces": "트레이스",
     "serviceGraph": "서비스 그래프",
     "services": "서비스 카탈로그",
     "aiObservability": "AI 옵저버빌리티",
@@ -1217,7 +1174,6 @@
     "rum": "실제 사용자 모니터링",
     "settings": "설정",
     "iam": "IAM",
-    "report": "보고서",
     "pipeline": "파이프라인",
     "workflows": "워크플로우",
     "language": "언어",
@@ -1383,8 +1339,6 @@
     "loadingMsg": "잠시만요. RUM 데이터를 로드하고 있습니다.",
     "breadcrumbs": "빵 부스러기",
     "tags": "태그",
-    "traces": "트레이스",
-    "searchEvents": "검색 이벤트",
     "loadingSessions": "잠시만요. 세션을 가져오는 중이에요.",
     "errorStack": "오류 스택",
     "sessionReplay": "세션 리플레이",
@@ -1394,11 +1348,6 @@
     "discoverSessionMessage": "Session Replay는 웹 사이트 또는 애플리케이션에서의 사용자 상호 작용을 캡처하고 재생합니다.이를 통해 사용자가 탐색하는 방식, 클릭한 위치, 입력하는 내용, 콘텐츠에 참여하는 방식을 시각적으로 검토할 수 있습니다.",
     "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다.",
     "eventID": "이벤트 ID",
-    "noCorrelatedTraces": "이 세션에 대해 상관관계가 있는 추적을 찾을 수 없습니다.",
-    "span": "한 뼘",
-    "spans": "기간",
-    "errorTraces": "오류 추적",
-    "failedToFetchTraces": "추적 데이터를 가져오지 못했습니다.다시 시도해 주세요.",
     "seekToMoment": "세션에서 이 순간을 찾아라",
     "route": "노선",
     "duration": "지속",
@@ -1485,7 +1434,6 @@
     "frustrationErrorClick": "클릭으로 JavaScript 오류가 발생함",
     "frustrationRageTap": "사용자가 빠르게 여러 번 탭함(3회 이상) - 불만을 나타냄",
     "frustrationErrorTap": "탭으로 JavaScript 오류가 발생함",
-    "fetchTraceMetadataFailed": "트레이스 메타데이터를 가져오지 못했습니다",
     "frustrationEventTooltip": "⚠️ 불만: {types}\n{name}",
     "errorEventTooltip": "⛔ 오류: {name}",
     "frustrationSignalType": "불만 신호: {type}"
@@ -1537,10 +1485,8 @@
     "feature_column_name": "특징",
     "feature_logs": "로그",
     "feature_metrics": "측정항목",
-    "feature_traces": "트레이스",
     "feature_alerts": "알림",
     "feature_dashboards": "대시보드",
-    "feature_reports": "보고서",
     "feature_vrl_functions": "VRL 함수",
     "feature_pipelines": "파이프라인",
     "feature_high_availability": "높은 가용성",
@@ -1561,7 +1507,6 @@
     "feature_license": "라이선스",
     "feature_support": "서포트",
     "feature_cost": "비용",
-    "feature_pipelines_external": "파이프라인 - 외부 목적지",
     "feature_extreme_performance": "뛰어난 성능 (많은 쿼리의 경우 100배 향상)",
     "feature_query_optimizer": "쿼리 옵티마이저",
     "value_license_agpl": "AGPL",
@@ -1663,7 +1608,6 @@
       },
       "core_features": {
         "logs_metrics_traces": {
-          "name": "로그, 지표, 트레이스",
           "note": "완전한 옵저버빌리티 데이터 수집 및 분석"
         },
         "rum": {
@@ -1678,7 +1622,6 @@
           "note": "사용자 지정 가능한 시각화 대시보드"
         },
         "reports": {
-          "name": "보고서",
           "note": "정기 및 온디맨드 보고"
         },
         "vrl_functions": {
@@ -1735,10 +1678,7 @@
           "name": "민감한 데이터 수정",
           "note": "PII 및 민감한 정보 보호"
         },
-        "pipeline_remote_destinations": {
-          "name": "파이프라인 원격 목적지",
-          "note": "원격 목적지로 데이터 전송"
-        },
+        "pipeline_remote_destinations": {},
         "query_optimizer": {
           "name": "쿼리 최적화 프로그램/어그리게이션 캐시",
           "note": "TopK 집계 및 쿼리 최적화"
@@ -1780,7 +1720,6 @@
           "note": "최적화된 분산 조인 작업"
         },
         "logs_metrics_traces_correlation": {
-          "name": "로그, 지표 및 트레이스 상관관계",
           "note": "자동 탐지 및 상관관계 분석"
         },
         "service_maps": {
@@ -2464,7 +2403,6 @@
       "secondaryIndexCount": "보조 인덱스 ({count})"
     },
     "deleteField": "필드 삭제",
-    "header": "스트림",
     "subtitle": "인덱스 관리 및 스트림 구성",
     "streamNameHelpText": "영숫자, 밑줄 및 콜론만 사용하십시오.",
     "search": "검색 스트림",
@@ -2504,7 +2442,6 @@
     "deleteDatesMessage": "선택한 날짜를 정말로 삭제하시겠습니까?이 작업은 취소할 수 없습니다.",
     "labelLogs": "로그",
     "labelMetrics": "메트릭",
-    "labelTraces": "트레이스",
     "labelMetadata": "메타데이터",
     "add": "스트림 추가",
     "dataRetention": "데이터 보존 (일 단위)",
@@ -2546,7 +2483,6 @@
   },
   "workflow": {
     "header": "워크플로우",
-    "subtitle": "트리거, 로직 및 대상을 사용한 액션 자동화",
     "create": "새 워크플로우",
     "createSuccess": "워크플로우가 성공적으로 생성되었습니다",
     "name": "워크플로 이름",
@@ -2627,7 +2563,6 @@
     },
     "triggerMeta": {
       "orgId": "알림이 속한 조직 ID.",
-      "streamType": "스트림 유형 — 로그, 메트릭, 트레이스.",
       "streamName": "알림이 모니터링하는 스트림.",
       "alertName": "트리거된 알림의 이름.",
       "alertType": "알림 유형 — 실시간 또는 예약.",
@@ -2664,8 +2599,6 @@
         "input": "입력",
         "output": "출력",
         "noInput": "마지막 실행에서 이 단계는 레코드를 받지 못했습니다.",
-        "sentExternally": "외부 대상으로 전송됨",
-        "destinationNoRecords": "이 대상에 도달한 레코드가 없습니다 — 전송된 것이 없습니다.",
         "branchFiltered": "레코드 0개 — 이 분기로 전달된 것이 없습니다.",
         "conditionNoMatch": "이 조건과 일치하는 레코드가 없습니다 — 다운스트림으로 계속된 것이 없습니다.",
         "errorHeading": "오류",
@@ -2714,15 +2647,12 @@
       "kindAction": "액션",
       "condition": "조건",
       "function": "함수",
-      "sendToDestination": "대상",
       "configComingSoon": "{node} 구성은 이후 단계에서 제공됩니다.",
       "sectionTransform": "변환",
-      "sectionDestination": "대상",
       "stepSearchPlaceholder": "단계 검색...",
       "stepNoMatch": "검색과 일치하는 단계가 없습니다.",
       "conditionDesc": "규칙에 따라 분기",
       "functionDesc": "함수로 페이로드 재구성",
-      "destinationDesc": "대상으로 보내기",
       "triggerBody": "연결된 알림이 실행될 때 실행",
       "triggerDataExampleNote": "예시일 뿐 — 실제 열은 알림 쿼리에서 가져옵니다.",
       "incidentEventTypeLabel": "이벤트 유형",
@@ -2741,12 +2671,7 @@
       "functionCreateNew": "새 함수 만들기",
       "functionRequired": "함수가 필요합니다",
       "functionLoadError": "함수를 불러올 수 없습니다",
-      "destinationBody": "대상으로 보내기",
       "destinationBodySet": "{name}에게 전송",
-      "destinationSelect": "대상",
-      "destinationCreateNew": "새 대상 만들기",
-      "destinationRequired": "대상을 선택하세요",
-      "destinationLoadError": "대상을 불러올 수 없습니다",
       "namePlaceholder": "이 단계 이름 지정(선택 사항)",
       "commentLabel": "댓글(선택 사항)",
       "commentPlaceholder": "이 단계에 대한 메모 추가...",
@@ -2756,8 +2681,6 @@
       "disabledBadge": "비활성화됨",
       "incompleteBadge": "나중에 설정",
       "destinationSetUpLater": "아직 대상이 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
-      "destinationSetUpLaterPrompt": "대상은 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 대상이 필요합니다.",
-      "destinationSetUpLaterActive": "나중에 설정",
       "functionSetUpLater": "아직 함수가 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
       "functionSetUpLaterPrompt": "함수는 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 함수가 필요합니다.",
       "functionSetUpLaterActive": "나중에 설정"
@@ -2815,8 +2738,6 @@
       "functionNodeEmptyName": "함수 노드 {id}의 함수 이름이 비어 있습니다.",
       "functionNodeInvalidName": "함수 노드 {id}의 함수 이름 \"{name}\"이(가) 잘못되었습니다. 사용 가능한 함수 중 하나여야 합니다.",
       "outputStreamNodeEmptyName": "출력 스트림 노드 {id}의 스트림 이름이 비어 있습니다.",
-      "remoteStreamNodeEmptyDestination": "원격 스트림 노드 {id}의 대상 이름이 비어 있습니다.",
-      "remoteStreamNodeInvalidDestination": "원격 스트림 노드 {id}의 대상 \"{destination}\"이(가) 잘못되었습니다. 사용 가능한 파이프라인 대상 중 하나여야 합니다.",
       "edgeMissingSourceNode": "엣지 {id}가 존재하지 않는 소스 노드 {source}를 참조합니다.",
       "edgeMissingTargetNode": "엣지 {id}가 존재하지 않는 대상 노드 {target}를 참조합니다.",
       "inputNodeHasIncomingEdges": "입력 노드 {id}는 들어오는 엣지가 없어야 합니다. 들어오는 엣지 {count}개가 발견되었습니다.",
@@ -2831,7 +2752,6 @@
     "importErrors": {
       "unknownError": "알 수 없는 오류",
       "nameRequired": "파이프라인 - {index}: 이름은 필수입니다.",
-      "streamTypeInvalid": "파이프라인 - {index}: 스트림 유형은 필수이며 'logs', 'metrics', 'traces' 중 하나여야 합니다.",
       "sourceStreamNameRequired": "파이프라인 - {index}: 소스 스트림 이름은 필수입니다. ",
       "sqlQueryRequired": "파이프라인 - {index}: SQL 쿼리는 필수입니다.",
       "timezoneRequired": "파이프라인 - {index}: 시간대는 필수입니다.",
@@ -2844,7 +2764,6 @@
       "v0ConditionFields": "파이프라인 - {index}, 노드 {nodeIndex}: V0 형식 - 각 조건에는 column, operator, value가 있어야 합니다.",
       "v1ConditionInvalid": "파이프라인 - {index}, 노드 {nodeIndex}: 잘못된 V1 조건 형식입니다.",
       "conditionFormatUnrecognized": "파이프라인 - {index}, 노드 {nodeIndex}: 인식할 수 없는 조건 형식입니다.",
-      "remoteDestinationRequired": "파이프라인 - {index}: 원격 대상은 필수입니다.",
       "createSuccess": "파이프라인 - {index}: \"{name}\" 생성 성공 \n참고: 생성된 파이프라인 객체 {name}을(를) json 파일에서 제거해 주세요.",
       "createFailed": "파이프라인 - {index}: \"{name}\" 생성 실패 --> \n 이유: {reason}",
       "sqlQueryMismatch": "Pipeline - {index}: SQL 쿼리는 모든 노드에서 동일해야 하며 노드의 쿼리와 일치하도록 시도하십시오 \n\n          input.sql_query: {sqlQuery} \n\n          input.source.query_condition.sql: {sourceSql} \n",
@@ -2945,10 +2864,8 @@
     "defaultDelayTooltip": "기본값: 5초",
     "deleteDataBeforeBackfill": "백필 전에 기존 데이터 삭제",
     "irreversibleDeletionWarning": "경고: 되돌릴 수 없는 데이터 삭제",
-    "deleteBackfillWarningMessage": "백필을 실행하기 전에 지정된 시간 범위의 대상 스트림에 있는 모든 데이터를 영구적으로 삭제합니다. 이 작업은 취소할 수 없습니다.",
     "timeAlignmentRequirements": "시간 정렬 요구 사항(UTC):",
     "logsHourBoundaryNote": "스트림: 시간은 UTC의 매시간 경계에 맞춰야 합니다(예: 10:00:00, 10:15:00 아님).",
-    "metricsTracesLabel": "메트릭/트레이스",
     "dayBoundaryNote": "스트림: 시간은 UTC의 일 경계에 맞춰야 합니다(예: 00:00:00).",
     "estimatedProcessingTime": "예상 처리 시간:",
     "estimatedChunks": "예상 청크 수:",
@@ -2971,8 +2888,6 @@
       "statusUnknown": "알 수 없음",
       "phaseInitializing": "초기화 중"
     },
-    "deleteBackfillConfirmMessage": "백필 전에 기존 데이터를 삭제하도록 선택했습니다. 이렇게 하면 지정된 시간 범위의 대상 스트림에 있는 모든 데이터가 영구적으로 삭제됩니다.",
-    "editBackfillDeleteConfirmMessage": "백필 전에 기존 데이터를 삭제하도록 선택했습니다. 이렇게 하면 지정된 시간 범위의 대상 스트림에 있는 모든 데이터가 영구적으로 삭제됩니다. 작업이 업데이트되면 이 작업은 취소하거나 되돌릴 수 없습니다. 계속하시겠습니까?",
     "actionCannotBeUndone": "작업이 생성되면 이 작업은 취소하거나 되돌릴 수 없습니다.",
     "areYouSureProceed": "계속하시겠습니까?",
     "clearFilters": "필터 지우기",
@@ -2993,7 +2908,6 @@
     "chunkPeriodDefaultPlaceholder": "60",
     "organizationId": "조직 ID",
     "functionName": "함수 이름",
-    "remoteDestination": "원격 대상",
     "failedToLoadPipeline": "파이프라인을 불러오지 못했습니다.",
     "header": "파이프라인",
     "subtitle": "이동 중 데이터 변환, 강화 및 라우팅",
@@ -3021,7 +2935,6 @@
     "trigger": "트리거",
     "aggregation": "어그리게이션",
     "selectColumn": "컬럼 선택",
-    "value": "가치",
     "fieldRequired": "필드는 필수입니다!",
     "sqlQuery": "SQL 쿼리",
     "promqlQuery": "프롬큐 쿼리",
@@ -3036,15 +2949,11 @@
     "sourceQueryTooltip": "소스: 쿼리 노드",
     "functionTooltip": "함수 노드",
     "conditionTooltip": "조건 노드",
-    "destinationStreamTooltip": "대상: 스트림 노드",
-    "destinationExternalTooltip": "대상: 외부 대상 노드",
     "pipelineNotFound": "파이프라인을 찾을 수 없음",
     "pipelineNameRequired": "파이프라인 이름이 필요합니다",
     "sourceNodeRequired": "소스 노드가 필요합니다.",
-    "destinationNodeRequired": "대상 노드가 필요합니다",
     "connectAllNodes": "저장하기 전에 모든 노드를 연결하십시오.",
     "connectAllNodesShort": "모든 노드를 연결하십시오",
-    "enrichmentTablesScheduledOnly": "대상 스트림으로 테이블을 보강하는 기능은 스케줄링된 파이프라인에서만 사용할 수 있습니다.",
     "savingPipeline": "파이프라인 저장 중...",
     "pipelineUpdated": "파이프라인이 성공적으로 업데이트되었습니다",
     "pipelineSaved": "파이프라인이 성공적으로 저장되었습니다.",
@@ -3076,7 +2985,6 @@
     "functionAlreadyAssociated": "함수가 이미 연결되어 있습니다",
     "atLeastOneCondition": "조건을 하나 이상 추가하세요",
     "fillAllConditionFields": "모든 조건 필드를 입력하세요(열, 연산자, 값은 필수입니다)",
-    "selectExternalDestination": "목록에서 외부 대상을 선택하세요",
     "backfillNumericRange": "{min}에서 {max} 사이여야 합니다",
     "selectValidTimeRange": "유효한 시간 범위를 선택하세요",
     "startBeforeEndTime": "시작 시간은 종료 시간 이전이어야 합니다.",
@@ -3092,11 +3000,9 @@
       "streamType": "스트림 유형 *"
     },
     "sourceNode": "소스",
-    "streamNode": "스트림",
     "queryNode": "쿼리",
     "transformNode": "트랜스폼",
     "functionNode": "기능",
-    "destinationNode": "목적지",
     "remoteNode": "리모트",
     "conditionsNode": "조건",
     "editorFunctionTooltip": "함수로 페이로드 재구성",
@@ -3155,8 +3061,7 @@
       "customStep4": "인증에 필요한 헤더를 구성하세요",
       "customStep5": "출력 형식(JSON 또는 NDJSON)을 선택하세요",
       "customStep6": "연결을 테스트하여 작동하는지 확인하세요",
-      "defaultTitle": "연결 정보",
-      "defaultStep1": "특정 지침을 보려면 대상 유형을 선택하세요"
+      "defaultTitle": "연결 정보"
     },
     "deleteFunctionAssociationConfirm": "함수 연결을 삭제하시겠습니까?",
     "deleteStreamRoutingConfirm": "스트림 라우팅을 삭제하시겠습니까?",
@@ -3182,7 +3087,6 @@
     "noJobSelected": "선택된 작업 없음",
     "updateBackfillJobFailed": "백필 작업 업데이트 실패",
     "fetchPipelineHistoryFailed": "파이프라인 기록을 가져오지 못했습니다.",
-    "defaultDestinationNodeWarning": "기본 대상 노드를 제거하면 더 이상 해당 노드로 데이터가 수집되지 않습니다. 그러면 소스 스트림은 새로 추가된 대상 스트림으로만 라우팅됩니다. 어떤 대상 스트림으로도 라우팅되지 않은 데이터는 삭제됩니다.",
     "confirmBulkDeleteMsg": "{count}개의 파이프라인을 삭제하시겠습니까?",
     "confirmPauseBackfillJob": "백필 작업 \"{name}\"을(를) 일시 중지하시겠습니까? 나중에 다시 시작할 수 있습니다.",
     "confirmResumeBackfillJob": "백필 작업 \"{name}\"을(를) 다시 시작하시겠습니까?",
@@ -3292,10 +3196,6 @@
     "analyzingDimensions": "치수 분석 중...",
     "arrowSeparator": "→",
     "computingDistributions": "{count} 차원에 걸친 주파수 분포 계산",
-    "dashboardDescError": "오류 급증 기간 동안의 트레이스 오류 비율을 차원별로 기준선과 비교합니다.",
-    "dashboardDescLatency": "선택한 트레이스의 백분위 지연 시간 (기간 {start}-{end}µs)을 차원별로 기준선과 비교합니다.",
-    "dashboardDescVolume": "차원별로 트레이스 개수 분포를 기준선과 비교합니다.",
-    "dashboardDescVolumeRate": "선택한 기간의 트레이스 개수 분포 (비율 {start}-{end} 트레이스)를 차원별로 기준선과 비교합니다.",
     "dashboardTitleError": "오류 인사이트",
     "dashboardTitleLatency": "지연 시간 인사이트",
     "dashboardTitleVolume": "볼륨 인사이트",
@@ -3303,8 +3203,6 @@
     "durationLabel": "기간:",
     "failedToLoad": "분석을 로드하지 못했습니다.",
     "panelDescErrorComparison": "차원: {dimension}의 오류 비율 비교. 선택된 막대가 높을수록 이 차원 값이 오류 급증 기간에 더 많은 오류가 발생했음을 나타냅니다.",
-    "panelDescLatencyComparison": "차원: {dimension}의 백분위 지연 시간 비교. 선택된 막대가 높을수록 이 차원 값이 더 느린 트레이스와 상관관계가 있음을 나타냅니다.",
-    "panelDescVolumeComparison": "차원: {dimension}의 트레이스 개수 비교. 선택된 막대가 높을수록 이 차원 값이 높은 볼륨 기간에 더 자주 나타남을 나타냅니다.",
     "panelDescVolumeTopValues": "차원: {dimension}의 개수별 상위 값.",
     "refreshTooltip": "업데이트된 백분위수로 분석 새로 고침",
     "retryButton": "재시도",
@@ -3315,7 +3213,6 @@
     "title": "인사이트",
     "tabLabel": "요율",
     "analyzeTooltipLogs": "현재 시간 범위의 차원 분포 분석",
-    "analyzeTooltipTraces": "속도, 지연 및 오류 패턴에 대한 트레이스 차원 분석",
     "rateLabel": "요금:",
     "searchInspectionsLabel": "검색 작업 실행 세부 정보 검사",
     "inspectBtnLabel": "검사",
@@ -3418,7 +3315,6 @@
       "singleTargetTitle": "단일 원격 쓰기 대상",
       "fanoutTitle": "여러 백엔드로 팬아웃",
       "tipPrefix": "팁: `vmagent`는 다음 플래그를 반복하여 쓰기를 중복할 수 있습니다",
-      "tipSuffix": "따라서 메트릭을 OpenObserve로 전달하면서 기존 VictoriaMetrics 대상을 유지할 수 있습니다.",
       "docLinkText": "vmagent 원격 쓰기 대상 구성에 대해 자세히 알아보기."
     },
     "ai": {
@@ -3441,7 +3337,6 @@
     "customLabel": "커스텀",
     "logsLabel": "로그",
     "metricsLabel": "메트릭",
-    "tracesLabel": "트레이스",
     "redirectionIngestionMsg": "참고: IAM 이외의 페이지에 액세스하려면 현재 조직 내에서 데이터 수집을 시작해야 합니다.",
     "databaseLabel": "데이터베이스",
     "securityLabel": "보안",
@@ -3466,7 +3361,6 @@
     "dotnettracing": "닷넷 트레이싱",
     "dotnetlogs": "닷넷 로그",
     "macos": "macOS",
-    "tracesotlp": "트레이스 ({product})",
     "rum": "실제 사용자 모니터링",
     "openvpn": "OpenVPN",
     "nginx": "Nginx",
@@ -3491,7 +3385,6 @@
       "diagnosticSettingsPath": "진단 설정 → + 진단 설정 추가",
       "enterNameCheckCategories": "이름을 입력하고 활성화할 로그 범주를 선택합니다.",
       "underPrefix": "아래",
-      "destinationDetails": "대상 세부 정보",
       "chooseSuffix": ", 선택",
       "streamToEventHub": "이벤트 허브로 스트리밍",
       "selectEventHubPrefix": "1단계에서 만든 Event Hub 네임스페이스와 Event Hub를 선택합니다(접두사:",
@@ -3629,21 +3522,17 @@
       "anyWindowsHostNote": "모든 Windows 서버 또는 VM.",
       "arrow": "→",
       "askOnSlack": "Slack에서 문의",
-      "autoInstrumentTracesDesc": "선택 사항. OpenTelemetry 운영자는 주석이 달린 워크로드에 계측을 주입하므로 **애플리케이션 코드를 수정하거나 이미지를 다시 빌드하지 않고도 분산 추적**을 얻을 수 있습니다. 언어를 선택한 다음 실행 중인 네임스페이스에 주석을 답니다.",
-      "autoInstrumentTracesTitle": "애플리케이션 트레이스 자동 계측",
       "cassandraJmxNote": "수신기가 연결할 수 있도록 Cassandra에서 JMX 원격 액세스를 활성화하십시오.",
       "cassandraTagline": "OpenTelemetry Collector의 JMX 리시버를 통해 Cassandra 메트릭을 수집하여 OpenObserve로 전송하세요.",
       "checking": "확인 중…",
       "checkingForLogs": "로그 확인 중…",
       "checkingForMetrics": "메트릭 확인 중…",
-      "checkingForSpans": "스팬 확인 중…",
       "chipEditor": "편집기",
       "chipInstall": "설치",
       "chipLogs": "로그",
       "chipMetrics": "메트릭",
       "chipRun": "실행",
       "chipTerminal": "터미널",
-      "chipTraces": "트레이스",
       "clusterNameHelp": "로그, 메트릭 및 대시보드에서 이 클러스터를 식별합니다.",
       "clusterNameLabel": "클러스터 이름",
       "collectorInstallDesc": "리시버는 Contrib 빌드에만 포함되어 있습니다. 플랫폼을 선택하세요.",
@@ -3654,14 +3543,11 @@
       "configureCollectorTitle": "OpenTelemetry Collector 구성",
       "connectedLogsHeadline": "연결됨 — 로그가 흐르고 있습니다",
       "connectedMetricsHeadline": "연결됨 — 메트릭이 흐르고 있습니다",
-      "connectedTracesHeadline": "연결됨 — 트레이스가 흐르고 있습니다",
       "countLogs": "{count} 로그 | {count} 로그",
       "countMetricStreams": "{count} 메트릭 스트림 | {count} 메트릭 스트림",
-      "countSpans": "{count} 스팬 | {count} 스팬",
       "downloadEnvTooltip": ".env 다운로드",
       "downloadJmxJarDesc": "JMX 수신기는 이 헬퍼 jar를 실행합니다 (수집 호스트에 Java가 필요합니다).",
       "downloadJmxJarTitle": "JMX 메트릭 Jar 다운로드",
-      "dynamodbFirehoseEndpointDesc": "Kinesis Data Firehose 전송 스트림을 만들 때 이 값을 **HTTP Endpoint** 대상으로 사용하세요.",
       "dynamodbFirehoseEndpointTitle": "OpenObserve Firehose 엔드포인트",
       "dynamodbPipelineDesc": "테이블에서 **DynamoDB Streams**를 활성화하고 **Kinesis Data Stream**에 연결한 다음, 위의 HTTP 엔드포인트를 가리키도록 **Kinesis Data Firehose** 전송 스트림을 구성하세요.",
       "dynamodbPipelineTitle": "DynamoDB → Firehose 스트리밍",
@@ -3675,7 +3561,6 @@
       "gcpFixBody": "GCP는 구독 자체에서 전달 실패를 보고합니다. 싱크가 게시 중인데 여기에 아무 것도 도착하지 않으면 푸시 엔드포인트가 일반적으로 요청을 거부하고 있습니다:",
       "gcpFixTitle": "푸시 구독 확인",
       "gcpPushUrlNote": "이 URL을 비밀로 유지하세요 — 여기에는 수집 키가 포함되어 있습니다. 유출되면 이 페이지의 헤더에서 키를 교체하세요.",
-      "gcpSinkDesc": "GCP 콘솔에서 Pub/Sub를 대상으로 하는 **Log Router sink**를 만들고(Logging → Log Router → Create sink) 주제를 생성하도록 두세요. 싱크의 포함 필터가 OpenObserve에 도달하는 로그를 결정합니다.",
       "gcpSinkTitle": "로그를 Pub/Sub 주제로 라우팅",
       "gcpSinkWriterNote": "싱크의 작성자 ID에 토픽에 대한 Pub/Sub 게시자 역할을 부여하세요. 그렇지 않으면 조용히 아무것도 게시하지 않습니다.",
       "gcpStreamHelp": "위의 푸시 URL에 사용되며 아래 검사에서 모니터링됩니다. 전용 스트림은 GCP 로그를 분리합니다.",
@@ -3714,7 +3599,6 @@
       "k8sInstallerNote": "이것은 cert-manager, OpenTelemetry 운영자 및 OpenObserve 수집기를 자동으로 설치합니다.",
       "k8sInternalEndpointNote": "OpenObserve가 동일한 클러스터에서 실행될 때 이 옵션을 사용하세요 — 트래픽이 클러스터를 벗어나지 않습니다.",
       "k8sTroubleAnnotationA": "주입은 파드 생성 시 발생하므로 기존 파드는 재시작할 때까지 영향을 받지 않습니다 — `kubectl rollout restart deployment -n my-namespace`를 실행하세요. `kubectl get ns my-namespace -o yaml`로 주석이 적용되었는지 확인하고, 값이 `openobserve-collector/openobserve-<language>`와 일치하는지 확인하세요. Go의 경우 `otel-go-auto-target-exe`는 컨테이너 **내부**의 바이너리 경로여야 합니다.",
-      "k8sTroubleAnnotationQ": "네임스페이스에 주석을 달았지만 추적이 나타나지 않습니다",
       "k8sTroubleEndpointA": "**In-Cluster**는 OpenObserve 자체가 이 클러스터에서 실행될 때만 사용하세요. 그러면 트래픽이 클러스터 내부에 머물며 네트워크를 건너지 않습니다. URL은 `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080`입니다. 기본값은 네임스페이스 `openobserve`의 릴리스 `o2`를 가정하므로, 다른 경우 편집하세요. 그 외에는 외부 엔드포인트를 사용합니다.",
       "k8sTroubleEndpointQ": "어떤 엔드포인트를 사용해야 하나요 — 외부 또는 클러스터 내부?",
       "k8sTroubleExampleA": "예 — **HOT commerce**는 엔드투엔드로 연결된 샘플 애플리케이션이며, **OpenTelemetry Operator** 문서에 전체 주석 참조가 있습니다. 둘 다 이 페이지 하단에 링크되어 있습니다.",
@@ -3748,7 +3632,6 @@
       "mysqlTagline": "OpenTelemetry Collector로 MySQL 메트릭을 수집하고 OpenObserve로 전송하세요.",
       "noLogsFoundYet": "아직 로그가 없습니다",
       "noMetricsFoundYet": "아직 메트릭이 없습니다",
-      "noSpansFoundYet": "아직 스팬이 없습니다",
       "nothingOnStream": "{stream}에 아무것도 없습니다 — 앱을 실행하고 다시 테스트하세요",
       "notTestedYet": "아직 테스트되지 않음",
       "onStream": "{stream}에서",
@@ -3757,16 +3640,13 @@
       "oracleTagline": "OpenTelemetry Collector로 Oracle DB 메트릭을 수집하고 OpenObserve로 전송하세요.",
       "otlpFixBody": "익스포터를 정의하는 것만으로는 충분하지 않습니다 — 파이프라인에 나열되어야 합니다. 올바르게 보이는 구성이 아무것도 보내지 않는 가장 흔한 이유입니다:",
       "otlpFixTitle": "익스포터가 실제로 파이프라인에 연결되어 있는지 확인",
-      "otlpGrpcNote": "높은 스팬 볼륨에서 HTTP보다 오버헤드가 낮습니다. 포트 5081은 수집기에서 연결 가능해야 합니다.",
       "otlpHttpNote": "OpenTelemetry Collector의 기본값 — 프록시 및 로드 밸런서 뒤를 포함한 모든 곳에서 작동합니다.",
       "otlpSdkEnvNote": "표준 OTEL_* 환경 변수 — 모든 OpenTelemetry SDK가 이를 읽으므로 코드 변경이 필요 없습니다.",
       "otlpTracesStreamHelp": "위의 구성에 `stream-name`으로 기록되며 아래 검사에서 모니터링됩니다.",
       "otlpTrouble401A": "`Authorization` 헤더는 이 조직의 수집 토큰을 사용하여 `Basic <token>` 형식이어야 합니다 — 위의 값은 이미 올바릅니다. 토큰이 교체된 경우 이 페이지에서 다시 복사하세요.",
       "otlpTrouble401Q": "수집기는 401 또는 403을 기록합니다.",
-      "otlpTroubleHttpGrpcA": "HTTP는 안전한 기본값이며 프록시와 로드 밸런서를 원활하게 통과합니다. gRPC는 높은 스팬 볼륨에서 오버헤드가 낮지만 포트 5081이 종단 간 연결 가능해야 합니다.",
       "otlpTroubleHttpGrpcQ": "HTTP 또는 gRPC를 사용해야 하나요?",
       "otlpTroubleStreamA": "`stream-name` 헤더는 스트림을 결정합니다. 위의 필드와 동일한 이름으로 설정하십시오. 그렇지 않으면 아래의 검사는 아무것도 기록되지 않는 스트림을 감시합니다.",
-      "otlpTroubleStreamQ": "스팬이 도착하지만 잘못된 스트림으로 들어갑니다.",
       "otlpTroubleTlsA": "`tls.insecure` 플래그는 엔드포인트의 스킴과 일치해야 합니다 — 이 배포의 URL에 따라 위에서 `{insecure}`로 설정되어 있습니다. 일반 HTTP 엔드포인트는 `insecure: true`가 필요하고, HTTPS 엔드포인트는 `false`가 필요합니다.",
       "otlpTroubleTlsQ": "gRPC 연결이 TLS 오류로 실패합니다.",
       "pillActiveBackends": "활성 백엔드",
@@ -3824,7 +3704,6 @@
       "pillServiceMap": "서비스 맵",
       "pillSessions": "세션",
       "pillSetup": "설정",
-      "pillSpans": "스팬",
       "pillSqlCompilationRate": "SQL 컴파일 속도",
       "pillStorageBytes": "스토리지 바이트",
       "pillSystem": "시스템",
@@ -3856,7 +3735,6 @@
       "preparePostgresqlTitle": "PostgreSQL 준비",
       "prepareSqlServerDesc": "모니터링 로그인을 생성하세요 — SQL 클라이언트에서 실행하고, **셸이 아닌** 곳에서 실행하세요.",
       "prepareSqlServerTitle": "SQL Server 준비",
-      "providerNameOtlpTraces": "트레이스(OpenTelemetry)",
       "providerNameRum": "실사용자 모니터링",
       "quickInstallDesc": "**단일 명령**으로 OpenObserve 수집기를 설치하세요. 클러스터 이름을 설정하고 실행하기만 하면 됩니다. 이름이 모든 레코드에 태그를 지정하므로 여러 클러스터가 보고되면 구분할 수 있습니다.",
       "quickInstallTitle": "빠른 설치 (권장)",
@@ -3969,19 +3847,16 @@
       "sqlServerTagline": "OpenTelemetry Collector로 SQL Server 메트릭을 수집하고 OpenObserve로 전송하세요.",
       "startIngestingTestForLogs": "수집을 시작한 다음 로그를 테스트하세요",
       "startIngestingTestForMetrics": "수집을 시작한 다음 메트릭을 테스트하세요",
-      "startIngestingTestForSpans": "수집을 시작한 다음 스팬을 테스트하세요",
       "streamNameError": "문자, 숫자 및 _만 사용하세요.",
       "streamNameLabel": "스트림 이름",
       "stuck": "막혔나요?",
       "taglineDatabricks": "로그 API를 통해 Databricks 노트북 로그를 OpenObserve로 전송하세요.",
       "taglineGcp": "Pub/Sub 푸시 구독으로 Google Cloud 로그를 OpenObserve로 스트리밍하세요. 실행할 에이전트나 수집기가 필요 없습니다.",
-      "taglineKubernetes": "OpenObserve 수집기를 클러스터에 배포하세요. 컨테이너 로그, Kubernetes 이벤트, 클러스터 메트릭, 그리고 워크로드를 위한 코드 없는 트레이스가 포함됩니다.",
       "taglineLinux": "모든 Linux 호스트에 OpenObserve 에이전트를 설치하세요. 시스템 및 journald 로그와 CPU, 메모리, 디스크, 네트워크 메트릭이 포함됩니다.",
       "taglineMacos": "모든 Mac에 OpenObserve 에이전트를 설치하세요. 통합 로그와 표준 로그 파일, 그리고 CPU, 메모리, 디스크, 네트워크 메트릭이 포함됩니다.",
       "taglineOtlpTraces": "OpenTelemetry 익스포터를 OpenObserve로 지정하세요. 수집기 또는 SDK, HTTP 또는 gRPC. 엔드포인트와 토큰은 아래에 이미 입력되어 있습니다.",
       "taglineWindows": "모든 Windows 호스트에 OpenObserve 에이전트를 설치하세요. 이벤트 로그, 성능 카운터, 호스트 메트릭이 포함됩니다.",
       "testAgain": "다시 테스트",
-      "tracesStreamNameLabel": "트레이스 스트림 이름",
       "trackScreensDesc": "React Navigation을 사용하는 경우, SDK에 navigation ref를 전달하면 모든 라우트 변경이 RUM 뷰로 기록됩니다 — 화면별 코드가 필요 없습니다.",
       "trackScreensTitle": "화면 자동 추적 (선택 사항)",
       "troubleshooting": "문제 해결",
@@ -4001,7 +3876,6 @@
       "verifyMongodbMetricsDesc": "아래의 Test를 누르거나, Streams에서 `mongodb_*` 메트릭을 확인하세요.",
       "verifyMysqlMetricsDesc": "아래의 Test를 누르거나, Streams에서 `mysql_*` 메트릭을 확인하세요.",
       "verifyOracledbMetricsDesc": "아래의 Test를 누르거나, Streams에서 `oracledb_*` 메트릭을 확인하세요.",
-      "verifyOtlpTracesDesc": "컬렉터(또는 앱)를 다시 시작하고, 스팬을 생성하는 요청을 보낸 후 Test를 누르세요.",
       "verifyPostgresqlMetricsDesc": "아래의 Test를 누르거나, Streams에서 `postgresql_*` 메트릭을 확인하세요.",
       "verifyReactNativeRumDesc": "시뮬레이터, 에뮬레이터 또는 기기에서 앱을 실행하고 몇 개의 화면을 이동한 후 테스트를 클릭하세요 — React Native 이벤트가 `_rumdata` 스트림에 도착합니다.",
       "verifyRedisMetricsDesc": "아래의 Test를 누르거나, Streams에서 `redis_*` 메트릭을 확인하세요.",
@@ -4012,7 +3886,6 @@
       "verifyZookeeperMetricsDesc": "아래의 Test를 누르거나, Streams에서 `zookeeper_*` 메트릭을 확인하세요.",
       "viewLogs": "로그 보기",
       "viewStreams": "스트림 보기",
-      "viewTraces": "트레이스 보기",
       "whatTheInstallerDoes": "설치 프로그램이 하는 일",
       "windowsAgentFixBody": "설치 프로그램은 에이전트를 Windows 서비스로 등록합니다. 아무것도 도착하지 않으면 실행 중인지 확인하고 로그에서 가장 최근 항목을 읽으세요:",
       "windowsTroubleScriptA": "PowerShell은 기본적으로 서명되지 않은 스크립트를 차단합니다. 콘솔을 **관리자 권한으로** 실행하고, 필요한 경우 해당 세션에서 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`로 스크립트를 허용하세요.",
@@ -4036,11 +3909,8 @@
       "verifyAndroidRumDesc": "에뮬레이터나 기기에서 앱을 실행하고 몇 개 화면을 이동한 다음 테스트를 누르세요 — 네이티브 Android 이벤트가 `_rumdata` 스트림에 도착합니다.",
       "verifyIosRumDesc": "시뮬레이터나 기기에서 앱을 실행하고 몇 개 화면을 이동한 다음 테스트를 누르세요 — 네이티브 iOS 이벤트가 `_rumdata` 스트림에 도착합니다.",
       "dbmPreparePostgresTitle": "데이터베이스 모니터링 · 액세스 권한 부여 (선택 사항)",
-      "dbmPreparePostgresDesc": "**위의 모든 내용은 그 자체로 완전합니다** — 쿼리 시간 정보는 이미 애플리케이션 트레이스에서 데이터베이스에 도달하며 여기서 설정할 것이 없습니다. 이 마지막 단계들은 트레이스가 결코 볼 수 없는 것, 즉 데이터베이스 자체만 기록하는 교착 상태와 차단된 쿼리를 추가합니다. 수집기가 다른 세션의 쿼리를 읽을 수 있도록 `pg_monitor` 권한을 부여하세요 — SQL 클라이언트에서 실행하세요, **셸이 아닙니다**.",
       "dbmPrepareMysqlTitle": "데이터베이스 모니터링 · 교착 상태 기록 유지 (선택 사항)",
       "dbmPrepareMariadbTitle": "데이터베이스 모니터링 · 교착 상태 기록 유지 (선택 사항)",
-      "dbmPrepareMysqlDesc": "**위의 모든 내용은 그 자체로 완전합니다** — 쿼리 시간 정보는 이미 애플리케이션 트레이스에서 데이터베이스에 도달하며 여기서 설정할 것이 없습니다. 이 마지막 단계들은 트레이스가 결코 볼 수 없는 것, 즉 데이터베이스 자체만 기록하는 교착 상태와 차단된 쿼리를 추가합니다. 전체 교착 상태 기록을 켜세요 — SQL 클라이언트에서 실행하세요, **셸이 아닙니다**.",
-      "dbmPrepareMariadbDesc": "**위의 모든 내용은 그 자체로 완전합니다** — 쿼리 시간 정보는 이미 애플리케이션 트레이스에서 데이터베이스에 도달하며 여기서 설정할 것이 없습니다. 이 마지막 단계들은 트레이스가 결코 볼 수 없는 것, 즉 데이터베이스 자체만 기록하는 교착 상태와 차단된 쿼리를 추가합니다. 전체 교착 상태 기록을 켜세요 — SQL 클라이언트에서 실행하세요, **셸이 아닙니다**.",
       "dbmPgLoggingTitle": "데이터베이스 모니터링 · Postgres가 교착 상태를 기록하도록 허용 (선택 사항)",
       "dbmPgLoggingDesc": "교착 상태는 Postgres 로그에만 기록되며 아래 설정이 켜져 있을 때만 기록됩니다. 따라서 이 단계가 교착 상태 탭이 채워지게 하는 것입니다. 접두사 줄은 정확히 일치해야 합니다: 수집기는 이를 읽어 관련된 대상을 찾으며, 다른 접두사를 사용하면 아무것도 찾지 못하면서도 정상으로 보고합니다.",
       "dbmPgLoggingVerifyTitle": "데이터베이스 모니터링 · 설정 적용 확인 (선택 사항)",
@@ -4066,7 +3936,6 @@
       "dbmMysqlLogPathHelp": "수집기가 이 파일을 읽을 수 있어야 합니다. 다음 명령으로 찾으세요: SHOW VARIABLES LIKE 'log_error';",
       "dbmMariadbLogPathHelp": "수집기가 이 파일을 읽을 수 있어야 합니다. 다음 명령으로 찾으세요: SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "데이터베이스 모니터링 · 액세스 권한 부여 (선택 사항)",
-      "dbmPrepareMssqlDesc": "**위의 모든 것은 단독으로 완료됩니다** — 쿼리 타이밍은 이미 애플리케이션 트레이스에서 데이터베이스로 도달하므로 여기서 설정할 필요가 없습니다. 이 마지막 그룹은 트레이스가 절대 볼 수 없는 것, 즉 데이터베이스 자체만 기록하는 교착 상태와 차단된 쿼리를 추가합니다. 두 권한이 모두 필요합니다 — 하나는 수집기가 다른 세션을 읽을 수 있게 하고, 다른 하나는 교착 상태 기록을 읽을 수 있게 합니다. SQL 클라이언트에서 실행하세요, **셸이 아닌**.",
       "dbmConfigureMssqlDesc": "`dbm-config.yaml`을 작성합니다 — 아래에서 연결할 데이터베이스를 설정하세요. SQL Server는 여기서 교착 상태, 차단된 쿼리, 활동 샘플, 상위 쿼리 및 실행 계획을 얻습니다. sqlserver 수신기는 전체 인스턴스를 읽으므로 활동 및 상위 쿼리는 위에서 지정한 데이터베이스로 제한되지 않습니다.",
       "dbmRunMssqlDesc": "두 구성을 함께 실행합니다. 1단계에서 만든 동일한 로그인과 비밀번호를 사용하세요.",
       "dbmVerifyBlockingDesc": "**인프라 → 데이터베이스 → 차단된 쿼리**를 엽니다. 잠금을 기다리는 세션은 샘플링되는 즉시 나타납니다 — 빈 탭은 차단된 항목이 없는지 아니면 수집되고 있지 않은지를 알려줍니다.",
@@ -4076,7 +3945,6 @@
       "dbmVerifyTableHealthDesc": "**인프라 → 데이터베이스**를 열고 아래에서 탭을 선택하세요. 교착 상태와 차단된 쿼리는 데이터베이스가 보고하는 즉시 나타납니다 — 빈 탭은 아무 일도 일어나지 않았는지 아니면 수집되고 있지 않은지 알려줍니다. 테이블 상태는 첫 60초 스냅샷 후에 채워집니다."
     },
     "instrumentBeforeImportTitle": "클라이언트 가져오기 전에 계측",
-    "instrumentBeforeImportBody": "앱이 실행되지만 스팬이 도착하지 않으면 계측이 클라이언트를 가져온 후에 로드된 것일 수 있습니다. 초기화가 먼저 실행되도록 순서를 변경하세요:",
     "launchCloudFormationStack": "CloudFormation 스택 시작",
     "openStackSetsConsole": "StackSets 콘솔 열기",
     "integrations": {
@@ -4239,7 +4107,6 @@
       "streamOverview": "{stream} 개요"
     },
     "selectField": "필드",
-    "selectIndex": "스트림",
     "selectStreamType": "스트림 유형",
     "toggleFunctionEditor": "토글 함수 편집기",
     "useSavedFunction": "저장된 함수 사용",
@@ -4353,7 +4220,6 @@
     "extraOptions": "옵션",
     "nameOfVariable": "이름",
     "labelOfVariable": "라벨 (선택 사항)",
-    "ValueOfVariable": "가치",
     "DefaultValue": "기본값 (선택 사항)",
     "typeOfVariable": "변수 유형",
     "DefaultSize": "기본 최대 레코드 크기 (선택 사항)",
@@ -4423,7 +4289,6 @@
     "alignRight": "Right",
     "sectionStyling": "스타일링",
     "sectionConditionalStyling": "조건부 스타일링",
-    "conditionThreshold": "가치",
     "conditionAddRule": "+ 규칙 추가",
     "conditionNoRules": "아직 규칙이 없습니다.",
     "conditionIfValue": "값이 다음과 같은 경우",
@@ -4486,7 +4351,6 @@
     "unsavedMessage": "변경 내용을 저장하지 않았습니다.정말 떠나고 싶니?",
     "currentFolderLabel": "현재 폴더",
     "selectFolderLabel": "폴더 선택",
-    "selectFolderPlaceholder": "대상 폴더 선택",
     "selectDashboardLabel": "대시보드 선택",
     "selectTabLabel": "탭 선택",
     "layerType": "레이어 유형",
@@ -4646,7 +4510,6 @@
     "markLinesTooltip": "차트에 임계선을 표시합니다.",
     "markLineType": "타입",
     "markLineLabel": "레이블",
-    "markLineValue": "가치",
     "markLineAdd": "+ 추가",
     "markLineAverage": "평균",
     "markLineMedian": "중앙값",
@@ -4748,7 +4611,6 @@
     "editValueMapping": "값 매핑 편집",
     "valueMappingsTitle": "값 매핑",
     "valueMappingType": "타입",
-    "valueMappingValue": "가치",
     "valueMappingRegex": "정규식",
     "valueMappingFrom": "에서",
     "valueMappingTo": "에",
@@ -4916,7 +4778,6 @@
         "storage": "스토리지",
         "dashboard": "대시보드"
       },
-      "selectFolderTitle": "대상 폴더 선택",
       "back": "뒤로",
       "addDashboard": "대시보드 추가",
       "folder": "폴더",
@@ -5104,7 +4965,6 @@
       "configuration": "구성",
       "having": "Having",
       "add": "추가",
-      "value": "값",
       "markAsNonTimestamp": "이 필드를 타임스탬프가 아닌 것으로 표시",
       "renderDataAsJson": "데이터를 JSON / 배열로 렌더링",
       "sortBy": "정렬 기준",
@@ -5554,7 +5414,6 @@
     "deletePanelTitle": "패널 삭제",
     "deletePanelMessage": "정말로 이 패널을 삭제하시겠습니까?",
     "movePanelTitle": "패널을 다른 탭으로 이동",
-    "movePanelMessage": "대상 선택 탭",
     "noQueriesToCreateAlert": "이 패널에는 알림을 생성할 쿼리가 없습니다.",
     "panelQueryMustHaveStream": "패널 쿼리에는 스트림이 구성되어 있어야 합니다.",
     "unsupportedPanelTypeAlert": "{type} 패널에서 알림 생성이 예상대로 작동하지 않을 수 있음",
@@ -5562,7 +5421,6 @@
     "panelDuplicationFailed": "패널 복제 실패",
     "firstColumn": "첫 번째 칼럼",
     "zAxis": "Z-축",
-    "breakdown": "브레이크다운",
     "pivotField": "피벗 필드",
     "pivotFieldTooltip": "차원 필드를 여기로 드래그합니다.고유 값은 피벗 테이블의 열 머리글이 됩니다.다단계 피벗에는 최대 3개의 필드가 허용됩니다.",
     "breakdownTooltipHBar": "이 필드를 사용하여 데이터를 Y축의 여러 섹션으로 분할하여 더 명확하게 볼 수 있습니다.",
@@ -5610,7 +5468,6 @@
         "anomalyHint": "{n}개 이벤트 샘플링됨",
         "colField": "필드",
         "colRarity": "희귀도",
-        "colValue": "값",
         "rarity": {
           "anomalous": "이상",
           "rare": "희귀",
@@ -5649,15 +5506,12 @@
     "longitude": "경도",
     "weight": "무게",
     "mapname": "이름",
-    "mapvalue": "가치",
     "source": "소스",
-    "target": "타깃",
-    "value": "가치"
+    "target": "타깃"
   },
   "home": {
     "alertsOverviewSection": "알림 개요 섹션",
     "pipelinesOverviewSection": "파이프라인 개요 섹션",
-    "streams": "스트림",
     "totalDataIngested": "수집된 총 데이터",
     "totalDataCompressed": "압축된 크기",
     "viewButton": "보기",
@@ -5669,7 +5523,6 @@
       "description": "이 조직은 아직 데이터를 받지 않았으므로 차트로 표시할 내용이 없습니다.이벤트 흐름이 시작되면 <strong>수집량, 스토리지, 쿼리 사용량이</strong> 여기에 자동으로 표시됩니다.",
       "logs": "로그 전송",
       "logsDesc": "{product1}, {product2}, {product3}, {product4} 및 기타",
-      "traces": "트레이스 전송",
       "tracesDesc": "{product1} / {product2} / {product3} 분산 추적",
       "metrics": "지표 전송",
       "metricsDesc": "{product1}, {product2}, {product3} 및 기타",
@@ -5679,7 +5532,6 @@
       "shippers": "로그 화주"
     },
     "indexSizeLbl": "인덱스 크기",
-    "docsCountLbl": "이벤트",
     "functionTitle": "함수",
     "schedulePipelineTitle": "예약됨",
     "rtPipelineTitle": "실시간",
@@ -5717,8 +5569,6 @@
     "emptyActionAlertsDesc": "구성된 경고 및 임계값 검토",
     "emptyActionLogs": "로그 살펴보기",
     "emptyActionLogsDesc": "로그 스트림 검색 및 필터링",
-    "emptyActionTraces": "트레이스 살펴보기",
-    "emptyActionTracesDesc": "분산된 트레이스 및 서비스 지연 시간 검사",
     "anomalyDetectedTitle": "이상 감지 — {name}",
     "anomalyDetectedDescription": "스트림: {stream} · 이상 지점 {count}개",
     "secondsAgo": "{count}초 전",
@@ -5767,7 +5617,6 @@
     "stderr": "표준 오류",
     "truncatedLabel": "잘림",
     "copyQuery": "쿼리 복사",
-    "stream": "스트림",
     "start": "시작",
     "end": "종료",
     "from": "부터",
@@ -5806,7 +5655,6 @@
       "taglineTail": ".내가 너한테 쓸 수 있어",
       "taglineSql": "SQL",
       "taglineVrl": "VRL",
-      "taglineAnd": "로그, 추적, 지표 및 인시던트를 안내합니다.",
       "signedInAs": "로 로그인",
       "role": "역할",
       "tryOneOfThese": "또는 다음 중 하나를 시도해 보십시오."
@@ -5814,12 +5662,10 @@
     "capabilities": {
       "query": {
         "title": "쿼리 작성",
-        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL",
         "prompt": "쿼리 작성을 도와주세요"
       },
       "incident": {
         "title": "인시던트 조사",
-        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)",
         "prompt": "인시던트 조사를 도와주세요"
       },
       "dashboard": {
@@ -5916,9 +5762,7 @@
         "alert": "알림",
         "dashboard": "대시보드",
         "pipeline": "파이프라인",
-        "report": "보고서",
         "function": "함수",
-        "stream": "스트림",
         "folder": "폴더",
         "panel": "패널",
         "user": "사용자",
@@ -5962,7 +5806,6 @@
     "features": "특징",
     "included": "무엇이 포함되어 있나요?",
     "proPlanSubtitle": "소규모 팀을 위한 맞춤형 솔루션",
-    "unlimitedNote": "무제한 사용자, 로그, 메트릭, 트레이스 등",
     "paymentNote": "월별 청구 주기 말의 사용량을 기준으로 요금이 계산됩니다.",
     "proPlanLabel": "사용량에 따라 지불",
     "contactLabel": "영업팀에 문의",
@@ -6145,13 +5988,10 @@
       "anomalyImportFailed": "이상 탐지 - {index}: \"{name}\" 가져오기 실패 — {reason}",
       "nameRequired": "알림 - {index}: 이름은 필수이며 유효한 문자열이어야 합니다.",
       "orgIdInvalid": "알림 - {index}: 조직 ID는 필수이며, 조직 목록에 있어야 하고 {orgId}와 같아야 합니다.",
-      "streamTypeInvalid": "알림 - {index}: 스트림 유형은 필수이며 'logs', 'metrics', 'traces' 중 하나여야 합니다.",
       "streamNameInvalid": "알림 - {index}: 스트림 이름은 필수이며, 스트림 목록에 있어야 하고 유효한 문자열이어야 합니다.",
-      "destinationsRequired": "알림 - {index}: 대상은 필수이며 배열이어야 합니다.",
       "enabledBoolean": "알림 - {index}: 활성화는 Boolean이어야 합니다.",
       "tzOffsetNumber": "알림 - {index}: 시간대 오프셋은 숫자여야 합니다.",
       "timezoneRequiredForCron": "알림 - {index}: 빈도 유형이 'cron'인 경우 시간대가 필요합니다.",
-      "destinationNotExist": "알림 - {index}: \"{destination}\" 대상이 존재하지 않습니다.",
       "createSuccess": "알림 - {index}: \"{name}\"이(가) 성공적으로 생성되었습니다. \n참고: JSON 파일에서 생성된 알림 객체 {name}을(를) 제거하십시오.",
       "createFailed": "알림 - {index}: \"{name}\" 생성 실패 --> \n 이유: {reason}",
       "unknownError": "알 수 없는 오류",
@@ -6261,7 +6101,6 @@
       "noChildren": "아직 하위 경보가 없습니다. 최소 두 개를 추가하세요.",
       "wouldTrigger": "발화될 것",
       "wouldNotTrigger": "발화되지 않을 것",
-      "firing": "발화 중",
       "normal": "정상",
       "stepByStep": "단계별",
       "result": "결과",
@@ -6288,7 +6127,6 @@
     "exportDialogSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 프로바이더용 Terraform으로 다운로드하세요.",
     "jsonFilesOnlyHint": ".json 파일만",
     "outputMessages": "출력 메시지",
-    "destinationsRequiredLabel": "대상 *",
     "timezoneRequiredLabel": "시간대 *",
     "organizationIdLabel": "조직 ID",
     "alertCreationTitle": "알림 생성",
@@ -6328,13 +6166,11 @@
     "guidelinesLabel": "지침:",
     "selectStreamGuideline": "목록에서 기존 스트림을 선택하거나 새 스트림을 생성할 이름을 입력하십시오.",
     "enrichmentTablesTerm": "Enrichment_tables",
-    "enrichmentTablesDestinationNote": "대상 스트림은 예약된 파이프라인에서만 사용할 수 있습니다.",
     "useCurlyBracesNote": "중괄호 사용",
     "configureStreamNameDynamicNote": "스트림 이름을 동적으로 구성하려면. 예:",
     "staticTextBeforeAfterNote": ". 앞/뒤의 정적 텍스트",
     "isOptionalNote": "선택 사항입니다",
     "noTriggersLoaded": "로드된 트리거 없음",
-    "externalDestinationTitle": "외부 대상",
     "serviceGraphLegendTitle": "그래프 범례",
     "serviceGraphRootCause": "빨간색 = 잠재적 근본 원인",
     "serviceGraphHighFrequency": "주황색 = 높은 빈도",
@@ -6362,7 +6198,6 @@
     "pendingBatches": "대기 중인 배치",
     "pendingBatchesTooltip": "함께 그룹화되기를 기다리는 알림",
     "historyTimeline": {
-      "firing": "발화 중",
       "ok": "정상",
       "error": "오류",
       "skipped": "건너뜀",
@@ -6381,7 +6216,6 @@
     "duration": "지속 시간",
     "retries": "재시도",
     "dedup": "중복 제거",
-    "noDestinations": "사용 가능한 대상이 없습니다",
     "validation": {
       "streamTypeRequired": "Stream 유형은 필수입니다.",
       "streamNameRequired": "Stream 이름은 필수입니다.",
@@ -6392,7 +6226,6 @@
       "validEmails": "유효한 이메일을 추가하세요!",
       "silenceNonNegative": "알림 침묵은 0 이상이어야 합니다",
       "periodPositive": "기간은 0보다 커야 합니다",
-      "destinationRequired": "하나 이상의 대상이 필요합니다.",
       "thresholdPositive": "임계값은 0보다 커야 합니다",
       "frequencyPositive": "빈도는 0보다 커야 합니다",
       "aggregationColumnRequired": "집계 함수를 사용할 때는 열이 필요합니다.",
@@ -6403,7 +6236,6 @@
       "minimumFrequency": "최소 주기는 {minutes}분이어야 합니다.",
       "nameMandatoryString": "이름은 필수이며 유효한 문자열이어야 합니다.",
       "orgIdMismatch": "조직 ID는 {orgId}와 같아야 합니다.",
-      "streamTypeMandatory": "스트림 유형은 필수이며 logs, metrics, traces 중 하나여야 합니다.",
       "streamNameMandatoryString": "스트림 이름은 필수이며 유효한 문자열이어야 합니다.",
       "streamNotInList": "스트림 \"{streamName}\"이(가) 스트림 목록에 없습니다.",
       "isRealTimeMandatoryBoolean": "실시간 여부는 필수이며 부울 값이어야 합니다.",
@@ -6435,10 +6267,6 @@
       "cronRequiredForCronType": "빈도 유형이 cron인 경우 cron 표현식이 필요합니다.",
       "timezoneRequiredForCronType": "빈도 유형이 cron인 경우 시간대가 필요합니다.",
       "triggerConditionRequired": "트리거 조건이 필요합니다.",
-      "destinationsArray": "대상은 배열이어야 합니다.",
-      "destinationRequiredPlain": "최소 하나의 대상이 필요합니다.",
-      "noDestinationsInSystem": "시스템에서 사용 가능한 대상을 찾을 수 없습니다.",
-      "invalidDestinations": "잘못된 대상: {destinations} - 사용 가능한 대상 목록에 있어야 합니다.",
       "enabledFlagBoolean": "활성화 플래그는 부울이어야 합니다.",
       "silenceNotificationRequired": "무음 알림은 비어 있지 않아야 합니다.",
       "thresholdNotEmpty": "임계값은 비어 있지 않아야 합니다.",
@@ -6459,8 +6287,6 @@
     "searchAllFolders": "모든 폴더",
     "streamConfig": "스트림 구성",
     "alertRules": "경고 규칙",
-    "noTemplatesMsg": "알림을 생성하려면 최소 하나의 템플릿과 하나의 대상이 필요합니다.템플릿은 알림 메시지의 형식을 정의합니다. 먼저 템플릿을 만들어 보세요.",
-    "noDestinationsMsg": "알림을 생성하려면 적어도 하나의 대상과 하나의 템플릿이 필요합니다.목적지는 알림이 전송되는 위치를 정의합니다. 먼저 알림을 생성하세요.",
     "add": "알림 추가",
     "edit": "편집",
     "clone": "클론 경고",
@@ -6511,37 +6337,25 @@
     "frequency": "주파수",
     "threshold": "임계값",
     "silenceNotification": "에 대한 침묵 알림",
-    "destination": "여행지",
-    "destinationOrWorkflowRequired": "대상 또는 워크플로우를 하나 이상 추가하십시오.",
-    "customDestination": "커스텀 데스티네이션",
-    "customDestinationDescription": "사용자 지정 HTTP 엔드포인트 또는 이메일 대상 구성",
-    "testIdleMessage": "'테스트'를 클릭하여 대상 구성을 확인합니다.",
-    "destinationPreview": "목적지 미리 보기",
     "template": "템플릿 오버라이드",
     "additionalVariables": "추가 변수",
-    "testSuccessMessage": "테스트 성공!목적지가 올바르게 구성되었습니다.",
     "testFailedMessage": "테스트에 실패했습니다.구성을 확인하고 다시 시도하세요.",
     "testFailedWithReason": "테스트 실패: {reason}",
-    "testInProgress": "테스트 대상...",
     "sendingNotification": "연결 확인을 위한 테스트 알림 전송",
     "testErrorDNS": "DNS 확인에 실패했습니다.웹후크 URL 또는 호스트 이름을 확인하십시오.",
     "testErrorConnection": "연결이 거부되었습니다.URL을 확인하고 서비스에 연결할 수 있는지 확인하십시오.",
-    "testErrorTimeout": "요청 시간이 초과되었습니다.대상 서비스가 느리거나 연결이 불가능할 수 있습니다.",
     "testErrorSSL": "SSL/TLS 인증서 오류가 발생했습니다.인증서를 확인하거나 SSL 인증을 비활성화하세요.",
     "testErrorClientError": "클라이언트 오류 (4xx).자격 증명과 구성을 확인하십시오.",
-    "testErrorServerError": "서버 오류 (5xx).대상 서비스에 문제가 있습니다.",
     "viewDetails": "세부 정보 보기",
     "error": "오류",
     "httpStatus": "HTTP 상태",
     "responseBody": "응답 바디",
     "retry": "재시도",
     "suggestCheckUrl": "웹후크 URL이 정확하고 연결할 수 있는지 확인하십시오.",
-    "suggestCheckFirewall": "방화벽 설정을 확인하고 대상 서비스에 액세스할 수 있는지 확인하십시오.",
     "suggestCheckCredentials": "API 자격 증명이 올바른지 확인하십시오.",
     "suggestCheckPermissions": "자격 증명에 필요한 권한이 있는지 확인하십시오.",
     "suggestCheckEndpoint": "엔드포인트 URL이 올바른지 확인하십시오.",
     "suggestRateLimit": "속도 제한을 초과했습니다.다시 시도하기 전에 잠시 기다려 주세요.",
-    "suggestServerIssue": "대상 서비스에 문제가 있습니다.나중에 다시 시도하세요.",
     "description": "설명",
     "stream_name": "스트림 이름",
     "cloneTitle": "클론 경고",
@@ -6601,7 +6415,6 @@
       "notEqualTo": "같지 않음",
       "eventsDetected": "이벤트 감지됨",
       "sendsTo": "전송 대상",
-      "noDestination": "목적지 없음",
       "notSetupYet": "(아직 설정되지 않음)",
       "cooldown": "재사용 대기시간",
       "betweenAlerts": "경고 사이",
@@ -6649,7 +6462,6 @@
     },
     "placeholders": {
       "typeSomething": "무언가를 입력하세요",
-      "value": "가치",
       "selectColumn": "컬럼 선택",
       "savedFunctions": "저장된 함수",
       "autoUsesCheckInterval": "자동 (검사 간격 사용)",
@@ -6732,7 +6544,6 @@
       "ifPrefix": "조건",
       "noConditionsDefined": "정의된 조건 없음",
       "loadingCorrelatedMetrics": "연관 메트릭 불러오는 중...",
-      "loadingCorrelatedTraces": "연관 트레이스 불러오는 중...",
       "disambiguationChangedMessage": "이 인시던트가 생성된 후 서비스 검색 구성(식별 필드)이 변경되었습니다.",
       "noActivityYet": "아직 활동이 없습니다",
       "eventsAndCommentsAppearHere": "이벤트와 댓글이 여기에 표시됩니다",
@@ -6766,7 +6577,6 @@
       "correlatedAlertsCount": "알림: {count}개의 연관 알림",
       "noCorrelatedLogs": "연관 로그를 찾을 수 없습니다",
       "noCorrelatedMetrics": "상관된 메트릭 없음",
-      "noCorrelatedTraces": "상관된 트레이스 없음",
       "lastAlertAt": "마지막 알림",
       "title_field": "타이틀",
       "stableDimensions": "치수",
@@ -6779,7 +6589,6 @@
       "acknowledge": "인정하다",
       "resolve": "해결",
       "reopen": "다시 엽니다",
-      "statusOpen": "열기",
       "statusAcknowledged": "확인됨",
       "statusResolved": "해결됨",
       "correlationServiceDiscovery": "서비스 디스커버리",
@@ -6844,7 +6653,6 @@
       "noAlertDetailsAvailable": "사용 가능한 알림 세부 정보 없음",
       "clickOnTriggerToViewDetails": "세부 정보를 보려면 테이블에서 트리거를 클릭하세요",
       "refreshCorrelatedData": "상관 데이터 새로 고침",
-      "showingCorrelatedTraces": "인시던트 기간의 상관 트레이스 표시 중",
       "incidentTitleUpdatedSuccess": "인시던트 제목이 성공적으로 업데이트되었습니다",
       "markAsAcknowledgedTooltip": "인시던트를 확인됨 및 처리 중으로 표시",
       "markAsResolvedTooltip": "인시던트를 해결됨으로 표시하고 종료",
@@ -6964,16 +6772,10 @@
       "helpLegendLiveExample": "CPU 높음",
       "helpLegendSampleExample": "42",
       "sectionTitle": "설정",
-      "noDestinationsAvailable": "사용 가능한 대상 없음",
-      "noTargetsAvailable": "사용 가능한 대상 또는 워크플로우 없음",
-      "targetsDestinationsGroup": "대상",
       "targetsWorkflowsGroup": "워크플로우",
-      "refreshDestinations": "최신 대상 새로 고침",
-      "addNewDestination": "새 목적지 추가",
       "cooldownTooltip": "경고가 트리거되면 다른 알림을 보내기 전에 얼마나 기다려야 합니까? 예를 들어 경보가 오후 4시에 트리거되고 무음 알림이 10분으로 설정된 경우 경고가 1분이 지난 후에도 오후 4시 10분까지는 다른 알림을 보내지 않습니다.이는 사용자에게 알림을 스팸으로 보내는 것을 방지하기 위한 것입니다.",
       "periodTooltip": "쿼리를 실행해야 하는 기간. 예를 들어 10분은 쿼리가 실행될 때마다 최근 10분의 데이터를 사용한다는 의미입니다.",
       "timezoneWarning": "경고: 표시된 시간대는 대략적인 시간대입니다.정확한 시간대를 수동으로 확인하고 선택하십시오.",
-      "destinationsTooltip": "경고 알림을 보낼 대상을 하나 이상 선택합니다.",
       "createsIncident": "인시던트 생성",
       "createsIncidentTooltip": "알림이 인시던트를 생성할 수 있는 경우, 전용 알림을 보내지 않습니다. 대신 새 인시던트가 생성되거나 새 알림 유형이 기존 인시던트에 추가될 때 인시던트에 대한 알림이 전송됩니다.",
       "helpTemplateTitle": "템플릿 오버라이드",
@@ -6985,11 +6787,7 @@
       "helpLegendLive": "알림의 실제 가치",
       "helpLegendSample": "샘플 — 알림이 실행될 때 실제 값이 설정됩니다.",
       "helpLegendOpaque": "경고가 발생하면 자동으로 추가됨",
-      "helpTemplateExplain": "템플릿은 텍스트와 {'{'} alert_name {'}'} 같은 변수를 포함하여 전송되는 알림 메시지입니다.여기서 하나를 선택하면 각 대상의 자체 템플릿보다 우선 적용됩니다 (이 알림에 한함).",
       "helpCurrentHeading": "이 알림이 지금 보내는 내용",
-      "helpCurrentNoOverride": "오버라이드 설정 없음 - 각 대상에서 자체 템플릿을 사용합니다.",
-      "helpCurrentNoDestinations": "목적지가 아직 선택되지 않았습니다.각 목적지는 자체적으로 구성된 템플릿을 사용합니다.",
-      "helpCurrentOverrideHeading": "모든 목적지는 다음 템플릿을 사용합니다.",
       "helpPreviewHeading": "템플릿 미리 보기",
       "helpPreviewSelectPlaceholder": "미리 볼 템플릿 선택",
       "helpApplyToAlert": "알림에 적용",
@@ -7001,7 +6799,6 @@
       "helpYourVariablesEmpty": "아직 변수를 추가하지 않았습니다.",
       "helpRowTemplateExplain": "알림은 여러 행과 일치할 수 있습니다.행 템플릿은 단일 행의 모양을 결정합니다.그러면 기본 템플릿의 {'{'} rows {'}'} 가 이미 서식이 지정된 모든 일치하는 행에 드롭됩니다.",
       "helpRowTemplateTypeHeading": "문자열과 JSON 비교",
-      "helpRowTemplateTypeExplain": "문자열은 행당 일반 텍스트를 생성합니다.JSON은 구조화된 대상에 적합한 행당 JSON 객체를 생성합니다.",
       "helpRowTemplateTypeCurrent": "현재 선택됨:",
       "helpPreviewHeadingShort": "시사",
       "helpWhyHeading": "왜 변수를 사용할까요?",
@@ -7014,7 +6811,6 @@
       "helpVariablesExampleCaption": "심각도와 팀을 변수로 추가한 다음 템플릿의 어느 곳에서나 사용할 수 있습니다.",
       "helpExampleResultLabel": "전송되는 내용",
       "helpTemplateWhenHeading": "언제 오버라이드해야 하나요?",
-      "helpTemplateWhenDesc": "비워 두면 각 목적지마다 고유한 템플릿을 사용합니다.각 대상의 템플릿을 수정하지 않고도 이 하나의 알림으로 모든 대상에 동일하고 일관된 메시지를 전송하도록 하려면 오버라이드를 설정하세요.",
       "helpRowTemplateWhyHeading": "행 템플릿이 필요한 이유",
       "helpRowTemplateWhyDesc": "알림은 여러 레코드와 일치할 수 있습니다.행 템플릿은 하나의 레코드를 포맷합니다. {'{'} rows {'}'} 는 포맷된 모든 레코드를 기본 템플릿에 드롭하므로 루프를 작성하지 않고도 일치하는 모든 항목을 나열할 수 있습니다.",
       "helpRowTemplateExampleCaption": "일치하는 각 행은 행 템플릿으로 형식이 지정되고 {'{'} rows {'}'} 는 모든 행을 기본 템플릿에 드롭합니다.",
@@ -7023,10 +6819,8 @@
       "helpRowTemplatePreviewEmpty": "행 템플릿이 아직 없습니다. 여기에서 미리 보려면 추가 설정 탭에 행 템플릿을 입력하십시오.",
       "helpPreviewSelectEmpty": "전송할 메시지를 미리 보려면 위의 템플릿을 선택하세요.",
       "helpCurrentBodyEmpty": "이 템플릿에는 미리 볼 본문이 없습니다.",
-      "helpDestinationNoTemplate": "이 대상의 기본 형식을 사용합니다.",
       "builtInVars": {
         "orgName": "조직 이름",
-        "streamType": "스트림 유형(로그, 메트릭, 트레이스)",
         "streamName": "알림이 감시하는 스트림 이름",
         "alertName": "알림 이름",
         "alertType": "알림 유형(예: 예약, 실시간)",
@@ -7048,7 +6842,6 @@
     },
     "advanced": {
       "addVariable": "변수 추가",
-      "variablesTooltip": "변수는 알림에서 대상으로 데이터를 전달하는 데 사용됩니다.",
       "templateType": "템플릿 유형:",
       "noTemplatesAvailable": "사용 가능한 템플릿 없음",
       "refreshTemplates": "최신 템플릿 새로 고침",
@@ -7133,12 +6926,10 @@
     },
     "anomaly": {
       "addFilter": "필터 추가",
-      "addNewDestination": "새 목적지 추가",
       "anomalyScoreRange": "변칙 점수 범위:",
       "checkEvery": "모두 확인",
       "checkEveryTooltip": "탐지 작업의 실행 빈도샘플 기간보다 길 수 있습니다 (예: 5m마다 샘플링, 1시간마다 탐지 실행).",
       "clickLoadDataHint": "데이터 로드를 클릭하여 시계열을 미리 봅니다.",
-      "destinationRequired": "목적지가 하나 이상 필요합니다!",
       "detectionResolution": "감지 해상도",
       "detectionResolutionTooltip": "각 데이터 포인트가 얼마나 세분화되었는지.예를 들어 “5m”은 5분 해상도에서 이상 징후가 감지되었음을 의미합니다.",
       "disabled": "장애인",
@@ -7153,10 +6944,8 @@
       "lookBackWindowTooltip": "각 탐지에서 쿼리를 실행한 시점잠시 멈춘 후에도 창에 캡이 표시됩니다.기본값은 [모든 간격 확인] 입니다.",
       "maxThresholdMarkLine": "최대 임계값",
       "minThresholdMarkLine": "최소 임계값",
-      "noDestinationsFound": "목적지를 찾을 수 없음",
       "noFieldsFound": "필드를 찾을 수 없음",
       "notifications": "알림",
-      "notificationsTooltip": "활성화하면 이상이 감지될 때마다 선택한 대상으로 알림이 전송됩니다.",
       "retrainEvery": "모든 재교육",
       "retrainEveryTooltip": "모델을 자동으로 재학습시키는 빈도.“절대 안 함”이란 한 번 학습하고 수동으로 재훈련할 때까지 모델을 유지하는 것을 의미합니다.",
       "retrainFourteenDays": "14일",
@@ -7171,14 +6960,12 @@
       "sqlColumnsHint": "쿼리는 두 개의 열을 반환해야 합니다: {timeBucket} 및 {valueColumn}.",
       "sqlRequired": "사용자 지정 SQL 모드에서는 SQL이 필요합니다.",
       "summaryAlerting": "✓ 알림: {status}",
-      "summaryAlertingEnabled": "✓ 알림: 활성화됨 → {destinations}",
       "summaryAlertingNoDestination": "✓ 알림: 활성화됨 ⚠️ {warning}",
       "summaryConfiguring": "{streamType} 스트림 \"{stream}\"에 대한 이상 탐지 구성",
       "summaryDataSource": "✓ 데이터 소스: {type} — {name}",
       "summaryDetectionFunction": "✓ 탐지 함수: {fn}",
       "summaryDetectionWindow": "✓ 탐지 창: 마지막 {window}",
       "summaryMonitoring": "\"{stream}\"을(를) {schedule}마다 모니터링하여 {fn} 이상 징후를 감지하고, {trainingDays}일의 기록으로 학습",
-      "summaryNoDestinationSet": "대상이 설정되지 않음",
       "summaryQueryMode": "✓ 쿼리 모드: {mode}",
       "summaryResolution": "✓ 해상도: {resolution}",
       "summaryRetrain": "✓ 재학습: {retrain}",
@@ -7304,21 +7091,14 @@
       "triggerAlertFailed": "알림 트리거 실패",
       "triggerRetrainingFailed": "재학습 트리거 실패",
       "bulkDeleteAlertsFailed": "알림 삭제 중 오류가 발생했습니다. 다시 시도해 주세요.",
-      "deleteDestinationFailed": "대상 삭제 중 오류가 발생했습니다.",
-      "bulkDeleteDestinationsFailed": "대상 삭제 중 오류가 발생했습니다. 다시 시도해 주세요.",
       "bulkDeleteTemplatesFailed": "템플릿 삭제 중 오류가 발생했습니다. 다시 시도해 주세요."
     },
     "prebuilt": {
-      "conversionSuccess": "대상이 성공적으로 변환되었습니다",
       "validationError": "유효성 검사 오류: {error}",
-      "invalidDestinationType": "잘못된 대상 유형",
       "invalidTargetType": "잘못된 타겟 유형",
-      "unknownDestinationType": "알 수 없는 대상 유형",
       "testFailedUnknownError": "알 수 없는 오류로 테스트 실패"
     },
     "confirmDeleteAlerts": "{count}개의 알림을 삭제하시겠습니까? | {count}개의 알림을 삭제하시겠습니까?",
-    "confirmDeleteDestinations": "{count}개의 수신처를 삭제하시겠습니까? | {count}개의 수신처를 삭제하시겠습니까?",
-    "prebuiltDestination": "미리 만들어진 {type} 수신처",
     "errorValidations": "오류 검증",
     "outputMessagesLabel": "출력 메시지",
     "incidentSingular": "인시던트",
@@ -7374,7 +7154,6 @@
       "critical": "치명적",
       "warning": "경고",
       "ok": "정상",
-      "firingTotal": "발생",
       "observedTotal": "그룹",
       "nOfMFiring": "{firing} / {observed} 그룹 발생 중",
       "groupedBy": "{columns}별로 그룹화됨",
@@ -7388,7 +7167,6 @@
       "when": "시각",
       "change": "수준 변경",
       "outcome": "결과",
-      "value": "값",
       "rollupRow": "모든 그룹 (롤업)",
       "noHistoryTitle": "기록된 전환이 없습니다.",
       "noHistoryDescription": "그룹이 발화, 확대 또는 복구되기 시작하면 레벨 변경 사항이 여기에 표시됩니다.",
@@ -7436,7 +7214,6 @@
       "dialog": {
         "title": "경고 만들기",
         "continue": "경고로 계속",
-        "streamLabel": "스트림",
         "thresholdLabel": "경고 대상",
         "thresholdMatchingRows": "일치하는 행",
         "thresholdCount": "행 수",
@@ -7523,26 +7300,22 @@
     "actionOpen": "열기",
     "actionDelete": "삭제",
     "deleteTitle": "{name}을(를) 삭제하시겠습니까?",
-    "deleteMessage": "이 작업은 영구적으로 제거합니다. 알림 또는 대상에서 여전히 사용 중이면 삭제가 차단됩니다.",
     "deletedToast": "{name} 삭제됨",
     "deleteFailedToast": "{name}을(를) 삭제할 수 없습니다",
     "loading": "의존성 그래프 작성 중…",
     "failedToLoad": "의존성을 불러오지 못했습니다: {error}",
     "usedBy": "{count} 알림 | {count} 알림",
-    "countDestinations": "{count} 대상 | {count} 대상",
     "usedByColumn": "사용처",
     "searchPlaceholder": "검색",
     "noDependencies": "의존성 없음.",
     "noMatches": "일치하는 항목 없음.",
     "laneEmpty": "알림 없음",
     "directOverrides": "이 템플릿을 직접 사용",
-    "sectionDestinations": "대상",
     "sectionAlerts": "알림",
     "orphanTag": "사용되지 않음",
     "missingTag": "누락됨",
     "enabled": "활성화됨",
     "paused": "일시 중지됨",
-    "impactTemplate": "사용처: {destinations} · {alerts}",
     "impactDestination": "사용처: {alerts}"
   },
   "alert_library": {
@@ -7587,7 +7360,6 @@
       "noDescription": "라이브러리에 설명이 없습니다.",
       "needsDataCallout": "이 알림은 {stream}을(를) 쿼리하지만 이 조직에서는 해당 스트림을 수신하지 않습니다. 지금 설치하면 실행되지 않는 알림이 생성됩니다.",
       "query": "쿼리",
-      "stream": "스트림",
       "streamType": "스트림 유형",
       "metricCondition": "메트릭 조건",
       "matchCount": "일치하는 행 필요",
@@ -7609,18 +7381,11 @@
     "install": {
       "title": "라이브러리에서 설치",
       "subtitle": "알림이 전송될 대상, 설치할 알림, 그리고 보관 위치를 선택합니다.",
-      "stepDestination": "대상",
       "stepAlerts": "알림",
       "stepFolder": "폴더",
       "stepTune": "조정",
       "stepInstall": "설치",
-      "destinationIntro": "이 배치의 모든 알림은 여기서 선택한 대상으로 알림을 보냅니다. 라이브러리 파일에는 해당 파일을 내보낸 조직의 대상 이름이 지정되어 있지만, 이 조직에는 존재하지 않습니다.",
-      "destinationLabel": "대상",
-      "destinationPlaceholder": "대상 선택",
-      "destinationsLoadFailed": "기존 대상을 불러오지 못했습니다.",
       "retry": "다시 시도",
-      "destinationsNoneBody": "이 조직에는 아직 알림 대상이 없으므로 이러한 알림을 보낼 곳이 없습니다. 대상 페이지에서 대상을 만든 후 돌아와서 여기에서 선택하세요.",
-      "openDestinations": "대상 열기",
       "selectAll": "모두 선택",
       "clear": "선택 해제",
       "selectedCount": "{total}개 중 {count}개 선택됨",
@@ -7675,7 +7440,6 @@
     "importBodyLabel": "템플릿 본문 *",
     "importTypeLabel": "템플릿 유형 *",
     "importTitleLabel": "템플릿 제목 *",
-    "header": "대상 템플릿",
     "add": "템플릿 추가",
     "edit": "편집",
     "name": "이름",
@@ -7735,7 +7499,6 @@
     "chartPreviewPlaceholder": "실제 알림에서는 차트가 여기에 표시됩니다 — 미리 보기에는 없는 알림 자체의 평가 기록에서 가져옵니다.",
     "channelTitlesDescription": "특정 채널에서 다른 제목 사용 — 예: 이메일의 짧은 제목.",
     "namePlaceholder": "예: 높은 오류율",
-    "nameLockedHint": "알림 및 대상은 이름으로 이 템플릿을 참조하므로 이름을 바꿀 수 없습니다. 템플릿을 복제하여 새 이름으로 복사본을 만드세요.",
     "rawBodyCaption": "작성된 그대로 전송되며 {'{'}variables{'}'}가 대체됩니다. 사용 가능한 모든 항목은 변수 가이드를 참조하세요.",
     "contentTitlePlaceholder": "{'{'}alert_name{'}'} · {'{'}stream_name{'}'}",
     "fieldLabelPlaceholder": "예: 값",
@@ -7749,7 +7512,6 @@
     "moveUp": "위로 이동",
     "moveDown": "아래로 이동",
     "fieldLabel": "레이블",
-    "fieldValue": "값",
     "linkLabel": "레이블",
     "linkUrl": "URL",
     "channelTitleSlack": "Slack",
@@ -7809,12 +7571,10 @@
     "channelSns": "SNS",
     "testSendGroupLabel": "실제 테스트 메시지 보내기",
     "testSend": "테스트 보내기",
-    "testSendDestinationLabel": "대상",
     "testSendConfirmTitle": "실제 테스트 메시지를 보내시겠습니까?",
     "testSendConfirm": "선택한 채널에 [TEST]로 표시된 실제 메시지를 게시합니다.",
     "testSendSuccess": "테스트 메시지 전송됨",
-    "testSendRateLimited": "테스트 전송이 너무 많습니다 — 잠시 후 다시 시도하세요.",
-    "testSendNoDestination": "먼저 대상을 선택하세요."
+    "testSendRateLimited": "테스트 전송이 너무 많습니다 — 잠시 후 다시 시도하세요."
   },
   "alert_sources": {
     "header": "외부 알림 소스",
@@ -7852,10 +7612,8 @@
     "editTitle": "알림 소스 편집",
     "name": "이름",
     "nameHint": "레이블일 뿐입니다. 모든 소스는 동일한 구성을 사용합니다.",
-    "incidentDestination": "인시던트 대상",
     "incidentDestinationPlaceholder": "조직 기본값 사용",
     "incidentDestinationHint": "이 소스의 알림이 인시던트를 생성하거나 참여할 때 알림이 전달되는 위치입니다. 비워 두면 조직 기본값을 사용합니다. 둘 다 설정하지 않으면 일치하는 인시던트는 알림 없이 발생합니다.",
-    "noDestinationSet": "인시던트 대상이 설정되지 않음",
     "setupStep1Title": "1. 웹훅 만들기",
     "setupStep1Body": "Grafana, Alertmanager 또는 JSON을 POST할 수 있는 도구에서 웹훅 연락처/수신자를 만드세요.",
     "setupRemainingStepsHint": "이 소스를 저장하여 URL과 토큰을 얻은 다음 해당 웹훅 구성에 붙여넣으세요.",
@@ -7878,13 +7636,10 @@
     "createdSuccess": "알림 소스가 생성되었습니다",
     "updatedSuccess": "알림 소스가 업데이트되었습니다",
     "error": "알림 소스를 불러오는 중 오류 발생",
-    "senderError": "소스 상태를 불러오는 중 오류 발생",
-    "destinationsLoadError": "대상을 불러오는 중 오류 발생"
+    "senderError": "소스 상태를 불러오는 중 오류 발생"
   },
   "alert_destinations": {
-    "sectionTab": "대상",
     "chooseTypeTitle": "유형 선택",
-    "selectDestinationType": "대상 유형 선택",
     "connectionStepTitle": "연결",
     "connectionDetailsTitle": "연결 세부 정보",
     "urlHelpText": "후행 슬래시가 없는 기본 URL (예: https://your-domain.com)",
@@ -7903,10 +7658,6 @@
     "datadogHostnameHelpText": "Datadog 로그용 호스트 이름",
     "exampleLabel": "예:",
     "subtitle": "트리거된 알림이 전달되는 위치",
-    "exportDestination": "내보내기 대상",
-    "deleteDestinationTitle": "대상 삭제",
-    "deleteDestinationMessage": "대상을 삭제하시겠습니까?",
-    "deleteDestinationsTitle": "대상 삭제",
     "selected": "선택됨",
     "organizationLabel": "조직",
     "defaultPlaceholder": "예: default",
@@ -7925,25 +7676,18 @@
     "ddTagsPlaceholder": "태그 입력 (예: env:prod,version:1.0)",
     "serviceLabel": "서비스",
     "servicePlaceholder": "서비스 이름 입력 (예: api-gateway)",
-    "header": "여행지",
-    "add": "목적지 추가",
     "edit": "편집",
-    "search": "목적지 검색",
     "filterAll": "모두",
     "filterPrebuilt": "사전 구축",
     "filterCustom": "사용자 지정",
     "templateDefaultBadge": "디폴트",
     "name": "이름",
-    "destination_type": "목적지 유형",
     "template": "템플릿",
     "actions": "액션",
-    "addTitle": "목적지 추가",
-    "updateTitle": "목적지 업데이트",
     "delete": "삭제",
     "method": "메서드",
     "url": "URL",
     "api_header": "머리글",
-    "api_header_value": "가치",
     "skip_tls_verify": "TLS 확인 건너뛰기",
     "action": "액션",
     "output_format": "출력 형식",
@@ -7952,7 +7696,6 @@
     "custom_headers": "사용자 지정 헤더 (선택 사항)",
     "preview": "시사",
     "test": "테스트",
-    "saved": "목적지가 성공적으로 저장되었습니다.",
     "customWebhook": "사용자 지정 (웹후크)",
     "customEmail": "사용자 지정 (이메일)",
     "customAction": "사용자 지정 (액션)",
@@ -7962,7 +7705,6 @@
     "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)",
     "templateDefaultOption": "Default ({name})",
     "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one.",
-    "loadingData": "대상 데이터를 로드하는 중...",
     "noEmailTemplates": "아직 이메일 템플릿을 생성하지 않은 것 같습니다.",
     "createEmailTemplate": "이메일 템플릿 생성",
     "headers": "헤더",
@@ -7977,40 +7719,14 @@
       "servicenowDescription": "ServiceNow에 인시던트 생성"
     },
     "import": {
-      "title": "대상 가져오기",
       "errorValidations": "오류 유효성 검사",
       "outputMessages": "출력 메시지",
-      "destinationName": "대상 이름",
-      "destinationUrl": "대상 URL",
-      "destinationMethod": "대상 메서드",
       "templates": "템플릿",
       "emails": "이메일 (쉼표로 구분)",
       "actions": "작업",
-      "destinationCreation": "대상 생성",
       "jsonStringEmpty": "JSON 문자열이 비어 있습니다",
       "invalidJsonFormat": "잘못된 JSON 형식",
-      "importSuccess": "대상 가져오기 성공",
-      "importError": "대상 가져오기 오류, JSON을 확인하세요",
-      "unknownError": "알 수 없는 오류",
-      "nameRequired": "대상 - {index}: \"name\" 필드는 필수이며 유효한 문자열이어야 합니다.",
-      "nameExists": "대상 - {index}: \"{name}\"이(가) 이미 존재합니다",
-      "typeInvalid": "대상 - {index}: \"type\" 필드는 \"email\", \"http\" 또는 \"action\" 중 하나여야 합니다.",
-      "actionTypeNotSupported": "대상 - {index}: 'action' 유형은 지원되지 않습니다.",
-      "actionNotFound": "대상 - {index}: 유형 \"{type}\"에 대한 작업 \"{actionId}\"이(가) 존재하지 않습니다",
-      "urlRequired": "대상 - {index}: http 유형 대상에는 \"url\" 필드가 필요합니다.",
-      "methodInvalid": "대상 - {index}: \"method\" 필드는 \"post\", \"get\" 또는 \"put\" 중 하나여야 합니다.",
-      "templateRequiredHttp": "대상 - {index}: http 유형 대상에는 \"template\" 필드가 필요합니다.",
-      "skipTlsVerifyRequired": "대상 - {index}: \"skip_tls_verify\" 필드는 필수이며 불리언 값이어야 합니다",
-      "headersMustBeObject": "대상 - {index}: http 유형의 경우 'headers'는 객체여야 합니다",
-      "urlNotAllowedEmail": "대상 - {index}: 이메일 유형의 경우 'url'을 제공해서는 안 됩니다",
-      "headersNotAllowedEmail": "대상 - {index}: 이메일 유형의 경우 'headers'를 제공해서는 안 됩니다",
-      "emailsRequired": "대상 - {index}: 이메일 유형 대상의 경우 \"emails\" 필드는 필수이며 배열이어야 합니다.",
-      "emailsMustBeStrings": "대상 - {index}: 이메일 유형의 경우 'emails'는 문자열 배열이어야 합니다",
-      "templateRequiredEmail": "대상 - {index}: 이메일 유형 대상의 경우 \"template\" 필드가 필요합니다.",
-      "templateNotFound": "대상 - {index}: 유형 \"{type}\"에 대한 템플릿 \"{template}\"이(가) 존재하지 않습니다",
-      "actionIdInvalid": "대상 - {index}: \"action_id\" 필드는 유효한 문자열이어야 합니다.",
-      "createSuccess": "대상 - {index}: \"{name}\"이(가) 성공적으로 생성되었습니다\n참고: 생성된 대상 객체 {name}을(를) JSON 파일에서 제거하세요",
-      "createFailed": "대상 - {index}: \"{name}\" 생성 실패 --> \n 이유: {reason}"
+      "unknownError": "알 수 없는 오류"
     },
     "priorityP1Description": "최고 우선순위 알림",
     "priorityP2Description": "높은 우선순위 알림",
@@ -8022,10 +7738,7 @@
     "severityWarningDescription": "경고 수준 인시던트",
     "severityInfoDescription": "정보 인시던트"
   },
-  "pipeline_destinations": {
-    "header": "파이프라인 목적지",
-    "search": "목적지 검색"
-  },
+  "pipeline_destinations": {},
   "storage_settings": {
     "heroBrand": "OpenObserve.",
     "tabLabel": "조직 스토리지",
@@ -8234,7 +7947,6 @@
     },
     "metricCard": {
       "lastRefreshed": "마지막 새로고침:",
-      "traceId": "추적 ID: {id}",
       "metricLabel": "메트릭: {name}",
       "queryLabel": "쿼리: {query}",
       "errorLabel": "오류: {error}",
@@ -8267,7 +7979,6 @@
       "loadingLabels": "레이블 로딩 중...",
       "noLabelsFound": "레이블을 찾을 수 없음",
       "operator": "연산자",
-      "value": "값",
       "selectLabelFirst": "먼저 레이블을 선택하세요",
       "noValuesFound": "값을 찾을 수 없음",
       "addLabelFilter": "레이블 필터 추가",
@@ -8358,7 +8069,6 @@
     "generalLabel": "일반",
     "groupGeneral": "일반",
     "groupAccessSecurity": "접근 및 보안",
-    "groupDestinations": "대상",
     "groupDataAI": "데이터 및 AI",
     "groupOperations": "운영",
     "groupSynthetics": "Synthetics",
@@ -8387,8 +8097,6 @@
     "customLogoText": "사용자 지정 로고 텍스트",
     "orgLabel": "조직 매개변수",
     "logDetails": "로그 세부 정보",
-    "traceIdFieldName": "트레이스 ID 필드 이름",
-    "spanIdFieldName": "스팬 ID 필드 이름",
     "toggleIngestionLogsLabel": "통합 로그 전환",
     "usageStreamEnabledLabel": "사용 스트림 활성화",
     "claimParserFunction": "SSO 클레임 파서",
@@ -8514,7 +8222,6 @@
     "genAiAgentMapping": {
       "tabLabel": "젠아이 에이전트 매핑",
       "title": "젠아이 에이전트 매핑",
-      "description": "LLM 추적 및 평가를 위한 에이전트 ID를 정규화하는 데 사용되는 폴백 텔레메트리 속성을 구성합니다.",
       "agentNameFields": "상담원 이름 폴백 필드",
       "agentNameHelp": "gen_ai.agent.name의 폴백으로 사용할 들어오는 속성입니다.",
       "agentNameInfo": "표준 gen_ai.agent.name 속성이 없거나 비어 있는 경우에만 확인합니다.수신되는 텔레메트리 속성을 한 줄에 하나씩 추가합니다.",
@@ -8532,7 +8239,6 @@
       "resetToEmpty": "빈 상태로 재설정",
       "clearRegistry": "레지스트리 지우기",
       "clearRegistryTitle": "에이전트 레지스트리를 지우시겠습니까?",
-      "clearRegistryDescription": "이렇게 하면 이 조직에 대해 검색된 GenAI 에이전트 레지스트리 행이 모두 삭제됩니다.일치하는 새 트레이스는 수집 중에 레지스트리를 다시 채웁니다.",
       "clearRegistryConfirm": "레지스트리 지우기",
       "saved": "GenAI 에이전트 매핑이 성공적으로 저장되었습니다.",
       "clearRegistrySuccess": "GenAI 에이전트 레지스트리가 삭제되었습니다. {deletedCount} 개의 저장된 에이전트와 {bufferCount} 개의 대기 중인 관찰을 삭제했습니다.",
@@ -8552,7 +8258,6 @@
       "fieldAliasesSaveError": "필드 별칭 저장 실패",
       "fieldAliasesUnsavedConfirm": "저장되지 않은 필드 매핑 변경 사항이 있습니다. 삭제하고 나가시겠습니까?",
       "discoveredServicesTitle": "검색된 서비스",
-      "discoveredServicesDescription": "서비스는 텔레메트리 데이터에서 자동으로 검색되며 상관 관계를 파악할 수 있도록 FQN (FQualified Name) 별로 그룹화됩니다.동일한 FQN을 공유하는 서비스는 로그, 추적 및 지표 전반에서 서로 상관관계가 있습니다.",
       "noServicesYet": "아직 검색된 서비스가 없습니다.",
       "noServicesDescription": "원격 측정 데이터가 서비스 식별 속성 (예: k8s-배포, 서비스 이름 등) 과 함께 수집되면 서비스가 여기에 표시됩니다.",
       "searchServiceName": "서비스 이름 검색...",
@@ -8560,7 +8265,6 @@
       "serviceName": "서비스 이름",
       "service": "서비스",
       "logs": "로그",
-      "traces": "트레이스",
       "metrics": "측정항목",
       "lastSeen": "마지막 확인",
       "retry": "재시도",
@@ -8572,7 +8276,6 @@
       "fieldMappingDialogHelp": "텔레메트리 데이터 전반에서 서비스 이름으로 인식되어야 하는 필드 이름을 추가하거나 제거하세요.",
       "fieldMappingPlaceholder": "필드 이름을 입력하고 Enter 키를 누르세요",
       "foundInLogs": "로그에서 발견됨",
-      "foundInTraces": "트레이스에서 발견됨",
       "foundInMetrics": "메트릭에서 발견됨",
       "distinguishByLabel": "서비스 구분 기준",
       "distinguishByHelp": "서비스가 실행되는 위치를 정의하는 필드를 선택하세요. 예를 들어 cluster + namespace + deployment를 함께 사용하면 각 서비스에 대한 고유 ID가 생성됩니다. 최대 5개 필드까지 가능합니다.",
@@ -8608,13 +8311,11 @@
       "instancesCount": "(인스턴스 {count}개)",
       "noDimensions": "차원 없음",
       "defaultSetWarningTitle": "상관 분석이 신뢰할 수 없을 수 있습니다.",
-      "defaultSetWarningBody": "이 인스턴스에는 명확화가 없습니다 — 워크로드 일치 없이(cluster, namespace 또는 environment 컨텍스트 없이) 발견되었습니다. 로그와 트레이스가 동일한 서비스 이름의 서로 다른 배포에서 나올 수 있습니다.",
       "instanceIdentity": "인스턴스 ID",
       "noDimensionsCatchAll": "차원 없음 — 모든 항목 포괄 인스턴스",
       "streamSources": "스트림 소스",
       "fieldNameMapping": "필드 이름 매핑",
       "logsWithCount": "로그 ({count})",
-      "tracesWithCount": "트레이스 ({count})",
       "metricsWithCount": "메트릭 ({count})"
     },
     "addRegexPattern": {
@@ -8727,9 +8428,7 @@
       "importPatternFailed": "패턴 \"{name}\"을(를) 가져오지 못했습니다: {error}",
       "createFailed": "정규식 패턴 - {index}: \"{name}\" 생성 실패 --> \n 이유: {error}"
     },
-    "index": {
-      "genAiAgentMappingDesc": "GenAI 스팬을 에이전트 식별자에 매핑"
-    },
+    "index": {},
     "organizationManagementPage": {
       "setAiCredits": "AI 크레딧 설정",
       "setAiCreditsSubtitle": "조직의 평생 AI 크레딧 허용 한도를 설정합니다.",
@@ -8863,8 +8562,6 @@
       "noValues": "값 없음",
       "cardinality": "카디널리티:",
       "uniqueValues": "{n}개의 고유 값",
-      "streams": "스트림",
-      "streamsSubtext": "스트림",
       "noAdditionalDimensions": "추가 차원이 감지되지 않았습니다.",
       "noSampleData": "이 필드에 대한 샘플 데이터가 없습니다.",
       "uniqueValuesDetected": "{n}개의 고유 값이 감지됨",
@@ -8931,7 +8628,6 @@
     "cachedReportHint": "참고: 캐시된 보고서는 대시보드에 빠르게 액세스하기 위해 저장되며, 이러한 보고서에는 공유가 비활성화됩니다.",
     "selectDashboardStep": "대시보드 선택",
     "timeRangeDescription": "지정된 시간 범위의 데이터로 보고서를 생성합니다",
-    "pngPageLimitNote": "PNG는 대시보드의 첫 번째 보이는 페이지만 캡처합니다. 대시보드가 여러 페이지에 걸쳐 있는 경우 PDF를 사용하세요.",
     "widthPlaceholder": "예: 1440",
     "heightPlaceholder": "예: 900",
     "dimensionsDefaultHint": "비워 두면 서버 기본값을 사용합니다",
@@ -8947,7 +8643,6 @@
     "searchAllFoldersTitle": "모든 폴더에서 검색",
     "never": "안 함",
     "startDate": "시작 날짜",
-    "header": "보고서",
     "subtitle": "정기 보고서 및 내보내기",
     "searchThisFolder": "이 폴더",
     "searchAllFolders": "모든 폴더",
@@ -9050,7 +8745,6 @@
     "totalTimeRange": "전체 쿼리 범위",
     "searchType": "검색 유형",
     "querySource": "쿼리 소스",
-    "traceId": "트레이스 ID",
     "userId": "사용자 ID",
     "orgId": "조직 ID",
     "streamType": "스트림 유형",
@@ -9137,16 +8831,10 @@
     },
     "openInFullView": "전체 화면으로 열기",
     "viewLogs": "로그 보기",
-    "viewLogsUnavailable": "이 스팬의 로그를 열 수 없습니다.",
     "backToLogs": "로그로 돌아가기",
-    "openInTraces": "오픈 인 트레이스",
     "loadingStream": "스트림 로드 중...",
     "noLogsAvailableForService": "이 서비스에 사용할 수 있는 로그가 없습니다.",
-    "noCorrelatedLogsFound": "이 스팬에 대한 연관 로그가 없습니다",
     "noData": {
-      "title": "{product}로 트레이스 보내기 시작",
-      "description": "이 조직에서는 아직 트레이스 스트림을 찾을 수 없습니다.인스트루먼트 서비스 및 트레이스가 여기에 자동으로 표시됩니다.",
-      "otlp": "{product}를 통해 트레이스 보내기",
       "otlpDesc": "{product1}, {product2} 및 모든 {product3} 호환 SDK",
       "otelCollectorDesc": "{product}를 통해 모든 텔레메트리 신호를 라우팅",
       "or": "또는:",
@@ -9155,21 +8843,12 @@
     "configureFullTextSearch": "스트림에 전체 텍스트 검색 필드를 구성합니다.",
     "collapseFields": "필드 축소",
     "openFields": "오픈 필드",
-    "timeRangeUpdated": "선택한 시간 범위에는 이 추적이 포함되지 않았습니다.트레이스의 타임스탬프와 일치하도록 시간 범위가 업데이트되었습니다.",
-    "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다.",
-    "fetchingTraces": "잠깐만요, 우리가 당신의 흔적을 찾고 있어요.",
     "noStream": {
       "title": "스트림을 선택하여 탐색을 시작하세요",
-      "description": "트레이스 스트림을 선택한 다음 <strong>쿼리 실행을</strong> 누릅니다.결과가 로드되면 서비스, 기간, 범위 상태 등을 기준으로 필터링할 수 있습니다.",
       "selectStream": "스트림 선택",
-      "selectStreamDesc": "이 조직에서 사용 가능한 트레이스 스트림 찾아보기",
-      "queryGuide": "트레이스 가이드 읽기",
-      "queryGuideDesc": "서비스 그래프, 스팬 필터링, RED 메트릭 등",
       "recent": "최근:"
     },
     "noEvents": {
-      "title": "흔적을 찾을 수 없음",
-      "descNoFilters": "{range} 에서 흔적을 찾을 수 없습니다.결과를 로드할 시간 범위를 넓혀 보십시오.",
       "descWithFilters": "선택한 창에서 <strong>이 쿼리와</strong> 일치하는 항목이 없습니다.시간 범위를 넓히거나 필터를 제거해 보세요.",
       "descOutOfRange": "선택한 시간 범위에 이 스트림의 데이터가 없습니다. 데이터가 마지막으로 확인된 시점으로 이동하세요.",
       "jumpToData": "최신 데이터로 이동",
@@ -9177,38 +8856,19 @@
       "askAi": "AI에게 쿼리 수정 요청하기",
       "selectedRange": "선택한 범위"
     },
-    "tracesFound": "흔적 발견",
-    "spansFound": "스팬 발견",
-    "errorTraces": "오류 추적",
-    "errorSpans": "오류 범위",
     "filterByErrors": "오류별 필터링",
     "clearErrorFilter": "오류 필터 지우기",
     "error": "오류",
     "errorCount": "{n} 오류 | {n} 오류",
     "success": "성공",
-    "applyPendingFilters": "보류 중인 필터 및 검색 추적 적용",
-    "backToTraces": "트레이스로 돌아가기",
     "loadingTrace": "로드 중...",
-    "traceId": "트레이스 ID",
-    "copyTraceId": "트레이스 ID 복사",
     "viewFilters": "뷰 필터",
-    "reviewAndApplyFilters": "필터 검토 및 트레이스에 적용",
-    "spansLabel": "기간",
     "errorsLabel": "오류",
     "previousMatch": "이전 경기",
     "nextMatch": "다음 경기",
-    "searchInSpans": "스팬으로 검색",
-    "spansTableView": "스팬 테이블 뷰",
     "comingSoon": "곧 출시됩니다...",
-    "fetchingTrace": "트레이스를 가져오는 중입니다.",
-    "traceFilters": "트레이스 필터",
-    "showTraces": "트레이스 보기",
     "applyAndSearch": "신청 및 검색",
     "timestamp": "타임스탬프",
-    "noErrorPresent": "이 스팬에는 오류가 없습니다.",
-    "noEventsPresent": "이 스팬에 대한 이벤트 없음",
-    "noLinksPresent": "이 스팬에 대한 링크 없음",
-    "loadingTraceDag": "트레이스 DAG 로딩 중...",
     "exceptionsWithCount": "예외 ({count})",
     "typeLabel": "유형:",
     "messageLabel": "메시지:",
@@ -9222,7 +8882,6 @@
       "templateBadge": "주형"
     },
     "sessionsList": {
-      "streamLabel": "스트림",
       "sessions": "세션",
       "failedToLoad": "세션을 로드하지 못했습니다.",
       "retry": "재시도",
@@ -9240,7 +8899,6 @@
         "cost": "비용",
         "status": "상태"
       },
-      "stream": "스트림",
       "agent": "에이전트",
       "noAgentsTitle": "이 범위에 에이전트 없음",
       "noAgentsDescription": "선택한 시간 범위에서 GenAI 에이전트가 감지되지 않았습니다. 더 넓은 범위를 시도하거나 스트림 보기로 전환하세요.",
@@ -9254,12 +8912,9 @@
       "failedToLoad": "세션을 로드하지 못했습니다.",
       "retry": "재시도",
       "sessionNotFound": "세션을 찾을 수 없음",
-      "noSpansFound": "현재 시간 범위에서 {id} 에 대한 범위를 찾을 수 없습니다.",
-      "searchPlaceholder": "이 세션에서 추적 검색...",
       "turn": "회전",
       "turns": "회전합니다",
       "turnCount": "{count} {unit}",
-      "openInTraceExplorer": "트레이스 보기",
       "filters": {
         "status": "상태",
         "model": "모델",
@@ -9348,7 +9003,6 @@
         "warning": "경고",
         "critical": "심각"
       },
-      "viewTraces": "트레이스 보기",
       "types": {
         "all": "모두",
         "service": "서비스",
@@ -9362,20 +9016,15 @@
         "title": "오류율"
       }
     },
-    "spansTab": "스팬",
-    "tracesTab": "트레이스",
     "serviceGraphTab": "서비스 그래프",
     "serviceGraphSubtitle": "서비스가 서로 호출하는 방식을 확인하세요 — 종속성, 처리량 및 오류율",
-    "servicesCatalogSubtitle": "트레이스를 보내는 모든 서비스 — 지연 시간, 처리량 및 오류율 포함",
     "treeView": "트리 뷰",
     "graphView": "그래프 보기",
     "layoutHorizontal": "수평형",
     "layoutVertical": "수직형",
     "layoutForce": "포스 레이아웃",
-    "exportTraces": "트레이스 내보내기",
     "waterfall": "폭포",
     "flameGraph": "플레임 그래프",
-    "traceGraph": "트레이스 그래프",
     "thread": "스레드",
     "dbSpanDetails": {
       "dbSystem": "DB 시스템",
@@ -9385,7 +9034,6 @@
       "host": "호스트",
       "user": "사용자",
       "storedProcedure": "저장 프로시저",
-      "noQueryText": "이 스팬에 대한 쿼리 텍스트가 기록되지 않았습니다.",
       "performance": "성능",
       "rowsReturned": "반환된 행",
       "batchSize": "배치 크기",
@@ -9398,13 +9046,11 @@
       "changeStreamTitle": "스트림 변경?",
       "switchStream": "스트림 전환",
       "cancel": "취소",
-      "changeStreamMessage": "이렇게 하면 Traces/Spans 탭의 스트림도 업데이트되고 기존 쿼리가 재설정됩니다.",
       "errorGettingFunctions": "함수를 가져오는 중 오류 발생",
       "errorPullingIndex": "선택한 조직의 인덱스를 가져오는 중 오류 발생{message}",
       "errorGettingStreams": "스트림을 가져오는 중 오류 발생",
       "errorLoadingStreams": "스트림을 로드하는 중 오류 발생",
       "errorConstructingQuery": "검색 쿼리를 구성하는 중 오류가 발생했습니다.",
-      "traceNotFound": "트레이스 {traceId}를 찾을 수 없음",
       "errorProcessingRequest": "요청 처리 중 오류 발생",
       "searchRequestFailed": "검색 요청 실패"
     },
@@ -9425,9 +9071,6 @@
       "service": "서비스",
       "operationName": "작업 이름",
       "duration": "지속 시간",
-      "spans": "스팬",
-      "spanKind": "스팬 종류",
-      "spanStatus": "스팬 상태",
       "status": "상태",
       "serviceLatency": "서비스 지연 시간",
       "inputTokens": "입력 토큰",
@@ -9439,11 +9082,9 @@
       "noErrorsInRange": "이 시간 범위에 오류가 없습니다",
       "time": "시간",
       "service": "서비스",
-      "operation": "작업",
-      "traceId": "추적 ID"
+      "operation": "작업"
     },
     "lLMInsightsDashboard": {
-      "stream": "스트림",
       "agent": "에이전트",
       "compareEntry": "버전 비교",
       "compareEntryHint": "이 에이전트의 두 버전을 나란히 비교",
@@ -9454,7 +9095,6 @@
       "viewByStream": "스트림별 보기",
       "totalCost": "총 비용",
       "totalTokens": "총 토큰",
-      "totalTraces": "총 추적",
       "p95Latency": "P95 지연 시간",
       "errorRate": "오류율",
       "timeAxis": "시간",
@@ -9466,13 +9106,10 @@
     "serviceGraphNodeSidePanel": {
       "viewRelated": "관련 항목 보기",
       "logs": "로그",
-      "traces": "추적",
       "databases": "데이터베이스",
-      "viewTraces": "추적 보기",
       "operations": "작업",
       "metrics": "메트릭",
       "noOperationsFound": "작업을 찾을 수 없음",
-      "viewInTraces": "추적에서 보기",
       "noResourceDataFound": "{resource} 데이터를 찾을 수 없음",
       "retry": "재시도",
       "noMetricsAvailable": "이 서비스에 사용 가능한 메트릭이 없습니다.",
@@ -9496,13 +9133,11 @@
       "tabHosts": "호스트",
       "tabDatabases": "데이터베이스",
       "tabQueries": "쿼리",
-      "tabDestinations": "대상",
       "tabRpcServices": "RPC 서비스",
       "tabUrls": "URL",
       "colHost": "호스트",
       "colDatabase": "데이터베이스",
       "colDbOperation": "DB 작업",
-      "colDestination": "대상",
       "colRpcService": "RPC 서비스",
       "colUrl": "URL",
       "envHost": "호스트",
@@ -9517,14 +9152,11 @@
       "dbResponseStatusCode": "DB 응답 상태 코드",
       "processExitCode": "프로세스 종료 코드"
     },
-    "traceLatencyCell": {
-      "spansAcrossServices": "{spans}개 스팬이 {services}개 서비스에 걸쳐 있습니다"
-    },
+    "traceLatencyCell": {},
     "threadToolCalls": {
       "toolCall": "도구 호출",
       "toolCalls": "도구 호출",
       "showCalls": "호출 표시",
-      "openSpanDetails": "스팬 세부 정보 열기",
       "arguments": "인수",
       "result": "결과",
       "empty": "(비어 있음)"
@@ -9538,17 +9170,13 @@
       "cost": "비용",
       "model": "모델",
       "errors": "오류",
-      "noSpansLoaded": "이 추적에 로드된 스팬이 없습니다.",
-      "noLlmTurns": "LLM 턴이 감지되지 않았습니다. 추적에 다음이 포함된 스팬이 없습니다.",
       "system": "시스템",
-      "historicalMessage": "{count}개의 이전 세션 메시지 — 이전 트레이스에서 처리됨. | {count}개의 이전 세션 메시지 — 이전 트레이스에서 처리됨.",
       "user": "사용자",
       "startedAt": "{time}에 시작됨",
       "unknown": "알 수 없음",
       "tokens": "토큰",
       "tokensSuffix": "토큰",
-      "error": "오류",
-      "viewSpan": "스팬 보기"
+      "error": "오류"
     },
     "traceHeader": {
       "operationName": "작업 이름"
@@ -9566,7 +9194,6 @@
       "start": "시작",
       "requestResent": "요청이 {count}회 재전송됨 | 요청이 {count}회 재전송됨",
       "resends": "재전송",
-      "spanIdTitle": "스팬 ID: {id}",
       "inputTokens": "입력 토큰",
       "in": "입력",
       "outputTokens": "출력 토큰",
@@ -9584,11 +9211,8 @@
       "modelParameters": "모델 매개변수",
       "table": "테이블",
       "field": "필드",
-      "value": "값",
       "timestamp": "타임스탬프",
       "enterpriseLicenseRequired": "상관 관계 기능은 엔터프라이즈 라이선스가 필요합니다",
-      "missingSpanOrStream": "스팬 또는 스트림 이름 누락",
-      "spanIdCopied": "스팬 ID가 클립보드에 복사됨",
       "attributesCopied": "속성이 클립보드에 복사됨",
       "copiedToClipboard": "{type}이(가) 클립보드에 복사됨",
       "failedToCopyClipboard": "클립보드 복사 실패",
@@ -9601,26 +9225,20 @@
       "filterAdded": "필터 추가됨: {field} {operator} '{value}'",
       "timeline": "타임라인",
       "serviceMap": "서비스 맵",
-      "traceNotFound": "트레이스 {traceId}를 찾을 수 없음",
-      "spanNotFound": "트레이스에서 스팬 {spanId}를 찾을 수 없음",
       "unknownOperation": "알 수 없는 작업",
       "unknownService": "알 수 없는 서비스",
-      "traceIdCopied": "트레이스 ID가 클립보드에 복사됨",
       "sessionIdCopied": "세션 ID가 클립보드에 복사됨"
     },
     "traceTree": {
       "clickToExpand": "클릭하여 펼치기",
       "clickToCollapse": "클릭하여 접기",
-      "errorSpan": "오류 스팬",
-      "httpStatus": "HTTP {status}",
-      "spanEvent": "{count} 스팬 이벤트 | {count} 스팬 이벤트"
+      "httpStatus": "HTTP {status}"
     },
     "tracesAnalysisDashboard": {
       "baseline": "기준선:",
       "selected": "선택됨:",
       "dimensions": "차원",
-      "collapseDimensions": "차원 접기",
-      "tracesPerInterval": "트레이스/간격"
+      "collapseDimensions": "차원 접기"
     },
     "sessionDetails": {
       "missingSessionInfo": "URL에 세션 ID 또는 스트림 누락",
@@ -9628,36 +9246,21 @@
       "copied": "복사됨"
     },
     "flameGraphView": {
-      "spans": "스팬",
       "depth": "깊이",
-      "noSpansToDisplay": "표시할 스팬 없음",
       "service": "서비스:",
       "duration": "지속 시간:",
-      "percentOfTrace": "트레이스의 %:",
       "hasErrors": "⚠ 오류 있음"
     },
     "tracesNoEventsState": {
       "lastData": "마지막 데이터: {formatted} ({zone})"
     },
     "correlation": {
-      "distributedTrace": "분산 추적",
-      "loadingTraceData": "추적 데이터를 불러오는 중...",
-      "noTraceInfoAvailable": "이 이벤트에 사용 가능한 추적 정보가 없습니다",
-      "traceIdLabel": "추적 ID:",
-      "copyTraceId": "추적 ID 복사",
-      "spanIdLabel": "스팬 ID:",
-      "spanHierarchy": "스팬 계층:",
-      "applicationSpan": "애플리케이션 스팬",
-      "browserSdkSpanPrefix": "브라우저 SDK 스팬 (",
       "closingParen": ")",
-      "backendSpansPrefix": "백엔드 스팬 (",
       "performanceBreakdown": "성능 분석:",
       "totalDuration": "총 지속 시간:",
       "browserLabel": "브라우저:",
       "networkLabel": "네트워크:",
-      "backendLabel": "백엔드:",
-      "viewTraceDetails": "추적 세부 정보 보기",
-      "backendTraceNotAvailable": "백엔드 추적 데이터를 아직 사용할 수 없습니다. 추적 데이터는 수집되는 데 최대 30초가 걸릴 수 있습니다."
+      "backendLabel": "백엔드:"
     },
     "failedToAnalyzeDimensions": "차원을 분석하지 못했습니다",
     "failedToFetchCorrelatedLogs": "상관 로그를 가져오지 못했습니다",
@@ -9685,7 +9288,6 @@
     "serviceDiscoveryNotEnabled": "서비스 검색이 활성화되지 않았습니다. 이는 엔터프라이즈 기능입니다.",
     "startTime": "시작 시간",
     "streamNameRequiredForCorrelation": "상관 관계 분석에는 스트림 이름이 필요합니다",
-    "trace": "트레이스",
     "unableToConnectToServer": "서버에 연결할 수 없습니다. 애플리케이션이 실행 중인지 확인해 주세요.",
     "unknownService": "알 수 없는 서비스",
     "unknownPattern": "알 수 없는 패턴",
@@ -9696,7 +9298,6 @@
       "requestsLabel": "요청:",
       "errorsLabel": "오류:",
       "errorRateLabel": "오류율:",
-      "spansLabel": "스팬:",
       "callsLabel": "호출:",
       "averageLabel": "평균:",
       "minimumLabel": "최소:",
@@ -9705,10 +9306,8 @@
       "p75Label": "P75:",
       "p95Label": "P95:",
       "p99Label": "P99:",
-      "averageOfTrace": "{avg}ms (트레이스의 {percent}%)",
       "requestCount": "{count}건"
     },
-    "spanEventTimeline": "Span 이벤트 타임라인",
     "eventClusterTooltip": "{count} 이벤트",
     "spanEventCount": "{count} 이벤트",
     "spanEventCountPlural": "{count} 이벤트",
@@ -9719,8 +9318,7 @@
     "eventClusterAriaLabel": "{count} 이벤트, {errors} 오류",
     "eventClusterAriaLabelPlural": "{count} 이벤트, {errors} 오류",
     "eventMarkerTooltip": "이벤트: {name}",
-    "exceptionMarkerTooltip": "예외: {type}",
-    "spanEventFallback": "span 이벤트"
+    "exceptionMarkerTooltip": "예외: {type}"
   },
   "actions": {
     "realTime": "실시간",
@@ -9794,7 +9392,6 @@
     "requiresConfirmation": "실행 전 확인 필요",
     "envVars": "환경 변수",
     "envKey": "변수 이름",
-    "envValue": "가치",
     "addEnvVar": "변수 추가",
     "credentialFiles": "자격 증명 파일",
     "credEnvVar": "환경 변수 이름",
@@ -10017,11 +9614,9 @@
     "selectMetrics": "지표 스트림 선택",
     "correlatedLogs": "상관관계가 있는 로그",
     "correlatedMetrics": "상관관계가 있는 지표",
-    "correlatedTraces": "상관관계가 있는 트레이스",
     "loadingCorrelation": "상관관계 데이터 로드 중...",
     "clickToLoadLogs": "상호 관련된 로그를 로드하려면 클릭하십시오.",
     "clickToLoadMetrics": "상관관계가 있는 지표를 로드하려면 클릭하십시오.",
-    "clickToLoadTraces": "상관관계가 있는 트레이스를 로드하려면 클릭하십시오.",
     "logs": {
       "filtersLabel": "필터",
       "allValues": "모든 값",
@@ -10040,19 +9635,11 @@
     "noLogsFound": "상관관계가 있는 로그를 찾을 수 없습니다.",
     "noDataFound": "데이터를 찾을 수 없음",
     "noLogsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 로그를 찾을 수 없습니다.",
-    "correlatedTracesFor": "서비스에 대한 상관관계가 있는 트레이스: {service}",
     "all": "모두",
-    "loadingTraces": "상관관계가 있는 트레이스 불러오는 중...",
-    "tracesError": "트레이스를 로드하지 못했습니다.",
-    "tracesErrorDetails": "추적 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
     "metricsError": "지표를 로드할 수 없음",
     "metricsErrorDetails": "지표 데이터를 가져오는 동안 오류가 발생했습니다.다시 시도해 주세요.",
     "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다.",
     "dimensionBasedCorrelation": "차원 기반 상관관계",
-    "tracesFromService": "서비스의 추적: {service}",
-    "noTracesFound": "상관관계가 있는 흔적을 찾을 수 없습니다.",
-    "noTracesDescription": "선택한 시간 범위에서 이 상관관계에 대한 추적을 찾을 수 없습니다.",
-    "viewInTraces": "트레이스에서 보기",
     "filters": "필터",
     "semanticFieldGroupsCaption": "상관 관계 분석 및 중복 제거를 위한 필드 이름 매핑 정의 (예: 호스트, 호스트 이름, 노드 → 'host' 그룹)",
     "exportToJson": "JSON으로 내보내기",
@@ -10185,10 +9772,8 @@
     "editCrossLink": "크로스링크 편집",
     "name": "이름",
     "nameRequired": "이름은 필수",
-    "namePlaceholder": "예: 트레이스 세부 정보 보기",
     "urlTemplate": "URL 템플릿",
     "urlRequired": "URL이 필요합니다",
-    "urlPlaceholder": "예: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
     "urlInvalid": "유효한 http(s) URL을 입력하세요",
     "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} 사용",
     "fields": "필드",
@@ -10281,7 +9866,6 @@
     "colPattern": "패턴",
     "colPricingSimple": "가격 책정",
     "testMatchTitle": "테스트 모델 매칭",
-    "testMatchSubtitle": "스팬의 모델 이름이 가격 책정 규칙과 어떻게 일치하는지 시뮬레이션해 보세요.",
     "modelNameInput": "모델 이름",
     "modelNameHint": "여러분 세대의 모델 이름.",
     "enterModelName": "매칭을 테스트할 모델 이름을 입력합니다.",
@@ -10377,8 +9961,7 @@
         "errorRate": "오류율",
         "p50": "P50 지연 시간",
         "p95": "P95 지연 시간",
-        "p99": "P99 지연 시간",
-        "cost": "비용 / 트레이스"
+        "p99": "P99 지연 시간"
       },
       "insufficientLabel": "참고용",
       "tooltip": {
@@ -10445,11 +10028,8 @@
       "sessions": "상담원 세션을 차례대로 찾아보고 살펴보세요",
       "agentGraph": "에이전트가 상호 작용하는 대상(도구, 모델, 서비스, 데이터 저장소)을 확인하세요",
       "agentBehavior": "루프에 갇힌 에이전트와 실패를 유발하는 오류를 발견합니다",
-      "discovery": "검토할 가치가 있는 비정상 트레이스 찾기",
       "queues": "상태를 유지하는 검토 할 일 목록",
-      "datasets": "주석이 달린 트레이스와 리뷰에서 골든 데이터셋을 큐레이션하세요",
       "experiments": "불변 오프라인 평가 실행을 미리 보고 생성합니다.",
-      "quality": "스팬, 트레이스 및 세션 평가에서 점수 품질 추적",
       "evalJobs": "세션 전반에서 평가 작업 실행 및 모니터링",
       "scorers": "LLM 결과를 채점하는 채점자 생성 및 관리",
       "scoreConfigs": "평가에 사용되는 채점 루브릭을 구성합니다."
@@ -10458,8 +10038,6 @@
       "button": "주석 달기",
       "title": "주석 달기 · {scope}",
       "scope": {
-        "span": "스팬",
-        "trace": "트레이스",
         "session": "세션"
       },
       "viaAnnotation": "주석",
@@ -10493,7 +10071,6 @@
       "dataset": {
         "button": "데이터셋에 추가",
         "title": "데이터셋에 추가",
-        "hint": "{ref}을(를) 골든으로 전환합니다. 입력은 트레이스에서 다시 읽어오며, 예상 출력을 직접 작성합니다.",
         "errors": {
           "dataset": "데이터셋 선택",
           "expectedOutput": "예상 출력 작성"
@@ -10502,7 +10079,6 @@
         "datasetPlaceholder": "데이터셋 선택...",
         "noDatasets": "아직 데이터셋이 없습니다 — 먼저 데이터셋 페이지에서 만드세요.",
         "inputLabel": "입력",
-        "inputReadOnly": "트레이스에서 읽음",
         "expectedLabel": "예상 출력",
         "expectedPlaceholder": "이 항목이 생성했어야 하는 출력을 작성하세요...",
         "confirm": "데이터셋에 추가",
@@ -10516,13 +10092,9 @@
       "searchPlaceholder": "서비스, 입력, 품질 검색...",
       "searchFooter": "이 페이지의 {loaded}개 중 {matched}개 일치",
       "scope": {
-        "span": "스팬",
-        "trace": "트레이스",
         "session": "세션"
       },
       "scopeNoun": {
-        "span": "스팬",
-        "trace": "트레이스",
         "session": "세션"
       },
       "inQueueFilter": {
@@ -10538,10 +10110,8 @@
         "started": "시작됨",
         "type": "유형",
         "kind": "종류",
-        "span": "스팬",
         "session": "세션",
         "topic": "토픽",
-        "traces": "트레이스",
         "duration": "지속 시간",
         "service": "서비스",
         "input": "입력",
@@ -10549,7 +10119,6 @@
         "inQueue": "대기열에 있나요?",
         "actions": "작업"
       },
-      "spanParent": "{trace} 내",
       "quality": {
         "issue": "이슈",
         "multiple": "여러 개",
@@ -10622,7 +10191,6 @@
         "operatorIs": "같음",
         "operatorIsNot": "같지 않음",
         "conditionScorePlaceholder": "점수 구성",
-        "conditionValuePlaceholder": "값",
         "pin": "버전 고정",
         "versionLatest": "v{version} (최신)",
         "success": "큐가 생성되었습니다",
@@ -10638,10 +10206,8 @@
         "searchPlaceholder": "항목 검색...",
         "footerTitle": "항목",
         "allItems": "전체",
-        "inTrace": "추적 {traceId}에서",
         "reviewAgain": "다시 검토",
         "emptyTitle": "검토할 항목 없음",
-        "emptyBody": "Discovery 또는 추적 뷰에서 이 큐에 트레이스, 스팬 또는 세션을 추가하세요.",
         "columns": {
           "refType": "참조",
           "refId": "참조",
@@ -10660,8 +10226,6 @@
         "next": "다음 항목",
         "collapseNav": "항목 목록 접기",
         "expandNav": "항목 목록 펼치기",
-        "openTrace": "전체 트레이스 열기",
-        "openTraceSoon": "전체 트레이스 보기는 다음 업데이트에서 제공됩니다.",
         "input": "입력",
         "output": "출력",
         "retrievedContext": "검색된 컨텍스트",
@@ -10692,7 +10256,6 @@
         "distill": {
           "title": "데이터셋으로 추출",
           "action": "데이터셋",
-          "hint": "이 항목이 생성했어야 하는 답변을 작성하세요. 이것이 골든 출력이 됩니다. 입력은 검토된 트레이스에서 가져옵니다.",
           "datasetLabel": "데이터셋",
           "datasetPlaceholder": "데이터셋 선택...",
           "noDatasets": "아직 데이터셋이 없습니다 — 먼저 데이터셋 페이지에서 생성하세요.",
@@ -10704,7 +10267,6 @@
           "updated": "골든 업데이트됨 — 이 항목은 이미 해당 데이터셋에 있습니다.",
           "openDataset": "데이터셋 열기",
           "needsReview": "리뷰를 먼저 완료하세요 — 골든에는 판정된 판단이 필요합니다",
-          "sessionUnsupported": "세션 항목은 증류할 수 없습니다 — 트레이스와 스팬만 가능합니다",
           "loadError": "데이터셋을 불러오지 못했습니다",
           "error": "이 항목을 데이터셋에 추가하지 못했습니다"
         },
@@ -10730,12 +10292,10 @@
       "trial": "시도 {index}",
       "summary": "데이터셋 v{version} · 시도 {trials}개 · 평가자 {scorers}명",
       "previewCounts": "행 {rows}개 × 시도 {trials}개 = 슬롯 {slots}개",
-      "viewTrace": "실행 추적 보기",
       "scoresTitle": "점수",
       "taskProgress": "작업: {completed}/{total} 완료 · {skipped} 건너뜀",
       "scoringProgress": "점수: {completed}/{total} 완료 · {skipped} 건너뜀",
       "skipTiers": "건너뛴 행: {full} 완전히 · {partial} 부분적으로",
-      "scoreEvidence": "{scorer} · v{version}: 샘플 {samples}개, 참조 없음 {noReference}개, 추적 없음 {noTrace}개",
       "scorerApplicability": "{scorer} · v{version}: 적격 슬롯 {eligible}개, 참조 없음 {noReference}개",
       "loadError": "실험을 불러오지 못했습니다",
       "previewError": "실험 슬롯을 미리보지 못했습니다",
@@ -10781,7 +10341,6 @@
         "sourcesPlaceholder": "모든 소스",
         "sourcesHelp": "비워 두면 데이터셋의 모든 행이 실행됩니다.",
         "sources": {
-          "trace": "추적",
           "annotation": "주석",
           "manual": "수동"
         },
@@ -10912,7 +10471,6 @@
         "trials": "시도",
         "trial": "시도 {index}",
         "retryFailedSlot": "실패한 슬롯 다시 시도",
-        "viewTrace": "추적 보기",
         "scores": "점수",
         "dimension": "차원",
         "unknownDimension": "알 수 없는 차원",
@@ -10999,7 +10557,6 @@
         "actions": "작업"
       },
       "source": {
-        "trace": "트레이스",
         "annotation": "주석",
         "manual": "수동"
       },
@@ -11055,8 +10612,6 @@
           },
           "versionPill": "v{version} · {count} 버전 | v{version} · {count} 버전",
           "sourceSection": "소스",
-          "sourceTrace": "트레이스",
-          "sourceSpan": "스팬",
           "sourceReview": "제출 검토",
           "sourceImport": "가져온 곳",
           "inputSection": "입력",
@@ -11097,10 +10652,8 @@
       "version": "버전"
     },
     "agentGraph": {
-      "stream": "스트림",
       "agent": "에이전트",
       "noAgentsTitle": "에이전트를 찾을 수 없음",
-      "noAgentsDescription": "이 시간 범위에서 에이전트를 찾을 수 없습니다. 시간 범위를 넓히거나 추적에 gen_ai 에이전트 속성이 포함되어 있는지 확인하세요.",
       "versionAgnosticHint": "토폴로지는 버전 간에 동일합니다 — 그래프는 환경별로 범위를 지정하며 버전별로 지정하지 않습니다. 버전을 비교하려면 버전 비교를 사용하세요."
     },
     "panels": {
@@ -11112,10 +10665,7 @@
         "title": "토큰 트렌드",
         "subtitle": "모델별 토큰"
       },
-      "spanTrend": {
-        "title": "스팬 트렌드",
-        "subtitle": "종류별 스팬 수"
-      },
+      "spanTrend": {},
       "latencyByModel": {
         "title": "모델별 지연 시간",
         "subtitle": "p50/ p90/ p95/ p99"
@@ -11129,7 +10679,6 @@
         "subtitle": "오류 개수"
       },
       "spansByModel": {
-        "title": "모델별 스팬",
         "subtitle": "모델당 콜 수"
       },
       "tokensByModel": {
@@ -11137,8 +10686,7 @@
         "subtitle": "모델당 총 토큰"
       },
       "recentErrors": {
-        "title": "최근 오류",
-        "subtitle": "지난 10개의 실패한 스팬"
+        "title": "최근 오류"
       }
     },
     "behavior": {
@@ -11148,7 +10696,6 @@
         "disabled": "이 배포에 대해 에이전트 동작 신호가 꺼져 있습니다"
       },
       "loopsTitle": "루핑 에이전트",
-      "loopsHint": "트레이스당 동일한 도구를 여러 번 재실행하는 에이전트",
       "summaryLoops": "루프 에이전트",
       "summaryFailures": "실패 분류",
       "summaryAgents": "영향을 받은 에이전트",
@@ -11163,9 +10710,7 @@
       "unknownAgent": "(알 수 없는 에이전트)",
       "colAgent": "에이전트",
       "colTool": "도구",
-      "colRatio": "호출 / 트레이스",
       "colCalls": "호출",
-      "colTraces": "트레이스",
       "colFailClass": "실패 클래스",
       "colCount": "개수",
       "colCost": "비용 ($)",
@@ -11173,32 +10718,18 @@
       "colErrors": "오류",
       "detail": {
         "title": "신호 세부 정보",
-        "tracesTitle": "트레이스",
-        "tracesHint": "트레이스를 클릭하여 열기",
-        "worstLoopTraces": "최악의 트레이스 (반복 순)",
-        "topCostTraces": "가장 비용이 많이 드는 트레이스",
-        "noTraces": "이 신호에 대한 트레이스가 없습니다",
         "errorsTitle": "오류가 나타내는 것",
-        "noErrors": "캡처된 오류 메시지가 없습니다 — 검사할 트레이스를 열어보세요",
-        "colTraceId": "트레이스",
-        "colSpans": "스팬",
         "colRepeats": "반복",
-        "openInNewTab": "새 탭에서 트레이스 열기",
         "showFull": "전체 오류 표시",
         "showLess": "간략히 표시",
         "colError": "오류 메시지",
         "colOccurrences": "횟수",
-        "loopHeadline": "{agent}가 평균적으로 트레이스당 {tool}을 {ratio}× 호출했습니다({traces}개 트레이스에서 {calls}회 호출).",
         "failHeadline": "{agent}가 {count}개의 “{cls}” 오류를 발생했습니다.",
-        "costHeadline": "{agent}: ${cost} 사용 · {tokens} 토큰 · {errors} 오류.",
-        "loopExplain": "반복률이 높다는 것은 일반적으로 에이전트가 결과를 캐싱하지 않거나 재시도 중임을 의미합니다. 아래의 최악의 트레이스를 열어 반복된 호출을 확인하세요.",
-        "failExplain": "이것들은 이 실패 클래스의 실제 오류 메시지입니다 — 수정 방법을 찾으려면 읽어보거나, 발생 위치를 보려면 트레이스를 여세요.",
-        "costExplain": "이 트레이스들이 이 에이전트의 비용을 발생시켰습니다. 가장 비용이 많이 드는 트레이스를 열어 실행된 내용을 확인하세요."
+        "costHeadline": "{agent}: ${cost} 사용 · {tokens} 토큰 · {errors} 오류."
       }
     },
     "versionCompare": {
       "datePickerDisabled": "이 모드에서 창은 버전별입니다.",
-      "sampledNote": "지연 시간 및 비용 간격은 버전당 최대 {cap}개의 무작위 샘플링된 트레이스로 계산됩니다.",
       "bar": {
         "versionA": "버전 A",
         "versionB": "버전 B",
@@ -11216,9 +10747,7 @@
         "partial": "이 버전들은 부분적으로 동시에 실행되었습니다 — 차이는 각각이 실행된 시점에 의해 부분적으로 설명될 수 있습니다."
       },
       "windowCard": {
-        "label": "{env} · {version} — {window} · {count} 트레이스",
-        "clamp": "기준선은 {duration} 동안만 실행되었습니다 — 각 버전의 처음 {duration}을 비교합니다.",
-        "labelNoEnv": "{version} — {window} · {count} 트레이스"
+        "clamp": "기준선은 {duration} 동안만 실행되었습니다 — 각 버전의 처음 {duration}을 비교합니다."
       }
     }
   },
@@ -11279,25 +10808,18 @@
     },
     "manualEvaluation": {
       "titles": {
-        "span": "스팬 평가",
-        "trace": "트레이스 평가",
         "session": "세션 평가"
       },
       "targetLabels": {
-        "span": "스팬 ID",
-        "trace": "트레이스 ID",
         "session": "세션 ID"
       },
       "scopes": {
-        "span": "스팬",
-        "trace": "트레이스",
         "session": "세션"
       },
       "description": "이 대상에 대해 실행할 평가 작업을 선택하세요. 평가 워커는 이 페이지의 시간 범위에서 소스 텔레메트리를 로드합니다.",
       "jobLabel": "평가 작업",
       "jobPlaceholder": "평가 작업 선택",
       "jobRequired": "평가 작업 선택",
-      "noCompatibleJobs": "{scope} 평가 작업 중 {stream} 트레이스 스트림을 사용하는 작업이 없습니다.",
       "loadJobsError": "평가 작업을 불러오지 못했습니다.",
       "run": "평가 실행",
       "queued": "{count} 평가 작업을 대기열에 추가했습니다. | {count} 평가 작업을 대기열에 추가했습니다.",
@@ -11323,8 +10845,6 @@
         "filterLabel": "점수 범위",
         "filterHint": "이 점수 구성을 평가 대상 범위에서 비교합니다.",
         "all": "모두",
-        "span": "스팬",
-        "trace": "트레이스",
         "session": "세션"
       },
       "kpis": {
@@ -11393,7 +10913,6 @@
       },
       "runs": {
         "title": "평가 점수",
-        "hint": "점수와 추론은 _llm_scores에서 제공됩니다. 추가 조사를 위해 실행을 선택하여 평가자 추적을 여십시오.",
         "filterLabel": "평가 점수 필터링",
         "footerTitle": "평가 점수",
         "noThresholdHint": "이 점수 구성에 건강 임계값을 설정하여 건강하지 않은 점수를 분류하고 강조 표시합니다.",
@@ -11527,7 +11046,6 @@
         "dataTypeLabel": "데이터 유형",
         "rangeLabel": "범위",
         "categoriesLabel": "카테고리",
-        "valuesLabel": "값",
         "thresholdSection": "정상 임계값",
         "thresholdHint": "점수를 정상으로 집계",
         "noThreshold": "선언되지 않음",
@@ -11588,7 +11106,6 @@
       "booleanInfo": "Boolean 구성은 {trueLabel} / {falseLabel} 값을 허용합니다. 추가 구성이 필요하지 않습니다.",
       "healthyThresholdTitle": "정상 임계값",
       "optional": "선택 사항",
-      "healthyThresholdIntro": "이 차원의 점수가 정상으로 간주되는 시점을 정의하세요. 이 범위를 벗어나는 점수는 트레이스 목록, 세션 및 기타 보기에서 품질 문제를 트리거합니다.",
       "healthyWhenValueIs": "값이 다음일 때 정상:",
       "healthyCategories": "정상 카테고리:",
       "healthyCategoriesHint": "정상으로 집계되는 모든 값을 선택하세요.",
@@ -11667,8 +11184,6 @@
           "col": {
             "time": "시간",
             "job": "작업",
-            "spanId": "스팬 ID",
-            "traceId": "트레이스 ID",
             "score": "점수",
             "latency": "지연 시간",
             "status": "상태"
@@ -11806,9 +11321,7 @@
       "remoteHeaders": {
         "subtitle": "모든 요청과 함께 전송됩니다.",
         "colName": "이름",
-        "colValue": "값",
         "keyPlaceholder": "X-Custom-Header",
-        "valuePlaceholder": "값",
         "addButton": "+ 헤더 추가"
       },
       "requestBodyLabel": "본문 템플릿 요청",
@@ -11854,13 +11367,11 @@
         "eyebrow": "평가 작업",
         "refresh": "새로 고침",
         "targetSection": "평가 대상",
-        "streamLabel": "스트림",
         "streamTypeLabel": "스트림 유형",
         "targetScopeLabel": "각각 평가",
         "idleWindowLabel": "유휴 창",
         "maxAgeLabel": "최대 기간",
         "filterLabel": "필터",
-        "filterEmpty": "필터 없음 — 모든 스팬이 평가됩니다",
         "scorersSection": "스코어러",
         "scorersEmpty": "아직 이 작업에 연결된 스코어러가 없습니다.",
         "scorerUnknown": "(제거된 스코어러)",
@@ -11870,7 +11381,6 @@
         "viewScorerHint": "보기",
         "samplingSection": "샘플링",
         "samplingModeLabel": "모드",
-        "samplingValueLabel": "값",
         "samplingAll": "모든 일치 항목 평가",
         "samplingRate": "비율로 무작위 샘플링",
         "samplingCount": "처음 N개 일치 항목",
@@ -11896,8 +11406,6 @@
           "col": {
             "time": "시간",
             "scorer": "스코어러",
-            "spanId": "스팬 ID",
-            "traceId": "트레이스 ID",
             "score": "점수",
             "latency": "지연 시간",
             "status": "상태"
@@ -11918,7 +11426,6 @@
       "columns": {
         "name": "이름",
         "status": "상태",
-        "stream": "스트림",
         "targetScope": "범위",
         "scorers": "스코어러",
         "created": "생성됨",
@@ -11944,30 +11451,18 @@
       "scorersSection": "채점자 및 매핑",
       "nameLabel": "이름",
       "namePlaceholder": "프로덕션 충실도 모니터",
-      "streamLabel": "스트림",
       "streamPlaceholder": "스트림 선택",
       "targetScopeLabel": "각각 평가",
       "targetScopes": {
-        "span": "스팬",
-        "trace": "트레이스",
         "session": "세션"
       },
-      "targetScopeHelp": {
-        "span": "각 일치하는 스팬을 독립적으로 평가합니다.",
-        "trace": "완료 창이 닫힌 후 전체 트레이스를 평가합니다.",
-        "session": "완료 창이 닫힌 후 트레이스 전체의 세션을 평가합니다."
-      },
+      "targetScopeHelp": {},
       "completionSection": "완료 기준",
       "completionHelp": {
-        "trace": "이 중 하나가 충족되면 트레이스가 평가됩니다.",
         "session": "이 중 하나가 충족되면 세션이 평가됩니다."
       },
       "idleWindowLabel": "유휴 창(초)",
-      "idleWindowHelp": "새 스팬이 없는 {duration} 후에 평가됩니다.",
-      "idleWindowHelpEmpty": "새 스팬이 도착하지 않으면 평가됩니다.",
       "maxAgeLabel": "최대 수명(초)",
-      "maxAgeHelp": "첫 번째 스팬 후 {duration}에 평가됩니다.",
-      "maxAgeHelpEmpty": "스팬이 계속 도착하더라도 고정된 시간에 평가됩니다.",
       "descriptionLabel": "설명",
       "samplingModeLabel": "샘플링 모드",
       "samplingValueLabel": "샘플링 비율",
@@ -11978,8 +11473,6 @@
       "scorerPicker": {
         "title": "득점자",
         "hint": {
-          "span": "일치하는 각 스팬에 대해 실행할 하나 이상의 스코어러를 선택합니다.",
-          "trace": "적격한 각 트레이스에 대해 실행할 하나 이상의 스코어러를 선택합니다.",
           "session": "적격한 각 세션에 대해 실행할 하나 이상의 스코어러를 선택합니다."
         },
         "meta": "{type} · v{version}",
@@ -11989,37 +11482,21 @@
       },
       "filter": {
         "title": "필터 조건",
-        "hint": {
-          "span": "이 조건과 일치하는 스팬만 샘플링 및 채점에 들어갑니다.",
-          "trace": "트레이스는 해당 스팬 중 하나라도 이 조건과 일치하면 샘플링 및 채점에 들어갑니다.",
-          "session": "세션은 해당 스팬 중 하나라도 이 조건과 일치하면 샘플링 및 채점에 들어갑니다."
-        }
+        "hint": {}
       },
       "selector": {
-        "title": "어떤 스팬(선택 사항)",
-        "hint": {
-          "trace": "비워두면 트레이스의 모든 스팬이 포함됩니다."
-        }
+        "hint": {}
       },
       "endSignal": {
         "title": "종료 신호(선택 사항)",
-        "hint": {
-          "trace": "스팬이 일치하면 트레이스를 즉시 닫는 스팬 조건을 정의합니다.",
-          "session": "스팬이 일치하면 세션을 즉시 닫는 스팬 조건을 정의합니다."
-        }
+        "hint": {}
       },
       "inputMapping": {
         "title": "프롬프트 변수",
-        "hint": {
-          "span": "각 변수를 스팬 속성에 매핑하세요.",
-          "trace": "각 변수를 시스템 제공 값 또는 스팬 속성에 매핑하세요.",
-          "session": "각 변수를 시스템 제공 값 또는 스팬 속성에 매핑하세요."
-        },
+        "hint": {},
         "placeholder": "값 선택",
-        "searchPlaceholder": "시스템 값 및 스팬 속성 검색…",
         "groups": {
-          "systemProvided": "시스템 제공 값 · 이 작업이 평가하는 각 {scope}에 대해",
-          "spanAttributes": "스팬 속성"
+          "systemProvided": "시스템 제공 값 · 이 작업이 평가하는 각 {scope}에 대해"
         },
         "selectScorers": "매핑을 구성할 채점자를 선택합니다.",
         "noVariables": "이 채점기에는 매핑할 템플릿 변수가 없습니다.",
@@ -12029,72 +11506,38 @@
           "title": "{scope} 시스템 값",
           "description": "OpenObserve는 이 작업이 평가하는 각 {scope}에 대해 이러한 값을 별도로 생성합니다. Scorer의 프롬프트 변수를 매핑할 때 소스로 사용하세요.",
           "badge": "시스템 제공",
-          "selectorRequired": "스팬 선택기 필요",
           "columns": {
-            "variable": "값",
             "source": "소스",
             "description": "제공된 값"
           },
           "variables": {
-            "input": {
-              "trace": "트레이스 루트 스팬의 입력."
-            },
-            "output": {
-              "trace": "트레이스 루트 스팬의 출력."
-            },
-            "statistics": {
-              "trace": "트레이스 메트릭: 스팬 수, 기간, LLM 및 도구 호출, 오류, 토큰 및 비용.",
-              "session": "세션 메트릭: 트레이스 및 턴 수, 기간, 오류."
-            },
-            "spans": {
-              "trace": "작업의 스팬 선택기에 의해 선택된 스팬의 필터링된 하위 집합."
-            },
-            "steps": {
-              "trace": "시간 순서의 스팬; 트레이스가 매우 길면 중간이 접힙니다.",
-              "session": "시간 순서의 트레이스, 대화 턴으로 표현됩니다."
-            }
+            "input": {},
+            "output": {},
+            "statistics": {},
+            "spans": {},
+            "steps": {}
           }
         }
       },
       "spanSelector": {
-        "select": "스팬 선택기 선택",
-        "bindingHelp": "트레이스는 수백 개의 스팬을 가질 수 있습니다. 이 스코어러가 볼 스팬을 선택하세요.",
         "createForScorer": "스코어러용 생성",
-        "createForScorerTitle": "이 스코어러에 대한 스팬 선택기 생성",
-        "editorTitle": "스팬 선택기",
         "name": "선택기 이름",
         "schemaMode": "읽을 필드",
         "defaultSchema": "표준 GenAI 필드",
         "customSchema": "사용자 정의 필드",
-        "defaultSchemaHelp": "일치하는 모든 스팬에서 이 8개 필드를 읽습니다. 누락된 항목은 비어 있는 상태로 전달됩니다.",
         "fields": "필드",
         "fieldsHelp": "이 필드만 읽습니다. 다른 것은 점수 계산기로 전송되지 않습니다.",
-        "maximumSpans": "최대 스팬 수",
-        "budget": "추적에서 선택할 스팬 수를 제한합니다.",
         "validation": {
           "name": "선택기 이름을 입력하세요.",
           "duplicateName": "선택기 이름은 이 작업 내에서 고유해야 합니다.",
           "filter": "완료되지 않은 필터 조건을 완료하거나 제거하세요.",
-          "fields": "사용자 정의 스키마에 대해 최소 하나의 필드를 선택하세요.",
-          "maximumSpans": "최대 스팬 수는 양의 정수여야 합니다.",
-          "budget": "선택한 필드에 비해 스팬이 너무 많습니다. 스팬 수를 줄이거나 더 적은 필드를 읽으세요.",
-          "binding": "추적 스팬을 사용하는 각 Scorer에 대해 Span Selector를 선택하세요."
+          "fields": "사용자 정의 스키마에 대해 최소 하나의 필드를 선택하세요."
         }
       },
       "preview": {
         "scopes": {
-          "span": {
-            "title": "일치하는 스팬",
-            "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 스팬 수가 표시됩니다.",
-            "matchedSuffix": "일치된 스팬 · 최근 1h",
-            "matchedLoading": "일치하는 스팬 계산 중…"
-          },
-          "trace": {
-            "title": "일치하는 추적",
-            "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 추적 수가 표시됩니다.",
-            "matchedSuffix": "일치된 트레이스 · 최근 1h",
-            "matchedLoading": "일치하는 추적 계산 중…"
-          },
+          "span": {},
+          "trace": {},
           "session": {
             "title": "일치하는 세션",
             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 세션 수가 표시됩니다.",
@@ -12122,9 +11565,7 @@
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
         "idleWindowMinimum": "유휴 창은 최소 1초 이상이어야 합니다.",
-        "idleWindowMaximumTrace": "트레이스 유휴 창은 30분을 초과할 수 없습니다",
         "idleWindowMaximumSession": "세션 유휴 창은 4시간을 초과할 수 없습니다",
-        "maxAgeMaximumTrace": "트레이스 최대 기간은 2시간을 초과할 수 없습니다",
         "maxAgeMaximumSession": "세션 최대 기간은 24시간을 초과할 수 없습니다",
         "samplingValueRequired": "A sampling value is required"
       }
@@ -12187,7 +11628,6 @@
       "curlDesc": "가장 빠른 방법은 명령 하나를 붙여넣기만 하면 로그가 흐르기 시작하는 것입니다.",
       "shippers": "통나무 발송자 사용",
       "shippersDesc": "{product1}, {product2}, {product3}, {product4}, {product5} 등",
-      "otelDesc": "로그, 추적 및 메트릭을 위한 공급업체 중립적 OTLP 통합",
       "or": "또는:",
       "aws": "AWS/ 클라우드워치",
       "askAi": "AI에 인제스트 설정 요청"
@@ -12196,13 +11636,11 @@
       "title": "스트림을 선택하여 탐색을 시작하세요",
       "description": "스트림을 선택한 다음 <strong>쿼리 실행을</strong> 누릅니다.결과가 들어오면 필터, VRL 함수, 사용자 지정 시간 범위를 사용하여 세분화할 수 있습니다.",
       "selectStream": "스트림 선택",
-      "selectStreamDesc": "로그, 트레이스, 메트릭 및 RUM 스트림 찾아보기",
       "queryGuide": "쿼리 가이드 읽기",
       "queryGuideDesc": "필터, SQL 모드, VRL 및 저장된 뷰",
       "recent": "최근:"
     },
     "noEvents": {
-      "title": "이벤트를 찾을 수 없음",
       "descNoFilters": "{range} 에서 이벤트를 찾을 수 없습니다.결과를 로드할 시간 범위를 넓혀 보십시오.",
       "descWithFilters": "선택한 창에서 <strong>이 쿼리와</strong> 일치하는 항목이 없습니다.시간 범위를 넓히거나, 필터를 완화하거나, 쿼리를 재설정해 보세요.",
       "descOutOfRange": "선택한 시간 범위에 이 스트림의 데이터가 없습니다. 데이터가 마지막으로 확인된 시점으로 이동하세요.",
@@ -12293,13 +11731,11 @@
       "scannedEventsForQuery": "이 쿼리에 대해 스캔된 이벤트",
       "timeTaken": "소요 시간",
       "noData": "데이터 없음",
-      "traceId": "추적 ID",
       "viewQuery": "쿼리 보기",
       "sqlQuery": "SQL 쿼리",
       "copied": "복사됨!",
       "sql": "SQL",
       "noSqlAvailable": "사용 가능한 SQL 쿼리 없음",
-      "fullTraceId": "전체 추적 ID",
       "columnDuration": "기간",
       "columnNodeName": "노드 이름",
       "columnRole": "역할",
@@ -12312,7 +11748,6 @@
       "goodResponse": "양호한 응답",
       "moderateResponse": "보통 응답",
       "slowResponse": "느린 응답",
-      "failedToCopyTraceId": "추적 ID를 클립보드에 복사하지 못했습니다",
       "failedToCopySql": "SQL을 클립보드에 복사하지 못했습니다"
     },
     "searchResult": {
@@ -12331,8 +11766,7 @@
       "unableToRetrieveCorrelation": "상관관계 데이터를 검색할 수 없습니다",
       "noMetricStreams": "서비스 \"{service}\"에 대한 메트릭 스트림이 없습니다",
       "correlationError": "상관관계 오류: {error}",
-      "contentCopied": "콘텐츠가 성공적으로 복사되었습니다!",
-      "noTraceIdForInspection": "검사할 수 있는 추적 ID가 없습니다"
+      "contentCopied": "콘텐츠가 성공적으로 복사되었습니다!"
     },
     "searchBar": {
       "customRangeAlt": "사용자 정의 범위",
@@ -12496,7 +11930,6 @@
     "expandRangeDesc": "액세스 가능한 데이터는 다른 시간대에 있을 수 있습니다.",
     "copyError": "오류 세부 정보 복사",
     "copied": "복사 완료!",
-    "traceId": "트레이스 ID:",
     "askAi": "AI에게 쿼리 수정 요청하기",
     "showDetail": "세부 정보 보기",
     "hideDetail": "세부 정보 숨기기"
@@ -12561,7 +11994,6 @@
       "addVariable": "변수 추가",
       "cookieDomainPlaceholder": "도메인",
       "cookieNamePlaceholder": "이름",
-      "cookieValuePlaceholder": "값",
       "customHeaders": "사용자 정의 헤더",
       "headerKeyPlaceholder": "헤더 키",
       "headerValuePlaceholder": "헤더 값",
@@ -12577,7 +12009,6 @@
       "variableNamePlaceholder": "이름",
       "variableSecureTooltipHide": "이 값을 민감한 데이터로 마스킹합니다.",
       "variableSecureTooltipShow": "값이 마스킹되었습니다. 클릭하여 표시.",
-      "variableValuePlaceholder": "값",
       "variables": "변수"
     },
     "variablesPanel": {
@@ -12927,7 +12358,6 @@
       "stopping": "중지 중…",
       "timeoutBelowDefaultWarning": "이 단계의 기본값 {default}ms보다 짧습니다. 애플리케이션의 실제 응답 시간보다 짧은 타임아웃은 가짜 실패의 가장 흔한 원인입니다.",
       "timeoutLabel": "시간 초과 (ms)",
-      "valueFallback": "값",
       "showSetupSteps": "설정 단계 표시",
       "waitingForActions": "브라우저에서 작업을 기다리는 중…"
     },
@@ -13073,7 +12503,6 @@
       "http": {
         "addAssertion": "어설션 추가",
         "addHeader": "헤더 추가",
-        "assertionValue": "값",
         "assertions": "어설션",
         "body": "요청 본문",
         "bodyPlaceholder": "{'{'}\"key\": \"value\"{'}'}",
@@ -13084,7 +12513,6 @@
         },
         "followRedirects": "리디렉션 따르기",
         "headerName": "이름",
-        "headerValue": "값",
         "headers": "헤더",
         "method": "메서드",
         "operators": {
@@ -13268,7 +12696,6 @@
       "maxDuration": "최대 시간",
       "noExecutionData": "실행 데이터를 찾을 수 없음",
       "noExecutionDataDesc": "실행 {runId}의 스트림 데이터가 예약 시간 전후 5분 창 내에서 발견되지 않았습니다.",
-      "openTrace": "Playwright 트레이스 열기",
       "runId": "실행 ID",
       "screenshotAlt": "단계 스크린샷",
       "screenshotPlaceholder": "스크린샷 자리 표시자",
@@ -13354,7 +12781,6 @@
       "errorPatternsWindowDesc": "{window}에 걸쳐 정규화됨 · 행을 클릭하여 실행 필터링"
     },
     "scheduleAlert": {
-      "addNewDestination": "새 목적지 추가",
       "alertedIfFails": "테스트 실패 시 알림",
       "alertedIfFailsSuffix": "타임스.",
       "alerts": "알림",
@@ -13370,8 +12796,6 @@
         "weeks": "주"
       },
       "customIntervalValue": "매번 반복",
-      "destinationRequired": "목적지가 하나 이상 필요합니다.",
-      "destinations": "목적지",
       "frequency": "주파수",
       "frequencyOptions": {
         "15min": "15분",
@@ -13383,8 +12807,6 @@
         "custom": "사용자 지정"
       },
       "minutes": "분",
-      "noDestinations": "이용 가능한 목적지 없음",
-      "refreshDestinations": "목적지 새로 고침",
       "retries": "재시도",
       "retriesOnFailure": "실패 시 재시도",
       "retriesOnFailureSuffix": "타임스.",
@@ -13642,12 +13064,9 @@
       "logs": "로그",
       "dashboards": "대시보드",
       "metrics": "측정항목",
-      "traces": "트레이스",
       "alerts": "알림",
-      "streams": "스트림",
       "pipelines": "파이프라인",
       "functions": "함수",
-      "reports": "보고서",
       "iam": "IAM",
       "settings": "설정",
       "onlineEvals": "온라인 평가",
@@ -13662,26 +13081,20 @@
       "dashboards": "대시보드 보기",
       "dashboardsPanel": "대시보드 - 패널 (패널에 마우스 커서를 놓음)",
       "metrics": "측정항목",
-      "traces": "트레이스",
       "alerts": "알림",
-      "streams": "스트림",
       "pipelines": "파이프라인",
       "functions": "함수",
-      "reports": "보고서",
       "iamUsers": "IAM — 사용자",
       "iamRoles": "IAM — 역할",
       "iamGroups": "IAM — 그룹",
       "iamServiceAccounts": "IAM — 서비스 계정",
-      "alertDestinations": "알림 — 목적지",
       "alertSources": "알림 — 외부 소스",
       "alertTemplates": "알림 — 템플릿",
       "panelEditor": "패널 에디터",
-      "traceDetail": "트레이스 세부 정보",
       "runningQueries": "쿼리 실행",
       "ingestionTokens": "IAM — 인제스트 토큰",
       "syntheticsTokens": "IAM — Synthetics 토큰",
       "alertIncidents": "알림 — 인시던트",
-      "pipelineDestinations": "파이프라인 — 목적지",
       "enrichmentTables": "강화 테이블",
       "iamInvitations": "IAM — 초대장",
       "iamOrganizations": "IAM — 조직",
@@ -13757,7 +13170,6 @@
       "iamGroupsRefresh": "목록 새로 고침",
       "iamServiceAccountsAdd": "새 서비스 계정 추가",
       "iamServiceAccountsRefresh": "목록 새로 고침",
-      "alertDestinationsAdd": "새 목적지 추가",
       "alertDestinationsRefresh": "목록 새로 고침",
       "alertSourcesAdd": "새 알림 소스 추가",
       "alertSourcesRefresh": "목록 새로고침",
@@ -13768,8 +13180,6 @@
       "panelEditorRun": "쿼리 실행/ 적용",
       "panelEditorSave": "저장 패널",
       "panelEditorBack": "폐기하고 돌아가세요",
-      "traceNextSpan": "다음 스팬",
-      "tracePrevSpan": "이전 스팬",
       "runningQueriesRefresh": "쿼리 목록 새로 고침",
       "ingestionTokensAdd": "새 토큰 생성",
       "ingestionTokensRefresh": "토큰 목록 새로 고침",
@@ -13780,7 +13190,6 @@
       "aiChatExpand": "AI 채팅 펼치기/접기",
       "logsSaveView": "저장된 뷰로 저장",
       "logsExport": "결과를 CSV로 내보내기",
-      "tracesCopyUrl": "트레이스 공유 URL 복사",
       "alertIncidentsRefresh": "목록 새로 고침",
       "pipelineDestinationsRefresh": "목록 새로 고침",
       "enrichmentTablesRefresh": "목록 새로 고침",
@@ -14047,7 +13456,6 @@
       "alertState": {
         "ok": "확인",
         "normal": "정상",
-        "firing": "발화",
         "notifyfailed": "알림 실패",
         "flapping": "플래핑",
         "anomaly": "이상",
@@ -14078,7 +13486,6 @@
         "error": "오류"
       },
       "crossLinkSource": {
-        "stream": "스트림",
         "global": "전역"
       },
       "themeApplied": {
@@ -14133,7 +13540,6 @@
       },
       "eventStatus": {
         "failed": "실패",
-        "firing": "발동",
         "anomaly": "이상"
       },
       "featureStatus": {
@@ -14148,7 +13554,6 @@
         "array": "배열"
       },
       "incidentStatus": {
-        "firing": "발동",
         "closed": "닫힘"
       },
       "invoiceStatus": {
@@ -14160,14 +13565,12 @@
         "pending": "보류 중"
       },
       "logLevel": {
-        "trace": "트레이스",
         "debug": "디버그",
         "info": "정보",
         "warn": "경고",
         "fatal": "치명적"
       },
       "pipelineRunOutcome": {
-        "firing": "발동",
         "normal": "정상",
         "succeeded": "성공",
         "skipped": "건너뜀",
@@ -14309,21 +13712,11 @@
       "pleaseSelectStreamType": "스트림 유형을 선택해 주세요. ",
       "anomalyDetectionClonedSuccessfully": "이상 탐지가 성공적으로 복제되었습니다.",
       "errorWhileFetchingTemplates": "템플릿을 가져오는 중 오류가 발생했습니다.",
-      "errorWhileFetchingDestinations": "대상을 가져오는 중 오류가 발생했습니다.",
       "failedToLoadAlertForEditing": "편집을 위해 알림을 불러오지 못했습니다.",
       "pleaseWaitWhileLoadingAlert": "알림을 불러오는 동안 기다려 주세요...",
       "errorWhilePullingAlerts": "알림을 가져오는 중 오류가 발생했습니다.",
       "pleaseWaitWhileLoadingAlerts": "알림을 불러오는 동안 기다려 주세요...",
-      "destinationsDeletedSuccessfully": "{count}개 대상을 성공적으로 삭제했습니다. | {count}개 대상을 성공적으로 삭제했습니다.",
-      "failedToDeleteDestinations": "{count}개 대상을 삭제하지 못했습니다. | {count}개 대상을 삭제하지 못했습니다.",
-      "destinationsDeletedWithFailures": "{count}개 대상을 성공적으로 삭제했지만 {failed}개는 실패했습니다. | {count}개 대상을 성공적으로 삭제했지만 {failed}개는 실패했습니다.",
-      "noDestinationsSelectedForDeletion": "삭제할 대상이 선택되지 않았습니다.",
-      "deletingDestinations": "대상 삭제 중...",
-      "destinationDeletedSuccessfully": "대상 {name}이(가) 성공적으로 삭제되었습니다.",
-      "errorWhilePullingDestinations": "대상을 가져오는 중 오류가 발생했습니다.",
-      "pleaseWaitWhileLoadingDestinations": "대상을 불러오는 동안 기다려 주세요...",
       "errorWhileLoadingActions": "작업을 불러오는 중 오류가 발생했습니다.",
-      "pleaseWaitWhileLoadingAlertDestination": "알림 대상을 불러오는 동안 기다려 주세요...",
       "errorImportingAlertPleaseCheck": "알림을 가져오는 중 오류가 발생했습니다. JSON을 확인해 주세요.",
       "alertsImportedSuccessfully": "{count}개 알림을 성공적으로 가져왔습니다. | {count}개 알림을 성공적으로 가져왔습니다.",
       "invalidJson": "잘못된 JSON: {error}",
@@ -14342,8 +13735,6 @@
       "incidentsRefreshed": "인시던트가 새로 고쳐졌습니다.",
       "failedToPostComment": "댓글을 게시하지 못했습니다.",
       "commentPostedSuccessfully": "댓글이 성공적으로 게시되었습니다.",
-      "destinationUpdatedSuccessfully": "대상 \"{name}\"이(가) 성공적으로 업데이트되었습니다.",
-      "destinationCreatedSuccessfully": "대상 \"{name}\"이(가) 성공적으로 생성되었습니다.",
       "failedToDeleteTemplates": "템플릿 {count}개를 삭제하지 못했습니다. | 템플릿 {count}개를 삭제하지 못했습니다.",
       "templatesDeletedWithFailures": "템플릿 {count}개를 삭제했지만 {failed}개는 실패했습니다. | 템플릿 {count}개를 삭제했지만 {failed}개는 실패했습니다.",
       "successfullyDeletedTemplates": "템플릿 {count}개를 성공적으로 삭제했습니다. | 템플릿 {count}개를 성공적으로 삭제했습니다.",
@@ -14393,16 +13784,13 @@
       "resources": {
         "dashboards": "대시보드",
         "alerts": "알림",
-        "streams": "스트림",
         "functions": "함수",
         "savedviews": "저장된 보기",
         "users": "사용자",
         "roles": "역할",
         "organizations": "조직",
         "pipelines": "파이프라인",
-        "destinations": "대상",
         "templates": "템플릿",
-        "reports": "보고서",
         "llmModelPricing": "LLM 모델 가격"
       },
       "noPermissionToChangeFavorites": "즐겨찾기를 변경할 권한이 없습니다.",
@@ -14564,8 +13952,6 @@
       "errorWhileUpdating": "보고서 업데이트 중 오류가 발생했습니다."
     },
     "correlation": {
-      "refreshingTraceData": "트레이스 데이터를 새로 고치는 중...",
-      "traceDetailViewComingSoon": "트레이스 상세 보기가 곧 제공될 예정입니다.",
       "columnIsAlreadyVisible": "열 \"{name}\"은(는) 이미 표시 중입니다.",
       "columnAddedToTable": "열 \"{name}\"이(가) 테이블에 추가되었습니다."
     },
@@ -14605,7 +13991,6 @@
       "isNotASupportedFileType": "\"{fileName}\"은(는) 지원되지 않는 파일 형식입니다. {allowed} 파일만 허용됩니다."
     },
     "workflows": {
-      "thisBranchAlreadyEndsInA": "이 분기는 이미 대상에서 끝납니다.",
       "chooseATriggerNodeToStart": "워크플로를 시작하려면 트리거 노드를 선택하세요.",
       "thisConnectionWouldCreateALoop": "이 연결은 루프를 만들 수 있습니다.",
       "onlyOneIncomingConnectionToA": "단계에 들어오는 연결은 하나만 허용됩니다."
@@ -14613,8 +13998,6 @@
     "views": {
       "youAreNotAuthorizedToManage": "라이선스를 관리할 권한이 없습니다.",
       "copiedToClipboard": "클립보드에 복사되었습니다.",
-      "noDestinationsFoundPleaseCreateA": "대상을 찾을 수 없습니다. 먼저 대상을 만들어 주세요.",
-      "errorWhilePullingDestinations": "대상을 가져오는 중 오류가 발생했습니다.",
       "rumTokenUpdatedSuccessfully": "RUM 토큰이 성공적으로 업데이트되었습니다.",
       "rumTokenGeneratedSuccessfully": "RUM 토큰이 성공적으로 생성되었습니다.",
       "tokenResetSuccessfully": "토큰이 성공적으로 재설정되었습니다.",
@@ -14631,7 +14014,6 @@
       "pleaseWaitWhileLoadingStreams": "스트림을 불러오는 동안 기다려 주세요...",
       "errorWhilePullingSummary": "요약을 가져오는 중 오류가 발생했습니다.",
       "pleaseWaitWhileLoadingSummary": "요약을 불러오는 동안 기다려 주세요...",
-      "noDestinationsCreateOneBeforeSaving": "대상을 찾을 수 없습니다. 이 알림을 저장하기 전에 대상을 만들어 주세요.",
       "errorWhileLoadingAlert": "알림을 불러오는 중 오류가 발생했습니다."
     },
     "RUM": {
@@ -14760,7 +14142,6 @@
       "tags": "태그",
       "tagsPlaceholder": "태그를 추가하고 Enter를 누르세요",
       "streamType": "스트림 유형",
-      "stream": "스트림",
       "queryLanguage": "쿼리 언어",
       "scope": "범위",
       "scopeHint": "분모에 적용되는 선택적 필터입니다. 비워 두면 모든 행에 적용됩니다.",
@@ -14830,7 +14211,6 @@
         "noHistory": "이 알림에 대한 평가 기록이 아직 없습니다. 실행되면 측정이 시작됩니다.",
         "loadFailed": "평가 기록을 불러올 수 없습니다",
         "legendGood": "정상",
-        "legendBad": "발생 중",
         "legendUnmeasured": "미측정"
       }
     },
@@ -15008,7 +14388,6 @@
     "loginCallback": "로그인 콜백",
     "emptyStateDemo": "빈 상태 데모",
     "searchScheduler": "검색 스케줄러",
-    "traceDetails": "트레이스 상세",
     "sessionDetails": "세션 상세",
     "streamExplorer": "스트림 탐색기",
     "viewDashboard": "대시보드 보기",
@@ -15360,20 +14739,17 @@
         "failed": "실패"
       },
       "columnHints": {
-        "calls": "이 쿼리가 실행된 횟수입니다. 데이터베이스가 보고하는 경우 자체 집계를 사용합니다 — 이는 추적을 보내는 시스템 부분뿐만 아니라 모든 클라이언트를 포함합니다. 클라이언트 관측으로 표시된 행은 대신 추적에서 집계됩니다. 데이터베이스가 보고하지 않았기 때문입니다.",
         "p50": "전체 호출의 절반이 이보다 빠르게 완료되었습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에 측정되지 않습니다.",
         "p95": "느린 꼬리 — 20건 중 1건은 최소 이 시간이 걸렸습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에 측정되지 않습니다.",
         "p99": "최악의 1% 호출은 최소 이 시간이 걸렸습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에 측정되지 않습니다.",
         "max": "이 시간 창에서 가장 느린 단일 호출 — 실제 호출 하나이며 평균이 아닙니다.",
         "errors": "이 호출 중 오류가 발생한 호출 수입니다.",
-        "perTrace": "단일 요청 내에서 이 쿼리가 실행된 횟수입니다. 높은 수치는 일반적으로 루프를 의미합니다.",
-        "load": "이 쿼리가 데이터베이스에서 보낸 총 시간입니다. 데이터베이스가 보고하는 경우 자체 수치: Postgres의 실행 시간, MySQL 및 MariaDB의 대기 시간 — 각 행이 어떤 것인지 나타냅니다. 클라이언트 관측으로 표시된 행은 추적에서 측정되므로 네트워크 왕복이 포함됩니다."
+        "perTrace": "단일 요청 내에서 이 쿼리가 실행된 횟수입니다. 높은 수치는 일반적으로 루프를 의미합니다."
       },
       "errorsNone": "없음",
       "errorsAll": "모두",
       "actions": {
         "open": "세부 정보 열기",
-        "traces": "예제 트레이스 보기",
         "copy": "쿼리 복사",
         "copied": "쿼리 복사됨",
         "copyFailed": "쿼리를 복사할 수 없습니다.",
@@ -15404,8 +14780,7 @@
       },
       "n-plus-one": {
         "title": "요청당 최소 {multiplier}회 실행",
-        "body": "데이터베이스 시간의 {share} · {service}",
-        "rule": "이 쿼리는 단일 요청 내에서 최소 {ratio}회 실행되고, 최소 {traces}개의 요청에 걸쳐 있기 때문에 표시됩니다. 이는 하한값이므로 실제 숫자는 더 높을 수 있습니다. 정당한 일괄 작업도 동일하게 보일 수 있습니다."
+        "body": "데이터베이스 시간의 {share} · {service}"
       },
       "volume-shift": {
         "title": "더 바빠짐, 느려지지 않음",
@@ -15479,7 +14854,6 @@
       "subtitleCounts": "{pass}개 통과, {fail}개 실패. | {pass}개 통과, {fail}개 실패.",
       "checklistTitle": "확인한 내용",
       "showMeHow": "계측 방법 보기",
-      "checkTrace": "내 트레이스 중 하나 확인",
       "checks": {
         "enabled": {
           "ok": "데이터베이스 모니터링이 켜져 있습니다.",
@@ -15488,21 +14862,15 @@
           "noDetail": "관리자가 이 조직에 대해 이 기능을 켠 다음 수집기를 다시 시작할 수 있습니다."
         },
         "traces": {
-          "ok": "트레이스가 도착하고 있습니다.",
-          "okDetail": "이 시간 범위에 {count}개 기록됨",
-          "no": "도착한 트레이스가 없습니다.",
-          "noDetail": "데이터베이스 모니터링은 트레이스를 기반으로 하며, 이 조직은 아직 트레이스를 보내지 않았습니다."
+          "okDetail": "이 시간 범위에 {count}개 기록됨"
         },
         "permission": {
           "ok": "이 데이터에 액세스할 수 있습니다.",
           "okDetail": "당신은 {org}의 관리자입니다.",
-          "no": "이 데이터에 액세스할 수 없습니다.",
-          "noDetail": "데이터베이스 모니터링은 트레이스를 읽지만, 사용자의 역할에는 트레이스가 포함되지 않습니다. 관리자에게 읽기 권한을 요청하세요."
+          "no": "이 데이터에 액세스할 수 없습니다."
         },
         "dbSpans": {
-          "ok": "트레이스에 데이터베이스가 언급되어 있습니다.",
           "okDetail": "데이터베이스 호출이 기록되고 있습니다.",
-          "no": "어떤 트레이스에도 데이터베이스가 언급되지 않았습니다.",
           "noDetail": "애플리케이션이 추적되고 있지만, 데이터베이스와 통신하는 부분은 추적되지 않습니다. 언어에 맞는 데이터베이스 계측을 추가하면 쿼리가 여기에 표시됩니다."
         },
         "counted": {
@@ -15533,7 +14901,6 @@
         "plans": "쿼리 계획",
         "plansHint": "데이터베이스가 이 쿼리를 실행하기 위해 거친 단계입니다. 느린 이유를 파악하려면 여기서 시작하세요.",
         "callers": "호출자 및 예시",
-        "callersHint": "애플리케이션의 어떤 부분이 이 쿼리를 실행했는지, 그리고 트레이스로 열 수 있는 개별 느린 실행을 보여줍니다.",
         "callersLocked": "개별 실행은 추적에서 비롯됩니다. 이 시간 범위에 이 쿼리를 추적한 항목이 없습니다."
       },
       "notFound": {
@@ -15559,10 +14926,6 @@
       "noSamples": "이 범위에 대해 로드된 개별 실행이 없습니다.",
       "noSeries": "선택한 범위에서 이 쿼리에 대한 기록이 없습니다.",
       "liveSeries": "가장 최근 포인트는 아직 집계 중이며 변경될 수 있습니다.",
-      "noStream": "어떤 트레이스 스트림이 이 쿼리를 전달하는지 확인할 수 없어 호출자와 예시를 로드할 수 없습니다.",
-      "ambiguousStream": "이 조직에는 둘 이상의 트레이스 스트림이 있으며, 이 쿼리가 어느 스트림에서 실행되는지 확인할 수 없습니다. 스트림을 선택하여 호출자와 샘플 트레이스를 로드하십시오.",
-      "pickStream": "트레이스 스트림 선택",
-      "invalidStream": "인식할 수 없는 트레이스 스트림 이름이므로 검색을 실행하지 않았습니다.",
       "firstSeen": "이 목록에 처음 나타난 시각: {time}",
       "firstSeenHint": "이 범위에서 이 쿼리가 자체적으로 추적할 수 있을 만큼 무거웠던 가장 이른 지점입니다.",
       "lastSeen": "마지막으로 나타난 시각: {time}",
@@ -15593,7 +14956,6 @@
       "sampleOk": "정상",
       "sampleError": "실패",
       "viewTrace": "요청 보기 →",
-      "viewTraces": "예시 트레이스 보기",
       "copySummary": "복사",
       "copySummaryHint": "여기의 모든 숫자는 이미 이 페이지에 있습니다 — 이것은 단지 문장을 작성할 뿐이므로, 사고 발생 13분에는 아무 것도 없는 대신 메시지가 생성됩니다.",
       "summaryCopied": "요약이 복사되었습니다.",
@@ -15685,8 +15047,7 @@
         "unjoinable": "표시되지 않음 — 이 명령문은 여러 종류의 데이터베이스에서 실행되므로, 어떤 데이터베이스인지 알지 못한 채 호출자를 매칭하면 잘못된 서비스가 지정될 수 있습니다.",
         "tracedCalls": "추적된 호출 {calls}건",
         "coverage": "위의 {executions}회 실행 중 {traced}회에서 {count}개의 서비스가 확인되었습니다. 나머지는 아직 추적하지 않는 호출자에서 발생했습니다.",
-        "coverageUnknown": "{traced}건의 추적된 호출에서 {count}개의 서비스가 확인되었습니다. 데이터베이스가 이 명령문의 총계를 보고하지 않았으므로 비율을 제공할 수 없습니다.",
-        "noneNamed": "{traced}건의 호출이 추적되었지만, 그중 어느 것도 서비스로 연결되지 않았습니다 — 해당 트레이스는 이 시간 범위 밖에서 시작됩니다."
+        "coverageUnknown": "{traced}건의 추적된 호출에서 {count}개의 서비스가 확인되었습니다. 데이터베이스가 이 명령문의 총계를 보고하지 않았으므로 비율을 제공할 수 없습니다."
       },
       "callersEmpty": {
         "title": "이 쿼리에 대한 추적된 호출이 아직 없습니다.",
@@ -15752,9 +15113,7 @@
       "failedWithCode": "실패 · {code}",
       "viewTrace": "이 호출이 포함된 요청 열기",
       "scatterOk": "완료",
-      "partial": "일부 추적 데이터를 읽을 수 없어 이 목록에서 호출이 누락될 수 있습니다.",
       "disclosureShort": "각 행은 실제 완료된 호출 하나입니다",
-      "disclosureDetail": "보내는 추적에서 호출을 만든 애플리케이션이 측정합니다. 완료된 호출만 여기에 있습니다 — 아직 실행 중이거나 중단되어 응답이 없는 쿼리는 측정값을 생성하지 않았습니다.",
       "counts": {
         "complete": "이 창의 모든 {count}개 데이터베이스 호출을 느린 순서대로 표시합니다.",
         "truncated": "이 창에서 가장 느린 {count}개 호출 — 여기에 표시된 것보다 더 많이 실행되었습니다.",
@@ -15959,8 +15318,6 @@
         "blocking": "차단 중"
       },
       "coverage": {
-        "summary": "가장 긴 대기는 {longest}입니다. 모든 대기는 잠금을 보유한 {roots}로 거슬러 올라갑니다.",
-        "summaryCapped": "한 번에 읽을 수 있는 것보다 더 많은 세션이 대기 중이었습니다. 확인된 세션 중 가장 긴 대기는 {longest}이며, 잠금을 보유한 {roots}로 거슬러 올라갑니다.",
         "summaryOneRoot": "세션 1개",
         "summaryManyRoots": "세션 {count}개",
         "checked": "{interval}초마다 확인; 마지막 확인 {time}.",
