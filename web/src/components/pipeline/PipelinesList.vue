@@ -485,6 +485,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </ODialog>
+
+  <ExportResourceDialog
+    v-model:open="showExportDialog"
+    :items="pipelinesToExport"
+    :terraform="pipelinesTerraform"
+    :title="
+      t(
+        'pipeline_list.exportDialogTitle',
+        { count: pipelinesToExport.length },
+        pipelinesToExport.length,
+      )
+    "
+    :sub-title="t('pipeline_list.exportDialogSubtitle')"
+    file-prefix="pipelines"
+    data-test="pipeline-export-dialog"
+    @download="onPipelineExportDownloaded"
+  />
 </template>
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
@@ -498,6 +515,8 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
+import { pipelinesToTerraform } from "@/utils/pipelines/pipelineTerraform";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -1114,54 +1133,37 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.data = null;
 };
 
+// ── Export ──────────────────────────────────────────────────────────────────
+// Export opens the shared dialog rather than downloading straight away, the same
+// as alerts, SLOs and dashboards: a pipeline can leave as the JSON the import
+// screen reads back, or as an openobserve_pipeline Terraform resource.
+const showExportDialog = ref(false);
+const pipelinesToExport = ref<Record<string, unknown>[]>([]);
+const pipelinesTerraform = computed(() =>
+  pipelinesToTerraform(pipelinesToExport.value, {
+    orgId: store.state.selectedOrganization.identifier,
+  }),
+);
+
 const exportPipeline = (row: any) => {
-  const pipelineToBeExported = row.name;
+  // The row IS the pipeline, ids included, so nothing has to be re-fetched and
+  // the import block can read the id straight off it.
+  pipelinesToExport.value = [row];
+  showExportDialog.value = true;
+};
 
-  const pipelineJson = JSON.stringify(row, null, 2);
-  // Create a Blob from the JSON string
-  const blob = new Blob([pipelineJson], { type: "application/json" });
-
-  // Create an object URL for the Blob
-  const url = URL.createObjectURL(blob);
-
-  // Create an anchor element to trigger the download
-  const link = document.createElement("a");
-  link.href = url;
-
-  // Set the filename of the download
-  link.download = `${pipelineToBeExported}.json`;
-
-  // Trigger the download by simulating a click
-  link.click();
-
-  // Clean up the URL object after download
-  URL.revokeObjectURL(url);
+const onPipelineExportDownloaded = ({ count }: { format: string; count: number }) => {
+  toast({
+    message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", { count }),
+    variant: "success",
+  });
+  selectedPipelineIds.value = [];
 };
 
 const exportBulkPipelines = () => {
-  // Create an array of selected pipelines without modifying their structure
-  const pipelinesToExport = selectedPipelines.value;
-
-  const exportJson = JSON.stringify(pipelinesToExport, null, 2);
-  const blob = new Blob([exportJson], { type: "application/json" });
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  const date = new Date().toISOString().split("T")[0];
-  link.download = `pipelines_export_${date}.json`;
-
-  link.click();
-
-  URL.revokeObjectURL(url);
-
-  selectedPipelineIds.value = [];
-  toast({
-    message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
-      count: pipelinesToExport.length,
-    }),
-    variant: "success",
-  });
+  if (!selectedPipelines.value.length) return;
+  pipelinesToExport.value = [...selectedPipelines.value];
+  showExportDialog.value = true;
 };
 //if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
 const handleResumePipeline = () => {

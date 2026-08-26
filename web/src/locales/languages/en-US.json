@@ -3529,6 +3529,16 @@
       "chooseMethod": "Choose Integration Method",
       "chooseMethodPrompt": "Select how you want to integrate {service}:"
     },
+    "iac": {
+      "shortName": "Manage as code",
+      "title": "Manage {brand} as code",
+      "body": "Define your observability configuration as Terraform or OpenTofu and keep it in version control alongside the rest of your infrastructure. Export any supported resource from its list page to get a ready-to-apply configuration, including import blocks that adopt what you already run.",
+      "registriesLabel": "Available on",
+      "resourceAlerts": "Alerts, including composite alerts",
+      "resourceSlos": "SLOs",
+      "resourceDashboards": "Dashboards",
+      "resourcePipelines": "Pipelines and pipeline destinations"
+    },
     "mcp": {
       "name": "OpenObserve MCP Server",
       "shortName": "MCP Server",
@@ -5009,6 +5019,8 @@
       "folderDeletionFailed": "Folder deletion failed",
       "errorFetchingSearch": "Error fetching search results",
       "exportedSuccessfully": "{count} Dashboards exported successfully.",
+      "exportDialogTitle": "Export dashboard | Export {count} dashboards",
+      "exportDialogSubtitle": "Review the dashboard, then download it as JSON or as Terraform for the OpenObserve provider.",
       "errorExporting": "Error exporting dashboards",
       "deletingDashboards": "Deleting dashboards...",
       "noneSelectedForDeletion": "No dashboards selected for deletion",
@@ -8020,7 +8032,9 @@
     "severityCriticalDescription": "Highest priority incidents",
     "severityErrorDescription": "Standard error incidents",
     "severityWarningDescription": "Warning level incidents",
-    "severityInfoDescription": "Informational incidents"
+    "severityInfoDescription": "Informational incidents",
+    "exportDialogTitle": "Export destination | Export {count} destinations",
+    "exportDialogSubtitle": "Review the destination, then download it as JSON or as Terraform for the OpenObserve provider."
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
@@ -10167,7 +10181,9 @@
     "period": "Period",
     "cron": "Cron",
     "type": "Type",
-    "run_pipeline": "Run Pipeline"
+    "run_pipeline": "Run Pipeline",
+    "exportDialogTitle": "Export pipeline | Export {count} pipelines",
+    "exportDialogSubtitle": "Review the pipeline, then download it as JSON or as Terraform for the OpenObserve provider."
   },
   "alert_list": {
     "alert_history": "History"

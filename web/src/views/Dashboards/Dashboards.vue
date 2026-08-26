@@ -397,6 +397,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <ExportResourceDialog
+      v-model:open="showExportDialog"
+      :items="dashboardsToExport"
+      :terraform="dashboardsTerraform"
+      :title="
+        t(
+          'dashboard.dashboards.exportDialogTitle',
+          { count: dashboardsToExport.length },
+          dashboardsToExport.length,
+        )
+      "
+      :sub-title="t('dashboard.dashboards.exportDialogSubtitle')"
+      file-prefix="dashboards"
+      data-test="dashboard-export-dialog"
+      @download="onExportDownloaded"
+    />
+
     <!-- add dashboard -->
     <ODialog
       v-model:open="showAddDashboardDialog"
@@ -491,6 +508,8 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
+import { dashboardsToTerraform } from "@/utils/dashboards/dashboardTerraform";
 // @ts-nocheck
 import {
   computed,
@@ -597,6 +616,7 @@ export default defineComponent({
     ODropdownSeparator,
     OInput,
     ODialog,
+    ExportResourceDialog,
     AddDashboard,
     OTooltip,
     AddDashboardFromGitHub,
@@ -1457,13 +1477,29 @@ export default defineComponent({
       filterQuery.value = "";
       searchQuery.value = "";
     };
+    // ── Export ────────────────────────────────────────────────────────────────
+    // Export opens the shared dialog rather than downloading straight away, the
+    // same as alerts and SLOs: a dashboard can leave as the JSON the import
+    // screen reads back, or as an openobserve_dashboard Terraform resource.
+    const showExportDialog = ref(false);
+    const dashboardsToExport = ref<Record<string, unknown>[]>([]);
+    // Import blocks address a dashboard by its own id, kept alongside the
+    // documents in the order they were fetched.
+    const dashboardIdsToExport = ref<string[]>([]);
+    const dashboardsTerraform = computed(() =>
+      dashboardsToTerraform(dashboardsToExport.value, {
+        folderId: (route.query.folder as string) || "default",
+        orgId: store.state.selectedOrganization.identifier,
+        ids: dashboardIdsToExport.value,
+      }),
+    );
+
     const multipleExportDashboard = async () => {
       try {
+        const ids = [...selectedDashboardIds.value];
         //this is used to get the dashbaords from the selected dashboard ids
         const dashboards = await Promise.all(
-          selectedDashboardIds.value.map((dashboardId) =>
-            getDashboard(store, dashboardId, route.query.folder),
-          ),
+          ids.map((dashboardId) => getDashboard(store, dashboardId, route.query.folder)),
         );
         //this is used to clean up the owner field and set the default title if missing
         const cleanedDashboards = dashboards.map((dashboard, index) => {
@@ -1472,26 +1508,21 @@ export default defineComponent({
           return dashboard;
         });
 
-        const dataStr =
-          "data:text/json;charset=utf-8," +
-          encodeURIComponent(JSON.stringify(cleanedDashboards, null, 2));
+        if (!cleanedDashboards.length) throw new Error("empty export payload");
 
-        // Create and trigger the download
-        const htmlA = document.createElement("a");
-        htmlA.setAttribute("href", dataStr);
-        //the file name is exported_dashboards.json
-        htmlA.setAttribute("download", "exported_dashboards.json");
-        htmlA.click();
-
-        showPositiveNotification(
-          t("dashboard.dashboards.exportedSuccessfully", { count: cleanedDashboards.length }),
-        );
-        selectedIds.value = [];
+        dashboardsToExport.value = cleanedDashboards;
+        dashboardIdsToExport.value = ids;
+        showExportDialog.value = true;
       } catch (error) {
         showErrorNotification(
           raw(asCaughtError(error).message ?? t("dashboard.dashboards.errorExporting")),
         );
       }
+    };
+
+    const onExportDownloaded = ({ count }: { format: string; count: number }) => {
+      showPositiveNotification(t("dashboard.dashboards.exportedSuccessfully", { count }));
+      selectedIds.value = [];
     };
 
     const moveMultipleDashboards = () => {
@@ -1748,6 +1779,10 @@ export default defineComponent({
       updateActiveFolderId,
       selectedIds,
       multipleExportDashboard,
+      showExportDialog,
+      dashboardsToExport,
+      dashboardsTerraform,
+      onExportDownloaded,
       moveMultipleDashboards,
       openBulkDeleteDialog,
       bulkDeleteDashboards,
