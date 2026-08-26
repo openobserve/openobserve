@@ -488,6 +488,13 @@ const useHttpStreaming = () => {
     if (traceMap.value[traceId]) {
       delete traceMap.value[traceId];
     }
+    // A stream that ends normally used to leave its controller here forever.
+    // Each signal keeps the abort listeners its caller registered, and those
+    // closures hold the whole panel's state — so on a dashboard that reloads
+    // many panels the map alone retains every result set ever fetched.
+    if (abortControllers.value[traceId]) {
+      delete abortControllers.value[traceId];
+    }
   };
 
   const closeStreamWithError = () => {
