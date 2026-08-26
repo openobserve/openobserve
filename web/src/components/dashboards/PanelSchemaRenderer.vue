@@ -1396,13 +1396,13 @@ export default defineComponent({
       }
     });
 
-    watch(
-      panelData,
-      () => {
-        emit("series-data-update", panelData.value);
-      },
-      { deep: true },
-    );
+    // panelData is a shallowRef replaced wholesale on every conversion, so the
+    // ref change alone is the signal. Deep-watching it forced Vue to traverse
+    // the entire converted chart option — every series, every point — per
+    // update, per panel, for nothing.
+    watch(panelData, () => {
+      emit("series-data-update", panelData.value);
+    });
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(
