@@ -280,6 +280,24 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Don't use for:** Decorative illustrations in empty states — those come from `OEmptyState`.
 **Key props:**
 - `name` (`IconName | string`, required — registry name or `img:<path>`). There are several hundred registry names; discover them in `@/lib/core/Icon/OIcon.icons.ts` (the exported `iconRegistry` / `IconName` type). Do not guess — check the registry.
+  - **A wrong name fails SILENTLY — nothing renders, no error, no warning.** The
+    `| string` in the prop type (needed for `img:<path>`) collapses the union, so
+    a typo type-checks. Registry keys are **kebab-case**; Material Symbols'
+    snake_case names are NOT valid. The SLO module shipped `format_list_bulleted`,
+    `gpp_maybe`, `timelapse`, `hourglass_empty`, `restart_alt` and `data_usage` —
+    six blank icons across four files, one of which left a filter row where only
+    one of four options had a glyph.
+  - **So type the literal, don't rely on the prop.** When icon names live in a
+    data array, annotate it so the strings are checked against the union:
+    ```ts
+    import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+    const options = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
+      { value: "all", label: t("x.all"), icon: "format-list-bulleted" },
+    ]);
+    ```
+    Without the annotation TS infers `icon: string` and the typo survives to
+    production. To audit an existing file, grep its icon literals against
+    `iconRegistry`'s keys.
 - `size` (`xs` | `sm` | `md` | `lg` | `xl` — default `md`; xs=12px, sm=16px, md=24px, lg=32px, xl=40px)
 - `label` (string — accessible label; sets `role="img"`, otherwise the icon is `aria-hidden`)
 

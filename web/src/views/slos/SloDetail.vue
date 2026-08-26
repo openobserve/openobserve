@@ -440,7 +440,7 @@ const frozenBanner = computed(() => {
     return {
       // Not the snowflake: a window that is still filling is not frozen, and
       // this banner now shows while the SLO is publishing figures.
-      icon: "hourglass_empty",
+      icon: "hourglass-empty",
       title: t("slos.frozen.measuringSinceTitle", { since: measuringSince.value.since }),
       body: t("slos.frozen.measuringSinceBody", measuringSince.value),
     };

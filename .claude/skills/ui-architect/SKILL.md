@@ -690,7 +690,11 @@ considering the UI done:
       a re-telling of the code or the history of the PR that added it (no ticket
       ids, "review finding", "as discussed"). Same in specs. See
       [conventions § Comments stay short](references/conventions.md).
-- [ ] `cd web && npm run lint && npm run type-check` pass.
+- [ ] `cd web && npm run lint && npm run type-check:app` pass. **`type-check:app`,
+      not `type-check`** — the latter runs `tsconfig.vitest.json`, whose `include`
+      is only `src/**/*.spec.{ts,js}`, so it never checks a `.vue` file and a
+      green run says nothing about the component you just wrote. `type-check:app`
+      (`tsconfig.app.json`) is the one that covers `src/**/*.vue`.
 
 ## When a rule can't be satisfied
 
