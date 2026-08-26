@@ -77,7 +77,9 @@ read it once, it is the backbone of everything below.
 
 1. **Every page/module header is `OPageHeader`** — never a hand-rolled
    `<div class="header">…<h1>` or a `q-toolbar`. One header contract keeps the
-   title in the same place across list → detail → edit.
+   title in the same place across list → detail → edit. Peer/section tabs need
+   **`tabs-below`** (the slot alone renders them inline beside the title), and the
+   header `icon` must be the SAME `IconName` the page's nav entry declares.
 2. **Build from O2 components in `web/src/lib`** — never a bare HTML control
    (`<button>`, `<input>`) or a third-party UI primitive when an `O*` equivalent
    exists. Drive them by **intent**
@@ -515,7 +517,7 @@ and each domain has its own reference below.
 | --- | --- | --- |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
 | **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY when you need chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit — annotate the site with why, and convert once the schema renderer forwards clicks. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
-| **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
+| **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
 | **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
 | **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered` | [page-recipes](references/page-recipes.md) |
@@ -565,6 +567,13 @@ Run this in your head before writing template markup, and again before
 considering the UI done:
 
 - [ ] Page/module header is `OPageHeader` (not a hand-built header bar).
+- [ ] Peer/section tabs pass **`tabs-below`** so the strip is the full-width
+      row-2 band — the bare `#header-tabs`/`#tabs` slot renders them inline
+      beside the title, where they shift as the title's width changes.
+- [ ] The header **`icon` matches the page's nav entry** verbatim
+      (`navGroups.ts` / `linksList` / `settingsItems` / SectionRail). A module
+      showing one glyph in the rail and another in its header reads as two
+      places — see [navigation-menus](references/navigation-menus.md#icon-parity).
 - [ ] Every interactive control is an O2 component if one exists in
       `web/src/lib` — no bare HTML controls or third-party primitives with an O2 equivalent.
 - [ ] A self-contained/repeated UI element with no matching component was
