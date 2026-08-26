@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm"
-        icon-left="account-tree"
+        icon-left="alt-route"
         data-test="oncall-responses-routing-btn"
         @click="goTo('onCallRouting')"
       >
@@ -138,9 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-responses-table"
-      :row-rail-tone="rowRailTone"
       :row-tone="rowTone"
-      :row-section="rowSection"
+      :row-section="visibleRowSection"
       :section-order="SECTION_ORDER"
       selection="multiple"
       v-model:selected-ids="selectedIds"
@@ -205,6 +204,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div v-else class="flex w-full flex-wrap items-center gap-2">
+          <ODropdown align="start" side="bottom" :side-offset="4">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                :aria-label="t('oncall.filters')"
+                data-test="oncall-responses-filters-btn"
+              >
+                <template #icon-left>
+                  <OIcon name="filter-list" size="sm" />
+                </template>
+                <OTooltip :content="t('oncall.filters')" side="bottom" />
+              </OButton>
+            </template>
+
+            <div class="min-w-48 py-1" data-test="oncall-responses-filters-panel">
+              <p class="text-text-secondary px-3 py-1 text-xs font-medium">
+                {{ t("oncall.filters") }}
+              </p>
+              <ul role="listbox" :aria-label="t('oncall.filters')" aria-multiselectable="true">
+                <!-- A resolved page is the only record of what happened, and it
+                     was reachable from nowhere. Off by default so the live
+                     list stays about what still needs somebody. -->
+                <li
+                  class="rounded-default hover:bg-surface-panel flex cursor-pointer items-center gap-2 px-3 py-1.5 transition-colors"
+                  @click.stop="toggleResolved"
+                >
+                  <OCheckbox
+                    :model-value="includeResolved"
+                    size="sm"
+                    data-test="oncall-responses-resolved-toggle"
+                    @update:model-value="toggleResolved"
+                    @click.stop
+                  />
+                  <span class="text-text-body flex-1 text-sm select-none">
+                    {{ t("oncall.showResolved") }}
+                  </span>
+                </li>
+                <ODropdownSeparator class="my-1" />
+                <li
+                  v-for="section in SECTION_ORDER"
+                  :key="section"
+                  class="rounded-default hover:bg-surface-panel flex cursor-pointer items-center gap-2 px-3 py-1.5 transition-colors"
+                  @click.stop="toggleSectionVisible(section)"
+                >
+                  <OCheckbox
+                    :model-value="sectionVisibility[section]"
+                    size="sm"
+                    :data-test="`oncall-responses-section-toggle-${section}`"
+                    @update:model-value="toggleSectionVisible(section)"
+                    @click.stop
+                  />
+                  <span class="text-text-body flex-1 text-sm select-none">
+                    {{ t(`oncall.section_${section}`) }}
+                  </span>
+                  <OTag variant="default-soft" size="sm">
+                    {{ raw(String(sectionCounts[section] ?? 0)) }}
+                  </OTag>
+                </li>
+              </ul>
+            </div>
+          </ODropdown>
           <!-- `width` is a PROP, not a class: OSelect merges an incoming class
                with its own width class, so a `w-56` here lost to the default
                `w-full` and stacked the whole toolbar into three rows. -->
@@ -235,14 +296,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('oncall.searchResponses')"
             data-test="oncall-responses-search"
           />
-          <!-- A resolved page is the only record of what happened, and it was
-               reachable from nowhere. Off by default so the live list stays
-               about what still needs somebody. -->
+          <!-- On by default. A rule firing every minute is one problem, not
+               ninety-five, and the ungrouped view is for reading history. -->
           <OCheckbox
-            v-model="includeResolved"
-            :label="t('oncall.showResolved')"
-            data-test="oncall-responses-resolved-toggle"
-            @update:model-value="onResolvedToggle"
+            v-model="grouped"
+            :label="t('oncall.groupByAlert')"
+            data-test="oncall-responses-group-toggle"
           />
           <!-- Only with resolved pages in the list: a cause is written at
                resolve, so filtering an open list by one can only ever empty
@@ -256,13 +315,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width="sm"
             data-test="oncall-responses-cause-filter"
             @update:model-value="onCauseFilter"
-          />
-          <!-- On by default. A rule firing every minute is one problem, not
-               ninety-five, and the ungrouped view is for reading history. -->
-          <OCheckbox
-            v-model="grouped"
-            :label="t('oncall.groupByAlert')"
-            data-test="oncall-responses-group-toggle"
           />
         </div>
       </template>
@@ -720,7 +772,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
-import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
@@ -750,7 +802,6 @@ import {
   isOnCallUnavailable,
   isSnoozed,
   nextHandover,
-  priorityTone,
   winningRule,
 } from "@/utils/oncall";
 
@@ -824,6 +875,12 @@ const mineOnly = ref(false);
 const selectedIds = ref<string[]>([]);
 const grouped = ref(true);
 const includeResolved = ref(false);
+/// All three on by default: nothing is hidden until the reader asks for it.
+const sectionVisibility = ref<Record<SectionKey, boolean>>({
+  ringing: true,
+  snoozed: true,
+  handled: true,
+});
 /// Empty means every cause. Cleared whenever resolved pages leave the list,
 /// because a cause filter over open records matches nothing and would read as
 /// "there is nothing here" rather than "this filter cannot apply".
@@ -913,7 +970,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   },
   {
     id: "subject",
-    header: t("oncall.subject"),
+    header: t("oncall.subjectColumn"),
     // The producer sends the alert's name; the source id is a ksuid and tells
     // a woken engineer nothing. Fall back only when there is no title.
     accessorFn: (row: PageRow) => row.latest.title || row.latest.subject.source_id,
@@ -1096,9 +1153,19 @@ function onCauseFilter(value: unknown) {
 
 /// Turning resolved pages off takes the cause filter with it — left behind it
 /// would narrow an open list to nothing and read as an empty inbox.
-function onResolvedToggle() {
+function toggleResolved() {
+  includeResolved.value = !includeResolved.value;
   if (!includeResolved.value) causeFilter.value = "";
   void fetchResponses();
+}
+
+/// Client-side only: the section is already in `rows`, this just decides
+/// whether `visibleRowSection` lets it into the table.
+function toggleSectionVisible(section: SectionKey) {
+  sectionVisibility.value = {
+    ...sectionVisibility.value,
+    [section]: !sectionVisibility.value[section],
+  };
 }
 
 const youLabel = computed(() => String(t("oncall.onCallYou")));
@@ -1392,6 +1459,15 @@ function rowSection(row: PageRow): SectionKey {
   return "handled";
 }
 
+/// What `OTable` groups by. Unlike `rowSection`, a section the filters
+/// dropdown unchecked returns null here — `OTable` drops a row entirely when
+/// its section is null, which is how "hide Handled" hides Handled rows
+/// without touching `rows`, `sectionCounts`, or anything counted off it.
+function visibleRowSection(row: PageRow): SectionKey | null {
+  const section = rowSection(row);
+  return sectionVisibility.value[section] ? section : null;
+}
+
 /// Counted over the filtered set, not the page: a heading reading "3" on page
 /// one of five would be describing the pagination rather than the state.
 const sectionCounts = computed<Record<string, number>>(() => {
@@ -1423,12 +1499,6 @@ function ladderStarted(record: OnCallResponse): I18nText | "" {
   return t("oncall.ladderStartedAfter", {
     duration: formatMicrosDuration(first.after_micros),
   });
-}
-
-// The rail carries severity on every row. A closed record has no severity left
-// to signal, so it gets none rather than a stale colour.
-function rowRailTone(row: PageRow): RowRailTone | null {
-  return isEscalating(row.latest.state) ? priorityTone(row.latest.priority) : null;
 }
 
 // Snoozed rows are deliberately inert, so they recede. This is the only wash

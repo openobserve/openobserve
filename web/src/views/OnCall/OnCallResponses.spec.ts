@@ -62,7 +62,6 @@ const stubs = {
     name: "OTable",
     props: [
       "data",
-      "rowRailTone",
       "rowTone",
       "columns",
       "selectedIds",
@@ -265,18 +264,6 @@ describe("OnCallResponses", () => {
     ]);
   });
 
-  /// A resolved record has no severity left to signal; a stale rail would say
-  /// it still does.
-  it("rails open rows by severity and leaves closed ones bare", async () => {
-    const wrapper = await withPages([page()]);
-    const railTone = wrapper.findComponent({ name: "OTable" }).props("rowRailTone") as any;
-
-    const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
-    expect(railTone(asRow(page({ priority: 1 })))).toBe("p1");
-    expect(railTone(asRow(page({ priority: 2 })))).toBe("p2");
-    expect(railTone(asRow(page({ state: "resolved" })))).toBeNull();
-  });
-
   /// Snoozed rows recede rather than shouting; the loud treatment is reserved
   /// for something you must act on now.
   it("mutes a snoozed row", async () => {
@@ -324,7 +311,7 @@ describe("OnCallResponses", () => {
     const time = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
     const col = time.find((c) => c.id === "last_alert_at");
 
-    expect(col.header).toBe("Last Alert");
+    expect(col.header).toBe("Created");
     expect(col.sortable).toBe(true);
   });
 
