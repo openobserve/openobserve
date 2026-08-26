@@ -126,6 +126,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODescriptionList>
         </template>
       </template>
+
+      <!-- How this page has gone so far: whether it moved, and how far up the
+           ladder it got to make that happen. These used to be a stat strip of
+           their own above the fold — read once, right after who is on the
+           hook for them, rather than as a separate stop on the page. -->
+      <OSeparator class="my-3" />
+
+      <ODescriptionList dense>
+        <ODescriptionItem :label="ackLabel">
+          <span class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+            <span data-test="oncall-who-is-on-ack-value">{{ ackValue }}</span>
+            <OUserCell
+              v-if="ackedBy"
+              class="text-text-secondary min-w-0 truncate text-xs"
+              :value="ackedBy"
+            />
+          </span>
+        </ODescriptionItem>
+
+        <ODescriptionItem :label="resolveLabel">
+          <span data-test="oncall-who-is-on-resolve-value">{{ resolveValue }}</span>
+        </ODescriptionItem>
+
+        <!-- How deep the ladder actually went. It was in every payload this
+             page fetches and rendered nowhere, so "was anybody past the first
+             rung ever called?" — the question that decides whether to
+             escalate again — was only answerable by reading the timeline. -->
+        <ODescriptionItem :label="t('oncall.statReachedRung')">
+          <span data-test="oncall-who-is-on-reached-rung">{{ reachedRung }}</span>
+        </ODescriptionItem>
+      </ODescriptionList>
     </OCardSection>
   </OCard>
 </template>
@@ -143,7 +174,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import type { DeliveryRecord, OnCallPosition } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -166,6 +197,17 @@ const props = withDefaults(
      * tense and drops the rows that are advice about a pager still being held.
      */
     closedAt?: number | null;
+    /** "Time to ack" once acked, "Unacked for" (or "—") while still open. */
+    ackLabel: I18nText;
+    /** The duration itself, in the tense `ackLabel` names. */
+    ackValue: I18nText | string;
+    /** Who acked it, once somebody has. */
+    ackedBy?: string | null;
+    /** "Time to resolve" once closed, "Open for" (or "—") while still open. */
+    resolveLabel: I18nText;
+    resolveValue: I18nText | string;
+    /** How far up the ladder this page got, as a rung rather than a delay. */
+    reachedRung: I18nText | string;
   }>(),
   {
     positions: () => [],
@@ -173,6 +215,7 @@ const props = withDefaults(
     handoverAt: null,
     handoverTo: null,
     closedAt: null,
+    ackedBy: null,
   },
 );
 

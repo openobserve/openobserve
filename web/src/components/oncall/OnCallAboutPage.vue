@@ -119,14 +119,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </ODescriptionItem>
 
-        <ODescriptionItem v-if="ackedBy" :label="t('oncall.ackedBy')">
-          <OUserCell :value="ackedBy" />
-        </ODescriptionItem>
-
-        <ODescriptionItem :label="t('oncall.openedAt')">
-          <OTimeCell :value="openedAt" unit="us" />
-        </ODescriptionItem>
-
         <ODescriptionItem v-if="cause" :label="t('oncall.resolveCause')">
           <span data-test="oncall-about-cause">
             {{ t(`oncall.cause_${cause}`) }}
@@ -215,8 +207,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
@@ -233,12 +223,9 @@ const props = withDefaults(
     teamName: string;
     subjectType: SubjectType;
     sourceId: string;
-    /** Micros. */
-    openedAt: number;
     /** The engine's sentence for why this team was picked. */
     routingReason?: string | null;
     subjectStream?: string | null;
-    ackedBy?: string | null;
     incidentId?: string | null;
     cause?: ResolutionCause | null;
     causeNote?: string | null;
@@ -250,7 +237,6 @@ const props = withDefaults(
   {
     routingReason: null,
     subjectStream: null,
-    ackedBy: null,
     incidentId: null,
     cause: null,
     causeNote: null,

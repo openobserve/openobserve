@@ -25,8 +25,6 @@ const stubs = {
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OButton: { name: "OButton", template: "<button><slot /></button>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
-  OUserCell: { name: "OUserCell", props: ["value"], template: `<span>{{ value }}</span>` },
   ODescriptionList: { name: "ODescriptionList", template: "<dl><slot /></dl>" },
   ODescriptionItem: {
     name: "ODescriptionItem",
@@ -49,7 +47,6 @@ function render(props: Record<string, unknown> = {}) {
       teamName: "Gateway",
       subjectType: "alert" as SubjectType,
       sourceId: "al_ckt",
-      openedAt: 1_700_000_000_000_000,
       ...props,
     },
     global: { plugins: [i18n], stubs },

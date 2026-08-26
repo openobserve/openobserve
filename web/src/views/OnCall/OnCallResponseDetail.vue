@@ -3,10 +3,46 @@
     bleed
     data-test="oncall-response-detail-page"
     :title="title"
-    :subtitle="subtitle"
     icon="notifications-active"
     :back="{ label: t('oncall.backToResponses'), to: { name: 'onCallResponses' } }"
   >
+    <!-- Team, which firing this is, and when it opened — the tagline reads as
+         one short line rather than a metadata grid below the fold. Team is a
+         real link because "whose rotation is this" is the next click a
+         responder makes; the firing count carries its history as a tooltip
+         instead of a trailing clause, which is enough for "not the first
+         time" without spelling out how many. -->
+    <template v-if="response" #subtitle>
+      <i18n-t
+        keypath="oncall.responseSubtitle"
+        tag="span"
+        scope="global"
+        class="flex min-w-0 items-center gap-1 truncate"
+        data-test="oncall-response-subtitle"
+      >
+        <template #team>
+          <router-link
+            class="text-accent shrink-0 hover:underline"
+            :to="teamRoute"
+            data-test="oncall-response-team-link"
+          >
+            {{ raw(teamName) }}
+          </router-link>
+        </template>
+        <template #firing>
+          <span class="shrink-0" data-test="oncall-response-firing">
+            #{{ response.subject.firing }}
+            <OTooltip v-if="historyLabel">
+              <template #content>{{ historyLabel }}</template>
+            </OTooltip>
+          </span>
+        </template>
+        <template #opened>
+          <span class="truncate" data-test="oncall-response-opened">{{ openedAtClock }}</span>
+        </template>
+      </i18n-t>
+    </template>
+
     <!-- The two facts a responder needs before anything else ride the title,
          rather than sitting in a metadata grid below the fold. -->
     <template #title-trail>
@@ -195,8 +231,6 @@
           </router-link>
         </OBanner>
 
-        <OStatStrip :items="summaryStats" data-test="oncall-response-stats" />
-
         <!-- Two columns rather than three tabs. Everything a responder needs
              to decide is on one screen: the tabs cost a click each for facts
              that were never optional, and the rail's answers — who this is
@@ -289,6 +323,12 @@
               :handover-at="handoverAt"
               :handover-to="handoverTo"
               :closed-at="response.closed_at"
+              :ack-label="ackLabel"
+              :ack-value="ackValue"
+              :acked-by="response.acked_by"
+              :resolve-label="resolveLabel"
+              :resolve-value="resolveValue"
+              :reached-rung="reachedRung"
             />
 
             <OnCallEscalationSkeleton v-if="loading && !escalation" />
@@ -311,10 +351,8 @@
               :team-name="teamName"
               :subject-type="response.subject.subject_type"
               :source-id="response.subject.source_id"
-              :opened-at="response.opened_at"
               :routing-reason="routingReason"
               :subject-stream="subjectStream"
-              :acked-by="response.acked_by"
               :incident-id="response.incident_id"
               :cause="response.cause"
               :cause-note="response.cause_note"
@@ -552,12 +590,11 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatItem, StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
@@ -598,6 +635,7 @@ import {
   routingReasonOf,
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { formatTimestampInTimezone } from "@/utils/date";
 
 const { t } = useI18nTyped();
 const nowMicros = useOnCallClock();
@@ -781,20 +819,33 @@ const canAcknowledge = computed(
   () => !!response.value && isEscalating(response.value.state),
 );
 
-/// Team, which firing this is, and whether the subject has form. The id used
-/// to sit here, where it told a woken responder nothing they could act on; it
-/// is now a copyable row in the rail.
-const subtitle = computed(() => {
-  const r = response.value;
-  if (!r) return undefined;
-  const history = firingHistory.value.length
+/// Where the team-name link in the subtitle goes — same target and tab
+/// OnCallAboutPage's own team row links to, so the two agree on what
+/// clicking the team means.
+const teamRoute = computed(() => ({
+  name: "onCallTeamDetail",
+  params: { teamId: response.value?.team_id ?? "", tab: "overview" },
+  query: { org_identifier: orgId.value },
+}));
+
+/// The subtitle used to spell out "first page from this subject" / "N earlier
+/// firings" inline, which made a one-line tagline read as a paragraph. The
+/// firing count alone says "this isn't the first time" (or is); the rest is a
+/// tooltip on that count instead of a trailing clause, and the same prose the
+/// About card already carries.
+const historyLabel = computed(() =>
+  firingHistory.value.length
     ? t("oncall.historyFirings", { count: firingHistory.value.length }, firingHistory.value.length)
-    : t("oncall.historyFirstPage");
-  return t("oncall.responseSubtitle", {
-    team: teamName.value,
-    firing: r.subject.firing,
-    history,
-  });
+    : t("oncall.historyFirstPage"),
+);
+
+/// Clock time, not "N ago" — the elapsed duration is already said once, beside
+/// the title tags, and repeating it here as "opened 2 hours ago" would just be
+/// the same fact twice in two words.
+const openedAtClock = computed(() => {
+  const r = response.value;
+  if (!r) return "";
+  return formatTimestampInTimezone(r.opened_at, "HH:mm", store.state.timezone);
 });
 
 /// How long this has been somebody's problem. An open page reads as elapsed;
@@ -806,103 +857,32 @@ const elapsedLabel = computed(() => {
   return formatMicrosDuration(end - r.opened_at);
 });
 
-/// The headline is "when does this wake somebody else" — the question a
-/// responder actually has, previously buried mid-page.
-/// Every tile said "—" on the page that needs them most: an open record has no
-/// ack duration and no resolve duration yet, and an exhausted ladder has no
-/// next rung. A dash is not the answer to "when does this escalate" — the
-/// answer is that it never will again, and each tile now says its own version
-/// of that instead of going blank.
-/// `echoesState` marks the readings where this tile says nothing the title bar
-/// has not already said: "Acknowledged", "Resolved" and "Snoozed" are all tags
-/// beside the page title, and a tile repeating one of them is a fifth of the
-/// strip spent on a word already on screen. The countdown, "nobody left" and
-/// "not started" are readings that exist nowhere else, so those still get a
-/// tile.
-const escalatesIn = computed<{ value: I18nText | string; tone: StatTone; echoesState: boolean }>(
-  () => {
-    const r = response.value;
-    const progress = escalation.value;
-    if (r?.state === "resolved")
-      return { value: t("oncall.escalationResolvedShort"), tone: "neutral", echoesState: true };
-    if (r && isSnoozed(r))
-      return { value: t("oncall.escalationSnoozedShort"), tone: "warning", echoesState: true };
-    if (r?.state === "acknowledged")
-      return { value: t("oncall.escalationAcked"), tone: "success", echoesState: true };
-    const remaining = progress?.next_at ? progress.next_at - nowMicros.value : null;
-    if (remaining && remaining > 0) {
-      return {
-        value: formatMicrosDuration(remaining),
-        tone: remaining < 5 * 60 * 1_000_000 ? "error" : "neutral",
-        echoesState: false,
-      };
-    }
-    // Nothing is coming: either the ladder ran out with nobody answering, or it
-    // has not started. The first is the loudest fact on the page.
-    if (progress?.exhausted)
-      return { value: t("oncall.statNobodyLeft"), tone: "error", echoesState: false };
-    return { value: t("oncall.escalationNotStarted"), tone: "neutral", echoesState: false };
-  },
-);
-
-const summaryStats = computed<StatItem[]>(() => {
+/// Until somebody acks, "time to ack" is a clock still running, and freezing
+/// it at a dash hid the number the SLA is measured on.
+const ackLabel = computed(() => {
   const r = response.value;
   const openMicros = r ? nowMicros.value - r.opened_at : null;
-  const acked = Boolean(r?.acked_at);
-  const closed = Boolean(r?.closed_at);
-  const stats: StatItem[] = [
-    {
-      // Until somebody acks, "time to ack" is a clock still running, and
-      // freezing it at a dash hid the number the SLA is measured on.
-      key: "ack",
-      label: acked || !openMicros ? t("oncall.timeToAck") : t("oncall.statUnackedFor"),
-      value: acked ? timeToAck.value : openMicros ? formatMicrosDuration(openMicros) : ABSENT,
-      icon: "check-circle",
-      tone: "neutral",
-      dataTest: "oncall-stat-ttack",
-    },
-    {
-      key: "resolve",
-      label: closed || !openMicros ? t("oncall.timeToResolve") : t("oncall.statOpenFor"),
-      value: closed ? timeToResolve.value : openMicros ? formatMicrosDuration(openMicros) : ABSENT,
-      icon: "task-alt",
-      tone: "neutral",
-      dataTest: "oncall-stat-ttr",
-    },
-    {
-      // How deep the ladder actually went. It was in every payload this page
-      // fetches and rendered nowhere, so "was anybody past the first rung ever
-      // called?" — the question that decides whether to escalate again — was
-      // only answerable by reading the timeline.
-      key: "reachedRung",
-      label: t("oncall.statReachedRung"),
-      value: reachedRung.value,
-      icon: "arrow-upward",
-      tone: r?.reached_rung_micros === undefined ? "neutral" : "warning",
-      dataTest: "oncall-stat-reached-rung",
-    },
-    {
-      key: "firing",
-      label: t("oncall.firing"),
-      value: r ? `#${r.subject.firing}` : ABSENT,
-      icon: "format-list-numbered",
-      tone: "neutral",
-      dataTest: "oncall-stat-firing",
-    },
-  ];
+  return r?.acked_at || !openMicros ? t("oncall.timeToAck") : t("oncall.statUnackedFor");
+});
 
-  if (!escalatesIn.value.echoesState) {
-    stats.unshift({
-      key: "escalatesIn",
-      label: t("oncall.statEscalatesIn"),
-      value: escalatesIn.value.value,
-      icon: "notifications-active",
-      tone: escalatesIn.value.tone,
-      dataTest: "oncall-stat-escalates-in",
-    });
-  }
+const ackValue = computed(() => {
+  const r = response.value;
+  const openMicros = r ? nowMicros.value - r.opened_at : null;
+  if (r?.acked_at) return timeToAck.value;
+  return openMicros ? formatMicrosDuration(openMicros) : ABSENT;
+});
 
-  return stats;
+const resolveLabel = computed(() => {
+  const r = response.value;
+  const openMicros = r ? nowMicros.value - r.opened_at : null;
+  return r?.closed_at || !openMicros ? t("oncall.timeToResolve") : t("oncall.statOpenFor");
+});
+
+const resolveValue = computed(() => {
+  const r = response.value;
+  const openMicros = r ? nowMicros.value - r.opened_at : null;
+  if (r?.closed_at) return timeToResolve.value;
+  return openMicros ? formatMicrosDuration(openMicros) : ABSENT;
 });
 
 /// How far up the ladder a page got, said as the rung rather than as a delay.

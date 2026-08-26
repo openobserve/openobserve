@@ -68,9 +68,13 @@ const alerts = vi.mocked(alertsService);
 const stubs = {
   OPageLayout: {
     name: "OPageLayout",
-    // `title-trail` carries the state tags, which are assertions of their own.
-    template: "<div><slot name='title-trail' /><slot name='actions' /><slot /></div>",
+    // `title-trail` carries the state tags and `subtitle` the team/firing/
+    // opened line, both of which are assertions of their own.
+    template:
+      "<div><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><slot /></div>",
   },
+  OTooltip: { name: "OTooltip", template: "<span><slot name='content' /></span>" },
+  RouterLink: { name: "RouterLink", props: ["to"], template: "<a><slot /></a>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
@@ -97,7 +101,6 @@ const stubs = {
     template: "<div />",
   },
   OContent: { name: "OContent", template: "<div><slot /></div>" },
-  OStatStrip: { name: "OStatStrip", props: ["items"], template: "<div />" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
   // Always open: the tests are about what the page holds, not about whether
   // the disclosure widget animates.
@@ -125,7 +128,19 @@ const stubs = {
   },
   OnCallWhoIsOn: {
     name: "OnCallWhoIsOn",
-    props: ["positions", "deliveries", "handoverAt", "handoverTo", "closedAt"],
+    props: [
+      "positions",
+      "deliveries",
+      "handoverAt",
+      "handoverTo",
+      "closedAt",
+      "ackLabel",
+      "ackValue",
+      "ackedBy",
+      "resolveLabel",
+      "resolveValue",
+      "reachedRung",
+    ],
     template: "<div />",
   },
   OnCallAboutPage: {
@@ -136,10 +151,8 @@ const stubs = {
       "teamName",
       "subjectType",
       "sourceId",
-      "openedAt",
       "routingReason",
       "subjectStream",
-      "ackedBy",
       "incidentId",
       "cause",
       "causeNote",
@@ -825,6 +838,55 @@ describe("OnCallResponseDetail", () => {
     });
   });
 
+  /// The tagline: team, which firing this is, and when it opened — read once,
+  /// under the title, instead of being spread across a metadata grid.
+  describe("the tagline", () => {
+    it("links the team name to its detail page", async () => {
+      const wrapper = await renderWith();
+      const link = wrapper
+        .findAllComponents({ name: "RouterLink" })
+        .find((c) => c.attributes("data-test") === "oncall-response-team-link");
+
+      expect(link?.text()).toBe("Platform");
+      expect(link?.props("to")).toEqual({
+        name: "onCallTeamDetail",
+        params: { teamId: "team_1", tab: "overview" },
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    });
+
+    /// The trailing clause used to spell out "first page from this subject" /
+    /// "N earlier firings" inline; it is now a tooltip on the count instead —
+    /// still reachable, no longer read every time.
+    it("shows which firing this is, with the history behind a tooltip", async () => {
+      const wrapper = await renderWith();
+      const firing = wrapper.find('[data-test="oncall-response-firing"]');
+
+      expect(firing.text()).toContain("#2");
+      expect(firing.text()).toContain("first page from this subject");
+    });
+
+    it("shows the earlier-firings count in the same tooltip once there is history", async () => {
+      service.responseHistory.mockResolvedValue({
+        data: [{ id: "resp_0", state: "resolved", opened_at: 1, acked_by: null, cause: null }],
+      } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.find('[data-test="oncall-response-firing"]').text()).toContain(
+        "1 earlier firing",
+      );
+    });
+
+    /// The elapsed duration already rides the title tags — "opened" repeats it
+    /// as a clock time rather than a second "N ago".
+    it("shows the clock time the page opened, not how long ago", async () => {
+      const wrapper = await renderWith();
+      const opened = wrapper.find('[data-test="oncall-response-opened"]');
+
+      expect(opened.text()).toMatch(/^\d{2}:\d{2}$/);
+    });
+  });
+
   /// The rail's four answers. Each is context: the record has to render when
   /// every one of them fails, which is what these pin.
   describe("team context", () => {
@@ -948,52 +1010,22 @@ describe("OnCallResponseDetail", () => {
       actual_value: 7.4,
     });
   });
-  /// The strip read "— — —" on exactly the page that needs it: an open record
-  /// has no ack or resolve duration yet, and an exhausted ladder has no next
-  /// rung. Each tile now says its own version of what is actually true.
-  it("says what the clocks are doing instead of three dashes", async () => {
+  /// The rail read "— —" on exactly the page that needs it: an open record
+  /// has no ack or resolve duration yet. Each row now says its own version of
+  /// what is actually true, and both moved off the page's own stat strip into
+  /// the "who is on" rail once the strip went away.
+  it("says what the clocks are doing instead of a dash", async () => {
     const wrapper = await renderWith();
-    const items = wrapper.findComponent({ name: "OStatStrip" }).props("items") as {
-      key: string;
-      label: string;
-      value: string;
-    }[];
+    const who = wrapper.findComponent({ name: "OnCallWhoIsOn" });
 
-    const ack = items.find((i) => i.key === "ack")!;
-    expect(ack.label).toBe("Unacked for");
-    expect(ack.value).not.toBe("—");
+    expect(who.props("ackLabel")).toBe("Unacked for");
+    expect(who.props("ackValue")).not.toBe("—");
 
-    const resolve = items.find((i) => i.key === "resolve")!;
-    expect(resolve.label).toBe("Open for");
-    expect(resolve.value).not.toBe("—");
+    expect(who.props("resolveLabel")).toBe("Open for");
+    expect(who.props("resolveValue")).not.toBe("—");
   });
 
-  /// A ladder with nowhere left to go is the loudest fact on the page; a dash
-  /// under "escalates in" read as one still counting down.
-  it("says nobody is left rather than dashing the escalation tile", async () => {
-    service.escalationProgress.mockResolvedValue({
-      data: {
-        fired: [],
-        next_targets: [],
-        next_at: null,
-        exhausted: true,
-        stopped_because: "the ladder is exhausted — nobody acknowledged",
-      },
-    } as any);
-
-    const wrapper = await renderWith();
-    const items = wrapper.findComponent({ name: "OStatStrip" }).props("items") as {
-      key: string;
-      value: string;
-      tone: string;
-    }[];
-
-    const escalates = items.find((i) => i.key === "escalatesIn")!;
-    expect(escalates.value).toBe("Nobody left");
-    expect(escalates.tone).toBe("error");
-  });
-
-  /// Once it is answered the tile freezes into the metric it was always
+  /// Once it is answered the reading freezes into the metric it was always
   /// labelled as — the running clock belongs to the open state only.
   it("reverts to the settled durations once the page is answered", async () => {
     const wrapper = await renderWith({
@@ -1001,32 +1033,11 @@ describe("OnCallResponseDetail", () => {
       acked_by: "engineer@example.com",
       acked_at: 1_700_000_000_000_000 + HOUR_MICROS,
     });
-    const items = wrapper.findComponent({ name: "OStatStrip" }).props("items") as {
-      key: string;
-      label: string;
-      value: string;
-    }[];
+    const who = wrapper.findComponent({ name: "OnCallWhoIsOn" });
 
-    const ack = items.find((i) => i.key === "ack")!;
-    expect(ack.label).toBe("Time to ack");
-    expect(ack.value).toContain("1h");
-  });
-
-  /// The state tag sits beside the page title. A tile whose whole reading is
-  /// that same word spends a fifth of the strip repeating what is already on
-  /// screen, so it stands down and leaves the four measurements.
-  it("drops the escalation tile once its reading is the state tag over again", async () => {
-    const wrapper = await renderWith({
-      state: "acknowledged",
-      acked_by: "engineer@example.com",
-      acked_at: 1_700_000_000_000_000 + HOUR_MICROS,
-    });
-    const items = wrapper.findComponent({ name: "OStatStrip" }).props("items") as {
-      key: string;
-    }[];
-
-    expect(items.find((i) => i.key === "escalatesIn")).toBeUndefined();
-    expect(items.map((i) => i.key)).toEqual(["ack", "resolve", "reachedRung", "firing"]);
+    expect(who.props("ackLabel")).toBe("Time to ack");
+    expect(who.props("ackValue")).toContain("1h");
+    expect(who.props("ackedBy")).toBe("engineer@example.com");
   });
 });
 
@@ -1049,9 +1060,8 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     alerts.get_by_alert_id.mockResolvedValue({ data: {} } as any);
   });
 
-  const stat = async (wrapper: any, key: string) =>
-    (wrapper.findComponent({ name: "OStatStrip" }).props("items") as { key: string; value: unknown }[])
-      .find((i) => i.key === key)?.value;
+  const reachedRung = (wrapper: any) =>
+    wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("reachedRung");
 
   /// **`0` is a real and common value** — it means the page never left the
   /// first rung — so `if (micros)` is a bug here. The absent case is the one
@@ -1075,7 +1085,7 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       } as any);
 
       const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
-      expect(await stat(wrapper, "reachedRung")).toBe("2 of 3");
+      expect(reachedRung(wrapper)).toBe("2 of 3");
     });
 
     it("treats never leaving the first rung as a rung, not as nothing", async () => {
@@ -1092,19 +1102,19 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       } as any);
 
       const wrapper = await renderWith({ priority: 2, reached_rung_micros: 0 });
-      expect(await stat(wrapper, "reachedRung")).toBe("1 of 1");
+      expect(reachedRung(wrapper)).toBe("1 of 1");
     });
 
     it("reads a dash only when no page went out at all", async () => {
       const wrapper = await renderWith({ priority: 2 });
-      expect(await stat(wrapper, "reachedRung")).toBe("—");
+      expect(reachedRung(wrapper)).toBe("—");
     });
 
     /// With no policy to match against, the delay is still more honest than
     /// nothing — the reader learns the ladder got 5m deep.
     it("falls back to the delay when the ladder cannot be matched", async () => {
       const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
-      expect(await stat(wrapper, "reachedRung")).toBe("+5m");
+      expect(reachedRung(wrapper)).toBe("+5m");
     });
   });
 

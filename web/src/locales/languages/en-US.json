@@ -13677,7 +13677,7 @@
     "historyFirstPage": "first page from this subject",
     "historyFirings": "{count} earlier firing | {count} earlier firings",
     "historyFiringsCause": "{count} earlier firings · {causeCount}× {cause}",
-    "responseSubtitle": "{team} · firing #{firing} — {history}",
+    "responseSubtitle": "{team} · firing {firing} · opened {opened}",
     "onCallNowCount": "On-call teams ({count})",
     "coverageGapCount": "{count} gap | {count} gaps",
     "moreActions": "More actions",
