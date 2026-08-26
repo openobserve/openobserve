@@ -133,11 +133,6 @@
       "description": "組織將您的使用者與資料整合在一起。建立一個以開始使用。"
     },
     "noAlertDestinations": {
-      "title": "尚無目的地",
-      "description": "目的地定義警報通知的傳送位置 — Slack、電子郵件、webhook 等。",
-      "action": "新增目的地",
-      "actionDesc": "連接通知管道",
-      "import": "匯入目的地",
       "importDesc": "從 JSON 檔案匯入"
     },
     "noAlertSources": {
@@ -147,14 +142,10 @@
       "actionDesc": "建立 Webhook URL 和權杖"
     },
     "noPipelineDestinations": {
-      "title": "尚無目的地",
-      "description": "管線輸出的外部目標 — HTTP 端點與遠端寫入目標。",
-      "action": "新增目的地",
-      "actionDesc": "連接管線目的地"
+      "description": "管線輸出的外部目標 — HTTP 端點與遠端寫入目標。"
     },
     "noAlertTemplates": {
       "title": "尚無範本",
-      "description": "範本定義警報通知訊息的格式。",
       "action": "新增範本",
       "actionDesc": "建立通知範本",
       "import": "匯入範本",
@@ -273,9 +264,6 @@
       "createActionDesc": "手動定義串流架構"
     },
     "noAlerts": {
-      "title": "建立您的第一個警報",
-      "description": "當您的資料越過閾值時，警報會立即通知您。定義一個以開始監控。",
-      "action": "新增警報",
       "actionDesc": "定義要監控的條件"
     },
     "noMonitors": {
@@ -407,7 +395,6 @@
       "workflows": "工作流程",
       "functions": "函式",
       "streams": "串流",
-      "alerts": "警報",
       "incidents": "事件",
       "traces": "追蹤",
       "discoveryItems": "不健康的項目",
@@ -426,9 +413,7 @@
       "roleLimits": "角色限制",
       "ingestionTokens": "擷取權杖",
       "organizations": "組織",
-      "alertDestinations": "目的地",
       "alertSources": "警示來源",
-      "pipelineDestinations": "目的地",
       "alertTemplates": "範本",
       "evalTemplates": "評估範本",
       "enrichmentTables": "擴充資料表",
@@ -744,7 +729,6 @@
     "nameIsRequired": "必須填寫名稱",
     "streamTypeIsRequired": "必須填寫資料流類型",
     "functionNameIsRequired": "必須填寫函數名稱",
-    "remoteDestinationIsRequired": "必須填寫遠端目的地",
     "timezoneIsRequired": "必須填寫時區",
     "idPrefix": "ID：{id}",
     "unchangedCount": "未變更 ({count})",
@@ -844,11 +828,7 @@
       "loading": "正在載入條件...",
       "loadError": "無法讀取已儲存的條件，已重設。立即儲存將會覆寫。"
     },
-    "destination": {
-      "createNew": "建立新目的地",
-      "select": "目的地",
-      "loadError": "擷取目的地時發生錯誤。"
-    },
+    "destination": {},
     "function": {
       "createNew": "建立新函式",
       "createNewNoteWorkflow": "注意：函式將會建立，然後您將被重新導向至先前的表單，以將新建立的函式與工作流程關聯。",
@@ -1384,7 +1364,6 @@
     "breadcrumbs": "導覽路徑",
     "tags": "標籤",
     "traces": "追蹤",
-    "searchEvents": "搜尋事件",
     "loadingSessions": "正在擷取工作階段，請稍候。",
     "errorStack": "錯誤堆疊",
     "sessionReplay": "工作階段重播",
@@ -1561,7 +1540,6 @@
     "feature_license": "授權",
     "feature_support": "支援",
     "feature_cost": "費用",
-    "feature_pipelines_external": "管線 - 外部目的地",
     "feature_extreme_performance": "極致效能 (許多查詢可提升 100 倍)",
     "feature_query_optimizer": "查詢最佳化器",
     "value_license_agpl": "AGPL",
@@ -1735,10 +1713,7 @@
           "name": "敏感資料遮蔽",
           "note": "保護個人識別資訊與敏感資料"
         },
-        "pipeline_remote_destinations": {
-          "name": "管線遠端目的地",
-          "note": "將資料傳送至遠端目的地"
-        },
+        "pipeline_remote_destinations": {},
         "query_optimizer": {
           "name": "查詢最佳化器 / 彙總快取",
           "note": "TopK 彙總與查詢最佳化"
@@ -2488,7 +2463,6 @@
     "confirmBatchDeleteHead": "刪除串流",
     "confirmDeleteMsg": "確定要刪除此串流嗎？",
     "confirmBatchDeleteMsg": "確定要刪除已選取的串流嗎？",
-    "deleteAssociatedAlertsPipelines": "刪除與該串流相關聯的所有管線與警報",
     "cancel": "取消",
     "ok": "確定",
     "docsCount": "文件數",
@@ -2546,7 +2520,6 @@
   },
   "workflow": {
     "header": "工作流程",
-    "subtitle": "使用觸發器、邏輯和目的地自動化動作",
     "create": "新增工作流程",
     "createSuccess": "工作流程已成功建立",
     "name": "工作流程名稱",
@@ -2664,8 +2637,6 @@
         "input": "輸入",
         "output": "輸出",
         "noInput": "此步驟在最後一次執行時未收到任何記錄。",
-        "sentExternally": "已傳送至外部目的地",
-        "destinationNoRecords": "沒有記錄到達此目的地 — 未傳送任何內容。",
         "branchFiltered": "0 條記錄 — 沒有內容傳遞到此分支。",
         "conditionNoMatch": "沒有記錄符合此條件 — 沒有內容繼續傳遞至下游。",
         "errorHeading": "錯誤",
@@ -2714,15 +2685,12 @@
       "kindAction": "動作",
       "condition": "條件",
       "function": "函數",
-      "sendToDestination": "目的地",
       "configComingSoon": "{node} 設定將在後續步驟中出現",
       "sectionTransform": "轉換",
-      "sectionDestination": "目的地",
       "stepSearchPlaceholder": "搜尋步驟...",
       "stepNoMatch": "沒有符合搜尋條件的步驟。",
       "conditionDesc": "依規則分支",
       "functionDesc": "使用函數重新調整負載",
-      "destinationDesc": "傳送至目的地",
       "triggerBody": "當關聯警示觸發時執行",
       "triggerDataExampleNote": "僅為範例 — 實際欄位來自您的警示查詢。",
       "incidentEventTypeLabel": "事件類型",
@@ -2741,12 +2709,7 @@
       "functionCreateNew": "建立新函數",
       "functionRequired": "必須提供函數",
       "functionLoadError": "無法載入函數",
-      "destinationBody": "傳送至目的地",
       "destinationBodySet": "傳送至 {name}",
-      "destinationSelect": "目的地",
-      "destinationCreateNew": "建立新目的地",
-      "destinationRequired": "請選擇目的地",
-      "destinationLoadError": "無法載入目的地",
       "namePlaceholder": "命名此步驟（選填）",
       "commentLabel": "備註（選填）",
       "commentPlaceholder": "新增此步驟的備註...",
@@ -2756,8 +2719,6 @@
       "disabledBadge": "已停用",
       "incompleteBadge": "稍後設定",
       "destinationSetUpLater": "稍後設定",
-      "destinationSetUpLaterPrompt": "還沒有目的地？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
-      "destinationSetUpLaterActive": "目的地目前會略過 — 名稱和備註仍會儲存。發布前您需要設定目的地。",
       "functionSetUpLater": "稍後設定",
       "functionSetUpLaterPrompt": "還沒有函數？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
       "functionSetUpLaterActive": "函數目前會略過 — 名稱和備註仍會儲存。發布前您需要設定函數。"
@@ -2815,8 +2776,6 @@
       "functionNodeEmptyName": "函數節點 {id} 的函數名稱為空",
       "functionNodeInvalidName": "函數節點 {id} 的函數名稱 \"{name}\" 無效。必須是可用函數之一。",
       "outputStreamNodeEmptyName": "輸出串流節點 {id} 的串流名稱為空",
-      "remoteStreamNodeEmptyDestination": "遠端串流節點 {id} 的目的地名稱為空",
-      "remoteStreamNodeInvalidDestination": "遠端串流節點 {id} 的目的地 \"{destination}\" 無效。必須是可用管線目的地之一。",
       "edgeMissingSourceNode": "邊 {id} 參照了不存在的來源節點 {source}",
       "edgeMissingTargetNode": "邊 {id} 參照了不存在的目標節點 {target}",
       "inputNodeHasIncomingEdges": "輸入節點 {id} 不應有傳入邊。發現 {count} 條傳入邊。",
@@ -2844,7 +2803,6 @@
       "v0ConditionFields": "管線 - {index}，節點 {nodeIndex}：V0 格式 - 每個條件都必須包含欄位、運算子和值。",
       "v1ConditionInvalid": "管線 - {index}，節點 {nodeIndex}：V1 條件格式無效。",
       "conditionFormatUnrecognized": "管線 - {index}，節點 {nodeIndex}：無法識別的條件格式。",
-      "remoteDestinationRequired": "管線 - {index}：遠端目的地為必填",
       "createSuccess": "管線 - {index}: \"{name}\" 建立成功 \n注意：請從 JSON 檔案中移除已建立的管線物件 {name}",
       "createFailed": "管線 - {index}: \"{name}\" 建立失敗 --> \n 原因：{reason}",
       "sqlQueryMismatch": "管線 - {index}：SQL 查詢在所有節點中應保持一致，並請嘗試比對節點中的查詢 \n\n          input.sql_query: {sqlQuery} \n\n          input.source.query_condition.sql: {sourceSql} \n",
@@ -2945,7 +2903,6 @@
     "defaultDelayTooltip": "預設值：5 秒",
     "deleteDataBeforeBackfill": "回填前刪除現有資料",
     "irreversibleDeletionWarning": "警告：不可逆的資料刪除",
-    "deleteBackfillWarningMessage": "這將在執行回填前永久刪除指定時間範圍內目的地串流的所有資料。此操作無法復原。",
     "timeAlignmentRequirements": "時間對齊要求（UTC）：",
     "logsHourBoundaryNote": "串流：時間必須對齊至 UTC 的整點（例如 10:00:00，而非 10:15:00）",
     "metricsTracesLabel": "指標/追蹤",
@@ -2971,8 +2928,6 @@
       "statusUnknown": "未知",
       "phaseInitializing": "初始化"
     },
-    "deleteBackfillConfirmMessage": "您已選擇在回填前刪除現有資料。這將永久刪除指定時間範圍內目的地串流的所有資料。",
-    "editBackfillDeleteConfirmMessage": "您已選擇在回填前刪除現有資料。這將永久刪除指定時間範圍內目的地串流的所有資料。一旦任務更新，此操作就無法復原或取消。您確定要繼續嗎？",
     "actionCannotBeUndone": "一旦任務建立，此操作就無法復原或取消。",
     "areYouSureProceed": "您確定要繼續嗎？",
     "clearFilters": "清除篩選條件",
@@ -2993,7 +2948,6 @@
     "chunkPeriodDefaultPlaceholder": "60",
     "organizationId": "組織 ID",
     "functionName": "函式名稱",
-    "remoteDestination": "遠端目的地",
     "failedToLoadPipeline": "無法載入管線",
     "header": "管線",
     "subtitle": "在傳輸過程中轉換、擴充與路由資料",
@@ -3036,15 +2990,11 @@
     "sourceQueryTooltip": "來源：查詢節點",
     "functionTooltip": "函式節點",
     "conditionTooltip": "條件節點",
-    "destinationStreamTooltip": "目的地：串流節點",
-    "destinationExternalTooltip": "目的地：外部目的地節點",
     "pipelineNotFound": "找不到管線",
     "pipelineNameRequired": "管線名稱為必填",
     "sourceNodeRequired": "來源節點為必填",
-    "destinationNodeRequired": "目的地節點為必填",
     "connectAllNodes": "儲存前請連接所有節點",
     "connectAllNodesShort": "請連接所有節點",
-    "enrichmentTablesScheduledOnly": "擴充表作為目的地串流僅適用於排程管線",
     "savingPipeline": "正在儲存管線...",
     "pipelineUpdated": "管線更新成功",
     "pipelineSaved": "管線儲存成功",
@@ -3076,7 +3026,6 @@
     "functionAlreadyAssociated": "此函式已關聯",
     "atLeastOneCondition": "請至少新增一個條件",
     "fillAllConditionFields": "請填寫所有條件欄位（欄、運算子和值均為必填）",
-    "selectExternalDestination": "請從清單中選擇外部目的地",
     "backfillNumericRange": "必須介於 {min} 和 {max} 之間",
     "selectValidTimeRange": "請選擇有效的時間範圍",
     "startBeforeEndTime": "開始時間必須早於結束時間",
@@ -3096,7 +3045,6 @@
     "queryNode": "查詢",
     "transformNode": "轉換",
     "functionNode": "函式",
-    "destinationNode": "目的地",
     "remoteNode": "遠端",
     "conditionsNode": "條件",
     "editorFunctionTooltip": "使用函式重新塑造資料負載",
@@ -3155,8 +3103,7 @@
       "customStep4": "設定驗證所需的任何 Headers",
       "customStep5": "選擇輸出格式（JSON 或 NDJSON）",
       "customStep6": "測試連線以確認是否正常運作",
-      "defaultTitle": "連線詳細資料",
-      "defaultStep1": "選取目的地類型以查看特定指示"
+      "defaultTitle": "連線詳細資料"
     },
     "deleteFunctionAssociationConfirm": "您確定要刪除函式關聯嗎？",
     "deleteStreamRoutingConfirm": "您確定要刪除串流路由嗎？",
@@ -3182,7 +3129,6 @@
     "noJobSelected": "未選取任何作業",
     "updateBackfillJobFailed": "更新回填作業失敗",
     "fetchPipelineHistoryFailed": "取得管線歷史失敗",
-    "defaultDestinationNodeWarning": "移除預設目的地節點會停止將資料攝入其中。來源串流之後只會路由到新增加的目的地串流。未路由到任何目的地串流的資料將被丟棄。",
     "confirmBulkDeleteMsg": "您確定要刪除 {count} 個管線嗎？",
     "confirmPauseBackfillJob": "您確定要暫停「{name}」的回填作業嗎？您可以稍後恢復。",
     "confirmResumeBackfillJob": "您確定要恢復「{name}」的回填作業嗎？",
@@ -3418,7 +3364,6 @@
       "singleTargetTitle": "單一遠端寫入目標",
       "fanoutTitle": "扇出至多個後端",
       "tipPrefix": "提示：`vmagent` 可以透過重複",
-      "tipSuffix": "flag，因此您可以保留現有的 VictoriaMetrics 目的地，同時也將指標轉送至 OpenObserve。",
       "docLinkText": "深入了解設定 vmagent 遠端寫入目標的相關資訊。"
     },
     "ai": {
@@ -3491,7 +3436,6 @@
       "diagnosticSettingsPath": "診斷設定 → + 新增診斷設定",
       "enterNameCheckCategories": "輸入名稱，勾選您要啟用的記錄類別",
       "underPrefix": "在",
-      "destinationDetails": "目的地詳細資料",
       "chooseSuffix": "，選擇",
       "streamToEventHub": "串流至 Event Hub",
       "selectEventHubPrefix": "選取在步驟 1 建立的 Event Hub 命名空間與 Event Hub（前置詞：",
@@ -3636,7 +3580,6 @@
       "checking": "正在檢查…",
       "checkingForLogs": "正在檢查日誌…",
       "checkingForMetrics": "正在檢查指標…",
-      "checkingForSpans": "正在檢查跨度…",
       "chipEditor": "編輯器",
       "chipInstall": "安裝",
       "chipLogs": "日誌",
@@ -3657,11 +3600,9 @@
       "connectedTracesHeadline": "已連線 — 追蹤正在流入",
       "countLogs": "{count} 個記錄 | {count} 個記錄",
       "countMetricStreams": "{count} 個指標串流 | {count} 個指標串流",
-      "countSpans": "{count} 個跨度 | {count} 個跨度",
       "downloadEnvTooltip": "下載 .env",
       "downloadJmxJarDesc": "JMX receiver 會執行此 helper jar（collector 主機上需要 Java）。",
       "downloadJmxJarTitle": "下載 JMX Metrics Jar",
-      "dynamodbFirehoseEndpointDesc": "在建立 Kinesis Data Firehose 交付串流時，將這些用作 **HTTP Endpoint** 目的地。",
       "dynamodbFirehoseEndpointTitle": "OpenObserve Firehose 端點",
       "dynamodbPipelineDesc": "在您的資料表上啟用 **DynamoDB Streams**，將它連接到 **Kinesis Data Stream**，然後將 **Kinesis Data Firehose** 交付串流指向上述 HTTP 端點。",
       "dynamodbPipelineTitle": "將 DynamoDB 串流至 Firehose",
@@ -3675,7 +3616,6 @@
       "gcpFixBody": "GCP 會在訂閱本身回報傳遞失敗。如果接收器正在發布，但這裡沒有任何資料，通常是推送端點拒絕了要求：",
       "gcpFixTitle": "檢查推送訂閱",
       "gcpPushUrlNote": "請將此 URL 保密 — 它內嵌了擷取金鑰。如果外洩，請從此頁面的標頭輪替它。",
-      "gcpSinkDesc": "在 GCP 主控台中，建立一個 **Log Router sink**（Logging → Log Router → 建立 sink），以 Pub/Sub 作為目的地，並讓它自動建立主題。sink 的包含篩選器會決定哪些日誌會送到 OpenObserve。",
       "gcpSinkTitle": "將日誌路由到 Pub/Sub 主題",
       "gcpSinkWriterNote": "在主題上授予接收器的寫入者身分 Pub/Sub Publisher 角色，否則它會靜默地不發布任何內容。",
       "gcpStreamHelp": "用於上方推送 URL，並由下方檢查監看。專用串流可讓 GCP 記錄保持分離。",
@@ -3824,7 +3764,6 @@
       "pillServiceMap": "服務地圖",
       "pillSessions": "工作階段",
       "pillSetup": "設定",
-      "pillSpans": "跨度",
       "pillSqlCompilationRate": "SQL 編譯率",
       "pillStorageBytes": "儲存位元組",
       "pillSystem": "系統",
@@ -3969,7 +3908,6 @@
       "sqlServerTagline": "使用 OpenTelemetry Collector 收集 SQL Server 指標，並將它們傳送至 OpenObserve。",
       "startIngestingTestForLogs": "開始收集，然後測試日誌",
       "startIngestingTestForMetrics": "開始收集，然後測試指標",
-      "startIngestingTestForSpans": "開始收集，然後測試跨度",
       "streamNameError": "僅可使用字母、數字和 _。",
       "streamNameLabel": "串流名稱",
       "stuck": "卡住了嗎？",
@@ -4076,7 +4014,6 @@
       "dbmVerifyTableHealthDesc": "開啟 **Infra → Databases** 並選擇下方索引標籤。死結與被封鎖的查詢會在資料庫回報時立即出現 — 該索引標籤空白可讓您判斷是沒有發生任何情況，還是沒有收集任何資料。資料表健康狀態會在首次 60 秒快照後填入。"
     },
     "instrumentBeforeImportTitle": "在匯入用戶端之前先進行儀器化",
-    "instrumentBeforeImportBody": "如果您的應用程式有執行但沒有收到任何跨度，很可能是儀器化在匯入用戶端之後才載入。請重新排序，讓 init 先執行：",
     "launchCloudFormationStack": "啟動 CloudFormation Stack",
     "openStackSetsConsole": "開啟 StackSets 主控台",
     "integrations": {
@@ -4411,7 +4348,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -4481,7 +4423,6 @@
     "unsavedMessage": "有未儲存的變更，確定要離開嗎？",
     "currentFolderLabel": "目前資料夾",
     "selectFolderLabel": "選擇資料夾",
-    "selectFolderPlaceholder": "選擇目的地資料夾",
     "selectDashboardLabel": "選擇儀表板",
     "selectTabLabel": "選擇分頁",
     "layerType": "圖層類型",
@@ -4536,7 +4477,6 @@
     "insideBottomLeft": "內部左下",
     "insideTopRight": "內部右上",
     "insideBottomRight": "內部右下",
-    "top": "上方",
     "left": "左側",
     "showSymbol": "顯示符號",
     "yes": "是",
@@ -5557,7 +5497,6 @@
     "panelDuplicationFailed": "面板複製失敗",
     "firstColumn": "第一欄",
     "zAxis": "Z 軸",
-    "breakdown": "分解",
     "pivotField": "樞紐欄位",
     "pivotFieldTooltip": "將維度欄位拖曳至此處。欄位的不重複值將成為樞紐分析表的欄標題。最多允許 3 個欄位進行多層樞紐分析。",
     "breakdownTooltipHBar": "使用這些欄位將資料分割為 Y 軸上的不同區段，以獲得更清晰的檢視。",
@@ -5674,7 +5613,6 @@
       "shippers": "日誌傳送工具"
     },
     "indexSizeLbl": "索引大小",
-    "docsCountLbl": "事件",
     "functionTitle": "函式",
     "schedulePipelineTitle": "排程",
     "rtPipelineTitle": "即時",
@@ -5708,8 +5646,6 @@
     "untitledIncident": "未命名事件",
     "allClear": "一切正常",
     "allClearDesc": "在選取的時間區段中沒有作用中的異常、事件或降級服務。",
-    "emptyActionAlerts": "檢視警報規則",
-    "emptyActionAlertsDesc": "檢閱已設定的警報與閾值",
     "emptyActionLogs": "探索日誌",
     "emptyActionLogsDesc": "搜尋並篩選您的日誌串流",
     "emptyActionTraces": "探索追蹤",
@@ -5814,7 +5750,6 @@
       },
       "incident": {
         "title": "調查事件",
-        "description": "跨日誌、追蹤、警報進行根本原因分析 — 例如「為何 gateway-5xx 被觸發？」",
         "prompt": "協助我調查事件"
       },
       "dashboard": {
@@ -5822,19 +5757,14 @@
         "description": "從一個主題開始 — 例如「K8s 節點健康狀態：CPU、記憶體、重新啟動次數」。也會建立面板。",
         "prompt": "協助我建立儀表板或面板"
       },
-      "alert": {
-        "title": "建立警報",
-        "description": "閾值或排程警報，以及擷取時的 VRL 管線。",
-        "prompt": "協助我建立警報或管線"
-      }
+      "alert": {}
     },
     "suggestions": {
       "vrlParseJson": "撰寫 VRL 以解析我的 nginx 日誌中的 JSON",
       "regexRedact": "產生用於遮蔽電子郵件的 regex 模式",
       "mapStreamSchema": "對應我的「default」串流結構描述",
       "promqlCpu": "為 CPU 使用率 > 80% 的 Pod 撰寫 PromQL",
-      "datadogToO2": "將此 Datadog 查詢轉換為 OpenObserve SQL",
-      "lastAlertFired": "為何我上一個警報被觸發？"
+      "datadogToO2": "將此 Datadog 查詢轉換為 OpenObserve SQL"
     },
     "placeholderRotation": {
       "one": "顯示過去一小時的錯誤…",
@@ -6142,11 +6072,9 @@
       "orgIdInvalid": "警示 - {index}: 組織 ID 是必填欄位，必須存在於組織清單中，且必須等於 {orgId}。",
       "streamTypeInvalid": "警示 - {index}: 串流類型是必填欄位，且必須是下列其中一項：'logs'、'metrics'、'traces'。",
       "streamNameInvalid": "警示 - {index}: 串流名稱是必填欄位，必須存在於串流清單中，且必須是有效的字串。",
-      "destinationsRequired": "警示 - {index}: 目的地為必填項目，且必須是陣列。",
       "enabledBoolean": "警示 - {index}: 啟用值應為布林值。",
       "tzOffsetNumber": "警示 - {index}: 時區偏移量應為數字。",
       "timezoneRequiredForCron": "Alert - {index}: 當頻率類型為 'cron' 時，需要時區。",
-      "destinationNotExist": "Alert - {index}: 目的地 \"{destination}\" 不存在",
       "createSuccess": "Alert - {index}: \"{name}\" 建立成功\n注意：請從 JSON 檔案中移除已建立的警示物件 {name}",
       "createFailed": "Alert - {index}: \"{name}\" 建立失敗 --> \n 原因：{reason}",
       "unknownError": "未知錯誤",
@@ -6229,7 +6157,6 @@
       "warningPolicy": "警告行為",
       "warningCountsAsFiring": "警告視為觸發",
       "warningDoesNotCount": "警告不視為觸發",
-      "stalePolicy": "過期子警報原則",
       "useLastState": "使用上次狀態",
       "useLastStateHelp": "當新鮮度過期時，使用子項上次計算的狀態。",
       "treatStaleFalse": "將過期視為 false",
@@ -6237,33 +6164,20 @@
       "treatStaleTrue": "將過期視為 true",
       "treatStaleTrueHelp": "當新鮮度過期時，將子項視為觸發。",
       "expression": "運算式",
-      "missingJobWarning": "此已啟用的複合警報沒有排程工作。請編輯並儲存，或停用後重新啟用，以修復評估。",
       "disabledNeverEvaluated": "已停用；{state}",
       "levelOutcomeEnabled": "{level}；{outcome}；已啟用",
-      "openChild": "開啟子警報 {name}",
-      "referencedByCount": "被 {count} 個複合警報引用",
-      "openReferences": "開啟 {count} 個複合警報引用",
-      "referencesTitle": "複合警報引用",
-      "closeReferences": "關閉複合警報引用",
-      "deleteBlocked": "因複合警報引用而無法刪除",
-      "openParent": "開啟父複合警報 {name}",
       "hiddenReferenceCount": "另有 {count} 個引用已隱藏",
       "expressionEmpty": "輸入運算式",
       "expressionPlaceholder": "例如：A && B",
       "insert": "插入：",
-      "addAlert": "新增警報",
-      "removeChild": "移除子警報 {name}",
-      "noChildren": "尚無子警報。請至少新增兩個。",
       "wouldTrigger": "會觸發",
       "wouldNotTrigger": "不會觸發",
       "firing": "觸發中",
       "normal": "正常",
       "stepByStep": "逐步",
       "result": "結果",
-      "subAlerts": "子警報",
       "triggerExpression": "觸發運算式",
       "settings": "設定",
-      "banner": "複合警報以布林邏輯結合現有警報的目前狀態。它執行自己的通知與冷卻時間設定，且絕不重新查詢底層資料。",
       "name": "名稱",
       "type": "類型",
       "yes": "是",
@@ -6272,7 +6186,6 @@
       "levelWhenFiringValue": "嚴重",
       "currentEvaluation": "目前評估",
       "statusTimeline": "狀態時間軸",
-      "timelineHint": "每個子警報及複合結果的層級歷史",
       "timelineLoading": "正在載入時間軸…",
       "timelineEmpty": "尚無時間軸資料",
       "legendWarning": "警告",
@@ -6283,7 +6196,6 @@
     "exportDialogSubtitle": "檢閱定義，然後將其下載為 JSON 或適用於 OpenObserve provider 的 Terraform。",
     "jsonFilesOnlyHint": "僅限 .json 檔案",
     "outputMessages": "輸出訊息",
-    "destinationsRequiredLabel": "目的地 *",
     "timezoneRequiredLabel": "時區 *",
     "organizationIdLabel": "組織 ID",
     "alertCreationTitle": "建立警示",
@@ -6323,13 +6235,11 @@
     "guidelinesLabel": "準則：",
     "selectStreamGuideline": "從清單中選取現有的串流，或輸入名稱以建立新的串流",
     "enrichmentTablesTerm": "Enrichment_tables",
-    "enrichmentTablesDestinationNote": "目的地串流僅適用於排程管線",
     "useCurlyBracesNote": "使用大括號",
     "configureStreamNameDynamicNote": "用於動態設定串流名稱，例如.",
     "staticTextBeforeAfterNote": ". 前後的靜態文字",
     "isOptionalNote": "為選用",
     "noTriggersLoaded": "未載入任何觸發器",
-    "externalDestinationTitle": "外部目的地",
     "serviceGraphLegendTitle": "圖例",
     "serviceGraphRootCause": "紅色 = 潛在根因",
     "serviceGraphHighFrequency": "橘色 = 高頻率",
@@ -6376,7 +6286,6 @@
     "duration": "持續時間",
     "retries": "重試次數",
     "dedup": "去重",
-    "noDestinations": "沒有可用的目的地",
     "validation": {
       "streamTypeRequired": "Stream 類型為必填項。",
       "streamNameRequired": "Stream 名稱為必填項。",
@@ -6430,10 +6339,6 @@
       "cronRequiredForCronType": "當頻率類型為 cron 時，需要 cron 運算式",
       "timezoneRequiredForCronType": "當頻率類型為 cron 時，需要時區",
       "triggerConditionRequired": "需要觸發條件",
-      "destinationsArray": "目的地必須為陣列",
-      "destinationRequiredPlain": "至少需要一個目的地",
-      "noDestinationsInSystem": "系統中找不到可用的目的地",
-      "invalidDestinations": "無效的目的地：{destinations} - 必須來自可用的目的地列表",
       "enabledFlagBoolean": "啟用標記必須為布林值",
       "silenceNotificationRequired": "靜默通知不應為空",
       "thresholdNotEmpty": "閾值不應為空",
@@ -6449,13 +6354,9 @@
       "linkUrlNotAUrl": "請輸入有效的 URL — 例如 https://example.com/runbook、類似 /web/logs 的路徑，或 {'{'}變數{'}'}。"
     },
     "header": "警示",
-    "subtitle": "警報規則與通知管道",
     "searchThisFolder": "此資料夾",
     "searchAllFolders": "所有資料夾",
     "streamConfig": "串流設定",
-    "alertRules": "警報規則",
-    "noTemplatesMsg": "看來您尚未建立任何範本。若要建立警報，您至少需要有一個目的地與一個範本",
-    "noDestinationsMsg": "看來您尚未建立任何目的地。若要建立警報，您至少需要有一個目的地與一個範本",
     "add": "新增警示",
     "edit": "編輯",
     "clone": "複製警示",
@@ -6469,9 +6370,6 @@
     "matchingTypeFound": "找到相符的 {type}",
     "matchingMetricsFound": "找到相符的指標",
     "metricsValueFieldTooltip": "指標串流預設將其量測值儲存於「value」欄位中",
-    "howOftenCheckTooltip": "檢查此警報條件的頻率",
-    "alertIfNoOfEvents": "若事件數量達到下列條件則警報",
-    "alertIfValueIs": "若值符合下列條件則警報",
     "havingSeries": "具有序列",
     "clearMultiWindowsTitle": "清除多重視窗？",
     "vrlEditor": "VRL 編輯器",
@@ -6506,37 +6404,25 @@
     "frequency": "檢查頻率",
     "threshold": "觸發條件 ",
     "silenceNotification": "冷卻期",
-    "destination": "目的地",
-    "destinationOrWorkflowRequired": "至少新增一個目的地或工作流程。",
-    "customDestination": "自訂目的地",
-    "customDestinationDescription": "設定自訂 HTTP 端點或電子郵件目的地",
-    "testIdleMessage": "按一下 [測試] 以驗證目的地組態",
-    "destinationPreview": "目的地預覽",
     "template": "範本覆寫",
     "additionalVariables": "額外變數",
-    "testSuccessMessage": "測試成功！目的地組態正確。",
     "testFailedMessage": "測試失敗。請檢查組態後重試。",
     "testFailedWithReason": "測試失敗：{reason}",
-    "testInProgress": "正在測試目的地...",
     "sendingNotification": "正在傳送測試通知以驗證連線",
     "testErrorDNS": "DNS 解析失敗。請檢查 Webhook URL 或主機名稱。",
     "testErrorConnection": "連線被拒。請確認 URL 並確保服務可連線。",
-    "testErrorTimeout": "請求逾時。目的地服務可能緩慢或無法連線。",
     "testErrorSSL": "SSL/TLS 憑證錯誤。請驗證憑證或停用 SSL 驗證。",
     "testErrorClientError": "用戶端錯誤 (4xx)。請檢查認證資訊和組態。",
-    "testErrorServerError": "伺服器錯誤 (5xx)。目的地服務發生問題。",
     "viewDetails": "檢視詳細資訊",
     "error": "錯誤",
     "httpStatus": "HTTP 狀態",
     "responseBody": "回應主體",
     "retry": "重試",
     "suggestCheckUrl": "請確認 Webhook URL 正確且可連線。",
-    "suggestCheckFirewall": "請檢查防火牆設定並確保目的地服務可存取。",
     "suggestCheckCredentials": "請確認 API 認證資訊正確。",
     "suggestCheckPermissions": "請確認認證資訊具有必要的權限。",
     "suggestCheckEndpoint": "請確認端點 URL 正確。",
     "suggestRateLimit": "已超過速率限制。請稍後再重試。",
-    "suggestServerIssue": "目的地服務發生問題。請稍後再試。",
     "description": "說明",
     "stream_name": "串流名稱",
     "cloneTitle": "複製警示",
@@ -6596,7 +6482,6 @@
       "notEqualTo": "不等於",
       "eventsDetected": "偵測到事件",
       "sendsTo": "傳送至",
-      "noDestination": "無目的地",
       "notSetupYet": "(尚未設定)",
       "cooldown": "冷卻",
       "betweenAlerts": "警示之間",
@@ -6774,7 +6659,6 @@
       "acknowledge": "確認",
       "resolve": "解決",
       "reopen": "重新開啟",
-      "statusOpen": "開啟",
       "statusAcknowledged": "已確認",
       "statusResolved": "已解決",
       "correlationServiceDiscovery": "服務探索",
@@ -6959,16 +6843,10 @@
       "helpLegendLiveExample": "高 CPU",
       "helpLegendSampleExample": "42",
       "sectionTitle": "設定",
-      "noDestinationsAvailable": "無可用目的地",
-      "noTargetsAvailable": "無可用目的地或工作流程",
-      "targetsDestinationsGroup": "目的地",
       "targetsWorkflowsGroup": "工作流程",
-      "refreshDestinations": "重新整理最新的目的地",
-      "addNewDestination": "新增目的地",
       "cooldownTooltip": "如果警示觸發，需等待多久才能傳送另一則通知。例如，如果警示在下午 4:00 觸發且靜音通知設定為 10 分鐘，則即使警示在 1 分鐘後仍有效，也不會在下午 4:10 之前傳送另一則通知。這是為了避免通知過多。",
       "periodTooltip": "查詢應執行的期間。例如 10 分鐘表示每次查詢時使用最近 10 分鐘的資料。",
       "timezoneWarning": "警告：顯示的時區為近似值。請手動驗證並選擇正確的時區。",
-      "destinationsTooltip": "選擇一個或多個目的地以傳送警示通知。",
       "createsIncident": "建立事件",
       "createsIncidentTooltip": "如果警示可以建立事件，則不會傳送專屬的通知。而是在建立新事件或新的警示類型加入現有事件時，傳送事件通知。",
       "helpTemplateTitle": "範本覆寫",
@@ -6980,11 +6858,7 @@
       "helpLegendLive": "您警示的真實值",
       "helpLegendSample": "一個範例 — 真實值會在警示觸發時設定",
       "helpLegendOpaque": "在警示觸發時自動新增",
-      "helpTemplateExplain": "範本是要傳送的通知訊息 — 文字加上變數（如 {'{'}alert_name{'}'}）。在此處選擇一個範本會覆寫每個目的地的自有範本，僅適用於此警示。",
       "helpCurrentHeading": "此警示目前傳送的內容",
-      "helpCurrentNoOverride": "未設定覆寫 — 每個目的地使用其自有範本：",
-      "helpCurrentNoDestinations": "尚未選取任何目的地。每個目的地將使用其已設定的範本。",
-      "helpCurrentOverrideHeading": "所有目的地都使用此範本：",
       "helpPreviewHeading": "預覽範本",
       "helpPreviewSelectPlaceholder": "選取要預覽的範本",
       "helpApplyToAlert": "套用至警示",
@@ -6996,7 +6870,6 @@
       "helpYourVariablesEmpty": "您尚未新增任何變數。",
       "helpRowTemplateExplain": "一個警示可以比對多行。列範本決定單一列的呈現方式。然後主範本中的 {'{'}rows{'}'} 會插入每個已格式化的比對列。",
       "helpRowTemplateTypeHeading": "字串 vs JSON",
-      "helpRowTemplateTypeExplain": "字串每行產生純文字。JSON 每行產生 JSON 物件，適合結構化目的地。",
       "helpRowTemplateTypeCurrent": "目前已選取：",
       "helpPreviewHeadingShort": "預覽",
       "helpWhyHeading": "為什麼使用變數？",
@@ -7009,7 +6882,6 @@
       "helpVariablesExampleCaption": "將 severity 和 team 新增為變數，然後在範本中任何地方使用它們：",
       "helpExampleResultLabel": "傳送的內容",
       "helpTemplateWhenHeading": "何時應覆寫？",
-      "helpTemplateWhenDesc": "留空則每個目的地使用自己的範本。當您希望此警示向每個目的地發送相同且一致的訊息時，設定覆寫——無需編輯每個目的地的範本。",
       "helpRowTemplateWhyHeading": "為什麼需要列範本？",
       "helpRowTemplateWhyDesc": "一個警示可以比對多筆記錄。列範本格式化單一記錄；然後 {'{'}rows{'}'} 將每個格式化的記錄插入主範本——因此無需撰寫迴圈即可列出所有比對結果。",
       "helpRowTemplateExampleCaption": "每個比對列由列範本格式化，然後 {'{'}rows{'}'} 將它們全部插入主範本：",
@@ -7018,7 +6890,6 @@
       "helpRowTemplatePreviewEmpty": "尚無列範本 — 在「其他設定」分頁輸入一個，即可在此預覽。",
       "helpPreviewSelectEmpty": "選取上方的一個範本，預覽其將傳送的訊息。",
       "helpCurrentBodyEmpty": "此範本沒有可預覽的主體。",
-      "helpDestinationNoTemplate": "使用此目的地的預設格式。",
       "builtInVars": {
         "orgName": "您的組織名稱",
         "streamType": "串流類型（日誌、指標、追蹤）",
@@ -7043,7 +6914,6 @@
     },
     "advanced": {
       "addVariable": "新增變數",
-      "variablesTooltip": "變數用於將資料從警示傳遞至目的地。",
       "templateType": "範本類型：",
       "noTemplatesAvailable": "無可用範本",
       "refreshTemplates": "重新整理最新的範本",
@@ -7128,12 +6998,10 @@
     },
     "anomaly": {
       "addFilter": "新增篩選條件",
-      "addNewDestination": "新增目的地",
       "anomalyScoreRange": "異常分數範圍：",
       "checkEvery": "檢查頻率",
       "checkEveryTooltip": "偵測工作的執行頻率。可以大於取樣週期 (例如每 5 分鐘取樣，每 1 小時執行偵測)。",
       "clickLoadDataHint": "按一下 [載入資料] 以預覽時間序列",
-      "destinationRequired": "至少需要一個目的地！",
       "detectionResolution": "偵測解析度",
       "detectionResolutionTooltip": "每個資料點的精細程度。例如「5m」表示以 5 分鐘的解析度偵測異常。",
       "disabled": "已停用",
@@ -7148,10 +7016,8 @@
       "lookBackWindowTooltip": "每次偵測執行查詢的回溯範圍。即使暫停很長時間也會限制視窗。預設為檢查頻率間隔。",
       "maxThresholdMarkLine": "最大閾值",
       "minThresholdMarkLine": "最小閾值",
-      "noDestinationsFound": "找不到目的地",
       "noFieldsFound": "找不到欄位",
       "notifications": "通知",
-      "notificationsTooltip": "啟用後，偵測到異常時會傳送通知至選定的目的地。",
       "retrainEvery": "重新訓練頻率",
       "retrainEveryTooltip": "自動重新訓練模型的頻率。「從不」表示訓練一次並保留模型直到手動重新訓練。",
       "retrainFourteenDays": "14 天",
@@ -7173,7 +7039,6 @@
       "summaryDetectionFunction": "✓ 偵測函式：{fn}",
       "summaryDetectionWindow": "✓ 偵測視窗：最近 {window}",
       "summaryMonitoring": "每 {schedule} 監控「{stream}」的 {fn} 異常，並以 {trainingDays} 天的歷史資料訓練",
-      "summaryNoDestinationSet": "未設定目的地",
       "summaryQueryMode": "✓ 查詢模式：{mode}",
       "summaryResolution": "✓ 解析度：{resolution}",
       "summaryRetrain": "✓ 重新訓練：{retrain}",
@@ -7299,21 +7164,14 @@
       "triggerAlertFailed": "觸發警示失敗",
       "triggerRetrainingFailed": "觸發重新訓練失敗",
       "bulkDeleteAlertsFailed": "刪除警示時發生錯誤，請重試。",
-      "deleteDestinationFailed": "刪除目的地時發生錯誤。",
-      "bulkDeleteDestinationsFailed": "刪除目的地時發生錯誤，請重試。",
       "bulkDeleteTemplatesFailed": "刪除範本時發生錯誤，請重試。"
     },
     "prebuilt": {
-      "conversionSuccess": "目的地已成功轉換",
       "validationError": "驗證錯誤：{error}",
-      "invalidDestinationType": "無效的目的地類型",
       "invalidTargetType": "無效的目標類型",
-      "unknownDestinationType": "未知的目的地類型",
       "testFailedUnknownError": "測試因未知錯誤失敗"
     },
     "confirmDeleteAlerts": "您確定要刪除 {count} 個警示嗎？ | 您確定要刪除 {count} 個警示嗎？",
-    "confirmDeleteDestinations": "您確定要刪除 {count} 個目的地嗎？ | 您確定要刪除 {count} 個目的地嗎？",
-    "prebuiltDestination": "預先建置的 {type} 目的地",
     "errorValidations": "錯誤驗證",
     "outputMessagesLabel": "輸出訊息",
     "incidentSingular": "事件",
@@ -7431,7 +7289,6 @@
       "dialog": {
         "title": "建立警示",
         "continue": "繼續前往警示",
-        "streamLabel": "資料流",
         "thresholdLabel": "警示條件",
         "thresholdMatchingRows": "符合的資料列",
         "thresholdCount": "資料列計數",
@@ -7518,20 +7375,17 @@
     "actionOpen": "開啟",
     "actionDelete": "刪除",
     "deleteTitle": "刪除 {name}?",
-    "deleteMessage": "此操作會永久刪除。若警示或目的地仍在使用，將無法刪除。",
     "deletedToast": "{name} 已刪除",
     "deleteFailedToast": "無法刪除 {name}",
     "loading": "正在建立相依性圖…",
     "failedToLoad": "載入相依性失敗：{error}",
     "usedBy": "{count} 個警示 | {count} 個警示",
-    "countDestinations": "{count} 個目的地 | {count} 個目的地",
     "usedByColumn": "使用於",
     "searchPlaceholder": "搜尋",
     "noDependencies": "沒有相依性。",
     "noMatches": "沒有相符的項目。",
     "laneEmpty": "沒有警示",
     "directOverrides": "直接使用此範本",
-    "sectionDestinations": "目的地",
     "sectionAlerts": "警示",
     "orphanTag": "未使用",
     "missingTag": "遺失",
@@ -7604,18 +7458,11 @@
     "install": {
       "title": "從程式庫安裝",
       "subtitle": "選擇警示通知的位置、要安裝的警示，以及歸檔的位置。",
-      "stepDestination": "目的地",
       "stepAlerts": "警示",
       "stepFolder": "資料夾",
       "stepTune": "調整",
       "stepInstall": "安裝",
-      "destinationIntro": "此批次中的每個警示都會通知您在此選擇的目的地。程式庫檔案使用其匯出來源組織的目的地名稱，而這些名稱在您的組織中不存在。",
-      "destinationLabel": "目的地",
-      "destinationPlaceholder": "選擇目的地",
-      "destinationsLoadFailed": "無法載入您現有的目的地。",
       "retry": "再試一次",
-      "destinationsNoneBody": "此組織尚無警示目的地，因此這些警示沒有可通知的地方。請在「目的地」頁面建立一個，然後回來在此選擇。",
-      "openDestinations": "開啟目的地",
       "selectAll": "全選",
       "clear": "清除",
       "selectedCount": "已選取 {count} / {total}",
@@ -7670,7 +7517,6 @@
     "importBodyLabel": "範本內文 *",
     "importTypeLabel": "範本類型 *",
     "importTitleLabel": "範本標題 *",
-    "header": "目的地範本",
     "add": "新增範本",
     "edit": "編輯",
     "name": "名稱",
@@ -7730,7 +7576,6 @@
     "chartPreviewPlaceholder": "圖表在實際通知中會顯示於此 — 它取自警示本身的評估歷史，而預覽沒有此資料。",
     "channelTitlesDescription": "在特定頻道使用不同的標題 — 例如為電子郵件使用較短的主旨行。",
     "namePlaceholder": "例如：高錯誤率",
-    "nameLockedHint": "警示與目的地會依名稱參照此範本，因此無法重新命名。請複製範本，以新名稱建立一份複本。",
     "rawBodyCaption": "完全按原樣傳送，並替換 {'{'}variables{'}'}。請參閱「變數指南」以取得所有可用內容。",
     "contentTitlePlaceholder": "{'{'}alert_name{'}'} · {'{'}stream_name{'}'}",
     "fieldLabelPlaceholder": "例如：數值",
@@ -7768,7 +7613,6 @@
     "toolbarLink": "連結",
     "toolbarHeading": "標題",
     "toolbarEmoji": "插入圖示",
-    "emojiSiren": "警報器",
     "emojiFire": "火焰",
     "emojiWarning": "警告",
     "emojiCheck": "勾選",
@@ -7804,16 +7648,12 @@
     "channelSns": "SNS",
     "testSendGroupLabel": "傳送真實測試訊息",
     "testSend": "傳送測試",
-    "testSendDestinationLabel": "目的地",
     "testSendConfirmTitle": "傳送真實測試訊息？",
     "testSendConfirm": "這會將真實訊息發佈到所選頻道，並標記為 [TEST]。",
     "testSendSuccess": "測試訊息已傳送",
-    "testSendRateLimited": "傳送測試次數過多——請稍候片刻再試",
-    "testSendNoDestination": "請先選擇目的地"
+    "testSendRateLimited": "傳送測試次數過多——請稍候片刻再試"
   },
   "alert_sources": {
-    "header": "外部警報來源",
-    "subtitle": "從 Grafana、Prometheus Alertmanager 或任何可呼叫 Webhook 的工具傳送警報——它們會顯示在此處，並自動關聯到事件中。",
     "acceptsAnyFormat": "接受任何 Webhook 格式",
     "revealToken": "顯示完整 URL",
     "hideToken": "隱藏完整 URL",
@@ -7847,10 +7687,8 @@
     "editTitle": "編輯警示來源",
     "name": "名稱",
     "nameHint": "只是一個標籤 — 每個來源都使用相同的設定。",
-    "incidentDestination": "事件目的地",
     "incidentDestinationPlaceholder": "使用組織預設值",
     "incidentDestinationHint": "當此來源的警示建立或加入事件時，通知會傳送到哪裡。留空以使用組織預設 — 若兩者皆未設定，符合的事件會靜默觸發。",
-    "noDestinationSet": "未設定事件目的地",
     "setupStep1Title": "1. 建立 Webhook",
     "setupStep1Body": "在 Grafana、Alertmanager 或任何可以 POST JSON 的工具中，建立 Webhook 聯絡點 / 接收器。",
     "setupRemainingStepsHint": "儲存此來源以取得其 URL 和 Token，然後將它們貼到該 Webhook 設定中。",
@@ -7873,13 +7711,10 @@
     "createdSuccess": "已建立警示來源",
     "updatedSuccess": "已更新警示來源",
     "error": "載入警示來源時發生錯誤",
-    "senderError": "載入來源狀態時發生錯誤",
-    "destinationsLoadError": "載入目的地時發生錯誤"
+    "senderError": "載入來源狀態時發生錯誤"
   },
   "alert_destinations": {
-    "sectionTab": "目的地",
     "chooseTypeTitle": "選擇類型",
-    "selectDestinationType": "選擇目的地類型",
     "connectionStepTitle": "連線",
     "connectionDetailsTitle": "連線詳細資料",
     "urlHelpText": "Base URL 不含結尾斜線（例如：https://your-domain.com）",
@@ -7898,10 +7733,6 @@
     "datadogHostnameHelpText": "Datadog 日誌的主機名稱",
     "exampleLabel": "範例：",
     "subtitle": "觸發警示的傳送位置",
-    "exportDestination": "匯出目的地",
-    "deleteDestinationTitle": "刪除目的地",
-    "deleteDestinationMessage": "您確定要刪除目的地嗎？",
-    "deleteDestinationsTitle": "刪除目的地",
     "selected": "已選取",
     "organizationLabel": "組織",
     "defaultPlaceholder": "例如：default",
@@ -7920,20 +7751,14 @@
     "ddTagsPlaceholder": "輸入標籤（例如：env:prod,version:1.0）",
     "serviceLabel": "服務",
     "servicePlaceholder": "輸入服務名稱（例如：api-gateway）",
-    "header": "通知目的地",
-    "add": "新增目的地",
     "edit": "編輯",
-    "search": "搜尋目的地",
     "filterAll": "全部",
     "filterPrebuilt": "預先建置",
     "filterCustom": "自訂",
     "templateDefaultBadge": "預設",
     "name": "名稱",
-    "destination_type": "目的地類型",
     "template": "範本",
     "actions": "操作",
-    "addTitle": "新增目的地",
-    "updateTitle": "更新目的地",
     "delete": "刪除",
     "method": "方法",
     "url": "URL",
@@ -7947,7 +7772,6 @@
     "custom_headers": "自訂標頭 (選填)",
     "preview": "預覽",
     "test": "測試",
-    "saved": "目的地儲存成功",
     "customWebhook": "自訂 (Webhook)",
     "customEmail": "自訂 (電子郵件)",
     "customAction": "自訂 (動作)",
@@ -7957,7 +7781,6 @@
     "separator_hint": "記錄之間使用的分隔字串 (允許空格)",
     "templateDefaultOption": "預設（{name}）",
     "templateHelp": "保留為預設以使用標準的 {type} 範本（{name}），或選擇自訂範本。",
-    "loadingData": "正在載入目的地資料...",
     "noEmailTemplates": "您似乎尚未建立任何電子郵件範本。",
     "createEmailTemplate": "建立電子郵件範本",
     "headers": "標頭",
@@ -7972,40 +7795,14 @@
       "servicenowDescription": "在 ServiceNow 中建立事件"
     },
     "import": {
-      "title": "匯入目的地",
       "errorValidations": "錯誤驗證",
       "outputMessages": "輸出訊息",
-      "destinationName": "目的地名稱",
-      "destinationUrl": "目的地 URL",
-      "destinationMethod": "目的地方法",
       "templates": "範本",
       "emails": "電子郵件（逗號分隔）",
       "actions": "動作",
-      "destinationCreation": "建立目的地",
       "jsonStringEmpty": "JSON 字串為空",
       "invalidJsonFormat": "無效的 JSON 格式",
-      "importSuccess": "已成功匯入目的地",
-      "importError": "匯入目的地時發生錯誤，請檢查 JSON",
-      "unknownError": "未知錯誤",
-      "nameRequired": "目的地 - {index}：「名稱」欄位為必填，且必須是有效的字串。",
-      "nameExists": "目的地 - {index}：「{name}」已存在",
-      "typeInvalid": "目的地 - {index}：「類型」欄位必須是「email」、「http」或「action」",
-      "actionTypeNotSupported": "目的地 - {index}：不支援「action」類型。",
-      "actionNotFound": "目的地 - {index}：類型「{type}」不存在動作「{actionId}」",
-      "urlRequired": "目的地 - {index}：http 類型的目的地需要「url」欄位。",
-      "methodInvalid": "目的地 - {index}：「方法」欄位必須是「post」、「get」或「put」之一",
-      "templateRequiredHttp": "目的地 - {index}：http 類型的目的地需要「範本」欄位。",
-      "skipTlsVerifyRequired": "目的地 - {index}：「skip_tls_verify」欄位為必填，且必須是布林值",
-      "headersMustBeObject": "目的地 - {index}：http 類型的「headers」應為物件",
-      "urlNotAllowedEmail": "目的地 - {index}：email 類型不應提供「url」",
-      "headersNotAllowedEmail": "目的地 - {index}：email 類型不應提供「headers」",
-      "emailsRequired": "目的地 - {index}：email 類型的目的地需要「emails」欄位，且應為陣列。",
-      "emailsMustBeStrings": "目的地 - {index}：email 類型的「emails」應為字串陣列",
-      "templateRequiredEmail": "目的地 - {index}：email 類型的目的地需要「範本」欄位。",
-      "templateNotFound": "目的地 - {index}：類型「{type}」不存在範本「{template}」",
-      "actionIdInvalid": "目的地 - {index}：「action_id」欄位必須是有效的字串。",
-      "createSuccess": "目的地 - {index}：「{name}」已成功建立\n注意：請從 json 檔案中移除已建立的目的地物件 {name} ",
-      "createFailed": "目的地 - {index}：「{name}」建立失敗 --> \n 原因：{reason}"
+      "unknownError": "未知錯誤"
     },
     "priorityP1Description": "最高優先級警示",
     "priorityP2Description": "高優先級警示",
@@ -8017,10 +7814,7 @@
     "severityWarningDescription": "警告等級事件",
     "severityInfoDescription": "資訊事件"
   },
-  "pipeline_destinations": {
-    "header": "管線目的地",
-    "search": "搜尋目的地"
-  },
+  "pipeline_destinations": {},
   "storage_settings": {
     "heroBrand": "OpenObserve.",
     "tabLabel": "儲存設定",
@@ -8353,7 +8147,6 @@
     "generalLabel": "一般設定",
     "groupGeneral": "一般",
     "groupAccessSecurity": "存取與安全性",
-    "groupDestinations": "目的地",
     "groupDataAI": "資料與 AI",
     "groupOperations": "營運",
     "groupSynthetics": "合成監控",
@@ -8364,7 +8157,6 @@
     "regexPatternsDesc": "用於遮蔽的可重複使用 regex 模式",
     "domainManagementDesc": "限制僅允許的 SSO 網域登入",
     "pipelineDestinationsDesc": "管線輸出的外部目標",
-    "templatesDesc": "可重複使用的警報訊息範本",
     "storageSettingsDesc": "各組織的儲存設定",
     "modelPricingDesc": "LLM 模型成本設定",
     "correlationSettingsDesc": "遙測關聯設定",
@@ -8722,9 +8514,7 @@
       "importPatternFailed": "匯入模式 \"{name}\" 失敗：{error}",
       "createFailed": "正則表達式模式 - {index}: \"{name}\" 建立失敗 --> \n 原因：{error}"
     },
-    "index": {
-      "genAiAgentMappingDesc": "將 GenAI 跨度對應到代理識別碼"
-    },
+    "index": {},
     "organizationManagementPage": {
       "setAiCredits": "設定 AI 額度",
       "setAiCreditsSubtitle": "設定組織的 AI 額度終身配額。",
@@ -8859,7 +8649,6 @@
       "cardinality": "基數：",
       "uniqueValues": "{n} 個唯一值",
       "streams": "串流",
-      "streamsSubtext": "資料流",
       "noAdditionalDimensions": "未偵測到其他維度。",
       "noSampleData": "此欄位無可用樣本資料。",
       "uniqueValuesDetected": "偵測到 {n} 個唯一值",
@@ -9201,8 +8990,6 @@
     "applyAndSearch": "套用並搜尋",
     "timestamp": "時間戳記",
     "noErrorPresent": "此 span 無錯誤",
-    "noEventsPresent": "此跨度無事件",
-    "noLinksPresent": "此跨度無連結",
     "loadingTraceDag": "正在載入追蹤 DAG...",
     "exceptionsWithCount": "例外狀況 ({count})",
     "typeLabel": "類型：",
@@ -9380,7 +9167,6 @@
       "host": "主機",
       "user": "使用者",
       "storedProcedure": "預存程序",
-      "noQueryText": "此跨度未記錄查詢文字。",
       "performance": "效能",
       "rowsReturned": "傳回行數",
       "batchSize": "批次大小",
@@ -9393,7 +9179,6 @@
       "changeStreamTitle": "變更串流？",
       "switchStream": "切換串流",
       "cancel": "取消",
-      "changeStreamMessage": "這也會更新追蹤/跨度標籤中的串流，並重設現有查詢。",
       "errorGettingFunctions": "取得函式時發生錯誤",
       "errorPullingIndex": "為選取組織提取索引時發生錯誤{message}",
       "errorGettingStreams": "取得串流時發生錯誤",
@@ -9491,13 +9276,11 @@
       "tabHosts": "主機",
       "tabDatabases": "資料庫",
       "tabQueries": "查詢",
-      "tabDestinations": "目的地",
       "tabRpcServices": "RPC 服務",
       "tabUrls": "URL",
       "colHost": "主機",
       "colDatabase": "資料庫",
       "colDbOperation": "資料庫操作",
-      "colDestination": "目的地",
       "colRpcService": "RPC 服務",
       "colUrl": "URL",
       "envHost": "主機",
@@ -9512,14 +9295,11 @@
       "dbResponseStatusCode": "資料庫回應狀態碼",
       "processExitCode": "程序結束碼"
     },
-    "traceLatencyCell": {
-      "spansAcrossServices": "{spans} 個跨 {services} 個服務的跨度"
-    },
+    "traceLatencyCell": {},
     "threadToolCalls": {
       "toolCall": "工具呼叫",
       "toolCalls": "工具呼叫",
       "showCalls": "顯示呼叫",
-      "openSpanDetails": "開啟跨度詳細資訊",
       "arguments": "引數",
       "result": "結果",
       "empty": "(空)"
@@ -9533,7 +9313,6 @@
       "cost": "成本",
       "model": "模型",
       "errors": "錯誤",
-      "noSpansLoaded": "此追蹤未載入任何跨度。",
       "noLlmTurns": "未偵測到 LLM 輪次。此追蹤不包含帶有",
       "system": "系統",
       "historicalMessage": "{count} 則來自此工作階段的較早訊息 — 已在先前的追蹤中處理。 | {count} 則來自此工作階段的較早訊息 — 已在先前的追蹤中處理。",
@@ -9542,8 +9321,7 @@
       "unknown": "未知",
       "tokens": "令牌",
       "tokensSuffix": "令牌",
-      "error": "錯誤",
-      "viewSpan": "檢視跨度"
+      "error": "錯誤"
     },
     "traceHeader": {
       "operationName": "操作名稱"
@@ -9561,7 +9339,6 @@
       "start": "開始",
       "requestResent": "請求已重新傳送 {count} 次 | 請求已重新傳送 {count} 次",
       "resends": "重新傳送",
-      "spanIdTitle": "跨度 ID：{id}",
       "inputTokens": "輸入令牌",
       "in": "輸入",
       "outputTokens": "輸出令牌",
@@ -9582,8 +9359,6 @@
       "value": "值",
       "timestamp": "時間戳記",
       "enterpriseLicenseRequired": "關聯功能需要企業版授權",
-      "missingSpanOrStream": "缺少跨度或串流名稱",
-      "spanIdCopied": "跨度 ID 已複製到剪貼簿",
       "attributesCopied": "屬性已複製到剪貼簿",
       "copiedToClipboard": "{type} 已複製到剪貼簿",
       "failedToCopyClipboard": "複製到剪貼簿失敗",
@@ -9597,7 +9372,6 @@
       "timeline": "時間軸",
       "serviceMap": "服務地圖",
       "traceNotFound": "找不到追蹤 {traceId}",
-      "spanNotFound": "在追蹤中找不到跨度 {spanId}",
       "unknownOperation": "未知操作",
       "unknownService": "未知服務",
       "traceIdCopied": "追蹤 ID 已複製到剪貼簿",
@@ -9999,7 +9773,6 @@
     "selectMetrics": "選擇指標串流",
     "correlatedLogs": "日誌",
     "correlatedMetrics": "指標",
-    "correlatedTraces": "追蹤",
     "loadingCorrelation": "正在載入關聯資料…",
     "clickToLoadLogs": "按一下以載入關聯日誌",
     "clickToLoadMetrics": "按一下以載入關聯指標",
@@ -11034,7 +10807,6 @@
           "versionPill": "v{version} · {count} 版本 | v{version} · {count} 版本",
           "sourceSection": "來源",
           "sourceTrace": "追蹤",
-          "sourceSpan": "跨度",
           "sourceReview": "審查提交",
           "sourceImport": "匯入自",
           "inputSection": "輸入",
@@ -11159,7 +10931,6 @@
         "errorsTitle": "錯誤訊息說明",
         "noErrors": "未擷取到錯誤訊息 — 請開啟追蹤進行檢查",
         "colTraceId": "追蹤",
-        "colSpans": "跨度",
         "colRepeats": "重複",
         "openInNewTab": "在新分頁中開啟追蹤",
         "showFull": "顯示完整錯誤",
@@ -11926,12 +11697,9 @@
       "streamPlaceholder": "選擇串流",
       "targetScopeLabel": "評估每個",
       "targetScopes": {
-        "span": "跨度",
-        "trace": "追蹤",
         "session": "會話"
       },
       "targetScopeHelp": {
-        "span": "獨立評估每個符合條件的跨度。",
         "trace": "在完成視窗關閉後評估整個追蹤。",
         "session": "在完成視窗關閉後評估跨追蹤的工作階段。"
       },
@@ -11941,11 +11709,7 @@
         "session": "工作階段在滿足這些條件中的第一個時立即評估。"
       },
       "idleWindowLabel": "閒置視窗（秒）",
-      "idleWindowHelp": "在 {duration} 沒有新跨度後評估。",
-      "idleWindowHelpEmpty": "在沒有新跨度到達時評估。",
       "maxAgeLabel": "最大年齡（秒）",
-      "maxAgeHelp": "在第一個跨度後 {duration} 評估。",
-      "maxAgeHelpEmpty": "在固定年齡評估，即使跨度仍在到達。",
       "descriptionLabel": "描述",
       "samplingModeLabel": "取樣模式",
       "samplingValueLabel": "取樣率",
@@ -11956,7 +11720,6 @@
       "scorerPicker": {
         "title": "評分器",
         "hint": {
-          "span": "選擇一個或多個評分器，針對每個符合條件的跨度執行。",
           "trace": "選擇一個或多個評分器，針對每個符合條件的追蹤執行。",
           "session": "選擇一個或多個評分器，針對每個符合條件的工作階段執行。"
         },
@@ -11967,24 +11730,14 @@
       },
       "filter": {
         "title": "篩選條件",
-        "hint": {
-          "span": "只有符合此條件的跨度才會進入取樣和評分。",
-          "trace": "如果追蹤中的任何跨度符合此條件，則該追蹤進入取樣和評分。",
-          "session": "如果工作階段中的任何跨度符合此條件，則該工作階段進入取樣和評分。"
-        }
+        "hint": {}
       },
       "selector": {
-        "title": "哪些跨度（可選）",
-        "hint": {
-          "trace": "留空以包含追蹤中的每個跨度。"
-        }
+        "hint": {}
       },
       "endSignal": {
         "title": "結束訊號（可選）",
-        "hint": {
-          "trace": "定義一個跨度條件，當任何跨度符合時立即關閉追蹤。",
-          "session": "定義一個跨度條件，當任何跨度符合時立即關閉工作階段。"
-        }
+        "hint": {}
       },
       "inputMapping": {
         "title": "提示變數",
@@ -12007,39 +11760,26 @@
           "title": "{scope} 系統值",
           "description": "OpenObserve 會針對此作業評估的每個 {scope} 分別建立這些值。在對應評分器的提示變數時，可將它們用作來源。",
           "badge": "系統提供",
-          "selectorRequired": "需要跨度選擇器",
           "columns": {
             "variable": "值",
             "source": "來源",
             "description": "提供的值"
           },
           "variables": {
-            "input": {
-              "trace": "來自追蹤根跨度的輸入。"
-            },
-            "output": {
-              "trace": "來自追蹤根跨度的輸出。"
-            },
+            "input": {},
+            "output": {},
             "statistics": {
-              "trace": "追蹤指標：跨度數量、持續時間、LLM 和工具呼叫、錯誤、令牌和成本。",
               "session": "工作階段指標：追蹤和輪次數量、持續時間和錯誤。"
             },
-            "spans": {
-              "trace": "由工作的跨度選擇器選出的跨度過濾子集。"
-            },
+            "spans": {},
             "steps": {
-              "trace": "按時間順序排列的跨度；當追蹤很長時，中間部分折疊。",
               "session": "按時間順序排列的追蹤，表示為對話輪次。"
             }
           }
         }
       },
       "spanSelector": {
-        "select": "選擇跨度選擇器",
-        "bindingHelp": "追蹤可能有數百個跨度。挑選此評分器應查看的跨度。",
         "createForScorer": "為評分器建立",
-        "createForScorerTitle": "為此評分器建立一個跨度選擇器",
-        "editorTitle": "跨度選擇器",
         "name": "選擇器名稱",
         "schemaMode": "要讀取的欄位",
         "defaultSchema": "標準 GenAI 欄位",
@@ -12180,7 +11920,6 @@
       "recent": "最近："
     },
     "noEvents": {
-      "title": "找不到事件",
       "descNoFilters": "在 {range} 內找不到任何事件。請嘗試放寬時間範圍以載入結果。",
       "descWithFilters": "在選定的時段內，沒有任何項目符合<strong>此查詢</strong>。此串流在此處有資料 — 請嘗試放寬查詢列中的篩選條件。",
       "descOutOfRange": "您的時段不包含此串流的任何資料。請跳至上次出現資料的時間。",
@@ -12624,8 +12363,6 @@
     "createBrowserTest": {
       "buildManually": "手動建立",
       "continue": "繼續",
-      "gateDescription": "告訴我們從哪裡開始——接下來您將錄製旅程。其他所有內容（排程、警報、RUM）將在之後設置。",
-      "gateFooter": "這是我們開始所需的一切。錄製後，您可以在這裡重播，然後儲存以配置排程、警報等。",
       "loadFailed": "無法載入檢查配置。",
       "loadFailedTitle": "無法載入",
       "loading": "正在載入檢查…",
@@ -13091,7 +12828,6 @@
       },
       "timeoutMs": "逾時 (毫秒)",
       "tls": {
-        "minDays": "當在 (天) 內到期時發出警報",
         "title": "TLS 憑證",
         "verifyChain": "驗證憑證鏈",
         "verifyHostname": "驗證主機名稱"
@@ -13332,7 +13068,6 @@
       "errorPatternsWindowDesc": "跨 {window} 標準化 · 點選某行以篩選執行"
     },
     "scheduleAlert": {
-      "addNewDestination": "新增目的地",
       "alertedIfFails": "若測試失敗則發出警示",
       "alertedIfFailsSuffix": "次。",
       "alerts": "警示",
@@ -13348,8 +13083,6 @@
         "weeks": "週"
       },
       "customIntervalValue": "每",
-      "destinationRequired": "至少需要一個目的地",
-      "destinations": "目的地",
       "frequency": "頻率",
       "frequencyOptions": {
         "15min": "15 分鐘",
@@ -13361,8 +13094,6 @@
         "custom": "自訂"
       },
       "minutes": "分鐘",
-      "noDestinations": "無可用目的地",
-      "refreshDestinations": "重新整理目的地",
       "retries": "重試次數",
       "retriesOnFailure": "失敗時重試",
       "retriesOnFailureSuffix": "次。",
@@ -13621,11 +13352,8 @@
       "dashboards": "儀表板",
       "metrics": "指標",
       "traces": "追蹤",
-      "alerts": "警報",
       "streams": "串流",
-      "pipelines": "管道",
       "functions": "函數",
-      "reports": "報告",
       "iam": "IAM",
       "settings": "設定",
       "onlineEvals": "線上評估",
@@ -13641,25 +13369,18 @@
       "dashboardsPanel": "儀表板 — 面板（懸停面板）",
       "metrics": "指標",
       "traces": "追蹤",
-      "alerts": "警報",
       "streams": "串流",
-      "pipelines": "管道",
       "functions": "函數",
-      "reports": "報告",
       "iamUsers": "IAM — 使用者",
       "iamRoles": "IAM — 角色",
       "iamGroups": "IAM — 群組",
       "iamServiceAccounts": "IAM — 服務帳戶",
-      "alertDestinations": "警報 — 目的地",
       "alertSources": "警示 — 外部來源",
-      "alertTemplates": "警報 — 範本",
       "panelEditor": "面板編輯器",
       "traceDetail": "追蹤詳細資料",
       "runningQueries": "執行中的查詢",
       "ingestionTokens": "IAM — 擷取令牌",
       "syntheticsTokens": "IAM — Synthetics Token",
-      "alertIncidents": "警報 — 事件",
-      "pipelineDestinations": "管道 — 目的地",
       "enrichmentTables": "豐富化表格",
       "iamInvitations": "IAM — 邀請",
       "iamOrganizations": "IAM — 組織",
@@ -13720,8 +13441,6 @@
       "alertsRefresh": "重新整理警示清單",
       "streamsAdd": "新增串流",
       "streamsRefresh": "重新整理清單",
-      "pipelinesAdd": "建立新管道",
-      "pipelinesImport": "匯入管道",
       "pipelinesRefresh": "重新整理清單",
       "functionsAdd": "新增函數",
       "functionsRefresh": "重新整理清單",
@@ -13735,7 +13454,6 @@
       "iamGroupsRefresh": "重新整理清單",
       "iamServiceAccountsAdd": "新增服務帳戶",
       "iamServiceAccountsRefresh": "重新整理清單",
-      "alertDestinationsAdd": "新增目的地",
       "alertDestinationsRefresh": "重新整理清單",
       "alertSourcesAdd": "新增警示來源",
       "alertSourcesRefresh": "重新整理清單",
@@ -13746,8 +13464,6 @@
       "panelEditorRun": "執行/套用查詢",
       "panelEditorSave": "儲存面板",
       "panelEditorBack": "放棄並返回",
-      "traceNextSpan": "下一個跨度",
-      "tracePrevSpan": "上一個跨度",
       "runningQueriesRefresh": "重新整理查詢列表",
       "ingestionTokensAdd": "建立新權杖",
       "ingestionTokensRefresh": "重新整理權杖列表",
@@ -14138,7 +13854,6 @@
         "pending": "待處理"
       },
       "logLevel": {
-        "trace": "追蹤",
         "debug": "除錯",
         "info": "資訊",
         "warn": "警告",
@@ -14287,21 +14002,11 @@
       "pleaseSelectStreamType": "請選取串流類型 ",
       "anomalyDetectionClonedSuccessfully": "異常偵測已成功複製",
       "errorWhileFetchingTemplates": "取得範本時發生錯誤。",
-      "errorWhileFetchingDestinations": "取得目的地時發生錯誤。",
       "failedToLoadAlertForEditing": "無法載入警示以進行編輯",
       "pleaseWaitWhileLoadingAlert": "正在載入警示，請稍候...",
       "errorWhilePullingAlerts": "擷取警示時發生錯誤。",
       "pleaseWaitWhileLoadingAlerts": "正在載入警示，請稍候...",
-      "destinationsDeletedSuccessfully": "{count} 個目的地已成功刪除 | {count} 個目的地已成功刪除",
-      "failedToDeleteDestinations": "刪除 {count} 個目的地失敗 | 刪除 {count} 個目的地失敗",
-      "destinationsDeletedWithFailures": "{count} 個目的地已成功刪除，{failed} 個失敗 | {count} 個目的地已成功刪除，{failed} 個失敗",
-      "noDestinationsSelectedForDeletion": "未選取要刪除的目的地",
-      "deletingDestinations": "正在刪除目的地...",
-      "destinationDeletedSuccessfully": "目的地 {name} 已成功刪除",
-      "errorWhilePullingDestinations": "擷取目的地時發生錯誤。",
-      "pleaseWaitWhileLoadingDestinations": "正在載入目的地，請稍候...",
       "errorWhileLoadingActions": "載入動作時發生錯誤。",
-      "pleaseWaitWhileLoadingAlertDestination": "正在載入警示目的地，請稍候...",
       "errorImportingAlertPleaseCheck": "匯入警示時發生錯誤。請檢查 JSON。",
       "alertsImportedSuccessfully": "{count} 個警示已成功匯入 | {count} 個警示已成功匯入",
       "invalidJson": "無效的 JSON：{error}",
@@ -14320,8 +14025,6 @@
       "incidentsRefreshed": "事件已重新整理",
       "failedToPostComment": "張貼留言失敗",
       "commentPostedSuccessfully": "留言張貼成功",
-      "destinationUpdatedSuccessfully": "目的地 \"{name}\" 更新成功。",
-      "destinationCreatedSuccessfully": "目的地 \"{name}\" 建立成功。",
       "failedToDeleteTemplates": "刪除 {count} 個範本失敗 | 刪除 {count} 個範本失敗",
       "templatesDeletedWithFailures": "已刪除 {count} 個範本，但 {failed} 個失敗 | 已刪除 {count} 個範本，但 {failed} 個失敗",
       "successfullyDeletedTemplates": "成功刪除 {count} 個範本 | 成功刪除 {count} 個範本",
@@ -14377,8 +14080,6 @@
         "users": "使用者",
         "roles": "角色",
         "organizations": "組織",
-        "pipelines": "管道",
-        "destinations": "目的地",
         "templates": "範本",
         "reports": "報表",
         "llmModelPricing": "LLM 模型定價"
@@ -14409,8 +14110,7 @@
       "pleaseWaitWhileLoadingFunctions": "載入函數時請稍候...",
       "enrichmentReloadStarted": "擴充表重新載入已開始。正在背景處理中...",
       "enrichmentJobStarted": "擴充表作業已開始。正在背景處理中...",
-      "enrichmentCreationFailed": "建立擴充表失敗",
-      "functionDeletionAssociatedPipelines": "函數刪除失敗，因為它與管道關聯。按一下檢視按鈕以取得關聯的管道。"
+      "enrichmentCreationFailed": "建立擴充表失敗"
     },
     "recommended": {
       "failedToImportDashboard": "匯入儀表板失敗：{error}",
@@ -14583,7 +14283,6 @@
       "isNotASupportedFileType": "「{fileName}」不是支援的檔案類型。僅允許 {allowed} 檔案。"
     },
     "workflows": {
-      "thisBranchAlreadyEndsInA": "此分支的終點已是目的地。",
       "chooseATriggerNodeToStart": "選擇觸發節點以開始您的工作流程",
       "thisConnectionWouldCreateALoop": "此連線會造成迴圈",
       "onlyOneIncomingConnectionToA": "每個步驟只允許一個傳入連線"
@@ -14591,8 +14290,6 @@
     "views": {
       "youAreNotAuthorizedToManage": "您無權管理授權。",
       "copiedToClipboard": "已複製到剪貼簿。",
-      "noDestinationsFoundPleaseCreateA": "找不到目的地。請先建立目的地。",
-      "errorWhilePullingDestinations": "擷取目的地時發生錯誤。",
       "rumTokenUpdatedSuccessfully": "RUM Token 已成功更新。",
       "rumTokenGeneratedSuccessfully": "RUM Token 已成功產生。",
       "tokenResetSuccessfully": "Token 已成功重設。",
@@ -14609,7 +14306,6 @@
       "pleaseWaitWhileLoadingStreams": "正在載入串流，請稍候...",
       "errorWhilePullingSummary": "擷取摘要時發生錯誤。",
       "pleaseWaitWhileLoadingSummary": "正在載入摘要，請稍候...",
-      "noDestinationsCreateOneBeforeSaving": "找不到目的地。儲存此警示前，請先建立一個目的地。",
       "errorWhileLoadingAlert": "載入警示時發生錯誤。"
     },
     "RUM": {
@@ -14664,7 +14360,6 @@
       "count": "切片寬度不會改變此 SLO 的數值。無論如何都會計入相同的事件。5 分鐘的切片只會儲存五分之一的歷史記錄。",
       "perSlice": "每個切片會整體評為良好或不良，因此寬度是單一失敗所能耗用的最小預算量。在 7 天內達到 99.9% 的情況下，單一不良的 5 分鐘切片會耗用約一半的預算。若要在短時間視窗內達成嚴格目標，請選擇 1 分鐘。"
     },
-    "backfillNote": "儲存時執行回溯填補：分塊進行，最新的歷史優先。警報保持凍結，直到涵蓋範圍超過下限。",
     "budgetHint": "錯誤預算 = {budget}",
     "budgetDays": "{n} 天",
     "budgetHours": "{n} 小時",
@@ -14772,8 +14467,7 @@
       "streamPlaceholder": "選擇串流"
     },
     "empty": {
-      "title": "尚無 SLO",
-      "description": "SLO 衡量請求或時間中有多少比例達到目標，並為警報提供可消耗的錯誤預算。"
+      "title": "尚無 SLO"
     },
     "groups": {
       "emptyTitle": "尚未測量任何群組",
@@ -14782,30 +14476,17 @@
     "frozen": {
       "title": "凍結：涵蓋範圍不足",
       "body": "此時間視窗僅測量了 {coverage}，低於 {floor} 下限。SLO 會被視為沒有資料，其警示既不會觸發也不會解除，因此未測量的時間永遠不會回報為正常運作時間。",
-      "alertGapsBody": "此視窗僅測量了 {coverage}，低於 {floor} 下限：來源警報在其餘時間未評估，無論是暫停、靜音或失敗。SLO 讀取為無資料，其警報既不會觸發也不會解決，因此未測量的時間永遠不會被報告為正常運作時間。",
-      "alertStaleTitle": "凍結：來源警報已停止評估",
-      "alertStaleBody": "來源警報自 {since} 起未評估，因此測量已凍結：視窗保持在原處，SLO 的警報既不會觸發也不會解決。以下數字是最後一次真實測量，而非目前狀態。",
-      "measuringSinceTitle": "自 {since} 起測量",
-      "measuringSinceBody": "此 SLO 擁有 {window} 天歷史中的 {measured} 天：在 {since} 之前沒有其來源警報的可用記錄。以下每個數字描述的是實際測量的天數，而非完整視窗，且視窗會隨著時間過去而填滿。"
+      "measuringSinceTitle": "自 {since} 起測量"
     },
     "regenerate": {
       "title": "此編輯會重新開始測量",
       "body": "您變更了時間片的含義，因此新的世代開始，目前視窗的測量將被丟棄。僅變更目標不會造成這種情況；目標會在讀取 SLO 時套用。"
     },
     "alertSli": {
-      "source": "來源警報",
-      "sourcePlaceholder": "選擇警報",
-      "sourceHint": "正常運作時間是此警報未觸發的測量時間比例。它未評估的時間 — 暫停、靜音或失敗 — 是未測量的，且永遠不計為正常運作時間。",
-      "loadFailed": "無法載入符合資格的警報",
-      "noneEligible": "此組織中尚無任何警報可用作來源。",
       "ineligibleOption": "{name} — {reason}",
-      "groupingLocked": "基於警報的 SLI 無法分組：可用性分類帳記錄每個警報的一次執行，而非每個群組，因此沒有每個群組的涵蓋範圍可依賴。",
-      "sourceLink": "來源警報",
       "preview": {
         "title": "已測量的正常運作時間",
         "tally": "在視窗的 {coverage} 中有 {sli}% 良好",
-        "wouldFreeze": "此視窗測量的部分太少，因此此來源上的 SLO 讀取為無資料，其警報既不會觸發也不會解決。上述百分比僅涵蓋已測量的部分。",
-        "noHistory": "此警報尚無評估歷史。一旦執行，測量便會開始。",
         "loadFailed": "無法載入評估歷史",
         "legendGood": "正常",
         "legendBad": "觸發中",
@@ -15856,9 +15537,7 @@
           "reading": {
             "title": "我們正在讀取你的資料庫日誌",
             "detail": "{databases} · 最近讀取的行 {age}",
-            "detailNoFleet": "最近讀取的行 {age}",
-            "detailUnknown": "{databases} — 日誌管道已連線",
-            "detailUnknownNoFleet": "日誌管道已連線"
+            "detailNoFleet": "最近讀取的行 {age}"
           },
           "reporting": {
             "title": "死鎖回報已開啟",
@@ -15868,9 +15547,7 @@
             "titleUnknown": "檢查死鎖回報是否已開啟"
           },
           "traffic": {
-            "title": "我們從這些資料庫看到了 {lines} 條其他日誌行",
-            "detail": "因此日誌管道正在傳輸流量——死鎖會經由它傳遞過來",
-            "titleUnknown": "日誌管道正在傳輸流量"
+            "title": "我們從這些資料庫看到了 {lines} 條其他日誌行"
           },
           "lastEver": {
             "title": "我們最後一次看到的死鎖",
@@ -16104,9 +15781,7 @@
             "detailUnknown": "按照您的收集器設定的排程"
           },
           "pipeline": {
-            "title": "您的資料庫正在與我們連線",
-            "detail": "此時間範圍內，{lines} 行其他資料透過相同的管道送達",
-            "detailUnknown": "承載此資料的管道正在執行中"
+            "title": "您的資料庫正在與我們連線"
           },
           "meaning": {
             "title": "此分頁在非空白時顯示的內容",
