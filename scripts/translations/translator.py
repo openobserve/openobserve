@@ -153,8 +153,8 @@ TERMS = {
         "'to open'",
     },
     "top": {
-        "sense": "in rankings (Top N, Top Queries): highest-ranked — not the "
-        "spatial top edge",
+        "sense": "in rankings (Top N, Top Queries): highest-ranked; in layout "
+        "and position labels it is the ordinary spatial top",
     },
     "value": {
         "sense": "the data value of a field or metric — never worth/merit",
