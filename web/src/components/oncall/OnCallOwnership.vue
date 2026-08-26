@@ -18,12 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Routing: what reaches this team, what it caught, and what reached nobody —
   as one list, read top to bottom.
 
-  The rules lead. The tester used to, on the theory that "would this page us?"
-  is the question people arrive with; but it asks the reader to describe a
-  hypothetical alert before they have seen a single rule. It is now a strip that
-  opens under the list, and the cheap version of the same answer — what a draft
-  rule would catch — lives inside the rule editor, where the question actually
-  comes up.
+  The rules lead. The cheap answer to "would this page us?" — what a draft
+  rule would catch — lives inside the rule editor, where the question
+  actually comes up.
 -->
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-ownership">
@@ -44,27 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :saving="saving"
       :saving-default="savingDefault"
       :claiming="claiming"
-      :tester-open="testerOpen"
       @save-rule="saveRule"
       @remove="(rule) => (ruleToDelete = rule)"
       @set-default="saveDefaultTeam"
       @claim-all="claimAllOpen = true"
       @dismiss="dismissSignal"
-      @toggle-tester="testerOpen = !testerOpen"
       @preview="previewConflict"
-    />
-
-    <OnCallRoutingSimulator
-      v-if="testerOpen"
-      :preview="preview"
-      :team-id="teamId"
-      :team-name="teamName"
-      :teams="teams"
-      :aliases="aliases"
-      :loading="testing"
-      :sending="sendingTest"
-      @run="runPreview"
-      @send-test="sendTestPage"
     />
 
     <ConfirmDialog
@@ -105,8 +87,6 @@ import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallRoutingList from "@/components/oncall/OnCallRoutingList.vue";
-import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
-import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.vue";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import alertsService from "@/services/alerts";
@@ -155,19 +135,13 @@ const sets = ref<IdentitySet[]>([]);
 const { config: routingConfig, load: loadRoutingConfig, refresh: refreshRoutingConfig } =
   useOnCallRoutingConfig();
 
-const preview = ref<RoutingPreview | null>(null);
-/// Who holds the path the rule editor is currently drafting. Separate from
-/// `preview`, which belongs to the tester strip and answers a different
-/// question the reader asked deliberately.
+/// Who holds the path the rule editor is currently drafting.
 const conflict = ref<RoutingPreview | null>(null);
 
 const loadingRules = ref(false);
-const testing = ref(false);
-const sendingTest = ref(false);
 const saving = ref(false);
 const savingDefault = ref(false);
 const claiming = ref(false);
-const testerOpen = ref(false);
 
 const claimAllOpen = ref(false);
 const ruleToDelete = ref<OwnershipRuleStats | null>(null);
@@ -377,47 +351,6 @@ async function saveDefaultTeam(teamId: string | null) {
     failed(err, t("oncall.defaultTeamSaveFailed"));
   } finally {
     savingDefault.value = false;
-  }
-}
-
-async function runPreview(query: SimulatorQuery) {
-  testing.value = true;
-  try {
-    const res = await oncallService.previewRouting({
-      org_identifier: orgId.value,
-      data: { dimensions: query.dimensions },
-    });
-    preview.value = res.data;
-  } catch (err) {
-    failed(err, t("oncall.testRoutingFailed"));
-  } finally {
-    testing.value = false;
-  }
-}
-
-/// This one really sends. The simulator above it does not, which is why the
-/// two are separate buttons rather than one control with a mode.
-async function sendTestPage(value: { team_id: string; priority: string }) {
-  sendingTest.value = true;
-  try {
-    const res = await oncallService.testPage({
-      org_identifier: orgId.value,
-      team_id: value.team_id,
-      priority: Number(value.priority.replace(/^P/i, "")) || undefined,
-    });
-    // `attempts`, not `recipients` — the latter never existed on the wire, so
-    // this counted `undefined` and called a delivered page "Nobody".
-    const reached = (res.data?.attempts ?? []).filter((attempt) => attempt.delivered).length;
-    toast({
-      variant: res.data?.reached_anyone ? "success" : "warning",
-      message: res.data?.reached_anyone
-        ? t("oncall.testPageSent", { count: reached }, reached)
-        : t("oncall.testPageNobody", { reason: raw(res.data?.not_sent_because ?? "") }),
-    });
-  } catch (err) {
-    failed(err, t("oncall.testPageFailed"));
-  } finally {
-    sendingTest.value = false;
   }
 }
 

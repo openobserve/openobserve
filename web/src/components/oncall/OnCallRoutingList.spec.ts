@@ -474,13 +474,6 @@ describe("OnCallRoutingList", () => {
     expect((wrapper.emitted("remove")?.[0]?.[0] as { rule_id: string }).rule_id).toBe("r_broad");
   });
 
-  it("asks the host to open the tester", async () => {
-    const wrapper = render();
-    await flushPromises();
-    await wrapper.find('[data-test="oncall-routing-list-test"]').trigger("click");
-    expect(wrapper.emitted("toggle-tester")).toHaveLength(1);
-  });
-
   /// An empty rule set is not an empty screen: everything falls to the last
   /// row, and that row is still there saying so.
   it("keeps the catch-all row when there are no rules at all", async () => {

@@ -40,19 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="meta">{{ t("oncall.routingListHint") }}</OText>
 
         <OButton
-          variant="outline"
-          size="sm-action"
-          class="ms-auto"
-          :active="testerOpen"
-          data-test="oncall-routing-list-test"
-          @click="emit('toggle-tester')"
-        >
-          {{ testerOpen ? t("oncall.routingHideTest") : t("oncall.routingTestSignal") }}
-        </OButton>
-
-        <OButton
           variant="primary"
           size="sm-action"
+          class="ms-auto"
           data-test="oncall-routing-list-add"
           @click="setEditor('new')"
         >
@@ -501,7 +491,6 @@ const props = withDefaults(
     saving?: boolean;
     savingDefault?: boolean;
     claiming?: boolean;
-    testerOpen?: boolean;
   }>(),
   {
     rules: () => [],
@@ -520,7 +509,6 @@ const props = withDefaults(
     saving: false,
     savingDefault: false,
     claiming: false,
-    testerOpen: false,
   },
 );
 
@@ -530,7 +518,6 @@ const emit = defineEmits<{
   (e: "set-default", teamId: string | null): void;
   (e: "claim-all", signals: UnroutedSignal[]): void;
   (e: "dismiss", signal: UnroutedSignal): void;
-  (e: "toggle-tester"): void;
   /** The drafted path changed — the host asks the engine who holds it today. */
   (e: "preview", dimensions: Record<string, string>): void;
 }>();

@@ -34,7 +34,6 @@ vi.mock("@/services/oncall", () => ({
     previewRouting: vi.fn(),
     unroutedSignals: vi.fn(),
     dismissUnroutedSignal: vi.fn(),
-    testPage: vi.fn(),
     getRoutingConfig: vi.fn(),
     setRoutingConfig: vi.fn(),
   },
@@ -43,8 +42,8 @@ vi.mock("@/services/oncall", () => ({
 const service = vi.mocked(oncallService);
 const ORG = store.state.selectedOrganization.identifier;
 
-/// The list and the tester are stubbed so this file is about the WIRING
-/// between them and the API. Each one has its own spec for what it renders.
+/// The list is stubbed so this file is about the WIRING between it and the
+/// API. It has its own spec for what it renders.
 const stubs = {
   OnCallRoutingList: {
     name: "OnCallRoutingList",
@@ -61,13 +60,7 @@ const stubs = {
       "saving",
       "savingDefault",
       "claiming",
-      "testerOpen",
     ],
-    template: "<div />",
-  },
-  OnCallRoutingSimulator: {
-    name: "OnCallRoutingSimulator",
-    props: ["preview", "teamId", "teamName", "teams", "aliases", "loading", "sending"],
     template: "<div />",
   },
   ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
@@ -103,7 +96,6 @@ function render() {
 type Wrapper = ReturnType<typeof render>;
 
 const list = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingList" });
-const simulator = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingSimulator" });
 
 describe("OnCallOwnership", () => {
   beforeEach(() => {
@@ -335,63 +327,6 @@ describe("OnCallOwnership", () => {
     expect(service.dismissUnroutedSignal).toHaveBeenCalledWith({
       org_identifier: ORG,
       signal_id: "s7",
-    });
-  });
-
-  /// The tester no longer leads the screen: it asks the reader to describe a
-  /// hypothetical alert before they have seen a rule.
-  it("keeps the tester closed until it is asked for", async () => {
-    const wrapper = render();
-    await flushPromises();
-    expect(simulator(wrapper).exists()).toBe(false);
-
-    list(wrapper).vm.$emit("toggle-tester");
-    await wrapper.vm.$nextTick();
-    expect(simulator(wrapper).exists()).toBe(true);
-  });
-
-  it("passes the routing preview back down to the tester", async () => {
-    service.previewRouting.mockResolvedValue({
-      data: { decision: { kind: "ownership" }, team_id: "team_2", reason: "routed" },
-    } as any);
-    const wrapper = render();
-    await flushPromises();
-    list(wrapper).vm.$emit("toggle-tester");
-    await wrapper.vm.$nextTick();
-
-    simulator(wrapper).vm.$emit("run", { dimensions: { service: "api" }, priority: "P1" });
-    await flushPromises();
-
-    expect(service.previewRouting).toHaveBeenCalledWith({
-      org_identifier: ORG,
-      data: { dimensions: { service: "api" } },
-    });
-    expect(simulator(wrapper).props("preview")).toMatchObject({ team_id: "team_2" });
-  });
-
-  /// The API takes a number; the simulator speaks in "P1".
-  it("sends a real test page with the priority as a number", async () => {
-    service.testPage.mockResolvedValue({
-      data: {
-        reached_anyone: true,
-        channels: ["email"],
-        attempts: [
-          { channel: "email", recipient: "a@o2.ai", reason: "on call now", delivered: true },
-        ],
-      },
-    } as any);
-    const wrapper = render();
-    await flushPromises();
-    list(wrapper).vm.$emit("toggle-tester");
-    await wrapper.vm.$nextTick();
-
-    simulator(wrapper).vm.$emit("send-test", { team_id: "team_2", priority: "P3" });
-    await flushPromises();
-
-    expect(service.testPage).toHaveBeenCalledWith({
-      org_identifier: ORG,
-      team_id: "team_2",
-      priority: 3,
     });
   });
 
