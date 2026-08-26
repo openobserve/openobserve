@@ -262,7 +262,8 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 
 ### OTooltip
 **Import:** `@/lib/overlay/Tooltip/OTooltip.vue`
-**Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot — attaches to its parent element as its tooltip).
+**Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot).
+**Child mode binds to the nearest previous VISIBLE ELEMENT SIBLING, and only falls back to the parent when there is none** — it is not simply "the parent". So put a child-mode `OTooltip` **first** inside the element you want as the trigger; placed after an `<OIcon>` it silently binds to that icon, and only the icon becomes hoverable. Text nodes do not count as siblings, so `<OIcon/> {{ count }} <OTooltip/>` binds to the icon and leaves the count dead. This shipped in the alert-dependency count chips, where the tooltip fired on a 12px glyph inside a 52px chip.
 **Don't use for:** Anything the user interacts with inside the bubble (use **OPopover**); an action menu (use **ODropdown**).
 **Key props:** `content` (string — plain-text shorthand for `#content`) · `side` (`"top"|"right"|"bottom"|"left"` — default `"top"`) · `align` (`"start"|"center"|"end"` — default `"center"`) · `sideOffset` (number — default `4`) · `alignOffset` (number — default `0`) · `delay` (number ms — default `700`) · `maxWidth` (string — default `"320px"`) · `disabled` (boolean) · `open` (boolean — controlled) · `contentClass` (string) · `shortcut` (`string | string[]`) · `shortcutId` (string — prefer over `shortcut`)
 **Slots:** `default` (trigger — single focusable element; omit for child mode), `content` (rich content, overrides `content` prop)
