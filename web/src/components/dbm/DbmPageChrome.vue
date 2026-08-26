@@ -18,9 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   DbmPageChrome — the header every DBM list tab wears.
 
   All seven list pages opened with the same twenty lines: an OPageLayout with the
-  database icon, tabs on a second row, a bleeding body, the shared tab strip in
-  `#header-tabs`, and the same six-prop DateTime in `#actions`. Only the title,
-  the subtitle and two data-tests differed, so those are the props.
+  database icon, tabs on a second row, a bleeding body and the shared tab strip
+  in `#header-tabs`. The title and subtitle are ONE constant "Databases" header
+  for the whole section rather than a per-tab pair: the tab strip already names
+  the view, so a title that changed on every tab only made the section read as
+  seven unrelated screens. Only the title's data-test still differs per page, for
+  the e2e selectors that address each tab by it.
 
   Two things deliberately stay in the page. The tab strip's markup lives HERE
   rather than in `DbmShell` for the reason `dbmTabCounts.ts` documents — it
@@ -30,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OPageLayout
-    :title="title"
-    :subtitle="subtitle"
+    :title="t('dbm.header.title')"
+    :subtitle="t('dbm.header.subtitle')"
     icon="database"
     :title-data-test="titleDataTest"
     tabs-below
@@ -51,13 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import type { I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 defineProps<{
-  title: I18nText;
-  subtitle: I18nText;
+  /** Per-tab data-test on the shared title, for the e2e selectors that key off it. */
   titleDataTest: string;
   /** What the tab strip paints — the shell's fan-out with this page's own count substituted. */
   tabCounts: DbmTabCountProps;
 }>();
+
+const { t } = useI18nTyped();
 </script>

@@ -43,8 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <DbmPageChrome
-    :title="t('dbm.tableHealth.title')"
-    :subtitle="t('dbm.tableHealth.subtitle')"
     title-data-test="dbm-table-health-title"
     :tab-counts="tabCounts"
   >

@@ -40,8 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <DbmPageChrome
-    :title="t('dbm.activity.title')"
-    :subtitle="t(isLiveWindow ? 'dbm.activity.subtitle' : 'dbm.activity.subtitlePast')"
     title-data-test="dbm-activity-title"
     :tab-counts="tabCounts"
   >

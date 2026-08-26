@@ -41,8 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <DbmPageChrome
-    :title="t('dbm.deadlocks.title')"
-    :subtitle="t('dbm.deadlocks.subtitle')"
     title-data-test="dbm-deadlocks-title"
     :tab-counts="tabCounts"
   >

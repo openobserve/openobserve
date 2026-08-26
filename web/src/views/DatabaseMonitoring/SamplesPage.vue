@@ -42,8 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <DbmPageChrome
-    :title="t('dbm.samples.title')"
-    :subtitle="t(serverListShown ? 'dbm.samples.subtitleServer' : 'dbm.samples.subtitle')"
     title-data-test="dbm-samples-title"
     :tab-counts="tabCounts"
   >

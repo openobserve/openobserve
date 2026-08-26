@@ -37,8 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <DbmPageChrome
-    :title="t('dbm.blocked.title')"
-    :subtitle="t(isLiveWindow ? 'dbm.blocked.subtitle' : 'dbm.blocked.subtitlePast')"
     title-data-test="dbm-blocked-title"
     :tab-counts="tabCounts"
   >

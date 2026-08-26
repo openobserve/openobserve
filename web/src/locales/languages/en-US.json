@@ -14922,6 +14922,10 @@
       "loadFailed": "Could not load database data. Try again, or narrow the time range.",
       "actions": "Actions"
     },
+    "header": {
+      "title": "Databases",
+      "subtitle": "Query performance and health across your databases"
+    },
     "ai": {
       "suggestFix": "Ask AI how to fix this",
       "suggestFixHint": "Opens the AI assistant with this query, its engine and its latency numbers, and asks what to change. It does not change anything itself.",
@@ -14962,8 +14966,6 @@
       "wasValue": "was {value}"
     },
     "databases": {
-      "title": "Databases",
-      "subtitle": "Query performance and health per database",
       "searchPlaceholder": "Search database or service…",
       "unnamedInstance": "Instance not named",
       "unnamedInstanceHint": "The database's own statement reports prove this engine is running, but they don't name a host. The row will show an address once a feed that carries one — session sampling or instance metrics — is set up.",
@@ -15010,9 +15012,6 @@
       }
     },
     "queries": {
-      "title": "Top queries",
-      "subtitle": "The queries using the most database time",
-      "subtitleServer": "The statements your databases ran, counted inside the database — most frequently run first",
       "searchPlaceholder": "Search query text, table or service…",
       "trendLabel": "How this query's time has moved across the range",
       "otherRow": "All other queries",
@@ -15437,9 +15436,6 @@
       }
     },
     "samples": {
-      "title": "Slowest calls",
-      "subtitle": "The slowest individual database calls in this window, across every database and query — as their callers measured them, finished calls only",
-      "subtitleServer": "The slowest statements your databases completed in this window, measured inside the database",
       "logOffTitle": "Your databases are not logging slow statements yet",
       "logOffDescription": "Nothing traced these calls, so we asked the databases for their own slowest statements — and they log none. This list comes from PostgreSQL's statement log (log_min_duration_statement), which is off by default — the setup card's logging step turns it on. Per-statement capture is currently PostgreSQL-only, so MySQL and MariaDB can't feed this list yet. Top queries can still show you what runs most, because it reads the counter tables instead.",
       "searchPlaceholder": "Search query text, service or database…",
@@ -15489,8 +15485,6 @@
       "climbed": "New heaviest query"
     },
     "deadlocks": {
-      "title": "Databases",
-      "subtitle": "Transactions that blocked each other and were rolled back",
       "deadlockCount": "no deadlocks | {count} deadlock | {count} deadlocks",
       "pairCount": "no query pairs | {count} query pair | {count} query pairs",
       "searchPlaceholder": "Search query text, table or application…",
@@ -15640,9 +15634,6 @@
       }
     },
     "blocked": {
-      "title": "Databases",
-      "subtitle": "Sessions currently waiting on a lock",
-      "subtitlePast": "Sessions that were waiting on a lock during this window",
       "waitingCount": "no sessions waiting on a lock | {count} session waiting on a lock right now | {count} sessions waiting on a lock right now",
       "waitingCountPast": "no sessions waited on a lock | {count} session waited on a lock in this window | {count} sessions waited on a lock in this window",
       "sessionCount": "no sessions | {count} session | {count} sessions",
@@ -15773,9 +15764,6 @@
       }
     },
     "activity": {
-      "title": "Activity",
-      "subtitle": "What your databases are doing right now, sampled from their own session tables.",
-      "subtitlePast": "What your databases were doing during this window, sampled from their own session tables.",
       "searchPlaceholder": "Search sessions, users, applications",
       "wait": {
         "onCpu": "On CPU / no wait",
@@ -15899,8 +15887,6 @@
       "deadlockLabel": "deadlocks"
     },
     "tableHealth": {
-      "title": "Table health",
-      "subtitle": "Size, bloat and vacuum state for every table, newest snapshot first.",
       "searchPlaceholder": "Search tables",
       "never": "Never",
       "countersCumulative": "Scan and vacuum counts are lifetime totals since the last statistics reset, not counts for the selected time range.",

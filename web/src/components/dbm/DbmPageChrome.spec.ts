@@ -19,7 +19,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import i18n from "@/locales";
-import { raw } from "@/types/i18n";
 
 import DbmPageChrome from "./DbmPageChrome.vue";
 import DbmSectionTabs from "./DbmSectionTabs.vue";
@@ -35,8 +34,6 @@ const tabCounts: DbmTabCountProps = { queryCount: 12, databaseCount: 3 };
 const mountChrome = (props: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
   mount(DbmPageChrome, {
     props: {
-      title: raw("Deadlocks"),
-      subtitle: raw("Query pairs that deadlocked"),
       titleDataTest: "dbm-deadlocks-title",
       tabCounts,
       ...props,
@@ -62,11 +59,16 @@ describe("DbmPageChrome", () => {
     expect(layout.props("bleed")).toBe(true);
   });
 
-  it("carries the page's title, subtitle and title data-test", () => {
+  /**
+   * One constant "Databases" header for every tab — the tab strip names the
+   * view, so a per-tab title only made the section read as seven unrelated
+   * screens. Only the title's data-test varies, for the e2e selectors keyed off it.
+   */
+  it("wears the one shared Databases header, with the page's own title data-test", () => {
     const layout = mountChrome().findComponent(OPageLayout);
 
-    expect(layout.props("title")).toBe("Deadlocks");
-    expect(layout.props("subtitle")).toBe("Query pairs that deadlocked");
+    expect(layout.props("title")).toBe("Databases");
+    expect(layout.props("subtitle")).toBe("Query performance and health across your databases");
     expect(layout.props("titleDataTest")).toBe("dbm-deadlocks-title");
   });
 

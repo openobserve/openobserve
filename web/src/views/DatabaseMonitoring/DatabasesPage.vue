@@ -52,8 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <DbmPageChrome
-    :title="t('dbm.databases.title')"
-    :subtitle="t('dbm.databases.subtitle')"
     title-data-test="dbm-databases-title"
     :tab-counts="tabCounts"
   >
