@@ -67,7 +67,7 @@ use config::utils::schema::format_stream_name;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::{
-        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
@@ -798,9 +798,9 @@ pub async fn handle_otlp_request(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
                         [(
                             ERROR_HEADER,
-                            format!(
+                            error_header_value(&format!(
                                 "[trace_id: {trace_id}] stream did not receive a valid json object"
-                            ),
+                            )),
                         )],
                         Json(MetaHttpResponse::error(
                             http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -873,18 +873,10 @@ pub async fn handle_otlp_request(
                                     log::error!(
                                         "[TRACES:OTLP] stream did not receive a valid json object"
                                     );
-                                    return Ok((
+                                    return Ok(MetaHttpResponse::error_with_header(
                                         http::StatusCode::INTERNAL_SERVER_ERROR,
-                                        [(
-                                            ERROR_HEADER,
-                                            "stream did not receive a valid json object",
-                                        )],
-                                        Json(MetaHttpResponse::error(
-                                            http::StatusCode::INTERNAL_SERVER_ERROR,
-                                            "stream did not receive a valid json object",
-                                        )),
-                                    )
-                                        .into_response());
+                                        "stream did not receive a valid json object",
+                                    ));
                                 }
                             };
                             normalize_llm_field_types(&mut record_val);
@@ -1036,15 +1028,10 @@ pub async fn handle_otlp_request(
         } else {
             http::StatusCode::INTERNAL_SERVER_ERROR
         };
-        return Ok((
+        return Ok(MetaHttpResponse::error_with_header(
             status_code,
-            [(ERROR_HEADER, format!("error while writing trace data: {e}"))],
-            Json(MetaHttpResponse::error(
-                status_code,
-                format!("error while writing trace data: {e}"),
-            )),
-        )
-            .into_response());
+            format!("error while writing trace data: {e}"),
+        ));
     }
 
     #[cfg(feature = "enterprise")]
@@ -1253,9 +1240,9 @@ pub async fn ingest_json(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     [(
                         ERROR_HEADER,
-                        format!(
+                        error_header_value(&format!(
                             "[trace_id: {trace_id}] stream did not receive a valid json object"
-                        ),
+                        )),
                     )],
                     Json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -1401,15 +1388,10 @@ pub async fn ingest_json(
         } else {
             http::StatusCode::INTERNAL_SERVER_ERROR
         };
-        return Ok((
+        return Ok(MetaHttpResponse::error_with_header(
             status_code,
-            [(ERROR_HEADER, format!("error while writing trace data: {e}"))],
-            Json(MetaHttpResponse::error(
-                status_code,
-                format!("error while writing trace data: {e}"),
-            )),
-        )
-            .into_response());
+            format!("error while writing trace data: {e}"),
+        ));
     }
 
     #[cfg(feature = "enterprise")]

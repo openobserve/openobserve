@@ -1223,7 +1223,10 @@
     "ingestionText": "수집",
     "navigationLink": "탐색 링크",
     "ariaCurrentPage": "{label} - 현재 페이지",
-    "ariaWithNotifications": "{label} (알림 {count}개)"
+    "ariaWithNotifications": "{label} (알림 {count}개)",
+    "infra": "인프라",
+    "databases": "데이터베이스",
+    "topQueries": "상위 쿼리"
   },
   "rum": {
     "noSessionReplay": "사용 가능한 세션 재생이 없습니다",
@@ -3442,6 +3445,17 @@
     "languagesLabel": "언어/프레임워크",
     "otherLabel": "기타",
     "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "snowflake": "Snowflake",
+    "zookeeper": "Zookeeper",
+    "cassandra": "Cassandra",
+    "aerospike": "Aerospike",
+    "dynamodb": "DynamoDB",
+    "jenkins": "Jenkins",
+    "ansible": "Ansible",
+    "terraform": "Terraform",
+    "gactions": "GitHub Actions",
+    "python": "Python",
     "dotnettracing": "닷넷 트레이싱",
     "dotnetlogs": "닷넷 로그",
     "macos": "macOS",
@@ -3703,6 +3717,12 @@
       "k8sTroubleWebhookA": "OpenTelemetry 운영자의 웹훅은 cert-manager의 웹훅이 먼저 서빙되어야 합니다. `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook`를 실행한 다음 설치를 다시 실행하세요 — 멱등적입니다.",
       "k8sTroubleWebhookQ": "설치가 어드미션 웹훅 관련 오류로 실패합니다",
       "linuxAgentFixBody": "설치 프로그램은 에이전트를 systemd 서비스로 시작합니다. 아무것도 도착하지 않으면 실행 중인지 확인하고 인증 또는 연결 오류가 있는지 로그를 읽으세요:",
+      "prepareMariadbTitle": "MariaDB 준비",
+      "prepareMariadbDesc": "모니터링 사용자를 생성하세요 — SQL 클라이언트에서 실행하세요, **셸이 아닙니다**.",
+      "runCollectorMariadbDesc": "수집기를 시작하세요 (사용자 비밀번호는 환경 변수를 통해 전달).",
+      "mariadbHostLabel": "MariaDB 호스트",
+      "verifyMariadbMetricsDesc": "아래에서 테스트를 클릭하거나 Streams에서 `mysql_*` 메트릭을 확인하세요 (MariaDB는 MySQL 수신기를 통해 보고합니다).",
+      "mariadbTagline": "OpenTelemetry Collector로 MariaDB 메트릭을 수집하여 OpenObserve로 전송하세요.",
       "logsStreamNameLabel": "로그 스트림 이름",
       "macosAgentFixBody": "설치 프로그램은 두 개의 launchd 데몬을 등록합니다: 에이전트 자체와 통합 로그 브리지입니다. 아무것도 도착하지 않으면 둘 다 로드되었는지 확인하고 에이전트 로그에서 인증 또는 연결 오류를 읽으세요:",
       "macosAgentServicesFixTitle": "에이전트 서비스 확인",
@@ -4007,7 +4027,46 @@
       "enableSessionReplayOptionalTitle": "세션 재생 활성화 (선택 사항)",
       "enableSessionReplayNativeDesc": "세션 재생은 **별도로** 활성화되며 RUM 엔드포인트를 **상속하지 않습니다**. 또한 아무것도 추가하지 않으므로 아래의 전체 `/replay` URL이 필요합니다. 이것을 잘못 설정하는 것이 RUM 이벤트는 도착하지만 재생이 전혀 되지 않는 일반적인 이유입니다.",
       "verifyAndroidRumDesc": "에뮬레이터나 기기에서 앱을 실행하고 몇 개 화면을 이동한 다음 테스트를 누르세요 — 네이티브 Android 이벤트가 `_rumdata` 스트림에 도착합니다.",
-      "verifyIosRumDesc": "시뮬레이터나 기기에서 앱을 실행하고 몇 개 화면을 이동한 다음 테스트를 누르세요 — 네이티브 iOS 이벤트가 `_rumdata` 스트림에 도착합니다."
+      "verifyIosRumDesc": "시뮬레이터나 기기에서 앱을 실행하고 몇 개 화면을 이동한 다음 테스트를 누르세요 — 네이티브 iOS 이벤트가 `_rumdata` 스트림에 도착합니다.",
+      "dbmPreparePostgresTitle": "데이터베이스 모니터링 · 액세스 권한 부여 (선택 사항)",
+      "dbmPreparePostgresDesc": "**위의 모든 내용은 그 자체로 완전합니다** — 쿼리 시간 정보는 이미 애플리케이션 트레이스에서 데이터베이스에 도달하며 여기서 설정할 것이 없습니다. 이 마지막 단계들은 트레이스가 결코 볼 수 없는 것, 즉 데이터베이스 자체만 기록하는 교착 상태와 차단된 쿼리를 추가합니다. 수집기가 다른 세션의 쿼리를 읽을 수 있도록 `pg_monitor` 권한을 부여하세요 — SQL 클라이언트에서 실행하세요, **셸이 아닙니다**.",
+      "dbmPrepareMysqlTitle": "데이터베이스 모니터링 · 교착 상태 기록 유지 (선택 사항)",
+      "dbmPrepareMariadbTitle": "데이터베이스 모니터링 · 교착 상태 기록 유지 (선택 사항)",
+      "dbmPrepareMysqlDesc": "**위의 모든 내용은 그 자체로 완전합니다** — 쿼리 시간 정보는 이미 애플리케이션 트레이스에서 데이터베이스에 도달하며 여기서 설정할 것이 없습니다. 이 마지막 단계들은 트레이스가 결코 볼 수 없는 것, 즉 데이터베이스 자체만 기록하는 교착 상태와 차단된 쿼리를 추가합니다. 전체 교착 상태 기록을 켜세요 — SQL 클라이언트에서 실행하세요, **셸이 아닙니다**.",
+      "dbmPrepareMariadbDesc": "**위의 모든 내용은 그 자체로 완전합니다** — 쿼리 시간 정보는 이미 애플리케이션 트레이스에서 데이터베이스에 도달하며 여기서 설정할 것이 없습니다. 이 마지막 단계들은 트레이스가 결코 볼 수 없는 것, 즉 데이터베이스 자체만 기록하는 교착 상태와 차단된 쿼리를 추가합니다. 전체 교착 상태 기록을 켜세요 — SQL 클라이언트에서 실행하세요, **셸이 아닙니다**.",
+      "dbmPgLoggingTitle": "데이터베이스 모니터링 · Postgres가 교착 상태를 기록하도록 허용 (선택 사항)",
+      "dbmPgLoggingDesc": "교착 상태는 Postgres 로그에만 기록되며 아래 설정이 켜져 있을 때만 기록됩니다. 따라서 이 단계가 교착 상태 탭이 채워지게 하는 것입니다. 접두사 줄은 정확히 일치해야 합니다: 수집기는 이를 읽어 관련된 대상을 찾으며, 다른 접두사를 사용하면 아무것도 찾지 못하면서도 정상으로 보고합니다.",
+      "dbmPgLoggingVerifyTitle": "데이터베이스 모니터링 · 설정 적용 확인 (선택 사항)",
+      "dbmPgLoggingVerifyDesc": "재시작 후 이 명령을 실행하세요. 어떤 값이 여전히 이전 설정을 표시한다면 Postgres가 재시작되지 않고 리로드된 것이며 수집기가 읽을 것이 없습니다.",
+      "dbmPgAutoExplainTitle": "데이터베이스 모니터링 · 실제 실행 계획 캡처 (선택 사항)",
+      "dbmPgAutoExplainDesc": "이 단계가 없으면 쿼리 계획은 실제 매개변수 값 없이 계산된 일반적인 추정치입니다 — 유용하지만 실제로 실행된 계획은 아닙니다. auto_explain은 임계값보다 느린 모든 문에 대해 Postgres가 실제로 실행한 계획을 실제 행 수와 실제 기간과 함께 기록합니다. 샘플링하는 문에 측정 가능한 실행기 오버헤드를 추가하므로 설정의 주석을 읽은 후 바쁜 주 서버에 적용하고 위의 로깅 단계와 동일한 재시작에서 진행하세요.",
+      "dbmConfigureTitle": "데이터베이스 모니터링 · 수집기 구성 (선택 사항)",
+      "dbmConfigurePostgresDesc": "`dbm-config.yaml`을 작성합니다 — 아래에서 데이터베이스와 Postgres 로그 파일 경로를 설정하세요. 교착 상태와 차단된 쿼리 외에도 이 구성은 활동 샘플과 서버 상위 쿼리(추정 계획 포함)를 켭니다: 수집기는 기본적으로 둘 다 OFF로 제공되므로 이 파일의 최상위 `events:` 블록이 이를 활성화합니다 — 이것이 없으면 수집기는 정상으로 보이고 아무것도 보내지 않습니다.",
+      "dbmConfigureMysqlDesc": "`dbm-config.yaml`을 작성합니다 — 아래에서 데이터베이스와 MySQL 오류 로그 경로를 설정하세요. 교착 상태와 차단된 쿼리 외에도 이 구성은 활동 샘플과 서버 상위 쿼리를 켭니다: 수집기는 기본적으로 둘 다 OFF로 제공되므로 이 파일의 최상위 `events:` 블록이 이를 활성화합니다 — 이것이 없으면 수집기는 정상으로 보이고 아무것도 보내지 않습니다.",
+      "dbmConfigureMariadbDesc": "`dbm-config.yaml`을 작성합니다 — 아래에서 데이터베이스와 MariaDB 오류 로그 경로를 설정하세요. MariaDB는 여기서 교착 상태, 차단된 쿼리, 활동 샘플 및 상위 쿼리를 얻습니다: mysql 수신기는 MariaDB의 프로토콜을 사용하며 올바르게 식별합니다. 수신기가 스스로 보고하는 한 가지 공백이 있습니다 — MariaDB는 샘플링된 문 텍스트를 노출하지 않으므로 활동 행은 SQL 없이 세션 이름만 표시합니다.",
+      "dbmRunTitle": "데이터베이스 모니터링 · 수집기 실행 (선택 사항)",
+      "dbmRunPostgresDesc": "두 구성을 함께 실행합니다. 1단계에서 만든 동일한 역할과 비밀번호를 사용하세요.",
+      "dbmRunMysqlDesc": "두 구성을 함께 실행합니다. 1단계에서 만든 동일한 사용자와 비밀번호를 사용하세요.",
+      "dbmRunMariadbDesc": "두 구성을 함께 실행합니다. 1단계에서 만든 동일한 사용자와 비밀번호를 사용하세요.",
+      "dbmVerifyTitle": "데이터베이스 모니터링 · 교착 상태 및 차단된 쿼리 보기",
+      "dbmVerifyDesc": "**인프라 → 데이터베이스**를 열고 아래 탭을 선택하세요. 데이터베이스가 하나를 보고하는 즉시 이벤트가 나타납니다 — 빈 탭은 아무 일도 일어나지 않았는지 또는 수집되는 것이 없는지 알려줍니다.",
+      "dbmVerifyFullDesc": "**인프라 → 데이터베이스**를 열고 아래 탭을 선택하세요. 교착 상태와 차단된 쿼리는 데이터베이스가 하나를 보고하는 즉시 나타납니다. 활동 탭은 수집기 시작 후 1분 이내에 샘플링된 세션으로 채워지며, 추정 계획은 MySQL 8.0.22 이상의 쿼리 상세 페이지에 나타납니다. 테이블 상태는 첫 60초 스냅샷 후 채워집니다.",
+      "dbmDatabaseLabel": "데이터베이스",
+      "dbmPgLogPathLabel": "Postgres 로그 파일",
+      "dbmPgLogPathHelp": "수집기가 이 파일을 읽을 수 있어야 합니다. 다음 명령으로 찾으세요: SHOW log_directory;",
+      "dbmMysqlLogPathLabel": "MySQL 오류 로그",
+      "dbmMariadbLogPathLabel": "MariaDB 오류 로그",
+      "dbmMysqlLogPathHelp": "수집기가 이 파일을 읽을 수 있어야 합니다. 다음 명령으로 찾으세요: SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "수집기가 이 파일을 읽을 수 있어야 합니다. 다음 명령으로 찾으세요: SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "데이터베이스 모니터링 · 액세스 권한 부여 (선택 사항)",
+      "dbmPrepareMssqlDesc": "**위의 모든 것은 단독으로 완료됩니다** — 쿼리 타이밍은 이미 애플리케이션 트레이스에서 데이터베이스로 도달하므로 여기서 설정할 필요가 없습니다. 이 마지막 그룹은 트레이스가 절대 볼 수 없는 것, 즉 데이터베이스 자체만 기록하는 교착 상태와 차단된 쿼리를 추가합니다. 두 권한이 모두 필요합니다 — 하나는 수집기가 다른 세션을 읽을 수 있게 하고, 다른 하나는 교착 상태 기록을 읽을 수 있게 합니다. SQL 클라이언트에서 실행하세요, **셸이 아닌**.",
+      "dbmConfigureMssqlDesc": "`dbm-config.yaml`을 작성합니다 — 아래에서 연결할 데이터베이스를 설정하세요. SQL Server는 여기서 교착 상태, 차단된 쿼리, 활동 샘플, 상위 쿼리 및 실행 계획을 얻습니다. sqlserver 수신기는 전체 인스턴스를 읽으므로 활동 및 상위 쿼리는 위에서 지정한 데이터베이스로 제한되지 않습니다.",
+      "dbmRunMssqlDesc": "두 구성을 함께 실행합니다. 1단계에서 만든 동일한 로그인과 비밀번호를 사용하세요.",
+      "dbmVerifyBlockingDesc": "**인프라 → 데이터베이스 → 차단된 쿼리**를 엽니다. 잠금을 기다리는 세션은 샘플링되는 즉시 나타납니다 — 빈 탭은 차단된 항목이 없는지 아니면 수집되고 있지 않은지를 알려줍니다.",
+      "dbmVerifyFullNoSampleTextDesc": "**인프라 → 데이터베이스**를 열고 아래에서 탭을 선택하세요. 교착 상태와 차단된 쿼리는 데이터베이스가 보고하는 즉시 나타납니다; 활동 탭은 수집기가 시작된 후 1분 이내에 샘플링된 세션으로 채워지며, 상위 쿼리는 쿼리 상세 페이지에서 계획을 포함합니다. MariaDB는 샘플링된 문 텍스트를 노출하지 않으므로 활동 행은 SQL 없이 세션 이름을 표시합니다. 테이블 상태는 첫 60초 스냅샷 후에 채워집니다.",
+      "dbmVerifyFullPlainPlansDesc": "**인프라 → 데이터베이스**를 열고 아래에서 탭을 선택하세요. 교착 상태와 차단된 쿼리는 데이터베이스가 보고하는 즉시 나타납니다; 활동 탭은 수집기가 시작된 후 1분 이내에 샘플링된 세션으로 채워지며, 실행 계획은 쿼리 상세 페이지에 나타납니다. 테이블 상태는 첫 60초 스냅샷 후에 채워집니다.",
+      "dbmVerifyFullSlowTableHealthDesc": "**인프라 → 데이터베이스**를 열고 아래에서 탭을 선택하세요. 교착 상태와 차단된 쿼리는 데이터베이스가 보고하는 즉시 나타납니다; 활동 탭은 수집기가 시작된 후 1분 이내에 샘플링된 세션으로 채워지며, 예상 계획은 쿼리 상세 페이지에 나타납니다. 테이블 상태는 최대 5분이 소요됩니다 — 스키마가 커질수록 테이블 크기 읽기가 느려지므로 다른 항목보다 덜 자주 실행됩니다.",
+      "dbmVerifyTableHealthDesc": "**인프라 → 데이터베이스**를 열고 아래에서 탭을 선택하세요. 교착 상태와 차단된 쿼리는 데이터베이스가 보고하는 즉시 나타납니다 — 빈 탭은 아무 일도 일어나지 않았는지 아니면 수집되고 있지 않은지 알려줍니다. 테이블 상태는 첫 60초 스냅샷 후에 채워집니다."
     },
     "instrumentBeforeImportTitle": "클라이언트 가져오기 전에 계측",
     "instrumentBeforeImportBody": "앱이 실행되지만 스팬이 도착하지 않으면 계측이 클라이언트를 가져온 후에 로드된 것일 수 있습니다. 초기화가 먼저 실행되도록 순서를 변경하세요:",
@@ -4492,6 +4551,8 @@
     "folder": "폴더",
     "folders": "폴더",
     "searchFolder": "검색 폴더",
+    "folderIcon": "아이콘",
+    "folderIconAria": "폴더 아이콘 선택",
     "deleteFolder": "폴더 삭제",
     "deleteFolderMessage": "정말로 이 폴더를 삭제하시겠습니까?",
     "trellisLayout": "격자 레이아웃",
@@ -5443,7 +5504,8 @@
     "variableNameAlreadyExists": "같은 이름의 변수가 이미 존재합니다.",
     "pivotTotal": "총계",
     "pivotOthers": "기타",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "일치하는 로그 탐색"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5531,7 +5593,59 @@
     "mapvalue": "가치",
     "source": "소스",
     "target": "타깃",
-    "value": "가치"
+    "value": "가치",
+    "logExplorer": {
+      "title": "로그 탐색기",
+      "openInLogs": "로그에서 열기",
+      "invalidParams": "잘못된 드릴다운 매개변수",
+      "noEvents": "이 필터와 일치하는 이벤트가 없습니다",
+      "filterHint": "클릭하여 관련 로그 탐색",
+      "timestamp": "타임스탬프",
+      "queryMode": "SQL",
+      "runQuery": "쿼리 실행",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "이벤트",
+      "events": "이벤트",
+      "prevPage": "이전",
+      "nextPage": "다음",
+      "of": "중",
+      "sqlEditorLabel": "SQL 쿼리",
+      "resetSql": "재설정",
+      "detail": {
+        "drawerTitle": "이벤트 상세",
+        "details": "상세",
+        "json": "JSON",
+        "insights": "인사이트",
+        "copyLink": "링크 복사",
+        "copy": "복사",
+        "copyValue": "값 복사",
+        "insightsHint": "로드된 {n}개 이벤트의 필드 빈도"
+      },
+      "insights": {
+        "anomalyTitle": "필드 이상 프로필",
+        "anomalyHint": "{n}개 이벤트 샘플링됨",
+        "colField": "필드",
+        "colRarity": "희귀도",
+        "colValue": "값",
+        "rarity": {
+          "anomalous": "이상",
+          "rare": "희귀",
+          "uncommon": "흔하지 않음",
+          "common": "흔함"
+        },
+        "timelineTitle": "이벤트 타임라인",
+        "timelineHint": "선택한 범위의 빈도",
+        "timelineEmpty": "데이터 없음",
+        "patternsTitle": "로그 패턴",
+        "patternsHint": "유사한 구조로 그룹화됨",
+        "zScore": "z={value}",
+        "patternsEmpty": "이 필터에 대한 패턴이 추출되지 않았습니다",
+        "contextTitle": "주변 이벤트",
+        "contextHint": "이 타임스탬프 근처의 이벤트",
+        "contextTooltip": "이 이벤트 전후 3분 동안 이 스트림의 다른 이벤트 — 같은 순간에 어떤 일이 일어났는지 보여줍니다.",
+        "contextEmpty": "주변 이벤트를 찾을 수 없습니다"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "알림 개요 섹션",
@@ -6017,6 +6131,7 @@
     "SearchSQLCancelled": "오류: 검색 SQL이 취소되었습니다."
   },
   "alerts": {
+    "allAlerts": "모든 알림",
     "compositeAlert": "복합",
     "import": {
       "anomalyImportSuccess": "이상 탐지 - {index}: \"{name}\"을(를) 성공적으로 가져왔습니다.",
@@ -7345,6 +7460,18 @@
         "panel": {
           "label": "경고 만들기",
           "toast": "대시보드 패널 \"{sourceLabel}\"에서 쿼리를 가져왔습니다."
+        },
+        "library": {
+          "label": "편집기에서 사용자 지정",
+          "toast": "알림 라이브러리에서: {sourceLabel}"
+        },
+        "dbm": {
+          "label": "알림 받기",
+          "toast": "데이터베이스 모니터링에서 가져옴: \"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "알림 받기",
+          "toast": "데이터베이스 모니터링에서 가져옴 (서버 관점): \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7366,7 +7493,13 @@
         "noQueries": "이 패널에는 경고를 생성할 쿼리가 없습니다.",
         "noConstants": "선택된 패턴에는 일치시킬 고유한 텍스트가 없습니다.",
         "sqlModeFilterDropped": "SQL 쿼리가 전달되지 않았습니다 — 경고는 선택된 패턴만 일치합니다.",
-        "patternsUnusable": "이 페이지의 어떤 패턴에도 일치시킬 고유한 텍스트가 없으므로 경고는 검색어만 사용합니다."
+        "patternsUnusable": "이 페이지의 어떤 패턴에도 일치시킬 고유한 텍스트가 없으므로 경고는 검색어만 사용합니다.",
+        "dbmRollupLag": "데이터베이스 수치는 {minutes}분마다 집계되므로 이 알림은 그 간격으로만 발생할 수 있습니다 — 실시간 페이지가 아닙니다.",
+        "dbmFingerprintVersion": "이 알림은 특정 쿼리의 정확한 형태에 고정되어 있습니다. 쿼리가 그룹화되는 방식이 변경되면 알림이 더 이상 일치하지 않을 수 있으므로 다시 만들어야 합니다.",
+        "dbmNoFingerprint": "이 쿼리에는 안정적인 식별자가 없으므로 알림은 대신 전체 데이터베이스를 감시합니다.",
+        "dbmServerVantage": "이는 데이터베이스 서버 자체가 잠금에 대해 보고한 내용을 측정하며, 애플리케이션이 대기한 시간이 아닙니다. 쿼리 지연 시간 알림과 비교하지 마세요.",
+        "dbmLockSampling": "잠금 활동은 일정 간격으로 샘플링되므로 두 샘플 사이에 시작되고 해소된 경합은 기록되지 않습니다. 조용한 알림은 차단이 없었다는 증거가 아닙니다.",
+        "dbmNoInstance": "단일 데이터베이스 인스턴스가 식별되지 않았으므로 이 알림은 이 엔진의 모든 인스턴스를 감시합니다."
       }
     },
     "saveFailed": "경고를 저장할 수 없습니다.",
@@ -7405,6 +7538,112 @@
     "impactTemplate": "사용처: {destinations} · {alerts}",
     "impactDestination": "사용처: {alerts}"
   },
+  "alert_library": {
+    "header": "알림 라이브러리",
+    "subtitle": "이미 수집 중인 데이터에 맞춰진, 엄선된 즉시 설치 가능한 알림",
+    "sectionTab": "라이브러리",
+    "contribute": "GitHub에서 기여하기",
+    "searchPlaceholder": "이름, 설명 또는 스트림으로 검색",
+    "searchLabel": "알림 라이브러리 검색",
+    "categories": "카테고리",
+    "searchCategories": "카테고리 검색",
+    "searchCategoriesAria": "카테고리 필터 검색",
+    "noCategoryMatch": "일치하는 카테고리가 없습니다.",
+    "selectedCount": "{count}개 선택됨",
+    "facetAria": "{label}, {count}개 알림",
+    "severity": "심각도",
+    "severityAll": "모두",
+    "severityCritical": "심각",
+    "severityWarning": "경고",
+    "severityInfo": "정보",
+    "statReady": "설치 준비 완료",
+    "statNeedsData": "수집되지 않음",
+    "statAll": "모두",
+    "notIngested": "수집되지 않음: {stream}",
+    "notIngestedHint": "이 조직은 {stream}을(를) 수신하지 않으므로 이 알림은 절대 발생하지 않습니다. 그래도 설치하면 데이터가 도착하는 즉시 작동하기 시작합니다.",
+    "alertCount": "{count}개 알림 | {count}개 알림",
+    "noCollectorTitle": "아직 여기에 데이터와 일치하는 것이 없습니다",
+    "noCollectorDescription": "이 {count}개 알림 중 어느 것도 이 조직이 수신하는 스트림을 쿼리하지 않습니다. {group} 텔레메트리를 OpenObserve로 보내면 여기에 표시됩니다.",
+    "setupGuide": "수집 가이드",
+    "emptyLibraryTitle": "알림 라이브러리가 비어 있습니다.",
+    "emptyLibraryDescription": "카탈로그가 로드되었지만 알림이 없습니다. 필터 문제가 아니라 게시 문제입니다. 잠시 후 다시 시도하세요.",
+    "noMatchesTitle": "이 필터와 일치하는 알림이 없습니다.",
+    "noMatchesDescription": "다른 카테고리, 심각도 또는 검색어를 시도하세요.",
+    "clearFilters": "필터 지우기",
+    "loadFailedTitle": "알림 라이브러리를 불러오지 못했습니다.",
+    "retry": "재시도",
+    "openDetails": "{title} 열기",
+    "drawer": {
+      "dataAvailable": "데이터 사용 가능",
+      "streamNotFound": "스트림을 찾을 수 없습니다.",
+      "detects": "감지 내용",
+      "noDescription": "라이브러리에 설명이 없습니다.",
+      "needsDataCallout": "이 알림은 {stream}을(를) 쿼리하지만 이 조직에서는 해당 스트림을 수신하지 않습니다. 지금 설치하면 실행되지 않는 알림이 생성됩니다.",
+      "query": "쿼리",
+      "stream": "스트림",
+      "streamType": "스트림 유형",
+      "metricCondition": "메트릭 조건",
+      "matchCount": "일치하는 행 필요",
+      "previewBlocked": "{stream}은(는) 이 조직의 스트림이 아니므로 평가할 항목이 없습니다.",
+      "wouldTrigger": "발생함",
+      "wouldNotTrigger": "발생하지 않음",
+      "loading": "라이브러리에서 이 알림을 불러오는 중",
+      "loadFailed": "라이브러리에서 이 알림을 불러오지 못했습니다.",
+      "customize": "편집기에서 사용자 지정",
+      "customizeHint": "이 알림이 미리 채워진 표준 알림 편집기를 엽니다.",
+      "customizeFailed": "편집기에서 이 알림을 열 수 없습니다.",
+      "install": "설치",
+      "neverIngested": "아직 데이터 없음",
+      "neverIngestedCallout": "{stream}이(가) 존재하지만 데이터를 수신한 적이 없으므로 이 알림이 발생할 조건이 없습니다.",
+      "lastData": "마지막 데이터 {when}",
+      "staleCallout": "{stream}이(가) 마지막으로 데이터를 수신한 시점은 {when}입니다. 이 알림은 수집이 재개될 때까지 조용히 유지됩니다.",
+      "unknownTime": "알 수 없는 시간에"
+    },
+    "install": {
+      "title": "라이브러리에서 설치",
+      "subtitle": "알림이 전송될 대상, 설치할 알림, 그리고 보관 위치를 선택합니다.",
+      "stepDestination": "대상",
+      "stepAlerts": "알림",
+      "stepFolder": "폴더",
+      "stepTune": "조정",
+      "stepInstall": "설치",
+      "destinationIntro": "이 배치의 모든 알림은 여기서 선택한 대상으로 알림을 보냅니다. 라이브러리 파일에는 해당 파일을 내보낸 조직의 대상 이름이 지정되어 있지만, 이 조직에는 존재하지 않습니다.",
+      "destinationLabel": "대상",
+      "destinationPlaceholder": "대상 선택",
+      "destinationsLoadFailed": "기존 대상을 불러오지 못했습니다.",
+      "retry": "다시 시도",
+      "destinationsNoneBody": "이 조직에는 아직 알림 대상이 없으므로 이러한 알림을 보낼 곳이 없습니다. 대상 페이지에서 대상을 만든 후 돌아와서 여기에서 선택하세요.",
+      "openDestinations": "대상 열기",
+      "selectAll": "모두 선택",
+      "clear": "선택 해제",
+      "selectedCount": "{total}개 중 {count}개 선택됨",
+      "folderIntro": "설치된 알림이 여기에 보관됩니다. 이 배치에 별도의 폴더가 필요하면 + 버튼에서 폴더를 만드세요.",
+      "tuneToggle": "이 배치의 모든 알림에 대해 설정",
+      "tuneHint": "전체 배치에 안전하게 설정할 수 있는 것은 이 두 가지뿐입니다. 임계값은 알림별로 유지됩니다 — 변경하려면 해당 알림을 열어 단독으로 설치하세요.",
+      "frequency": "실행 주기",
+      "silence": "음소거 기간",
+      "minutes": "분",
+      "summaryTuningNone": "라이브러리 기본값",
+      "summaryTuningOverride": "{frequency}분마다, {silence}분 동안 음소거",
+      "run": "{count}개 알림 설치 | {count}개 알림 설치",
+      "retryFailed": "실패 {count}개 다시 시도 | 실패 {count}개 다시 시도",
+      "allInstalled": "알림 {count}개 설치됨 | 알림 {count}개 설치됨",
+      "someFailed": "{installed}개 설치됨, {failed}개 실패함",
+      "unknownError": "알림을 만들 수 없습니다.",
+      "unreadableConditions": "이 알림의 필터 조건은 이 버전에서 읽을 수 없는 형식입니다. 설치하면 필터가 없는 알림이 생성되므로 건너뛰었습니다.",
+      "back": "뒤로",
+      "next": "다음",
+      "cancel": "취소",
+      "done": "완료"
+    },
+    "error": {
+      "network": "라이브러리에 연결할 수 없습니다. 네트워크 연결을 확인하고 다시 시도하세요.",
+      "http": "라이브러리 서버가 오류를 반환했습니다. 잠시 후 다시 시도하세요.",
+      "unparseable": "라이브러리가 카탈로그가 아닌 응답을 반환했습니다.",
+      "unsupported_version": "이 라이브러리 카탈로그는 이 버전의 OpenObserve에서 읽을 수 있는 것보다 최신입니다. 업그레이드하여 탐색하세요.",
+      "malformed": "라이브러리 카탈로그가 불완전하거나 손상되었습니다."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "템플릿 내보내기",
     "selected": "선택됨",
@@ -7429,7 +7668,7 @@
     "importBodyLabel": "템플릿 본문 *",
     "importTypeLabel": "템플릿 유형 *",
     "importTitleLabel": "템플릿 제목 *",
-    "header": "템플릿",
+    "header": "대상 템플릿",
     "add": "템플릿 추가",
     "edit": "편집",
     "name": "이름",
@@ -7636,6 +7875,7 @@
     "destinationsLoadError": "대상을 불러오는 중 오류 발생"
   },
   "alert_destinations": {
+    "sectionTab": "대상",
     "chooseTypeTitle": "유형 선택",
     "selectDestinationType": "대상 유형 선택",
     "connectionStepTitle": "연결",
@@ -9143,7 +9383,8 @@
       "rowsReturned": "반환된 행",
       "batchSize": "배치 크기",
       "querySummary": "쿼리 요약",
-      "responseStatus": "응답 상태"
+      "responseStatus": "응답 상태",
+      "viewQueryTrend": "데이터베이스 모니터링에서 쿼리 추세 보기"
     },
     "index": {
       "clickHere": "여기를 클릭",
@@ -9219,6 +9460,7 @@
       "viewRelated": "관련 항목 보기",
       "logs": "로그",
       "traces": "추적",
+      "databases": "데이터베이스",
       "viewTraces": "추적 보기",
       "operations": "작업",
       "metrics": "메트릭",
@@ -9995,7 +10237,7 @@
     "copyPattern": "패턴 복사",
     "copied": "복사 완료!",
     "pricingTiers": "요금 티어",
-    "pricingTiersDesc": "첫 번째 계층이 기본값입니다.사용 조건이 충족되면 추가 등급이 적용됩니다.",
+    "pricingTiersDesc": "첫 번째 티어가 기본입니다. 추가 티어는 사용 조건과 UTC 시간 창이 충족될 때 적용됩니다.",
     "tierName": "티어 이름",
     "applyTierWhen": "다음과 같은 경우 이 등급을 적용합니다.",
     "quickSetup": "빠른 설정:",
@@ -10087,7 +10329,25 @@
     "saveShadowedWarning": "저장되었지만 이 항목은 패턴이 같고 우선 순위가 더 높은 “{winner}”가 가려져 있습니다.다른 항목을 삭제하거나 비활성화하지 않는 한 이 항목은 비용 계산에 절대 사용되지 않습니다.",
     "modelPricingSaved": "모델 가격 절감",
     "errSave": "저장 실패",
-    "errLoadModel": "모델을 로드하지 못했습니다."
+    "errLoadModel": "모델을 로드하지 못했습니다.",
+    "tierDefaultName": "기본",
+    "timeWindows": "활성 시간(UTC)",
+    "timeWindowsDesc": "피크/오프피크 요금을 청구하는 제공업체의 경우, 이 티어를 반복되는 UTC 시간으로 제한하세요.",
+    "timeWindowFrom": "시작",
+    "timeWindowTo": "종료",
+    "addTimeWindow": "시간 창 추가",
+    "removeTimeWindow": "시간 창 제거",
+    "addUsageCondition": "사용 조건 추가",
+    "removeUsageCondition": "사용 조건 제거",
+    "timeWindowInvalid": "티어 \"{name}\": HH:MM(24시간 UTC) 형식으로 시간을 입력하세요.",
+    "timeWindowSameBounds": "티어 \"{name}\": 시작과 종료는 달라야 합니다. 티어를 항상 활성화하려면 창을 제거하세요.",
+    "timeWindowWrapsHint": "UTC 자정을 넘는 시간 창입니다.",
+    "tierNeedsRestriction": "티어 \"{name}\"에는 사용 조건과 시간 창이 없으므로 절대 도달하지 않습니다. 하나를 추가하거나 티어를 삭제하세요.",
+    "timeBasedChip": "시간 기반",
+    "tierAlwaysActive": "항상 활성(기본)",
+    "testAtTimeLabel": "테스트할 UTC 시간",
+    "testAtTimeHint": "비워두면 현재 시간을 사용합니다. 피크/오프피크 티어는 이 시간을 기준으로 결정됩니다.",
+    "localTimeHint": "내 시간대: {range}"
   },
   "aiObservability": {
     "title": "LLM 옵저버빌리티",
@@ -13269,6 +13529,24 @@
     "combobox": {
       "noOptionsFound": "옵션을 찾을 수 없음"
     },
+    "emojiPicker": {
+      "chooseIcon": "아이콘 선택",
+      "searchPlaceholder": "아이콘 검색...",
+      "removeIcon": "아이콘 제거",
+      "noResults": "검색과 일치하는 아이콘이 없습니다.",
+      "groups": {
+        "results": "결과",
+        "status": "상태",
+        "services": "서비스",
+        "ai": "AI",
+        "creatures": "생물",
+        "infra": "인프라",
+        "data": "데이터",
+        "teams": "팀",
+        "objects": "사물",
+        "world": "세계"
+      }
+    },
     "input": {
       "clear": "지우기"
     },
@@ -13647,6 +13925,14 @@
       },
       "variableScope": {
         "global": "전역"
+      },
+      "dataConfidence": {
+        "estimated": "≈ 추정값",
+        "topNSubset": "상위 N개 하위 집합",
+        "live": "실시간",
+        "belowTopN": "상위 N개 아래",
+        "truncated": "잘림",
+        "gap": "갭"
       }
     }
   },
@@ -14627,6 +14913,1056 @@
     },
     "hover": {
       "deprecated": "**더 이상 사용되지 않음** — 정식 함수를 사용하세요."
+    }
+  },
+  "dbm": {
+    "common": {
+      "reload": "새로고침",
+      "lastRefreshed": "마지막 새로고침: {age}",
+      "loadFailed": "데이터베이스 데이터를 불러오지 못했습니다. 다시 시도하거나 시간 범위를 좁히세요."
+    },
+    "ai": {
+      "suggestFix": "AI에게 수정 방법 묻기",
+      "suggestFixHint": "AI 어시스턴트가 이 쿼리, 엔진 및 대기 시간 수치를 열어 무엇을 변경할지 묻습니다. 자체적으로는 아무것도 변경하지 않습니다.",
+      "rowSuggestFix": "AI에게 수정 방법 묻기",
+      "deadlockFix": "이 교착 상태를 어떻게 중지하나요?",
+      "deadlockFixHint": "충돌하는 두 명령문과 행 순서 증거를 AI 어시스턴트로 보냅니다.",
+      "blockingFix": "이것이 왜 차단 중인가요?",
+      "blockingFixHint": "루트 세션의 명령문, 유휴 시간 및 뒤에 대기 중인 세션 수를 AI 어시스턴트로 보냅니다."
+    },
+    "filters": {
+      "allEngines": "모든 엔진",
+      "allInstances": "모든 데이터베이스",
+      "allNamespaces": "모든 스키마",
+      "allEnvs": "모든 환경",
+      "allServices": "모든 서비스",
+      "scope": "필터",
+      "clearScope": "모두 지우기",
+      "removeScope": "이 필터 제거",
+      "popoverTitle": "범위 좁히기",
+      "dimension": {
+        "system": "엔진",
+        "instance": "데이터베이스",
+        "namespace": "스키마",
+        "env": "환경",
+        "service": "서비스",
+        "insight": "인사이트"
+      }
+    },
+    "delta": {
+      "new": "이 목록에 새로 등장",
+      "gone": "실행 중지됨",
+      "newHint": "이 쿼리는 이전에 가장 무거운 쿼리 중 하나가 아니었으므로 비교할 대상이 없습니다. 이전에 실행 중이었을 수 있지만 단독으로 추적할 만큼 무겁지는 않았습니다.",
+      "goneHint": "이 쿼리는 오늘 이전에 실행되었지만 지금 보고 있는 시간 범위에는 포함되지 않습니다.",
+      "comparison": "이전 {previous} → 현재 {current}",
+      "noChange": "변경 없음",
+      "timesMore": "{ratio}배 더 많음",
+      "timesFewer": "{ratio}배 더 적음",
+      "wasValue": "이전 값: {value}"
+    },
+    "databases": {
+      "title": "데이터베이스",
+      "subtitle": "데이터베이스별 쿼리 성능 및 상태",
+      "searchPlaceholder": "데이터베이스 또는 서비스 검색…",
+      "unnamedInstance": "인스턴스 이름 없음",
+      "unnamedInstanceHint": "데이터베이스 자체의 명령문 보고서는 이 엔진이 실행 중임을 증명하지만 호스트 이름을 명명하지 않습니다. 호스트 정보를 전달하는 피드(세션 샘플링 또는 인스턴스 메트릭)가 설정되면 행에 주소가 표시됩니다.",
+      "moreServices": "+{count}",
+      "columns": {
+        "instance": "데이터베이스",
+        "calls": "호출",
+        "qps": "초당",
+        "errorRate": "실패",
+        "p50": "절반이 이보다 짧음",
+        "p95": "느린 호출",
+        "p99": "가장 느린 1%",
+        "services": "사용처",
+        "load": "데이터베이스 시간",
+        "attention": "주의 필요"
+      },
+      "summary": {
+        "databases": "데이터베이스",
+        "calls": "호출",
+        "time": "데이터베이스 시간",
+        "failed": "실패"
+      },
+      "databaseCount": "데이터베이스 1개 | 데이터베이스 {count}개",
+      "openQueries": "쿼리 보기",
+      "alertMe": "알림 받기",
+      "columnHints": {
+        "qps": "초당 호출 — 이 창의 호출 수를 기간으로 나눈 값으로, 15분 보기와 4시간 보기가 비교 가능하게 유지됩니다.",
+        "p50": "전체 호출의 절반이 이보다 빠르게 완료되었습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에서 측정되지 않습니다.",
+        "p95": "느린 꼬리 — 20개 중 1개의 호출이 최소 이 시간이 걸렸습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에서 측정되지 않습니다.",
+        "p99": "최악의 1% 호출은 최소 이 시간이 걸렸습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에서 측정되지 않습니다.",
+        "load": "애플리케이션이 이 데이터베이스에서 대기하는 데 소비한 총 시간입니다. 클라이언트 측에서 측정되므로 이 데이터베이스가 처리한 트래픽의 양을 반영하며 서버의 부하 정도는 반영하지 않습니다.",
+        "attention": "이 인스턴스가 자체 엔진이 게시하는 한도에 얼마나 가까운지 — 현재는 max_connections 대비 연결 수입니다. 혼합 점수가 아닌 최악의 비율입니다. 가장 높은 순으로 정렬되며 상태를 읽을 수 없는 인스턴스가 맨 위에 표시됩니다. 보이지 않는 인스턴스는 건강하다고 알 수 없기 때문입니다. 데이터베이스 서버에서 측정되므로 옆의 데이터베이스 시간과 비교할 수 없습니다."
+      },
+      "failedChip": "{count} 실패",
+      "columnSubLabels": {
+        "attention": "서버",
+        "load": "클라이언트",
+        "calls": "클라이언트"
+      },
+      "attention": {
+        "connections": "연결",
+        "noLimit": "게시된 한도 없음",
+        "unknown": "측정되지 않음"
+      }
+    },
+    "queries": {
+      "title": "상위 쿼리",
+      "subtitle": "데이터베이스 시간을 가장 많이 사용하는 쿼리",
+      "subtitleServer": "데이터베이스 내부에서 집계된, 데이터베이스가 실행한 명령문 — 가장 자주 실행된 순서",
+      "searchPlaceholder": "쿼리 텍스트, 테이블 또는 서비스 검색…",
+      "trendLabel": "이 쿼리의 시간이 범위에 걸쳐 어떻게 변화했는지",
+      "otherRow": "기타 모든 쿼리",
+      "truncatedText": "이 명령문은 전체를 저장하기에 너무 길어서 줄여서 표시됩니다.",
+      "stmtClass": {
+        "query": "쿼리",
+        "queryHint": "실제 SQL만 — SELECT, INSERT, UPDATE 및 DELETE.",
+        "all": "쿼리 + 연결 오버헤드",
+        "allHint": "또한 드라이버가 쿼리 사이에 보내는 부가 작업(BEGIN 및 COMMIT, SET, 풀 연결을 유지하는 검사)도 집계합니다."
+      },
+      "completionBias": {
+        "title": "호출이 {drop}% 감소한 반면 실패는 증가했습니다",
+        "body": "이는 일반적으로 쿼리가 완료되지 않고 멈추고 있음을 의미합니다 — 그리고 완료된 쿼리만 측정할 수 있습니다. 여기에서 선이 떨어지고 있다고 해서 반드시 회복 중임을 의미하지는 않습니다."
+      },
+      "columns": {
+        "query": "쿼리",
+        "calls": "호출",
+        "p95": "느린 호출",
+        "errors": "실패",
+        "perTrace": "요청당",
+        "load": "데이터베이스 시간",
+        "p99": "가장 느린 1%",
+        "max": "최악 관측",
+        "services": "사용처"
+      },
+      "queryCount": "쿼리 종류 1개 | 쿼리 종류 {count}개",
+      "otherRowDetail": "— {calls}건의 호출. 이들에 대한 쿼리별 수치는 없으며 결합된 합계만 있습니다. 위의 모든 합계에 포함됩니다.",
+      "foldRowText": "작은 쿼리 1개 | 작은 쿼리 {count}개",
+      "serverList": {
+        "title": "데이터베이스가 보고한 쿼리",
+        "subtitle": "데이터베이스 내부에서 모든 클라이언트에 걸쳐 집계되며, 가장 자주 실행된 순으로 나열됩니다. 이 시간 창에 추적된 애플리케이션 호출이 없으므로 일반적인 목록은 비어 있습니다 — 그동안 데이터베이스가 본 내용입니다.",
+        "truncated": "가장 자주 실행된 {count}개 명령문 — 여기에 표시된 것보다 더 많이 실행되었습니다",
+        "columns": {
+          "query": "쿼리",
+          "calls": "호출",
+          "totalTime": "데이터베이스 내 시간",
+          "meanTime": "호출당 평균"
+        },
+        "columnHints": {
+          "time": "데이터베이스 내부에서 측정: PostgreSQL의 실행 시간, MySQL 및 MariaDB의 대기 시간. 애플리케이션이 경험한 것과는 다릅니다 — 네트워크 및 연결 대기는 포함되지 않습니다.",
+          "mean": "데이터베이스 내 시간을 호출 수로 나눈 값 — 시간 창 전체의 평균이며 백분위수가 아닙니다."
+        }
+      },
+      "foldRowDetail": "· 데이터베이스 시간의 {share} · 클릭하여 표시",
+      "foldRowDetailOpen": "· 데이터베이스 시간의 {share} · 클릭하여 접기",
+      "summary": {
+        "queries": "쿼리 종류",
+        "calls": "호출",
+        "time": "데이터베이스 시간",
+        "failed": "실패"
+      },
+      "columnHints": {
+        "calls": "이 쿼리가 실행된 횟수입니다. 데이터베이스가 보고하는 경우 자체 집계를 사용합니다 — 이는 추적을 보내는 시스템 부분뿐만 아니라 모든 클라이언트를 포함합니다. 클라이언트 관측으로 표시된 행은 대신 추적에서 집계됩니다. 데이터베이스가 보고하지 않았기 때문입니다.",
+        "p50": "전체 호출의 절반이 이보다 빠르게 완료되었습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에 측정되지 않습니다.",
+        "p95": "느린 꼬리 — 20건 중 1건은 최소 이 시간이 걸렸습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에 측정되지 않습니다.",
+        "p99": "최악의 1% 호출은 최소 이 시간이 걸렸습니다. 완료된 호출만 집계합니다 — 아직 실행 중이거나 응답이 없는 쿼리는 여기에 측정되지 않습니다.",
+        "max": "이 시간 창에서 가장 느린 단일 호출 — 실제 호출 하나이며 평균이 아닙니다.",
+        "errors": "이 호출 중 오류가 발생한 호출 수입니다.",
+        "perTrace": "단일 요청 내에서 이 쿼리가 실행된 횟수입니다. 높은 수치는 일반적으로 루프를 의미합니다.",
+        "load": "이 쿼리가 데이터베이스에서 보낸 총 시간입니다. 데이터베이스가 보고하는 경우 자체 수치: Postgres의 실행 시간, MySQL 및 MariaDB의 대기 시간 — 각 행이 어떤 것인지 나타냅니다. 클라이언트 관측으로 표시된 행은 추적에서 측정되므로 네트워크 왕복이 포함됩니다."
+      },
+      "errorsNone": "없음",
+      "errorsAll": "모두",
+      "actions": {
+        "open": "세부 정보 열기",
+        "traces": "예제 트레이스 보기",
+        "copy": "쿼리 복사",
+        "copied": "쿼리 복사됨",
+        "copyFailed": "쿼리를 복사할 수 없습니다.",
+        "alert": "이 쿼리가 느려지면 알림"
+      },
+      "otherRowTextFor": "{database}의 다른 모든 쿼리",
+      "otherRowDetailShort": "— {calls}건의 호출.",
+      "columnSubLabels": {
+        "calls": "보고된 서버",
+        "load": "보고된 서버"
+      }
+    },
+    "insights": {
+      "showRows": "이 쿼리 표시 | 이 {count}개 쿼리 표시",
+      "clearFilter": "필터 지우기",
+      "alsoAffects": "및 기타 쿼리 {count}개 | 및 기타 쿼리 {count}개",
+      "showLess": "간단히 보기",
+      "more": "{count}개 더보기 | {count}개 더보기",
+      "regression": {
+        "title": "평소보다 {ratio}배 느림",
+        "body": "{before} → {after}, 동일한 트래픽",
+        "rule": "이 쿼리의 느린 호출이 {baseline}보다 {ratio}배 이상 느려졌고, 최소 {calls}회 호출되었기 때문에 표시됩니다."
+      },
+      "new-expensive": {
+        "title": "새 쿼리, 이미 비용이 높음",
+        "body": "이전에는 실행되지 않음 · 현재 데이터베이스 시간의 {share} 차지",
+        "rule": "이 쿼리는 {baseline}에서 가장 무거운 쿼리에 포함되지 않았지만 현재 데이터베이스 시간의 최소 {share}%를 차지하고, 최소 {calls}회 호출되었기 때문에 표시됩니다. 이전에도 실행되었을 수 있지만 단독으로 추적할 만큼 무겁지는 않았을 뿐입니다."
+      },
+      "n-plus-one": {
+        "title": "요청당 최소 {multiplier}회 실행",
+        "body": "데이터베이스 시간의 {share} · {service}",
+        "rule": "이 쿼리는 단일 요청 내에서 최소 {ratio}회 실행되고, 최소 {traces}개의 요청에 걸쳐 있기 때문에 표시됩니다. 이는 하한값이므로 실제 숫자는 더 높을 수 있습니다. 정당한 일괄 작업도 동일하게 보일 수 있습니다."
+      },
+      "volume-shift": {
+        "title": "더 바빠짐, 느려지지 않음",
+        "body": "{ratio}배 더 호출됨, 동일한 속도 · {service}",
+        "rule": "이 쿼리는 {baseline}보다 {ratio}배 이상 자주 호출되는 반면 속도는 {latency}배 이내로 유지되기 때문에 표시됩니다. 변화는 이 쿼리를 호출하는 쪽에 있습니다."
+      },
+      "rank-churn": {
+        "title": "새로운 최중량 쿼리",
+        "body": "#{from} → #{to}로 이동",
+        "rule": "{baseline}에서 가장 무거운 {from} 밖에서 가장 무거운 {into} 안으로 쿼리가 진입했고, 전체 데이터베이스 시간이 증가했기 때문에 표시됩니다.",
+        "unranked": "순위 없음"
+      },
+      "hide": "숨기기",
+      "show": "표시",
+      "findRow": "찾기",
+      "all-failing": {
+        "title": "모든 호출이 실패 중",
+        "body": "{total}개의 호출 중 {failed}개 실패 · {query}",
+        "rule": "범위 내에서 이 쿼리에 대한 모든 호출이 오류로 반환되었기 때문에 표시됩니다."
+      },
+      "baseline": {
+        "label": "다음과 비교",
+        "previous": "이전 기간",
+        "yesterday": "어제 같은 시간",
+        "previousShort": "이전과 비교",
+        "previousHint": "같은 길이의 바로 이전 기간과 비교합니다.",
+        "yesterdayShort": "어제와 비교",
+        "yesterdayHint": "하루 전 같은 시간과 비교합니다. 트래픽이 일일 주기를 따르거나 배포 이후 변경 사항을 확인할 때 유용합니다."
+      }
+    },
+    "coverage": {
+      "unknownNote": "선택한 범위와 필터에서 측정할 항목이 없습니다.",
+      "lineHealthy": "이 데이터베이스 시간의 {percent}%를 보고 있습니다. 가장 무거운 {count}가지 유형의 쿼리입니다.",
+      "lineRemainder": "이 데이터베이스 시간의 {percent}%를 보고 있습니다. 나머지는 개별적으로 나열하지 않는 더 가벼운 쿼리에 있습니다.",
+      "lineStale": "집계가 {minutes}분 지연되어 가장 최근 쿼리가 아직 여기에 없을 수 있습니다.",
+      "lineTruncated": "마지막 구간에 처리할 수 있는 것보다 더 많은 데이터가 있어 최신 숫자는 과소 집계되었습니다.",
+      "lineTruncatedStale": "마지막 구간에 처리할 수 있는 것보다 더 많은 데이터가 있고 집계가 {minutes}분 지연되었습니다. 최신 숫자는 과소 집계되었으며 가장 최근 쿼리는 아직 여기에 없을 수 있습니다.",
+      "lineGap": "이 창에서 {minutes}분이 누락되었습니다. 집계가 {stopped}에 중지되었고 {reach}분까지만 거슬러 올라갈 수 있으므로 {from}–{to}를 포함하는 항목이 없습니다.",
+      "lineSubset": "{filter}(으)로 필터링했으므로 이 백분율은 전체 데이터베이스가 아닌 표시된 행을 설명합니다.",
+      "lineHealthyAll": "실행된 모든 쿼리를 보고 있습니다. 여기의 속도는 모든 호출에 걸쳐 측정되므로 정확합니다.",
+      "lineHealthyAllEstimated": "실행된 모든 쿼리를 보고 있습니다. 여기의 속도는 여러 시간 구간에서 혼합되었으므로 정확하지는 않지만 근접합니다.",
+      "lineCountedTo": "{time}까지 집계됨; 마지막 30초는 아직 수신 중입니다.",
+      "lineExact": "모든 데이터베이스가 보고 중입니다. 여기의 속도는 모든 호출에 걸쳐 측정되므로 정확합니다.",
+      "lineExactEstimated": "모든 데이터베이스가 보고 중입니다. 여기의 속도는 여러 시간 구간에서 혼합되었으므로 정확하지는 않지만 근접합니다.",
+      "lineSubsetUnnamed": "필터가 이 합계가 집계되는 수준보다 좁혀지므로 백분율은 전체 데이터베이스가 아닌 표시된 행을 설명합니다.",
+      "lineQuery": "타이밍은 애플리케이션에서 측정되므로 네트워크 시간과 사용 가능한 연결을 기다리는 시간이 포함됩니다.",
+      "lineUncodedErrors": "여기 실패의 {percent}는 이유 코드 없이 반환되어 계산할 수는 있지만 설명할 수는 없습니다.",
+      "lineSubsetStale": "{filter}(으)로 필터링했고 집계가 {minutes}분 지연되었습니다. 이 백분율은 표시된 행을 설명하며 가장 최근 쿼리는 아직 여기에 없을 수 있습니다.",
+      "lineSubsetUnnamedStale": "필터가 이 합계가 집계되는 수준보다 좁혀지고 집계가 {minutes}분 지연되었습니다. 백분율은 표시된 행을 설명하며 가장 최근 쿼리는 아직 여기에 없을 수 있습니다.",
+      "lineCountedToBehind": "{time}까지 집계됨; {minutes}분 지연되었습니다."
+    },
+    "breakdown": {
+      "loading": "시간이 어디에 사용되었는지 계산하는 중…",
+      "noSchema": "스키마가 보고되지 않음",
+      "noService": "호출자 미식별",
+      "nothingToAttribute": "이 데이터베이스의 총계는 있지만 이 범위에는 쿼리별 행이 없어서 어떤 서비스가 시간을 사용했는지 알 수 없습니다.",
+      "queryCount": "{count}개 쿼리 | {count}개 쿼리",
+      "shortfall": "이것들을 합치면 이 데이터베이스의 총계보다 {percent} 적습니다. 가장 무거운 유형의 쿼리만 개별적으로 추적되기 때문입니다."
+    },
+    "freshness": {
+      "neverAggregated": "이 범위의 계산이 아직 끝나지 않았습니다. 첫 번째 숫자는 보통 약 15분 내에 나타납니다."
+    },
+    "empty": {
+      "filtered": {
+        "title": "필터와 일치하는 쿼리가 없습니다.",
+        "description": "적용한 검색 및 필터와 일치하는 항목이 없습니다.",
+        "action": "필터 지우기"
+      },
+      "title": "아직 아무것도 없습니다 — 정확한 이유는 다음과 같습니다.",
+      "subtitle": "필수 조건을 모두 확인했습니다.",
+      "subtitleCounts": "{pass}개 통과, {fail}개 실패. | {pass}개 통과, {fail}개 실패.",
+      "checklistTitle": "확인한 내용",
+      "showMeHow": "계측 방법 보기",
+      "checkTrace": "내 트레이스 중 하나 확인",
+      "checks": {
+        "enabled": {
+          "ok": "데이터베이스 모니터링이 켜져 있습니다.",
+          "okDetail": "이 조직에서",
+          "no": "데이터베이스 모니터링이 꺼져 있습니다.",
+          "noDetail": "관리자가 이 조직에 대해 이 기능을 켠 다음 수집기를 다시 시작할 수 있습니다."
+        },
+        "traces": {
+          "ok": "트레이스가 도착하고 있습니다.",
+          "okDetail": "이 시간 범위에 {count}개 기록됨",
+          "no": "도착한 트레이스가 없습니다.",
+          "noDetail": "데이터베이스 모니터링은 트레이스를 기반으로 하며, 이 조직은 아직 트레이스를 보내지 않았습니다."
+        },
+        "permission": {
+          "ok": "이 데이터에 액세스할 수 있습니다.",
+          "okDetail": "당신은 {org}의 관리자입니다.",
+          "no": "이 데이터에 액세스할 수 없습니다.",
+          "noDetail": "데이터베이스 모니터링은 트레이스를 읽지만, 사용자의 역할에는 트레이스가 포함되지 않습니다. 관리자에게 읽기 권한을 요청하세요."
+        },
+        "dbSpans": {
+          "ok": "트레이스에 데이터베이스가 언급되어 있습니다.",
+          "okDetail": "데이터베이스 호출이 기록되고 있습니다.",
+          "no": "어떤 트레이스에도 데이터베이스가 언급되지 않았습니다.",
+          "noDetail": "애플리케이션이 추적되고 있지만, 데이터베이스와 통신하는 부분은 추적되지 않습니다. 언어에 맞는 데이터베이스 계측을 추가하면 쿼리가 여기에 표시됩니다."
+        },
+        "counted": {
+          "ok": "이 범위의 계산을 완료했습니다.",
+          "okDetail": "숫자는 최신 상태입니다.",
+          "no": "아직 계산을 완료하지 못했습니다.",
+          "noDetail": "데이터베이스 호출이 도착했지만 첫 번째 숫자가 아직 준비되지 않았습니다. 일반적으로 몇 분이 걸립니다."
+        },
+        "window": {
+          "ok": "이 시간 범위에 실행된 항목이 있습니다.",
+          "okDetail": "데이터베이스 호출이 기록되었습니다.",
+          "no": "선택한 시간 범위에 실행된 항목이 없습니다.",
+          "noDetail": "더 넓은 범위를 시도하세요."
+        },
+        "alsoWorthKnowing": {
+          "title": "알아두면 좋은 점",
+          "detail": "그것이 준비되면 첫 번째 쿼리는 약 15분 내에 나타납니다."
+        }
+      },
+      "action": "다시 시도",
+      "viewDocs": "문서 보기"
+    },
+    "detail": {
+      "title": "쿼리 상세",
+      "tabs": {
+        "overview": "개요",
+        "overviewHint": "이 쿼리가 얼마나 느린지, 얼마나 자주 실행되는지, 어디에서 실행되는지.",
+        "plans": "쿼리 계획",
+        "plansHint": "데이터베이스가 이 쿼리를 실행하기 위해 거친 단계입니다. 느린 이유를 파악하려면 여기서 시작하세요.",
+        "callers": "호출자 및 예시",
+        "callersHint": "애플리케이션의 어떤 부분이 이 쿼리를 실행했는지, 그리고 트레이스로 열 수 있는 개별 느린 실행을 보여줍니다.",
+        "callersLocked": "개별 실행은 추적에서 비롯됩니다. 이 시간 범위에 이 쿼리를 추적한 항목이 없습니다."
+      },
+      "notFound": {
+        "title": "이 쿼리는 이 조직에 없습니다",
+        "description": "주소가 가리키는 쿼리는 현재 보고 있는 범위에서 {org}가 실행하지 않은 쿼리입니다. 방금 조직을 전환했다면, 이 쿼리는 이전 조직에 속합니다.",
+        "descriptionNoOrg": "주소가 가리키는 쿼리는 현재 보고 있는 범위에서 이 조직이 실행하지 않은 쿼리입니다. 방금 조직을 전환했다면, 이 쿼리는 이전 조직에 속합니다.",
+        "scopeHint": "이 조직, 시간 범위 및 범위에서 일치하는 항목이 없습니다. 주소가 다른 엔진이나 인스턴스에서 온 경우 해당 필터를 지우거나 목록으로 돌아가십시오.",
+        "missingTitle": "선택된 쿼리 없음",
+        "missingDescription": "이 페이지는 하나의 쿼리를 설명하지만 주소가 쿼리를 지정하지 않습니다. 방금 조직을 전환했다면, 읽고 있던 쿼리는 이전 조직에 속합니다.",
+        "action": "이 조직의 쿼리 찾아보기"
+      },
+      "backToQueries": "상위 쿼리로 돌아가기",
+      "backToActivity": "활동으로 돌아가기",
+      "backToSamples": "가장 느린 호출로 돌아가기",
+      "backToDeadlocks": "교착 상태로 돌아가기",
+      "latencyTitle": "시간에 따른 속도",
+      "volumeTitle": "시간에 따른 호출 및 실패",
+      "endpointsTitle": "호출된 위치",
+      "endpointsHint": "요청이 이 쿼리를 실행한 애플리케이션의 부분입니다.",
+      "noEndpoints": "이 범위에서 어떤 애플리케이션 부분이 이를 실행했는지 확인할 수 없습니다.",
+      "samplesTitle": "가장 느린 예시",
+      "samplesHint": "각 점은 실제 실행 하나입니다 — 클릭하면 전체 요청을 볼 수 있습니다",
+      "noSamples": "이 범위에 대해 로드된 개별 실행이 없습니다.",
+      "noSeries": "선택한 범위에서 이 쿼리에 대한 기록이 없습니다.",
+      "liveSeries": "가장 최근 포인트는 아직 집계 중이며 변경될 수 있습니다.",
+      "noStream": "어떤 트레이스 스트림이 이 쿼리를 전달하는지 확인할 수 없어 호출자와 예시를 로드할 수 없습니다.",
+      "ambiguousStream": "이 조직에는 둘 이상의 트레이스 스트림이 있으며, 이 쿼리가 어느 스트림에서 실행되는지 확인할 수 없습니다. 스트림을 선택하여 호출자와 샘플 트레이스를 로드하십시오.",
+      "pickStream": "트레이스 스트림 선택",
+      "invalidStream": "인식할 수 없는 트레이스 스트림 이름이므로 검색을 실행하지 않았습니다.",
+      "firstSeen": "이 목록에 처음 나타난 시각: {time}",
+      "firstSeenHint": "이 범위에서 이 쿼리가 자체적으로 추적할 수 있을 만큼 무거웠던 가장 이른 지점입니다.",
+      "lastSeen": "마지막으로 나타난 시각: {time}",
+      "lastSeenHint": "이 범위에서 이 쿼리가 자체적으로 추적할 수 있을 만큼 무거웠던 가장 최근 지점입니다. 지금도 실행 중일 수 있습니다 — 목록에 마지막으로 오른 시각입니다.",
+      "errorsByCode": {
+        "title": "사유 코드별 실패",
+        "exactHint": "이 범위의 모든 호출에서 집계되었습니다.",
+        "sampleHint": "아래 예시에서 집계되었습니다 — 샘플이지 전체가 아닙니다.",
+        "noCode": "사유 코드 없음"
+      },
+      "whereItRuns": {
+        "title": "실행 위치",
+        "hint": "이 쿼리의 활동을 실행된 데이터베이스별로 나누어 보여줍니다. 행을 클릭하면 이 페이지가 해당 항목에 초점을 맞춥니다.",
+        "trackedHint": "이 수치는 쿼리가 자체적으로 추적할 수 있을 만큼 무거웠던 범위의 구간을 다룹니다 — 조용한 구간은 여기에 추가되지 않으므로 최소 합계로 읽으십시오.",
+        "showAll": "모든 위치 표시",
+        "emptyFiltered": "이 페이지가 초점을 맞춘 위치에서 이 쿼리에 대해 추적된 것이 없습니다. 실행된 위치를 보려면 모든 위치를 표시하십시오.",
+        "noInstance": "인스턴스가 보고되지 않음",
+        "focused": "초점됨",
+        "focusHint": "이 페이지의 수치는 현재 이 행으로 좁혀져 있습니다. 다시 클릭하면 넓힙니다.",
+        "columns": {
+          "location": "실행 대상",
+          "avg": "호출당 평균"
+        }
+      },
+      "qps": "초당 호출",
+      "errorRate": "실패한 호출",
+      "unattributed": "귀속되지 않음",
+      "sampleOk": "정상",
+      "sampleError": "실패",
+      "viewTrace": "요청 보기 →",
+      "viewTraces": "예시 트레이스 보기",
+      "copySummary": "복사",
+      "copySummaryHint": "여기의 모든 숫자는 이미 이 페이지에 있습니다 — 이것은 단지 문장을 작성할 뿐이므로, 사고 발생 13분에는 아무 것도 없는 대신 메시지가 생성됩니다.",
+      "summaryCopied": "요약이 복사되었습니다.",
+      "summaryCopyFailed": "요약을 복사할 수 없습니다.",
+      "columns": {
+        "calls": "호출",
+        "time": "시간",
+        "duration": "기간",
+        "status": "상태",
+        "caller": "호출자",
+        "callShare": "호출 점유율",
+        "p50": "절반은 이 값 미만"
+      },
+      "belowTopN": {
+        "title": "이 쿼리는 이 범위의 일부 동안 가장 무거운 쿼리에 포함되지 않았습니다",
+        "body": "우리는 가장 무거운 쿼리를 개별적으로 추적하고 나머지는 함께 집계합니다. 이 쿼리가 충분히 무겁지 않은 경우, 0으로 표시하는 대신 차트를 음영 처리합니다. 쿼리는 여전히 실행 중이었기 때문입니다.",
+        "capped": "기록은 보유한 기간까지 거슬러 올라갑니다."
+      },
+      "firstSeenCaveat": "— 그 이전에도 실행 중이었을 수 있으며, 단지 가장 무거운 쿼리에 포함되지 않았을 뿐입니다.",
+      "copyQuery": "쿼리 복사",
+      "alertMe": "이것이 느려지면 알림",
+      "stats": {
+        "load": "데이터베이스 시간",
+        "loadShare": "이 데이터베이스의 {percent}",
+        "calls": "호출",
+        "callsDelta": "이전보다 {change}",
+        "p50": "절반은 이 값 미만",
+        "p95": "느린 호출",
+        "max": "최악 관측",
+        "errors": "실패",
+        "noErrors": "오류 없음",
+        "approx": "근사값, 정확하지 않음",
+        "exact": "정확값"
+      },
+      "overlap": {
+        "serverExecution": "{engine}가 실행하는 데 소비한 시간",
+        "serverWait": "{engine}가 대기하는 데 소비한 시간 — 대기 시간, 실행 시간이 아님",
+        "serverCounted": "모든 클라이언트에 걸쳐 {engine}가 집계한 수치",
+        "clientObserved": "계측된 호출자에 의해 관측됨 — 데이터베이스에서 이 값을 보고하지 않았습니다."
+      },
+      "endpointsConcentrated": "하나의 엔드포인트가 이 쿼리 시간의 {percent}를 차지합니다. {endpoint}를 수정하면 이 쿼리를 해결할 수 있습니다.",
+      "typicalMarker": "느린 호출 {value}",
+      "plans": {
+        "title": "쿼리 계획",
+        "sourceLabel": "일반 예상 계획",
+        "sourceTooltip": "이 계획은 모든 쿼리 매개변수를 NULL로 설정하여 추정한 것이며 실제로 실행되지 않았습니다. Postgres는 실제 쿼리에 대해 다른 계획을 실행했을 수 있습니다. 계획의 형태를 확인하는 용도로만 사용하고, 소요 시간을 설명하는 데 사용하지 마세요.",
+        "stableCaveat": "이 창에서 하나의 계획 형태가 캡처되었습니다. 이것이 계획 문제를 배제하지는 않습니다 — 추정 계획은 실제 계획이 변경되는 동안 안정적으로 유지될 수 있으며, 실행 계획 캡처는 로그에 기록할 만큼 느린 문만 볼 수 있으므로 이 쿼리를 더 빠르게 만드는 계획 변경은 캡처에서 완전히 사라질 수 있습니다.",
+        "executedLabel": "실행 계획",
+        "executedTooltip": "이것은 Postgres가 실제 실행에서 실행한 계획으로, auto_explain을 통해 실제 매개변수 값으로 캡처된 것입니다. 이 행의 행 수와 기간은 추정이 아닌 측정된 값입니다 — 그러나 auto_explain 임계값보다 느린 실행만 캡처되므로, 모든 실행이 아니라 느린 꼬리부분을 설명합니다.",
+        "capturedDurations": "캡처된 {count}번의 실행에서 평균 {avg} · 최대 {max}",
+        "estVsAct": "추정 {est} → 실제 {act} 행",
+        "driftCallout": "이 창에서 계획 형태가 변경되었습니다. {count}개의 서로 다른 형태가 캡처되었으며, 이는 일반적으로 인덱스 삭제나 테이블 리파티셔닝과 같은 스키마 또는 통계 변경을 의미합니다.",
+        "viewPlans": "계획 보기",
+        "noPlans": "캡처된 계획 없음",
+        "noPlansHint": "아직 이 데이터베이스에 대한 계획을 전송한 수집기가 없습니다. 수집기 레시피에서 상위 쿼리 수집을 켜서 계획 캡처를 시작하세요 — 설정 페이지에서 안내합니다.",
+        "noPlanForQuery": "이 쿼리에 대한 계획 없음",
+        "noPlanForQueryHint": "우리는 이 데이터베이스에 대한 계획을 캡처하고 있습니다 — 이 쿼리에는 계획이 없을 뿐입니다. COMMIT, ROLLBACK, SHOW와 같이 데이터베이스가 설명할 수 없는 문에는 정상적인 현상입니다.",
+        "planHash": "계획",
+        "firstSeen": "최초 확인",
+        "lastSeen": "마지막 확인",
+        "noTree": "실행 계획을 읽을 수 없습니다.",
+        "nodeCost": "비용 {cost}"
+      },
+      "serverMetrics": {
+        "title": "데이터베이스가 직접 기록한 내용",
+        "subtitle": "서버 측 — 모든 클라이언트",
+        "clientSubtitle": "클라이언트 관찰 — 계측된 호출자만, 완료된 호출만 포함됩니다. 아직 실행 중이거나 중단된 쿼리는 이 수치에 포함되지 않습니다.",
+        "instance": "{instance}가 보고함",
+        "instanceWide": "이 인스턴스의 모든 데이터베이스",
+        "calls": "실행 횟수",
+        "rows": "반환된 행",
+        "meanExecution": "평균 실행 시간",
+        "meanWait": "평균 대기 시간",
+        "sharedBlksHit": "캐시에서 읽은 블록",
+        "sharedBlksRead": "디스크에서 읽은 블록",
+        "tempBlksWritten": "기록된 임시 블록",
+        "noMatch": "이 쿼리에 대한 서버 측 기록이 없습니다.",
+        "noMatchHint": "데이터베이스는 실행한 명령문을 보고하지만 이 쿼리는 그 목록에 없습니다. 이는 정상입니다. 두 보기에서 쿼리를 식별하는 방식이 다르므로 항상 일치하지 않습니다. 위의 모든 수치는 여전히 애플리케이션에서 측정된 것입니다.",
+        "ambiguous": "이 쿼리일 수 있는 데이터베이스가 여러 개입니다.",
+        "ambiguousHint": "여러 인스턴스가 이 이름의 데이터베이스를 보고하므로 어떤 인스턴스가 이 쿼리를 실행했는지 알 수 없습니다. 잘못된 인스턴스의 수치를 표시하는 것은 아예 표시하지 않는 것보다 나쁩니다. 후보: {instances}.",
+        "off": "수집된 서버 측 메트릭이 없습니다.",
+        "offHint": "수집기가 아직 데이터베이스에서 명령문별 메트릭을 수집하지 않습니다. 수집기 레시피에서 상위 쿼리 수집을 켜세요. 설정 페이지에서 단계별로 안내합니다.",
+        "setUp": "설정",
+        "readFailed": "서버 측 메트릭을 읽을 수 없습니다.",
+        "readFailedHint": "읽기에 실패했으므로 데이터베이스가 명령문을 보고하는지 여부를 알 수 없습니다. 위의 모든 수치는 여전히 애플리케이션에서 측정된 것입니다."
+      },
+      "callingServices": {
+        "title": "이 쿼리를 호출한 서비스",
+        "unjoinable": "표시되지 않음 — 이 명령문은 여러 종류의 데이터베이스에서 실행되므로, 어떤 데이터베이스인지 알지 못한 채 호출자를 매칭하면 잘못된 서비스가 지정될 수 있습니다.",
+        "tracedCalls": "추적된 호출 {calls}건",
+        "coverage": "위의 {executions}회 실행 중 {traced}회에서 {count}개의 서비스가 확인되었습니다. 나머지는 아직 추적하지 않는 호출자에서 발생했습니다.",
+        "coverageUnknown": "{traced}건의 추적된 호출에서 {count}개의 서비스가 확인되었습니다. 데이터베이스가 이 명령문의 총계를 보고하지 않았으므로 비율을 제공할 수 없습니다.",
+        "noneNamed": "{traced}건의 호출이 추적되었지만, 그중 어느 것도 서비스로 연결되지 않았습니다 — 해당 트레이스는 이 시간 범위 밖에서 시작됩니다."
+      },
+      "callersEmpty": {
+        "title": "이 쿼리에 대한 추적된 호출이 아직 없습니다.",
+        "description": "데이터베이스가 이 명령문을 보고했지만, 이를 실행한 애플리케이션을 추적한 항목이 없습니다. 따라서 지정할 호출자도, 열 개별 실행도 없습니다. 이 데이터베이스와 통신하는 서비스를 계측하면 여기에 나타납니다.",
+        "checklistTitle": "필요 조건",
+        "setUp": "추적 설정",
+        "checks": {
+          "server": {
+            "ok": "데이터베이스가 이 쿼리를 보고하고 있습니다.",
+            "okDetail": "다른 탭의 타이밍이 여기에서 비롯됩니다."
+          }
+        }
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "실행 시간",
+        "serverWait": "대기 시간",
+        "serverCounted": "서버 수",
+        "clientObserved": "클라이언트 관찰",
+        "serverReported": "데이터베이스에서 보고됨"
+      }
+    },
+    "page": {
+      "tabs": {
+        "overview": "개요",
+        "queries": "상위 쿼리",
+        "samples": "가장 느린 호출",
+        "samplesHintClient": "이 기간 동안 계측된 서비스가 관찰한 완료된 호출입니다. 추적되지 않은 호출자는 집계되지 않으므로 이는 전체가 아닌 하한선입니다. 표에는 그중 가장 느린 호출이 표시됩니다.",
+        "samplesHintServer": "이 기간 동안 데이터베이스가 완료를 보고한 명령문으로, 데이터베이스 내부에서 집계됩니다. 표에는 그중 가장 느린 것이 표시됩니다.",
+        "samplesHintUnknown": "이 기간 동안의 가장 느린 개별 데이터베이스 호출.",
+        "deadlocks": "교착 상태",
+        "blocked": "차단된 쿼리",
+        "deadlocksHint": "데이터베이스가 보고한 교착 상태.",
+        "blockedHint": "지금 잠금을 기다리는 세션.",
+        "activity": "활동",
+        "activityHint": "지금 데이터베이스에서 실행 중인 세션.",
+        "tableHealth": "테이블 상태",
+        "tableHealthHint": "테이블 크기, 블로트 및 진공 상태. 블로트와 진공은 PostgreSQL 전용입니다.",
+        "deadlocksLocked": "교착 상태는 엔터프라이즈 기능입니다. 어떤 쿼리가 서로 교착 상태에 빠졌는지, 그리고 그 이유를 보려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다.",
+        "blockedLocked": "차단된 쿼리는 엔터프라이즈 기능입니다. 어떤 세션이 잠금을 기다리고 있고 무엇이 잠금을 보유하고 있는지 보려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다.",
+        "tableHealthLocked": "테이블 상태는 엔터프라이즈 기능입니다. 테이블 크기, 블로트 및 진공 상태를 추적하려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다."
+      }
+    },
+    "samples": {
+      "title": "가장 느린 호출",
+      "subtitle": "이 창에서 모든 데이터베이스와 쿼리 중 가장 느린 개별 데이터베이스 호출 — 호출자가 측정한 대로, 완료된 호출만",
+      "subtitleServer": "이 창에서 데이터베이스가 완료한 가장 느린 문장, 데이터베이스 내부에서 측정됨",
+      "logOffTitle": "데이터베이스가 아직 느린 문장을 기록하지 않고 있습니다",
+      "logOffDescription": "이 호출들을 추적한 것이 없어 데이터베이스에 자체 가장 느린 문장을 요청했지만 로그가 없습니다. 이 목록은 PostgreSQL의 문장 로그(log_min_duration_statement)에서 가져오며 기본적으로 꺼져 있습니다 — 설정 카드의 로깅 단계에서 켭니다. 문장별 캡처는 현재 PostgreSQL 전용이므로 MySQL과 MariaDB는 아직 이 목록을 제공할 수 없습니다. 상위 쿼리는 카운터 테이블을 읽으므로 가장 많이 실행되는 것을 계속 보여줄 수 있습니다.",
+      "searchPlaceholder": "쿼리 텍스트, 서비스 또는 데이터베이스 검색…",
+      "columns": {
+        "query": "쿼리",
+        "when": "시각",
+        "duration": "소요 시간",
+        "service": "서비스",
+        "status": "상태"
+      },
+      "columnHints": {
+        "duration": "호출자가 측정한 이 호출의 소요 시간. 완료된 호출만 계산 — 아직 실행 중이거나 응답이 없는 쿼리는 여기서 측정되지 않습니다."
+      },
+      "failed": "실패",
+      "failedWithCode": "실패 · {code}",
+      "viewTrace": "이 호출이 포함된 요청 열기",
+      "scatterOk": "완료",
+      "partial": "일부 추적 데이터를 읽을 수 없어 이 목록에서 호출이 누락될 수 있습니다.",
+      "disclosureShort": "각 행은 실제 완료된 호출 하나입니다",
+      "disclosureDetail": "보내는 추적에서 호출을 만든 애플리케이션이 측정합니다. 완료된 호출만 여기에 있습니다 — 아직 실행 중이거나 중단되어 응답이 없는 쿼리는 측정값을 생성하지 않았습니다.",
+      "counts": {
+        "complete": "이 창의 모든 {count}개 데이터베이스 호출을 느린 순서대로 표시합니다.",
+        "truncated": "이 창에서 가장 느린 {count}개 호출 — 여기에 표시된 것보다 더 많이 실행되었습니다.",
+        "filtered": "{total}개 호출 중 {count}개 표시."
+      },
+      "serverList": {
+        "title": "데이터베이스가 보고한 가장 느린 호출",
+        "subtitle": "각 데이터베이스 내부에서 문장이 완료되는 시점에 측정 — 모든 클라이언트가 집계되지만 네트워크 및 연결 대기는 제외됩니다. 이 창에 추적된 애플리케이션 호출이 없어 일반 목록이 비어 있습니다. 여기에 표시되는 호출은 데이터베이스 자체의 로깅 임계값에 따라 결정됩니다. 이러한 문장별 보고서는 현재 PostgreSQL에서만 제공됩니다 — 수집기 레시피가 아직 다른 엔진의 문장 로그를 캡처하지 않으므로 MySQL 및 MariaDB 호출은 여기에 표시되지 않습니다.",
+        "truncated": "보고된 가장 느린 {count}개 호출 — 여기에 표시된 것보다 더 많은 호출이 임계값을 넘었습니다",
+        "columns": {
+          "query": "쿼리",
+          "when": "시각",
+          "took": "소요 시간",
+          "user": "사용자"
+        },
+        "columnHints": {
+          "took": "엔진이 측정한 문장 시작부터 완료까지의 데이터베이스 내 시간. 호출자가 경험한 시간이 아닙니다 — 네트워크 및 연결 대기는 포함되지 않습니다."
+        }
+      }
+    },
+    "rowChips": {
+      "new": "이 목록에 새로 추가됨",
+      "slower": "평소보다 {ratio}배 느림",
+      "loop": "요청당 {multiplier}회 실행",
+      "allFailed": "모두 {count}개 실패",
+      "busier": "더 바쁨, 느리지 않음",
+      "climbed": "새로운 최대 부하 쿼리"
+    },
+    "deadlocks": {
+      "title": "데이터베이스",
+      "subtitle": "서로 차단되어 롤백된 트랜잭션",
+      "deadlockCount": "교착 상태 없음 | {count}개 교착 상태 | {count}개 교착 상태",
+      "pairCount": "쿼리 쌍 없음 | {count}개 쿼리 쌍 | {count}개 쿼리 쌍",
+      "searchPlaceholder": "쿼리 텍스트, 테이블 또는 애플리케이션 검색…",
+      "grouping": {
+        "pairs": "쿼리 쌍별로 그룹화",
+        "pairsHint": "서로 교착 상태가 되는 쿼리 쌍마다 한 행씩, 발생 빈도와 함께 표시됩니다.",
+        "events": "모든 이벤트",
+        "eventsHint": "교착 상태마다 한 행씩, 최신순 — 특정 시점이 필요할 때 사용하세요."
+      },
+      "columns": {
+        "pair": "서로 교착 상태가 되는 두 쿼리",
+        "applications": "애플리케이션",
+        "objects": "경쟁한 행",
+        "lastSeen": "마지막",
+        "count": "교착 상태",
+        "when": "시각",
+        "cancelled": "취소됨",
+        "finished": "완료됨"
+      },
+      "coverage": {
+        "complete": "데이터베이스가 보고한 모든 교착 상태가 여기 있습니다. 이 창에서 {deadlocks}건, {pairs}쌍에서 발생했습니다.",
+        "capped": "한 번에 읽을 수 있는 것보다 더 많은 교착 상태가 발생했습니다. 현재 확보한 것은 {deadlocks}건, {pairs}쌍입니다. 실제 숫자는 더 많습니다.",
+        "readUpTo": "{time}까지 읽었습니다.",
+        "mysqlPartial": "MySQL 데이터베이스는 innodb_print_all_deadlocks가 켜져 있지 않으면 가장 최근 교착 상태만 유지합니다."
+      },
+      "chips": {
+        "oppositeOrder": "반대 행 순서",
+        "cadence": "매 {seconds}초마다",
+        "noQueries": "캡처되지 않은 쿼리",
+        "partial": "한쪽만"
+      },
+      "rowActions": {
+        "topQueries": "Top 쿼리에서 찾기",
+        "copy": "두 쿼리 복사",
+        "alert": "교착 상태 알림 받기"
+      },
+      "detail": {
+        "mostRecent": "최근 · {time}",
+        "nthOf": "{index} / {total}",
+        "earlier": "이전",
+        "later": "다음",
+        "victim": "데이터베이스에 의해 취소됨",
+        "survivor": "완료 허용됨",
+        "pid": "pid {pid}",
+        "thread": "스레드 {pid}",
+        "transaction": "트랜잭션 {id}",
+        "eachWaits": "서로 상대를 기다림",
+        "deadlock": "교착 상태",
+        "noQueryCaptured": "로그에 이 교착 상태가 기록되었지만 문장은 기록되지 않았습니다.",
+        "waitingFor": "{target}이(가) 끝나기를 기다리고 있었습니다.",
+        "waitingForRow": "{target}이(가) 끝나기를 기다리고 있었습니다 — 다른 세션이 이미 원하는 행을 변경했습니다.",
+        "rawLock": "{mode} · {target}",
+        "plainTitle": "무슨 일이 있었는지 순서대로.",
+        "plainBody": "{a}가 한 행을 변경하고 유지했습니다. {b}가 다른 행을 변경하고 유지했습니다. 그런 다음 각자 상대의 행을 변경하려 했지만, 둘 다 움직일 수 없었습니다. 데이터베이스는 {victim}을(를) 취소하여 교착 상태를 해결했습니다. 해당 애플리케이션은 오류를 받았고 전체 트랜잭션이 롤백되었습니다.",
+        "fixTitle": "수정은 데이터베이스가 아닌 코드에 있습니다.",
+        "fixBody": "이 두 문장은 {object} 행을 반대 순서로 접근합니다. 양쪽이 같은 순서(가장 낮은 id 먼저)로 업데이트하도록 하면 이 쌍은 더 이상 교착 상태가 되지 않습니다.",
+        "fixGeneric": "양쪽이 서로가 원하는 것을 보유하고 있습니다. 모든 트랜잭션이 같은 순서로 잠금을 획득하도록 하면 이 쌍은 더 이상 교착 상태가 되지 않습니다.",
+        "copyForSlack": "복사",
+        "occurrencesTitle": "이 쌍이 교착 상태가 된 모든 {count}회",
+        "occurrencesHint": "위에서 해당 항목을 로드하려면 지점을 선택하세요.",
+        "lostLabel": "{pid} 취소됨",
+        "bothSidesLose": "양쪽이 거의 동일하게 취소됩니다 — {a} 대 {b}. 어느 애플리케이션도 문제가 아니며, 순서가 문제입니다.",
+        "oneSideLoses": "{pid}는 매번 취소됩니다.",
+        "showAbove": "위에 표시",
+        "copy": "SQL 복사",
+        "seeInTopQueries": "Top queries에서 보기",
+        "whichService": "어떤 서비스인가요?",
+        "partialTitle": "이 교착 상태의 한 쪽만 도달했습니다",
+        "partialBody": "MySQL은 교착 상태의 각 쪽을 별도의 로그 항목으로 기록합니다. 파트너 항목은 도착하지 않았습니다 — 이 창 밖에 있거나 두 항목 사이에 로그가 순환되었을 수 있습니다. 표시된 내용은 실제이며, 다른 문장은 그냥 누락된 것입니다.",
+        "copyHint": "이 쪽의 문장만 복사합니다.",
+        "copySqlTooltip": "이 쪽의 문장 복사",
+        "copyForSlackHint": "두 문장, 이 쌍의 교착 상태 발생 빈도와 마지막 발생 시각 — 채널이나 티켓에 붙여넣을 수 있는 메시지로 작성됩니다."
+      },
+      "storm": {
+        "title": "교착 상태 폭풍.",
+        "body": "이 창에서 {count}개 — 정상적으로는 없음.",
+        "copyForSlack": "복사",
+        "biasWarning": "지금 Top queries 탭이 실제보다 조용해 보일 수 있습니다. 취소된 쿼리도 결국 완료되지만, 이 잠금 뒤에 대기 중인 쿼리는 완료되지 않았습니다. 따라서 호출 수가 사용자가 겪고 있는 것보다 낮게 표시됩니다."
+      },
+      "summary": {
+        "deadlocks": "교착 상태",
+        "pairs": "쿼리 쌍"
+      },
+      "healthy": {
+        "title": "교착 상태 없음 — 그리고 확실히 확인 중입니다",
+        "description": "이 창에서 데이터베이스가 교착 상태를 단 하나도 보고하지 않았습니다. 이는 수집에 문제가 있는 것이 아니라 정상적인 상태입니다.",
+        "checklistTitle": "확인 방법",
+        "collectionHealthy": "수집 정상",
+        "checks": {
+          "reading": {
+            "title": "데이터베이스 로그를 읽고 있습니다",
+            "detail": "{databases} · 가장 최근 읽은 줄: {age}",
+            "detailNoFleet": "가장 최근 읽은 줄: {age}",
+            "detailUnknown": "{databases} — 로그 파이프라인이 연결되어 있습니다",
+            "detailUnknownNoFleet": "로그 파이프라인이 연결되어 있습니다"
+          },
+          "reporting": {
+            "title": "교착 상태 보고가 켜져 있습니다",
+            "detail": "Postgres는 기본적으로 교착 상태를 기록하고, MySQL은 innodb_print_all_deadlocks가 켜져 있어 최신 것뿐만 아니라 모든 교착 상태가 기록됩니다.",
+            "detailMysqlPartial": "Postgres는 기본적으로 교착 상태를 기록합니다. MySQL에는 innodb_print_all_deadlocks가 켜져 있지 않아 가장 최근 것만 유지됩니다.",
+            "detailUnknown": "Postgres는 기본적으로 교착 상태를 기록합니다. MySQL에서는 SELECT {'@@'}innodb_print_all_deadlocks를 실행하세요 — 1이어야 하며, 그렇지 않으면 가장 최근 교착 상태만 유지됩니다. 여기서 이 설정을 읽을 수 없습니다.",
+            "titleUnknown": "교착 상태 보고가 켜져 있는지 확인"
+          },
+          "traffic": {
+            "title": "이 데이터베이스에서 {lines}개의 다른 로그 줄을 보았습니다",
+            "detail": "파이프라인이 트래픽을 전달하고 있으므로 교착 상태도 통과했을 것입니다",
+            "titleUnknown": "로그 파이프라인이 트래픽을 전달하고 있습니다"
+          },
+          "lastEver": {
+            "title": "지금까지 본 마지막 교착 상태",
+            "detail": "{when}. 창을 넓혀 확인하세요.",
+            "titleNone": "이 데이터베이스에서 교착 상태를 본 적이 없습니다",
+            "detailNone": "아직 비교할 것이 없습니다 — 이 창은 특이하지 않습니다."
+          }
+        },
+        "widen": "지난 24시간으로 넓히기"
+      },
+      "notCollecting": {
+        "title": "아직 교착 상태를 볼 수 없습니다 — 이유는 다음과 같습니다",
+        "description": "교착 상태는 애플리케이션이 아닌 데이터베이스 자체에서 보고합니다. 네 가지를 확인합니다.",
+        "checklistTitle": "확인한 항목",
+        "checks": {
+          "queries": {
+            "ok": "쿼리 데이터가 도착하고 있습니다",
+            "okDetail": "{databases}에서 {queries} — Top queries 탭이 작동합니다",
+            "okDetailNoFleet": "{queries} — Top queries 탭이 작동합니다",
+            "no": "쿼리 데이터도 도착하지 않습니다",
+            "noDetail": "Top queries 탭부터 시작하세요 — 이 데이터베이스에서 아직 아무것도 도달하지 않았습니다."
+          },
+          "enabled": {
+            "ok": "데이터베이스 모니터링이 켜져 있습니다",
+            "okDetail": "이 조직에 대해",
+            "no": "데이터베이스 모니터링이 꺼져 있습니다",
+            "noDetail": "수집을 시작하려면 설정에서 켜세요."
+          },
+          "log": {
+            "no": "어떤 데이터베이스도 로그를 보내지 않습니다",
+            "noDetail": "쿼리 타이밍은 애플리케이션에서 오지만, 교착 상태는 데이터베이스 자체 로그에만 기록됩니다. 수집기를 Postgres 또는 MySQL 로그 파일로 지정하면 이 탭이 자동으로 채워집니다.",
+            "ok": "데이터베이스 로그가 도착하고 있습니다",
+            "okDetail": "그래서 교착 상태가 우리에게 포착되었을 텐데 — 아직 한 번도 없었습니다."
+          },
+          "settings": {
+            "title": "시작하기 전에 알아두면 좋은 점",
+            "detail": "Postgres는 교착 상태를 두 개의 로그 라인에 걸쳐 기록하고 MySQL은 여러 로그 라인에 걸쳐 기록합니다 — 관련 쿼리는 나중 라인에 있습니다. 첫 번째 라인만 일치시키는 설정은 교착 상태 발생을 기록하고 모든 쿼리를 잃습니다. 이 레시피는 둘 다 처리합니다."
+          }
+        }
+      }
+    },
+    "blocked": {
+      "title": "데이터베이스",
+      "subtitle": "현재 잠금을 기다리는 세션",
+      "subtitlePast": "이 시간 범위 동안 잠금을 기다린 세션",
+      "waitingCount": "잠금을 기다리는 세션 없음 | 지금 잠금을 기다리는 세션 {count}개 | 지금 잠금을 기다리는 세션 {count}개",
+      "waitingCountPast": "잠금을 기다린 세션 없음 | 이 시간 범위에 잠금을 기다린 세션 {count}개 | 이 시간 범위에 잠금을 기다린 세션 {count}개",
+      "sessionCount": "세션 없음 | 세션 {count}개 | 세션 {count}개",
+      "searchPlaceholder": "쿼리 텍스트, 테이블 또는 애플리케이션 검색…",
+      "perspective": {
+        "waiting": "누가 막혀 있나",
+        "waitingHint": "잠금을 기다리는 세션당 한 행씩, 가장 오래 기다린 순서로.",
+        "blocking": "누가 막고 있나",
+        "blockingHint": "잠금을 보유한 세션과 그 뒤에 막혀 있는 모든 것."
+      },
+      "columns": {
+        "stuckQuery": "막힌 쿼리",
+        "session": "세션",
+        "waitingFor": "대기 대상",
+        "heldUpBy": "막고 있는 세션",
+        "waiting": "대기 중",
+        "sessionQuery": "세션 및 실행 중인 쿼리",
+        "application": "애플리케이션",
+        "blocking": "차단 중"
+      },
+      "coverage": {
+        "summary": "가장 긴 대기는 {longest}입니다. 모든 대기는 잠금을 보유한 {roots}로 거슬러 올라갑니다.",
+        "summaryCapped": "한 번에 읽을 수 있는 것보다 더 많은 세션이 대기 중이었습니다. 확인된 세션 중 가장 긴 대기는 {longest}이며, 잠금을 보유한 {roots}로 거슬러 올라갑니다.",
+        "summaryOneRoot": "세션 1개",
+        "summaryManyRoots": "세션 {count}개",
+        "checked": "{interval}초마다 확인; 마지막 확인 {time}.",
+        "checkedUnknown": "데이터베이스의 잠금 테이블에서 샘플링한 데이터입니다."
+      },
+      "rowActions": {
+        "showChain": "체인 표시",
+        "copy": "쿼리 복사",
+        "alertMe": "잠금 대기 알림 받기"
+      },
+      "waitEvent": {
+        "transaction": "다른 트랜잭션 완료",
+        "row": "행 잠금",
+        "table": "테이블 잠금",
+        "extend": "테이블 확장",
+        "advisory": "애플리케이션 잠금",
+        "object": "객체 잠금",
+        "buffer": "데이터 페이지 읽기",
+        "lock": "잠금"
+      },
+      "deep": "{count}단계 깊이",
+      "notWaiting": "대기 중 아님",
+      "longestWait": "최장 대기",
+      "holdsTheLock": "모두가 원하는 잠금 보유",
+      "lastStatement": "마지막 쿼리 {age} 전",
+      "idleInTransaction": "아무것도 기다리지 않음 · 열린 트랜잭션에서 유휴 상태",
+      "pills": {
+        "root": "루트 — 여기서 시작",
+        "waitingBlocking": "대기 및 차단 {count}",
+        "waiting": "대기 중"
+      },
+      "waitingOn": "{pid} 대기 중",
+      "degraded": "한 세션이 {count}개의 세션을 막고 있습니다. 이 세션은 {age} 동안 트랜잭션을 열어둔 채 쿼리를 실행하지 않았습니다 — 아마도 커밋을 잊은 애플리케이션일 것입니다.",
+      "footer": {
+        "allLeadBack": "모든 {waits} 대기는 pid {pid}로 이어집니다",
+        "allLeadBackDetail": "— {object}에 대한 잠금을 보유한 세션 하나입니다.",
+        "switchToBlocking": "“누가 차단 중인지”로 전환",
+        "releaseAll": "세션 {pid}을 종료하면 모든 {count}이 해제됩니다.",
+        "releaseAllDetail": "그 아래의 모든 것은 오직 그 잠금 하나 때문에 대기 중입니다.",
+        "timeLost": "총 손실 시간: {seconds} — {sessions}개 세션에 걸쳐"
+      },
+      "terminate": {
+        "copied": "복사됨",
+        "hint": "세션을 종료하려면 {instance}에서 직접 실행하세요. 저희는 절대 대신 실행하지 않습니다.",
+        "hintNoInstance": "세션을 종료하려면 직접 실행하세요. 저희는 절대 대신 실행하지 않습니다."
+      },
+      "summary": {
+        "waiting": "대기 중인 세션",
+        "longest": "최장 대기",
+        "chains": "체인"
+      },
+      "rootCount": "루트 블로커 없음 | 루트 블로커 {count}개 | 루트 블로커 {count}개",
+      "inChain": "체인의 세션 {count}개",
+      "healthy": {
+        "title": "잠금 대기 중인 세션이 없습니다",
+        "description": "현재 데이터베이스에서 다른 세션 뒤에 막혀 있는 세션이 없습니다. 이는 정상적인 상태이며, 수집에 누락이 있는 것이 아닙니다.",
+        "descriptionPast": "이 기간 동안 데이터베이스에서 다른 세션 뒤에 막혀 있던 세션이 없습니다. 이는 정상적인 상태이며, 수집된 데이터에 누락이 있는 것이 아닙니다.",
+        "checklistTitle": "확인 방법",
+        "collectionHealthy": "수집 정상",
+        "checks": {
+          "sampling": {
+            "title": "데이터베이스들의 잠금 테이블을 확인 중입니다.",
+            "detail": "{interval}초마다 · 마지막 확인 {age}",
+            "detailUnknown": "컬렉터에 구성된 일정에 따라"
+          },
+          "sessions": {
+            "title": "세션이 정상적으로 실행 중입니다",
+            "detail": "활성 세션이 보이며, 그중 어느 것도 잠금 대기열에 없습니다"
+          },
+          "meaning": {
+            "title": "이 탭이 비어 있지 않을 때 표시되는 내용",
+            "detail": "다른 세션이 보유한 잠금을 기다리는 세션과, 해당 잠금을 보유한 세션까지의 체인을 보여줍니다. 짧은 대기는 정상이며 저절로 해소됩니다 — 이 탭은 그렇지 않은 대기를 위한 것입니다."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "차단된 쿼리를 아직 볼 수 없습니다 — 그 정확한 이유는 다음과 같습니다.",
+        "description": "차단된 쿼리는 데이터베이스 내부의 잠금 테이블에서만 볼 수 있습니다. 우리는 세 가지를 확인합니다.",
+        "checklistTitle": "확인한 내용",
+        "checks": {
+          "queries": {
+            "ok": "쿼리 데이터가 도착하고 있습니다",
+            "okDetail": "{queries} ({databases}에서) — Top queries 탭이 작동합니다.",
+            "okDetailNoFleet": "{queries} — Top queries 탭이 작동합니다.",
+            "no": "쿼리 데이터도 도착하지 않고 있습니다.",
+            "noDetail": "Top queries 탭부터 시작하세요 — 이 데이터베이스들에서 아직 아무것도 수신되지 않습니다."
+          },
+          "enabled": {
+            "ok": "데이터베이스 모니터링이 켜져 있습니다",
+            "okDetail": "이 조직에 대해",
+            "no": "데이터베이스 모니터링이 꺼져 있습니다",
+            "noDetail": "수집을 시작하려면 설정에서 켜세요."
+          },
+          "sampling": {
+            "no": "데이터베이스의 잠금 테이블을 샘플링하고 있지 않습니다.",
+            "noDetail": "누가 누구를 기다리는지는 데이터베이스 내부에서, 그리고 대기가 발생하는 동안에만 존재합니다. 컬렉터 레시피가 정기적으로 이를 읽고 log_lock_waits를 활성화하여 긴 대기도 기록되도록 합니다.",
+            "ok": "잠금 테이블 샘플링이 실행 중입니다",
+            "okDetail": "따라서 차단된 세션이 있다면 우리가 알 수 있습니다 — 그런 세션이 없을 뿐입니다."
+          },
+          "settings": {
+            "title": "시작 전에 알아두면 좋은 점",
+            "detail": "log_lock_waits는 대기가 deadlock_timeout(기본값 1초)보다 오래 지속된 경우에만 기록합니다. 그보다 짧은 대기는 정상이며 기록되지 않습니다. 그래서 이 탭은 로그만 읽지 않고 실시간으로 샘플링하는 것입니다."
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "활동",
+      "subtitle": "지금 데이터베이스가 무엇을 하고 있는지, 자체 세션 테이블에서 샘플링한 내용입니다.",
+      "subtitlePast": "이 기간 동안 데이터베이스가 무엇을 했는지, 자체 세션 테이블에서 샘플링한 내용입니다.",
+      "searchPlaceholder": "세션, 사용자, 애플리케이션 검색",
+      "wait": {
+        "onCpu": "CPU 사용 중 / 대기 없음",
+        "qualified": "{type}: {event}",
+        "plain": "{event}",
+        "remainder": "+{count}개의 대기 이벤트 추가 ({share})",
+        "remainderNoShare": "+{count}개의 대기 이벤트 추가"
+      },
+      "disclosure": {
+        "sampled": "{interval}초마다 샘플링 — 이는 연속 녹화가 아닌 일련의 스냅샷이므로, 샘플 간격보다 짧은 세션은 실행되고 종료되어도 보이지 않을 수 있습니다.",
+        "sampledUnknown": "정기적으로 샘플링 — 이는 연속 녹화가 아닌 일련의 스냅샷입니다. 아직 수집기가 얼마나 자주 폴링하는지 파악하기에 충분한 샘플을 보지 못했습니다.",
+        "filtered": "샘플은 이미 수집기에 의해 필터링되었습니다: 가장 최근 실행 중인 쿼리보다 오래된 유휴 세션은 누군가를 차단하지 않는 한 제외됩니다. 따라서 이는 모든 연결의 전체 목록이 아닙니다.",
+        "short": "{interval}초마다 샘플링 및 사전 필터링됨",
+        "shortUnknown": "정기적으로 샘플링 및 사전 필터링됨",
+        "more": "의미"
+      },
+      "columns": {
+        "session": "세션",
+        "user": "사용자",
+        "application": "애플리케이션",
+        "state": "상태",
+        "waitEvent": "대기 대상",
+        "running": "실행 시간",
+        "lastQuery": "마지막 쿼리",
+        "query": "쿼리",
+        "blockedBy": "차단자"
+      },
+      "summary": {
+        "sessions": "세션",
+        "onCpu": "CPU 사용 중",
+        "waiting": "대기 중",
+        "idleInTransaction": "트랜잭션 유휴"
+      },
+      "state": {
+        "unknown": "상태 미보고"
+      },
+      "counts": {
+        "complete": "{count}개 세션 표시 중.",
+        "capped": "한 번에 읽을 수 있는 것보다 더 많은 세션이 샘플링되었습니다. 이는 현재 보유한 {count}개입니다.",
+        "filtered": "전체 {total}개 세션 중 {count}개 표시 중."
+      },
+      "transactionOpen": "트랜잭션 열림 {age}",
+      "healthy": {
+        "title": "지금 실행 중인 것이 없습니다",
+        "description": "데이터베이스의 세션 테이블을 샘플링했지만 활성 세션을 찾지 못했습니다. 이는 유휴 데이터베이스의 정상적인 상태이며, 수집에 공백이 있는 것이 아닙니다.",
+        "descriptionPast": "이 기간 동안 데이터베이스의 세션 테이블을 샘플링했지만 활성 세션을 찾지 못했습니다. 이는 유휴 데이터베이스의 정상적인 상태이며, 수집된 데이터에 공백이 있는 것이 아닙니다.",
+        "checklistTitle": "확인 방법",
+        "collectionHealthy": "수집 상태 정상",
+        "checks": {
+          "sampling": {
+            "title": "데이터베이스의 세션 테이블을 샘플링하고 있습니다",
+            "detail": "{interval}초마다 · 마지막 확인 {age}",
+            "detailUnknown": "수집기에 구성된 일정에 따라"
+          },
+          "pipeline": {
+            "title": "데이터베이스에서 데이터가 수신되고 있습니다",
+            "detail": "이 기간 동안 동일한 파이프라인으로 {lines}개의 다른 라인이 들어왔습니다",
+            "detailUnknown": "이 데이터를 전달하는 파이프라인이 실행 중입니다"
+          },
+          "meaning": {
+            "title": "이 탭이 비어 있지 않을 때 표시하는 내용",
+            "detail": "데이터베이스에서 실행 중인 모든 세션, 각 세션이 대기 중인 항목, 그리고 지속 시간을 보여줍니다. 연속적으로 관찰하는 대신 샘플링하기 때문에, 아주 짧은 쿼리는 두 샘플 사이에 완료되어 표시되지 않을 수 있습니다."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "아직 실시간 세션을 볼 수 없습니다 — 그 정확한 이유는 다음과 같습니다",
+        "description": "데이터베이스가 지금 무엇을 하고 있는지는 해당 데이터베이스 내부의 세션 테이블에만 존재합니다. 그것을 폴링하는 무언가가 있어야 합니다. 우리는 세 가지를 확인합니다.",
+        "checklistTitle": "확인한 항목",
+        "checks": {
+          "queries": {
+            "ok": "쿼리 데이터가 수신되고 있습니다",
+            "okDetail": "{queries}건의 쿼리가 {databases}에서 도착 — 상위 쿼리 탭이 작동합니다",
+            "okDetailNoFleet": "{queries} — 상위 쿼리 탭이 작동합니다",
+            "no": "쿼리 데이터도 수신되지 않고 있습니다",
+            "noDetail": "상위 쿼리 탭부터 시작하세요 — 아직 이 데이터베이스에서 아무것도 도달하지 않았습니다."
+          },
+          "enabled": {
+            "ok": "데이터베이스 모니터링이 켜져 있습니다",
+            "okDetail": "이 조직에 대해",
+            "no": "데이터베이스 모니터링이 꺼져 있습니다",
+            "noDetail": "수집을 시작하려면 설정에서 켜세요."
+          },
+          "sampling": {
+            "no": "데이터베이스의 세션 테이블을 샘플링하는 항목이 없습니다",
+            "noDetail": "세션 샘플은 수집기에서 옵니다. 데이터베이스 호스트의 수집기 레시피에서 db.server.query_sample을 활성화하세요 — 설정 페이지에 안내되어 있습니다. OpenObserve는 데이터베이스 모니터링이 켜져 있을 때 이 피드를 수락하므로 수집기 쪽에서 해결해야 합니다."
+          }
+        }
+      }
+    },
+    "instanceMetrics": {
+      "columnHeader": "인스턴스 상태",
+      "columnHint": "수집기가 이미 보내는 메트릭 기준으로 한도 대비 연결 수입니다. 수신기가 이 인스턴스를 보고하기 전까지는 비어 있습니다.",
+      "connectionsOf": "{used} / {limit} 연결",
+      "connectionsNoLimit": "{used} 연결",
+      "noLimitHint": "이 엔진의 수신기는 자체적으로 연결 한도를 게시하지 않으므로 개수만 표시됩니다. 설정 카드의 연결 한도 레시피(sqlquery/mysql_limits)는 max_connections를 수집하여 백분율로 변환합니다.",
+      "trendLabel": "선택한 기간 동안의 연결",
+      "cacheHit": "캐시 적중 {percent}",
+      "lagBytes": "복제본 {value} 지연",
+      "lagSeconds": "복제본 {value} 지연",
+      "deadlocks": "{count} 교착 상태 | {count} 교착 상태",
+      "noTraffic": "이 기간 동안 애플리케이션 트래픽이 없습니다",
+      "noTrafficHint": "수집기가 이 인스턴스를 보고하지만 이 기간 동안 애플리케이션에서 쿼리하지 않았습니다. 쿼리 열이 비어 있는 것은 측정된 것이 없기 때문이지 빠르기 때문이 아닙니다.",
+      "unmatched": {
+        "pooler": "이 주소와 일치하는 인스턴스 메트릭이 없습니다",
+        "poolerHint": "이 행은 애플리케이션이 연결한 주소입니다. 수집기는 다른 호스트를 보고하는데, 이는 중간에 연결 풀러가 있을 때 나타나는 모습입니다 — 풀러의 주소와 실제 데이터베이스는 일치하지 않습니다.",
+        "loopback": "이 주소와 일치하는 인스턴스 메트릭이 없습니다",
+        "loopbackHint": "이 행은 localhost를 가리킵니다. 수집기는 루프백 엔드포인트를 자체 호스트 이름으로 다시 쓰므로 둘 다 정상이어도 두 이름은 일치할 수 없습니다.",
+        "noReceiver": "{engine} 수신기가 보고하지 않습니다",
+        "noReceiverHint": "애플리케이션이 이 데이터베이스를 쿼리하고 있지만 이에 대한 서버 메트릭을 보내는 {engine} 수신기가 없습니다. 이 열을 채우려면 수집기에 {engine} 수신기를 추가하세요.",
+        "noReceiverMariadbHint": "애플리케이션이 이 MariaDB 서버를 쿼리하고 있지만 서버 메트릭을 보내는 항목이 없습니다. 별도의 MariaDB 수신기는 없습니다 — MySQL 수신기를 이 인스턴스에 지정하면 해당 메트릭이 이 열을 채웁니다.",
+        "engineUnsupported": "{engine}에 대해 수집되지 않음",
+        "engineUnsupportedHint": "인스턴스 메트릭은 PostgreSQL, MySQL, MariaDB에 대해 수집됩니다 — 아직 {engine}용 수신기가 연결되어 있지 않으므로 이 열은 비어 있습니다. 이는 상태 판정이 아니라 적용 범위에 대한 참고 사항입니다.",
+        "unreadable": "인스턴스 메트릭을 읽을 수 없습니다",
+        "unreadableHint": "메트릭 스트림이 존재하지만 읽을 수 없습니다. 이는 일반적으로 데이터베이스 자체의 문제라기보다 권한 문제입니다."
+      },
+      "limitUnknownHint": "연결 수는 도착했지만 한도가 도착하지 않아 백분율을 표시할 수 없습니다. 이 수집기에서 연결 한도 메트릭이 활성화되어 있는지 확인하세요.",
+      "noReading": "이 기간 동안 측정값이 없습니다",
+      "noReadingHint": "수집기가 이 인스턴스를 보고하지만 이 기간 동안 연결 메트릭을 보내지 않았습니다. 수신기에서 메트릭이 꺼져 있거나 인스턴스가 보고를 중단했을 수 있습니다.",
+      "lagLabel": "복제 지연",
+      "deadlockLabel": "교착 상태"
+    },
+    "tableHealth": {
+      "title": "테이블 상태",
+      "subtitle": "각 테이블의 크기, 블로트, 진공 상태를 최신 스냅샷부터 표시합니다.",
+      "searchPlaceholder": "테이블 검색",
+      "never": "없음",
+      "countersCumulative": "스캔 및 진공 횟수는 마지막 통계 초기화 이후의 누적 총계이며 선택한 기간 동안의 횟수가 아닙니다.",
+      "tuplesEstimated": "행 수와 블로트 백분율은 데이터베이스 엔진의 통계 추정치이지 정확한 수치가 아닙니다.",
+      "notCollectingTitle": "테이블 통계가 아직 없습니다",
+      "notCollectingDescription": "이 시간 범위에서 테이블 통계를 보고한 항목이 없습니다. 이 신호는 별도의 수집기 레시피로 제공됩니다.",
+      "engineUnsupportedTitle": "이 엔진에 대해 수집되지 않음",
+      "engineUnsupportedDescription": "테이블 상태는 엔진별 수집기 레시피로 수집되며 이 엔진용 레시피는 제공되지 않습니다 — 따라서 수집되는 것이 없습니다. 이는 완전히 정상이라는 뜻이 아닙니다.",
+      "checklistTitle": "수집을 시작하려면",
+      "checkRecipe": "데이터베이스 설정 가이드의 pg_table_stats 레시피를 수집기 구성에 추가하세요.",
+      "checkGrant": "수집기 사용자에게 pg_stat_user_tables를 읽을 수 있도록 pg_monitor 권한을 부여하세요.",
+      "checkRange": "시간 범위를 넓히세요 — 레시피는 60초마다 한 번씩 보고합니다.",
+      "columns": {
+        "relation": "테이블",
+        "instance": "인스턴스",
+        "totalBytes": "총 크기",
+        "heapBytes": "힙 크기",
+        "overheadBytes": "인덱스 + TOAST",
+        "liveTuples": "라이브 행 (추정)",
+        "deadTuples": "죽은 행 (추정)",
+        "deadTupPct": "팽창 (추정)",
+        "modSinceAnalyze": "분석 이후 행 수",
+        "seqScanCount": "순차 스캔 (전체 기간)",
+        "seqTupRead": "순차 스캔된 행 (전체 기간)",
+        "idxScanCount": "인덱스 스캔 (전체 기간)",
+        "autovacuumCount": "자동 진공 (전체 기간)",
+        "frozenXidAge": "TXID 연령",
+        "lastVacuum": "마지막 진공",
+        "lastAutovacuum": "마지막 자동 진공",
+        "lastAnalyze": "마지막 분석"
+      },
+      "countLine": "{count}개 테이블"
+    },
+    "recommendations": {
+      "title": "권장 사항",
+      "subtitle": "수집기가 이미 보고하는 내용에 대한 결정적 검사입니다. 각 항목은 측정값과 초과한 임계값을 나타냅니다.",
+      "countersCumulative": "인덱스 스캔 수는 마지막 통계 초기화 이후의 전체 누적 수치이며, 선택한 시간 범위의 수치가 아닙니다.",
+      "andMore": "그 외 {count}개 더",
+      "unused-index": {
+        "title": "스캔되지 않은 인덱스",
+        "body": "{relation}의 {index} 인덱스는 기록된 스캔이 없으며 {size}를 차지합니다.",
+        "rule": "통계가 마지막으로 초기화된 이후 인덱스 스캔 수가 0이고, 인덱스 크기는 최소 {bytes} 바이트입니다. 스캔 수는 선택한 범위의 수치가 아닌 전체 누적 수치입니다.",
+        "caveat": "전체 누적 수치가 0이라는 것은 카운터가 마지막으로 초기화된 이후 플래너가 이 인덱스를 선택하지 않았음을 의미합니다. 여전히 복제본, 주기적 작업 또는 제약 조건에 사용될 수 있습니다."
+      },
+      "long-running-query": {
+        "title": "장기 실행 쿼리",
+        "body": "세션 {pid}이(가) {duration} 동안 실행 중입니다.",
+        "rule": "실행 중인 세션이 최소 {seconds}초 동안 실행되었습니다. 유휴 세션은 제외됩니다."
+      },
+      "high-impact-blocker": {
+        "title": "여러 세션을 차단 중인 세션",
+        "body": "세션 {pid}은(는) {count}개 세션이 대기 중인 체인의 맨 앞에 있습니다.",
+        "rule": "루트 차단자(다른 세션을 차단하고 아무 것도 기다리지 않는 세션) 뒤에는 전체 체인을 기준으로 최소 {sessions}개 세션이 대기 중입니다."
+      },
+      "high-row-count": {
+        "title": "호출당 높은 행 수",
+        "body": "이 문은 {calls}회 호출 동안 평균적으로 호출당 {rows}행을 반환했습니다.",
+        "rule": "평균 호출당 행 수는 최소 {calls}회 이상의 호출에서 최소 {rows}행입니다. 평균은 서버의 총 행 수를 호출 수로 나눈 값입니다."
+      },
+      "enginePartialTitle": "일부 검사가 실행되지 않았습니다",
+      "enginePartialDescription": "미사용 인덱스 검사에는 이 엔진에서 수집되지 않는 인덱스 스캔 카운터가 필요하므로, 여기의 빈 목록이 완전히 안전하다는 의미는 아닙니다.",
+      "allClearTitle": "임계값을 초과한 항목이 없습니다",
+      "allClearDescription": "모든 검사가 실행되었으며 이 시간 범위에서 임계값을 초과한 항목이 없습니다."
     }
   }
 }

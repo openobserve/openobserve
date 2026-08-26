@@ -17,12 +17,9 @@ use sea_orm::{
     ColumnTrait, Condition, EntityTrait, Order, QueryFilter, QueryOrder, Set, entity::prelude::*,
 };
 
-use super::{
-    entity::org_cleanup_tasks::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::org_cleanup_tasks::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -39,10 +36,7 @@ pub async fn add_batch(tasks: &[NewCleanupTask]) -> Result<(), errors::Error> {
     if tasks.is_empty() {
         return Ok(());
     }
-    // Init the ORM client BEFORE taking the lock: connect_to_orm acquires the
-    // same lock internally, so locking first can deadlock on the initial connect.
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let models: Vec<ActiveModel> = tasks
         .iter()
@@ -73,7 +67,7 @@ pub async fn add_batch(tasks: &[NewCleanupTask]) -> Result<(), errors::Error> {
 }
 
 pub async fn list_pending(max_attempts: i32) -> Result<Vec<CleanupTask>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let tasks = Entity::find()
         .filter(
             Condition::any()
@@ -91,8 +85,7 @@ pub async fn list_pending(max_attempts: i32) -> Result<Vec<CleanupTask>, errors:
 /// Atomically transition a task from any non-running state to 'running'.
 /// Returns true if this node won the CAS; false if another node beat us.
 pub async fn mark_running(id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let result = Entity::update_many()
         .col_expr(Column::Status, Expr::value("running"))
@@ -107,8 +100,7 @@ pub async fn mark_running(id: &str) -> Result<bool, errors::Error> {
 }
 
 pub async fn mark_done(id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     Entity::update_many()
         .col_expr(Column::Status, Expr::value("done"))
@@ -121,8 +113,7 @@ pub async fn mark_done(id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn mark_failed(id: &str, error: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     Entity::update_many()
         .col_expr(Column::Status, Expr::value("failed"))
@@ -141,8 +132,7 @@ pub async fn mark_failed(id: &str, error: &str) -> Result<(), errors::Error> {
 /// return it again — the deletion would stall forever. `attempts` is left as-is so
 /// the MAX_ATTEMPTS ceiling still applies across restarts.
 pub async fn requeue_running() -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let result = Entity::update_many()
         .col_expr(Column::Status, Expr::value("pending"))
@@ -158,7 +148,7 @@ pub async fn list_by_org_status(
     org_id: &str,
     status: Option<&str>,
 ) -> Result<Vec<CleanupTask>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut q = Entity::find().filter(Column::OrgId.eq(org_id));
     if let Some(s) = status {
         q = q.filter(Column::Status.eq(s));
@@ -173,8 +163,7 @@ pub async fn list_by_org_status(
 /// completes (org gone) or when an org is resurrected — the ledger for a
 /// nonexistent/restored org has no value.
 pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let result = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)

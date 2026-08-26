@@ -23,12 +23,9 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{
-    entity::users::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::users::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -114,7 +111,7 @@ impl From<&UserRecord> for DBUser {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -147,10 +144,7 @@ pub async fn add(user: UserRecord) -> Result<(), errors::Error> {
         id: Set(ider::uuid()),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => Ok(()),
         Err(e) => match e.sql_err() {
@@ -167,10 +161,7 @@ pub async fn update(
     password: &str,
     password_ext: Option<String>,
 ) -> Result<u64, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let result = Entity::update_many()
         .col_expr(Column::FirstName, Expr::value(first_name))
@@ -190,10 +181,7 @@ pub async fn update(
 }
 
 pub async fn remove(email: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
@@ -204,7 +192,7 @@ pub async fn remove(email: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .one(client)
@@ -216,7 +204,7 @@ pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
 }
 
 pub async fn get_root_user() -> Result<UserRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::IsRoot.eq(true))
         .one(client)
@@ -228,7 +216,7 @@ pub async fn get_root_user() -> Result<UserRecord, errors::Error> {
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<UserRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
@@ -245,7 +233,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<UserRecord>, errors::Error> 
 }
 
 pub async fn len() -> usize {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await;
 
     match len {
@@ -258,10 +246,7 @@ pub async fn len() -> usize {
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .exec(client)
         .await
@@ -275,10 +260,7 @@ pub async fn is_empty() -> bool {
 }
 
 pub async fn batch_remove(emails: Vec<String>) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let lowered_emails: Vec<String> = emails.iter().map(|e| e.to_lowercase()).collect();
     Entity::delete_many()
         .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).is_in(lowered_emails))

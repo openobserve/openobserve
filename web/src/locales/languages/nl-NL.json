@@ -1223,7 +1223,10 @@
     "ingestionText": "Ingestie",
     "navigationLink": "Navigatielink",
     "ariaCurrentPage": "{label} - Huidige pagina",
-    "ariaWithNotifications": "{label} ({count} meldingen)"
+    "ariaWithNotifications": "{label} ({count} meldingen)",
+    "infra": "Infra",
+    "databases": "Databases",
+    "topQueries": "Top Queries"
   },
   "rum": {
     "noSessionReplay": "Geen sessieherhaling beschikbaar",
@@ -3442,6 +3445,17 @@
     "languagesLabel": "Talen/kaders",
     "otherLabel": "Andere",
     "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "snowflake": "Snowflake",
+    "zookeeper": "Zookeeper",
+    "cassandra": "Cassandra",
+    "aerospike": "Aerospike",
+    "dynamodb": "DynamoDB",
+    "jenkins": "Jenkins",
+    "ansible": "Ansible",
+    "terraform": "Terraform",
+    "gactions": "GitHub Actions",
+    "python": "Python",
     "dotnettracing": ".Net traceren",
     "dotnetlogs": ".NET-logboeken",
     "macos": "macOS",
@@ -3703,6 +3717,12 @@
       "k8sTroubleWebhookA": "De webhook van de OpenTelemetry-operator vereist dat de webhook van cert-manager eerst actief is. Voer `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook` uit en voer daarna de installatie opnieuw uit — deze is idempotent.",
       "k8sTroubleWebhookQ": "De installatie mislukt met een fout over de admission webhook",
       "linuxAgentFixBody": "De installateur start de agent als een systemd-service. Als er niets aankomt, bevestig dan dat deze draait en lees de logs voor een authenticatie- of connectiviteitsfout:",
+      "prepareMariadbTitle": "MariaDB voorbereiden",
+      "prepareMariadbDesc": "Maak de monitoring-gebruiker aan — voer dit uit in een SQL-client, **niet** in je shell.",
+      "runCollectorMariadbDesc": "Start de collector (het wachtwoord van de gebruiker via env var).",
+      "mariadbHostLabel": "MariaDB-host",
+      "verifyMariadbMetricsDesc": "Klik op Test hieronder, of controleer Streams op de `mysql_*`-metrieken (MariaDB rapporteert via de MySQL-receiver).",
+      "mariadbTagline": "Verzamel MariaDB-metrieken met de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "logsStreamNameLabel": "Logstreamnaam",
       "macosAgentFixBody": "De installateur registreert twee launchd-daemons: de agent zelf en de unified log-bridge. Als er niets aankomt, bevestig dan dat beide zijn geladen en lees het logboek van de agent voor een authenticatie- of connectiviteitsfout:",
       "macosAgentServicesFixTitle": "Controleer de agentservices",
@@ -4007,7 +4027,46 @@
       "enableSessionReplayOptionalTitle": "Sessie-replay inschakelen (optioneel)",
       "enableSessionReplayNativeDesc": "Sessie-replay wordt **afzonderlijk** ingeschakeld en erft **geen** RUM-eindpunt. Het voegt ook niets toe, dus het heeft de volledige `/replay`-URL hieronder nodig. Een fout hierin is de gebruikelijke reden dat RUM-gebeurtenissen aankomen maar replays nooit.",
       "verifyAndroidRumDesc": "Voer de app uit op een emulator of apparaat, beweeg tussen een paar schermen en klik vervolgens op Test — native Android-gebeurtenissen komen terecht in de `_rumdata`-stroom.",
-      "verifyIosRumDesc": "Voer de app uit op een simulator of apparaat, beweeg tussen een paar schermen en klik vervolgens op Test — native iOS-gebeurtenissen komen terecht in de `_rumdata`-stroom."
+      "verifyIosRumDesc": "Voer de app uit op een simulator of apparaat, beweeg tussen een paar schermen en klik vervolgens op Test — native iOS-gebeurtenissen komen terecht in de `_rumdata`-stroom.",
+      "dbmPreparePostgresTitle": "Databasemonitoring · Toegang verlenen (optioneel)",
+      "dbmPreparePostgresDesc": "**Alles hierboven is op zichzelf compleet** — querytijden bereiken Databases al via de traces van je applicatie, zonder dat je hier iets hoeft in te stellen. Deze laatste stappen voegen toe wat een trace nooit kan zien: deadlocks en geblokkeerde queries, die alleen de database zelf registreert. Verleen `pg_monitor`, zodat de collector de queries van andere sessies kan lezen — voer dit uit in een SQL-client, **niet** in je shell.",
+      "dbmPrepareMysqlTitle": "Databasemonitoring · Deadlockgeschiedenis bewaren (optioneel)",
+      "dbmPrepareMariadbTitle": "Databasemonitoring · Deadlockgeschiedenis bewaren (optioneel)",
+      "dbmPrepareMysqlDesc": "**Alles hierboven is op zichzelf compleet** — querytijden bereiken Databases al via de traces van je applicatie, zonder dat je hier iets hoeft in te stellen. Deze laatste stappen voegen toe wat een trace nooit kan zien: deadlocks en geblokkeerde queries, die alleen de database zelf registreert. Schakel volledige deadlockgeschiedenis in — voer dit uit in een SQL-client, **niet** in je shell.",
+      "dbmPrepareMariadbDesc": "**Alles hierboven is op zichzelf compleet** — querytijden bereiken Databases al via de traces van je applicatie, zonder dat je hier iets hoeft in te stellen. Deze laatste stappen voegen toe wat een trace nooit kan zien: deadlocks en geblokkeerde queries, die alleen de database zelf registreert. Schakel volledige deadlockgeschiedenis in — voer dit uit in een SQL-client, **niet** in je shell.",
+      "dbmPgLoggingTitle": "Databasemonitoring · Laat Postgres deadlocks registreren (optioneel)",
+      "dbmPgLoggingDesc": "Deadlocks worden uitsluitend naar het Postgres-logboek geschreven, en alleen als de instellingen hieronder aan staan — dus deze stap is wat ervoor zorgt dat het tabblad Deadlocks überhaupt gevuld wordt. De prefixregel moet exact overeenkomen: de collector leest deze om te achterhalen wie erbij betrokken was, en een andere prefix betekent dat hij niets vindt terwijl hij toch gezond rapporteert.",
+      "dbmPgLoggingVerifyTitle": "Databasemonitoring · Controleer of de instellingen effect hebben gehad (optioneel)",
+      "dbmPgLoggingVerifyDesc": "Voer dit uit na de herstart. Als een waarde nog steeds de oude instelling toont, is Postgres herladen in plaats van herstart en heeft de collector niets om te lezen.",
+      "dbmPgAutoExplainTitle": "Databasemonitoring · Echte uitgevoerde plannen vastleggen (optioneel)",
+      "dbmPgAutoExplainDesc": "Zonder deze stap zijn queryplannen generieke schattingen die zijn berekend zonder je echte parameterwaarden — nuttig, maar nooit het plan dat daadwerkelijk is uitgevoerd. auto_explain registreert het plan dat Postgres werkelijk heeft uitgevoerd voor elke statement die langzamer is dan de drempelwaarde, met echte rijtellingen en een echte duur. Het voegt meetbare executor-overhead toe aan de statements die het bemonstert, dus lees de opmerkingen bij de instellingen voordat je ze toepast op een drukke primaire server, en voer het uit in dezelfde herstart als de bovenstaande loggingstap.",
+      "dbmConfigureTitle": "Databasemonitoring · De collector configureren (optioneel)",
+      "dbmConfigurePostgresDesc": "Schrijft `dbm-config.yaml` — stel hieronder de database en het pad naar je Postgres-logbestand in. Naast deadlocks en geblokkeerde queries schakelt deze configuratie activiteitsmonsters en server-topqueries in (met geschatte plannen): de collector heeft beide standaard op OFF staan, dus het `events:`-blok op het hoogste niveau in dit bestand is wat ze inschakelt — zonder dit ziet de collector er gezond uit en verzendt niets.",
+      "dbmConfigureMysqlDesc": "Schrijft `dbm-config.yaml` — stel hieronder de database en het pad naar je MySQL-foutlogboek in. Naast deadlocks en geblokkeerde queries schakelt deze configuratie activiteitsmonsters en server-topqueries in: de collector heeft beide standaard op OFF staan, dus het `events:`-blok op het hoogste niveau in dit bestand is wat ze inschakelt — zonder dit ziet de collector er gezond uit en verzendt niets.",
+      "dbmConfigureMariadbDesc": "Schrijft `dbm-config.yaml` — stel hieronder de database en het pad naar je MariaDB-foutlogboek in. MariaDB krijgt hier deadlocks, geblokkeerde queries, activiteitsmonsters en topqueries: de mysql-receiver spreekt het protocol van MariaDB en identificeert het correct. Een hiaat dat de receiver zelf meldt — MariaDB stelt de tekst van de bemonsterde statement niet beschikbaar, dus een activiteitsregel noemt de sessie zonder de SQL.",
+      "dbmRunTitle": "Databasemonitoring · De collector uitvoeren (optioneel)",
+      "dbmRunPostgresDesc": "Voert beide configuraties samen uit. Gebruik dezelfde rol en hetzelfde wachtwoord dat je in stap 1 hebt aangemaakt.",
+      "dbmRunMysqlDesc": "Voert beide configuraties samen uit. Gebruik dezelfde gebruiker en hetzelfde wachtwoord dat je in stap 1 hebt aangemaakt.",
+      "dbmRunMariadbDesc": "Voert beide configuraties samen uit. Gebruik dezelfde gebruiker en hetzelfde wachtwoord dat je in stap 1 hebt aangemaakt.",
+      "dbmVerifyTitle": "Databasemonitoring · Deadlocks en geblokkeerde queries bekijken",
+      "dbmVerifyDesc": "Open **Infra → Databases** en kies hieronder een tabblad. Gebeurtenissen verschijnen zodra je database er een meldt — een leeg tabblad vertelt je of er niets is gebeurd of dat er niets wordt verzameld.",
+      "dbmVerifyFullDesc": "Open **Infra → Databases** en kies hieronder een tabblad. Deadlocks en geblokkeerde queries verschijnen zodra je database er een meldt; het tabblad Activiteit vult zich met bemonsterde sessies binnen een minuut nadat de collector is gestart, en geschatte plannen verschijnen op de detailpagina van een query op MySQL 8.0.22 en nieuwer. Tabelgezondheid vult zich na de eerste momentopname van 60 seconden.",
+      "dbmDatabaseLabel": "Database",
+      "dbmPgLogPathLabel": "Postgres-logbestand",
+      "dbmPgLogPathHelp": "De collector moet dit bestand kunnen lezen. Vind het met: SHOW log_directory;",
+      "dbmMysqlLogPathLabel": "MySQL-foutlogboek",
+      "dbmMariadbLogPathLabel": "MariaDB-foutlogboek",
+      "dbmMysqlLogPathHelp": "De collector moet dit bestand kunnen lezen. Vind het met: SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "De collector moet dit bestand kunnen lezen. Vind het met: SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "Databasebewaking · Toegang verlenen (optioneel)",
+      "dbmPrepareMssqlDesc": "**Alles hierboven is op zichzelf compleet** — querytijden bereiken Databases al vanuit de traces van uw applicatie, zonder dat u hier iets hoeft in te stellen. Deze laatste groep voegt toe wat een trace nooit kan zien: deadlocks en geblokkeerde queries, die alleen de database zelf registreert. Beide rechten zijn nodig — de ene laat de collector andere sessies lezen, de andere laat hem de deadlockgeschiedenis lezen. Voer ze uit in een SQL-client, **niet** in uw shell.",
+      "dbmConfigureMssqlDesc": "Schrijft `dbm-config.yaml` — stel hieronder de database in waarmee verbinding moet worden gemaakt. SQL Server ontvangt hier deadlocks, geblokkeerde queries, activiteitsamples, topqueries en uitvoeringsplannen. De sqlserver-receiver leest over de hele instantie, dus activiteit en topqueries zijn niet beperkt tot de database die u hierboven noemt.",
+      "dbmRunMssqlDesc": "Voert beide configuraties samen uit. Gebruik dezelfde gebruikersnaam en hetzelfde wachtwoord die u in stap 1 hebt aangemaakt.",
+      "dbmVerifyBlockingDesc": "Open **Infra → Databases → Geblokkeerde queries**. Sessies die op een vergrendeling wachten, verschijnen zodra er een wordt gesampled — een leeg tabblad daar vertelt u of er niets is geblokkeerd of dat er niets wordt verzameld.",
+      "dbmVerifyFullNoSampleTextDesc": "Open **Infra → Databases** en kies hieronder een tabblad. Deadlocks en geblokkeerde queries verschijnen zodra uw database er een meldt; het tabblad Activiteit vult zich met gesamplede sessies binnen een minuut nadat de collector is gestart, en topqueries tonen hun plannen op de detailpagina van een query. MariaDB geeft de gesamplede statementtekst niet weer, dus een activiteitsrij noemt de sessie zonder de SQL. Tabelgezondheid vult zich na de eerste momentopname van 60 seconden.",
+      "dbmVerifyFullPlainPlansDesc": "Open **Infra → Databases** en kies hieronder een tabblad. Deadlocks en geblokkeerde queries verschijnen zodra uw database er een meldt; het tabblad Activiteit vult zich met gesamplede sessies binnen een minuut nadat de collector is gestart, en uitvoeringsplannen verschijnen op de detailpagina van een query. Tabelgezondheid vult zich na de eerste momentopname van 60 seconden.",
+      "dbmVerifyFullSlowTableHealthDesc": "Open **Infra → Databases** en kies hieronder een tabblad. Deadlocks en geblokkeerde queries verschijnen zodra uw database er een meldt; het tabblad Activiteit vult zich met gesamplede sessies binnen een minuut nadat de collector is gestart, en geschatte plannen verschijnen op de detailpagina van een query. Tabelgezondheid heeft maximaal vijf minuten nodig — het lezen van tabelgroottes wordt langzamer naarmate uw schema groeit, dus dit draait minder vaak dan de rest.",
+      "dbmVerifyTableHealthDesc": "Open **Infra → Databases** en kies hieronder een tabblad. Deadlocks en geblokkeerde queries verschijnen zodra uw database er een meldt — een leeg tabblad daar vertelt u of er niets is gebeurd of dat er niets wordt verzameld. Tabelgezondheid vult zich na de eerste momentopname van 60 seconden."
     },
     "instrumentBeforeImportTitle": "Instrumenteer vóór het importeren van de client",
     "instrumentBeforeImportBody": "Als uw app draait maar er geen spans aankomen, is de instrumentatie waarschijnlijk geladen nadat de client is geïmporteerd. Herschik de volgorde zodat de init eerst wordt uitgevoerd:",
@@ -4492,6 +4551,8 @@
     "folder": "Folder",
     "folders": "Mappen",
     "searchFolder": "Folder zoeken",
+    "folderIcon": "Pictogram",
+    "folderIconAria": "Kies een mappictogram",
     "deleteFolder": "Map verwijderen",
     "deleteFolderMessage": "Weet je zeker dat je deze map wilt verwijderen?",
     "trellisLayout": "Trellis-indeling",
@@ -5443,7 +5504,8 @@
     "variableNameAlreadyExists": "Er bestaat al een variabele met dezelfde naam",
     "pivotTotal": "Totaal",
     "pivotOthers": "Overige",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Verken overeenkomende logs"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5531,7 +5593,59 @@
     "mapvalue": "Waarde",
     "source": "Bron",
     "target": "Doelwit",
-    "value": "Waarde"
+    "value": "Waarde",
+    "logExplorer": {
+      "title": "Logverkenner",
+      "openInLogs": "Openen in Logs",
+      "invalidParams": "Ongeldige drilldown-parameters",
+      "noEvents": "Geen gebeurtenissen voldoen aan dit filter",
+      "filterHint": "Klik om gerelateerde logs te verkennen",
+      "timestamp": "Tijdstempel",
+      "queryMode": "SQL",
+      "runQuery": "Query uitvoeren",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "gebeurtenis",
+      "events": "gebeurtenissen",
+      "prevPage": "Vorige",
+      "nextPage": "Volgende",
+      "of": "van",
+      "sqlEditorLabel": "SQL-query",
+      "resetSql": "Reset",
+      "detail": {
+        "drawerTitle": "Gebeurtenisdetails",
+        "details": "Details",
+        "json": "JSON",
+        "insights": "Inzichten",
+        "copyLink": "Link kopiëren",
+        "copy": "Kopiëren",
+        "copyValue": "Waarde kopiëren",
+        "insightsHint": "Veldfrequenties over {n} geladen gebeurtenissen"
+      },
+      "insights": {
+        "anomalyTitle": "Veldanomalieprofiel",
+        "anomalyHint": "{n} gebeurtenissen gesampled",
+        "colField": "Veld",
+        "colRarity": "Zeldzaamheid",
+        "colValue": "Waarde",
+        "rarity": {
+          "anomalous": "Afwijkend",
+          "rare": "Zeldzaam",
+          "uncommon": "Ongewoon",
+          "common": "Algemeen"
+        },
+        "timelineTitle": "Gebeurtenistijdlijn",
+        "timelineHint": "Frequentie over geselecteerd bereik",
+        "timelineEmpty": "Geen gegevens",
+        "patternsTitle": "Logpatronen",
+        "patternsHint": "Gegroepeerd op vergelijkbare structuur",
+        "zScore": "z={value}",
+        "patternsEmpty": "Geen patronen geëxtraheerd voor dit filter",
+        "contextTitle": "Omringende gebeurtenissen",
+        "contextHint": "Gebeurtenissen nabij dit tijdstempel",
+        "contextTooltip": "Andere gebeurtenissen uit deze stream in de 3 minuten voor en na deze gebeurtenis — toont wat er op hetzelfde moment nog meer gebeurde.",
+        "contextEmpty": "Geen omringende gebeurtenissen gevonden"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Sectie overzicht van waarschuwingen",
@@ -6017,6 +6131,7 @@
     "SearchSQLCancelled": "Fout: Search SQL is geannuleerd."
   },
   "alerts": {
+    "allAlerts": "Alle meldingen",
     "compositeAlert": "Samengesteld",
     "import": {
       "anomalyImportSuccess": "Anomaliedetectie - {index}: \"{name}\" succesvol geïmporteerd",
@@ -7345,6 +7460,18 @@
         "panel": {
           "label": "Alert maken",
           "toast": "Query geïmporteerd uit dashboardpaneel: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Aanpassen in editor",
+          "toast": "Uit de meldingenbibliotheek: {sourceLabel}"
+        },
+        "dbm": {
+          "label": "Waarschuw mij",
+          "toast": "Geïmporteerd uit Databasebewaking: \"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "Waarschuw mij",
+          "toast": "Geïmporteerd uit Databasebewaking (serverperspectief): \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7366,7 +7493,13 @@
         "noQueries": "Dit paneel heeft geen query om een waarschuwing van te maken.",
         "noConstants": "De geselecteerde patronen hebben geen onderscheidende tekst om op te matchen.",
         "sqlModeFilterDropped": "Je SQL-query is niet overgenomen — de waarschuwing komt alleen overeen met de geselecteerde patronen.",
-        "patternsUnusable": "Geen van de patronen op deze pagina heeft onderscheidende tekst om op te matchen, dus de waarschuwing gebruikt alleen je zoekopdracht."
+        "patternsUnusable": "Geen van de patronen op deze pagina heeft onderscheidende tekst om op te matchen, dus de waarschuwing gebruikt alleen je zoekopdracht.",
+        "dbmRollupLag": "Databasenummers worden elke {minutes} minuten geaggregeerd, dus deze melding kan alleen zo vaak afgaan — het is geen realtime pagina.",
+        "dbmFingerprintVersion": "Deze melding is vastgepind aan de exacte vorm van één query. Als de manier waarop queries worden gegroepeerd ooit verandert, kan de melding niet meer overeenkomen en moet deze opnieuw worden aangemaakt.",
+        "dbmNoFingerprint": "Deze query heeft geen stabiele identifier, dus de melding bewaakt in plaats daarvan de hele database.",
+        "dbmServerVantage": "Dit meet wat de databaseserver zelf over vergrendelingen rapporteerde, niet hoe lang uw applicatie heeft gewacht. Vergelijk het niet met meldingen over querylatentie.",
+        "dbmLockSampling": "Vergrendelingsactiviteit wordt op een interval gesampled, dus conflicten die tussen twee samples begonnen en weer verdwenen zijn nooit geregistreerd. Een rustige melding is geen bewijs dat er geen blokkering was.",
+        "dbmNoInstance": "Er is geen enkele database-instantie geïdentificeerd, dus deze melding bewaakt elke instantie van deze engine."
       }
     },
     "saveFailed": "Kon de waarschuwing niet opslaan.",
@@ -7405,6 +7538,112 @@
     "impactTemplate": "Gebruikt door {destinations} · {alerts}",
     "impactDestination": "Gebruikt door {alerts}"
   },
+  "alert_library": {
+    "header": "Meldingenbibliotheek",
+    "subtitle": "Samengestelde, kant-en-klare meldingen, afgestemd op de gegevens die u al opneemt.",
+    "sectionTab": "Bibliotheek",
+    "contribute": "Bijdragen op GitHub",
+    "searchPlaceholder": "Zoeken op naam, beschrijving of stream",
+    "searchLabel": "Doorzoek de meldingenbibliotheek",
+    "categories": "Categorie",
+    "searchCategories": "Zoek categorieën",
+    "searchCategoriesAria": "Zoek categorie-filters",
+    "noCategoryMatch": "Geen categorieën gevonden.",
+    "selectedCount": "{count} geselecteerd",
+    "facetAria": "{label}, {count} meldingen",
+    "severity": "Ernst",
+    "severityAll": "Alle",
+    "severityCritical": "Kritiek",
+    "severityWarning": "Waarschuwing",
+    "severityInfo": "Info",
+    "statReady": "Klaar om te installeren",
+    "statNeedsData": "Niet opgenomen",
+    "statAll": "Alle",
+    "notIngested": "Niet opgenomen: {stream}",
+    "notIngestedHint": "Deze organisatie ontvangt geen {stream}, dus deze melding zou nooit afgaan. Installeer deze toch en die zal werken zodra de gegevens arriveren.",
+    "alertCount": "{count} melding | {count} meldingen",
+    "noCollectorTitle": "Niets hier komt nog overeen met uw gegevens.",
+    "noCollectorDescription": "Geen van deze {count} meldingen voert een query uit op een stream die deze organisatie ontvangt. Stuur {group}-telemetrie naar OpenObserve en ze lichten hier op.",
+    "setupGuide": "Opnamehandleiding",
+    "emptyLibraryTitle": "De alertbibliotheek is leeg",
+    "emptyLibraryDescription": "De catalogus is geladen maar bevat geen alerts. Dit is een publicatieprobleem, geen filter — probeer het binnenkort opnieuw.",
+    "noMatchesTitle": "Geen alerts voldoen aan deze filters",
+    "noMatchesDescription": "Probeer een andere categorie, ernst of zoekterm.",
+    "clearFilters": "Filters wissen",
+    "loadFailedTitle": "De alertbibliotheek kon niet worden geladen",
+    "retry": "Opnieuw proberen",
+    "openDetails": "{title} openen",
+    "drawer": {
+      "dataAvailable": "Gegevens beschikbaar",
+      "streamNotFound": "Stream niet gevonden",
+      "detects": "Wat het detecteert",
+      "noDescription": "Geen beschrijving in de bibliotheek.",
+      "needsDataCallout": "Deze alert bevraagt {stream}, die deze organisatie niet ontvangt. Als je deze nu installeert, wordt er een alert gemaakt die nooit afgaat.",
+      "query": "Query",
+      "stream": "Stream",
+      "streamType": "Streamtype",
+      "metricCondition": "Metrische conditie",
+      "matchCount": "Overeenkomende rijen vereist",
+      "previewBlocked": "{stream} is geen stream in deze organisatie, dus er is niets om te evalueren.",
+      "wouldTrigger": "Zou afgaan",
+      "wouldNotTrigger": "Zou niet afgaan",
+      "loading": "Deze alert wordt geladen vanuit de bibliotheek",
+      "loadFailed": "Deze alert kon niet worden geladen vanuit de bibliotheek.",
+      "customize": "Aanpassen in editor",
+      "customizeHint": "Opent de standaard alerteditor, vooraf ingevuld met deze alert.",
+      "customizeFailed": "Deze alert kon niet worden geopend in de editor.",
+      "install": "Installeren",
+      "neverIngested": "Nog geen gegevens",
+      "neverIngestedCallout": "{stream} bestaat maar heeft nooit gegevens ontvangen, dus deze alert heeft niets om op af te gaan.",
+      "lastData": "Laatste gegevens {when}",
+      "staleCallout": "{stream} ontving voor het laatst gegevens {when}. Deze alert blijft stil totdat de opname wordt hervat.",
+      "unknownTime": "op een onbekend tijdstip"
+    },
+    "install": {
+      "title": "Installeren vanuit de bibliotheek",
+      "subtitle": "Kies waar alerts meldingen sturen, welke alerts je installeert en waar ze worden opgeslagen.",
+      "stepDestination": "Bestemming",
+      "stepAlerts": "Alerts",
+      "stepFolder": "Map",
+      "stepTune": "Afstemmen",
+      "stepInstall": "Installeren",
+      "destinationIntro": "Elke alert in deze batch stuurt meldingen naar de bestemming die je hier kiest. Bibliotheekbestanden vermelden de bestemmingen van de organisatie waaruit ze zijn geëxporteerd, die niet bestaan in de jouwe.",
+      "destinationLabel": "Bestemming",
+      "destinationPlaceholder": "Kies een bestemming",
+      "destinationsLoadFailed": "Je bestaande bestemmingen konden niet worden geladen.",
+      "retry": "Probeer opnieuw",
+      "destinationsNoneBody": "Deze organisatie heeft nog geen alertbestemmingen, dus er is geen plek waar deze alerts meldingen naartoe kunnen sturen. Maak er een aan op de pagina Bestemmingen en kom daarna terug om deze hier te selecteren.",
+      "openDestinations": "Bestemmingen openen",
+      "selectAll": "Alles selecteren",
+      "clear": "Wissen",
+      "selectedCount": "{count} van {total} geselecteerd",
+      "folderIntro": "Geïnstalleerde alerts worden hier opgeslagen. Maak een map via de + knop als deze batch een eigen map verdient.",
+      "tuneToggle": "Stel deze in voor elke alert in deze batch",
+      "tuneHint": "Alleen deze twee kunnen veilig voor een hele batch worden ingesteld. Drempelwaarden blijven per alert — wijzig er een door die alert te openen en deze afzonderlijk te installeren.",
+      "frequency": "Uitvoeren elke",
+      "silence": "Dempen voor",
+      "minutes": "min",
+      "summaryTuningNone": "Bibliotheekstandaarden",
+      "summaryTuningOverride": "Elke {frequency} min, gedempt {silence} min",
+      "run": "Installeer {count} alert | Installeer {count} alerts",
+      "retryFailed": "Probeer {count} fout opnieuw | Probeer {count} fouten opnieuw",
+      "allInstalled": "{count} alert geïnstalleerd | {count} alerts geïnstalleerd",
+      "someFailed": "{installed} geïnstalleerd, {failed} mislukt",
+      "unknownError": "De alert kon niet worden aangemaakt.",
+      "unreadableConditions": "De filtervoorwaarden van deze alert zijn in een formaat dat deze versie niet kan lezen. Installeren zou een alert zonder filter opleveren, dus deze is overgeslagen.",
+      "back": "Terug",
+      "next": "Volgende",
+      "cancel": "Annuleren",
+      "done": "Klaar"
+    },
+    "error": {
+      "network": "De bibliotheek kon niet worden bereikt. Controleer uw netwerkverbinding en probeer het opnieuw.",
+      "http": "De bibliotheekserver heeft een fout geretourneerd. Probeer het over een moment opnieuw.",
+      "unparseable": "De bibliotheek heeft iets geretourneerd dat geen catalogus is.",
+      "unsupported_version": "Deze bibliotheekcatalogus is nieuwer dan deze versie van OpenObserve kan lezen. Upgrade om deze te bekijken.",
+      "malformed": "De bibliotheekcatalogus is onvolledig of beschadigd."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Template exporteren",
     "selected": "geselecteerd",
@@ -7429,7 +7668,7 @@
     "importBodyLabel": "Template-inhoud *",
     "importTypeLabel": "Templatetype *",
     "importTitleLabel": "Templatetitel *",
-    "header": "Sjablonen",
+    "header": "Bestemmingssjablonen",
     "add": "Sjabloon toevoegen",
     "edit": "Bewerken",
     "name": "Naam",
@@ -7636,6 +7875,7 @@
     "destinationsLoadError": "Fout bij het laden van bestemmingen"
   },
   "alert_destinations": {
+    "sectionTab": "Bestemmingen",
     "chooseTypeTitle": "Kies type",
     "selectDestinationType": "Selecteer bestemmingstype",
     "connectionStepTitle": "Verbinding",
@@ -9143,7 +9383,8 @@
       "rowsReturned": "Teruggegeven rijen",
       "batchSize": "Batchgrootte",
       "querySummary": "Querysamenvatting",
-      "responseStatus": "Responsstatus"
+      "responseStatus": "Responsstatus",
+      "viewQueryTrend": "Bekijk querytrend in Database Monitoring"
     },
     "index": {
       "clickHere": "Klik hier",
@@ -9219,6 +9460,7 @@
       "viewRelated": "Gerelateerd bekijken",
       "logs": "Logboeken",
       "traces": "Traces",
+      "databases": "Databases",
       "viewTraces": "Traces bekijken",
       "operations": "Operaties",
       "metrics": "Metrieken",
@@ -9995,7 +10237,7 @@
     "copyPattern": "Patroon kopiëren",
     "copied": "Gekopieerd!",
     "pricingTiers": "Prijsniveaus",
-    "pricingTiersDesc": "De eerste laag is de standaardinstelling. Er zijn extra niveaus van toepassing wanneer aan de gebruiksvoorwaarden is voldaan.",
+    "pricingTiersDesc": "De eerste laag is de standaard. Extra lagen worden toegepast wanneer aan hun gebruiksconditie en UTC-tijdvenster is voldaan.",
     "tierName": "Naam van het niveau",
     "applyTierWhen": "Pas deze laag toe wanneer",
     "quickSetup": "Snelle installatie:",
@@ -10087,7 +10329,25 @@
     "saveShadowedWarning": "Opgeslagen, maar dit item wordt overschaduwd door „{winner}”, dat hetzelfde patroon en een hogere prioriteit heeft. Het wordt nooit gebruikt voor kostenberekening, tenzij de andere invoer wordt verwijderd of uitgeschakeld.",
     "modelPricingSaved": "Modelprijzen opgeslagen",
     "errSave": "Opslaan is mislukt",
-    "errLoadModel": "Het laden van het model is mislukt"
+    "errLoadModel": "Het laden van het model is mislukt",
+    "tierDefaultName": "Standaard",
+    "timeWindows": "Actieve uren (UTC)",
+    "timeWindowsDesc": "Beperk deze laag tot terugkerende UTC-uren, voor providers die piek- en daltarieven factureren.",
+    "timeWindowFrom": "Van",
+    "timeWindowTo": "Tot",
+    "addTimeWindow": "Tijdvenster toevoegen",
+    "removeTimeWindow": "Tijdvenster verwijderen",
+    "addUsageCondition": "Gebruiksconditie toevoegen",
+    "removeUsageCondition": "Gebruiksconditie verwijderen",
+    "timeWindowInvalid": "Laag \"{name}\": voer een tijd in als HH:MM (24-uurs UTC).",
+    "timeWindowSameBounds": "Laag \"{name}\": begin en einde moeten verschillen. Verwijder het venster om de laag altijd actief te maken.",
+    "timeWindowWrapsHint": "Overschrijdt middernacht UTC.",
+    "tierNeedsRestriction": "Laag \"{name}\" heeft geen gebruiksconditie en geen tijdvenster, dus deze zou nooit worden bereikt. Voeg een toe of verwijder de laag.",
+    "timeBasedChip": "Tijdgebonden",
+    "tierAlwaysActive": "Altijd actief (standaard)",
+    "testAtTimeLabel": "Testen op UTC-tijd",
+    "testAtTimeHint": "Laat leeg om de huidige tijd te gebruiken. Piek-/dallagen worden op basis van deze tijd bepaald.",
+    "localTimeHint": "In uw tijdzone: {range}"
   },
   "aiObservability": {
     "title": "LLM-waarneembaarheid",
@@ -13269,6 +13529,24 @@
     "combobox": {
       "noOptionsFound": "Geen opties gevonden"
     },
+    "emojiPicker": {
+      "chooseIcon": "Kies een pictogram",
+      "searchPlaceholder": "Zoek pictogrammen...",
+      "removeIcon": "Pictogram verwijderen",
+      "noResults": "Geen pictogrammen gevonden voor uw zoekopdracht",
+      "groups": {
+        "results": "Resultaten",
+        "status": "Status",
+        "services": "Diensten",
+        "ai": "AI",
+        "creatures": "Wezens",
+        "infra": "Infrastructuur",
+        "data": "Gegevens",
+        "teams": "Teams",
+        "objects": "Objecten",
+        "world": "Wereld"
+      }
+    },
     "input": {
       "clear": "Wissen"
     },
@@ -13647,6 +13925,14 @@
       },
       "variableScope": {
         "global": "Globaal"
+      },
+      "dataConfidence": {
+        "estimated": "≈ geschat",
+        "topNSubset": "top-N-subset",
+        "live": "live",
+        "belowTopN": "onder top-N",
+        "truncated": "afgekapt",
+        "gap": "hiaat"
       }
     }
   },
@@ -14627,6 +14913,1056 @@
     },
     "hover": {
       "deprecated": "**Verouderd** — geef de voorkeur aan de canonieke functie."
+    }
+  },
+  "dbm": {
+    "common": {
+      "reload": "Vernieuwen",
+      "lastRefreshed": "Laatst vernieuwd {age}",
+      "loadFailed": "Kan databasegegevens niet laden. Probeer het opnieuw of verklein het tijdsbereik."
+    },
+    "ai": {
+      "suggestFix": "Vraag AI hoe dit op te lossen",
+      "suggestFixHint": "Opent de AI-assistent met deze query, de engine en de latentiewaarden, en vraagt wat er moet veranderen. Het verandert zelf niets.",
+      "rowSuggestFix": "Vraag AI hoe dit op te lossen",
+      "deadlockFix": "Hoe stop ik deze deadlock?",
+      "deadlockFixHint": "Verstuurt zowel de conflicterende statements als het rijvolgorde-bewijs naar de AI-assistent.",
+      "blockingFix": "Waarom blokkeert dit?",
+      "blockingFixHint": "Verstuurt de statement van de rootsessie, de inactieve tijd en het aantal sessies dat erachter vastzit naar de AI-assistent."
+    },
+    "filters": {
+      "allEngines": "Alle engines",
+      "allInstances": "Alle databases",
+      "allNamespaces": "Alle schema's",
+      "allEnvs": "Alle omgevingen",
+      "allServices": "Alle diensten",
+      "scope": "Filters",
+      "clearScope": "Alles wissen",
+      "removeScope": "Verwijder dit filter",
+      "popoverTitle": "Beperk dit",
+      "dimension": {
+        "system": "engine",
+        "instance": "database",
+        "namespace": "schema",
+        "env": "omgeving",
+        "service": "dienst",
+        "insight": "inzicht"
+      }
+    },
+    "delta": {
+      "new": "nieuw in deze lijst",
+      "gone": "gestopt met draaien",
+      "newHint": "Deze query hoorde eerder niet bij de zwaarste, dus er is niets om deze mee te vergelijken. Het kan zijn dat hij eerder draaide, maar gewoon niet zwaar genoeg om apart te worden gevolgd.",
+      "goneHint": "Deze query draaide eerder op de dag, maar niet in het tijdsbereik dat je nu bekijkt.",
+      "comparison": "Eerder {previous} → nu {current}",
+      "noChange": "geen wijziging",
+      "timesMore": "{ratio}× meer",
+      "timesFewer": "{ratio}× minder",
+      "wasValue": "was {value}"
+    },
+    "databases": {
+      "title": "Databases",
+      "subtitle": "Queryprestaties en gezondheid per database",
+      "searchPlaceholder": "Zoek database of service…",
+      "unnamedInstance": "Instantie niet benoemd",
+      "unnamedInstanceHint": "De eigen statement-rapporten van de database bewijzen dat deze engine draait, maar ze geven geen hostnaam. De rij toont een adres zodra een feed die er een bevat — sessiesampling of instantiemetrieken — is ingesteld.",
+      "moreServices": "+{count}",
+      "columns": {
+        "instance": "Database",
+        "calls": "Aanroepen",
+        "qps": "Per seconde",
+        "errorRate": "Mislukt",
+        "p50": "De helft eronder",
+        "p95": "Trage aanroepen",
+        "p99": "Traagste 1%",
+        "services": "Gebruikt door",
+        "load": "Databasetijd",
+        "attention": "Aandacht nodig"
+      },
+      "summary": {
+        "databases": "Databases",
+        "calls": "Aanroepen",
+        "time": "Databasetijd",
+        "failed": "Mislukt"
+      },
+      "databaseCount": "1 database | {count} databases",
+      "openQueries": "Bekijk de query's",
+      "alertMe": "Waarschuw mij",
+      "columnHints": {
+        "qps": "Aanroepen per seconde — de aanroepen van dit venster gedeeld door de lengte ervan, zodat een weergave van 15 minuten en een van 4 uur vergelijkbaar blijven.",
+        "p50": "De helft van alle aanroepen was sneller dan dit. Telt alleen voltooide aanroepen — een query die nog draait of nooit terugkwam, wordt hier niet gemeten.",
+        "p95": "De trage staart — 1 op de 20 aanroepen duurde minstens zo lang. Telt alleen voltooide aanroepen — een query die nog draait of nooit terugkwam, wordt hier niet gemeten.",
+        "p99": "De slechtste 1% van de aanroepen duurde minstens zo lang. Telt alleen voltooide aanroepen — een query die nog draait of nooit terugkwam, wordt hier niet gemeten.",
+        "load": "Totale tijd die je applicaties wachtten op deze database. Gemeten aan de clientkant, dus het weerspiegelt hoeveel verkeer deze database bediende — niet hoe belast de server is.",
+        "attention": "Hoe dicht deze instantie bij een limiet zit die de eigen engine publiceert — vandaag, verbindingen ten opzichte van max_connections. De slechtste dergelijke ratio, geen samengestelde score. Gesorteerd van hoog naar laag, met instanties waarvan de gezondheid niet kan worden uitgelezen bovenaan, want van een instantie die je niet kunt zien weet je niet of ze gezond is. Gemeten op de databaseserver, dus het is niet vergelijkbaar met de Databasetijd ernaast."
+      },
+      "failedChip": "{count} mislukt",
+      "columnSubLabels": {
+        "attention": "server",
+        "load": "client",
+        "calls": "client"
+      },
+      "attention": {
+        "connections": "verbindingen",
+        "noLimit": "geen limiet gepubliceerd",
+        "unknown": "niet gemeten"
+      }
+    },
+    "queries": {
+      "title": "Top-query's",
+      "subtitle": "De query's die de meeste databasetijd gebruiken",
+      "subtitleServer": "De statements die je databases uitvoerden, geteld in de database — de meest uitgevoerde eerst.",
+      "searchPlaceholder": "Zoek querytekst, tabel of service…",
+      "trendLabel": "Hoe de tijd van deze query is veranderd over het bereik",
+      "otherRow": "Alle andere query's",
+      "truncatedText": "Dit statement was te lang om volledig op te slaan, dus het wordt afgekort weergegeven.",
+      "stmtClass": {
+        "query": "Query's",
+        "queryHint": "Alleen echte SQL — SELECT, INSERT, UPDATE en DELETE.",
+        "all": "Query's + verbindingsoverhead",
+        "allHint": "Telt ook de administratie die je driver tussen query's verstuurt: BEGIN en COMMIT, SET, en de controles die een gepoolde verbinding in leven houden."
+      },
+      "completionBias": {
+        "title": "Aanroepen daalden met {drop}% terwijl fouten stegen.",
+        "body": "Dat betekent meestal dat query's vastlopen in plaats van dat ze afronden — en we kunnen alleen query's meten die afronden. Een dalende lijn hier betekent niet noodzakelijkerwijs dat het herstelt."
+      },
+      "columns": {
+        "query": "Query",
+        "calls": "Aanroepen",
+        "p95": "Trage aanroepen",
+        "errors": "Mislukt",
+        "perTrace": "Per verzoek",
+        "load": "Databasetijd",
+        "p99": "Langzaamste 1%",
+        "max": "Slechtste gezien",
+        "services": "Gebruikt door"
+      },
+      "queryCount": "1 soort query | {count} soorten queries",
+      "otherRowDetail": "— {calls} aanroepen. We hebben geen per-query cijfers voor deze, alleen dit gecombineerde totaal. Geteld in elk totaal hierboven.",
+      "foldRowText": "1 kleinere query | {count} kleinere queries",
+      "serverList": {
+        "title": "Queries gerapporteerd door je databases",
+        "subtitle": "Geteld in de database over elke client, de meest voorkomende eerst. Er zijn geen getraceerde applicatie-aanroepen in dit venster terechtgekomen, dus de gebruikelijke lijst is leeg — dit is wat de databases ondertussen zagen.",
+        "truncated": "De {count} meest uitgevoerde statements — er zijn er meer uitgevoerd dan hier worden getoond",
+        "columns": {
+          "query": "Query",
+          "calls": "Aanroepen",
+          "totalTime": "Tijd in database",
+          "meanTime": "Gemiddelde per aanroep"
+        },
+        "columnHints": {
+          "time": "Gemeten in de database: uitvoeringstijd voor PostgreSQL, wachttijd voor MySQL en MariaDB. Niet wat je applicaties hebben ervaren — netwerk- en verbindingswachttijd zijn niet inbegrepen.",
+          "mean": "Tijd in database gedeeld door aanroepen — een gemiddelde over het venster, geen percentiel."
+        }
+      },
+      "foldRowDetail": "· {share} van de databasetijd · klik om ze te tonen",
+      "foldRowDetailOpen": "· {share} van de databasetijd · klik om ze in te klappen",
+      "summary": {
+        "queries": "Soorten queries",
+        "calls": "Aanroepen",
+        "time": "Databasetijd",
+        "failed": "Mislukt"
+      },
+      "columnHints": {
+        "calls": "Hoe vaak deze query is uitgevoerd. De eigen telling van je database als deze er een rapporteert — dat omvat elke client, niet alleen de delen van je systeem die traces sturen. Rijen die als 'client-observed' zijn gemarkeerd, worden in plaats daarvan uit traces geteld, omdat je database ze niet rapporteerde.",
+        "p50": "De helft van alle aanroepen was sneller dan dit. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
+        "p95": "De langzame staart — 1 op de 20 aanroepen duurde minimaal zo lang. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
+        "p99": "De slechtste 1% van de aanroepen duurde minimaal zo lang. Telt alleen voltooide aanroepen — een query die nog draait, of die nooit is teruggekomen, wordt hier niet gemeten.",
+        "max": "De langzaamste afzonderlijke aanroep in dit venster — één echte aanroep, geen gemiddelde.",
+        "errors": "Hoeveel van deze aanroepen eindigden in een fout.",
+        "perTrace": "Hoe vaak dit wordt uitgevoerd binnen één verzoek. Een hoog getal duidt meestal op een lus.",
+        "load": "Totale tijd die deze query in de database doorbracht. Het eigen cijfer van je database als deze er een rapporteert: uitvoeringstijd op Postgres, maar wachttijd op MySQL en MariaDB — elke rij zegt welke. Rijen die als 'client-observed' zijn gemarkeerd, worden gemeten uit traces, dus ze omvatten de netwerkretour."
+      },
+      "errorsNone": "geen",
+      "errorsAll": "alle",
+      "actions": {
+        "open": "Details openen",
+        "traces": "Voorbeeldtraces bekijken",
+        "copy": "Query kopiëren",
+        "copied": "Query gekopieerd",
+        "copyFailed": "De query kon niet worden gekopieerd.",
+        "alert": "Waarschuw me als dit langzamer wordt"
+      },
+      "otherRowTextFor": "Alle andere queries op {database}",
+      "otherRowDetailShort": "— {calls} aanroepen.",
+      "columnSubLabels": {
+        "calls": "server waarop gerapporteerd",
+        "load": "server waarop gerapporteerd"
+      }
+    },
+    "insights": {
+      "showRows": "Toon deze query | Toon deze {count} queries",
+      "clearFilter": "Filter wissen",
+      "alsoAffects": "en {count} andere query | en {count} andere queries",
+      "showLess": "Toon minder",
+      "more": "{count} meer | {count} meer",
+      "regression": {
+        "title": "{ratio}× langzamer dan normaal",
+        "body": "{before} → {after}, zelfde belasting",
+        "rule": "Getoond omdat de langzame aanroepen van deze query meer dan {ratio}× langzamer zijn dan {baseline}, over ten minste {calls} aanroepen."
+      },
+      "new-expensive": {
+        "title": "Nieuwe query, al duur",
+        "body": "draaide eerder niet · nu {share} van de databasetijd",
+        "rule": "Getoond omdat deze query niet tot de zwaarste in {baseline} behoorde en nu ten minste {share}% van de databasetijd inneemt, over ten minste {calls} aanroepen. Hij draaide misschien eerder — alleen niet zwaar genoeg om apart te volgen."
+      },
+      "n-plus-one": {
+        "title": "Draait ten minste {multiplier}× per verzoek",
+        "body": "{share} van de databasetijd · {service}",
+        "rule": "Getoond omdat deze query ten minste {ratio} keer binnen één verzoek draait, over ten minste {traces} verzoeken. Het is een ondergrens, dus het werkelijke aantal kan hoger zijn. Legitiem batchwerk kan er hetzelfde uitzien."
+      },
+      "volume-shift": {
+        "title": "Drukker, niet langzamer",
+        "body": "{ratio}× vaker aangeroepen, zelfde snelheid · {service}",
+        "rule": "Getoond omdat deze query meer dan {ratio}× zo vaak wordt aangeroepen als in {baseline}, terwijl de snelheid binnen {latency}× daarvan bleef. De verandering zit in wat hem aanroept."
+      },
+      "rank-churn": {
+        "title": "Nieuwe zwaarste query",
+        "body": "verplaatst #{from} → #{to}",
+        "rule": "Getoond omdat een query in de zwaarste {into} terechtkwam van buiten de zwaarste {from} in {baseline}, terwijl de totale databasetijd groeide.",
+        "unranked": "ongerangschikt"
+      },
+      "hide": "Verbergen",
+      "show": "Tonen",
+      "findRow": "Vind het",
+      "all-failing": {
+        "title": "Elke aanroep mislukt",
+        "body": "{failed} van {total} aanroepen mislukt · {query}",
+        "rule": "Getoond omdat elke aanroep van deze query in het bereik een fout opleverde."
+      },
+      "baseline": {
+        "label": "Vergelijk met",
+        "previous": "de vorige periode",
+        "yesterday": "dezelfde uren gisteren",
+        "previousShort": "vs vorige",
+        "previousHint": "Vergelijk met de periode direct hiervoor, van dezelfde lengte.",
+        "yesterdayShort": "vs gisteren",
+        "yesterdayHint": "Vergelijk met dezelfde uren een dag eerder — handig wanneer het verkeer een dagelijkse cyclus volgt, of om te zien wat er sinds een deployment is veranderd."
+      }
+    },
+    "coverage": {
+      "unknownNote": "Niets te meten in het bereik en de filters die je hebt gekozen.",
+      "lineHealthy": "Je ziet {percent}% van de tijd van deze database — de {count} zwaarste soorten query's.",
+      "lineRemainder": "Je ziet {percent}% van de tijd van deze database. De rest zit in lichtere query's die we niet één voor één vermelden.",
+      "lineStale": "Onze telling loopt {minutes} minuten achter, dus de meest recente query's zijn mogelijk nog niet hier.",
+      "lineTruncated": "Er was meer data in het laatste deel dan we konden verwerken, dus de nieuwste cijfers zijn onderschattingen.",
+      "lineTruncatedStale": "Er was meer data in het laatste deel dan we konden verwerken, en onze telling loopt {minutes} minuten achter — de nieuwste cijfers zijn onderschattingen, en de meest recente query's zijn mogelijk nog niet hier.",
+      "lineGap": "{minutes} minuten ontbreken in dit venster. Onze telling stopte om {stopped} en kan slechts {reach} minuten teruggaan, dus niets dekt {from}–{to}.",
+      "lineSubset": "Je hebt gefilterd op {filter}, dus deze percentages beschrijven de getoonde rijen, niet de hele database.",
+      "lineHealthyAll": "Je ziet elke query die draaide. Snelheden hier zijn gemeten over elke aanroep, dus ze zijn exact.",
+      "lineHealthyAllEstimated": "Je ziet elke query die draaide. Snelheden hier zijn gemengd over meerdere tijdsperioden, dus ze zijn bij benadering maar niet exact.",
+      "lineCountedTo": "Geteld tot {time}; de laatste halve minuut komt nog binnen.",
+      "lineExact": "Alle databases rapporteren. Snelheden hier zijn gemeten over elke aanroep, dus ze zijn exact.",
+      "lineExactEstimated": "Alle databases rapporteren. Snelheden hier zijn gemengd over meerdere tijdsperioden, dus ze zijn bij benadering maar niet exact.",
+      "lineSubsetUnnamed": "Je filters beperken dit tot onder het niveau waarop deze totalen worden opgeteld, dus de percentages beschrijven de getoonde rijen in plaats van de hele database.",
+      "lineQuery": "Tijden worden gemeten vanuit je applicatie, dus ze omvatten netwerktijd en eventueel wachten op een vrije verbinding.",
+      "lineUncodedErrors": "{percent} van de mislukkingen hier kwam terug zonder een redencode, dus ze kunnen worden geteld maar niet verklaard.",
+      "lineSubsetStale": "Je hebt gefilterd op {filter}, en onze telling loopt {minutes} minuten achter — deze percentages beschrijven de getoonde rijen, en de meest recente query's zijn mogelijk nog niet hier.",
+      "lineSubsetUnnamedStale": "Je filters beperken dit tot onder het niveau waarop deze totalen worden opgeteld, en onze telling loopt {minutes} minuten achter — de percentages beschrijven de getoonde rijen, en de meest recente query's zijn mogelijk nog niet hier.",
+      "lineCountedToBehind": "Geteld tot {time}; we lopen {minutes} minuten achter."
+    },
+    "breakdown": {
+      "loading": "Bezig met uitzoeken waar de tijd naartoe ging…",
+      "noSchema": "Geen schema gerapporteerd",
+      "noService": "Aanroeper niet geïdentificeerd",
+      "nothingToAttribute": "We hebben de totalen van deze database, maar geen rijen per query in dit bereik, dus we kunnen niet zeggen welke dienst de tijd heeft besteed.",
+      "queryCount": "{count} query | {count} query's",
+      "shortfall": "Deze zijn samen {percent} minder dan het totaal van deze database, omdat alleen de zwaarste soorten query's afzonderlijk worden gevolgd."
+    },
+    "freshness": {
+      "neverAggregated": "We zijn nog niet klaar met het tellen van dit bereik. De eerste cijfers verschijnen meestal binnen ongeveer 15 minuten."
+    },
+    "empty": {
+      "filtered": {
+        "title": "Geen query's voldoen aan je filters",
+        "description": "Niets hier voldoet aan de zoekopdracht en filters die je hebt toegepast.",
+        "action": "Filters wissen"
+      },
+      "title": "Nog niets hier — en dit is precies waarom",
+      "subtitle": "We hebben alles gecontroleerd dat waar moet zijn.",
+      "subtitleCounts": "{pass} geslaagd, {fail} niet geslaagd. | {pass} geslaagd, {fail} niet geslaagd.",
+      "checklistTitle": "Wat we hebben gecontroleerd",
+      "showMeHow": "Laat me zien hoe ik het kan instrumenteren",
+      "checkTrace": "Bekijk een van mijn traces",
+      "checks": {
+        "enabled": {
+          "ok": "Databasemonitoring is ingeschakeld",
+          "okDetail": "voor deze organisatie",
+          "no": "Databasemonitoring is uitgeschakeld",
+          "noDetail": "Een beheerder kan het inschakelen voor deze organisatie en vervolgens de collector opnieuw starten."
+        },
+        "traces": {
+          "ok": "Je traces komen binnen",
+          "okDetail": "{count} geregistreerd in dit tijdsbereik",
+          "no": "Er zijn geen traces aangekomen",
+          "noDetail": "Databasemonitoring is gebouwd op basis van traces, en deze organisatie heeft er nog geen verzonden."
+        },
+        "permission": {
+          "ok": "Je hebt toegang tot deze gegevens",
+          "okDetail": "je bent beheerder op {org}",
+          "no": "Je hebt geen toegang tot deze gegevens",
+          "noDetail": "Databasemonitoring leest je traces, en jouw rol omvat deze niet. Vraag een beheerder om leestoegang."
+        },
+        "dbSpans": {
+          "ok": "Je traces vermelden een database",
+          "okDetail": "database-aanroepen worden opgenomen",
+          "no": "Geen van je traces vermelden een database",
+          "noDetail": "Je applicaties worden getraceerd, maar het onderdeel dat met de database praat niet. Voeg de database-instrumentatie toe voor jouw taal en de query's verschijnen hier."
+        },
+        "counted": {
+          "ok": "We zijn klaar met het tellen van dit bereik",
+          "okDetail": "cijfers zijn actueel",
+          "no": "We zijn nog niet klaar met tellen",
+          "noDetail": "Database-aanroepen zijn aangekomen, maar de eerste cijfers zijn nog niet klaar. Dit duurt meestal een paar minuten."
+        },
+        "window": {
+          "ok": "Er is iets uitgevoerd in dit tijdsbereik",
+          "okDetail": "database-aanroepen zijn opgenomen",
+          "no": "Er is niets uitgevoerd in het door jou gekozen tijdsbereik",
+          "noDetail": "Probeer een breder bereik."
+        },
+        "alsoWorthKnowing": {
+          "title": "Ook de moeite waard om te weten",
+          "detail": "Zodra dat is geregeld, verschijnen de eerste query's binnen ongeveer 15 minuten."
+        }
+      },
+      "action": "Probeer opnieuw",
+      "viewDocs": "Documentatie bekijken"
+    },
+    "detail": {
+      "title": "Querydetails",
+      "tabs": {
+        "overview": "Overzicht",
+        "overviewHint": "Hoe traag deze query is, hoe vaak deze wordt uitgevoerd en waar deze wordt uitgevoerd.",
+        "plans": "Queryplannen",
+        "plansHint": "De stappen die je database heeft genomen om deze query uit te voeren. Begin hier om te achterhalen waarom hij traag is.",
+        "callers": "Aanroepers en voorbeelden",
+        "callersHint": "Welke onderdelen van je applicatie deze query hebben uitgevoerd, en individuele trage uitvoeringen die je als trace kunt openen.",
+        "callersLocked": "Individuele uitvoeringen komen uit tracing. In dit tijdsbereik is deze query door niets getraceerd."
+      },
+      "notFound": {
+        "title": "Deze query hoort niet bij deze organisatie",
+        "description": "Het adres verwijst naar een query die {org} niet heeft uitgevoerd in het bereik dat je bekijkt. Als je net van organisatie bent gewisseld, hoort deze bij de organisatie die je hebt verlaten.",
+        "descriptionNoOrg": "Het adres verwijst naar een query die deze organisatie niet heeft uitgevoerd in het bereik dat je bekijkt. Als je net van organisatie bent gewisseld, hoort deze bij de organisatie die je hebt verlaten.",
+        "scopeHint": "Niets kwam hiermee overeen in deze organisatie, het tijdsbereik en de scope. Als het adres van een andere engine of instantie komt, wis die filters of keer terug naar de lijst.",
+        "missingTitle": "Geen query geselecteerd",
+        "missingDescription": "Deze pagina beschrijft één query, en het adres noemt er geen. Als je net van organisatie bent gewisseld, hoort de query die je aan het lezen was bij de organisatie die je hebt verlaten.",
+        "action": "Blader door de queries van deze organisatie"
+      },
+      "backToQueries": "Terug naar top-queries",
+      "backToActivity": "Terug naar activiteit",
+      "backToSamples": "Terug naar langzaamste aanroepen",
+      "backToDeadlocks": "Terug naar deadlocks",
+      "latencyTitle": "Snelheid over tijd",
+      "volumeTitle": "Aanroepen en fouten over tijd",
+      "endpointsTitle": "Waar het wordt aangeroepen",
+      "endpointsHint": "De onderdelen van je applicatie waarvan de verzoeken deze query hebben uitgevoerd.",
+      "noEndpoints": "We konden niet vaststellen welk deel van je applicatie dit in dit bereik heeft uitgevoerd.",
+      "samplesTitle": "Langzaamste voorbeelden",
+      "samplesHint": "elke stip is één echte uitvoering — klik om het hele verzoek te zien",
+      "noSamples": "Geen individuele uitvoeringen geladen voor dit bereik.",
+      "noSeries": "Geen geschiedenis voor deze query in het bereik dat je hebt gekozen.",
+      "liveSeries": "De meest recente punten worden nog geteld en kunnen veranderen.",
+      "noStream": "We konden niet bepalen welke trace stream deze query draagt, dus de aanroepers en voorbeelden kunnen niet worden geladen.",
+      "ambiguousStream": "Deze organisatie heeft meer dan één trace stream, en we kunnen niet bepalen op welke deze query draait. Kies een stream om de aanroepers en voorbeeld-traces te laden.",
+      "pickStream": "Kies een trace stream",
+      "invalidStream": "Die naam van de trace stream herkennen we niet, dus we hebben de zoekopdracht niet uitgevoerd.",
+      "firstSeen": "VOOR HET EERST VERSCHENEN IN DEZE LIJST OM {time}",
+      "firstSeenHint": "Het vroegste punt in dit bereik waarop deze query zwaar genoeg was om apart te worden gevolgd.",
+      "lastSeen": "LAATST VERSCHENEN OM {time}",
+      "lastSeenHint": "Het meest recente punt in dit bereik waarop deze query zwaar genoeg was om apart te worden gevolgd. Het kan nu nog steeds actief zijn — dit is de laatste keer dat het op de lijst stond.",
+      "errorsByCode": {
+        "title": "Fouten per redencode",
+        "exactHint": "Geteld over elke aanroep in dit bereik.",
+        "sampleHint": "Geteld uit de onderstaande voorbeelden — een steekproef, geen totaal.",
+        "noCode": "geen redencode"
+      },
+      "whereItRuns": {
+        "title": "Waar het draait",
+        "hint": "De activiteit van deze query, uitgesplitst naar de database waarop deze draaide. Klik op een rij om deze pagina daarop te focussen.",
+        "trackedHint": "Deze cijfers hebben betrekking op de delen van dit bereik waarin de query zwaar genoeg was om apart te worden gevolgd — rustigere delen voegen hier niets toe, dus beschouw ze als minimaal-totalen.",
+        "showAll": "Toon elke locatie",
+        "emptyFiltered": "Niets gevolgd voor deze query waar deze pagina op is gericht. Toon elke locatie om te zien waar deze draaide.",
+        "noInstance": "Instantie niet gerapporteerd",
+        "focused": "Gericht",
+        "focusHint": "De cijfers op deze pagina zijn momenteel beperkt tot deze rij. Klik opnieuw om te verbreden.",
+        "columns": {
+          "location": "Draait op",
+          "avg": "Gem. per aanroep"
+        }
+      },
+      "qps": "Aanroepen per seconde",
+      "errorRate": "Mislukte aanroepen",
+      "unattributed": "Niet toegeschreven",
+      "sampleOk": "OK",
+      "sampleError": "Mislukt",
+      "viewTrace": "Bekijk het verzoek →",
+      "viewTraces": "Bekijk voorbeeld-traces",
+      "copySummary": "Kopiëren",
+      "copySummaryHint": "Elk getal hier staat al op deze pagina — dit schrijft alleen de zin, dus minuut 13 van een incident produceert een bericht in plaats van niets.",
+      "summaryCopied": "Samenvatting gekopieerd",
+      "summaryCopyFailed": "Kan de samenvatting niet kopiëren.",
+      "columns": {
+        "calls": "Aanroepen",
+        "time": "Tijd",
+        "duration": "Duur",
+        "status": "Status",
+        "caller": "Aanroeper",
+        "callShare": "Aandeel van de aanroepen",
+        "p50": "De helft ligt onder"
+      },
+      "belowTopN": {
+        "title": "Deze query behoorde voor een deel van dit bereik niet tot de zwaarste",
+        "body": "We volgen de zwaarste queries afzonderlijk; de rest wordt samen geteld. Waar deze niet zwaar genoeg was, arceren we de grafiek in plaats van een nul te tekenen — hij draaide nog steeds.",
+        "capped": "De geschiedenis gaat terug tot zover we die hebben."
+      },
+      "firstSeenCaveat": "— hij draaide mogelijk al eerder, alleen niet bij de zwaarste",
+      "copyQuery": "Query kopiëren",
+      "alertMe": "Waarschuw me als dit trager wordt",
+      "stats": {
+        "load": "Databasetijd",
+        "loadShare": "{percent} van deze database",
+        "calls": "Aanroepen",
+        "callsDelta": "{change} dan eerder",
+        "p50": "De helft ligt onder",
+        "p95": "Trage aanroepen",
+        "max": "Slechtst waargenomen",
+        "errors": "Mislukt",
+        "noErrors": "geen fouten",
+        "approx": "bij benadering, niet exact",
+        "exact": "exact"
+      },
+      "overlap": {
+        "serverExecution": "Tijd die {engine} besteedde aan het uitvoeren ervan",
+        "serverWait": "Tijd die {engine} besteedde aan wachten erop — wachttijd, niet uitvoeringstijd",
+        "serverCounted": "Geteld door {engine}, voor elke client",
+        "clientObserved": "Waargenomen door geïnstrumenteerde aanroepers — je database heeft deze niet gerapporteerd"
+      },
+      "endpointsConcentrated": "Eén endpoint is verantwoordelijk voor {percent} van de tijd van deze query. Los {endpoint} op en je hebt deze query opgelost.",
+      "typicalMarker": "trage aanroepen {value}",
+      "plans": {
+        "title": "Queryplannen",
+        "sourceLabel": "Algemeen geschat plan",
+        "sourceTooltip": "Dit plan is geschat met elke queryparameter ingesteld op NULL en is nooit echt uitgevoerd. Postgres heeft mogelijk een ander plan uitgevoerd voor echte queries. Gebruik het om de vorm van de query te zien, niet om te verklaren hoe lang het duurde.",
+        "stableCaveat": "In dit venster is één planvorm vastgelegd. Dat sluit een planprobleem niet uit — geschatte plannen kunnen stabiel blijven terwijl het echte plan verandert, en vastlegging van uitgevoerde plannen ziet alleen instructies die langzaam genoeg zijn om te worden gelogd, dus een planwijziging die deze query sneller maakte, zou volledig uit de vastlegging verdwijnen.",
+        "executedLabel": "Uitgevoerd plan",
+        "executedTooltip": "Dit is het plan dat Postgres daadwerkelijk heeft uitgevoerd voor een echte uitvoering, vastgelegd door auto_explain met de echte parameterwaarden. Rijtellingen en duur op deze rij zijn gemeten, niet geschat — maar alleen uitvoeringen die langzamer zijn dan de drempel van auto_explain worden vastgelegd, dus ze beschrijven de langzame staart, niet elke uitvoering.",
+        "capturedDurations": "gem. {avg} · max {max} over {count} vastgelegde uitvoeringen",
+        "estVsAct": "geschat {est} → werkelijk {act} rijen",
+        "driftCallout": "De planvorm is in dit venster veranderd. Er zijn {count} verschillende vormen vastgelegd, wat meestal een schema- of statistiekwijziging betekent, zoals een index die is verwijderd of een tabel die opnieuw is gepartitioneerd.",
+        "viewPlans": "Plannen bekijken",
+        "noPlans": "Geen plannen vastgelegd",
+        "noPlansHint": "Nog geen collector heeft een plan voor deze database aangeleverd. Schakel topqueryverzameling in je collector-recept in om plannen te gaan vastleggen — de installatiepagina leidt je erdoorheen.",
+        "noPlanForQuery": "Geen plan voor deze query",
+        "noPlanForQueryHint": "We leggen plannen vast voor deze database — deze query heeft er gewoon geen. Dat is normaal voor instructies die de database niet kan uitleggen, zoals COMMIT, ROLLBACK en SHOW.",
+        "planHash": "Plan",
+        "firstSeen": "Eerst gezien",
+        "lastSeen": "Laatst gezien",
+        "noTree": "Het plan kon niet worden gelezen",
+        "nodeCost": "kosten {cost}"
+      },
+      "serverMetrics": {
+        "title": "Wat de database zelf heeft geregistreerd",
+        "subtitle": "Serverzijde — alle clients",
+        "clientSubtitle": "Door de client waargenomen — alleen geïnstrumenteerde aanroepers, alleen voltooide aanroepen. Een query die nog loopt, of die is vastgelopen, zit niet in deze cijfers.",
+        "instance": "Gerapporteerd door {instance}",
+        "instanceWide": "Alle databases op deze instantie",
+        "calls": "Uitvoeringen",
+        "rows": "Geretourneerde rijen",
+        "meanExecution": "Gemiddelde uitvoeringstijd",
+        "meanWait": "Gemiddelde wachttijd",
+        "sharedBlksHit": "Blokken uit cache",
+        "sharedBlksRead": "Blokken van schijf",
+        "tempBlksWritten": "Tijdelijke blokken geschreven",
+        "noMatch": "Geen server-side record voor deze query",
+        "noMatchHint": "Uw database rapporteert de statements die zijn uitgevoerd, en deze hoort daar niet bij. Dat is normaal: de twee weergaven identificeren een query op verschillende manieren, dus ze komen niet altijd overeen. Al het bovenstaande is nog steeds gemeten vanuit uw applicatie.",
+        "ambiguous": "Meer dan één database kan deze query zijn",
+        "ambiguousHint": "Meerdere instanties rapporteren een database met deze naam, dus er is geen manier om te bepalen welke deze query heeft uitgevoerd. Cijfers van de verkeerde instantie tonen zou slechter zijn dan geen tonen. Kandidaten: {instances}.",
+        "off": "Geen server-side metrieken verzameld",
+        "offHint": "Uw collector verzamelt nog geen per-statement metrieken van de database. Schakel top query-verzameling in uw collector-recept in — de instelpagina begeleidt u erdoorheen.",
+        "setUp": "Instellen",
+        "readFailed": "Server-side metrieken konden niet worden gelezen",
+        "readFailedHint": "Het lezen is mislukt, dus dit zegt niets over of uw database statements rapporteert. Al het bovenstaande is nog steeds gemeten vanuit uw applicatie."
+      },
+      "callingServices": {
+        "title": "Welke van uw services heeft dit aangeroepen",
+        "unjoinable": "Niet getoond — dit statement draait op meer dan één soort database hier, en het matchen van aanroepers zonder te weten welke, zou de verkeerde services benoemen.",
+        "tracedCalls": "{calls} aanroepen getraceerd",
+        "coverage": "{count} services gezien in {traced} van de {executions} uitvoeringen hierboven. De rest kwam van aanroepers die u nog niet traceert.",
+        "coverageUnknown": "{count} services gezien in {traced} getraceerde aanroepen. Uw database heeft geen totaal voor dit statement gerapporteerd, dus er is geen aandeel te geven.",
+        "noneNamed": "{traced} aanroepen zijn getraceerd, maar geen ervan kon aan een service worden gekoppeld — hun traces starten buiten dit tijdsbereik."
+      },
+      "callersEmpty": {
+        "title": "Nog geen getraceerde aanroepen voor deze query",
+        "description": "Uw database heeft dit statement gerapporteerd, maar niets heeft de applicatie die het uitvoerde getraceerd — dus er is geen aanroeper om te noemen en geen individuele run om te openen. Instrumenteer de services die met deze database communiceren en ze verschijnen hier.",
+        "checklistTitle": "Wat moet waar zijn",
+        "setUp": "Tracing instellen",
+        "checks": {
+          "server": {
+            "ok": "Uw database rapporteert deze query",
+            "okDetail": "dat is waar de tijden op de andere tabbladen vandaan komen"
+          }
+        }
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "uitvoeringstijd",
+        "serverWait": "wachttijd",
+        "serverCounted": "serveraantal",
+        "clientObserved": "client-waargenomen",
+        "serverReported": "gerapporteerd door uw databases"
+      }
+    },
+    "page": {
+      "tabs": {
+        "overview": "Overzicht",
+        "queries": "Top queries",
+        "samples": "Langzaamste aanroepen",
+        "samplesHintClient": "Voltooide aanroepen die uw geïnstrumenteerde services in dit venster hebben waargenomen — aanroepers zonder tracing worden niet meegeteld, dus dit is een ondergrens, niet het totaal. De tabel toont de langzaamste daarvan.",
+        "samplesHintServer": "Statements die uw databases in dit venster als voltooid hebben gerapporteerd, geteld in de database. De tabel toont de langzaamste daarvan.",
+        "samplesHintUnknown": "De langzaamste individuele database-aanroepen in dit venster.",
+        "deadlocks": "Deadlocks",
+        "blocked": "Geblokkeerde queries",
+        "deadlocksHint": "Deadlocks die uw databases hebben gerapporteerd.",
+        "blockedHint": "Sessies die nu op een lock wachten.",
+        "activity": "Activiteit",
+        "activityHint": "Sessies die je databases nu draaien.",
+        "tableHealth": "Tabelgezondheid",
+        "tableHealthHint": "Tabelgrootte, bloat en vacuumstatus. Bloat en vacuum zijn alleen voor PostgreSQL beschikbaar.",
+        "deadlocksLocked": "Deadlocks is een Enterprise-functie. Upgrade om te zien welke queries tegen elkaar deadlocked zijn en waarom. De andere database-tabbladen werken op elk abonnement.",
+        "blockedLocked": "Geblokkeerde queries is een Enterprise-functie. Upgrade om te zien welke sessies op een lock wachten en wat die vasthoudt. De andere database-tabbladen werken op elk abonnement.",
+        "tableHealthLocked": "Tabelgezondheid is een Enterprise-functie. Upgrade om tabelgrootte, bloat en vacuumstatus bij te houden. De andere database-tabbladen werken op elk abonnement."
+      }
+    },
+    "samples": {
+      "title": "Traagste aanroepen",
+      "subtitle": "De traagste individuele database-aanroepen in dit venster, over elke database en query — zoals hun aanroepers ze hebben gemeten, alleen voltooide aanroepen",
+      "subtitleServer": "De traagste statements die je databases in dit venster hebben voltooid, gemeten binnen de database",
+      "logOffTitle": "Je databases loggen nog geen trage statements",
+      "logOffDescription": "Niets heeft deze aanroepen getraceerd, dus we hebben de databases gevraagd naar hun eigen traagste statements — en ze loggen er geen. Deze lijst komt uit PostgreSQL's statementlog (log_min_duration_statement), dat standaard is uitgeschakeld — de logstap van de setupkaart schakelt dit in. Per-statement-capturering is momenteel alleen voor PostgreSQL, dus MySQL en MariaDB kunnen deze lijst nog niet voeden. Top queries kunnen nog steeds tonen wat het meest draait, omdat die in plaats daarvan de tellertabellen leest.",
+      "searchPlaceholder": "Zoek querytekst, service of database…",
+      "columns": {
+        "query": "Query",
+        "when": "Tijdstip",
+        "duration": "Duur",
+        "service": "Service",
+        "status": "Status"
+      },
+      "columnHints": {
+        "duration": "Hoe lang deze ene aanroep duurde, gemeten door de aanroeper. Telt alleen voltooide aanroepen — een query die nog draait, of een die nooit terugkwam, wordt hier niet gemeten."
+      },
+      "failed": "Mislukt",
+      "failedWithCode": "Mislukt · {code}",
+      "viewTrace": "Open het verzoek waar deze aanroep deel van uitmaakte",
+      "scatterOk": "Voltooid",
+      "partial": "Een deel van je tracedata kon niet worden gelezen, dus aanroepen kunnen in deze lijst ontbreken.",
+      "disclosureShort": "Elke rij is een echte voltooide aanroep",
+      "disclosureDetail": "Gemeten door de applicatie die de aanroep deed, op basis van de traces die je verzendt. Alleen aanroepen die zijn voltooid staan hier — een query die nog draait, of een die bleef hangen en nooit terugkwam, leverde geen meting op.",
+      "counts": {
+        "complete": "Toont alle {count} database-aanroepen in dit venster, langzaamste eerst.",
+        "truncated": "De {count} langzaamste aanroepen in dit venster — er draaiden er meer dan hier worden getoond.",
+        "filtered": "Toont {count} van {total} aanroepen."
+      },
+      "serverList": {
+        "title": "Langzaamste aanroepen gerapporteerd door je databases",
+        "subtitle": "Gemeten binnen elke database op het moment dat een statement werd voltooid — elke client wordt meegeteld, maar netwerk- en verbindingswachttijd niet. Er zijn geen getraceerde applicatie-aanroepen in dit venster beland, dus de gebruikelijke lijst is leeg; welke aanroepen hier verschijnen, wordt bepaald door de eigen logdrempel van de database. Deze per-statement-rapporten komen momenteel alleen van PostgreSQL — de collectorrecepten leggen de statementlogs van andere engines nog niet vast, dus MySQL- en MariaDB-aanroepen verschijnen hier niet.",
+        "truncated": "De {count} langzaamste gerapporteerde aanroepen — er zijn er meer over de drempel gegaan dan hier worden getoond",
+        "columns": {
+          "query": "Query",
+          "when": "Tijdstip",
+          "took": "Duur",
+          "user": "Gebruiker"
+        },
+        "columnHints": {
+          "took": "Tijd binnen de database van start tot voltooiing van het statement, zoals de engine die heeft gemeten. Niet wat een aanroeper heeft ervaren — netwerk- en verbindingswachttijd zijn niet inbegrepen."
+        }
+      }
+    },
+    "rowChips": {
+      "new": "NIEUW IN DEZE LIJST",
+      "slower": "{ratio}× LANGZAMER DAN GEBRUIKELIJK",
+      "loop": "DRAAIT {multiplier}× PER AANVRAAG",
+      "allFailed": "ALLE {count} MISLUKT",
+      "busier": "DRUKKER, NIET LANGZAMER",
+      "climbed": "NIEUWE ZWAARSTE QUERY"
+    },
+    "deadlocks": {
+      "title": "Databases",
+      "subtitle": "Transacties die elkaar blokkeerden en zijn teruggedraaid",
+      "deadlockCount": "geen deadlocks | {count} deadlock | {count} deadlocks",
+      "pairCount": "geen queryparen | {count} querypaar | {count} queryparen",
+      "searchPlaceholder": "Zoek querytekst, tabel of applicatie…",
+      "grouping": {
+        "pairs": "Groepeer op querypaar",
+        "pairsHint": "Eén rij per paar query's die elkaar deadlocken, met hoe vaak het gebeurde.",
+        "events": "Elke gebeurtenis",
+        "eventsHint": "Eén rij per deadlock, nieuwste eerst — gebruik dit wanneer je een specifiek tijdstip nodig hebt."
+      },
+      "columns": {
+        "pair": "De twee query's die elkaar deadlocken",
+        "applications": "Toepassingen",
+        "objects": "Betwiste rijen",
+        "lastSeen": "Laatste",
+        "count": "Deadlocks",
+        "when": "Wanneer",
+        "cancelled": "Geannuleerd",
+        "finished": "Voltooid"
+      },
+      "coverage": {
+        "complete": "Elke deadlock die je databases hebben gerapporteerd staat hier — {deadlocks} in dit venster, van {pairs}.",
+        "capped": "Er zijn meer deadlocks gebeurd dan we in één keer konden lezen. Dit zijn de {deadlocks} die we hebben, van {pairs} — het werkelijke aantal is hoger.",
+        "readUpTo": "Gelezen tot {time}.",
+        "mysqlPartial": "Je MySQL-database bewaart alleen de meest recente deadlock, tenzij innodb_print_all_deadlocks aan staat."
+      },
+      "chips": {
+        "oppositeOrder": "TEGENGESTELDE RIJVOLGORDE",
+        "cadence": "ELKE {seconds}s",
+        "noQueries": "QUERIES NIET VASTGELEGD",
+        "partial": "MAAR ÉÉN KANT"
+      },
+      "rowActions": {
+        "topQueries": "Vind deze in Top-query's",
+        "copy": "Kopieer beide query's",
+        "alert": "Waarschuw me bij deadlocks"
+      },
+      "detail": {
+        "mostRecent": "Meest recent · {time}",
+        "nthOf": "{index} van {total}",
+        "earlier": "Eerder",
+        "later": "Later",
+        "victim": "Geannuleerd door de database",
+        "survivor": "Toegestaan om te voltooien",
+        "pid": "pid {pid}",
+        "thread": "thread {pid}",
+        "transaction": "transactie {id}",
+        "eachWaits": "elk wacht op de ander",
+        "deadlock": "deadlock",
+        "noQueryCaptured": "Het logboek heeft deze deadlock vastgelegd, maar niet de statement.",
+        "waitingFor": "Wachtte tot {target} klaar was.",
+        "waitingForRow": "Wachtte tot {target} klaar was — de andere sessie had de rij die het wilde al gewijzigd.",
+        "rawLock": "{mode} · {target}",
+        "plainTitle": "Wat er gebeurde, in volgorde.",
+        "plainBody": "{a} wijzigde één rij en hield die vast. {b} wijzigde een andere en hield die vast. Toen probeerde elk de rij van de ander te wijzigen, dus geen van beiden kon verder. De database verbrak de patstelling door {victim} te annuleren — die applicatie kreeg een foutmelding en de hele transactie werd teruggedraaid.",
+        "fixTitle": "De oplossing zit in je code, niet in de database.",
+        "fixBody": "Deze twee statements raken {object} rijen in tegengestelde volgorde. Zorg dat beide kanten in dezelfde volgorde bijwerken — laagste id eerst — en dit paar kan niet langer deadlocken.",
+        "fixGeneric": "Beide kanten houden vast wat de ander wil. Laat elke transactie deze locks in dezelfde volgorde nemen en dit paar kan niet langer deadlocken.",
+        "copyForSlack": "Kopieer",
+        "occurrencesTitle": "Alle {count} keer dat dit paar deadlockte",
+        "occurrencesHint": "Selecteer een punt om die hierboven te laden",
+        "lostLabel": "{pid} verloor",
+        "bothSidesLose": "Beide kanten worden ongeveer even vaak geannuleerd — {a} vs {b}. Geen van beide applicaties is het probleem; de volgorde wel.",
+        "oneSideLoses": "{pid} wordt elke keer geannuleerd.",
+        "showAbove": "Toon hierboven",
+        "copy": "Kopieer SQL",
+        "seeInTopQueries": "Bekijk in Top queries",
+        "whichService": "Welke service?",
+        "partialTitle": "Slechts één kant van deze deadlock heeft ons bereikt",
+        "partialBody": "MySQL schrijft elke kant van een deadlock als een aparte logboekvermelding. De tegenhanger is niet aangekomen — deze valt mogelijk buiten dit venster, of het logboek is tussen de twee gerouleerd. Wat wordt getoond is echt; de andere verklaring ontbreekt simpelweg.",
+        "copyHint": "Kopieert alleen de verklaring van deze kant.",
+        "copySqlTooltip": "Kopieer de verklaring van deze kant",
+        "copyForSlackHint": "Beide verklaringen, hoe vaak dit paar een deadlock heeft gehad en wanneer dat voor het laatst gebeurde — geschreven als een bericht dat je in een kanaal of ticket kunt plakken."
+      },
+      "storm": {
+        "title": "Deadlock-storm.",
+        "body": "{count} in dit venster — normaal gesproken geen.",
+        "copyForSlack": "Kopiëren",
+        "biasWarning": "Verwacht dat het tabblad Top queries er nu rustiger uitziet dan de werkelijkheid. Een geannuleerde query wordt nog steeds afgerond, maar de queries die achter deze locks in de wachtrij staan niet — dus de aantallen oproepen daar zijn lager dan wat uw gebruikers ervaren."
+      },
+      "summary": {
+        "deadlocks": "Deadlocks",
+        "pairs": "Queryparen"
+      },
+      "healthy": {
+        "title": "Geen deadlocks — en we zijn zeker aan het kijken",
+        "description": "Uw databases hebben in dit venster geen enkele deadlock gerapporteerd. Dat is de gezonde norm, geen gat in wat we verzamelen.",
+        "checklistTitle": "Hoe we het weten",
+        "collectionHealthy": "Verzameling gezond",
+        "checks": {
+          "reading": {
+            "title": "We lezen de logboeken van uw databases",
+            "detail": "{databases} · meest recente regel gelezen {age}",
+            "detailNoFleet": "Meest recente regel gelezen {age}",
+            "detailUnknown": "{databases} — de logpijplijn is verbonden",
+            "detailUnknownNoFleet": "De logpijplijn is verbonden"
+          },
+          "reporting": {
+            "title": "Deadlock-rapportage is ingeschakeld",
+            "detail": "Postgres logt deadlocks standaard, en uw MySQL heeft innodb_print_all_deadlocks aan, dus elke deadlock wordt vastgelegd — niet alleen de meest recente.",
+            "detailMysqlPartial": "Postgres logt deadlocks standaard. Uw MySQL heeft innodb_print_all_deadlocks niet aan, dus alleen de meest recente wordt bewaard.",
+            "detailUnknown": "Postgres logt deadlocks standaard. Voer op MySQL SELECT {'@@'}innodb_print_all_deadlocks uit — dit moet 1 zijn, anders wordt alleen de meest recente deadlock bewaard. We kunnen deze instelling vanaf hier niet lezen.",
+            "titleUnknown": "Controleer of deadlock-rapportage is ingeschakeld"
+          },
+          "traffic": {
+            "title": "We zagen {lines} andere logregels van deze databases",
+            "detail": "dus de pijplijn verwerkt verkeer — een deadlock zou erdoorheen zijn gekomen",
+            "titleUnknown": "De logpijplijn verwerkt verkeer"
+          },
+          "lastEver": {
+            "title": "Laatste deadlock die we ooit zagen",
+            "detail": "{when}. Maak het venster breder om het te bekijken.",
+            "titleNone": "We hebben nog nooit een deadlock op deze databases gezien",
+            "detailNone": "Nog niets om mee te vergelijken — dit venster is niet ongebruikelijk."
+          }
+        },
+        "widen": "Verbreed naar de laatste 24 uur"
+      },
+      "notCollecting": {
+        "title": "We kunnen nog geen deadlocks zien — en dit is precies waarom",
+        "description": "Deadlocks worden gerapporteerd door de database zelf, niet door uw applicaties. We controleren vier dingen.",
+        "checklistTitle": "Wat we hebben gecontroleerd",
+        "checks": {
+          "queries": {
+            "ok": "Uw querygegevens komen binnen",
+            "okDetail": "{queries} van {databases} — het tabblad Top queries werkt",
+            "okDetailNoFleet": "{queries} — het tabblad Top queries werkt",
+            "no": "Er komen ook geen querygegevens binnen",
+            "noDetail": "Begin met het tabblad Top queries — er komt nog niets van deze databases bij ons binnen."
+          },
+          "enabled": {
+            "ok": "Databasemonitoring is ingeschakeld",
+            "okDetail": "voor deze organisatie",
+            "no": "Databasemonitoring is uitgeschakeld",
+            "noDetail": "Schakel het in in Instellingen om te beginnen met verzamelen."
+          },
+          "log": {
+            "no": "Geen database stuurt ons zijn logboek",
+            "noDetail": "Querytijden komen van uw applicaties, maar deadlocks worden alleen in het eigen logboek van de database geschreven. Richt uw collector op het Postgres- of MySQL-logbestand en dit tabblad vult zichzelf.",
+            "ok": "Er komt een databaselogboek binnen",
+            "okDetail": "dus een deadlock zou ons bereiken — er is simpelweg geen geweest."
+          },
+          "settings": {
+            "title": "Goed om te weten voordat je begint",
+            "detail": "Postgres schrijft een deadlock over twee logregels en MySQL over meerdere — de deelnemende queries staan in de latere regels. Een opstelling die alleen de eerste regel matcht, registreert dat er een deadlock is opgetreden en verliest elke query. Onze aanpak handelt beide gevallen af."
+          }
+        }
+      }
+    },
+    "blocked": {
+      "title": "Databases",
+      "subtitle": "Sessies die momenteel wachten op een lock",
+      "subtitlePast": "Sessies die tijdens dit tijdsvenster op een lock wachtten",
+      "waitingCount": "geen sessies wachten op een lock | {count} sessie wacht nu op een lock | {count} sessies wachten nu op een lock",
+      "waitingCountPast": "geen sessies wachtten op een lock | {count} sessie wachtte op een lock in dit tijdsvenster | {count} sessies wachtten op een lock in dit tijdsvenster",
+      "sessionCount": "geen sessies | {count} sessie | {count} sessies",
+      "searchPlaceholder": "Zoek querytekst, tabel of applicatie…",
+      "perspective": {
+        "waiting": "Wie zit er vast",
+        "waitingHint": "Eén rij per sessie die wacht op een lock, de langste wachttijd eerst.",
+        "blocking": "Wie blokkeert",
+        "blockingHint": "De sessie die de lock vasthoudt, met alles wat erachter vastzit."
+      },
+      "columns": {
+        "stuckQuery": "Query die vastzit",
+        "session": "Sessie",
+        "waitingFor": "Wacht op",
+        "heldUpBy": "Opgehouden door",
+        "waiting": "Wachtend",
+        "sessionQuery": "Sessie en wat deze draait",
+        "application": "Applicatie",
+        "blocking": "Blokkering"
+      },
+      "coverage": {
+        "summary": "De langste wachttijd is {longest}. Elke wachttijd is terug te voeren naar {roots} met een open lock.",
+        "summaryCapped": "Er wachtten meer sessies dan we in één keer konden lezen. Van de sessies die we hebben, is de langste wachttijd {longest} en ze zijn terug te voeren naar {roots} met een open lock.",
+        "summaryOneRoot": "één sessie",
+        "summaryManyRoots": "{count} sessies",
+        "checked": "Gecontroleerd elke {interval} seconden; laatste controle {time}.",
+        "checkedUnknown": "Gebaseerd op de eigen lock-tabellen van je database."
+      },
+      "rowActions": {
+        "showChain": "Toon de keten",
+        "copy": "Kopieer query",
+        "alertMe": "Waarschuw mij bij lock-wachttijden"
+      },
+      "waitEvent": {
+        "transaction": "het voltooien van een andere transactie",
+        "row": "een lock op een rij",
+        "table": "een lock op een tabel",
+        "extend": "het groeien van de tabel",
+        "advisory": "een applicatielock",
+        "object": "een objectlock",
+        "buffer": "het lezen van een datapagina",
+        "lock": "een lock"
+      },
+      "deep": "{count} diep",
+      "notWaiting": "niet aan het wachten",
+      "longestWait": "LANGSTE WACHTTIJD",
+      "holdsTheLock": "HOUDT DE LOCK VAST DIE IEDEREEN WIL",
+      "lastStatement": "laatste statement {age} geleden",
+      "idleInTransaction": "niet aan het wachten op iets · inactief in een open transactie",
+      "pills": {
+        "root": "ROOT — BEGIN HIER",
+        "waitingBlocking": "WACHTEND & BLOKKEREND {count}",
+        "waiting": "WACHTEND"
+      },
+      "waitingOn": "wachtend op {pid}",
+      "degraded": "Eén sessie houdt {count} tegen. Deze heeft al {age} een open transactie en heeft in die tijd geen query uitgevoerd — hoogstwaarschijnlijk een applicatie die is vergeten te committen.",
+      "footer": {
+        "allLeadBack": "Alle {waits} leiden terug naar pid {pid}",
+        "allLeadBackDetail": "— één sessie, die een lock vasthoudt op {object}.",
+        "switchToBlocking": "Schakel over naar “Wie blokkeert”",
+        "releaseAll": "Het beëindigen van sessie {pid} maakt alle {count} vrij.",
+        "releaseAllDetail": "Alles eronder wacht alleen vanwege die ene lock.",
+        "timeLost": "totale verloren tijd: {seconds} over {sessions} sessies"
+      },
+      "terminate": {
+        "copied": "Gekopieerd",
+        "hint": "Voer dit zelf uit tegen {instance} om de sessie te beëindigen. We voeren het nooit voor je uit.",
+        "hintNoInstance": "Voer dit zelf uit om de sessie te beëindigen. We voeren het nooit voor je uit."
+      },
+      "summary": {
+        "waiting": "Wachtende sessies",
+        "longest": "Langste wachttijd",
+        "chains": "Kettingen"
+      },
+      "rootCount": "geen root-blockers | {count} root-blocker | {count} root-blockers",
+      "inChain": "{count} sessies in de keten",
+      "healthy": {
+        "title": "Er wacht niets op een lock.",
+        "description": "Er is op dit moment geen sessie in je databases die achter een andere vastzit. Dat is de gezonde normaal, geen gat in wat we verzamelen.",
+        "descriptionPast": "Er was gedurende dit venster geen sessie in je databases die achter een andere vastzat. Dat is de gezonde normaal, geen gat in wat we hebben verzameld.",
+        "checklistTitle": "Hoe we het weten",
+        "collectionHealthy": "Collectie gezond",
+        "checks": {
+          "sampling": {
+            "title": "We controleren de lock-tabellen van je databases",
+            "detail": "elke {interval} seconden · laatste blik {age}",
+            "detailUnknown": "op het schema waarmee je collector is geconfigureerd"
+          },
+          "sessions": {
+            "title": "Sessies draaien normaal",
+            "detail": "we kunnen actieve sessies zien, en geen ervan staat in een lock-wachtrij"
+          },
+          "meaning": {
+            "title": "Wat dit tabblad toont wanneer het niet leeg is",
+            "detail": "Een sessie die wacht op een lock die door een andere wordt vastgehouden, en de keten terug naar welke sessie die ook vasthoudt. Korte wachttijden zijn normaal en lossen vanzelf op — dit tabblad is voor degenen die dat niet doen."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "We kunnen geblokkeerde queries nog niet zien — en hier is precies waarom",
+        "description": "Een geblokkeerde query is alleen zichtbaar van binnenuit de database, in de lock-tabellen. We controleren drie dingen.",
+        "checklistTitle": "Wat we hebben gecontroleerd",
+        "checks": {
+          "queries": {
+            "ok": "Je querygegevens komen binnen",
+            "okDetail": "{queries} van {databases} — het tabblad Top queries werkt",
+            "okDetailNoFleet": "{queries} — het tabblad Top queries werkt",
+            "no": "Er komen ook geen querygegevens binnen",
+            "noDetail": "Begin met het tabblad Top queries — er bereikt ons nog niets van deze databases."
+          },
+          "enabled": {
+            "ok": "Databasemonitoring is ingeschakeld",
+            "okDetail": "voor deze organisatie",
+            "no": "Databasemonitoring is uitgeschakeld",
+            "noDetail": "Schakel het in in Instellingen om te beginnen met verzamelen."
+          },
+          "sampling": {
+            "no": "Er wordt niets gesampled uit de lock-tabellen van je databases.",
+            "noDetail": "Wie op wie wacht bestaat alleen binnen de database, en alleen terwijl het wachten plaatsvindt. Ons collector-recept leest het op een schema en zet log_lock_waits aan, zodat ook lange wachttijden worden vastgelegd.",
+            "ok": "Sampling van lock-tabellen draait.",
+            "okDetail": "dus een geblokkeerde sessie zou ons bereiken — er is er gewoon geen."
+          },
+          "settings": {
+            "title": "Belangrijk om te weten voordat je begint",
+            "detail": "log_lock_waits registreert een wachttijd alleen zodra deze langer duurt dan deadlock_timeout — standaard één seconde. Kortere wachttijden zijn normaal en blijven ongeregistreerd, daarom sampled dit tabblad live in plaats van alleen de log te lezen."
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "Activiteit",
+      "subtitle": "Wat je databases op dit moment doen, gesampled uit hun eigen sessietabellen.",
+      "subtitlePast": "Wat je databases tijdens dit venster deden, gesampled uit hun eigen sessietabellen.",
+      "searchPlaceholder": "Zoek sessies, gebruikers, applicaties",
+      "wait": {
+        "onCpu": "Op CPU / geen wachttijd",
+        "qualified": "{type}: {event}",
+        "plain": "{event}",
+        "remainder": "+{count} meer wachtevenementen ({share})",
+        "remainderNoShare": "+{count} meer wachtevenementen"
+      },
+      "disclosure": {
+        "sampled": "Elke {interval} seconden gesampled — dit is een reeks momentopnames, geen continue opname, dus een sessie korter dan de tijd tussen samples kan draaien en eindigen zonder gezien te worden.",
+        "sampledUnknown": "Volgens een schema gesampled — dit is een reeks momentopnames, geen continue opname. We hebben nog niet genoeg samples gezien om te achterhalen hoe vaak uw collector pollt.",
+        "filtered": "Het sample is al gefilterd door uw collector: inactieve sessies ouder dan de nieuwste actieve query worden weggelaten tenzij ze iemand blokkeren. Dit is dus geen volledige lijst van elke verbinding.",
+        "short": "Elke {interval}s gesampled en voorgefilterd",
+        "shortUnknown": "Volgens een schema gesampled en voorgefilterd",
+        "more": "Wat dit betekent"
+      },
+      "columns": {
+        "session": "Sessie",
+        "user": "Gebruiker",
+        "application": "Applicatie",
+        "state": "Status",
+        "waitEvent": "Wacht op",
+        "running": "Al actief voor",
+        "lastQuery": "Laatste query",
+        "query": "Query",
+        "blockedBy": "Geblokkeerd door"
+      },
+      "summary": {
+        "sessions": "Sessies",
+        "onCpu": "Op CPU",
+        "waiting": "Wachtend",
+        "idleInTransaction": "Inactief in transactie"
+      },
+      "state": {
+        "unknown": "Status niet gerapporteerd"
+      },
+      "counts": {
+        "complete": "{count} sessies weergegeven.",
+        "capped": "Er zijn meer sessies gesampled dan we in één keer konden lezen. Dit zijn de {count} die we hebben.",
+        "filtered": "{count} van {total} sessies weergegeven."
+      },
+      "transactionOpen": "transactie open {age}",
+      "healthy": {
+        "title": "Er draait op dit moment niets",
+        "description": "We hebben de sessietabellen van uw databases gesampled en geen actieve sessies gevonden. Dat is de gezonde normaal voor een inactieve database, geen hiaat in wat we verzamelen.",
+        "descriptionPast": "We hebben de sessietabellen van uw databases in dit venster gesampled en geen actieve sessies gevonden. Dat is de gezonde normaal voor een inactieve database, geen hiaat in wat we hebben verzameld.",
+        "checklistTitle": "Hoe we dit weten",
+        "collectionHealthy": "Verzameling gezond",
+        "checks": {
+          "sampling": {
+            "title": "We sampelen de sessietabellen van uw databases",
+            "detail": "elke {interval} seconden · laatste blik {age}",
+            "detailUnknown": "volgens het schema waarmee uw collector is geconfigureerd"
+          },
+          "pipeline": {
+            "title": "Uw databases bereiken ons",
+            "detail": "{lines} andere regels kwamen in dit venster door dezelfde pijplijn",
+            "detailUnknown": "de pijplijn die deze gegevens vervoert, draait"
+          },
+          "meaning": {
+            "title": "Wat dit tabblad laat zien wanneer het niet leeg is",
+            "detail": "Elke sessie die uw databases draaien, waar elke sessie op wacht en hoe lang die al loopt. Omdat we sampelen in plaats van continu te kijken, kunnen zeer korte queries tussen twee samples eindigen en nooit verschijnen."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "We kunnen nog geen live sessies zien — en dit is precies waarom",
+        "description": "Wat een database op dit moment doet, bevindt zich alleen in die database, in zijn eigen sessietabel. Iets moet het pollen. We controleren drie dingen.",
+        "checklistTitle": "Wat we hebben gecontroleerd",
+        "checks": {
+          "queries": {
+            "ok": "Uw querygegevens komen binnen",
+            "okDetail": "{queries} van {databases} — het tabblad Top queries werkt",
+            "okDetailNoFleet": "{queries} — het tabblad Top queries werkt",
+            "no": "Er komen ook geen querygegevens binnen",
+            "noDetail": "Begin met het tabblad Top queries — er bereikt ons nog niets van deze databases."
+          },
+          "enabled": {
+            "ok": "Databasemonitoring is ingeschakeld",
+            "okDetail": "voor deze organisatie",
+            "no": "Databasemonitoring is uitgeschakeld",
+            "noDetail": "Zet het aan in Instellingen om te beginnen met verzamelen."
+          },
+          "sampling": {
+            "no": "Niets bemonstert de sessietabellen van je databases",
+            "noDetail": "Sessiemonsters komen van je collector: schakel db.server.query_sample in in het collector-recept op de databasehost — de installatiepagina legt het uit. OpenObserve accepteert deze feed wanneer databasemonitoring aan staat, dus de oplossing ligt aan de collectorzijde."
+          }
+        }
+      }
+    },
+    "instanceMetrics": {
+      "columnHeader": "Instantiegezondheid",
+      "columnHint": "Verbindingen ten opzichte van de limiet, op basis van de metrieken die je collector al verzendt. Leeg totdat een receiver deze instantie rapporteert.",
+      "connectionsOf": "{used} van {limit} verbindingen",
+      "connectionsNoLimit": "{used} verbindingen",
+      "noLimitHint": "De receiver voor deze engine publiceert zelf geen verbindingslimiet, dus alleen het aantal wordt weergegeven. Het recept voor verbindingslimieten van de installatiekaart (sqlquery/mysql_limits) verzamelt max_connections en zet dit om in een percentage.",
+      "trendLabel": "Verbindingen over het geselecteerde venster",
+      "cacheHit": "Cache-hit {percent}",
+      "lagBytes": "Replica {value} achter",
+      "lagSeconds": "Replica {value} achter",
+      "deadlocks": "{count} deadlock | {count} deadlocks",
+      "noTraffic": "Geen applicatieverkeer in dit venster",
+      "noTrafficHint": "Je collector rapporteert deze instantie, maar geen enkele applicatie heeft deze in dit venster bevraagd. De querykolommen zijn leeg omdat niets ze heeft gemeten, niet omdat het snel was.",
+      "unmatched": {
+        "pooler": "Geen instantiemetrieken kwamen overeen met dit adres",
+        "poolerHint": "Deze rij is het adres waarmee je applicatie verbinding maakte. Je collector rapporteert andere hosts, wat de situatie is wanneer er een connection pooler tussen zit — het adres van de pooler en de echte database komen nooit overeen.",
+        "loopback": "Geen instantiemetrieken kwamen overeen met dit adres",
+        "loopbackHint": "Deze rij verwijst naar localhost. De collector herschrijft een loopback-eindpunt naar zijn eigen hostname, dus de twee namen kunnen nooit overeenkomen, zelfs niet als beide gezond zijn.",
+        "noReceiver": "De {engine}-receiver rapporteert niet",
+        "noReceiverHint": "Je applicaties bevragen deze database, maar er is geen {engine}-receiver die servermetrieken hiervoor verzendt. Voeg de {engine}-receiver toe aan je collector om deze kolom te vullen.",
+        "noReceiverMariadbHint": "Je applicaties bevragen deze MariaDB-server, maar er worden geen servermetrieken voor verzonden. Er is geen aparte MariaDB-receiver — richt een MySQL-receiver op deze instantie en de metrieken vullen deze kolom.",
+        "engineUnsupported": "Niet verzameld voor {engine}",
+        "engineUnsupportedHint": "Instantiemetrieken worden verzameld voor PostgreSQL, MySQL en MariaDB — er is nog geen receiver gekoppeld voor {engine}, dus deze kolom blijft leeg. Dat is een dekkingsnotitie, geen gezondheidsoordeel.",
+        "unreadable": "Instantiemetrieken konden niet worden gelezen",
+        "unreadableHint": "De metriekenstromen bestaan, maar konden niet worden gelezen. Dit is meestal een rechtenprobleem en niet iets dat mis is met de database."
+      },
+      "limitUnknownHint": "Het aantal verbindingen is aangekomen, maar de limiet niet, dus kan er geen percentage worden weergegeven. Controleer of de metriek voor de verbindingslimiet is ingeschakeld op deze collector.",
+      "noReading": "Geen meting in dit venster",
+      "noReadingHint": "Je collector rapporteert deze instantie, maar heeft in dit venster geen verbindingsmetriek verzonden. De metriek is mogelijk uitgeschakeld op de receiver, of de instantie is mogelijk gestopt met rapporteren.",
+      "lagLabel": "Replica-achterstand",
+      "deadlockLabel": "deadlocks"
+    },
+    "tableHealth": {
+      "title": "Tabelgezondheid",
+      "subtitle": "Grootte, bloat en vacuumstatus voor elke tabel, nieuwste snapshot eerst.",
+      "searchPlaceholder": "Zoek tabellen",
+      "never": "Nooit",
+      "countersCumulative": "Scan- en vacuumtellingen zijn totalen over de levensduur sinds de laatste reset van statistieken, geen tellingen voor het geselecteerde tijdsbereik.",
+      "tuplesEstimated": "Rijtellingen en bloatpercentage zijn statistische schattingen van de database-engine, geen exacte aantallen.",
+      "notCollectingTitle": "Nog geen tabelstatistieken",
+      "notCollectingDescription": "Er is niets dat tabelstatistieken heeft gerapporteerd in dit tijdsbereik. Dit signaal wordt geleverd als een apart collector-recept.",
+      "engineUnsupportedTitle": "Niet verzameld voor deze engine",
+      "engineUnsupportedDescription": "Tabelgezondheid wordt verzameld via een collector-recept per engine, en er wordt geen recept voor deze engine meegeleverd — dus er wordt niets voor verzameld. Dit is geen geruststelling.",
+      "checklistTitle": "Om te beginnen met verzamelen",
+      "checkRecipe": "Voeg het pg_table_stats-recept uit de installatiehandleiding voor databases toe aan je collectorconfiguratie.",
+      "checkGrant": "Verleen pg_monitor aan de collector-gebruiker, zodat deze pg_stat_user_tables kan lezen.",
+      "checkRange": "Verbreed het tijdsbereik — het recept rapporteert eens per 60 seconden.",
+      "columns": {
+        "relation": "Tabel",
+        "instance": "Instantie",
+        "totalBytes": "Totale grootte",
+        "heapBytes": "Heap-grootte",
+        "overheadBytes": "Index + TOAST",
+        "liveTuples": "Levende rijen (geschat)",
+        "deadTuples": "Dode rijen (geschat)",
+        "deadTupPct": "Bloat (geschat)",
+        "modSinceAnalyze": "Rijen sinds analyse",
+        "seqScanCount": "Seq-scans (totaal)",
+        "seqTupRead": "Rijen sequentieel gescand (totaal)",
+        "idxScanCount": "Indexscans (totaal)",
+        "autovacuumCount": "Autovacuums (totaal)",
+        "frozenXidAge": "Txid-leeftijd",
+        "lastVacuum": "Laatste vacuum",
+        "lastAutovacuum": "Laatste autovacuum",
+        "lastAnalyze": "Laatste analyse"
+      },
+      "countLine": "{count} tabellen"
+    },
+    "recommendations": {
+      "title": "Aanbevelingen",
+      "subtitle": "Deterministische controles op wat de collector al rapporteert. Elke vermeldt de meting en de drempel die werd overschreden.",
+      "countersCumulative": "Indexscantellingen zijn totalen sinds de laatste statistiekreset, geen tellingen voor het geselecteerde tijdsbereik.",
+      "andMore": "en {count} meer soortgelijke",
+      "unused-index": {
+        "title": "Index niet gescand",
+        "body": "{index} op {relation} heeft geen geregistreerde scans en neemt {size} in.",
+        "rule": "Het indexscanaantal is 0 sinds de statistieken voor het laatst zijn gereset, en de index is ten minste {bytes} bytes. Scanaantallen zijn totalen over de levensduur, geen aantallen voor het geselecteerde bereik.",
+        "caveat": "Een telling van nul over de levensduur betekent dat de planner deze index niet heeft gekozen sinds de tellers voor het laatst zijn gereset. Deze kan nog steeds dienen voor een replica, een periodieke taak of een constraint."
+      },
+      "long-running-query": {
+        "title": "Langlopende query",
+        "body": "Sessie {pid} voert al {duration} uit.",
+        "rule": "Een actieve sessie draait al ten minste {seconds} seconden. Inactieve sessies zijn uitgesloten."
+      },
+      "high-impact-blocker": {
+        "title": "Blokkering die meerdere sessies vasthoudt",
+        "body": "Sessie {pid} staat aan het hoofd van een keten met {count} wachtende sessies.",
+        "rule": "Een root-blocker — een sessie die andere sessies blokkeert en op geen enkele wacht — heeft ten minste {sessions} sessies achter zich wachten, geteld over de hele keten."
+      },
+      "high-row-count": {
+        "title": "Veel rijen per aanroep",
+        "body": "Deze instructie retourneerde gemiddeld {rows} rijen per aanroep over {calls} aanroepen.",
+        "rule": "Het gemiddelde aantal rijen per aanroep is ten minste {rows}, over ten minste {calls} aanroepen. Het gemiddelde is het totale aantal rijen van de server gedeeld door het aantal aanroepen."
+      },
+      "enginePartialTitle": "Sommige controles zijn niet uitgevoerd",
+      "enginePartialDescription": "De controle op ongebruikte indexen vereist een indexscanteller die voor deze engine niet wordt verzameld, dus een lege lijst hier is geen vrijwaring.",
+      "allClearTitle": "Niets overschreed een drempel",
+      "allClearDescription": "Elke controle is uitgevoerd en geen enkele overschreed de drempel in dit tijdsbereik."
     }
   }
 }

@@ -43,7 +43,10 @@ use config::{
         window::{expected_slices, watermark_is_stale_or_absent},
     },
 };
-use infra::table::{slo as slo_table, slos as slos_table};
+use infra::{
+    db::get_orm_client_ro,
+    table::{slo as slo_table, slos as slos_table},
+};
 
 /// Everything one SLO-alert evaluation produced.
 #[derive(Debug, Clone)]
@@ -85,9 +88,7 @@ pub async fn evaluate(
         );
     }
 
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
 
     let Some(slo) = slos_table::get(db, org, &cond.slo_id).await? else {
         anyhow::bail!("SLO {} not found", cond.slo_id);

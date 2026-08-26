@@ -114,7 +114,8 @@ impl OtelIngestionProcessor {
     /// Process span with optional user-defined model pricing entries.
     /// If matching pricing is found in `org_pricing_entries`, it takes priority over built-in
     /// pricing. `span_start_nanos` is the span's `start_time_unix_nano` from the OTLP payload;
-    /// it is used to select the most-recently-applicable pricing definition via `valid_from`.
+    /// it is used to select the most-recently-applicable pricing definition via `valid_from`
+    /// and the time-of-day tier via `utc_windows`. Zero means unknown: no time restriction.
     /// In production always call `get_org_pricing_entries` to populate this slice.
     pub fn process_span_with_pricing(
         &self,
@@ -258,12 +259,15 @@ impl OtelIngestionProcessor {
         let mut input_includes_cache = extracted.input_includes_cache;
 
         if is_generation_or_embedding(extracted.op_name) {
-            let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
+            // Zero means the payload carried no start time; treat it as unknown rather
+            // than as 1970-01-01, which would land every such span in a time-of-day tier.
+            let span_ts_micros = (span_start_nanos != 0)
+                .then(|| i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX));
             let matched_pricing = extracted.model_name.as_ref().and_then(|mn| {
                 crate::db::model_pricing::find_pricing_sync_at(
                     org_pricing_entries,
                     mn,
-                    Some(span_ts_micros),
+                    span_ts_micros,
                 )
             });
             let tokenizer_key: &str = extracted.model_name.as_deref().unwrap_or("");
@@ -300,6 +304,7 @@ impl OtelIngestionProcessor {
                             &pricing_def,
                             &billable_usage,
                             &tier_usage,
+                            span_ts_micros,
                         );
                     if !result.cost.is_empty() {
                         log::debug!(
@@ -315,9 +320,12 @@ impl OtelIngestionProcessor {
                 } else if let Some(ref model_name) = extracted.model_name {
                     let input_tokens = billable_usage.get("input").cloned().unwrap_or_default();
                     let output_tokens = billable_usage.get("output").cloned().unwrap_or_default();
-                    if let Some((input_cost, output_cost, total_cost)) =
-                        pricing::calculate_cost(model_name, input_tokens, output_tokens)
-                    {
+                    if let Some((input_cost, output_cost, total_cost)) = pricing::calculate_cost(
+                        model_name,
+                        input_tokens,
+                        output_tokens,
+                        span_ts_micros,
+                    ) {
                         cost.insert("input".to_string(), input_cost);
                         cost.insert("output".to_string(), output_cost);
                         cost.insert("total".to_string(), total_cost);
@@ -636,13 +644,27 @@ impl OtelIngestionProcessor {
         scope_name: Option<&str>,
         events: &[Event],
     ) {
+        self.process_span_at(span_attributes, resource_attributes, scope_name, events, 0);
+    }
+
+    /// `process_span` with an explicit span start time, for models whose rates
+    /// depend on the UTC time of day (peak / off-peak pricing).
+    #[cfg(test)]
+    pub fn process_span_at(
+        &self,
+        span_attributes: &mut HashMap<String, json::Value>,
+        resource_attributes: &HashMap<String, json::Value>,
+        scope_name: Option<&str>,
+        events: &[Event],
+        span_start_nanos: u64,
+    ) {
         self.process_span_with_pricing(
             span_attributes,
             resource_attributes,
             scope_name,
             events,
             &[],
-            0,
+            span_start_nanos,
         );
     }
 }
@@ -1099,8 +1121,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_process_span_calculates_deepseek_cost_from_token_only_span() {
+    /// Nanoseconds since the epoch for a UTC clock time on 1970-01-01.
+    fn nanos_at_utc(hour: u64, minute: u64) -> u64 {
+        (hour * 3600 + minute * 60) * 1_000_000_000
+    }
+
+    fn deepseek_costs(span_start_nanos: u64) -> (f64, f64, f64) {
         let processor = OtelIngestionProcessor::new();
 
         let mut span_attrs = HashMap::new();
@@ -1115,24 +1141,79 @@ mod tests {
         let resource_attrs = HashMap::new();
         let events = vec![];
 
-        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+        processor.process_span_at(
+            &mut span_attrs,
+            &resource_attrs,
+            None,
+            &events,
+            span_start_nanos,
+        );
 
-        let input_cost = span_attrs
-            .get(GenAiExtensions::USAGE_COST_INPUT)
-            .and_then(|v| v.as_f64())
-            .unwrap();
-        let output_cost = span_attrs
-            .get(GenAiExtensions::USAGE_COST_OUTPUT)
-            .and_then(|v| v.as_f64())
-            .unwrap();
-        let total_cost = span_attrs
-            .get(GenAiAttributes::USAGE_COST)
-            .and_then(|v| v.as_f64())
-            .unwrap();
+        (
+            span_attrs
+                .get(GenAiExtensions::USAGE_COST_INPUT)
+                .and_then(|v| v.as_f64())
+                .unwrap(),
+            span_attrs
+                .get(GenAiExtensions::USAGE_COST_OUTPUT)
+                .and_then(|v| v.as_f64())
+                .unwrap(),
+            span_attrs
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64())
+                .unwrap(),
+        )
+    }
 
-        assert!((input_cost - 0.000435).abs() < 1e-12);
-        assert!((output_cost - 0.000435).abs() < 1e-12);
-        assert!((total_cost - 0.00087).abs() < 1e-12);
+    #[test]
+    fn test_process_span_calculates_deepseek_cost_from_token_only_span() {
+        // 12:00 UTC is outside DeepSeek's peak windows → off-peak: $0.66/$1.98 per 1M.
+        let (input_cost, output_cost, total_cost) = deepseek_costs(nanos_at_utc(12, 0));
+
+        assert!((input_cost - 0.00066).abs() < 1e-12);
+        assert!((output_cost - 0.00099).abs() < 1e-12);
+        assert!((total_cost - 0.00165).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_process_span_uses_deepseek_peak_rate_during_peak_hours() {
+        // 02:30 UTC falls in the 01:00-04:00 peak window → $1.32/$3.96 per 1M.
+        let (input_cost, output_cost, total_cost) = deepseek_costs(nanos_at_utc(2, 30));
+
+        assert!((input_cost - 0.00132).abs() < 1e-12);
+        assert!((output_cost - 0.00198).abs() < 1e-12);
+        assert!((total_cost - 0.0033).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_process_span_deepseek_second_peak_window_and_gap() {
+        // 07:00 UTC is inside the second peak window (06:00-10:00).
+        let (peak_input, ..) = deepseek_costs(nanos_at_utc(7, 0));
+        assert!((peak_input - 0.00132).abs() < 1e-12);
+
+        // 05:00 UTC sits in the gap between the two peak windows → off-peak.
+        let (gap_input, ..) = deepseek_costs(nanos_at_utc(5, 0));
+        assert!((gap_input - 0.00066).abs() < 1e-12);
+
+        // 04:00 UTC is the exclusive end of the first window → off-peak.
+        let (edge_input, ..) = deepseek_costs(nanos_at_utc(4, 0));
+        assert!((edge_input - 0.00066).abs() < 1e-12);
+
+        // 01:00 UTC is the inclusive start of the first window → peak.
+        let (start_input, ..) = deepseek_costs(nanos_at_utc(1, 0));
+        assert!((start_input - 0.00132).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_process_span_deepseek_missing_start_time_falls_back_to_unrestricted() {
+        // A zero start_time_unix_nano means the payload carried no timestamp. It must not
+        // be read as 1970-01-01 00:00 UTC, which would pin the span to whatever tier
+        // covers UTC midnight; an unknown time falls back to the unrestricted tier.
+        let (input_cost, output_cost, total_cost) = deepseek_costs(0);
+
+        assert!((input_cost - 0.00066).abs() < 1e-12);
+        assert!((output_cost - 0.00099).abs() < 1e-12);
+        assert!((total_cost - 0.00165).abs() < 1e-12);
     }
 
     #[test]
@@ -1456,6 +1537,7 @@ mod tests {
                         ("input".to_string(), 0.000005),
                         ("output".to_string(), 0.00002),
                     ]),
+                    utc_windows: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1529,6 +1611,7 @@ mod tests {
                         ("cache_read_input_tokens".to_string(), 0.0000001),
                         ("cache_creation_input_tokens".to_string(), 0.0000005),
                     ]),
+                    utc_windows: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1640,6 +1723,7 @@ mod tests {
                         ("output".to_string(), 0.000002),
                         ("cache_read_input_tokens".to_string(), 0.0000001),
                     ]),
+                    utc_windows: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1716,6 +1800,7 @@ mod tests {
                             0.003625 / 1_000_000.0,
                         ),
                     ]),
+                    utc_windows: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1810,6 +1895,7 @@ mod tests {
                         ("input".to_string(), 0.000001),  // $1/1M
                         ("output".to_string(), 0.000002), // $2/1M
                     ]),
+                    utc_windows: Vec::new(),
                 }],
                 ..Default::default()
             },

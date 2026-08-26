@@ -1223,7 +1223,10 @@
     "ingestionText": "Veri Alımı",
     "navigationLink": "Gezinme bağlantısı",
     "ariaCurrentPage": "{label} - Geçerli sayfa",
-    "ariaWithNotifications": "{label} ({count} bildirim)"
+    "ariaWithNotifications": "{label} ({count} bildirim)",
+    "infra": "Altyapı",
+    "databases": "Veritabanları",
+    "topQueries": "En Çok Kullanılan Sorgular"
   },
   "rum": {
     "noSessionReplay": "Oturum tekrarı mevcut değil",
@@ -3442,6 +3445,17 @@
     "languagesLabel": "Diller/Çerçeveler",
     "otherLabel": "Diğer",
     "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "snowflake": "Snowflake",
+    "zookeeper": "Zookeeper",
+    "cassandra": "Cassandra",
+    "aerospike": "Aerospike",
+    "dynamodb": "DynamoDB",
+    "jenkins": "Jenkins",
+    "ansible": "Ansible",
+    "terraform": "Terraform",
+    "gactions": "GitHub Actions",
+    "python": "Python",
     "dotnettracing": ".Net İzleme",
     "dotnetlogs": ".Net Günlükleri",
     "macos": "macOS",
@@ -3703,6 +3717,12 @@
       "k8sTroubleWebhookA": "OpenTelemetry operatörünün webhook'unun önce cert-manager'ın webhook'unun hizmet vermesi gerekir. `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook` komutunu çalıştırın, ardından kurulumu yeniden çalıştırın — bu işlem tekrarlanabilir.",
       "k8sTroubleWebhookQ": "Kurulum, kabul webhook'u ile ilgili bir hatayla başarısız oluyor",
       "linuxAgentFixBody": "Kurucu, aracıyı bir systemd hizmeti olarak başlatır. Hiçbir şey gelmezse çalıştığını doğrulayın ve kimlik doğrulama veya bağlantı hatası için günlüklerini okuyun:",
+      "prepareMariadbTitle": "MariaDB'yi Hazırlayın",
+      "prepareMariadbDesc": "İzleme kullanıcısını oluşturun — bunu bir SQL istemcisinde çalıştırın, **shell'inizde değil**.",
+      "runCollectorMariadbDesc": "Collector'ı başlatın (kullanıcının şifresi ortam değişkeniyle).",
+      "mariadbHostLabel": "MariaDB Sunucusu",
+      "verifyMariadbMetricsDesc": "Aşağıdaki Test'e tıklayın veya Akışlar'da `mysql_*` metriklerini kontrol edin (MariaDB, MySQL alıcısı üzerinden raporlar).",
+      "mariadbTagline": "MariaDB metriklerini OpenTelemetry Collector ile toplayın ve OpenObserve'e gönderin.",
       "logsStreamNameLabel": "Günlük Akışı Adı",
       "macosAgentFixBody": "Kurucu iki launchd arka plan programı kaydeder: aracının kendisi ve birleşik günlük köprüsü. Hiçbir şey gelmezse ikisinin de yüklendiğini doğrulayın ve kimlik doğrulama veya bağlantı hatası için aracının günlüğünü okuyun:",
       "macosAgentServicesFixTitle": "Aracı Hizmetlerini Kontrol Et",
@@ -4007,7 +4027,46 @@
       "enableSessionReplayOptionalTitle": "Oturum Tekrarını Etkinleştir (İsteğe Bağlı)",
       "enableSessionReplayNativeDesc": "Oturum Tekrarı **ayrı olarak** etkinleştirilir ve RUM uç noktasını **devralmaz**. Ayrıca hiçbir şey eklemez, bu nedenle aşağıdaki tam `/replay` URL'sine ihtiyaç duyar. Bunu yanlış yapmak, RUM olaylarının ulaşmasına rağmen tekrarların asla ulaşmamasının olağan nedenidir.",
       "verifyAndroidRumDesc": "Uygulamayı bir emülatörde veya cihazda çalıştırın, birkaç ekran arasında gezinin, ardından Test'e basın — yerel Android olayları `_rumdata` akışına düşer.",
-      "verifyIosRumDesc": "Uygulamayı bir simülatörde veya cihazda çalıştırın, birkaç ekran arasında gezinin, ardından Test'e basın — yerel iOS olayları `_rumdata` akışına düşer."
+      "verifyIosRumDesc": "Uygulamayı bir simülatörde veya cihazda çalıştırın, birkaç ekran arasında gezinin, ardından Test'e basın — yerel iOS olayları `_rumdata` akışına düşer.",
+      "dbmPreparePostgresTitle": "Veritabanı İzleme · Erişim izni verin (isteğe bağlı)",
+      "dbmPreparePostgresDesc": "**Yukarıdakilerin tümü kendi başına tamamdır** — sorgu süreleri, uygulamanızın izlerinden (traces) zaten Veritabanları'na ulaşır, burada ek bir kurulum gerekmez. Bu son adımlar, bir trace'in asla göremeyeceği şeyleri ekler: yalnızca veritabanının kaydettiği deadlock'lar ve engellenen sorgular. `pg_monitor` yetkisi verin ki collector diğer oturumların sorgularını okuyabilsin — bunu bir SQL istemcisinde çalıştırın, **shell'inizde değil**.",
+      "dbmPrepareMysqlTitle": "Veritabanı İzleme · Deadlock geçmişini sakla (isteğe bağlı)",
+      "dbmPrepareMariadbTitle": "Veritabanı İzleme · Deadlock geçmişini sakla (isteğe bağlı)",
+      "dbmPrepareMysqlDesc": "**Yukarıdakilerin tümü kendi başına tamamdır** — sorgu süreleri, uygulamanızın izlerinden (traces) zaten Veritabanları'na ulaşır, burada ek bir kurulum gerekmez. Bu son adımlar, bir trace'in asla göremeyeceği şeyleri ekler: yalnızca veritabanının kaydettiği deadlock'lar ve engellenen sorgular. Tam deadlock geçmişini açın — bunu bir SQL istemcisinde çalıştırın, **shell'inizde değil**.",
+      "dbmPrepareMariadbDesc": "**Yukarıdakilerin tümü kendi başına tamamdır** — sorgu süreleri, uygulamanızın izlerinden (traces) zaten Veritabanları'na ulaşır, burada ek bir kurulum gerekmez. Bu son adımlar, bir trace'in asla göremeyeceği şeyleri ekler: yalnızca veritabanının kaydettiği deadlock'lar ve engellenen sorgular. Tam deadlock geçmişini açın — bunu bir SQL istemcisinde çalıştırın, **shell'inizde değil**.",
+      "dbmPgLoggingTitle": "Veritabanı İzleme · Postgres'in deadlock'ları kaydetmesine izin ver (isteğe bağlı)",
+      "dbmPgLoggingDesc": "Deadlock'lar yalnızca Postgres günlüğüne yazılır ve yalnızca aşağıdaki ayarlar açıkken yazılır — bu yüzden Deadlocks sekmesinin hiç dolmasını sağlayan şey bu adımdır. Önek satırı birebir eşleşmelidir: collector, ilgili tarafları bulmak için bunu okur; farklı bir önek, hiçbir şey bulamayacağı ve yine de sağlıklı rapor vereceği anlamına gelir.",
+      "dbmPgLoggingVerifyTitle": "Veritabanı İzleme · Ayarların etkili olduğunu kontrol edin (isteğe bağlı)",
+      "dbmPgLoggingVerifyDesc": "Bunu yeniden başlatmanın ardından çalıştırın. Herhangi bir değer hâlâ eski ayarı gösteriyorsa, Postgres yeniden başlatılmak yerine yeniden yüklenmiş demektir ve collector'ın okuyacağı hiçbir şey olmayacaktır.",
+      "dbmPgAutoExplainTitle": "Veritabanı İzleme · Gerçek yürütülen planları yakala (isteğe bağlı)",
+      "dbmPgAutoExplainDesc": "Bu adım olmadan, sorgu planları gerçek parametre değerleriniz olmadan hesaplanan genel tahminlerdir — yararlıdır, ancak asla gerçekte çalışan plan değildir. auto_explain, eşik değerden yavaş olan her ifade için Postgres'in gerçekten yürüttüğü planı, gerçek satır sayıları ve gerçek süre ile günlüğe kaydeder. Örneklediği ifadelere ölçülebilir yürütücü ek yükü ekler; bu yüzden ayarların yorumlarını yoğun bir birincil sunucuya uygulamadan önce okuyun ve bunu yukarıdaki günlükleme adımıyla aynı yeniden başlatmada yapın.",
+      "dbmConfigureTitle": "Veritabanı İzleme · Collector'ı yapılandırın (isteğe bağlı)",
+      "dbmConfigurePostgresDesc": "`dbm-config.yaml` yazar — aşağıda veritabanını ve Postgres günlük dosyanızın yolunu belirleyin. Deadlock'lar ve engellenen sorguların yanı sıra, bu yapılandırma etkinlik örneklerini ve sunucu en çok kullanılan sorgularını (tahmini planlarla) açar: collector her ikisini de varsayılan olarak KAPALI gönderir, bu yüzden bu dosyadaki en üst düzey `events:` bloğu onları etkinleştiren şeydir — o olmadan collector sağlıklı görünür ve hiçbir şey göndermez.",
+      "dbmConfigureMysqlDesc": "`dbm-config.yaml` yazar — aşağıda veritabanını ve MySQL hata günlüğünüzün yolunu belirleyin. Deadlock'lar ve engellenen sorguların yanı sıra, bu yapılandırma etkinlik örneklerini ve sunucu en çok kullanılan sorgularını açar: collector her ikisini de varsayılan olarak KAPALI gönderir, bu yüzden bu dosyadaki en üst düzey `events:` bloğu onları etkinleştiren şeydir — o olmadan collector sağlıklı görünür ve hiçbir şey göndermez.",
+      "dbmConfigureMariadbDesc": "`dbm-config.yaml` yazar — aşağıda veritabanını ve MariaDB hata günlüğünüzün yolunu belirleyin. MariaDB burada deadlock'ları, engellenen sorguları, etkinlik örneklerini ve en çok kullanılan sorguları alır: mysql alıcısı MariaDB'nin protokolünü konuşur ve onu doğru şekilde tanımlar. Alıcının kendisinin bildirdiği bir eksiklik — MariaDB örneklenen ifade metnini açığa çıkarmaz, bu yüzden bir etkinlik satırı oturumu SQL'i olmadan adlandırır.",
+      "dbmRunTitle": "Veritabanı İzleme · Collector'ı çalıştırın (isteğe bağlı)",
+      "dbmRunPostgresDesc": "Her iki yapılandırmayı birlikte çalıştırır. 1. adımda oluşturduğunuz rolü ve şifreyi kullanın.",
+      "dbmRunMysqlDesc": "Her iki yapılandırmayı birlikte çalıştırır. 1. adımda oluşturduğunuz kullanıcıyı ve şifreyi kullanın.",
+      "dbmRunMariadbDesc": "Her iki yapılandırmayı birlikte çalıştırır. 1. adımda oluşturduğunuz kullanıcıyı ve şifreyi kullanın.",
+      "dbmVerifyTitle": "Veritabanı İzleme · Deadlock'ları ve engellenen sorguları görün",
+      "dbmVerifyDesc": "**Altyapı → Veritabanları**'nı açın ve aşağıdan bir sekme seçin. Veritabanınız bir olay bildirdiğinde olaylar görünür — oradaki boş bir sekme, hiçbir şeyin olmadığını mı yoksa hiçbir şeyin toplanmadığını mı söyler.",
+      "dbmVerifyFullDesc": "**Altyapı → Veritabanları**'nı açın ve aşağıdan bir sekme seçin. Deadlock'lar ve engellenen sorgular, veritabanınız bir tane bildirdiğinde görünür; Etkinlik sekmesi, collector başladıktan sonra bir dakika içinde örneklenmiş oturumlarla dolar ve tahmini planlar, MySQL 8.0.22 ve daha yeni sürümlerde bir sorgunun ayrıntı sayfasında görünür. Tablo sağlığı, ilk 60 saniyelik anlık görüntüden sonra dolar.",
+      "dbmDatabaseLabel": "Veritabanı",
+      "dbmPgLogPathLabel": "Postgres Günlük Dosyası",
+      "dbmPgLogPathHelp": "Collector bu dosyayı okuyabilmelidir. Şu komutla bulun: SHOW log_directory;",
+      "dbmMysqlLogPathLabel": "MySQL Hata Günlüğü",
+      "dbmMariadbLogPathLabel": "MariaDB Hata Günlüğü",
+      "dbmMysqlLogPathHelp": "Collector bu dosyayı okuyabilmelidir. Şu komutla bulun: SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "Collector bu dosyayı okuyabilmelidir. Şu komutla bulun: SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "Veritabanı İzleme · Erişim izni ver (isteğe bağlı)",
+      "dbmPrepareMssqlDesc": "**Yukarıdaki her şey kendi başına tamamlandı** — sorgu süreleri, uygulamanızın izlemelerinden Veritabanlarına zaten ulaşır, burada ek bir kurulum gerekmez. Bu son grup, bir izlemenin asla göremeyeceğini ekler: yalnızca veritabanının kendisinin kaydettiği kilitlenmeler ve engellenen sorgular. Her iki izin de gereklidir — biri toplayıcının diğer oturumları okumasını sağlar, diğeri kilitlenme geçmişini okumasını sağlar. Bunları bir SQL istemcisinde çalıştırın, **terminalinizde değil**.",
+      "dbmConfigureMssqlDesc": "`dbm-config.yaml` dosyasını yazar — aşağıda bağlanılacak veritabanını ayarlayın. SQL Server burada kilitlenmeleri, engellenen sorguları, etkinlik örneklerini, en çok kullanılan sorguları ve yürütme planlarını alır. sqlserver alıcısı tüm örneği okur, bu nedenle etkinlik ve en çok kullanılan sorgular yukarıda belirttiğiniz veritabanıyla sınırlı değildir.",
+      "dbmRunMssqlDesc": "Her iki yapılandırmayı birlikte çalıştırır. 1. adımda oluşturduğunuz aynı kullanıcı adını ve parolayı kullanın.",
+      "dbmVerifyBlockingDesc": "**Altyapı → Veritabanları → Engellenen sorgular** bölümünü açın. Bir kilit için bekleyen oturumlar, örneklenir örneklenmez görünür — oradaki boş bir sekme, hiçbir şeyin engellenmediğini veya hiçbir şeyin toplanmadığını söyler.",
+      "dbmVerifyFullNoSampleTextDesc": "**Altyapı → Veritabanları** bölümünü açın ve aşağıdan bir sekme seçin. Kilitlenmeler ve engellenen sorgular, veritabanınız bir tane bildirdiğinde görünür; Etkinlik sekmesi, toplayıcı başladıktan sonra bir dakika içinde örneklenen oturumlarla dolar ve en çok kullanılan sorgular, bir sorgunun ayrıntı sayfasında planlarını taşır. MariaDB, örneklenen ifade metnini açığa çıkarmaz, bu nedenle bir etkinlik satırı oturumu SQL'i olmadan adlandırır. Tablo sağlığı, ilk 60 saniyelik anlık görüntüden sonra dolar.",
+      "dbmVerifyFullPlainPlansDesc": "**Altyapı → Veritabanları** bölümünü açın ve aşağıdan bir sekme seçin. Kilitlenmeler ve engellenen sorgular, veritabanınız bir tane bildirdiğinde görünür; Etkinlik sekmesi, toplayıcı başladıktan sonra bir dakika içinde örneklenen oturumlarla dolar ve yürütme planları bir sorgunun ayrıntı sayfasında görünür. Tablo sağlığı, ilk 60 saniyelik anlık görüntüden sonra dolar.",
+      "dbmVerifyFullSlowTableHealthDesc": "**Altyapı → Veritabanları** bölümünü açın ve aşağıdan bir sekme seçin. Kilitlenmeler ve engellenen sorgular, veritabanınız bir tane bildirdiğinde görünür; Etkinlik sekmesi, toplayıcı başladıktan sonra bir dakika içinde örneklenen oturumlarla dolar ve tahmini planlar bir sorgunun ayrıntı sayfasında görünür. Tablo sağlığı beş dakikaya kadar sürer — tablo boyutlarını okumak, şemanız büyüdükçe yavaşlar, bu nedenle geri kalanından daha az sıklıkta çalışır.",
+      "dbmVerifyTableHealthDesc": "**Altyapı → Veritabanları** bölümünü açın ve aşağıdan bir sekme seçin. Kilitlenmeler ve engellenen sorgular, veritabanınız bir tane bildirdiğinde görünür — oradaki boş bir sekme, hiçbir şeyin olmadığını veya hiçbir şeyin toplanmadığını söyler. Tablo sağlığı, ilk 60 saniyelik anlık görüntüden sonra dolar."
     },
     "instrumentBeforeImportTitle": "İstemciyi İçe Aktarmadan Önce Enstrümantasyon",
     "instrumentBeforeImportBody": "Uygulamanız çalışıyor ancak spanlar gelmiyorsa, enstrümantasyon büyük olasılıkla istemci içe aktarıldıktan sonra yüklenmiştir. Başlatmanın önce çalışması için sıralamayı yeniden düzenleyin:",
@@ -4492,6 +4551,8 @@
     "folder": "Klasör",
     "folders": "Klasörler",
     "searchFolder": "Arama Klasörü",
+    "folderIcon": "Simge",
+    "folderIconAria": "Bir klasör simgesi seçin",
     "deleteFolder": "Klasörü Sil",
     "deleteFolderMessage": "Bu klasörü silmek istediğinizden emin misiniz?",
     "trellisLayout": "Kafes Düzeni",
@@ -5443,7 +5504,8 @@
     "variableNameAlreadyExists": "Aynı isimde değişken zaten mevcut",
     "pivotTotal": "Toplam",
     "pivotOthers": "Diğerleri",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Eşleşen günlükleri keşfet"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5531,7 +5593,59 @@
     "mapvalue": "Değer",
     "source": "Kaynak",
     "target": "Hedef",
-    "value": "Değer"
+    "value": "Değer",
+    "logExplorer": {
+      "title": "Günlük Gezgini",
+      "openInLogs": "Günlüklerde Aç",
+      "invalidParams": "Geçersiz detaylandırma parametreleri",
+      "noEvents": "Bu filtreyle eşleşen olay yok",
+      "filterHint": "İlgili günlükleri keşfetmek için tıklayın",
+      "timestamp": "Zaman Damgası",
+      "queryMode": "SQL",
+      "runQuery": "Sorguyu Çalıştır",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "olay",
+      "events": "olaylar",
+      "prevPage": "Önceki",
+      "nextPage": "Sonraki",
+      "of": " / ",
+      "sqlEditorLabel": "SQL Sorgusu",
+      "resetSql": "Sıfırla",
+      "detail": {
+        "drawerTitle": "Olay Ayrıntısı",
+        "details": "Ayrıntılar",
+        "json": "JSON",
+        "insights": "İçgörüler",
+        "copyLink": "Bağlantıyı Kopyala",
+        "copy": "Kopyala",
+        "copyValue": "Değeri Kopyala",
+        "insightsHint": "Yüklenen {n} olay arasında alan frekansları"
+      },
+      "insights": {
+        "anomalyTitle": "Alan Anomalisi Profili",
+        "anomalyHint": "{n} olay örneklendi",
+        "colField": "Alan",
+        "colRarity": "Nadirlik",
+        "colValue": "Değer",
+        "rarity": {
+          "anomalous": "Anormal",
+          "rare": "Nadir",
+          "uncommon": "Az rastlanan",
+          "common": "Yaygın"
+        },
+        "timelineTitle": "Olay Zaman Çizelgesi",
+        "timelineHint": "Seçilen aralıkta frekans",
+        "timelineEmpty": "Veri yok",
+        "patternsTitle": "Günlük Desenleri",
+        "patternsHint": "Benzer yapıya göre gruplandı",
+        "zScore": "z={value}",
+        "patternsEmpty": "Bu filtre için desen çıkarılmadı",
+        "contextTitle": "Çevredeki Olaylar",
+        "contextHint": "Bu zaman damgasına yakın olaylar",
+        "contextTooltip": "Bu olaydan önceki ve sonraki 3 dakika içinde bu akıştan diğer olaylar — aynı anda başka neler olduğunu gösterir.",
+        "contextEmpty": "Çevredeki olay bulunamadı"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Uyarılar genel bakış bölümü",
@@ -6017,6 +6131,7 @@
     "SearchSQLCancelled": "Hata: Search SQL iptal edildi."
   },
   "alerts": {
+    "allAlerts": "Tüm Uyarılar",
     "compositeAlert": "Bileşik",
     "import": {
       "anomalyImportSuccess": "Anomali Tespiti - {index}: \"{name}\" başarıyla içe aktarıldı",
@@ -7345,6 +7460,18 @@
         "panel": {
           "label": "Uyarı Oluştur",
           "toast": "Sorgu gösterge panelinden aktarıldı: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Düzenleyicide özelleştir",
+          "toast": "Uyarı Kitaplığı'ndan: {sourceLabel}"
+        },
+        "dbm": {
+          "label": "Beni uyar",
+          "toast": "Veritabanı İzleme'den içe aktarıldı: \"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "Beni uyar",
+          "toast": "Veritabanı İzleme'den içe aktarıldı (sunucu bakış açısı): \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7366,7 +7493,13 @@
         "noQueries": "Bu panelde uyarı oluşturmak için bir sorgu yok.",
         "noConstants": "Seçilen desenlerin eşleşecek ayırt edici bir metni yok.",
         "sqlModeFilterDropped": "SQL sorgunuz aktarılmadı — uyarı yalnızca seçilen desenlerle eşleşir.",
-        "patternsUnusable": "Bu sayfadaki desenlerin hiçbirinde eşleşecek ayırt edici metin yok, bu nedenle uyarı yalnızca aramanızı kullanır."
+        "patternsUnusable": "Bu sayfadaki desenlerin hiçbirinde eşleşecek ayırt edici metin yok, bu nedenle uyarı yalnızca aramanızı kullanır.",
+        "dbmRollupLag": "Veritabanı sayıları her {minutes} dakikada bir toplanır, bu nedenle bu uyarı yalnızca bu sıklıkta tetiklenebilir — gerçek zamanlı bir sayfa değildir.",
+        "dbmFingerprintVersion": "Bu uyarı, bir sorgunun tam biçimine sabitlenmiştir. Sorguların gruplanma şekli değişirse, uyarı eşleşmeyi durdurabilir ve yeniden oluşturulmalıdır.",
+        "dbmNoFingerprint": "Bu sorgunun sabit bir tanımlayıcısı yok, bu nedenle uyarı bunun yerine tüm veritabanını izler.",
+        "dbmServerVantage": "Bu, veritabanı sunucusunun kilitler hakkında bildirdiklerini ölçer, uygulamanızın ne kadar beklediğini değil. Bunu sorgu gecikmesi uyarılarıyla karşılaştırmayın.",
+        "dbmLockSampling": "Kilit etkinliği aralıklarla örneklenir, bu nedenle iki örnek arasında başlayıp sona eren çekişme asla kaydedilmedi. Sessiz bir uyarı, engelleme olmadığının kanıtı değildir.",
+        "dbmNoInstance": "Tek bir veritabanı örneği tanımlanmadı, bu nedenle bu uyarı bu motorun her örneğini izler."
       }
     },
     "saveFailed": "Uyarı kaydedilemedi.",
@@ -7405,6 +7538,112 @@
     "impactTemplate": "Kullanan: {destinations} · {alerts}",
     "impactDestination": "Kullanan: {alerts}"
   },
+  "alert_library": {
+    "header": "Uyarı Kitaplığı",
+    "subtitle": "Özenle seçilmiş, kuruluma hazır uyarılar; zaten aldığınız verilerle eşleştirilir",
+    "sectionTab": "Kitaplık",
+    "contribute": "GitHub'da katkıda bulunun",
+    "searchPlaceholder": "Ada, açıklamaya veya akışa göre ara",
+    "searchLabel": "Uyarı kitaplığını ara",
+    "categories": "Kategori",
+    "searchCategories": "Kategorileri ara",
+    "searchCategoriesAria": "Kategori filtrelerini ara",
+    "noCategoryMatch": "Eşleşen kategori yok.",
+    "selectedCount": "{count} seçildi",
+    "facetAria": "{label}, {count} uyarı",
+    "severity": "Önem Düzeyi",
+    "severityAll": "Tümü",
+    "severityCritical": "Kritik",
+    "severityWarning": "Uyarı",
+    "severityInfo": "Bilgi",
+    "statReady": "Kuruluma hazır",
+    "statNeedsData": "Alınmadı",
+    "statAll": "Tümü",
+    "notIngested": "Alınmadı: {stream}",
+    "notIngestedHint": "Bu kuruluş {stream} akışını almıyor, bu nedenle bu uyarı asla tetiklenmez. Yine de kurun, veri geldiğinde çalışmaya başlayacaktır.",
+    "alertCount": "{count} uyarı | {count} uyarı",
+    "noCollectorTitle": "Burada henüz verilerinizle eşleşen bir şey yok",
+    "noCollectorDescription": "Bu {count} uyarıdan hiçbiri, bu kuruluşun aldığı bir akışı sorgulamıyor. OpenObserve'e {group} telemetrisi gönderin, burada görünür hale gelsinler.",
+    "setupGuide": "Veri Alma Kılavuzu",
+    "emptyLibraryTitle": "Uyarı kitaplığı boş",
+    "emptyLibraryDescription": "Katalog yüklendi ancak uyarı içermiyor. Bu bir filtre sorunu değil, bir yayınlama sorunudur — kısa süre içinde tekrar deneyin.",
+    "noMatchesTitle": "Bu filtrelerle eşleşen uyarı yok",
+    "noMatchesDescription": "Başka bir kategori, önem düzeyi veya arama terimi deneyin.",
+    "clearFilters": "Filtreleri temizle",
+    "loadFailedTitle": "Uyarı kitaplığı yüklenemedi",
+    "retry": "Yeniden dene",
+    "openDetails": "{title} aç",
+    "drawer": {
+      "dataAvailable": "Veri mevcut",
+      "streamNotFound": "Akış bulunamadı",
+      "detects": "Neyi algılar",
+      "noDescription": "Kitaplıkta açıklama yok.",
+      "needsDataCallout": "Bu uyarı, bu kuruluşun almadığı {stream} akışını sorgular. Şimdi yüklemek, asla tetiklenmeyecek bir uyarı oluşturur.",
+      "query": "Sorgu",
+      "stream": "Akış",
+      "streamType": "Akış türü",
+      "metricCondition": "Metrik koşulu",
+      "matchCount": "Eşleşen satırlar gerekli",
+      "previewBlocked": "{stream}, bu kuruluşta bir akış değil, bu yüzden değerlendirilecek bir şey yok.",
+      "wouldTrigger": "Tetiklenirdi",
+      "wouldNotTrigger": "Tetiklenmezdi",
+      "loading": "Bu uyarı kitaplıktan yükleniyor",
+      "loadFailed": "Bu uyarı kitaplıktan yüklenemedi.",
+      "customize": "Düzenleyicide özelleştir",
+      "customizeHint": "Bu uyarıyla önceden doldurulmuş standart uyarı düzenleyicisini açar.",
+      "customizeFailed": "Bu uyarı düzenleyicide açılamadı.",
+      "install": "Yükle",
+      "neverIngested": "Henüz veri yok",
+      "neverIngestedCallout": "{stream} mevcut ancak hiç veri almadı, bu yüzden bu uyarının tetikleneceği bir şey yok.",
+      "lastData": "Son veri {when}",
+      "staleCallout": "{stream} son veriyi {when} aldı. Bu uyarı, veri alımı yeniden başlayana kadar sessiz kalacak.",
+      "unknownTime": "bilinmeyen bir zamanda"
+    },
+    "install": {
+      "title": "Kitaplıktan yükle",
+      "subtitle": "Uyarıların nereye bildirim yapacağını, hangi uyarıların yükleneceğini ve nereye kaydedileceğini seçin.",
+      "stepDestination": "Hedef",
+      "stepAlerts": "Uyarılar",
+      "stepFolder": "Klasör",
+      "stepTune": "Ayarla",
+      "stepInstall": "Yükle",
+      "destinationIntro": "Bu gruptaki her uyarı, burada seçtiğiniz hedefe bildirim gönderir. Kitaplık dosyaları, dışa aktarıldıkları kuruluşun hedeflerinin adlarını içerir; bu hedefler sizin kuruluşunuzda mevcut değildir.",
+      "destinationLabel": "Hedef",
+      "destinationPlaceholder": "Bir hedef seçin",
+      "destinationsLoadFailed": "Mevcut hedefleriniz yüklenemedi.",
+      "retry": "Tekrar dene",
+      "destinationsNoneBody": "Bu kuruluşun henüz uyarı hedefi yok, bu yüzden bu uyarıların bildirim gönderebileceği bir yer yok. Hedefler sayfasında bir tane oluşturun ve ardından buraya geri gelip buradan seçin.",
+      "openDestinations": "Hedefleri Aç",
+      "selectAll": "Tümünü seç",
+      "clear": "Temizle",
+      "selectedCount": "{count} / {total} seçildi",
+      "folderIntro": "Yüklenen uyarılar burada dosyalanır. Bu grup kendine ait bir klasörü hak ediyorsa + düğmesinden bir klasör oluşturun.",
+      "tuneToggle": "Bu gruptaki her uyarı için bunları ayarlayın",
+      "tuneHint": "Yalnızca bu ikisi tüm bir grup için güvenle ayarlanabilir. Eşikler uyarı başına kalır — birini değiştirmek için o uyarıyı açıp tek başına kurun.",
+      "frequency": "Her",
+      "silence": "Sessize alma",
+      "minutes": "dk",
+      "summaryTuningNone": "Kütüphane varsayılanları",
+      "summaryTuningOverride": "Her {frequency} dk, {silence} dk sessize alınır",
+      "run": "{count} uyarı kur | {count} uyarı kur",
+      "retryFailed": "{count} hatayı yeniden dene | {count} hatayı yeniden dene",
+      "allInstalled": "{count} uyarı kuruldu | {count} uyarı kuruldu",
+      "someFailed": "{installed} kuruldu, {failed} kurulamadı",
+      "unknownError": "Uyarı oluşturulamadı.",
+      "unreadableConditions": "Bu uyarının filtre koşulları, bu sürümün okuyamadığı bir biçimde. Kurulumu filtresiz bir uyarı oluşturacağı için atlandı.",
+      "back": "Geri",
+      "next": "İleri",
+      "cancel": "İptal",
+      "done": "Bitti"
+    },
+    "error": {
+      "network": "Kütüphaneye ulaşılamadı. Ağ bağlantınızı kontrol edip tekrar deneyin.",
+      "http": "Kütüphane sunucusu bir hata döndürdü. Birazdan tekrar deneyin.",
+      "unparseable": "Kütüphane, katalog olmayan bir yanıt döndürdü.",
+      "unsupported_version": "Bu kütüphane kataloğu, bu OpenObserve sürümünün okuyabildiğinden daha yeni. Göz atmak için yükseltin.",
+      "malformed": "Kütüphane kataloğu eksik veya bozuk."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Şablonu Dışa Aktar",
     "selected": "seçili",
@@ -7429,7 +7668,7 @@
     "importBodyLabel": "Şablon Gövdesi *",
     "importTypeLabel": "Şablon Türü *",
     "importTitleLabel": "Şablon Başlığı *",
-    "header": "Şablonlar",
+    "header": "Hedef Şablonları",
     "add": "Şablon Ekle",
     "edit": "Düzenle",
     "name": "İsim",
@@ -7636,6 +7875,7 @@
     "destinationsLoadError": "Hedefler yüklenirken hata"
   },
   "alert_destinations": {
+    "sectionTab": "Hedefler",
     "chooseTypeTitle": "Tür Seçin",
     "selectDestinationType": "Hedef Türü Seçin",
     "connectionStepTitle": "Bağlantı",
@@ -9143,7 +9383,8 @@
       "rowsReturned": "Döndürülen Satırlar",
       "batchSize": "Toplu İşlem Boyutu",
       "querySummary": "Sorgu Özeti",
-      "responseStatus": "Yanıt Durumu"
+      "responseStatus": "Yanıt Durumu",
+      "viewQueryTrend": "Veritabanı İzleme'de sorgu eğilimini görüntüle"
     },
     "index": {
       "clickHere": "Buraya tıklayın",
@@ -9219,6 +9460,7 @@
       "viewRelated": "İlgiliyi Görüntüle",
       "logs": "Günlükler",
       "traces": "İzler",
+      "databases": "Veritabanları",
       "viewTraces": "İzleri Görüntüle",
       "operations": "İşlemler",
       "metrics": "Metrikler",
@@ -9995,7 +10237,7 @@
     "copyPattern": "Deseni kopyala",
     "copied": "Kopyalandı!",
     "pricingTiers": "Fiyatlandırma Katmanları",
-    "pricingTiersDesc": "İlk katman varsayılan değerdir. Kullanım koşulları karşılandığında ek katmanlar uygulanır.",
+    "pricingTiersDesc": "İlk katman varsayılandır. Ek katmanlar, kendi kullanım koşulları ve UTC zaman pencereleri karşılandığında uygulanır.",
     "tierName": "Katman Adı",
     "applyTierWhen": "Bu katmanı şu durumlarda uygulayın",
     "quickSetup": "Hızlı kurulum:",
@@ -10087,7 +10329,25 @@
     "saveShadowedWarning": "Kaydedildi, ancak bu giriş aynı kalıba ve daha yüksek önceliğe sahip olan “{winner}” tarafından gölgeleniyor. Diğer giriş silinmedikçe veya devre dışı bırakılmadıkça hiçbir zaman maliyet hesaplaması için kullanılmayacaktır.",
     "modelPricingSaved": "Model fiyatlandırması kaydedildi",
     "errSave": "Kaydedilemedi",
-    "errLoadModel": "Model yüklenemedi"
+    "errLoadModel": "Model yüklenemedi",
+    "tierDefaultName": "Varsayılan",
+    "timeWindows": "Aktif saatler (UTC)",
+    "timeWindowsDesc": "Bu katmanı, tepe ve tepe dışı ücretler uygulayan sağlayıcılar için yinelenen UTC saatleriyle sınırlayın.",
+    "timeWindowFrom": "Başlangıç",
+    "timeWindowTo": "Bitiş",
+    "addTimeWindow": "Zaman penceresi ekle",
+    "removeTimeWindow": "Zaman penceresini kaldır",
+    "addUsageCondition": "Kullanım koşulu ekle",
+    "removeUsageCondition": "Kullanım koşulunu kaldır",
+    "timeWindowInvalid": "Katman \"{name}\": saati HH:MM (24 saatlik UTC) olarak girin.",
+    "timeWindowSameBounds": "Katman \"{name}\": başlangıç ve bitiş farklı olmalı. Katmanı her zaman aktif yapmak için pencereyi kaldırın.",
+    "timeWindowWrapsHint": "UTC'ye göre gece yarısını aşar.",
+    "tierNeedsRestriction": "Katman \"{name}\" hiçbir kullanım koşulu ve zaman penceresi içermiyor, bu yüzden asla etkinleşmeyecek. Bir tane ekleyin veya katmanı silin.",
+    "timeBasedChip": "Zaman tabanlı",
+    "tierAlwaysActive": "Her zaman aktif (varsayılan)",
+    "testAtTimeLabel": "UTC saatinde test et",
+    "testAtTimeHint": "Boş bırakılırsa geçerli saat kullanılır. Tepe / tepe dışı katmanlar bu saate göre belirlenir.",
+    "localTimeHint": "Saat diliminizde: {range}"
   },
   "aiObservability": {
     "title": "LLM Gözlemlenebilirlik",
@@ -13269,6 +13529,24 @@
     "combobox": {
       "noOptionsFound": "Seçenek bulunamadı"
     },
+    "emojiPicker": {
+      "chooseIcon": "Bir simge seçin",
+      "searchPlaceholder": "Simge ara...",
+      "removeIcon": "Simgeyi kaldır",
+      "noResults": "Aramanızla eşleşen simge yok",
+      "groups": {
+        "results": "Sonuçlar",
+        "status": "Durum",
+        "services": "Hizmetler",
+        "ai": "AI",
+        "creatures": "Yaratıklar",
+        "infra": "Altyapı",
+        "data": "Veri",
+        "teams": "Ekipler",
+        "objects": "Nesneler",
+        "world": "Dünya"
+      }
+    },
     "input": {
       "clear": "Temizle"
     },
@@ -13647,6 +13925,14 @@
       },
       "variableScope": {
         "global": "Genel"
+      },
+      "dataConfidence": {
+        "estimated": "≈ tahmini",
+        "topNSubset": "üst-N alt kümesi",
+        "live": "canlı",
+        "belowTopN": "üst-N altında",
+        "truncated": "kesilmiş",
+        "gap": "boşluk"
       }
     }
   },
@@ -14627,6 +14913,1056 @@
     },
     "hover": {
       "deprecated": "**Kullanımdan kaldırıldı** — kanonik işlevi tercih edin."
+    }
+  },
+  "dbm": {
+    "common": {
+      "reload": "Yenile",
+      "lastRefreshed": "Son yenileme {age}",
+      "loadFailed": "Veritabanı verileri yüklenemedi. Tekrar deneyin veya zaman aralığını daraltın."
+    },
+    "ai": {
+      "suggestFix": "Bunu nasıl düzelteceğini AI'ya sor",
+      "suggestFixHint": "Bu sorgu, motoru ve gecikme değerleriyle AI asistanını açar ve neyin değiştirileceğini sorar. Kendisi hiçbir şeyi değiştirmez.",
+      "rowSuggestFix": "Bunu nasıl düzelteceğini AI'ya sor",
+      "deadlockFix": "Bu kilitlenmeyi nasıl durdurabilirim?",
+      "deadlockFixHint": "Hem çakışan ifadeleri hem de satır sırası kanıtını AI asistanına gönderir.",
+      "blockingFix": "Bu neden engelliyor?",
+      "blockingFixHint": "Kök oturumun ifadesini, boşta kalma süresini ve arkasında bekleyen oturum sayısını AI asistanına gönderir."
+    },
+    "filters": {
+      "allEngines": "Tüm motorlar",
+      "allInstances": "Tüm veritabanları",
+      "allNamespaces": "Tüm şemalar",
+      "allEnvs": "Tüm ortamlar",
+      "allServices": "Tüm hizmetler",
+      "scope": "Filtreler",
+      "clearScope": "Tümünü temizle",
+      "removeScope": "Bu filtreyi kaldır",
+      "popoverTitle": "Bunu daralt",
+      "dimension": {
+        "system": "motor",
+        "instance": "veritabanı",
+        "namespace": "şema",
+        "env": "ortam",
+        "service": "hizmet",
+        "insight": "içgörü"
+      }
+    },
+    "delta": {
+      "new": "bu listede yeni",
+      "gone": "çalışmayı durdurdu",
+      "newHint": "Bu sorgu daha önce en ağır sorgular arasında değildi, bu yüzden karşılaştırılacak bir şey yok. Daha önce de çalışıyor olabilir — ancak kendi başına izlenecek kadar ağır değildi.",
+      "goneHint": "Bu sorgu günün erken saatlerinde çalıştı ancak baktığınız zaman aralığında değil.",
+      "comparison": "Önce {previous} → şimdi {current}",
+      "noChange": "değişiklik yok",
+      "timesMore": "{ratio}× daha fazla",
+      "timesFewer": "{ratio}× daha az",
+      "wasValue": "{value} idi"
+    },
+    "databases": {
+      "title": "Veritabanları",
+      "subtitle": "Veritabanı başına sorgu performansı ve sağlığı",
+      "searchPlaceholder": "Veritabanı veya hizmet ara…",
+      "unnamedInstance": "Örnek adlandırılmamış",
+      "unnamedInstanceHint": "Veritabanının kendi ifade raporları bu motorun çalıştığını kanıtlıyor, ancak bir ana bilgisayar adı vermiyorlar. Satır, bir adres taşıyan bir akış — oturum örnekleme veya örnek ölçümleri — kurulduğunda bir adres gösterecek.",
+      "moreServices": "+{count}",
+      "columns": {
+        "instance": "Veritabanı",
+        "calls": "Çağrılar",
+        "qps": "Saniyede",
+        "errorRate": "Başarısız",
+        "p50": "Yarısı daha hızlı",
+        "p95": "Yavaş çağrılar",
+        "p99": "En yavaş %1",
+        "services": "Kullanan",
+        "load": "Veritabanı süresi",
+        "attention": "Dikkat gerektiriyor"
+      },
+      "summary": {
+        "databases": "Veritabanları",
+        "calls": "Çağrılar",
+        "time": "Veritabanı süresi",
+        "failed": "Başarısız"
+      },
+      "databaseCount": "1 veritabanı | {count} veritabanı",
+      "openQueries": "Sorgularını gör",
+      "alertMe": "Beni uyar",
+      "columnHints": {
+        "qps": "Saniye başına çağrı — bu penceredeki çağrıların pencere uzunluğuna bölünmesiyle hesaplanır, böylece 15 dakikalık bir görünüm ile 4 saatlik bir görünüm karşılaştırılabilir kalır.",
+        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
+        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
+        "p99": "Çağrıların en kötü %1'i en az bu kadar sürdü. Yalnızca tamamlanmış çağrılar sayılır — hâlâ çalışan veya hiç dönmeyen bir sorgu burada ölçülmez.",
+        "load": "Uygulamalarınızın bu veritabanını bekleyerek geçirdiği toplam süre. İstemci tarafından ölçülür, bu nedenle veritabanının ne kadar trafik hizmet verdiğini yansıtır — sunucunun ne kadar yüklü olduğunu değil.",
+        "attention": "Bu örneğin kendi motorunun yayınladığı bir limite ne kadar yakın olduğu — bugün, max_connections'a karşı bağlantılar. En kötü oran, harmanlanmış bir puan değil. En yüksekten başlayarak sıralanır; sağlığı okunamayan örnekler en üsttedir, çünkü göremediğiniz bir şeyin sağlıklı olduğunu bilemezsiniz. Veritabanı sunucusunda ölçülür, bu nedenle yanındaki Veritabanı süresiyle karşılaştırılamaz."
+      },
+      "failedChip": "{count} başarısız",
+      "columnSubLabels": {
+        "attention": "sunucu",
+        "load": "istemci",
+        "calls": "istemci"
+      },
+      "attention": {
+        "connections": "bağlantılar",
+        "noLimit": "limit yayınlanmadı",
+        "unknown": "ölçülmedi"
+      }
+    },
+    "queries": {
+      "title": "En yoğun sorgular",
+      "subtitle": "En fazla veritabanı süresi kullanan sorgular",
+      "subtitleServer": "Veritabanlarınızın çalıştırdığı ifadeler, veritabanı içinde sayılır — en sık çalıştırılanlar ilk sırada",
+      "searchPlaceholder": "Sorgu metni, tablo veya hizmet ara…",
+      "trendLabel": "Bu sorgunun süresinin aralık boyunca nasıl değiştiği",
+      "otherRow": "Diğer tüm sorgular",
+      "truncatedText": "Bu ifade tamamen saklanamayacak kadar uzun olduğundan kısaltılmış gösteriliyor.",
+      "stmtClass": {
+        "query": "Sorgular",
+        "queryHint": "Yalnızca gerçek SQL — SELECT, INSERT, UPDATE ve DELETE.",
+        "all": "Sorgular + bağlantı ek yükü",
+        "allHint": "Ayrıca sürücünüzün sorgular arasında gönderdiği kayıt işlemlerini sayar: BEGIN ve COMMIT, SET ve havuzlanmış bağlantıyı canlı tutan kontroller."
+      },
+      "completionBias": {
+        "title": "Çağrılar {drop}% düşerken hatalar arttı",
+        "body": "Bu genellikle sorguların tamamlanmak yerine takıldığı anlamına gelir — ve yalnızca tamamlanan sorguları ölçebiliriz. Buradaki düşen çizgi iyileştiği anlamına gelmeyebilir."
+      },
+      "columns": {
+        "query": "Sorgu",
+        "calls": "Çağrılar",
+        "p95": "Yavaş çağrılar",
+        "errors": "Başarısız",
+        "perTrace": "İstek başına",
+        "load": "Veritabanı süresi",
+        "p99": "En yavaş %1",
+        "max": "En kötü görülen",
+        "services": "Kullanan"
+      },
+      "queryCount": "1 çeşit sorgu | {count} çeşit sorgu",
+      "otherRowDetail": "— {calls} çağrı. Bunlar için sorgu başına sayı verimiz yok, yalnızca bu birleşik toplam var. Yukarıdaki her toplamda sayılır.",
+      "foldRowText": "1 daha küçük sorgu | {count} daha küçük sorgu",
+      "serverList": {
+        "title": "Veritabanlarınız tarafından bildirilen sorgular",
+        "subtitle": "Veritabanı içinde tüm istemciler arasında sayılır, en sık çalıştırılan önce gelir. Bu zaman aralığında izlenen uygulama çağrısı olmadığından normal liste boş — bu, veritabanlarının bu sırada gördüğüdür.",
+        "truncated": "En sık çalıştırılan {count} ifade — burada gösterilenden daha fazlası çalıştı",
+        "columns": {
+          "query": "Sorgu",
+          "calls": "Çağrılar",
+          "totalTime": "Veritabanındaki süre",
+          "meanTime": "Çağrı başına ortalama"
+        },
+        "columnHints": {
+          "time": "Veritabanı içinde ölçülür: PostgreSQL için yürütme süresi, MySQL ve MariaDB için bekleme süresi. Uygulamalarınızın deneyimlediği değil — ağ ve bağlantı beklemesi dahil değildir.",
+          "mean": "Veritabanındaki sürenin çağrılara bölümü — zaman aralığı boyunca bir ortalama, yüzdelik değil."
+        }
+      },
+      "foldRowDetail": "· Veritabanı süresinin {share} · bunları göstermek için tıklayın",
+      "foldRowDetailOpen": "· Veritabanı süresinin {share} · geri katlamak için tıklayın",
+      "summary": {
+        "queries": "Sorgu çeşitleri",
+        "calls": "Çağrılar",
+        "time": "Veritabanı süresi",
+        "failed": "Başarısız"
+      },
+      "columnHints": {
+        "calls": "Bu sorgunun kaç kez çalıştığı. Veritabanınızın bildirdiği yerde kendi sayısı — bu, yalnızca iz gönderen sistem parçalarınızı değil, her istemciyi kapsar. İstemciden gözlemlenen olarak işaretlenen satırlar, veritabanınız bildirmediği için izlerden sayılır.",
+        "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
+        "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
+        "p99": "En kötü %1'lik çağrılar en az bu kadar sürdü. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç yanıt vermeyen bir sorgu burada ölçülmez.",
+        "max": "Bu zaman aralığındaki en yavaş tek çağrı — gerçek bir çağrı, ortalama değil.",
+        "errors": "Bu çağrıların kaçı hata ile geri döndü.",
+        "perTrace": "Bu, tek bir istek içinde kaç kez çalışır. Yüksek bir sayı genellikle bir döngü anlamına gelir.",
+        "load": "Bu sorgunun veritabanında geçirdiği toplam süre. Veritabanınızın bildirdiği yerde kendi sayısı: Postgres'te yürütme süresi, ancak MySQL ve MariaDB'de BEKLEME süresi — her satır hangisini söyler. İstemciden gözlemlenen olarak işaretlenen satırlar izlerden ölçülür, bu nedenle ağ gidiş-dönüşünü içerir."
+      },
+      "errorsNone": "yok",
+      "errorsAll": "tümü",
+      "actions": {
+        "open": "Ayrıntıları aç",
+        "traces": "Örnek izleri gör",
+        "copy": "Sorguyu kopyala",
+        "copied": "Sorgu kopyalandı",
+        "copyFailed": "Sorgu kopyalanamadı.",
+        "alert": "Bu yavaşlarsa beni uyar"
+      },
+      "otherRowTextFor": "{database} üzerindeki diğer tüm sorgular",
+      "otherRowDetailShort": "— {calls} çağrı.",
+      "columnSubLabels": {
+        "calls": "raporlandığı sunucu",
+        "load": "raporlandığı sunucu"
+      }
+    },
+    "insights": {
+      "showRows": "Bu sorguyu göster | Bu {count} sorguyu göster",
+      "clearFilter": "Filtreyi temizle",
+      "alsoAffects": "ve {count} diğer sorgu | ve {count} diğer sorgu",
+      "showLess": "Daha az göster",
+      "more": "{count} daha | {count} daha",
+      "regression": {
+        "title": "{ratio}× normalden daha yavaş",
+        "body": "{before} → {after}, aynı trafik",
+        "rule": "Bu sorgu, yavaş çağrılarının {ratio}×'ten daha fazla yavaşladığı (kıyas: {baseline}) ve en az {calls} çağrıda görüldüğü için gösteriliyor."
+      },
+      "new-expensive": {
+        "title": "Yeni sorgu, zaten pahalı",
+        "body": "daha önce çalışmıyordu · şimdi veritabanı süresinin {share}'i",
+        "rule": "Bu sorgu, {baseline} içindeki en ağır sorgular arasında olmadığı için gösteriliyor ve şimdi veritabanı süresinin en az %{share}'ini, en az {calls} çağrı boyunca alıyor. Daha önce de çalışıyor olabilir — ancak tek başına izlenemeyecek kadar yoğun değildi."
+      },
+      "n-plus-one": {
+        "title": "İstek başına en az {multiplier}× çalışır",
+        "body": "veritabanı süresinin {share}'i · {service}",
+        "rule": "Bu sorgu, tek bir istek içinde en az {ratio} kez çalıştığı ve en az {traces} istekte görüldüğü için gösteriliyor. Bu alt sınırdır, bu yüzden gerçek sayı daha yüksek olabilir. Meşru toplu işler de aynı görünebilir."
+      },
+      "volume-shift": {
+        "title": "Daha yoğun, daha yavaş değil",
+        "body": "{ratio}× daha fazla çağrıldı, aynı hız · {service}",
+        "rule": "Bu sorgu, {ratio}×'ten daha sık çağrıldığı ({baseline} dönemine göre) ve hızının {latency}× yakınında kaldığı için gösteriliyor. Değişiklik, onu çağıran şeylerde."
+      },
+      "rank-churn": {
+        "title": "Yeni en ağır sorgu",
+        "body": "taşındı #{from} → #{to}",
+        "rule": "Bu sorgu, en ağır {into} listesine, en ağır {from} listesi dışından yükseldiği ve {baseline} döneminde toplam veritabanı süresi arttığı için gösteriliyor.",
+        "unranked": "sıralanmamış"
+      },
+      "hide": "Gizle",
+      "show": "Göster",
+      "findRow": "Bul",
+      "all-failing": {
+        "title": "Her çağrı başarısız oluyor",
+        "body": "{failed} tanesi başarısız oldu (toplam {total} çağrıdan) · {query}",
+        "rule": "Bu sorguya aralıkta yapılan her çağrı bir hatayla döndüğü için gösteriliyor."
+      },
+      "baseline": {
+        "label": "Şununla karşılaştır",
+        "previous": "önceki dönem",
+        "yesterday": "dün aynı saatler",
+        "previousShort": "öncekiyle",
+        "previousHint": "Bu dönemden hemen önceki, aynı uzunluktaki dönemle karşılaştır.",
+        "yesterdayShort": "dünle",
+        "yesterdayHint": "Bir gün önceki aynı saatlerle karşılaştırın — trafik günlük bir döngü izlediğinde veya bir dağıtımdan sonra ne değiştiğini görmek için yararlıdır."
+      }
+    },
+    "coverage": {
+      "unknownNote": "Seçtiğiniz aralık ve filtrelerde ölçülecek bir şey yok.",
+      "lineHealthy": "Bu veritabanının süresinin %{percent}'ini görüyorsunuz — en ağır {count} sorgu türü.",
+      "lineRemainder": "Bu veritabanının süresinin %{percent}'ini görüyorsunuz. Geri kalanı tek tek listelemediğimiz daha hafif sorgularda.",
+      "lineStale": "Sayımımız {minutes} dakika geride, bu yüzden en yeni sorgular henüz burada olmayabilir.",
+      "lineTruncated": "Son bölümde alabileceğimizden daha fazla veri vardı, bu yüzden en yeni sayılar eksik hesaplandı.",
+      "lineTruncatedStale": "Son bölümde alabileceğimizden daha fazla veri vardı ve sayımımız {minutes} dakika geride — en yeni sayılar eksik hesaplandı ve en son sorgular henüz burada olmayabilir.",
+      "lineGap": "Bu pencerede {minutes} dakika eksik. Sayımımız {stopped} saatinde durdu ve yalnızca {reach} dakika geriye gidebiliyor, bu yüzden {from}–{to} aralığını hiçbir şey kapsamıyor.",
+      "lineSubset": "{filter} filtresini uyguladınız, bu yüzden bu yüzdeler gösterilen satırları tanımlıyor, tüm veritabanını değil.",
+      "lineHealthyAll": "Çalışan her sorguyu görüyorsunuz. Buradaki hızlar her çağrı üzerinden ölçülür, bu yüzden tamdırlar.",
+      "lineHealthyAllEstimated": "Çalışan her sorguyu görüyorsunuz. Buradaki hızlar birkaç zaman diliminden harmanlanır, bu yüzden yaklaşıktır ancak tam değildir.",
+      "lineCountedTo": "{time} saatine kadar sayıldı; son yarım dakika hâlâ işleniyor.",
+      "lineExact": "Tüm veritabanları raporluyor. Buradaki hızlar her çağrı üzerinden ölçülür, bu yüzden tamdırlar.",
+      "lineExactEstimated": "Tüm veritabanları raporluyor. Buradaki hızlar birkaç zaman diliminden harmanlanır, bu yüzden yaklaşıktır ancak tam değildir.",
+      "lineSubsetUnnamed": "Filtreleriniz bunu bu toplamların toplandığı seviyenin altına daraltıyor, bu yüzden yüzdeler tüm veritabanı yerine gösterilen satırları tanımlıyor.",
+      "lineQuery": "Zamanlamalar uygulamanızdan ölçülür, bu yüzden ağ süresini ve boş bir bağlantı için bekleme süresini içerir.",
+      "lineUncodedErrors": "Buradaki hataların %{percent}'i bir neden kodu olmadan döndü, bu yüzden sayılabilirler ancak açıklanamazlar.",
+      "lineSubsetStale": "{filter} filtresini uyguladınız ve sayımımız {minutes} dakika geride — bu yüzdeler gösterilen satırları tanımlıyor ve en son sorgular henüz burada olmayabilir.",
+      "lineSubsetUnnamedStale": "Filtreleriniz bunu bu toplamların toplandığı seviyenin altına daraltıyor ve sayımımız {minutes} dakika geride — yüzdeler gösterilen satırları tanımlıyor ve en son sorgular henüz burada olmayabilir.",
+      "lineCountedToBehind": "{time} saatine kadar sayıldı; {minutes} dakika gerideyiz."
+    },
+    "breakdown": {
+      "loading": "Zamanın nereye gittiği hesaplanıyor…",
+      "noSchema": "Şema bildirilmedi",
+      "noService": "Çağıran tanımlanmadı",
+      "nothingToAttribute": "Bu veritabanının toplamları var ancak bu aralıkta sorgu başına satır yok, bu yüzden hangi hizmetin zaman harcadığını söyleyemiyoruz.",
+      "queryCount": "{count} sorgu | {count} sorgu",
+      "shortfall": "Bunların toplamı, bu veritabanının toplamından {percent} daha az, çünkü yalnızca en ağır sorgu türleri tek tek izleniyor."
+    },
+    "freshness": {
+      "neverAggregated": "Bu aralığı saymayı henüz bitirmedik. İlk sayılar genellikle yaklaşık 15 dakika içinde görünür."
+    },
+    "empty": {
+      "filtered": {
+        "title": "Filtrelerinize uyan sorgu yok.",
+        "description": "Burada uyguladığınız arama ve filtrelerle eşleşen hiçbir şey yok.",
+        "action": "Filtreleri temizle"
+      },
+      "title": "Henüz hiçbir şey yok — ve işte tam nedeni",
+      "subtitle": "Doğru olması gereken her şeyi kontrol ettik.",
+      "subtitleCounts": "{pass} geçti, {fail} geçmedi. | {pass} geçti, {fail} geçmedi.",
+      "checklistTitle": "Kontrol ettiklerimiz",
+      "showMeHow": "Bana bunu nasıl enstrümante edeceğimi göster",
+      "checkTrace": "İzlerimden birini kontrol et",
+      "checks": {
+        "enabled": {
+          "ok": "Veritabanı izleme açık",
+          "okDetail": "bu kuruluş için",
+          "no": "Veritabanı izleme kapalı",
+          "noDetail": "Bir yönetici bunu bu kuruluş için açabilir, ardından toplayıcıyı yeniden başlatabilir."
+        },
+        "traces": {
+          "ok": "İzleriniz geliyor",
+          "okDetail": "Bu zaman aralığında {count} kaydedildi",
+          "no": "Hiç iz gelmedi",
+          "noDetail": "Veritabanı izleme, izlerden oluşturulur ve bu kuruluş henüz hiç göndermedi."
+        },
+        "permission": {
+          "ok": "Bu verilere erişiminiz var",
+          "okDetail": "{org} üzerinde yöneticisiniz",
+          "no": "Bu verilere erişiminiz yok",
+          "noDetail": "Veritabanı izleme izlerinizi okur ve rolünüz bunları kapsamaz. Okuma erişimi için bir yöneticiye başvurun."
+        },
+        "dbSpans": {
+          "ok": "İzleriniz bir veritabanından bahsediyor",
+          "okDetail": "veritabanı çağrıları kaydediliyor",
+          "no": "İzlerinizin hiçbiri bir veritabanından bahsetmiyor",
+          "noDetail": "Uygulamalarınız izleniyor, ancak veritabanıyla konuşan kısım izlenmiyor. Diliniz için veritabanı enstrümantasyonu ekleyin, sorgular burada görünecek."
+        },
+        "counted": {
+          "ok": "Bu aralığı saymayı bitirdik",
+          "okDetail": "sayılar güncel",
+          "no": "Saymayı henüz bitirmedik",
+          "noDetail": "Veritabanı çağrıları geldi, ancak ilk sayılar hazır değil. Bu genellikle birkaç dakika sürer."
+        },
+        "window": {
+          "ok": "Bu zaman aralığında bir şey çalıştı",
+          "okDetail": "veritabanı çağrıları kaydedildi",
+          "no": "Seçtiğiniz zaman aralığında hiçbir şey çalışmadı",
+          "noDetail": "Daha geniş bir aralık deneyin."
+        },
+        "alsoWorthKnowing": {
+          "title": "Ayrıca bilmeye değer",
+          "detail": "Bu yerleştiğinde, ilk sorgular yaklaşık 15 dakika içinde görünür."
+        }
+      },
+      "action": "Tekrar dene",
+      "viewDocs": "Dokümantasyonu görüntüle"
+    },
+    "detail": {
+      "title": "Sorgu ayrıntısı",
+      "tabs": {
+        "overview": "Genel bakış",
+        "overviewHint": "Bu sorgunun ne kadar yavaş olduğu, ne sıklıkla çalıştığı ve nerede çalıştığı.",
+        "plans": "Sorgu planları",
+        "plansHint": "Veritabanınızın bu sorguyu çalıştırırken attığı adımlar. Neden yavaş olduğunu anlamak için buradan başlayın.",
+        "callers": "Çağıranlar ve örnekler",
+        "callersHint": "Uygulamanızın hangi bölümleri bu sorguyu çalıştırdı ve iz olarak açabileceğiniz bireysel yavaş çalıştırmalar.",
+        "callersLocked": "Bireysel çalıştırmalar izlemeden gelir. Bu zaman aralığında bu sorguyu izleyen hiçbir şey yok."
+      },
+      "notFound": {
+        "title": "Bu sorgu bu organizasyonda değil",
+        "description": "Adres, {org} organizasyonunun baktığınız aralıkta çalıştırmadığı bir sorguyu gösteriyor. Az önce organizasyon değiştirdiyseniz, sorgu ayrıldığınız organizasyona aittir.",
+        "descriptionNoOrg": "Adres, bu organizasyonun baktığınız aralıkta çalıştırmadığı bir sorguyu gösteriyor. Az önce organizasyon değiştirdiyseniz, sorgu ayrıldığınız organizasyona aittir.",
+        "scopeHint": "Bu organizasyonda, zaman aralığında ve kapsamda eşleşen bir şey bulunamadı. Adres başka bir motor veya örnekten geldiyse, bu filtreleri temizleyin veya listeye geri dönün.",
+        "missingTitle": "Sorgu seçilmedi",
+        "missingDescription": "Bu sayfa tek bir sorguyu açıklar ve adres bir sorgu belirtmiyor. Az önce organizasyon değiştirdiyseniz, okuduğunuz sorgu ayrıldığınız organizasyona aittir.",
+        "action": "Bu organizasyonun sorgularına göz atın"
+      },
+      "backToQueries": "En sık çalıştırılan sorgulara geri dön",
+      "backToActivity": "Etkinliğe geri dön",
+      "backToSamples": "En yavaş çağrılara geri dön",
+      "backToDeadlocks": "Kilitlenmelere geri dön",
+      "latencyTitle": "Zaman içinde hız",
+      "volumeTitle": "Zaman içinde çağrılar ve hatalar",
+      "endpointsTitle": "Nereden çağrılıyor",
+      "endpointsHint": "Uygulamanızın, istekleri bu sorguyu çalıştıran bölümleri.",
+      "noEndpoints": "Bu aralıkta uygulamanızın hangi bölümünün bunu çalıştırdığını belirleyemedik.",
+      "samplesTitle": "En yavaş örnekler",
+      "samplesHint": "her nokta gerçek bir çalıştırmadır — tüm isteği görmek için tıklayın",
+      "noSamples": "Bu aralık için hiçbir bireysel çalıştırma yüklenmedi.",
+      "noSeries": "Seçtiğiniz aralıkta bu sorgu için geçmiş yok.",
+      "liveSeries": "En son noktalar hâlâ sayılıyor ve değişebilir.",
+      "noStream": "Bu sorguyu taşıyan iz akışını belirleyemedik, bu nedenle çağıranları ve örnekleri yüklenemiyor.",
+      "ambiguousStream": "Bu organizasyonda birden fazla iz akışı var ve bu sorgunun hangisinde çalıştığını belirleyemiyoruz. Çağıranları ve örnek izleri yüklemek için bir akış seçin.",
+      "pickStream": "Bir iz akışı seçin",
+      "invalidStream": "Bu iz akışı adı tanıdığımız bir ad değil, bu yüzden aramayı çalıştırmadık.",
+      "firstSeen": "BU LİSTEDE İLK GÖRÜNME: {time}",
+      "firstSeenHint": "Bu sorgunun kendi başına izlenecek kadar ağır olduğu bu aralıktaki en erken nokta.",
+      "lastSeen": "SON GÖRÜNME: {time}",
+      "lastSeenHint": "Bu sorgunun kendi başına izlenecek kadar ağır olduğu bu aralıktaki en son nokta. Hâlâ çalışıyor olabilir — listeye girdiği son zaman budur.",
+      "errorsByCode": {
+        "title": "Sebep koduna göre hatalar",
+        "exactHint": "Bu aralıktaki her çağrıda sayılır.",
+        "sampleHint": "Aşağıdaki örneklerden sayılır — bir örneklem, toplam değil.",
+        "noCode": "sebep kodu yok"
+      },
+      "whereItRuns": {
+        "title": "Nerede çalışır",
+        "hint": "Bu sorgunun etkinliği, üzerinde çalıştığı veritabanına göre bölünmüştür. Bu sayfayı buna odaklamak için bir satıra tıklayın.",
+        "trackedHint": "Bu rakamlar, sorgunun kendi başına izlenecek kadar ağır olduğu bu aralığın bölümlerini kapsar — daha sessiz bölümler buraya hiçbir şey eklemez, bu yüzden bunları en az toplamlar olarak okuyun.",
+        "showAll": "Tüm konumları göster",
+        "emptyFiltered": "Bu sayfanın odaklandığı yerde bu sorgu için hiçbir şey izlenmedi. Nerede çalıştığını görmek için tüm konumları göster.",
+        "noInstance": "Örnek bildirilmedi",
+        "focused": "Odaklanmış",
+        "focusHint": "Bu sayfanın sayıları şu anda bu satıra daraltılmış. Genişletmek için tekrar tıklayın.",
+        "columns": {
+          "location": "Üzerinde çalıştığı",
+          "avg": "Çağrı başına ortalama"
+        }
+      },
+      "qps": "Saniyede çağrı",
+      "errorRate": "Başarısız çağrılar",
+      "unattributed": "Atfedilmemiş",
+      "sampleOk": "OK",
+      "sampleError": "Başarısız",
+      "viewTrace": "İsteği gör →",
+      "viewTraces": "Örnek izleri gör",
+      "copySummary": "Kopyala",
+      "copySummaryHint": "Buradaki her sayı zaten bu sayfada — bu yalnızca cümleyi yazar; böylece bir olayın 13. dakikası hiçbir şey yerine bir mesaj üretir.",
+      "summaryCopied": "Özet kopyalandı",
+      "summaryCopyFailed": "Özet kopyalanamadı.",
+      "columns": {
+        "calls": "Çağrılar",
+        "time": "Zaman",
+        "duration": "Süre",
+        "status": "Durum",
+        "caller": "Çağıran",
+        "callShare": "Çağrı payı",
+        "p50": "Yarısı altında"
+      },
+      "belowTopN": {
+        "title": "Bu sorgu, bu aralığın bir kısmında en ağır sorgular arasında değildi",
+        "body": "En ağır sorguları tek tek izliyoruz; geri kalanlar birlikte sayılır. Bu sorgu yeterince ağır olmadığında, sıfır çizmek yerine grafiği gölgelendiririz — hâlâ çalışıyordu.",
+        "capped": "Geçmiş, elimizde olduğu kadar geriye uzanır."
+      },
+      "firstSeenCaveat": "— ondan önce de çalışıyor olabilir, yalnızca en ağırlar arasında değildi",
+      "copyQuery": "Sorguyu kopyala",
+      "alertMe": "Bu yavaşlarsa beni uyar",
+      "stats": {
+        "load": "Veritabanı süresi",
+        "loadShare": "Bu veritabanının {percent}'i",
+        "calls": "Çağrılar",
+        "callsDelta": "öncekinden {change}",
+        "p50": "Yarısı altında",
+        "p95": "Yavaş çağrılar",
+        "max": "Görülen en kötü",
+        "errors": "Başarısız",
+        "noErrors": "hata yok",
+        "approx": "yakın, tam değil",
+        "exact": "tam"
+      },
+      "overlap": {
+        "serverExecution": "{engine} onu çalıştırmak için harcadığı süre",
+        "serverWait": "{engine} onu beklemek için harcadığı süre — bekleme süresi, yürütme süresi değil",
+        "serverCounted": "{engine} tarafından, tüm istemcilerde sayıldı",
+        "clientObserved": "İzlenen çağıranlar tarafından gözlemlendi — veritabanınız bunu bildirmedi"
+      },
+      "endpointsConcentrated": "Bu sorgunun süresinin {percent}'i tek bir uç noktadan geliyor. {endpoint}'i düzeltirseniz bu sorguyu düzeltmiş olursunuz.",
+      "typicalMarker": "yavaş çağrılar {value}",
+      "plans": {
+        "title": "Sorgu planları",
+        "sourceLabel": "Genel tahmini plan",
+        "sourceTooltip": "Bu plan, tüm sorgu parametreleri NULL olarak ayarlanmış şekilde tahmin edildi ve hiç gerçekten çalıştırılmadı. Postgres gerçek sorgular için farklı bir plan çalıştırmış olabilir. Sorgunun şeklini görmek için kullanın, ne kadar sürdüğünü açıklamak için değil.",
+        "stableCaveat": "Bu pencerede bir plan şekli yakalandı. Bu, plan sorununu dışlamaz — tahmini planlar gerçek plan değişirken sabit kalabilir ve yürütülen plan yakalama yalnızca günlüğe kaydedilecek kadar yavaş ifadeleri görür; bu yüzden bu sorguyu hızlandıran bir plan değişikliği yakalamadan tamamen kaybolur.",
+        "executedLabel": "Yürütülen plan",
+        "executedTooltip": "Bu, Postgres'in gerçek bir yürütme için gerçekten çalıştırdığı plan; gerçek parametre değerleriyle auto_explain tarafından yakalanmıştır. Bu satırdaki satır sayıları ve süreler tahmin değil, ölçülmüştür — ancak yalnızca auto_explain eşiğinden yavaş olan yürütmeler yakalanır, bu yüzden her çalıştırmayı değil, yavaş kuyruğu tanımlarlar.",
+        "capturedDurations": "{avg} ort. · {max} maks., {count} yakalanan yürütme arasında",
+        "estVsAct": "tahmini {est} → gerçek {act} satır",
+        "driftCallout": "Bu pencerede plan şekli değişti. {count} farklı şekil yakalandı; bu genellikle bir dizin kaldırılması veya tablonun yeniden bölümlenmesi gibi bir şema veya istatistik değişikliği anlamına gelir.",
+        "viewPlans": "Planları görüntüle",
+        "noPlans": "Yakalanan plan yok",
+        "noPlansHint": "Bu veritabanı için henüz hiçbir toplayıcı plan göndermedi. Planları yakalamaya başlamak için toplayıcı tarifinizde en iyi sorgu toplamayı açın — kurulum sayfası bunu adım adım anlatır.",
+        "noPlanForQuery": "Bu sorgu için plan yok",
+        "noPlanForQueryHint": "Bu veritabanı için planları yakalıyoruz — bu sorgunun sadece planı yok. Bu, veritabanının açıklayamadığı COMMIT, ROLLBACK ve SHOW gibi ifadeler için normaldir.",
+        "planHash": "Plan",
+        "firstSeen": "İlk görülme",
+        "lastSeen": "Son görülme",
+        "noTree": "Plan okunamadı",
+        "nodeCost": "maliyet {cost}"
+      },
+      "serverMetrics": {
+        "title": "Veritabanının kendisinin kaydettiği",
+        "subtitle": "Sunucu tarafı — tüm istemciler",
+        "clientSubtitle": "İstemci tarafından gözlemlenen — yalnızca enstrümante edilmiş çağıranlar, yalnızca tamamlanmış çağrılar. Hâlâ çalışan veya takılıp kalan bir sorgu bu sayılarda yer almaz.",
+        "instance": "{instance} tarafından bildirildi",
+        "instanceWide": "Bu örnekteki tüm veritabanları",
+        "calls": "Çalıştırmalar",
+        "rows": "Döndürülen satırlar",
+        "meanExecution": "Ortalama çalıştırma süresi",
+        "meanWait": "Ortalama bekleme süresi",
+        "sharedBlksHit": "Önbellekten bloklar",
+        "sharedBlksRead": "Diskten bloklar",
+        "tempBlksWritten": "Yazılan geçici bloklar",
+        "noMatch": "Bu sorgu için sunucu tarafı kaydı yok",
+        "noMatchHint": "Veritabanınız çalıştırdığı ifadeleri raporlar ve bu onlardan biri değil. Bu normaldir: iki görünüm bir sorguyu farklı şekilde tanımlar, bu yüzden her zaman eşleşmezler. Yukarıdaki her şey hâlâ uygulamanızdan ölçülür.",
+        "ambiguous": "Birden fazla veritabanı bu sorguyu çalıştırmış olabilir",
+        "ambiguousHint": "Birden fazla örnek bu ada sahip bir veritabanı bildiriyor, bu yüzden bu sorguyu hangisinin çalıştırdığını söylemenin bir yolu yok. Yanlış örnekten sayılar göstermek hiç göstermemekten daha kötü olur. Adaylar: {instances}.",
+        "off": "Sunucu tarafı metrikleri toplanmadı",
+        "offHint": "Toplayıcınız henüz veritabanından ifade başına metrik toplamıyor. Toplayıcı tarifinizde en iyi sorgu toplamayı açın — kurulum sayfası bunu adım adım gösterir.",
+        "setUp": "Kur",
+        "readFailed": "Sunucu tarafı metrikleri okunamadı",
+        "readFailedHint": "Okuma başarısız oldu, bu yüzden bu, veritabanınızın ifadeleri raporlayıp raporlamadığı hakkında hiçbir şey söylemez. Yukarıdaki her şey hâlâ uygulamanızdan ölçülür."
+      },
+      "callingServices": {
+        "title": "Hangi hizmetleriniz bunu çağırdı",
+        "unjoinable": "Gösterilmiyor — bu ifade burada birden fazla veritabanı türünde çalışıyor ve hangisi olduğunu bilmeden çağıranları eşleştirmek yanlış hizmetleri adlandırır.",
+        "tracedCalls": "{calls} çağrı izlendi",
+        "coverage": "Yukarıdaki {executions} çalıştırmanın {traced} tanesinde {count} hizmet görüldü. Geri kalanı henüz izlemediğiniz çağıranlardan geldi.",
+        "coverageUnknown": "{traced} izlenen çağrıda {count} hizmet görüldü. Veritabanınız bu ifade için bir toplam bildirmedi, bu yüzden verilecek bir pay yok.",
+        "noneNamed": "{traced} çağrı izlendi, ancak hiçbiri bir hizmete bağlanamadı — izleri bu zaman aralığının dışında başlıyor."
+      },
+      "callersEmpty": {
+        "title": "Bu sorgu için henüz izlenen çağrı yok",
+        "description": "Veritabanınız bu ifadeyi bildirdi, ancak onu çalıştıran uygulamayı hiçbir şey izlemedi — bu yüzden adlandırılacak bir çağıran ve açılacak tek bir çalıştırma yok. Bu veritabanıyla konuşan hizmetleri enstrümante edin, burada görünürler.",
+        "checklistTitle": "Doğru olması gereken",
+        "setUp": "İzlemeyi kur",
+        "checks": {
+          "server": {
+            "ok": "Veritabanınız bu sorguyu raporluyor",
+            "okDetail": "diğer sekmelerdeki sürelerin kaynağı budur"
+          }
+        }
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "çalıştırma süresi",
+        "serverWait": "bekleme süresi",
+        "serverCounted": "sunucu sayısı",
+        "clientObserved": "istemci tarafından gözlemlenen",
+        "serverReported": "veritabanlarınız tarafından bildirildi"
+      }
+    },
+    "page": {
+      "tabs": {
+        "overview": "Genel Bakış",
+        "queries": "En İyi Sorgular",
+        "samples": "En Yavaş Çağrılar",
+        "samplesHintClient": "Bu pencerede enstrümante edilmiş hizmetlerinizin gözlemlediği tamamlanmış çağrılar — izleme olmayan çağıranlar sayılmaz, bu yüzden bu bir alt sınırdır, toplam değil. Tablo bunların en yavaşlarını gösterir.",
+        "samplesHintServer": "Veritabanlarınızın bu pencerede tamamlandığını bildirdiği ifadeler, veritabanının içinde sayılır. Tablo bunların en yavaşlarını gösterir.",
+        "samplesHintUnknown": "Bu penceredeki en yavaş bireysel veritabanı çağrıları.",
+        "deadlocks": "Kilitlenmeler",
+        "blocked": "Engellenen sorgular",
+        "deadlocksHint": "Veritabanlarınızın bildirdiği kilitlenmeler.",
+        "blockedHint": "Şu anda bir kilit üzerinde bekleyen oturumlar.",
+        "activity": "Etkinlik",
+        "activityHint": "Veritabanlarınızın şu anda çalıştırdığı oturumlar.",
+        "tableHealth": "Tablo sağlığı",
+        "tableHealthHint": "Tablo boyutu, şişkinlik ve vacuum durumu. Şişkinlik ve vacuum yalnızca PostgreSQL'e özgüdür.",
+        "deadlocksLocked": "Kilitlenmeler bir Enterprise özelliğidir. Hangi sorguların birbirine kilitlendiğini ve nedenini görmek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır.",
+        "blockedLocked": "Engellenen sorgular bir Enterprise özelliğidir. Hangi oturumların bir kilidi beklediğini ve neyin onu tuttuğunu görmek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır.",
+        "tableHealthLocked": "Tablo sağlığı bir Enterprise özelliğidir. Tablo boyutu, şişkinlik ve vacuum durumunu izlemek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır."
+      }
+    },
+    "samples": {
+      "title": "En yavaş çağrılar",
+      "subtitle": "Bu penceredeki en yavaş bireysel veritabanı çağrıları, her veritabanı ve sorgu genelinde — çağıranların ölçtüğü şekliyle, yalnızca tamamlanan çağrılar",
+      "subtitleServer": "Bu pencerede veritabanlarınızın tamamladığı en yavaş ifadeler, veritabanı içinde ölçülmüştür",
+      "logOffTitle": "Veritabanlarınız henüz yavaş ifadeleri günlüğe kaydetmiyor",
+      "logOffDescription": "Hiçbir şey bu çağrıları izlemedi, bu yüzden veritabanlarına kendi en yavaş ifadelerini sorduk — ve hiçbirini günlüğe kaydetmiyorlar. Bu liste PostgreSQL'in ifade günlüğünden (log_min_duration_statement) gelir; varsayılan olarak kapalıdır — kurulum kartının günlüğe kaydetme adımı onu açar. İfade başına yakalama şu anda yalnızca PostgreSQL'e özgüdür, bu nedenle MySQL ve MariaDB henüz bu listeyi besleyemez. En çok çalışan sorgular size neyin en çok çalıştığını gösterebilir, çünkü bunun yerine sayaç tablolarını okur.",
+      "searchPlaceholder": "Sorgu metni, hizmet veya veritabanı ara…",
+      "columns": {
+        "query": "Sorgu",
+        "when": "Zaman",
+        "duration": "Süre",
+        "service": "Hizmet",
+        "status": "Durum"
+      },
+      "columnHints": {
+        "duration": "Bu tek çağrının ne kadar sürdüğü, çağıran tarafından ölçülür. Yalnızca tamamlanan çağrıları sayar — hâlâ çalışan veya hiç geri dönmeyen bir sorgu burada ölçülmez."
+      },
+      "failed": "Başarısız",
+      "failedWithCode": "Başarısız · {code}",
+      "viewTrace": "Bu çağrının parçası olduğu isteği aç",
+      "scatterOk": "Tamamlandı",
+      "partial": "İzleme verilerinizin bir kısmı okunamadı, bu nedenle bu listede çağrılar eksik olabilir.",
+      "disclosureShort": "Her satır gerçek bir tamamlanmış çağrıdır.",
+      "disclosureDetail": "Gönderdiğiniz izlemelerden, çağrıyı yapan uygulama tarafından ölçülür. Burada yalnızca tamamlanan çağrılar vardır — hâlâ çalışan veya asılı kalıp geri dönmeyen bir sorgu ölçüm üretmemiştir.",
+      "counts": {
+        "complete": "Bu penceredeki tüm {count} veritabanı çağrısı gösteriliyor, en yavaştan başlayarak.",
+        "truncated": "Bu penceredeki en yavaş {count} çağrı — burada gösterilenden daha fazlası çalıştı.",
+        "filtered": "{total} çağrıdan {count} tanesi gösteriliyor."
+      },
+      "serverList": {
+        "title": "Veritabanlarınız tarafından bildirilen en yavaş çağrılar",
+        "subtitle": "Her veritabanının içinde, bir ifade bittiği anda ölçülür — her istemci sayılır, ancak ağ ve bağlantı beklemesi sayılmaz. Bu pencereye izlenen uygulama çağrısı düşmedi, bu yüzden olağan liste boş; burada hangi çağrıların görüneceği veritabanının kendi günlük kaydı eşiğine bağlıdır. Bu ifade başına raporlar şu anda yalnızca PostgreSQL'den gelir — toplayıcı tarifleri diğer motorların ifade günlüklerini henüz yakalamıyor, bu nedenle MySQL ve MariaDB çağrıları burada görünmez.",
+        "truncated": "Bildirilen en yavaş {count} çağrı — burada gösterilenden daha fazlası eşiği aştı",
+        "columns": {
+          "query": "Sorgu",
+          "when": "Zaman",
+          "took": "Süre",
+          "user": "Kullanıcı"
+        },
+        "columnHints": {
+          "took": "İfade başlangıcından tamamlanmasına kadar veritabanı içi süre, motorun ölçtüğü şekliyle. Hiçbir çağıranın deneyimlediği süre değildir — ağ ve bağlantı beklemesi dahil değildir."
+        }
+      }
+    },
+    "rowChips": {
+      "new": "BU LİSTEDE YENİ",
+      "slower": "{ratio}× NORMALDEN DAHA YAVAŞ",
+      "loop": "İSTEK BAŞINA {multiplier}× ÇALIŞIR",
+      "allFailed": "TÜM {count} BAŞARISIZ",
+      "busier": "DAHA YOĞUN, DAHA YAVAŞ DEĞİL",
+      "climbed": "YENİ EN AĞIR SORGU"
+    },
+    "deadlocks": {
+      "title": "Veritabanları",
+      "subtitle": "Birbirini engelleyen ve geri alınan işlemler",
+      "deadlockCount": "kilitlenme yok | {count} kilitlenme | {count} kilitlenme",
+      "pairCount": "sorgu çifti yok | {count} sorgu çifti | {count} sorgu çifti",
+      "searchPlaceholder": "Sorgu metni, tablo veya uygulama ara…",
+      "grouping": {
+        "pairs": "Sorgu çiftine göre grupla",
+        "pairsHint": "Birbirini kilitleyen sorgu çifti başına bir satır, ne sıklıkla olduğuyla birlikte.",
+        "events": "Her olay",
+        "eventsHint": "Her deadlock için bir satır, en yeni en üstte — belirli bir zaman gerektiğinde bunu kullanın."
+      },
+      "columns": {
+        "pair": "Birbirini kilitleyen iki sorgu",
+        "applications": "Uygulamalar",
+        "objects": "Çekişilen satırlar",
+        "lastSeen": "Son",
+        "count": "Deadlock'lar",
+        "when": "Zaman",
+        "cancelled": "İptal edildi",
+        "finished": "Bitti"
+      },
+      "coverage": {
+        "complete": "Veritabanlarınızın raporladığı her deadlock burada — bu pencerede {deadlocks}, {pairs} çiftten.",
+        "capped": "Aynı anda okuyabildiğimizden daha fazla deadlock oluştu. Elimizdekiler {deadlocks} adet, {pairs} çiftten — gerçek sayı daha yüksek.",
+        "readUpTo": "{time} itibarıyla okundu.",
+        "mysqlPartial": "MySQL veritabanınız, innodb_print_all_deadlocks açık olmadığı sürece yalnızca en son deadlock'u tutar."
+      },
+      "chips": {
+        "oppositeOrder": "TERS SATIR SIRASI",
+        "cadence": "HER {seconds}s",
+        "noQueries": "YAKALANMAYAN SORGULAR",
+        "partial": "YALNIZCA TEK TARAF"
+      },
+      "rowActions": {
+        "topQueries": "Bunları En İyi Sorgular'da bulun",
+        "copy": "Her iki sorguyu kopyala",
+        "alert": "Deadlock'lar hakkında beni uyar"
+      },
+      "detail": {
+        "mostRecent": "En son · {time}",
+        "nthOf": "{index} / {total}",
+        "earlier": "Daha önce",
+        "later": "Daha sonra",
+        "victim": "Veritabanı tarafından iptal edildi",
+        "survivor": "Bitirmesine izin verildi",
+        "pid": "pid {pid}",
+        "thread": "thread {pid}",
+        "transaction": "transaction {id}",
+        "eachWaits": "her biri diğerini bekliyor",
+        "deadlock": "deadlock",
+        "noQueryCaptured": "Günlük bu deadlock'u kaydetti ancak ifadeyi kaydetmedi.",
+        "waitingFor": "{target} tamamlanmasını bekliyordu.",
+        "waitingForRow": "{target} tamamlanmasını bekliyordu — diğer oturum istediği satırı zaten değiştirmişti.",
+        "rawLock": "{mode} · {target}",
+        "plainTitle": "Sırayla ne oldu.",
+        "plainBody": "{a} bir satırı değiştirdi ve onu tuttu. {b} başka bir satırı değiştirdi ve onu tuttu. Sonra her biri diğerinin satırını değiştirmeye çalıştı, bu yüzden ikisi de ilerleyemedi. Veritabanı, {victim} iptal ederek beraberliği bozdu — bu uygulama bir hata aldı ve tüm transaction'ı geri alındı.",
+        "fixTitle": "Çözüm kodunuzda, veritabanında değil.",
+        "fixBody": "Bu iki ifade {object} satırlarına ters sırada dokunuyor. Her iki tarafın da aynı sırada güncellemesini sağlayın — önce en düşük id — ve bu çift artık deadlock olamaz.",
+        "fixGeneric": "Her iki taraf da diğerinin istediğini tutuyor. Her transaction'ın bu kilitleri aynı sırada almasını sağlayın ve bu çift artık deadlock olamaz.",
+        "copyForSlack": "Kopyala",
+        "occurrencesTitle": "Bu çiftin deadlock olduğu tüm {count} kez",
+        "occurrencesHint": "Yukarıdakini yüklemek için bir nokta seçin",
+        "lostLabel": "{pid} kaybetti",
+        "bothSidesLose": "Her iki taraf da yaklaşık eşit şekilde iptal ediliyor — {a} vs {b}. Hiçbir uygulama sorun değil; sorun sıralama.",
+        "oneSideLoses": "{pid} her seferinde iptal ediliyor.",
+        "showAbove": "Yukarıda göster",
+        "copy": "SQL'i kopyala",
+        "seeInTopQueries": "En çok sorgularda gör",
+        "whichService": "Hangi hizmet?",
+        "partialTitle": "Bu deadlock'un yalnızca bir tarafı bize ulaştı",
+        "partialBody": "MySQL, bir deadlock'un her bir tarafını ayrı bir günlük girdisi olarak yazar. Eş girdi ulaşmadı — bu pencerenin dışında kalabilir veya günlük ikisi arasında döndürülmüş olabilir. Gösterilen gerçektir; diğer ifade basitçe eksiktir.",
+        "copyHint": "Yalnızca bu tarafın ifadesini kopyalar.",
+        "copySqlTooltip": "Bu tarafın ifadesini kopyala",
+        "copyForSlackHint": "Her iki ifade, bu çiftin ne sıklıkla deadlock'a girdiği ve son gerçekleşme zamanı — bir kanala veya bilete yapıştırabileceğiniz bir mesaj olarak yazılır."
+      },
+      "storm": {
+        "title": "Deadlock fırtınası.",
+        "body": "Bu pencerede {count} — normalde hiç yok.",
+        "copyForSlack": "Kopyala",
+        "biasWarning": "En çok sorgular sekmesinin şu anda gerçekte olduğundan daha sakin görünmesini bekleyin. İptal edilen bir sorgu yine de tamamlanır, ancak bu kilitlerin arkasında kuyruğa alınanlar tamamlanmadı — bu yüzden oradaki çağrı sayıları, kullanıcılarınızın deneyimlediğinden daha düşüktür."
+      },
+      "summary": {
+        "deadlocks": "Deadlock'lar",
+        "pairs": "Sorgu çiftleri"
+      },
+      "healthy": {
+        "title": "Deadlock yok — ve kesinlikle bakıyoruz",
+        "description": "Veritabanlarınız bu pencerede tek bir deadlock bildirmedi. Bu sağlıklı normaldir, topladığımız verilerde bir boşluk değil.",
+        "checklistTitle": "Nasıl biliyoruz",
+        "collectionHealthy": "Toplama sağlıklı",
+        "checks": {
+          "reading": {
+            "title": "Veritabanlarınızın günlüklerini okuyoruz",
+            "detail": "{databases} · en son okunan satır {age}",
+            "detailNoFleet": "En son okunan satır {age}",
+            "detailUnknown": "{databases} — günlük hattı bağlı",
+            "detailUnknownNoFleet": "Günlük hattı bağlı"
+          },
+          "reporting": {
+            "title": "Deadlock bildirimi açık",
+            "detail": "Postgres, deadlock'ları varsayılan olarak günlüğe kaydeder ve MySQL'inizde innodb_print_all_deadlocks açık olduğundan, her biri kaydedilir — yalnızca en son değil.",
+            "detailMysqlPartial": "Postgres, deadlock'ları varsayılan olarak günlüğe kaydeder. MySQL'inizde innodb_print_all_deadlocks açık olmadığından, yalnızca en son kaydedilir.",
+            "detailUnknown": "Postgres, deadlock'ları varsayılan olarak günlüğe kaydeder. MySQL'de SELECT {'@@'}innodb_print_all_deadlocks çalıştırın — 1 olmalıdır, aksi takdirde yalnızca en son deadlock kaydedilir. Bu ayarı buradan okuyamıyoruz.",
+            "titleUnknown": "Deadlock bildiriminin açık olduğunu kontrol edin"
+          },
+          "traffic": {
+            "title": "Bu veritabanlarından {lines} başka günlük satırı gördük",
+            "detail": "bu yüzden hat trafik taşıyor — bir deadlock oradan geçmiş olurdu",
+            "titleUnknown": "Günlük hattı trafik taşıyor"
+          },
+          "lastEver": {
+            "title": "Şimdiye kadar gördüğümüz son deadlock",
+            "detail": "{when}. Onu görmek için pencereyi genişletin.",
+            "titleNone": "Bu veritabanlarında hiç deadlock görmedik",
+            "detailNone": "Henüz karşılaştırılacak bir şey yok — bu pencere olağandışı değil."
+          }
+        },
+        "widen": "Son 24 saate genişlet"
+      },
+      "notCollecting": {
+        "title": "Henüz deadlock'ları göremiyoruz — ve işte tam nedeni",
+        "description": "Deadlock'lar veritabanının kendisi tarafından bildirilir, uygulamalarınız tarafından değil. Dört şeyi kontrol ediyoruz.",
+        "checklistTitle": "Kontrol ettiklerimiz",
+        "checks": {
+          "queries": {
+            "ok": "Sorgu verileriniz ulaşıyor",
+            "okDetail": "{queries} sorgu {databases}'dan — En çok sorgular sekmesi çalışıyor",
+            "okDetailNoFleet": "{queries} — En çok sorgular sekmesi çalışıyor",
+            "no": "Sorgu verisi de ulaşmıyor",
+            "noDetail": "En çok sorgular sekmesiyle başlayın — bu veritabanlarından henüz bize bir şey ulaşmıyor."
+          },
+          "enabled": {
+            "ok": "Veritabanı izleme açık",
+            "okDetail": "bu kuruluş için",
+            "no": "Veritabanı izleme kapalı",
+            "noDetail": "Toplamaya başlamak için Ayarlar'dan açın."
+          },
+          "log": {
+            "no": "Hiçbir veritabanı bize günlüğünü göndermiyor",
+            "noDetail": "Sorgu süreleri uygulamalarınızdan gelir, ancak deadlock'lar yalnızca veritabanının kendi günlüğüne yazılır. Toplayıcınızı Postgres veya MySQL günlük dosyasına yönlendirin, bu sekme kendini doldurur.",
+            "ok": "Bir veritabanı günlüğü ulaşıyor",
+            "okDetail": "dolayısıyla bir kilitlenme bize ulaşırdı — ancak hiç olmadı."
+          },
+          "settings": {
+            "title": "Başlamadan önce bilmeniz gerekenler",
+            "detail": "Postgres kilitlenmeyi iki log satırına, MySQL ise birkaç satıra yazar — katılımcı sorgular sonraki satırlardadır. Yalnızca ilk satırı eşleştiren bir kurulum, kilitlenmenin gerçekleştiğini kaydeder ve tüm sorguları kaybeder. Tarifimiz her ikisini de ele alır."
+          }
+        }
+      }
+    },
+    "blocked": {
+      "title": "Veritabanları",
+      "subtitle": "Şu anda bir kilit üzerinde bekleyen oturumlar",
+      "subtitlePast": "Bu zaman aralığında bir kilit üzerinde bekleyen oturumlar",
+      "waitingCount": "kilidi bekleyen oturum yok | şu anda kilidi bekleyen {count} oturum | şu anda kilidi bekleyen {count} oturum",
+      "waitingCountPast": "kilidi bekleyen oturum olmadı | bu zaman aralığında kilidi bekleyen {count} oturum | bu zaman aralığında kilidi bekleyen {count} oturum",
+      "sessionCount": "oturum yok | {count} oturum | {count} oturum",
+      "searchPlaceholder": "Sorgu metni, tablo veya uygulama ara…",
+      "perspective": {
+        "waiting": "Kim takıldı?",
+        "waitingHint": "Kilit üzerinde bekleyen her oturum için bir satır, en uzun bekleme ilk sırada.",
+        "blocking": "Kim engelliyor?",
+        "blockingHint": "Kilidi tutan oturum, arkasına takılan her şeyle birlikte."
+      },
+      "columns": {
+        "stuckQuery": "Takılan sorgu",
+        "session": "Oturum",
+        "waitingFor": "Beklenen",
+        "heldUpBy": "Engelleyen",
+        "waiting": "Bekliyor",
+        "sessionQuery": "Oturum ve çalıştırdığı",
+        "application": "Uygulama",
+        "blocking": "Engelliyor"
+      },
+      "coverage": {
+        "summary": "En uzun bekleme {longest}. Her bekleme, kilidi açık tutan {roots} kaynağına kadar uzanıyor.",
+        "summaryCapped": "Aynı anda okuyabildiğimizden daha fazla oturum bekliyordu. Elimizdekiler arasında en uzun bekleme {longest} ve bunlar kilidi açık tutan {roots} kaynağına kadar uzanıyor.",
+        "summaryOneRoot": "bir oturum",
+        "summaryManyRoots": "{count} oturum",
+        "checked": "Her {interval} saniyede bir kontrol edildi; son bakış {time}.",
+        "checkedUnknown": "Veritabanınızın kendi kilit tablolarından örneklendi."
+      },
+      "rowActions": {
+        "showChain": "Zinciri göster",
+        "copy": "Sorguyu kopyala",
+        "alertMe": "Kilit beklemeleri hakkında beni uyar"
+      },
+      "waitEvent": {
+        "transaction": "başka bir işlemin bitmesini",
+        "row": "bir satır kilidi",
+        "table": "bir tablo kilidi",
+        "extend": "tablonun büyümesini",
+        "advisory": "bir uygulama kilidi",
+        "object": "bir nesne kilidi",
+        "buffer": "bir veri sayfasının okunmasını",
+        "lock": "bir kilit"
+      },
+      "deep": "{count} derin",
+      "notWaiting": "beklemiyor",
+      "longestWait": "EN UZUN BEKLEME",
+      "holdsTheLock": "HERKESİN İSTEDİĞİ KİLİDİ TUTUYOR",
+      "lastStatement": "son ifade {age} önce",
+      "idleInTransaction": "hiçbir şey beklemiyor · açık bir işlemde boşta",
+      "pills": {
+        "root": "KÖK — BURADAN BAŞLAYIN",
+        "waitingBlocking": "BEKLİYOR VE ENGELLİYOR {count}",
+        "waiting": "BEKLİYOR"
+      },
+      "waitingOn": "{pid} bekleniyor",
+      "degraded": "Bir oturum {count} oturumu engelliyor. {age} süredir açık bir işlemi var ve bu süre içinde sorgu çalıştırmadı — büyük olasılıkla commit etmeyi unutan bir uygulama.",
+      "footer": {
+        "allLeadBack": "Tüm {waits} bekleme, pid {pid} değerine geri döner",
+        "allLeadBackDetail": "— bir oturum, {object} üzerinde kilit tutuyor.",
+        "switchToBlocking": "“Kim engelliyor” görünümüne geç",
+        "releaseAll": "Oturum {pid} sonlandırıldığında {count} tümü serbest kalır.",
+        "releaseAllDetail": "Altındaki her şey yalnızca o tek kilit nedeniyle bekliyor.",
+        "timeLost": "toplam kayıp süre: {sessions} oturumda {seconds}"
+      },
+      "terminate": {
+        "copied": "Kopyalandı",
+        "hint": "Oturumu sonlandırmak için bu işlemi {instance} üzerinde kendiniz çalıştırın. Biz sizin için asla çalıştırmayız.",
+        "hintNoInstance": "Oturumu sonlandırmak için bu işlemi kendiniz çalıştırın. Biz sizin için asla çalıştırmayız."
+      },
+      "summary": {
+        "waiting": "Bekleyen oturumlar",
+        "longest": "En uzun bekleme",
+        "chains": "Zincirler"
+      },
+      "rootCount": "kök engelleyici yok | {count} kök engelleyici | {count} kök engelleyici",
+      "inChain": "Zincirdeki {count} oturum",
+      "healthy": {
+        "title": "Hiçbir şey bir kilit için beklemiyor",
+        "description": "Şu anda veritabanlarınızda hiçbir oturum başka bir oturumun arkasında takılı değil. Bu, topladıklarımızda bir eksiklik değil, sağlıklı normal durumdur.",
+        "descriptionPast": "Bu zaman aralığında veritabanlarınızda hiçbir oturum başka bir oturumun arkasında takılı değildi. Bu, topladıklarımızda bir eksiklik değil, sağlıklı normal durumdur.",
+        "checklistTitle": "Nasıl biliyoruz",
+        "collectionHealthy": "Toplama sağlıklı",
+        "checks": {
+          "sampling": {
+            "title": "Veritabanlarınızın kilit tablolarını kontrol ediyoruz",
+            "detail": "her {interval} saniyede bir · son bakış {age}",
+            "detailUnknown": "toplayıcınızın yapılandırıldığı zamanlamaya göre"
+          },
+          "sessions": {
+            "title": "Oturumlar normal çalışıyor",
+            "detail": "etkin oturumları görebiliyoruz ve hiçbiri kilit kuyruğunda değil"
+          },
+          "meaning": {
+            "title": "Bu sekme dolu olduğunda ne gösterir",
+            "detail": "Başka bir oturumun tuttuğu bir kilidi bekleyen bir oturum ve onu tutan oturuma giden zincir. Kısa beklemeler normaldir ve kendiliğinden temizlenir — bu sekme, temizlenmeyenler içindir."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "Engellenen sorguları henüz göremiyoruz — ve işte tam nedeni",
+        "description": "Engellenen bir sorgu yalnızca veritabanının içinden, kilit tablolarında görülebilir. Üç şeyi kontrol ediyoruz.",
+        "checklistTitle": "Kontrol ettiklerimiz",
+        "checks": {
+          "queries": {
+            "ok": "Sorgu verileriniz geliyor",
+            "okDetail": "{databases} veritabanından {queries} sorgu — En çok sorgular sekmesi çalışıyor",
+            "okDetailNoFleet": "{queries} — En çok sorgular sekmesi çalışıyor",
+            "no": "Sorgu verisi de gelmiyor",
+            "noDetail": "En çok sorgular sekmesiyle başlayın — bu veritabanlarından henüz bize hiçbir şey ulaşmıyor."
+          },
+          "enabled": {
+            "ok": "Veritabanı izleme açık",
+            "okDetail": "bu organizasyon için",
+            "no": "Veritabanı izleme kapalı",
+            "noDetail": "Toplamaya başlamak için Ayarlar'dan açın."
+          },
+          "sampling": {
+            "no": "Veritabanlarınızın kilit tablolarını örnekleyen hiçbir şey yok",
+            "noDetail": "Kimin kimi beklediği yalnızca veritabanının içinde ve yalnızca bekleme gerçekleşirken bulunur. Toplayıcı tarifimiz bunu zamanlanmış olarak okur ve uzun beklemelerin de kaydedilmesi için log_lock_waits özelliğini açar.",
+            "ok": "Kilit tablosu örneklemesi çalışıyor",
+            "okDetail": "böylece engellenen bir oturum bize ulaşırdı — ancak hiç yok."
+          },
+          "settings": {
+            "title": "Başlamadan önce bilmeniz gerekenler",
+            "detail": "log_lock_waits, bir bekleme deadlock_timeout değerinden (varsayılan olarak bir saniye) daha uzun sürdüğünde kaydeder. Bundan daha kısa beklemeler normaldir ve kaydedilmez; bu nedenle bu sekme yalnızca günlüğü okumak yerine canlı örnekleme yapar."
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "Etkinlik",
+      "subtitle": "Veritabanlarınızın şu anda ne yaptığı, kendi oturum tablolarından alınan örneklerle gösterilir.",
+      "subtitlePast": "Veritabanlarınızın bu zaman aralığında ne yaptığı, kendi oturum tablolarından alınan örneklerle gösterilir.",
+      "searchPlaceholder": "Oturumları, kullanıcıları, uygulamaları ara",
+      "wait": {
+        "onCpu": "CPU'da / bekleme yok",
+        "qualified": "{type}: {event}",
+        "plain": "{event}",
+        "remainder": "+{count} daha fazla bekleme olayı ({share})",
+        "remainderNoShare": "+{count} daha fazla bekleme olayı"
+      },
+      "disclosure": {
+        "sampled": "Her {interval} saniyede bir örneklenir — bu bir dizi anlık görüntüdür, sürekli kayıt değildir; bu nedenle örnekler arasındaki boşluktan daha kısa süren bir oturum çalışıp fark edilmeden bitebilir.",
+        "sampledUnknown": "Bir zamanlamaya göre örneklenir — bu bir dizi anlık görüntüdür, sürekli kayıt değildir. Toplayıcınızın ne sıklıkta sorguladığını anlamak için henüz yeterli örnek görmedik.",
+        "filtered": "Örnek, toplayıcınız tarafından zaten filtrelenmiştir: en yeni çalışan sorgudan daha eski olan boşta oturumlar, birini engellemedikçe dışarıda bırakılır. Bu nedenle bu, her bağlantının tam listesi değildir.",
+        "short": "Her {interval}s'de bir örneklenir ve önceden filtrelenmiştir",
+        "shortUnknown": "Bir zamanlamaya göre örneklenir ve önceden filtrelenmiştir",
+        "more": "Bu ne anlama geliyor"
+      },
+      "columns": {
+        "session": "Oturum",
+        "user": "Kullanıcı",
+        "application": "Uygulama",
+        "state": "Durum",
+        "waitEvent": "Beklenen",
+        "running": "Çalışma süresi",
+        "lastQuery": "Son sorgu",
+        "query": "Sorgu",
+        "blockedBy": "Engelleyen"
+      },
+      "summary": {
+        "sessions": "Oturumlar",
+        "onCpu": "CPU'da",
+        "waiting": "Bekliyor",
+        "idleInTransaction": "İşlemde boşta"
+      },
+      "state": {
+        "unknown": "Durum bildirilmedi"
+      },
+      "counts": {
+        "complete": "{count} oturum gösteriliyor.",
+        "capped": "Aynı anda okuyabildiğimizden daha fazla oturum örneklendi. Elimizdeki {count} oturum bunlar.",
+        "filtered": "{total} oturumdan {count} tanesi gösteriliyor."
+      },
+      "transactionOpen": "işlem açık {age}",
+      "healthy": {
+        "title": "Şu anda hiçbir şey çalışmıyor",
+        "description": "Veritabanlarınızın oturum tablolarını örnekledik ve etkin oturum bulamadık. Bu, boş bir veritabanı için sağlıklı normaldir, topladıklarımızda bir boşluk değil.",
+        "descriptionPast": "Bu zaman aralığında veritabanlarınızın oturum tablolarını örnekledik ve etkin oturum bulamadık. Bu, boş bir veritabanı için sağlıklı normaldir, topladıklarımızda bir boşluk değil.",
+        "checklistTitle": "Nasıl biliyoruz",
+        "collectionHealthy": "Toplama sağlıklı",
+        "checks": {
+          "sampling": {
+            "title": "Veritabanlarınızın oturum tablolarını örnekliyoruz",
+            "detail": "her {interval} saniyede bir · son bakış {age}",
+            "detailUnknown": "toplayıcınızın yapılandırıldığı zamanlamaya göre"
+          },
+          "pipeline": {
+            "title": "Veritabanlarınız bize ulaşıyor",
+            "detail": "{lines} diğer satır bu zaman aralığında aynı işlem hattından geldi",
+            "detailUnknown": "bu veriyi taşıyan işlem hattı çalışıyor"
+          },
+          "meaning": {
+            "title": "Bu sekme boş olmadığında ne gösterir",
+            "detail": "Veritabanlarınızın çalıştırdığı tüm oturumlar, her birinin neyi beklediği ve ne kadar süredir devam ettiği. Sürekli izlemek yerine örnekleme yaptığımız için çok kısa sorgular iki örnek arasında bitip hiç görünmeyebilir."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "Canlı oturumları henüz göremiyoruz — ve işte tam nedeni",
+        "description": "Bir veritabanının şu anda ne yaptığı yalnızca o veritabanının içinde, kendi oturum tablosunda bulunur. Bir şeyin onu sorgulaması gerekir. Üç şeyi kontrol ediyoruz.",
+        "checklistTitle": "Ne kontrol ettik",
+        "checks": {
+          "queries": {
+            "ok": "Sorgu verileriniz geliyor",
+            "okDetail": "{queries} sorgu {databases} veritabanından — Top queries sekmesi çalışıyor",
+            "okDetailNoFleet": "{queries} — Top queries sekmesi çalışıyor",
+            "no": "Sorgu verisi de gelmiyor",
+            "noDetail": "Top queries sekmesiyle başlayın — bu veritabanlarından henüz bize hiçbir şey ulaşmıyor."
+          },
+          "enabled": {
+            "ok": "Veritabanı izleme açık",
+            "okDetail": "bu kuruluş için",
+            "no": "Veritabanı izleme kapalı",
+            "noDetail": "Toplamaya başlamak için Ayarlar'dan açın."
+          },
+          "sampling": {
+            "no": "Veritabanlarınızın oturum tablolarını örnekleyen hiçbir şey yok",
+            "noDetail": "Oturum örnekleri toplayıcınızdan gelir: veritabanı ana bilgisayarındaki toplayıcı tarifinde db.server.query_sample'ı etkinleştirin — kurulum sayfası bunu adım adım anlatır. OpenObserve bu akışı veritabanı izleme açık olduğunda kabul eder, bu yüzden çözüm toplayıcı tarafındadır."
+          }
+        }
+      }
+    },
+    "instanceMetrics": {
+      "columnHeader": "Örnek sağlığı",
+      "columnHint": "Toplayıcınızın zaten gönderdiği metriklerden, sınıra karşı bağlantılar. Bu örneği bir alıcı raporlayana kadar boş.",
+      "connectionsOf": "{used} / {limit} bağlantı",
+      "connectionsNoLimit": "{used} bağlantı",
+      "noLimitHint": "Bu motorun alıcısı kendi başına bir bağlantı limiti yayınlamaz, bu yüzden yalnızca sayı gösterilir. Kurulum kartının bağlantı limiti tarifi (sqlquery/mysql_limits) max_connections'ı toplar ve bunu yüzdeye dönüştürür.",
+      "trendLabel": "Seçilen zaman aralığındaki bağlantılar",
+      "cacheHit": "Önbellek isabeti {percent}",
+      "lagBytes": "Replica {value} geride",
+      "lagSeconds": "Replica {value} geride",
+      "deadlocks": "{count} kilitlenme | {count} kilitlenme",
+      "noTraffic": "Bu zaman aralığında uygulama trafiği yok",
+      "noTrafficHint": "Toplayıcınız bu örneği raporluyor, ancak bu zaman aralığında hiçbir uygulama onu sorgulamadı. Sorgu sütunları boş çünkü hiçbir şey onları ölçmedi, hızlı olduğu için değil.",
+      "unmatched": {
+        "pooler": "Bu adresle eşleşen örnek metriği yok",
+        "poolerHint": "Bu satır, uygulamanızın bağlandığı adrestir. Toplayıcınız farklı ana bilgisayarları raporlar; aradaki bir bağlantı havuzlayıcı böyle görünür — havuzlayıcının adresi ile gerçek veritabanı asla eşleşmez.",
+        "loopback": "Bu adresle eşleşen örnek metriği yok",
+        "loopbackHint": "Bu satır localhost'u gösteriyor. Toplayıcı bir geri döngü uç noktasını kendi ana bilgisayar adına yeniden yazar, bu yüzden ikisi de sağlıklı olsa bile iki ad asla eşleşemez.",
+        "noReceiver": "{engine} alıcısı rapor vermiyor",
+        "noReceiverHint": "Uygulamalarınız bu veritabanını sorguluyor, ancak bu veritabanı için hiçbir {engine} alıcısı sunucu metriği göndermiyor. Bu sütunu doldurmak için toplayıcınıza {engine} alıcısını ekleyin.",
+        "noReceiverMariadbHint": "Uygulamalarınız bu MariaDB sunucusunu sorguluyor, ancak onun için sunucu metriği gönderen hiçbir şey yok. Ayrı bir MariaDB alıcısı yok — bu örneğe bir MySQL alıcısı yönlendirin ve metrikleri bu sütunu doldursun.",
+        "engineUnsupported": "{engine} için toplanmadı",
+        "engineUnsupportedHint": "Örnek metrikleri PostgreSQL, MySQL ve MariaDB için toplanır — {engine} için henüz bir alıcı bağlı değil, bu yüzden bu sütun boş kalır. Bu bir kapsam notudur, bir sağlık kararı değildir.",
+        "unreadable": "Örnek metrikleri okunamadı",
+        "unreadableHint": "Metrik akışları mevcut ancak okunamadı. Bu genellikle veritabanıyla ilgili bir sorundan ziyade bir izin sorunudur."
+      },
+      "limitUnknownHint": "Bağlantı sayısı geldi ancak limit gelmedi, bu yüzden yüzde gösterilemiyor. Bu toplayıcıda bağlantı limiti metriğinin etkin olduğunu kontrol edin.",
+      "noReading": "Bu zaman aralığında okuma yok",
+      "noReadingHint": "Toplayıcınız bu örneği raporluyor, ancak bu zaman aralığında bağlantı metriği göndermedi. Metrik alıcıda kapatılmış olabilir veya örnek raporlamayı durdurmuş olabilir.",
+      "lagLabel": "Replica gecikmesi",
+      "deadlockLabel": "Kilitlenmeler"
+    },
+    "tableHealth": {
+      "title": "Tablo sağlığı",
+      "subtitle": "Her tablo için boyut, şişkinlik ve vakum durumu, en yeni anlık görüntü önce.",
+      "searchPlaceholder": "Tabloları ara",
+      "never": "Asla",
+      "countersCumulative": "Tarama ve vakum sayıları, son istatistik sıfırlamasından bu yana ömür boyu toplamlardır, seçilen zaman aralığı için sayılar değildir.",
+      "tuplesEstimated": "Satır sayıları ve şişkinlik yüzdesi, veritabanı motorundan alınan istatistik tahminleridir, kesin sayılar değildir.",
+      "notCollectingTitle": "Henüz tablo istatistiği yok",
+      "notCollectingDescription": "Bu zaman aralığında hiçbir şey tablo istatistiği bildirmedi. Bu sinyal ayrı bir toplayıcı tarifi olarak gelir.",
+      "engineUnsupportedTitle": "Bu motor için toplanmadı",
+      "engineUnsupportedDescription": "Tablo sağlığı, motora özel bir toplayıcı tarifi tarafından toplanır ve bu motor için bir tarif gelmiyor — bu yüzden onun için hiçbir şey toplanmaz. Bu bir temiz sağlık raporu değildir.",
+      "checklistTitle": "Toplamaya başlamak için",
+      "checkRecipe": "Databases kurulum kılavuzundaki pg_table_stats tarifini toplayıcı yapılandırmanıza ekleyin.",
+      "checkGrant": "pg_monitor'ü toplayıcı kullanıcısına verin, böylece pg_stat_user_tables'ı okuyabilsin.",
+      "checkRange": "Zaman aralığını genişletin — tarif her 60 saniyede bir rapor verir.",
+      "columns": {
+        "relation": "Tablo",
+        "instance": "Örnek",
+        "totalBytes": "Toplam boyut",
+        "heapBytes": "Yığın boyutu",
+        "overheadBytes": "İndeks + TOAST",
+        "liveTuples": "Canlı satırlar (tah.)",
+        "deadTuples": "Ölü satırlar (tah.)",
+        "deadTupPct": "Bloat (tah.)",
+        "modSinceAnalyze": "Analizden bu yana satırlar",
+        "seqScanCount": "Sıralı taramalar (toplam)",
+        "seqTupRead": "Sıralı taranan satırlar (toplam)",
+        "idxScanCount": "İndeks taramaları (toplam)",
+        "autovacuumCount": "Autovacuum'lar (toplam)",
+        "frozenXidAge": "Txid yaşı",
+        "lastVacuum": "Son vakum",
+        "lastAutovacuum": "Son autovacuum",
+        "lastAnalyze": "Son analiz"
+      },
+      "countLine": "{count} tablo"
+    },
+    "recommendations": {
+      "title": "Öneriler",
+      "subtitle": "Toplayıcının zaten raporladığı veriler üzerinde deterministik kontroller. Her biri ölçümü ve aştığı eşiği belirtir.",
+      "countersCumulative": "İndeks tarama sayıları, son istatistik sıfırlamasından bu yana toplam değerlerdir; seçilen zaman aralığı için sayılar değildir.",
+      "andMore": "ve {count} benzeri daha",
+      "unused-index": {
+        "title": "Taranmamış indeks",
+        "body": "{index}, {relation} üzerinde kayıtlı taramaya sahip değil ve {size} yer kaplıyor.",
+        "rule": "İndeks tarama sayısı, istatistiklerin son sıfırlanmasından bu yana 0'dır ve indeks en az {bytes} bayttır. Tarama sayıları toplam değerlerdir, seçilen aralık için sayılar değildir.",
+        "caveat": "Yaşam boyu sayının sıfır olması, planlayıcının bu indeksi sayaçların son sıfırlanmasından bu yana seçmediği anlamına gelir. Yine de bir replikaya, periyodik bir göreve veya bir kısıta hizmet ediyor olabilir."
+      },
+      "long-running-query": {
+        "title": "Uzun süren sorgu",
+        "body": "Oturum {pid} {duration} süredir çalışıyor.",
+        "rule": "Çalışan bir oturum en az {seconds} saniyedir çalışıyor. Boşta oturumlar hariçtir."
+      },
+      "high-impact-blocker": {
+        "title": "Birden çok oturumu bloke eden",
+        "body": "Oturum {pid}, {count} oturumun beklediği bir zincirin başında.",
+        "rule": "Bir kök engelleyici — başkalarını bloke eden ve hiçbirini beklemeyen bir oturum — arkasında en az {sessions} oturumun beklemesine sahiptir, tüm zincir boyunca sayılır."
+      },
+      "high-row-count": {
+        "title": "Çağrı başına yüksek satır sayısı",
+        "body": "Bu ifade, çağrı başına ortalama {rows} satır döndürdü; toplam {calls} çağrı üzerinden.",
+        "rule": "Çağrı başına ortalama satır sayısı en az {rows}, en az {calls} çağrı üzerinden. Ortalama, sunucunun toplam satırlarının çağrı sayısına bölünmesidir."
+      },
+      "enginePartialTitle": "Bazı kontroller çalışmadı",
+      "enginePartialDescription": "Kullanılmayan indeks kontrolü, bu motor için toplanmayan bir indeks tarama sayacı gerektirir; bu nedenle buradaki boş bir liste tamamen temiz anlamına gelmez.",
+      "allClearTitle": "Hiçbir şey bir eşiği aşmadı",
+      "allClearDescription": "Tüm kontroller çalıştı ve bu zaman aralığında hiçbiri eşiğini aşmadı."
     }
   }
 }

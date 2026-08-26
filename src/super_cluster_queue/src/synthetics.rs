@@ -47,7 +47,7 @@ use config::meta::{
     synthetics::Synthetic,
 };
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     errors::{Error, Result},
     table,
 };
@@ -261,7 +261,7 @@ fn encrypt_with(dek: &[u8], check: &mut Synthetic) -> Result<()> {
 }
 
 async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     match msg {
         SyntheticsMessage::Create { org_id, payload } => {
             let folder_slug = payload.folder_slug.clone();

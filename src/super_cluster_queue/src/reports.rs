@@ -15,11 +15,7 @@
 
 use std::str::FromStr;
 
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors::Result,
-    table,
-};
+use infra::{db::get_orm_client_rw, errors::Result, table};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType, ReportMessage};
 use svix_ksuid::Ksuid;
 
@@ -41,7 +37,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 pub(crate) async fn process_msg(msg: ReportMessage) -> Result<()> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     match msg {
         ReportMessage::Create {
             org_id,

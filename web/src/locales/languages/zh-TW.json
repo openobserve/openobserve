@@ -1223,7 +1223,10 @@
     "ingestionText": "資料擷取",
     "navigationLink": "導覽連結",
     "ariaCurrentPage": "{label} - 目前頁面",
-    "ariaWithNotifications": "{label}（{count} 則通知）"
+    "ariaWithNotifications": "{label}（{count} 則通知）",
+    "infra": "基礎設施",
+    "databases": "資料庫",
+    "topQueries": "熱門查詢"
   },
   "rum": {
     "noSessionReplay": "沒有可用的工作階段重播",
@@ -3442,6 +3445,17 @@
     "languagesLabel": "程式語言/框架",
     "otherLabel": "其他",
     "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "snowflake": "Snowflake",
+    "zookeeper": "Zookeeper",
+    "cassandra": "Cassandra",
+    "aerospike": "Aerospike",
+    "dynamodb": "DynamoDB",
+    "jenkins": "Jenkins",
+    "ansible": "Ansible",
+    "terraform": "Terraform",
+    "gactions": "GitHub Actions",
+    "python": "Python",
     "dotnettracing": ".Net Tracing",
     "dotnetlogs": ".Net Logs",
     "macos": "macOS",
@@ -3703,6 +3717,12 @@
       "k8sTroubleWebhookA": "OpenTelemetry operator 的 webhook 需要 cert-manager 的 webhook 先開始服務。執行 `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook`，然後重新執行安裝 — 它是冪等的。",
       "k8sTroubleWebhookQ": "安裝因有關准入 webhook 的錯誤而失敗",
       "linuxAgentFixBody": "安裝程式會以 systemd 服務啟動代理程式。如果沒有收到任何資料，請確認它正在執行，並閱讀其日誌以找出驗證或連線錯誤：",
+      "prepareMariadbTitle": "準備 MariaDB",
+      "prepareMariadbDesc": "建立監控使用者 — 在 SQL 用戶端中執行，**不是**您的 shell。",
+      "runCollectorMariadbDesc": "啟動收集器（透過環境變數提供使用者密碼）。",
+      "mariadbHostLabel": "MariaDB 主機",
+      "verifyMariadbMetricsDesc": "點擊下方的測試，或在 Streams 中查看 `mysql_*` 指標（MariaDB 透過 MySQL 接收器回報）。",
+      "mariadbTagline": "使用 OpenTelemetry Collector 收集 MariaDB 指標，並將它們傳送到 OpenObserve。",
       "logsStreamNameLabel": "日誌串流名稱",
       "macosAgentFixBody": "安裝程式會註冊兩個 launchd 常駐程式：代理程式本身和統一日誌橋接器。如果沒有收到任何資料，請確認兩者都已載入，並閱讀代理程式的日誌以找出驗證或連線錯誤：",
       "macosAgentServicesFixTitle": "檢查代理程式服務",
@@ -4007,7 +4027,46 @@
       "enableSessionReplayOptionalTitle": "啟用工作階段重播（選用）",
       "enableSessionReplayNativeDesc": "工作階段重播是**分別**啟用的，且**不會**繼承 RUM 端點。它也不會附加任何內容，因此需要下方完整的 `/replay` URL。設定錯誤是 RUM 事件送達但重播卻從未出現的常見原因。",
       "verifyAndroidRumDesc": "在模擬器或裝置上執行應用程式，在幾個畫面之間移動，然後按一下 Test — 原生 Android 事件會落在 `_rumdata` 串流中。",
-      "verifyIosRumDesc": "在模擬器或裝置上執行應用程式，在幾個畫面之間移動，然後按一下 Test — 原生 iOS 事件會落在 `_rumdata` 串流中。"
+      "verifyIosRumDesc": "在模擬器或裝置上執行應用程式，在幾個畫面之間移動，然後按一下 Test — 原生 iOS 事件會落在 `_rumdata` 串流中。",
+      "dbmPreparePostgresTitle": "資料庫監控 · 授予存取權限（選用）",
+      "dbmPreparePostgresDesc": "**以上所有內容本身已完整** — 查詢計時已從您應用程式的追蹤中到達資料庫，無需在此進行任何設定。這些最後的步驟增加了追蹤永遠看不到的內容：死結和被封鎖的查詢，只有資料庫本身才會記錄。授予 `pg_monitor`，讓收集器可以讀取其他工作階段的查詢 — 在 SQL 用戶端中執行，**不是**您的 shell。",
+      "dbmPrepareMysqlTitle": "資料庫監控 · 保留死結歷史（選用）",
+      "dbmPrepareMariadbTitle": "資料庫監控 · 保留死結歷史（選用）",
+      "dbmPrepareMysqlDesc": "**以上所有內容本身已完整** — 查詢計時已從您應用程式的追蹤中到達資料庫，無需在此進行任何設定。這些最後的步驟增加了追蹤永遠看不到的內容：死結和被封鎖的查詢，只有資料庫本身才會記錄。開啟完整的死結歷史 — 在 SQL 用戶端中執行，**不是**您的 shell。",
+      "dbmPrepareMariadbDesc": "**以上所有內容本身已完整** — 查詢計時已從您應用程式的追蹤中到達資料庫，無需在此進行任何設定。這些最後的步驟增加了追蹤永遠看不到的內容：死結和被封鎖的查詢，只有資料庫本身才會記錄。開啟完整的死結歷史 — 在 SQL 用戶端中執行，**不是**您的 shell。",
+      "dbmPgLoggingTitle": "資料庫監控 · 讓 Postgres 記錄死結（選用）",
+      "dbmPgLoggingDesc": "死結只會寫入 Postgres 記錄檔，且僅在下方設定開啟時才會寫入 — 因此這個步驟是讓 Deadlocks 標籤頁有內容的關鍵。前綴行必須完全相符：收集器會讀取它來找出涉及的角色，若前綴不同，就表示收集器找不到任何內容，但仍會回報正常。",
+      "dbmPgLoggingVerifyTitle": "資料庫監控 · 確認設定已生效（選用）",
+      "dbmPgLoggingVerifyDesc": "請在重新啟動後執行此操作。如果任何值仍顯示舊設定，表示 Postgres 是被重新載入而非重新啟動，收集器將沒有任何內容可讀。",
+      "dbmPgAutoExplainTitle": "資料庫監控 · 擷取實際執行的計畫（選用）",
+      "dbmPgAutoExplainDesc": "沒有這個步驟，查詢計畫是未使用真實參數值計算出的通用估計值 — 雖然有用，但絕非實際執行的計畫。auto_explain 會記錄 Postgres 對於任何超過閾值的語句實際執行的計畫，包含真實的列數和實際的耗時。它會對取樣的語句增加可量測的執行器額外負擔，因此在套用至繁忙的主要節點前，請閱讀設定的註解，並與上述記錄步驟在同一次重新啟動中一起套用。",
+      "dbmConfigureTitle": "資料庫監控 · 設定收集器（選用）",
+      "dbmConfigurePostgresDesc": "寫入 `dbm-config.yaml` — 在下方設定資料庫和 Postgres 記錄檔的路徑。除了死結和封鎖的查詢外，此設定還會開啟活動樣本和伺服器熱門查詢（含估計計畫）：收集器預設將兩者關閉，因此此檔案中的頂層 `events:` 區塊就是啟用它們的關鍵 — 沒有它，收集器看起來正常，但不會傳送任何內容。",
+      "dbmConfigureMysqlDesc": "寫入 `dbm-config.yaml` — 在下方設定資料庫和 MySQL 錯誤記錄檔的路徑。除了死結和封鎖的查詢外，此設定還會開啟活動樣本和伺服器熱門查詢：收集器預設將兩者關閉，因此此檔案中的頂層 `events:` 區塊就是啟用它們的關鍵 — 沒有它，收集器看起來正常，但不會傳送任何內容。",
+      "dbmConfigureMariadbDesc": "寫入 `dbm-config.yaml` — 在下方設定資料庫和 MariaDB 錯誤記錄檔的路徑。MariaDB 在此取得死結、封鎖的查詢、活動樣本和熱門查詢：MySQL 接收器能與 MariaDB 的通訊協定對話，並正確識別它。接收器本身回報了一個缺口 — MariaDB 不會公開取樣語句的文字，因此活動列只會指出工作階段名稱，而不包含其 SQL。",
+      "dbmRunTitle": "資料庫監控 · 執行收集器（選用）",
+      "dbmRunPostgresDesc": "同時執行兩個設定。使用您在步驟 1 建立的相同角色和密碼。",
+      "dbmRunMysqlDesc": "同時執行兩個設定。使用您在步驟 1 建立的相同使用者和密碼。",
+      "dbmRunMariadbDesc": "同時執行兩個設定。使用您在步驟 1 建立的相同使用者和密碼。",
+      "dbmVerifyTitle": "資料庫監控 · 查看死結和封鎖的查詢",
+      "dbmVerifyDesc": "開啟 **Infra → Databases** 並選擇下方的標籤頁。事件會在您的資料庫回報後立即出現 — 空白標籤頁會讓您知道是沒有發生任何事，還是沒有收集到任何內容。",
+      "dbmVerifyFullDesc": "開啟 **Infra → Databases** 並選擇下方的標籤頁。死結和封鎖的查詢會在您的資料庫回報後立即出現；Activity 標籤頁會在收集器啟動後一分鐘內填滿取樣的工作階段，而估計計畫會顯示在 MySQL 8.0.22 及以上版本的查詢詳細資料頁面中。資料表健康狀態會在第一個 60 秒快照後填滿。",
+      "dbmDatabaseLabel": "資料庫",
+      "dbmPgLogPathLabel": "Postgres 記錄檔",
+      "dbmPgLogPathHelp": "收集器必須能夠讀取此檔案。使用以下指令找到它：SHOW log_directory;",
+      "dbmMysqlLogPathLabel": "MySQL 錯誤記錄檔",
+      "dbmMariadbLogPathLabel": "MariaDB 錯誤記錄檔",
+      "dbmMysqlLogPathHelp": "收集器必須能夠讀取此檔案。使用以下指令找到它：SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "收集器必須能夠讀取此檔案。使用以下指令找到它：SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "資料庫監控 · 授予存取權限（選用）",
+      "dbmPrepareMssqlDesc": "**以上所有步驟本身即完整** — 查詢時間已從應用程式的追蹤中連到資料庫，無需在此設定。最後這一組加入了追蹤永遠看不到的資訊：死結與被封鎖的查詢，這些只有資料庫本身會記錄。需要同時授予兩種權限 — 一個讓收集器讀取其他工作階段，另一個讓它讀取死結歷程。請在 SQL 用戶端中執行，**不要**在您的 shell 中執行。",
+      "dbmConfigureMssqlDesc": "寫入 `dbm-config.yaml` — 在下方設定要連線的資料庫。SQL Server 在此取得死結、被封鎖的查詢、活動範例、熱門查詢與執行計畫。sqlserver 接收器會讀取整個執行個體，因此活動與熱門查詢不受限於您上方指定的資料庫。",
+      "dbmRunMssqlDesc": "同時執行兩份設定。請使用您在步驟 1 建立的相同登入名稱與密碼。",
+      "dbmVerifyBlockingDesc": "開啟 **Infra → Databases → Blocked queries**。等待鎖定的工作階段一經取樣即會出現 — 該索引標籤空白可讓您判斷是沒有任何封鎖，還是沒有收集任何資料。",
+      "dbmVerifyFullNoSampleTextDesc": "開啟 **Infra → Databases** 並選擇下方索引標籤。死結與被封鎖的查詢會在資料庫回報時立即出現；Activity 索引標籤會在收集器啟動後一分鐘內填滿取樣的工作階段，熱門查詢的詳細資料頁面會顯示其計畫。MariaDB 不公開取樣陳述式文字，因此活動列只顯示工作階段名稱，不含其 SQL。資料表健康狀態會在首次 60 秒快照後填入。",
+      "dbmVerifyFullPlainPlansDesc": "開啟 **Infra → Databases** 並選擇下方索引標籤。死結與被封鎖的查詢會在資料庫回報時立即出現；Activity 索引標籤會在收集器啟動後一分鐘內填滿取樣的工作階段，查詢的詳細資料頁面會顯示執行計畫。資料表健康狀態會在首次 60 秒快照後填入。",
+      "dbmVerifyFullSlowTableHealthDesc": "開啟 **Infra → Databases** 並選擇下方索引標籤。死結與被封鎖的查詢會在資料庫回報時立即出現；Activity 索引標籤會在收集器啟動後一分鐘內填滿取樣的工作階段，查詢的詳細資料頁面會顯示估計計畫。資料表健康狀態最多需要五分鐘 — 讀取資料表大小會隨結構成長而變慢，因此執行的頻率會低於其他部分。",
+      "dbmVerifyTableHealthDesc": "開啟 **Infra → Databases** 並選擇下方索引標籤。死結與被封鎖的查詢會在資料庫回報時立即出現 — 該索引標籤空白可讓您判斷是沒有發生任何情況，還是沒有收集任何資料。資料表健康狀態會在首次 60 秒快照後填入。"
     },
     "instrumentBeforeImportTitle": "在匯入用戶端之前先進行儀器化",
     "instrumentBeforeImportBody": "如果您的應用程式有執行但沒有收到任何跨度，很可能是儀器化在匯入用戶端之後才載入。請重新排序，讓 init 先執行：",
@@ -4487,6 +4546,8 @@
     "folder": "資料夾",
     "folders": "資料夾",
     "searchFolder": "搜尋資料夾",
+    "folderIcon": "圖示",
+    "folderIconAria": "選擇資料夾圖示",
     "deleteFolder": "刪除資料夾",
     "deleteFolderMessage": "確定要刪除此資料夾嗎？",
     "trellisLayout": "Trellis 版面配置",
@@ -5438,7 +5499,8 @@
     "variableNameAlreadyExists": "已存在相同名稱的變數",
     "pivotTotal": "總計",
     "pivotOthers": "其他",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "探索相符的日誌"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5526,7 +5588,59 @@
     "mapvalue": "值",
     "source": "來源",
     "target": "目標",
-    "value": "值"
+    "value": "值",
+    "logExplorer": {
+      "title": "日誌瀏覽器",
+      "openInLogs": "在日誌中開啟",
+      "invalidParams": "無效的向下鑽取參數",
+      "noEvents": "沒有事件符合此篩選條件",
+      "filterHint": "按一下以探索相關日誌",
+      "timestamp": "時間戳記",
+      "queryMode": "SQL",
+      "runQuery": "執行查詢",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "事件",
+      "events": "事件",
+      "prevPage": "上一頁",
+      "nextPage": "下一頁",
+      "of": " / ",
+      "sqlEditorLabel": "SQL 查詢",
+      "resetSql": "重設",
+      "detail": {
+        "drawerTitle": "事件詳細資料",
+        "details": "詳細資料",
+        "json": "JSON",
+        "insights": "深入解析",
+        "copyLink": "複製連結",
+        "copy": "複製",
+        "copyValue": "複製值",
+        "insightsHint": "已載入 {n} 個事件的欄位頻率"
+      },
+      "insights": {
+        "anomalyTitle": "欄位異常概況",
+        "anomalyHint": "已取樣 {n} 個事件",
+        "colField": "欄位",
+        "colRarity": "稀有度",
+        "colValue": "值",
+        "rarity": {
+          "anomalous": "異常",
+          "rare": "罕見",
+          "uncommon": "不常見",
+          "common": "常見"
+        },
+        "timelineTitle": "事件時間軸",
+        "timelineHint": "所選範圍內的頻率",
+        "timelineEmpty": "無資料",
+        "patternsTitle": "日誌模式",
+        "patternsHint": "以相似結構分組",
+        "zScore": "z={value}",
+        "patternsEmpty": "未從此篩選條件中擷取到任何模式",
+        "contextTitle": "周圍事件",
+        "contextHint": "此時間戳記附近的事件",
+        "contextTooltip": "此資料流中，此事件前後 3 分鐘內的其他事件 — 顯示同一時間點還發生了什麼事。",
+        "contextEmpty": "找不到周圍事件"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "警示概覽區段",
@@ -6012,6 +6126,7 @@
     "SearchSQLCancelled": "錯誤：搜尋 SQL 已取消。"
   },
   "alerts": {
+    "allAlerts": "所有警示",
     "compositeAlert": "複合",
     "import": {
       "anomalyImportSuccess": "異常偵測 - {index}: \"{name}\" 匯入成功",
@@ -7340,6 +7455,18 @@
         "panel": {
           "label": "建立警示",
           "toast": "已從儀表板面板匯入查詢：「{sourceLabel}」"
+        },
+        "library": {
+          "label": "在編輯器中自訂",
+          "toast": "來自警示庫：{sourceLabel}"
+        },
+        "dbm": {
+          "label": "警示我",
+          "toast": "從資料庫監控匯入：\"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "警示我",
+          "toast": "從資料庫監控（伺服器視角）匯入：\"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7361,7 +7488,13 @@
         "noQueries": "此面板沒有可用於建立警示的查詢。",
         "noConstants": "選取的模式沒有可匹配的獨特文字。",
         "sqlModeFilterDropped": "您的 SQL 查詢未沿用 — 警示僅會匹配選取的模式。",
-        "patternsUnusable": "此頁面上的模式皆沒有可匹配的獨特文字，因此警示僅使用您的搜尋。"
+        "patternsUnusable": "此頁面上的模式皆沒有可匹配的獨特文字，因此警示僅使用您的搜尋。",
+        "dbmRollupLag": "資料庫數字每 {minutes} 分鐘彙總一次，因此此警示只能在那麼頻繁的情況下觸發 — 它不是即時頁面。",
+        "dbmFingerprintVersion": "此警示固定於單一查詢的確切形狀。如果查詢分組方式改變，警示可能不再符合，應重新建立。",
+        "dbmNoFingerprint": "此查詢沒有穩定的識別碼，因此警示改為監控整個資料庫。",
+        "dbmServerVantage": "這衡量的是資料庫伺服器本身回報的鎖定情況，而非您應用程式的等待時間。請勿與查詢延遲警示比較。",
+        "dbmLockSampling": "鎖定活動會依間隔取樣，因此在兩次取樣之間開始並結束的競爭從未被記錄。警示安靜不代表沒有阻塞。",
+        "dbmNoInstance": "無法識別單一資料庫執行個體，因此此警示會監控此引擎的所有執行個體。"
       }
     },
     "saveFailed": "無法儲存警示。",
@@ -7400,6 +7533,112 @@
     "impactTemplate": "由 {destinations} · {alerts} 使用",
     "impactDestination": "由 {alerts} 使用"
   },
+  "alert_library": {
+    "header": "警示庫",
+    "subtitle": "精選且可立即安裝的警示，與您已攝取的資料比對",
+    "sectionTab": "程式庫",
+    "contribute": "在 GitHub 上貢獻",
+    "searchPlaceholder": "依名稱、說明或串流搜尋",
+    "searchLabel": "搜尋警示庫",
+    "categories": "類別",
+    "searchCategories": "搜尋類別",
+    "searchCategoriesAria": "搜尋類別篩選器",
+    "noCategoryMatch": "沒有相符的類別。",
+    "selectedCount": "已選取 {count} 個",
+    "facetAria": "{label}，{count} 個警示",
+    "severity": "嚴重性",
+    "severityAll": "全部",
+    "severityCritical": "嚴重",
+    "severityWarning": "警告",
+    "severityInfo": "資訊",
+    "statReady": "可安裝",
+    "statNeedsData": "未攝取",
+    "statAll": "全部",
+    "notIngested": "未攝取：{stream}",
+    "notIngestedHint": "此組織目前未接收 {stream}，因此此警示永遠不會觸發。仍可安裝，一旦資料到達便會開始運作。",
+    "alertCount": "{count} 個警示 | {count} 個警示",
+    "noCollectorTitle": "這裡尚無與您的資料相符的項目",
+    "noCollectorDescription": "這些 {count} 個警示均未查詢此組織正在接收的串流。將 {group} 遙測資料傳送到 OpenObserve，它們就會在此顯示。",
+    "setupGuide": "攝取指南",
+    "emptyLibraryTitle": "警示程式庫是空的",
+    "emptyLibraryDescription": "目錄已載入，但不包含任何警示。這是發布問題，不是篩選問題—請稍後再試。",
+    "noMatchesTitle": "沒有警示符合這些篩選條件",
+    "noMatchesDescription": "請嘗試其他類別、嚴重性或搜尋字詞。",
+    "clearFilters": "清除篩選條件",
+    "loadFailedTitle": "無法載入警示程式庫",
+    "retry": "重試",
+    "openDetails": "開啟 {title}",
+    "drawer": {
+      "dataAvailable": "資料可用",
+      "streamNotFound": "找不到串流",
+      "detects": "偵測內容",
+      "noDescription": "程式庫中沒有描述。",
+      "needsDataCallout": "此警示查詢 {stream}，但此組織並未接收該串流。立即安裝將建立一個永遠不會觸發的警示。",
+      "query": "查詢",
+      "stream": "串流",
+      "streamType": "串流類型",
+      "metricCondition": "指標條件",
+      "matchCount": "需要相符的列數",
+      "previewBlocked": "{stream} 不是此組織中的串流，因此沒有可評估的內容。",
+      "wouldTrigger": "會觸發",
+      "wouldNotTrigger": "不會觸發",
+      "loading": "從程式庫載入此警示",
+      "loadFailed": "無法從程式庫載入此警示。",
+      "customize": "在編輯器中自訂",
+      "customizeHint": "開啟已預填此警示的標準警示編輯器。",
+      "customizeFailed": "無法在編輯器中開啟此警示。",
+      "install": "安裝",
+      "neverIngested": "尚無資料",
+      "neverIngestedCallout": "{stream} 存在但從未接收過資料，因此此警示沒有可觸發的對象。",
+      "lastData": "最後資料 {when}",
+      "staleCallout": "{stream} 最後接收資料的時間為 {when}。此警示將保持靜默，直到恢復資料擷取。",
+      "unknownTime": "於未知時間"
+    },
+    "install": {
+      "title": "從程式庫安裝",
+      "subtitle": "選擇警示通知的位置、要安裝的警示，以及歸檔的位置。",
+      "stepDestination": "目的地",
+      "stepAlerts": "警示",
+      "stepFolder": "資料夾",
+      "stepTune": "調整",
+      "stepInstall": "安裝",
+      "destinationIntro": "此批次中的每個警示都會通知您在此選擇的目的地。程式庫檔案使用其匯出來源組織的目的地名稱，而這些名稱在您的組織中不存在。",
+      "destinationLabel": "目的地",
+      "destinationPlaceholder": "選擇目的地",
+      "destinationsLoadFailed": "無法載入您現有的目的地。",
+      "retry": "再試一次",
+      "destinationsNoneBody": "此組織尚無警示目的地，因此這些警示沒有可通知的地方。請在「目的地」頁面建立一個，然後回來在此選擇。",
+      "openDestinations": "開啟目的地",
+      "selectAll": "全選",
+      "clear": "清除",
+      "selectedCount": "已選取 {count} / {total}",
+      "folderIntro": "已安裝的警示會歸檔於此。如果此批次需要自己的資料夾，請使用 + 按鈕建立。",
+      "tuneToggle": "為此批次中的每個警示設定這些",
+      "tuneHint": "只有這兩個可以安全地為整個批次設定。閾值保持每個警示各自設定——若要變更其中一個，請開啟該警示並單獨安裝。",
+      "frequency": "每隔",
+      "silence": "靜音時間",
+      "minutes": "分鐘",
+      "summaryTuningNone": "程式庫預設值",
+      "summaryTuningOverride": "每隔 {frequency} 分鐘，靜音 {silence} 分鐘",
+      "run": "安裝 {count} 個警示 | 安裝 {count} 個警示",
+      "retryFailed": "重試 {count} 個失敗 | 重試 {count} 個失敗",
+      "allInstalled": "{count} 個警示已安裝 | {count} 個警示已安裝",
+      "someFailed": "{installed} 個已安裝，{failed} 個失敗",
+      "unknownError": "無法建立此警示。",
+      "unreadableConditions": "此警示的篩選條件格式為此版本無法讀取。安裝它會建立沒有篩選條件的警示，因此已略過。",
+      "back": "上一步",
+      "next": "下一步",
+      "cancel": "取消",
+      "done": "完成"
+    },
+    "error": {
+      "network": "無法連線到程式庫。請檢查您的網路連線後再試一次。",
+      "http": "程式庫伺服器傳回錯誤。請稍後再試一次。",
+      "unparseable": "程式庫回應的內容並非目錄。",
+      "unsupported_version": "此程式庫目錄比目前版本的 OpenObserve 可讀取的版本還新。請升級以瀏覽它。",
+      "malformed": "程式庫目錄不完整或已損毀。"
+    }
+  },
   "alert_templates": {
     "exportTemplate": "匯出範本",
     "selected": "已選取",
@@ -7424,7 +7663,7 @@
     "importBodyLabel": "範本內文 *",
     "importTypeLabel": "範本類型 *",
     "importTitleLabel": "範本標題 *",
-    "header": "範本",
+    "header": "目的地範本",
     "add": "新增範本",
     "edit": "編輯",
     "name": "名稱",
@@ -7631,6 +7870,7 @@
     "destinationsLoadError": "載入目的地時發生錯誤"
   },
   "alert_destinations": {
+    "sectionTab": "目的地",
     "chooseTypeTitle": "選擇類型",
     "selectDestinationType": "選擇目的地類型",
     "connectionStepTitle": "連線",
@@ -9138,7 +9378,8 @@
       "rowsReturned": "傳回行數",
       "batchSize": "批次大小",
       "querySummary": "查詢摘要",
-      "responseStatus": "回應狀態"
+      "responseStatus": "回應狀態",
+      "viewQueryTrend": "在資料庫監控中檢視查詢趨勢"
     },
     "index": {
       "clickHere": "點選此處",
@@ -9214,6 +9455,7 @@
       "viewRelated": "檢視相關",
       "logs": "日誌",
       "traces": "追蹤",
+      "databases": "資料庫",
       "viewTraces": "檢視追蹤",
       "operations": "操作",
       "metrics": "指標",
@@ -9990,7 +10232,7 @@
     "copyPattern": "複製模式",
     "copied": "已複製！",
     "pricingTiers": "定價層級",
-    "pricingTiersDesc": "第一個層級為預設。額外層級在符合使用條件時套用。",
+    "pricingTiersDesc": "第一個層級是預設的。後續層級會在其使用條件和 UTC 時間視窗符合時套用。",
     "tierName": "層級名稱",
     "applyTierWhen": "在以下情況套用此層級",
     "quickSetup": "快速設定：",
@@ -10082,7 +10324,25 @@
     "saveShadowedWarning": "已儲存，但此規則被 \"{winner}\" 遮蔽，因為具有相同模式和更高優先順序。除非刪除或停用該規則，否則永遠不會用於費用計算。",
     "modelPricingSaved": "模型定價已儲存",
     "errSave": "儲存失敗",
-    "errLoadModel": "載入模型失敗"
+    "errLoadModel": "載入模型失敗",
+    "tierDefaultName": "預設",
+    "timeWindows": "啟用時段 (UTC)",
+    "timeWindowsDesc": "將此層級限制在重複的 UTC 時段，適用於依據尖峰與離峰費率計費的供應商。",
+    "timeWindowFrom": "從",
+    "timeWindowTo": "至",
+    "addTimeWindow": "新增時間視窗",
+    "removeTimeWindow": "移除時間視窗",
+    "addUsageCondition": "新增使用條件",
+    "removeUsageCondition": "移除使用條件",
+    "timeWindowInvalid": "層級「{name}」：請輸入 HH:MM（24 小時制 UTC）格式的時間。",
+    "timeWindowSameBounds": "層級「{name}」：開始和結束時間必須不同。移除時間視窗可使層級永遠啟用。",
+    "timeWindowWrapsHint": "跨越 UTC 午夜。",
+    "tierNeedsRestriction": "層級「{name}」沒有使用條件和時間視窗，因此永遠不會被套用。請新增其中一個，或刪除該層級。",
+    "timeBasedChip": "時間型",
+    "tierAlwaysActive": "永遠啟用 (預設)",
+    "testAtTimeLabel": "以 UTC 時間測試",
+    "testAtTimeHint": "留空以使用目前時間。尖峰 / 離峰層級將依據此時間判斷。",
+    "localTimeHint": "您的時區：{range}"
   },
   "aiObservability": {
     "title": "AI 可觀測性",
@@ -13264,6 +13524,24 @@
     "combobox": {
       "noOptionsFound": "找不到選項"
     },
+    "emojiPicker": {
+      "chooseIcon": "選擇圖示",
+      "searchPlaceholder": "搜尋圖示...",
+      "removeIcon": "移除圖示",
+      "noResults": "沒有符合您搜尋的圖示",
+      "groups": {
+        "results": "結果",
+        "status": "狀態",
+        "services": "服務",
+        "ai": "AI",
+        "creatures": "生物",
+        "infra": "基礎設施",
+        "data": "資料",
+        "teams": "團隊",
+        "objects": "物件",
+        "world": "世界"
+      }
+    },
     "input": {
       "clear": "清除"
     },
@@ -13642,6 +13920,14 @@
       },
       "variableScope": {
         "global": "全域"
+      },
+      "dataConfidence": {
+        "estimated": "≈ 估計",
+        "topNSubset": "top-N 子集",
+        "live": "即時",
+        "belowTopN": "top-N 以下",
+        "truncated": "已截斷",
+        "gap": "間隙"
       }
     }
   },
@@ -14622,6 +14908,1056 @@
     },
     "hover": {
       "deprecated": "**已淘汰** — 請優先使用標準函式。"
+    }
+  },
+  "dbm": {
+    "common": {
+      "reload": "重新整理",
+      "lastRefreshed": "上次重新整理 {age}",
+      "loadFailed": "無法載入資料庫資料。請重試，或縮小時間範圍。"
+    },
+    "ai": {
+      "suggestFix": "詢問 AI 如何修正",
+      "suggestFixHint": "使用此查詢、其引擎和延遲資料開啟 AI 助手，並詢問應更改什麼。它本身不會更改任何內容。",
+      "rowSuggestFix": "詢問 AI 如何修正",
+      "deadlockFix": "如何停止這個死結？",
+      "deadlockFixHint": "將兩個衝突的陳述和列順序證據傳送給 AI 助手。",
+      "blockingFix": "為什麼這會阻塞？",
+      "blockingFixHint": "將根工作階段的陳述、其閒置時間以及卡在其後面的工作階段數量傳送給 AI 助手。"
+    },
+    "filters": {
+      "allEngines": "所有引擎",
+      "allInstances": "所有資料庫",
+      "allNamespaces": "所有結構描述",
+      "allEnvs": "所有環境",
+      "allServices": "所有服務",
+      "scope": "篩選器",
+      "clearScope": "全部清除",
+      "removeScope": "移除此篩選器",
+      "popoverTitle": "縮小範圍",
+      "dimension": {
+        "system": "引擎",
+        "instance": "資料庫",
+        "namespace": "結構描述",
+        "env": "環境",
+        "service": "服務",
+        "insight": "洞察"
+      }
+    },
+    "delta": {
+      "new": "此清單中的新項目",
+      "gone": "已停止執行",
+      "newHint": "此查詢先前不在負載最重的查詢之列，因此沒有可比較的基準。它可能之前就在執行——只是負載不夠重，未單獨追蹤。",
+      "goneHint": "此查詢當天較早執行過，但不在您查看的時間範圍內。",
+      "comparison": "先前 {previous} → 現在 {current}",
+      "noChange": "無變化",
+      "timesMore": "{ratio}× 更多",
+      "timesFewer": "{ratio}× 更少",
+      "wasValue": "原本 {value}"
+    },
+    "databases": {
+      "title": "資料庫",
+      "subtitle": "每個資料庫的查詢效能與健康狀態",
+      "searchPlaceholder": "搜尋資料庫或服務…",
+      "unnamedInstance": "執行個體未命名",
+      "unnamedInstanceHint": "資料庫自身的陳述式報告證明此引擎正在執行，但未指明主機。一旦設定了帶有主機的來源 — 工作階段取樣或執行個體指標 — 該列便會顯示位址。",
+      "moreServices": "+{count}",
+      "columns": {
+        "instance": "資料庫",
+        "calls": "呼叫",
+        "qps": "每秒",
+        "errorRate": "失敗",
+        "p50": "半數低於",
+        "p95": "慢速呼叫",
+        "p99": "最慢的 1%",
+        "services": "使用方",
+        "load": "資料庫時間",
+        "attention": "需要注意"
+      },
+      "summary": {
+        "databases": "資料庫",
+        "calls": "呼叫",
+        "time": "資料庫時間",
+        "failed": "失敗"
+      },
+      "databaseCount": "1 個資料庫 | {count} 個資料庫",
+      "openQueries": "查看其查詢",
+      "alertMe": "提醒我",
+      "columnHints": {
+        "qps": "每秒呼叫數 — 此時間範圍的呼叫數除以時間長度，因此 15 分鐘檢視與 4 小時檢視仍然可比。",
+        "p50": "半數呼叫完成時間比這更快。只計算已完成的呼叫 — 仍在執行或從未回傳的查詢，不在此計算範圍內。",
+        "p95": "慢速尾部 — 每 20 個呼叫中有 1 個至少耗費這麼久。只計算已完成的呼叫 — 仍在執行或從未回傳的查詢，不在此計算範圍內。",
+        "p99": "最慢的 1% 呼叫至少耗費這麼久。只計算已完成的呼叫 — 仍在執行或從未回傳的查詢，不在此計算範圍內。",
+        "load": "您的應用程式等待此資料庫的總時間。從用戶端衡量，因此反映此資料庫服務的流量 — 而非伺服器的負載程度。",
+        "attention": "此執行個體距離其引擎自行發布的限制有多近 — 目前是連線數對比 max_connections。取最差的比率，而非綜合分數。依最高的優先排序，健康狀態無法讀取的執行個體會排在頂部，因為您無法看到的執行個體，無法確定其健康。在資料庫伺服器上衡量，因此無法與旁邊的資料庫時間比較。"
+      },
+      "failedChip": "{count} 失敗",
+      "columnSubLabels": {
+        "attention": "伺服器",
+        "load": "用戶端",
+        "calls": "用戶端"
+      },
+      "attention": {
+        "connections": "連線",
+        "noLimit": "未發布限制",
+        "unknown": "未測量"
+      }
+    },
+    "queries": {
+      "title": "熱門查詢",
+      "subtitle": "使用最多資料庫時間的查詢",
+      "subtitleServer": "您的資料庫所執行的陳述式，在資料庫內部統計 — 最常執行的排在前面",
+      "searchPlaceholder": "搜尋查詢文字、資料表或服務…",
+      "trendLabel": "此查詢時間在範圍內的變化",
+      "otherRow": "所有其他查詢",
+      "truncatedText": "此陳述式過長，無法完整儲存，因此以截斷方式顯示。",
+      "stmtClass": {
+        "query": "查詢",
+        "queryHint": "僅限實際 SQL — SELECT、INSERT、UPDATE 和 DELETE。",
+        "all": "查詢 + 連線負擔",
+        "allHint": "也計算驅動程式在查詢之間傳送的維護作業：BEGIN 和 COMMIT、SET，以及維持連線集區存活的檢查。"
+      },
+      "completionBias": {
+        "title": "呼叫量下降 {drop}%，失敗卻增加",
+        "body": "這通常表示查詢卡住而非完成 — 而我們只能測量已完成的查詢。此處下降的線條可能不代表正在恢復。"
+      },
+      "columns": {
+        "query": "查詢",
+        "calls": "呼叫",
+        "p95": "慢速呼叫",
+        "errors": "失敗",
+        "perTrace": "每次請求",
+        "load": "資料庫時間",
+        "p99": "最慢 1%",
+        "max": "最差觀察",
+        "services": "使用於"
+      },
+      "queryCount": "1 種查詢 | {count} 種查詢",
+      "otherRowDetail": "— {calls} 次呼叫。我們沒有這些查詢的逐項數字，只有這個合計總數。以上每個總計都已包含。",
+      "foldRowText": "1 個較小的查詢 | {count} 個較小的查詢",
+      "serverList": {
+        "title": "您的資料庫所回報的查詢",
+        "subtitle": "在資料庫內部跨所有用戶端計數，最常執行的排在最前面。此時間範圍內沒有已追蹤的應用程式呼叫，因此通常的清單是空的 — 這是資料庫在此期間所看到的。",
+        "truncated": "最常執行的 {count} 個語句 — 實際執行的比顯示的更多",
+        "columns": {
+          "query": "查詢",
+          "calls": "呼叫",
+          "totalTime": "資料庫內時間",
+          "meanTime": "每次呼叫平均"
+        },
+        "columnHints": {
+          "time": "在資料庫內部測量：PostgreSQL 的執行時間，MySQL 和 MariaDB 的等待時間。並非您的應用程式實際體驗到的 — 網路和連線等待不包含在內。",
+          "mean": "資料庫內時間除以呼叫次數 — 整個時間範圍的平均值，不是百分位數。"
+        }
+      },
+      "foldRowDetail": "· {share} 的資料庫時間 · 按一下以顯示",
+      "foldRowDetailOpen": "· {share} 的資料庫時間 · 按一下以收合",
+      "summary": {
+        "queries": "查詢類型",
+        "calls": "呼叫",
+        "time": "資料庫時間",
+        "failed": "失敗"
+      },
+      "columnHints": {
+        "calls": "此查詢執行的次數。如果您的資料庫有回報，則使用其自身的計數 — 這涵蓋所有用戶端，而不只是系統中傳送追蹤的部分。標記為「用戶端觀察」的列改為從追蹤中計數，因為您的資料庫未回報它們。",
+        "p50": "所有呼叫中有一半完成速度快於此。只計數已完成的呼叫 — 仍在執行或從未回傳的查詢不在此測量範圍內。",
+        "p95": "慢速尾部 — 每 20 個呼叫中有 1 個耗時至少如此。只計數已完成的呼叫 — 仍在執行或從未回傳的查詢不在此測量範圍內。",
+        "p99": "最差的 1% 呼叫耗時至少如此。只計數已完成的呼叫 — 仍在執行或從未回傳的查詢不在此測量範圍內。",
+        "max": "此時間範圍內最慢的單一呼叫 — 一個真實的呼叫，不是平均值。",
+        "errors": "這些呼叫中有多少回傳了錯誤。",
+        "perTrace": "在單一請求內執行多少次。數字高通常表示迴圈。",
+        "load": "此查詢在資料庫中花費的總時間。如果您的資料庫有回報，則使用其自身的數字：Postgres 上是執行時間，但 MySQL 和 MariaDB 上是等待時間 — 每一列都會說明。標記為用戶端觀察的列是從追蹤中測量，因此包含網路來回時間。"
+      },
+      "errorsNone": "無",
+      "errorsAll": "全部",
+      "actions": {
+        "open": "開啟詳細資料",
+        "traces": "查看範例追蹤",
+        "copy": "複製查詢",
+        "copied": "已複製查詢",
+        "copyFailed": "無法複製查詢。",
+        "alert": "變慢時警示我"
+      },
+      "otherRowTextFor": "{database} 上的所有其他查詢",
+      "otherRowDetailShort": "— {calls} 次呼叫。",
+      "columnSubLabels": {
+        "calls": "回報的伺服器",
+        "load": "回報的伺服器"
+      }
+    },
+    "insights": {
+      "showRows": "顯示此查詢 | 顯示這 {count} 個查詢",
+      "clearFilter": "清除篩選",
+      "alsoAffects": "和 {count} 個其他查詢 | 和 {count} 個其他查詢",
+      "showLess": "顯示較少",
+      "more": "{count} 更多 | {count} 更多",
+      "regression": {
+        "title": "比平常慢 {ratio}×",
+        "body": "{before} → {after}，流量相同",
+        "rule": "顯示原因：此查詢的慢速呼叫超過 {ratio}× 慢於 {baseline}，且至少跨 {calls} 次呼叫。"
+      },
+      "new-expensive": {
+        "title": "新查詢，已屬昂貴",
+        "body": "先前未執行 · 現在佔資料庫時間的 {share}",
+        "rule": "顯示原因：此查詢在 {baseline} 中不在最重的查詢之列，而現在至少佔資料庫時間的 {share}%，且至少跨 {calls} 次呼叫。它之前可能已在執行——只是負載不夠重，無法單獨追蹤。"
+      },
+      "n-plus-one": {
+        "title": "每個請求至少執行 {multiplier}×",
+        "body": "{share} 的資料庫時間 · {service}",
+        "rule": "顯示原因：此查詢在單一請求內至少執行 {ratio} 次，且至少跨 {traces} 個請求。這是下限，因此實際數字可能更高。合法的批次工作可能看起來也一樣。"
+      },
+      "volume-shift": {
+        "title": "更頻繁，而非更慢",
+        "body": "呼叫次數增加 {ratio}×，速度相同 · {service}",
+        "rule": "顯示原因：此查詢被呼叫的頻率超過 {ratio}×（相較於 {baseline}），而其速度維持在 {latency}× 以內。變化在於呼叫它的因素。"
+      },
+      "rank-churn": {
+        "title": "新的最重查詢",
+        "body": "從 #{from} 移至 #{to}",
+        "rule": "顯示原因：某個查詢攀升至最重 {into} 之列，而它原先在最重 {from} 之外（見於 {baseline}），同時資料庫總時間成長。",
+        "unranked": "未排名"
+      },
+      "hide": "隱藏",
+      "show": "顯示",
+      "findRow": "找出它",
+      "all-failing": {
+        "title": "每次呼叫都失敗",
+        "body": "{failed} 次（共 {total} 次）呼叫失敗 · {query}",
+        "rule": "顯示原因：此範圍內對此查詢的每次呼叫都回傳錯誤。"
+      },
+      "baseline": {
+        "label": "比較基準",
+        "previous": "前一個期間",
+        "yesterday": "昨天同一時段",
+        "previousShort": "對比前期",
+        "previousHint": "與緊接在前、長度相同的期間比較。",
+        "yesterdayShort": "對比昨天",
+        "yesterdayHint": "與一天前的相同小時比較——當流量遵循每日週期，或想查看部署後有何變化時很實用。"
+      }
+    },
+    "coverage": {
+      "unknownNote": "您選擇的範圍和篩選條件中沒有可測量的資料。",
+      "lineHealthy": "您看到的是此資料庫時間的 {percent}%——最重的 {count} 種查詢。",
+      "lineRemainder": "您看到的是此資料庫時間的 {percent}%。其餘分散在較輕量的查詢中，我們不會逐一列出。",
+      "lineStale": "我們的計數落後 {minutes} 分鐘，因此最新的查詢可能尚未出現。",
+      "lineTruncated": "最後一段的資料量超出我們能接收的量，因此最新的數字被低估。",
+      "lineTruncatedStale": "最後一段的資料量超出我們能接收的量，且我們的計數落後 {minutes} 分鐘——最新數字被低估，最新的查詢可能尚未出現。",
+      "lineGap": "此時間視窗缺少 {minutes} 分鐘。我們的計數在 {stopped} 停止，且只能回溯 {reach} 分鐘，因此沒有資料涵蓋 {from}–{to}。",
+      "lineSubset": "您已篩選至 {filter}，因此這些百分比描述的是顯示的列，而非整個資料庫。",
+      "lineHealthyAll": "您看到的是所有執行過的查詢。這裡的速度是針對每次呼叫測量的，因此是精確的。",
+      "lineHealthyAllEstimated": "您看到的是所有執行過的查詢。這裡的速度是從多段時間混合而來，因此接近但不精確。",
+      "lineCountedTo": "計數截至 {time}；最後半分鐘仍在陸續進入。",
+      "lineExact": "所有資料庫都已在回報。這裡的速度是針對每次呼叫測量的，因此是精確的。",
+      "lineExactEstimated": "所有資料庫都已在回報。這裡的速度是從多段時間混合而來，因此接近但不精確。",
+      "lineSubsetUnnamed": "您的篩選條件將此範圍縮小到低於這些總計的彙總層級，因此百分比描述的是顯示的列，而非整個資料庫。",
+      "lineQuery": "時間是從您的應用程式測量，因此包含網路時間以及等待可用連線的時間。",
+      "lineUncodedErrors": "{percent} 的失敗沒有回傳原因代碼，因此可以被計數但無法解釋。",
+      "lineSubsetStale": "您已篩選至 {filter}，而我們的計數落後 {minutes} 分鐘——這些百分比描述的是顯示的列，且最新的查詢可能尚未出現。",
+      "lineSubsetUnnamedStale": "您的篩選條件將此範圍縮小到低於這些總計的彙總層級，且我們的計數落後 {minutes} 分鐘——百分比描述的是顯示的列，且最新的查詢可能尚未出現。",
+      "lineCountedToBehind": "計數截至 {time}；我們落後 {minutes} 分鐘。"
+    },
+    "breakdown": {
+      "loading": "正在計算時間的去向…",
+      "noSchema": "未回報結構描述",
+      "noService": "無法識別呼叫者",
+      "nothingToAttribute": "我們有這個資料庫的總計，但此時間範圍內沒有個別查詢的資料列，因此無法判斷是哪個服務耗用了時間。",
+      "queryCount": "{count} 筆查詢 | {count} 筆查詢",
+      "shortfall": "這些加總起來比這個資料庫的總計少 {percent}，因為只逐一追蹤最耗資源的查詢類型。"
+    },
+    "freshness": {
+      "neverAggregated": "我們尚未完成此時間範圍的計數。第一個數字通常約在 15 分鐘內出現。"
+    },
+    "empty": {
+      "filtered": {
+        "title": "沒有查詢符合您的篩選條件",
+        "description": "這裡沒有任何項目符合您套用的搜尋與篩選條件。",
+        "action": "清除篩選條件"
+      },
+      "title": "這裡還沒有任何項目 — 而這正是原因",
+      "subtitle": "我們已檢查所有必須成立的事項。",
+      "subtitleCounts": "通過 {pass} 項，未通過 {fail} 項。 | 通過 {pass} 項，未通過 {fail} 項。",
+      "checklistTitle": "我們檢查了什麼",
+      "showMeHow": "告訴我如何為它加入儀器",
+      "checkTrace": "檢查我的一個追蹤",
+      "checks": {
+        "enabled": {
+          "ok": "資料庫監控已開啟",
+          "okDetail": "適用於此組織",
+          "no": "資料庫監控已關閉",
+          "noDetail": "管理員可以為此組織開啟它，然後重新啟動 collector。"
+        },
+        "traces": {
+          "ok": "您的追蹤正在抵達",
+          "okDetail": "此時間範圍內記錄了 {count} 個",
+          "no": "尚無任何追蹤送達",
+          "noDetail": "資料庫監控是從追蹤建立的，而此組織尚未傳送任何追蹤。"
+        },
+        "permission": {
+          "ok": "您有存取此資料的權限",
+          "okDetail": "您是 {org} 的管理員",
+          "no": "您沒有存取此資料的權限",
+          "noDetail": "資料庫監控會讀取您的追蹤，而您的角色不包含這些資料。請向管理員要求讀取權限。"
+        },
+        "dbSpans": {
+          "ok": "您的追蹤中有提到資料庫",
+          "okDetail": "正在記錄資料庫呼叫",
+          "no": "您的追蹤中沒有任何一個提到資料庫",
+          "noDetail": "您的應用程式已有追蹤，但與資料庫溝通的部分沒有。請為您的語言加入資料庫儀器，查詢就會顯示在這裡。"
+        },
+        "counted": {
+          "ok": "我們已完成此時間範圍的計數",
+          "okDetail": "數字已更新至最新",
+          "no": "我們尚未完成計數",
+          "noDetail": "資料庫呼叫已送達，但第一批數字尚未就緒。這通常需要幾分鐘。"
+        },
+        "window": {
+          "ok": "此時間範圍內有執行活動",
+          "okDetail": "已記錄資料庫呼叫",
+          "no": "您選擇的時間範圍內沒有活動",
+          "noDetail": "請嘗試較大的時間範圍。"
+        },
+        "alsoWorthKnowing": {
+          "title": "其他您應該知道的資訊",
+          "detail": "一旦設定完成，第一批查詢約在 15 分鐘內出現。"
+        }
+      },
+      "action": "再試一次",
+      "viewDocs": "檢視文件"
+    },
+    "detail": {
+      "title": "查詢詳情",
+      "tabs": {
+        "overview": "總覽",
+        "overviewHint": "此查詢的速度、執行頻率，以及在哪裡執行。",
+        "plans": "查詢計畫",
+        "plansHint": "您的資料庫執行此查詢所採取的步驟。由此著手，找出它為何緩慢。",
+        "callers": "呼叫端與範例",
+        "callersHint": "您應用程式的哪些部分執行了此查詢，以及您可以作為追蹤開啟的個別慢速執行。",
+        "callersLocked": "個別執行來自追蹤。在此時間範圍內，沒有任何追蹤記錄此查詢。"
+      },
+      "notFound": {
+        "title": "此查詢不屬於此組織",
+        "description": "此網址指向的查詢，{org} 在您查看的時間範圍內並未執行。如果您剛切換了組織，它屬於您先前所在的組織。",
+        "descriptionNoOrg": "此網址指向的查詢，此組織在您查看的時間範圍內並未執行。如果您剛切換了組織，它屬於您先前所在的組織。",
+        "scopeHint": "在此組織、時間範圍和搜尋範圍內沒有任何相符的項目。如果此網址來自其他引擎或執行個體，請清除這些篩選條件或返回清單。",
+        "missingTitle": "未選取任何查詢",
+        "missingDescription": "此頁面描述一個查詢，但網址未指明是哪一個。如果您剛切換了組織，您正在閱讀的查詢屬於您先前所在的組織。",
+        "action": "瀏覽此組織的查詢"
+      },
+      "backToQueries": "返回熱門查詢",
+      "backToActivity": "返回活動",
+      "backToSamples": "返回最慢的呼叫",
+      "backToDeadlocks": "返回死結",
+      "latencyTitle": "隨時間變化的速度",
+      "volumeTitle": "隨時間變化的呼叫與失敗",
+      "endpointsTitle": "呼叫來源位置",
+      "endpointsHint": "您的應用程式中，其請求執行此查詢的部分。",
+      "noEndpoints": "我們無法判斷在此範圍內應用程式的哪個部分執行了此查詢。",
+      "samplesTitle": "最慢的範例",
+      "samplesHint": "每個點代表一次實際執行 — 按一下可查看完整請求",
+      "noSamples": "此範圍內未載入任何個別執行。",
+      "noSeries": "您選擇的範圍內沒有此查詢的歷史記錄。",
+      "liveSeries": "最近的點仍在計算中，可能會有所變更。",
+      "noStream": "我們無法確定哪個追蹤串流承載此查詢，因此無法載入其呼叫者和範例。",
+      "ambiguousStream": "此組織有多個追蹤串流，我們無法判斷此查詢在哪一個上執行。請選擇一個串流以載入其呼叫者和範例追蹤。",
+      "pickStream": "選擇追蹤串流",
+      "invalidStream": "該追蹤串流名稱不是我們認得的，因此我們未執行搜尋。",
+      "firstSeen": "在此清單中首次出現於 {time}",
+      "firstSeenHint": "此範圍內該查詢嚴重到足以自行追蹤的最早時間點。",
+      "lastSeen": "最後出現於 {time}",
+      "lastSeenHint": "此範圍內該查詢嚴重到足以自行追蹤的最近時間點。它現在可能仍在執行中 — 這是它最後一次進入清單的時間。",
+      "errorsByCode": {
+        "title": "依原因代碼分類的失敗",
+        "exactHint": "計算此範圍內的每次呼叫。",
+        "sampleHint": "從下方範例計算 — 屬抽樣，非總數。",
+        "noCode": "無原因代碼"
+      },
+      "whereItRuns": {
+        "title": "執行位置",
+        "hint": "此查詢的活動，依其執行的資料庫劃分。按一下某列即可將此頁面聚焦於該項目。",
+        "trackedHint": "這些數字涵蓋此範圍內該查詢嚴重到足以自行追蹤的區段 — 較安靜的區段在此不會增加任何內容，因此請將它們視為至少總數。",
+        "showAll": "顯示所有位置",
+        "emptyFiltered": "在此頁面聚焦的位置，沒有此查詢的追蹤記錄。顯示所有位置以查看它執行的位置。",
+        "noInstance": "未回報執行個體",
+        "focused": "已聚焦",
+        "focusHint": "此頁面的數字目前限定於此列。再次按一下以擴大範圍。",
+        "columns": {
+          "location": "執行於",
+          "avg": "每次呼叫平均"
+        }
+      },
+      "qps": "每秒呼叫數",
+      "errorRate": "失敗的呼叫",
+      "unattributed": "未歸屬",
+      "sampleOk": "正常",
+      "sampleError": "失敗",
+      "viewTrace": "查看請求 →",
+      "viewTraces": "查看範例追蹤",
+      "copySummary": "複製",
+      "copySummaryHint": "這裡的每個數字都已經在此頁面上 — 這只是寫出句子，因此事件的第 13 分鐘會產生訊息，而不是什麼都沒有。",
+      "summaryCopied": "摘要已複製",
+      "summaryCopyFailed": "無法複製摘要。",
+      "columns": {
+        "calls": "呼叫",
+        "time": "時間",
+        "duration": "持續時間",
+        "status": "狀態",
+        "caller": "呼叫者",
+        "callShare": "呼叫佔比",
+        "p50": "一半低於"
+      },
+      "belowTopN": {
+        "title": "此查詢在部分時間範圍內並非最重的查詢之一",
+        "body": "我們會個別追蹤最重的查詢；其餘的則一起計算。當此查詢不夠重時，我們會將圖表著色，而不是繪製為零 — 它仍在執行。",
+        "capped": "歷史記錄會回溯到我們所擁有的最遠時間。"
+      },
+      "firstSeenCaveat": "— 它可能在之前就已執行，只是不在最重的查詢之列",
+      "copyQuery": "複製查詢",
+      "alertMe": "如果此查詢變慢，提醒我",
+      "stats": {
+        "load": "資料庫時間",
+        "loadShare": "此資料庫的 {percent}",
+        "calls": "呼叫",
+        "callsDelta": "比之前 {change}",
+        "p50": "一半低於",
+        "p95": "慢速呼叫",
+        "max": "最差觀察值",
+        "errors": "失敗",
+        "noErrors": "無錯誤",
+        "approx": "接近，非精確",
+        "exact": "精確"
+      },
+      "overlap": {
+        "serverExecution": "{engine} 執行它所花費的時間",
+        "serverWait": "{engine} 等待它所花費的時間 — 等待時間，而非執行時間",
+        "serverCounted": "由 {engine} 計數，涵蓋每個用戶端",
+        "clientObserved": "由已檢測的呼叫者觀察 — 您的資料庫並未回報此項"
+      },
+      "endpointsConcentrated": "單一端點佔了此查詢時間的 {percent}。修正 {endpoint} 就能修正此查詢。",
+      "typicalMarker": "慢速呼叫 {value}",
+      "plans": {
+        "title": "查詢計畫",
+        "sourceLabel": "通用估計計畫",
+        "sourceTooltip": "此計劃是在所有查詢參數設為 NULL 的情況下估計出來的，實際上從未執行。Postgres 可能已為實際查詢執行了不同的計劃。請用此計劃來查看查詢的結構，而非解釋查詢耗時。",
+        "stableCaveat": "在此時間區間內只捕獲到一種計劃形狀。這並不排除計劃問題 — 估計計劃可能在真實計劃改變時仍保持穩定，而且已執行計劃的捕獲只會看到慢到足以被記錄的語句，因此讓此查詢變快的計劃變更會完全從捕獲中消失。",
+        "executedLabel": "已執行計劃",
+        "executedTooltip": "這是 Postgres 實際執行真實查詢時所使用的計劃，由 auto_explain 以真實參數值捕獲。此列上的列數與持續時間是測量所得，而非估計 — 但只有比 auto_explain 門檻更慢的執行才會被捕獲，因此它們描述的是慢速尾段，而非每次執行。",
+        "capturedDurations": "平均 {avg} · 最大 {max}，跨越 {count} 次被捕獲的執行",
+        "estVsAct": "估計 {est} → 實際 {act} 列",
+        "driftCallout": "此時間區間內的計劃形狀發生了變化。捕獲到 {count} 種不同的形狀，這通常表示結構或統計資料變更，例如索引被刪除或資料表重新分割。",
+        "viewPlans": "檢視計劃",
+        "noPlans": "未捕獲任何計劃",
+        "noPlansHint": "目前尚無收集器為此資料庫提供計劃。請在收集器配方中開啟最重查詢收集以開始捕獲計劃 — 設定頁面會逐步說明。",
+        "noPlanForQuery": "此查詢沒有計劃",
+        "noPlanForQueryHint": "我們正在為此資料庫捕獲計劃 — 此查詢只是沒有計劃。對於資料庫無法解釋的語句（例如 COMMIT、ROLLBACK 和 SHOW）來說，這是正常的。",
+        "planHash": "計劃",
+        "firstSeen": "首次出現",
+        "lastSeen": "上次看到",
+        "noTree": "無法讀取執行計畫",
+        "nodeCost": "成本 {cost}"
+      },
+      "serverMetrics": {
+        "title": "資料庫本身記錄的內容",
+        "subtitle": "伺服器端 — 所有用戶端",
+        "clientSubtitle": "用戶端觀察 — 僅限已埋點的呼叫端，且僅限已完成的呼叫。仍在執行或掛起的查詢不會出現在這些數字中。",
+        "instance": "由 {instance} 報告",
+        "instanceWide": "此執行個體上的所有資料庫",
+        "calls": "執行次數",
+        "rows": "傳回列數",
+        "meanExecution": "平均執行時間",
+        "meanWait": "平均等待時間",
+        "sharedBlksHit": "來自快取的區塊",
+        "sharedBlksRead": "來自磁碟的區塊",
+        "tempBlksWritten": "寫入的暫存區塊",
+        "noMatch": "此查詢沒有伺服器端記錄",
+        "noMatchHint": "您的資料庫會回報它執行過的陳述式，而這個陳述式不在其中。這是正常的：兩種檢視以不同方式識別查詢，因此不一定會吻合。以上所有資料仍是從您的應用程式量測而來。",
+        "ambiguous": "此查詢可能對應多個資料庫",
+        "ambiguousHint": "數個執行個體回報了具有此名稱的資料庫，因此無法判斷哪一個執行了此查詢。顯示來自錯誤執行個體的數值比完全不顯示更糟。候選項目：{instances}。",
+        "off": "未收集伺服器端指標",
+        "offHint": "您的收集器尚未從資料庫收集逐陳述式指標。請在收集器配方中開啟熱門查詢收集 — 設定頁面會逐步引導您。",
+        "setUp": "設定",
+        "readFailed": "無法讀取伺服器端指標",
+        "readFailedHint": "讀取失敗，因此這無法說明您的資料庫是否有回報陳述式。以上所有數值仍是從您的應用程式量測而來。"
+      },
+      "callingServices": {
+        "title": "您的哪個服務呼叫了此查詢",
+        "unjoinable": "未顯示 — 此陳述式在此處會在多種資料庫上執行，若不知道是哪一種就進行呼叫端比對，會指出錯誤的服務。",
+        "tracedCalls": "已追蹤 {calls} 個呼叫",
+        "coverage": "{count} 個服務出現在上方 {executions} 次執行中的 {traced} 次。其餘來自您尚未追蹤的呼叫端。",
+        "coverageUnknown": "{count} 個服務出現在 {traced} 個已追蹤呼叫中。您的資料庫未回報此陳述式的總數，因此無法提供佔比。",
+        "noneNamed": "已追蹤 {traced} 個呼叫，但沒有一個能連結回服務 — 它們的追蹤在目前時間範圍之外開始。"
+      },
+      "callersEmpty": {
+        "title": "此查詢尚無已追蹤的呼叫",
+        "description": "您的資料庫回報了此陳述式，但沒有任何追蹤記錄到執行它的應用程式 — 因此沒有可指名的呼叫端，也沒有可開啟的個別執行。為與此資料庫通訊的服務加上埋點，它們就會出現在這裡。",
+        "checklistTitle": "必要條件",
+        "setUp": "設定追蹤",
+        "checks": {
+          "server": {
+            "ok": "您的資料庫正在回報此查詢",
+            "okDetail": "那就是其他分頁上時間數值的來源"
+          }
+        }
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "執行時間",
+        "serverWait": "等待時間",
+        "serverCounted": "伺服器數量",
+        "clientObserved": "用戶端觀察",
+        "serverReported": "由您的資料庫回報"
+      }
+    },
+    "page": {
+      "tabs": {
+        "overview": "總覽",
+        "queries": "熱門查詢",
+        "samples": "最慢的呼叫",
+        "samplesHintClient": "您的已埋點服務在此時間範圍內觀察到的已完成呼叫 — 未追蹤的呼叫端不會計入，因此這是下限而非總數。表格顯示其中最慢的呼叫。",
+        "samplesHintServer": "您的資料庫回報在此時間範圍內完成的陳述式，在資料庫內部計數。表格顯示其中最慢的陳述式。",
+        "samplesHintUnknown": "此時間範圍內最慢的個別資料庫呼叫。",
+        "deadlocks": "死結",
+        "blocked": "被封鎖的查詢",
+        "deadlocksHint": "您的資料庫回報的死結。",
+        "blockedHint": "目前正在等待鎖定的工作階段。",
+        "activity": "活動",
+        "activityHint": "您的資料庫目前正在執行的工作階段。",
+        "tableHealth": "資料表健康狀態",
+        "tableHealthHint": "資料表大小、膨脹與 vacuum 狀態。膨脹與 vacuum 僅限 PostgreSQL。",
+        "deadlocksLocked": "死結 (deadlock) 是 Enterprise 功能。升級以查看哪些查詢彼此發生死結，以及原因。其他資料庫分頁適用於所有方案。",
+        "blockedLocked": "被封鎖的查詢是 Enterprise 功能。升級以查看哪些工作階段正在等待鎖定，以及什麼持有該鎖定。其他資料庫分頁適用於所有方案。",
+        "tableHealthLocked": "資料表健康狀態是 Enterprise 功能。升級以追蹤資料表大小、膨脹與 vacuum 狀態。其他資料庫分頁適用於所有方案。"
+      }
+    },
+    "samples": {
+      "title": "最慢的呼叫",
+      "subtitle": "此時間範圍內最慢的個別資料庫呼叫，涵蓋所有資料庫與查詢——以呼叫端測量結果為準，僅限已完成的呼叫。",
+      "subtitleServer": "您的資料庫在此時間範圍內完成的最慢陳述式（在資料庫內部測量）",
+      "logOffTitle": "您的資料庫尚未記錄慢速陳述式。",
+      "logOffDescription": "沒有任何追蹤涵蓋這些呼叫，所以我們向資料庫查詢它們自己的最慢陳述式——但它們沒有記錄任何項目。此清單來自 PostgreSQL 的陳述式日誌 (log_min_duration_statement)，該日誌預設為關閉——設定卡中的記錄步驟會將其開啟。目前僅 PostgreSQL 支援逐陳述式擷取，因此 MySQL 和 MariaDB 尚無法提供此清單的資料。Top queries 仍可向您顯示哪些查詢最常執行，因為它改為讀取計數器資料表。",
+      "searchPlaceholder": "搜尋查詢文字、服務或資料庫…",
+      "columns": {
+        "query": "查詢",
+        "when": "時間",
+        "duration": "耗時",
+        "service": "服務",
+        "status": "狀態"
+      },
+      "columnHints": {
+        "duration": "此單一呼叫花費的時間，以呼叫端測量。僅計算已完成的呼叫——仍在執行或從未回傳的查詢不在此處測量。"
+      },
+      "failed": "失敗",
+      "failedWithCode": "失敗 · {code}",
+      "viewTrace": "開啟此呼叫所屬的要求",
+      "scatterOk": "已完成",
+      "partial": "部分追蹤資料無法讀取，因此此清單中可能缺少某些呼叫。",
+      "disclosureShort": "每一列都是一個真實的已完成呼叫",
+      "disclosureDetail": "由發出呼叫的應用程式，根據您傳送的追蹤資料進行測量。這裡僅列出已完成的呼叫——仍在執行或卡住且從未回傳的查詢不會產生測量。",
+      "counts": {
+        "complete": "顯示此時間範圍內所有 {count} 筆資料庫呼叫，最慢的優先。",
+        "truncated": "此時間範圍內最慢的 {count} 筆呼叫——實際執行的數量多於此處顯示。",
+        "filtered": "顯示 {count} 筆（共 {total} 筆）呼叫。"
+      },
+      "serverList": {
+        "title": "您的資料庫回報的最慢呼叫",
+        "subtitle": "在每個資料庫內部，於陳述式完成時測量——每個用戶端都會計算在內，但網路和連線等待不包括在內。此時間範圍內沒有已追蹤的應用程式呼叫，因此平常的清單是空的；哪些呼叫會出現在此處，取決於資料庫自身的記錄閾值。這些逐陳述式報告目前僅來自 PostgreSQL——收集器 recipes 尚不支援擷取其他引擎的陳述式日誌，因此 MySQL 和 MariaDB 的呼叫不會出現在此處。",
+        "truncated": "已回報的最慢 {count} 筆呼叫——超過閾值的呼叫多於此處顯示",
+        "columns": {
+          "query": "查詢",
+          "when": "時間",
+          "took": "耗時",
+          "user": "使用者"
+        },
+        "columnHints": {
+          "took": "從陳述式開始到完成，資料庫內部的時間，以引擎測量的結果為準。並非呼叫端實際體驗的時間——不包含網路和連線等待。"
+        }
+      }
+    },
+    "rowChips": {
+      "new": "新上榜",
+      "slower": "比平常慢 {ratio}×",
+      "loop": "每個要求執行 {multiplier}×",
+      "allFailed": "全部 {count} 個失敗",
+      "busier": "更繁忙，並非更慢",
+      "climbed": "新的最繁重查詢"
+    },
+    "deadlocks": {
+      "title": "資料庫",
+      "subtitle": "互相封鎖並被回滾的交易",
+      "deadlockCount": "沒有死結 | {count} 個死結 | {count} 個死結",
+      "pairCount": "沒有查詢配對 | {count} 個查詢配對 | {count} 個查詢配對",
+      "searchPlaceholder": "搜尋查詢文字、資料表或應用程式…",
+      "grouping": {
+        "pairs": "依查詢配對分組",
+        "pairsHint": "每對互相死結的查詢各佔一行，並顯示發生次數。",
+        "events": "每個事件",
+        "eventsHint": "每個死結各佔一行，最新在前 — 當你需要特定時間時使用此檢視。"
+      },
+      "columns": {
+        "pair": "互相死結的兩個查詢",
+        "applications": "應用程式",
+        "objects": "爭奪的資料列",
+        "lastSeen": "最後一個",
+        "count": "死結",
+        "when": "時間",
+        "cancelled": "已取消",
+        "finished": "已完成"
+      },
+      "coverage": {
+        "complete": "您的資料庫回報的每個死結都在這裡 — 此時間範圍內共 {deadlocks} 個，來自 {pairs}。",
+        "capped": "發生的死結數量超過我們一次能讀取的範圍。這裡是我們取得的 {deadlocks} 個，來自 {pairs} — 實際數量更高。",
+        "readUpTo": "最多讀取至 {time}。",
+        "mysqlPartial": "除非啟用 innodb_print_all_deadlocks，否則您的 MySQL 資料庫只會保留最近一次的死結。"
+      },
+      "chips": {
+        "oppositeOrder": "相反的資料列順序",
+        "cadence": "每 {seconds} 秒",
+        "noQueries": "未擷取的查詢",
+        "partial": "僅單一側"
+      },
+      "rowActions": {
+        "topQueries": "在 Top queries 中尋找這些",
+        "copy": "複製兩個查詢",
+        "alert": "關於死結提醒我"
+      },
+      "detail": {
+        "mostRecent": "最近 · {time}",
+        "nthOf": "{index} / {total}",
+        "earlier": "較早",
+        "later": "較晚",
+        "victim": "已被資料庫取消",
+        "survivor": "允許完成",
+        "pid": "pid {pid}",
+        "thread": "執行緒 {pid}",
+        "transaction": "交易 {id}",
+        "eachWaits": "雙方互相等待",
+        "deadlock": "死結",
+        "noQueryCaptured": "記錄檔記錄了這個死結，但沒有記錄陳述式。",
+        "waitingFor": "正在等待 {target} 完成。",
+        "waitingForRow": "正在等待 {target} 完成 — 另一個工作階段已變更了它要的資料列。",
+        "rawLock": "{mode} · {target}",
+        "plainTitle": "依序發生的事件。",
+        "plainBody": "{a} 變更了一個資料列並保留。{b} 變更了另一個並保留。然後雙方都嘗試變更對方的資料列，導致兩者都無法繼續。資料庫透過取消 {victim} 來打破僵局 — 該應用程式收到錯誤，其整個交易已回復。",
+        "fixTitle": "修正方式在您的程式碼，而不是資料庫。",
+        "fixBody": "這兩個陳述式以相反順序存取 {object} 資料列。讓雙方以相同順序更新 — 最低 id 優先 — 這對查詢就不再發生死結。",
+        "fixGeneric": "雙方都持有對方想要的鎖。讓每個交易都以相同順序取得這些鎖，這對查詢就不再發生死結。",
+        "copyForSlack": "複製",
+        "occurrencesTitle": "此配對死結的所有 {count} 次",
+        "occurrencesHint": "選取一個點以載入上方該項目",
+        "lostLabel": "{pid} 失敗",
+        "bothSidesLose": "雙方被取消的次數大致相同 — {a} 對 {b}。問題不在任一個應用程式，而是順序。",
+        "oneSideLoses": "{pid} 每次都被取消。",
+        "showAbove": "在上方顯示",
+        "copy": "複製 SQL",
+        "seeInTopQueries": "在熱門查詢中查看",
+        "whichService": "哪個服務？",
+        "partialTitle": "只有這個死鎖的一方到達我們這裡",
+        "partialBody": "MySQL 會將死鎖的每一方寫為獨立的日誌條目。另一方的條目尚未到達——它可能落在這個時間窗口之外，或日誌在兩者之間已被輪替。這裡顯示的是真實的；另一條語句就只是缺失了。",
+        "copyHint": "僅複製此方的語句。",
+        "copySqlTooltip": "複製此方的語句",
+        "copyForSlackHint": "兩條語句、此配對發生死鎖的頻率以及最後一次發生的時間——以訊息形式寫出，你可以貼到頻道或工單中。"
+      },
+      "storm": {
+        "title": "死鎖風暴。",
+        "body": "{count} 在此時間窗口內——通常為零。",
+        "copyForSlack": "複製",
+        "biasWarning": "預期熱門查詢標籤頁現在看起來會比實際情況平靜。被取消的查詢仍會完成，但在這些鎖之後排隊的查詢尚未完成——因此那裡的呼叫計數低於使用者實際體驗到的數量。"
+      },
+      "summary": {
+        "deadlocks": "死鎖",
+        "pairs": "查詢配對"
+      },
+      "healthy": {
+        "title": "沒有死鎖——而且我們確實有在查看",
+        "description": "你的資料庫在此時間窗口內未回報任何死鎖。這是健康的正常狀態，不是我們收集上的缺口。",
+        "checklistTitle": "我們如何知道",
+        "collectionHealthy": "收集正常",
+        "checks": {
+          "reading": {
+            "title": "我們正在讀取你的資料庫日誌",
+            "detail": "{databases} · 最近讀取的行 {age}",
+            "detailNoFleet": "最近讀取的行 {age}",
+            "detailUnknown": "{databases} — 日誌管道已連線",
+            "detailUnknownNoFleet": "日誌管道已連線"
+          },
+          "reporting": {
+            "title": "死鎖回報已開啟",
+            "detail": "Postgres 預設會記錄死鎖，而你的 MySQL 已啟用 innodb_print_all_deadlocks，因此每一次死鎖都會被記錄——而不只是最新的一次。",
+            "detailMysqlPartial": "Postgres 預設會記錄死鎖。你的 MySQL 未啟用 innodb_print_all_deadlocks，因此只會保留最新的一次。",
+            "detailUnknown": "Postgres 預設會記錄死鎖。在 MySQL 上，執行 SELECT {'@@'}innodb_print_all_deadlocks — 它必須為 1，否則只會保留最新的死鎖。我們無法從這裡讀取此設定。",
+            "titleUnknown": "檢查死鎖回報是否已開啟"
+          },
+          "traffic": {
+            "title": "我們從這些資料庫看到了 {lines} 條其他日誌行",
+            "detail": "因此日誌管道正在傳輸流量——死鎖會經由它傳遞過來",
+            "titleUnknown": "日誌管道正在傳輸流量"
+          },
+          "lastEver": {
+            "title": "我們最後一次看到的死鎖",
+            "detail": "{when}。擴大時間窗口以查看它。",
+            "titleNone": "我們從未在這些資料庫上看過死鎖",
+            "detailNone": "尚無可比較的對象——此時間窗口並不異常。"
+          }
+        },
+        "widen": "擴大至過去 24 小時"
+      },
+      "notCollecting": {
+        "title": "我們還看不到死鎖——這正是確切原因",
+        "description": "死鎖由資料庫本身回報，而非你的應用程式。我們檢查四件事。",
+        "checklistTitle": "我們檢查了什麼",
+        "checks": {
+          "queries": {
+            "ok": "你的查詢資料正在送達",
+            "okDetail": "{queries} 來自 {databases} — 熱門查詢標籤頁正常運作",
+            "okDetailNoFleet": "{queries} — 熱門查詢標籤頁正常運作",
+            "no": "也沒有任何查詢資料送達",
+            "noDetail": "先從熱門查詢標籤頁開始——目前還沒有任何來自這些資料庫的資料到達我們這裡。"
+          },
+          "enabled": {
+            "ok": "資料庫監控已開啟",
+            "okDetail": "對這個組織",
+            "no": "資料庫監控已關閉",
+            "noDetail": "在設定中將它開啟以開始收集。"
+          },
+          "log": {
+            "no": "沒有任何資料庫在傳送其日誌給我們",
+            "noDetail": "查詢耗時來自你的應用程式，但死鎖只會寫入資料庫自己的日誌。將你的收集器指向 Postgres 或 MySQL 日誌檔，此標籤頁就會自動填入內容。",
+            "ok": "資料庫日誌正在送達",
+            "okDetail": "因此死鎖會到達我們這裡——只是還沒發生過。"
+          },
+          "settings": {
+            "title": "開始之前值得了解",
+            "detail": "Postgres 會將死鎖寫在兩行日誌中，而 MySQL 則分散在多行——參與的查詢位於後面的行中。僅匹配第一行的設定只會記錄死鎖發生，而遺失所有查詢。我們的配方兩者都能處理。"
+          }
+        }
+      }
+    },
+    "blocked": {
+      "title": "資料庫",
+      "subtitle": "目前正在等待鎖的會話",
+      "subtitlePast": "在此時間範圍內等待鎖的會話",
+      "waitingCount": "沒有會話正在等待鎖 | {count} 個會話正在等待鎖 | {count} 個會話正在等待鎖",
+      "waitingCountPast": "沒有會話等待鎖 | {count} 個會話在此時間範圍內等待鎖 | {count} 個會話在此時間範圍內等待鎖",
+      "sessionCount": "沒有會話 | {count} 個會話 | {count} 個會話",
+      "searchPlaceholder": "搜尋查詢文字、資料表或應用程式…",
+      "perspective": {
+        "waiting": "誰被卡住了",
+        "waitingHint": "每個等待鎖的會話一行，最長等待排在最前。",
+        "blocking": "誰在阻塞",
+        "blockingHint": "持有鎖的會話，以及所有被它卡住的事物。"
+      },
+      "columns": {
+        "stuckQuery": "卡住的查詢",
+        "session": "會話",
+        "waitingFor": "等待目標",
+        "heldUpBy": "阻塞者",
+        "waiting": "等待中",
+        "sessionQuery": "會話及其正在執行的內容",
+        "application": "應用程式",
+        "blocking": "阻塞"
+      },
+      "coverage": {
+        "summary": "最長等待時間為 {longest}。每次等待都可追溯到 {roots} 持有鎖未釋放。",
+        "summaryCapped": "等待的會話數超過我們一次能讀取的數量。在我們已取得的會話中，最長等待時間為 {longest}，它們都可追溯到 {roots} 持有鎖未釋放。",
+        "summaryOneRoot": "一個會話",
+        "summaryManyRoots": "{count} 個會話",
+        "checked": "每 {interval} 秒檢查一次；最後檢查時間：{time}。",
+        "checkedUnknown": "從您資料庫自身的鎖定資料表取樣。"
+      },
+      "rowActions": {
+        "showChain": "顯示鏈",
+        "copy": "複製查詢",
+        "alertMe": "鎖定等待時提醒我"
+      },
+      "waitEvent": {
+        "transaction": "另一個交易完成",
+        "row": "資料列鎖",
+        "table": "資料表鎖",
+        "extend": "資料表成長",
+        "advisory": "應用程式鎖",
+        "object": "物件鎖",
+        "buffer": "待讀取的資料頁面",
+        "lock": "鎖"
+      },
+      "deep": "深度 {count}",
+      "notWaiting": "未等待",
+      "longestWait": "最長等待",
+      "holdsTheLock": "持有所有人都想要的鎖",
+      "lastStatement": "最後一條語句在 {age} 前",
+      "idleInTransaction": "未等待任何事物 · 在開啟的交易中閒置",
+      "pills": {
+        "root": "根節點 — 從這裡開始",
+        "waitingBlocking": "等待中並阻塞 {count}",
+        "waiting": "等待中"
+      },
+      "waitingOn": "等待 {pid}",
+      "degraded": "一個會話阻塞了 {count}。它已開啟交易 {age} 且在此期間未執行任何查詢——很可能是應用程式忘記提交。",
+      "footer": {
+        "allLeadBack": "所有 {waits} 都回溯到 pid {pid}",
+        "allLeadBackDetail": "— 一個工作階段，在 {object} 上持有一個鎖。",
+        "switchToBlocking": "切換到“誰在阻塞”",
+        "releaseAll": "結束工作階段 {pid} 會釋放所有 {count}。",
+        "releaseAllDetail": "它下方的所有項目都只因那一個鎖而等待。",
+        "timeLost": "總計損失時間：{seconds}，跨 {sessions} 個工作階段"
+      },
+      "terminate": {
+        "copied": "已複製",
+        "hint": "請自行對 {instance} 執行以結束工作階段。我們永遠不會替您執行。",
+        "hintNoInstance": "請自行執行以結束工作階段。我們永遠不會替您執行。"
+      },
+      "summary": {
+        "waiting": "等待中的工作階段",
+        "longest": "最長等待",
+        "chains": "鏈"
+      },
+      "rootCount": "沒有根阻塞者 | {count} 個根阻塞者 | {count} 個根阻塞者",
+      "inChain": "鏈中有 {count} 個工作階段",
+      "healthy": {
+        "title": "沒有任何工作階段在等待鎖",
+        "description": "目前您的資料庫中沒有任何工作階段卡在其他工作階段之後。這是健康的正常狀態，而不是我們收集資料的缺口。",
+        "descriptionPast": "在這一時間區間內，您的資料庫中沒有任何工作階段卡在其他工作階段之後。這是健康的正常狀態，而不是我們收集資料的缺口。",
+        "checklistTitle": "我們如何得知",
+        "collectionHealthy": "收集正常",
+        "checks": {
+          "sampling": {
+            "title": "我們正在檢查您資料庫的鎖定表",
+            "detail": "每 {interval} 秒 · 上次查看 {age}",
+            "detailUnknown": "根據您的收集器所設定的排程"
+          },
+          "sessions": {
+            "title": "工作階段運作正常",
+            "detail": "我們可以看到作用中的工作階段，且沒有任何一個在鎖定佇列中"
+          },
+          "meaning": {
+            "title": "此分頁非空白時顯示的內容",
+            "detail": "一個工作階段等待另一個工作階段持有的鎖，並顯示回溯到持有該鎖之工作階段的鏈。短暫等待是正常的，且會自行清除 — 此分頁是為那些不會自行清除的等待而設。"
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "我們目前看不到被封鎖的查詢 — 以下就是確切原因",
+        "description": "被封鎖的查詢只能從資料庫內部、在其鎖定表中看到。我們檢查三件事。",
+        "checklistTitle": "我們檢查了什麼",
+        "checks": {
+          "queries": {
+            "ok": "您的查詢資料正在送達",
+            "okDetail": "{queries} 來自 {databases} — 熱門查詢分頁正常運作",
+            "okDetailNoFleet": "{queries} — 熱門查詢分頁正常運作",
+            "no": "也沒有查詢資料送達",
+            "noDetail": "請先查看熱門查詢分頁 — 目前還沒有任何資料從這些資料庫傳到我們這裡。"
+          },
+          "enabled": {
+            "ok": "資料庫監控已開啟",
+            "okDetail": "適用於此組織",
+            "no": "資料庫監控已關閉",
+            "noDetail": "請在設定中開啟以開始收集。"
+          },
+          "sampling": {
+            "no": "目前沒有任何工具在取樣您資料庫的鎖定表",
+            "noDetail": "誰在等待誰只存在於資料庫內部，且只在等待發生時存在。我們的收集器配置會按照排程讀取它，並開啟 log_lock_waits，這樣長時間等待也會被記錄下來。",
+            "ok": "鎖定表取樣正在執行",
+            "okDetail": "因此被封鎖的工作階段會到達我們這裡 — 只是目前沒有。"
+          },
+          "settings": {
+            "title": "開始前須知",
+            "detail": "log_lock_waits 只會在等待持續時間超過 deadlock_timeout（預設為一秒）後才記錄。短於此的等待是正常的，且不會被記錄，這就是為什麼此分頁會即時取樣，而不僅是讀取日誌。"
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "活動",
+      "subtitle": "您的資料庫目前正在做什麼，取樣自它們自己的工作階段表。",
+      "subtitlePast": "您的資料庫在此時間區間內做了什麼，取樣自它們自己的工作階段表。",
+      "searchPlaceholder": "搜尋工作階段、使用者、應用程式",
+      "wait": {
+        "onCpu": "在 CPU 上 / 無等待",
+        "qualified": "{type}：{event}",
+        "plain": "{event}",
+        "remainder": "+{count} 更多等待事件 ({share})",
+        "remainderNoShare": "+{count} 更多等待事件"
+      },
+      "disclosure": {
+        "sampled": "每 {interval} 秒取樣一次 — 這是一系列快照，不是連續錄製，因此比取樣間隔更短的工作階段可能在未被察覺的情況下執行並結束。",
+        "sampledUnknown": "按計劃取樣 — 這是一系列快照，不是連續錄製。我們還沒有看到足夠的樣本，因此無法確定您的收集器輪詢的頻率。",
+        "filtered": "樣本已由您的收集器過濾：比最新執行中查詢更舊的空閒工作階段會被排除，除非它們正在阻塞某人。因此這不是所有連線的完整清單。",
+        "short": "每 {interval} 秒取樣，並已預先過濾",
+        "shortUnknown": "按計劃取樣，並已預先過濾",
+        "more": "這代表什麼"
+      },
+      "columns": {
+        "session": "工作階段",
+        "user": "使用者",
+        "application": "應用程式",
+        "state": "狀態",
+        "waitEvent": "等待對象",
+        "running": "執行時長",
+        "lastQuery": "上次查詢",
+        "query": "查詢",
+        "blockedBy": "阻塞來源"
+      },
+      "summary": {
+        "sessions": "工作階段",
+        "onCpu": "在 CPU 上",
+        "waiting": "等待中",
+        "idleInTransaction": "交易中閒置"
+      },
+      "state": {
+        "unknown": "未回報狀態"
+      },
+      "counts": {
+        "complete": "顯示 {count} 個工作階段。",
+        "capped": "取樣到的工作階段超過我們一次能讀取的數量。這是我們擁有的 {count} 個。",
+        "filtered": "顯示 {count} / {total} 個工作階段。"
+      },
+      "transactionOpen": "交易已開啟 {age}",
+      "healthy": {
+        "title": "目前沒有正在執行的項目",
+        "description": "我們取樣了您的資料庫的工作階段資料表，沒有發現任何使用中的工作階段。對於閒置的資料庫來說，這是健康的正常現象，並非我們收集資料的缺口。",
+        "descriptionPast": "我們在此時間範圍內取樣了您的資料庫的工作階段資料表，沒有發現任何使用中的工作階段。對於閒置的資料庫來說，這是健康的正常現象，並非我們收集資料的缺口。",
+        "checklistTitle": "我們如何得知",
+        "collectionHealthy": "收集正常",
+        "checks": {
+          "sampling": {
+            "title": "我們正在取樣您的資料庫的工作階段資料表",
+            "detail": "每 {interval} 秒 · 上次檢查 {age}",
+            "detailUnknown": "按照您的收集器設定的排程"
+          },
+          "pipeline": {
+            "title": "您的資料庫正在與我們連線",
+            "detail": "此時間範圍內，{lines} 行其他資料透過相同的管道送達",
+            "detailUnknown": "承載此資料的管道正在執行中"
+          },
+          "meaning": {
+            "title": "此分頁在非空白時顯示的內容",
+            "detail": "您的資料庫正在執行的每個工作階段、每個工作階段在等待什麼，以及已持續多久。由於我們是取樣而不是持續觀看，非常短的查詢可能會在兩次取樣之間完成，因此永遠不會出現。"
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "我們還無法看到即時工作階段 — 以下就是確切原因",
+        "description": "資料庫目前正在做什麼，只存在於該資料庫自身的工作階段資料表中。必須有東西去輪詢它。我們檢查三件事。",
+        "checklistTitle": "我們檢查了什麼",
+        "checks": {
+          "queries": {
+            "ok": "您的查詢資料正在送達",
+            "okDetail": "{queries} 個來自 {databases} 的查詢 — 熱門查詢分頁運作正常",
+            "okDetailNoFleet": "{queries} — 熱門查詢分頁運作正常",
+            "no": "也沒有任何查詢資料送達",
+            "noDetail": "請從熱門查詢分頁開始 — 目前還沒有從這些資料庫送達任何資料。"
+          },
+          "enabled": {
+            "ok": "資料庫監控已啟用",
+            "okDetail": "適用於此組織",
+            "no": "資料庫監控已關閉",
+            "noDetail": "請在設定中開啟以開始收集。"
+          },
+          "sampling": {
+            "no": "目前沒有項目在取樣您的資料庫工作階段資料表",
+            "noDetail": "工作階段樣本來自您的收集器：在資料庫主機上的收集器配方中啟用 db.server.query_sample — 設定頁面會逐步說明。只要資料庫監控開啟，OpenObserve 就會接受此饋送，因此修正需在收集器端進行。"
+          }
+        }
+      }
+    },
+    "instanceMetrics": {
+      "columnHeader": "執行個體健康狀態",
+      "columnHint": "連線數與限制的比較，來自您的收集器已傳送的指標。在接收器回報此執行個體之前保持空白。",
+      "connectionsOf": "{used} / {limit} 個連線",
+      "connectionsNoLimit": "{used} 個連線",
+      "noLimitHint": "此引擎的接收器不會自行發布連線限制，因此僅顯示計數。設定卡片的連線限制配方 (sqlquery/mysql_limits) 會收集 max_connections 並將其轉換為百分比。",
+      "trendLabel": "所選時間範圍內的連線數",
+      "cacheHit": "快取命中 {percent}",
+      "lagBytes": "複本落後 {value}",
+      "lagSeconds": "複本落後 {value}",
+      "deadlocks": "{count} 個死結 | {count} 個死結",
+      "noTraffic": "此時間範圍內沒有應用程式流量",
+      "noTrafficHint": "您的收集器會回報此執行個體，但在此時間範圍內沒有應用程式查詢它。其查詢欄位會是空的，是因為沒有任何項目測量它們，而不是因為速度很快。",
+      "unmatched": {
+        "pooler": "沒有執行個體指標符合此位址",
+        "poolerHint": "此列是您的應用程式所連線的位址。您的收集器回報不同的主機，這就是中間有連線集區器的情況 — 集區器的位址和實際資料庫永遠不會相符。",
+        "loopback": "沒有執行個體指標符合此位址",
+        "loopbackHint": "此列指向 localhost。收集器會將回送端點重寫為其自身的主機名稱，因此即使兩者都健康，這兩個名稱也永遠無法相符。",
+        "noReceiver": "{engine} 接收器沒有回報",
+        "noReceiverHint": "您的應用程式正在查詢此資料庫，但沒有 {engine} 接收器傳送其伺服器指標。將 {engine} 接收器新增至您的收集器以填滿此欄位。",
+        "noReceiverMariadbHint": "您的應用程式正在查詢此 MariaDB 伺服器，但沒有項目傳送其伺服器指標。沒有獨立的 MariaDB 接收器 — 將 MySQL 接收器指向此執行個體，其指標即可填滿此欄位。",
+        "engineUnsupported": "未為 {engine} 收集",
+        "engineUnsupportedHint": "執行個體指標會為 PostgreSQL、MySQL 和 MariaDB 收集 — 目前沒有為 {engine} 連接任何接收器，因此此欄位保持空白。這是覆蓋範圍說明，而非健康狀態判定。",
+        "unreadable": "無法讀取執行個體指標",
+        "unreadableHint": "指標串流存在但無法讀取。這通常是權限問題，而非資料庫本身有問題。"
+      },
+      "limitUnknownHint": "連線計數已到達，但限制沒有，因此無法顯示百分比。請檢查此收集器上是否已啟用連線限制指標。",
+      "noReading": "此時間範圍內沒有讀數",
+      "noReadingHint": "您的收集器會回報此執行個體，但在此時間範圍內未傳送連線指標。該指標可能在接收器上被關閉，或者執行個體可能已停止回報。",
+      "lagLabel": "複本延遲",
+      "deadlockLabel": "死結"
+    },
+    "tableHealth": {
+      "title": "資料表健康狀態",
+      "subtitle": "每個資料表的大小、膨脹程度和 vacuum 狀態，以最新快照優先顯示。",
+      "searchPlaceholder": "搜尋資料表",
+      "never": "從未",
+      "countersCumulative": "掃描和 vacuum 計數是自上次統計重設以來的生命週期總計，而非所選時間範圍內的計數。",
+      "tuplesEstimated": "列數和膨脹百分比是資料庫引擎的統計估計值，而非精確計數。",
+      "notCollectingTitle": "尚無資料表統計資料",
+      "notCollectingDescription": "此時間範圍內沒有回報資料表統計資料。此訊號以獨立的收集器配方提供。",
+      "engineUnsupportedTitle": "未對此引擎收集",
+      "engineUnsupportedDescription": "資料表健康狀態由每個引擎的收集器配方收集，而此引擎沒有附帶任何配方，因此不會收集到任何資料。這不表示一切正常。",
+      "checklistTitle": "開始收集",
+      "checkRecipe": "將資料庫設定指南中的 pg_table_stats 配方新增至您的收集器設定。",
+      "checkGrant": "授予 pg_monitor 給收集器使用者，以便其讀取 pg_stat_user_tables。",
+      "checkRange": "擴大時間範圍 — 配方每 60 秒回報一次。",
+      "columns": {
+        "relation": "資料表",
+        "instance": "執行個體",
+        "totalBytes": "總大小",
+        "heapBytes": "堆積大小",
+        "overheadBytes": "索引 + TOAST",
+        "liveTuples": "存活列（估計）",
+        "deadTuples": "死亡列（估計）",
+        "deadTupPct": "膨脹（估計）",
+        "modSinceAnalyze": "自分析以來列數",
+        "seqScanCount": "循序掃描（累計）",
+        "seqTupRead": "循序掃描列數（累計）",
+        "idxScanCount": "索引掃描（累計）",
+        "autovacuumCount": "自動清理（累計）",
+        "frozenXidAge": "交易 ID 年齡",
+        "lastVacuum": "上次清理",
+        "lastAutovacuum": "上次自動清理",
+        "lastAnalyze": "上次分析"
+      },
+      "countLine": "{count} 個資料表"
+    },
+    "recommendations": {
+      "title": "建議",
+      "subtitle": "對於收集器已回報的內容進行確定性檢查。每一項都會說明測量值與其超過的臨界值。",
+      "countersCumulative": "索引掃描計數是自上次統計重設以來的累計總數，而非所選時間範圍內的計數。",
+      "andMore": "以及另外 {count} 個類似項目",
+      "unused-index": {
+        "title": "索引未被掃描",
+        "body": "{index} 位於 {relation} 上，沒有記錄到任何掃描，並佔用 {size}。",
+        "rule": "自上次統計重設以來，索引掃描計數為 0，且索引至少為 {bytes} 位元組。掃描計數是累計總數，而非所選範圍內的計數。",
+        "caveat": "累計計數為零表示自計數器上次重設以來，規劃器尚未選擇此索引。它仍可能服務於複本、定期作業或條件約束。"
+      },
+      "long-running-query": {
+        "title": "長時間執行的查詢",
+        "body": "工作階段 {pid} 已執行 {duration}。",
+        "rule": "執行中的工作階段已執行至少 {seconds} 秒。閒置工作階段不包括在內。"
+      },
+      "high-impact-blocker": {
+        "title": "阻擋多個工作階段的封鎖者",
+        "body": "工作階段 {pid} 位於鏈的開頭，有 {count} 個工作階段在等待。",
+        "rule": "根阻擋者（即阻擋其他工作階段且本身不等待的工作階段）背後至少有 {sessions} 個工作階段在等待，計數涵蓋整個鏈。"
+      },
+      "high-row-count": {
+        "title": "每次呼叫列數偏高",
+        "body": "此陳述式在 {calls} 次呼叫中平均每次回傳 {rows} 列。",
+        "rule": "平均每次呼叫列數至少為 {rows}，且至少經過 {calls} 次呼叫。平均值是伺服器總列數除以呼叫次數。"
+      },
+      "enginePartialTitle": "部分檢查未執行",
+      "enginePartialDescription": "未使用索引檢查需要索引掃描計數器，但此引擎不收集該計數器，因此這裡的空列表並不表示一切正常。",
+      "allClearTitle": "沒有超過任何臨界值",
+      "allClearDescription": "所有檢查都已執行，且在這個時間範圍內沒有任何一項超過其臨界值。"
     }
   }
 }

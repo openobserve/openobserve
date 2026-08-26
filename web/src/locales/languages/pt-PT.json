@@ -1223,7 +1223,10 @@
     "ingestionText": "Ingestão",
     "navigationLink": "Link de navegação",
     "ariaCurrentPage": "{label} - Página atual",
-    "ariaWithNotifications": "{label} ({count} notificações)"
+    "ariaWithNotifications": "{label} ({count} notificações)",
+    "infra": "Infra",
+    "databases": "Bancos de dados",
+    "topQueries": "Principais consultas"
   },
   "rum": {
     "noSessionReplay": "Nenhum replay de sessão disponível",
@@ -3442,6 +3445,17 @@
     "languagesLabel": "Linguagens/Frameworks",
     "otherLabel": "Outros",
     "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "snowflake": "Snowflake",
+    "zookeeper": "Zookeeper",
+    "cassandra": "Cassandra",
+    "aerospike": "Aerospike",
+    "dynamodb": "DynamoDB",
+    "jenkins": "Jenkins",
+    "ansible": "Ansible",
+    "terraform": "Terraform",
+    "gactions": "GitHub Actions",
+    "python": "Python",
     "dotnettracing": "Rastreamento do.NET",
     "dotnetlogs": "Registros do.NET",
     "macos": "macOS",
@@ -3703,6 +3717,12 @@
       "k8sTroubleWebhookA": "O webhook do operador do OpenTelemetry precisa que o webhook do cert-manager esteja em serviço primeiro. Execute `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook` e depois execute novamente a instalação — ela é idempotente.",
       "k8sTroubleWebhookQ": "A instalação falha com um erro sobre o webhook de admissão",
       "linuxAgentFixBody": "O instalador inicia o agente como um serviço systemd. Se nada chegar, confirme se ele está em execução e leia os logs para ver um erro de autenticação ou conectividade:",
+      "prepareMariadbTitle": "Preparar MariaDB",
+      "prepareMariadbDesc": "Crie o usuário de monitoramento — execute-o em um cliente SQL, **não** no seu shell.",
+      "runCollectorMariadbDesc": "Inicie o coletor (a senha do usuário via variável de ambiente).",
+      "mariadbHostLabel": "Host do MariaDB",
+      "verifyMariadbMetricsDesc": "Clique em Test abaixo ou verifique Streams para as métricas `mysql_*` (o MariaDB reporta por meio do receiver MySQL).",
+      "mariadbTagline": "Colete métricas do MariaDB com o OpenTelemetry Collector e envie-as para o OpenObserve.",
       "logsStreamNameLabel": "Nome do fluxo de logs",
       "macosAgentFixBody": "O instalador registra dois daemons launchd: o próprio agente e a ponte de log unificado. Se nada chegar, confirme se ambos estão carregados e leia o log do agente para ver um erro de autenticação ou conectividade:",
       "macosAgentServicesFixTitle": "Verificar os serviços do agente",
@@ -4007,7 +4027,46 @@
       "enableSessionReplayOptionalTitle": "Ativar Replay de Sessão (Opcional)",
       "enableSessionReplayNativeDesc": "O Replay de Sessão é ativado **separadamente** e **não** herda o endpoint RUM. Ele também não acrescenta nada, então precisa da URL completa `/replay` abaixo. Errar isso é o motivo usual de os eventos RUM chegarem, mas os replays nunca chegarem.",
       "verifyAndroidRumDesc": "Execute o aplicativo em um emulador ou dispositivo, navegue por algumas telas e clique em Testar — os eventos Android nativos chegam no stream `_rumdata`.",
-      "verifyIosRumDesc": "Execute o aplicativo em um simulador ou dispositivo, navegue por algumas telas e clique em Testar — os eventos iOS nativos chegam no stream `_rumdata`."
+      "verifyIosRumDesc": "Execute o aplicativo em um simulador ou dispositivo, navegue por algumas telas e clique em Testar — os eventos iOS nativos chegam no stream `_rumdata`.",
+      "dbmPreparePostgresTitle": "Monitoramento de banco de dados · Conceder acesso (opcional)",
+      "dbmPreparePostgresDesc": "**Tudo acima já está completo por si só** — os tempos de consulta já chegam a Bancos de dados a partir dos traces da sua aplicação, sem configuração aqui. Estas últimas etapas adicionam o que um trace nunca pode ver: deadlocks e consultas bloqueadas, que somente o próprio banco de dados registra. Conceda `pg_monitor` para que o coletor possa ler as consultas de outras sessões — execute-o em um cliente SQL, **não** no seu shell.",
+      "dbmPrepareMysqlTitle": "Monitoramento de banco de dados · Manter histórico de deadlocks (opcional)",
+      "dbmPrepareMariadbTitle": "Monitoramento de banco de dados · Manter histórico de deadlocks (opcional)",
+      "dbmPrepareMysqlDesc": "**Tudo acima já está completo por si só** — os tempos de consulta já chegam a Bancos de dados a partir dos traces da sua aplicação, sem configuração aqui. Estas últimas etapas adicionam o que um trace nunca pode ver: deadlocks e consultas bloqueadas, que somente o próprio banco de dados registra. Ative o histórico completo de deadlocks — execute-o em um cliente SQL, **não** no seu shell.",
+      "dbmPrepareMariadbDesc": "**Tudo acima já está completo por si só** — os tempos de consulta já chegam a Bancos de dados a partir dos traces da sua aplicação, sem configuração aqui. Estas últimas etapas adicionam o que um trace nunca pode ver: deadlocks e consultas bloqueadas, que somente o próprio banco de dados registra. Ative o histórico completo de deadlocks — execute-o em um cliente SQL, **não** no seu shell.",
+      "dbmPgLoggingTitle": "Monitoramento de banco de dados · Permitir que o Postgres registre deadlocks (opcional)",
+      "dbmPgLoggingDesc": "Deadlocks só são gravados no log do Postgres, e somente quando as configurações abaixo estão ativadas — portanto, esta etapa é o que faz a aba Deadlocks ser preenchida. A linha de prefixo precisa corresponder exatamente: o coletor a lê para descobrir quem estava envolvido, e um prefixo diferente significa que ele não encontra nada enquanto ainda reporta saudável.",
+      "dbmPgLoggingVerifyTitle": "Monitoramento de banco de dados · Verificar se as configurações foram aplicadas (opcional)",
+      "dbmPgLoggingVerifyDesc": "Execute isto após a reinicialização. Se algum valor ainda mostrar a configuração antiga, o Postgres foi recarregado em vez de reiniciado e o coletor não terá nada para ler.",
+      "dbmPgAutoExplainTitle": "Monitoramento de banco de dados · Capturar planos de execução reais (opcional)",
+      "dbmPgAutoExplainDesc": "Sem esta etapa, os planos de consulta são estimativas genéricas calculadas sem seus valores reais de parâmetro — úteis, mas nunca o plano que realmente foi executado. O auto_explain registra o plano que o Postgres realmente executou para qualquer instrução mais lenta que o limite, com contagens reais de linhas e duração real. Isso adiciona uma sobrecarga mensurável do executor às instruções que ele amostra, então leia os comentários das configurações antes de aplicá-las a um primário ocupado e inclua-o na mesma reinicialização da etapa de registro acima.",
+      "dbmConfigureTitle": "Monitoramento de banco de dados · Configurar o coletor (opcional)",
+      "dbmConfigurePostgresDesc": "Grava `dbm-config.yaml` — defina o banco de dados e o caminho para o arquivo de log do Postgres abaixo. Além de deadlocks e consultas bloqueadas, esta configuração ativa amostras de atividade e principais consultas do servidor (com planos estimados): o coletor envia ambos como OFF por padrão, então o bloco `events:` de nível superior neste arquivo é o que os ativa — sem ele, o coletor parece saudável e não envia nada.",
+      "dbmConfigureMysqlDesc": "Grava `dbm-config.yaml` — defina o banco de dados e o caminho para o log de erros do MySQL abaixo. Além de deadlocks e consultas bloqueadas, esta configuração ativa amostras de atividade e principais consultas do servidor: o coletor envia ambos como OFF por padrão, então o bloco `events:` de nível superior neste arquivo é o que os ativa — sem ele, o coletor parece saudável e não envia nada.",
+      "dbmConfigureMariadbDesc": "Grava `dbm-config.yaml` — defina o banco de dados e o caminho para o log de erros do MariaDB abaixo. O MariaDB recebe deadlocks, consultas bloqueadas, amostras de atividade e principais consultas aqui: o receiver mysql fala o protocolo do MariaDB e o identifica corretamente. Uma lacuna que o próprio receiver relata — o MariaDB não expõe o texto da instrução amostrada, então uma linha de atividade nomeia a sessão sem seu SQL.",
+      "dbmRunTitle": "Monitoramento de banco de dados · Executar o coletor (opcional)",
+      "dbmRunPostgresDesc": "Executa as duas configurações juntas. Use a mesma role e senha que você criou no passo 1.",
+      "dbmRunMysqlDesc": "Executa as duas configurações juntas. Use o mesmo usuário e senha que você criou no passo 1.",
+      "dbmRunMariadbDesc": "Executa as duas configurações juntas. Use o mesmo usuário e senha que você criou no passo 1.",
+      "dbmVerifyTitle": "Monitoramento de banco de dados · Ver deadlocks e consultas bloqueadas",
+      "dbmVerifyDesc": "Abra **Infra → Bancos de dados** e escolha uma aba abaixo. Os eventos aparecem assim que seu banco de dados relatar um — uma aba vazia por lá indica se nada aconteceu ou se nada está sendo coletado.",
+      "dbmVerifyFullDesc": "Abra **Infra → Bancos de dados** e escolha uma aba abaixo. Deadlocks e consultas bloqueadas aparecem assim que seu banco de dados relatar um; a aba Activity é preenchida com sessões amostradas em até um minuto após a inicialização do coletor, e planos estimados aparecem na página de detalhes de uma consulta no MySQL 8.0.22 e versões mais recentes. A saúde da tabela é preenchida após o primeiro snapshot de 60 segundos.",
+      "dbmDatabaseLabel": "Banco de dados",
+      "dbmPgLogPathLabel": "Arquivo de log do Postgres",
+      "dbmPgLogPathHelp": "O coletor deve conseguir ler este arquivo. Encontre-o com: SHOW log_directory;",
+      "dbmMysqlLogPathLabel": "Log de erros do MySQL",
+      "dbmMariadbLogPathLabel": "Log de erros do MariaDB",
+      "dbmMysqlLogPathHelp": "O coletor deve conseguir ler este arquivo. Encontre-o com: SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "O coletor deve conseguir ler este arquivo. Encontre-o com: SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "Monitoramento de Banco de Dados · Conceder acesso (opcional)",
+      "dbmPrepareMssqlDesc": "**Tudo acima está completo por si só** — os tempos de consulta já chegam aos Bancos de dados a partir dos traces da sua aplicação, sem configuração aqui. Este último grupo adiciona o que um trace nunca pode ver: deadlocks e consultas bloqueadas, que apenas o próprio banco de dados registra. Ambas as permissões são necessárias — uma permite que o coletor leia outras sessões, a outra permite ler o histórico de deadlocks. Execute-as em um cliente SQL, **não** no seu shell.",
+      "dbmConfigureMssqlDesc": "Grava `dbm-config.yaml` — defina abaixo o banco de dados ao qual conectar. O SQL Server obtém deadlocks, consultas bloqueadas, amostras de atividade, principais consultas e planos de execução aqui. O receptor sqlserver lê em toda a instância, portanto a atividade e as principais consultas não se limitam ao banco de dados nomeado acima.",
+      "dbmRunMssqlDesc": "Executa ambas as configurações juntas. Use o mesmo login e senha que você criou no passo 1.",
+      "dbmVerifyBlockingDesc": "Abra **Infra → Bancos de dados → Consultas bloqueadas**. Sessões aguardando em um bloqueio aparecem assim que uma é amostrada — uma aba vazia ali indica se nada está bloqueado ou se nada está sendo coletado.",
+      "dbmVerifyFullNoSampleTextDesc": "Abra **Infra → Bancos de dados** e escolha uma aba abaixo. Deadlocks e consultas bloqueadas aparecem assim que o banco de dados relata um; a aba Atividade é preenchida com sessões amostradas em um minuto após o início do coletor, e as principais consultas trazem seus planos na página de detalhes de uma consulta. O MariaDB não expõe o texto da instrução amostrada, portanto uma linha de atividade nomeia a sessão sem o seu SQL. A saúde da tabela é preenchida após o primeiro snapshot de 60 segundos.",
+      "dbmVerifyFullPlainPlansDesc": "Abra **Infra → Bancos de dados** e escolha uma aba abaixo. Deadlocks e consultas bloqueadas aparecem assim que o banco de dados relata um; a aba Atividade é preenchida com sessões amostradas em um minuto após o início do coletor, e os planos de execução aparecem na página de detalhes de uma consulta. A saúde da tabela é preenchida após o primeiro snapshot de 60 segundos.",
+      "dbmVerifyFullSlowTableHealthDesc": "Abra **Infra → Bancos de dados** e escolha uma aba abaixo. Deadlocks e consultas bloqueadas aparecem assim que o banco de dados relata um; a aba Atividade é preenchida com sessões amostradas em um minuto após o início do coletor, e os planos estimados aparecem na página de detalhes de uma consulta. A saúde da tabela leva até cinco minutos — a leitura dos tamanhos das tabelas fica mais lenta conforme o esquema cresce, então ela é executada com menos frequência que o restante.",
+      "dbmVerifyTableHealthDesc": "Abra **Infra → Bancos de dados** e escolha uma aba abaixo. Deadlocks e consultas bloqueadas aparecem assim que o banco de dados relata um — uma aba vazia ali indica se nada aconteceu ou se nada está sendo coletado. A saúde da tabela é preenchida após o primeiro snapshot de 60 segundos."
     },
     "instrumentBeforeImportTitle": "Instrumente Antes de Importar o Cliente",
     "instrumentBeforeImportBody": "Se o seu aplicativo executa, mas nenhum span chega, a instrumentação provavelmente foi carregada depois que o cliente foi importado. Reordene para que a inicialização seja executada primeiro:",
@@ -4492,6 +4551,8 @@
     "folder": "Pasta",
     "folders": "Pastas",
     "searchFolder": "Pasta de pesquisa",
+    "folderIcon": "Ícone",
+    "folderIconAria": "Escolha um ícone de pasta",
     "deleteFolder": "Excluir pasta",
     "deleteFolderMessage": "Tem certeza de que deseja excluir esta pasta?",
     "trellisLayout": "Layout de treliça",
@@ -5443,7 +5504,8 @@
     "variableNameAlreadyExists": "Já existe uma variável com o mesmo nome",
     "pivotTotal": "Total",
     "pivotOthers": "Outros",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Explorar logs correspondentes"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5531,7 +5593,59 @@
     "mapvalue": "Valor",
     "source": "Fonte",
     "target": "Alvo",
-    "value": "Valor"
+    "value": "Valor",
+    "logExplorer": {
+      "title": "Explorador de Logs",
+      "openInLogs": "Abrir em Logs",
+      "invalidParams": "Parâmetros de drilldown inválidos",
+      "noEvents": "Nenhum evento corresponde a este filtro",
+      "filterHint": "Clique para explorar logs relacionados",
+      "timestamp": "Timestamp",
+      "queryMode": "SQL",
+      "runQuery": "Executar consulta",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "evento",
+      "events": "eventos",
+      "prevPage": "Anterior",
+      "nextPage": "Próximo",
+      "of": "de",
+      "sqlEditorLabel": "Consulta SQL",
+      "resetSql": "Redefinir",
+      "detail": {
+        "drawerTitle": "Detalhe do Evento",
+        "details": "Detalhes",
+        "json": "JSON",
+        "insights": "Insights",
+        "copyLink": "Copiar link",
+        "copy": "Copiar",
+        "copyValue": "Copiar valor",
+        "insightsHint": "Frequências de campos em {n} eventos carregados"
+      },
+      "insights": {
+        "anomalyTitle": "Perfil de Anomalia de Campo",
+        "anomalyHint": "{n} eventos amostrados",
+        "colField": "Campo",
+        "colRarity": "Raridade",
+        "colValue": "Valor",
+        "rarity": {
+          "anomalous": "Anômalo",
+          "rare": "Raro",
+          "uncommon": "Incomum",
+          "common": "Comum"
+        },
+        "timelineTitle": "Linha do Tempo do Evento",
+        "timelineHint": "Frequência no intervalo selecionado",
+        "timelineEmpty": "Sem dados",
+        "patternsTitle": "Padrões de Log",
+        "patternsHint": "Agrupados por estrutura semelhante",
+        "zScore": "z={value}",
+        "patternsEmpty": "Nenhum padrão extraído para este filtro",
+        "contextTitle": "Eventos ao Redor",
+        "contextHint": "Eventos próximos a este timestamp",
+        "contextTooltip": "Outros eventos deste stream nos 3 minutos antes e depois deste evento — mostra o que mais estava acontecendo no mesmo momento.",
+        "contextEmpty": "Nenhum evento ao redor encontrado"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Seção de visão geral de alertas",
@@ -6017,6 +6131,7 @@
     "SearchSQLCancelled": "Erro: a pesquisa SQL foi cancelada."
   },
   "alerts": {
+    "allAlerts": "Todos os alertas",
     "compositeAlert": "Composto",
     "import": {
       "anomalyImportSuccess": "Detecção de Anomalias - {index}: \"{name}\" importado com sucesso",
@@ -7345,6 +7460,18 @@
         "panel": {
           "label": "Criar alerta",
           "toast": "Consulta importada do painel do dashboard: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Personalizar no editor",
+          "toast": "Da Biblioteca de Alertas: {sourceLabel}"
+        },
+        "dbm": {
+          "label": "Alertar-me",
+          "toast": "Importado do Monitoramento de Banco de Dados: \"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "Alertar-me",
+          "toast": "Importado do Monitoramento de Banco de Dados (perspectiva do servidor): \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7366,7 +7493,13 @@
         "noQueries": "Este painel não tem consulta para criar um alerta.",
         "noConstants": "Os padrões selecionados não têm texto distintivo para corresponder.",
         "sqlModeFilterDropped": "Sua consulta SQL não foi mantida — o alerta corresponde apenas aos padrões selecionados.",
-        "patternsUnusable": "Nenhum dos padrões nesta página tem texto distintivo para corresponder, portanto o alerta usa apenas sua pesquisa."
+        "patternsUnusable": "Nenhum dos padrões nesta página tem texto distintivo para corresponder, portanto o alerta usa apenas sua pesquisa.",
+        "dbmRollupLag": "Os números do banco de dados são agregados a cada {minutes} minutos, então este alerta só pode disparar com essa frequência — não é uma página em tempo real.",
+        "dbmFingerprintVersion": "Este alerta está fixado na forma exata de uma consulta. Se a maneira como as consultas são agrupadas mudar, o alerta pode parar de corresponder e deve ser recriado.",
+        "dbmNoFingerprint": "Esta consulta não tem um identificador estável, então o alerta monitora o banco de dados inteiro.",
+        "dbmServerVantage": "Isso mede o que o próprio servidor de banco de dados relatou sobre bloqueios, não quanto tempo sua aplicação esperou. Não compare com alertas de latência de consulta.",
+        "dbmLockSampling": "A atividade de bloqueio é amostrada em um intervalo, então a contenção que começou e terminou entre duas amostras nunca foi registrada. Um alerta silencioso não é prova de que não houve bloqueio.",
+        "dbmNoInstance": "Nenhuma instância de banco de dados única foi identificada, então este alerta monitora todas as instâncias deste mecanismo."
       }
     },
     "saveFailed": "Não foi possível salvar o alerta.",
@@ -7405,6 +7538,112 @@
     "impactTemplate": "Usado por {destinations} · {alerts}",
     "impactDestination": "Usado por {alerts}"
   },
+  "alert_library": {
+    "header": "Biblioteca de Alertas",
+    "subtitle": "Alertas selecionados, prontos para instalar, correspondentes aos dados que você já ingere",
+    "sectionTab": "Biblioteca",
+    "contribute": "Contribua no GitHub",
+    "searchPlaceholder": "Pesquisar por nome, descrição ou stream",
+    "searchLabel": "Pesquisar na biblioteca de alertas",
+    "categories": "Categoria",
+    "searchCategories": "Pesquisar categorias",
+    "searchCategoriesAria": "Pesquisar filtros de categoria",
+    "noCategoryMatch": "Nenhuma categoria corresponde.",
+    "selectedCount": "{count} selecionados",
+    "facetAria": "{label}, {count} alertas",
+    "severity": "Severidade",
+    "severityAll": "Todos",
+    "severityCritical": "Crítico",
+    "severityWarning": "Aviso",
+    "severityInfo": "Info",
+    "statReady": "Pronto para instalar",
+    "statNeedsData": "Não ingerido",
+    "statAll": "Todos",
+    "notIngested": "Não ingerido: {stream}",
+    "notIngestedHint": "Esta organização não está recebendo {stream}, então este alerta nunca dispararia. Instale-o mesmo assim e ele começará a funcionar assim que os dados chegarem.",
+    "alertCount": "{count} alerta | {count} alertas",
+    "noCollectorTitle": "Nada aqui corresponde aos seus dados ainda",
+    "noCollectorDescription": "Nenhum desses {count} alertas consulta um stream que esta organização está recebendo. Envie telemetria {group} para o OpenObserve e eles aparecem aqui.",
+    "setupGuide": "Guia de ingestão",
+    "emptyLibraryTitle": "A biblioteca de alertas está vazia",
+    "emptyLibraryDescription": "O catálogo foi carregado, mas não contém alertas. Isso é um problema de publicação, não um filtro — tente novamente em breve.",
+    "noMatchesTitle": "Nenhum alerta corresponde a esses filtros",
+    "noMatchesDescription": "Tente outra categoria, gravidade ou termo de busca.",
+    "clearFilters": "Limpar filtros",
+    "loadFailedTitle": "Não foi possível carregar a biblioteca de alertas",
+    "retry": "Tentar novamente",
+    "openDetails": "Abrir {title}",
+    "drawer": {
+      "dataAvailable": "Dados disponíveis",
+      "streamNotFound": "Stream não encontrado",
+      "detects": "O que ele detecta",
+      "noDescription": "Nenhuma descrição na biblioteca.",
+      "needsDataCallout": "Este alerta consulta {stream}, que esta organização não está recebendo. Instalá-lo agora criaria um alerta que nunca dispara.",
+      "query": "Consulta",
+      "stream": "Stream",
+      "streamType": "Tipo de stream",
+      "metricCondition": "Condição da métrica",
+      "matchCount": "Linhas correspondentes necessárias",
+      "previewBlocked": "{stream} não é um stream nesta organização, portanto não há nada para avaliar.",
+      "wouldTrigger": "Dispararia",
+      "wouldNotTrigger": "Não dispararia",
+      "loading": "Carregando este alerta da biblioteca",
+      "loadFailed": "Não foi possível carregar este alerta da biblioteca.",
+      "customize": "Personalizar no editor",
+      "customizeHint": "Abre o editor padrão de alertas pré-preenchido com este alerta.",
+      "customizeFailed": "Não foi possível abrir este alerta no editor.",
+      "install": "Instalar",
+      "neverIngested": "Ainda sem dados",
+      "neverIngestedCallout": "{stream} existe, mas nunca recebeu dados, então este alerta não tem em que disparar.",
+      "lastData": "Últimos dados {when}",
+      "staleCallout": "{stream} recebeu dados pela última vez {when}. Este alerta permanecerá inativo até que a ingestão seja retomada.",
+      "unknownTime": "em um horário desconhecido"
+    },
+    "install": {
+      "title": "Instalar da biblioteca",
+      "subtitle": "Escolha para onde os alertas notificam, quais alertas instalar e onde eles são arquivados.",
+      "stepDestination": "Destino",
+      "stepAlerts": "Alertas",
+      "stepFolder": "Pasta",
+      "stepTune": "Ajustar",
+      "stepInstall": "Instalar",
+      "destinationIntro": "Cada alerta deste lote notifica o destino que você escolher aqui. Os arquivos da biblioteca nomeiam os destinos da organização de onde foram exportados, que não existem na sua.",
+      "destinationLabel": "Destino",
+      "destinationPlaceholder": "Escolha um destino",
+      "destinationsLoadFailed": "Não foi possível carregar seus destinos existentes.",
+      "retry": "Tentar novamente",
+      "destinationsNoneBody": "Esta organização ainda não tem destinos de alerta, então não há para onde esses alertas notificarem. Crie um na página Destinos e depois volte e escolha aqui.",
+      "openDestinations": "Abrir Destinos",
+      "selectAll": "Selecionar todos",
+      "clear": "Limpar",
+      "selectedCount": "{count} de {total} selecionados",
+      "folderIntro": "Os alertas instalados são arquivados aqui. Crie uma pasta pelo botão + se este lote merecer uma própria.",
+      "tuneToggle": "Defina estes para cada alerta neste lote",
+      "tuneHint": "Apenas estes dois são seguros de definir para um lote inteiro. Os limites permanecem por alerta — altere um abrindo esse alerta e instalando-o separadamente.",
+      "frequency": "Executar a cada",
+      "silence": "Silenciar por",
+      "minutes": "min",
+      "summaryTuningNone": "Padrões da biblioteca",
+      "summaryTuningOverride": "A cada {frequency} min, silenciado por {silence} min",
+      "run": "Instalar {count} alerta | Instalar {count} alertas",
+      "retryFailed": "Repetir {count} falha | Repetir {count} falhas",
+      "allInstalled": "{count} alerta instalado | {count} alertas instalados",
+      "someFailed": "{installed} instalados, {failed} com falha",
+      "unknownError": "Não foi possível criar o alerta.",
+      "unreadableConditions": "As condições de filtro deste alerta estão em um formato que esta versão não consegue ler. Instalá-lo criaria um alerta sem filtro, por isso foi ignorado.",
+      "back": "Voltar",
+      "next": "Avançar",
+      "cancel": "Cancelar",
+      "done": "Concluído"
+    },
+    "error": {
+      "network": "Não foi possível acessar a biblioteca. Verifique sua conexão de rede e tente novamente.",
+      "http": "O servidor da biblioteca retornou um erro. Tente novamente em instantes.",
+      "unparseable": "A biblioteca respondeu com algo que não é um catálogo.",
+      "unsupported_version": "Este catálogo da biblioteca é mais recente do que esta versão do OpenObserve pode ler. Atualize para navegar por ele.",
+      "malformed": "O catálogo da biblioteca está incompleto ou danificado."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Exportar Modelo",
     "selected": "selecionado",
@@ -7429,7 +7668,7 @@
     "importBodyLabel": "Corpo do Modelo *",
     "importTypeLabel": "Tipo do Modelo *",
     "importTitleLabel": "Título do Modelo *",
-    "header": "Modelos",
+    "header": "Modelos de destino",
     "add": "Adicionar modelo",
     "edit": "Editar",
     "name": "Nome",
@@ -7636,6 +7875,7 @@
     "destinationsLoadError": "Erro ao carregar destinos"
   },
   "alert_destinations": {
+    "sectionTab": "Destinos",
     "chooseTypeTitle": "Escolher tipo",
     "selectDestinationType": "Selecionar tipo de destino",
     "connectionStepTitle": "Conexão",
@@ -9143,7 +9383,8 @@
       "rowsReturned": "Linhas Retornadas",
       "batchSize": "Tamanho do Lote",
       "querySummary": "Resumo da Consulta",
-      "responseStatus": "Status da Resposta"
+      "responseStatus": "Status da Resposta",
+      "viewQueryTrend": "Ver tendência de consulta no Monitoramento de Banco de Dados"
     },
     "index": {
       "clickHere": "Clique aqui",
@@ -9219,6 +9460,7 @@
       "viewRelated": "Ver Relacionados",
       "logs": "Logs",
       "traces": "Traces",
+      "databases": "Bancos de dados",
       "viewTraces": "Ver Traces",
       "operations": "Operações",
       "metrics": "Métricas",
@@ -9995,7 +10237,7 @@
     "copyPattern": "Padrão de cópia",
     "copied": "Copiado!",
     "pricingTiers": "Níveis de preços",
-    "pricingTiersDesc": "O primeiro nível é o padrão. Níveis adicionais se aplicam quando as condições de uso são atendidas.",
+    "pricingTiersDesc": "O primeiro nível é o padrão. Os níveis adicionais se aplicam quando a condição de uso e a janela de horário UTC são atendidas.",
     "tierName": "Nome do nível",
     "applyTierWhen": "Aplique esse nível quando",
     "quickSetup": "Configuração rápida:",
@@ -10087,7 +10329,25 @@
     "saveShadowedWarning": "Salvo, mas essa entrada é sombreada por “{winner}”, que tem o mesmo padrão e maior prioridade. Ela nunca será usada para cálculo de custos, a menos que a outra entrada seja excluída ou desativada.",
     "modelPricingSaved": "Preços de modelos salvos",
     "errSave": "Falha ao salvar",
-    "errLoadModel": "Falha ao carregar o modelo"
+    "errLoadModel": "Falha ao carregar o modelo",
+    "tierDefaultName": "Padrão",
+    "timeWindows": "Horas ativas (UTC)",
+    "timeWindowsDesc": "Restrinja este nível a horas UTC recorrentes, para provedores que cobram tarifas de pico e fora de pico.",
+    "timeWindowFrom": "De",
+    "timeWindowTo": "Até",
+    "addTimeWindow": "Adicionar janela de tempo",
+    "removeTimeWindow": "Remover janela de tempo",
+    "addUsageCondition": "Adicionar condição de uso",
+    "removeUsageCondition": "Remover condição de uso",
+    "timeWindowInvalid": "Nível \"{name}\": insira um horário no formato HH:MM (UTC de 24 horas).",
+    "timeWindowSameBounds": "Nível \"{name}\": início e fim devem ser diferentes. Remova a janela para tornar o nível sempre ativo.",
+    "timeWindowWrapsHint": "Estende-se após a meia-noite UTC.",
+    "tierNeedsRestriction": "O nível \"{name}\" não tem condição de uso nem janela de tempo, então nunca seria alcançado. Adicione uma ou exclua o nível.",
+    "timeBasedChip": "Por tempo",
+    "tierAlwaysActive": "Sempre ativo (padrão)",
+    "testAtTimeLabel": "Testar no horário UTC",
+    "testAtTimeHint": "Deixe em branco para usar o horário atual. Os níveis de pico / fora de pico são resolvidos com base neste horário.",
+    "localTimeHint": "No seu fuso horário: {range}"
   },
   "aiObservability": {
     "title": "Observabilidade do LLM",
@@ -13269,6 +13529,24 @@
     "combobox": {
       "noOptionsFound": "Nenhuma opção encontrada"
     },
+    "emojiPicker": {
+      "chooseIcon": "Escolha um ícone",
+      "searchPlaceholder": "Pesquisar ícones...",
+      "removeIcon": "Remover ícone",
+      "noResults": "Nenhum ícone corresponde à sua pesquisa",
+      "groups": {
+        "results": "Resultados",
+        "status": "Status",
+        "services": "Serviços",
+        "ai": "IA",
+        "creatures": "Criaturas",
+        "infra": "Infraestrutura",
+        "data": "Dados",
+        "teams": "Equipes",
+        "objects": "Objetos",
+        "world": "Mundo"
+      }
+    },
     "input": {
       "clear": "Limpar"
     },
@@ -13647,6 +13925,14 @@
       },
       "variableScope": {
         "global": "Global"
+      },
+      "dataConfidence": {
+        "estimated": "≈ estimado",
+        "topNSubset": "subconjunto top-N",
+        "live": "ao vivo",
+        "belowTopN": "abaixo do top-N",
+        "truncated": "truncado",
+        "gap": "lacuna"
       }
     }
   },
@@ -14627,6 +14913,1056 @@
     },
     "hover": {
       "deprecated": "**Obsoleto** — prefira a função canônica."
+    }
+  },
+  "dbm": {
+    "common": {
+      "reload": "Atualizar",
+      "lastRefreshed": "Última atualização {age}",
+      "loadFailed": "Não foi possível carregar os dados do banco de dados. Tente novamente ou reduza o intervalo de tempo."
+    },
+    "ai": {
+      "suggestFix": "Pergunte à IA como corrigir isso",
+      "suggestFixHint": "Abre o assistente de IA com esta consulta, seu mecanismo e seus números de latência, e pergunta o que alterar. Ele não altera nada por conta própria.",
+      "rowSuggestFix": "Pergunte à IA como corrigir isso",
+      "deadlockFix": "Como interrompo esse impasse?",
+      "deadlockFixHint": "Envia ambas as instruções conflitantes e as evidências de ordem das linhas para o assistente de IA.",
+      "blockingFix": "Por que isso está bloqueando?",
+      "blockingFixHint": "Envia a instrução da sessão raiz, seu tempo ocioso e quantas sessões estão presas atrás dela para o assistente de IA."
+    },
+    "filters": {
+      "allEngines": "Todos os mecanismos",
+      "allInstances": "Todos os bancos de dados",
+      "allNamespaces": "Todos os esquemas",
+      "allEnvs": "Todos os ambientes",
+      "allServices": "Todos os serviços",
+      "scope": "Filtros",
+      "clearScope": "Limpar tudo",
+      "removeScope": "Remover este filtro",
+      "popoverTitle": "Restringir isso",
+      "dimension": {
+        "system": "mecanismo",
+        "instance": "banco de dados",
+        "namespace": "esquema",
+        "env": "ambiente",
+        "service": "serviço",
+        "insight": "insight"
+      }
+    },
+    "delta": {
+      "new": "novo nesta lista",
+      "gone": "parou de executar",
+      "newHint": "Esta consulta não estava entre as mais pesadas antes, então não há nada com que compará-la. Ela pode ter sido executada antes — apenas não com intensidade suficiente para ser rastreada isoladamente.",
+      "goneHint": "Esta consulta foi executada mais cedo no dia, mas não no intervalo de tempo que você está analisando.",
+      "comparison": "Antes {previous} → agora {current}",
+      "noChange": "sem alteração",
+      "timesMore": "{ratio}× mais",
+      "timesFewer": "{ratio}× menos",
+      "wasValue": "era {value}"
+    },
+    "databases": {
+      "title": "Bancos de dados",
+      "subtitle": "Desempenho e saúde de consultas por banco de dados",
+      "searchPlaceholder": "Pesquisar banco de dados ou serviço…",
+      "unnamedInstance": "Instância sem nome",
+      "unnamedInstanceHint": "Os relatórios de instruções do próprio banco provam que este mecanismo está em execução, mas não identificam um host. A linha mostrará um endereço quando um feed que o contenha — amostragem de sessão ou métricas de instância — for configurado.",
+      "moreServices": "+{count}",
+      "columns": {
+        "instance": "Banco de dados",
+        "calls": "Chamadas",
+        "qps": "Por segundo",
+        "errorRate": "Falhas",
+        "p50": "Metade está abaixo",
+        "p95": "Chamadas lentas",
+        "p99": "1% mais lentas",
+        "services": "Usado por",
+        "load": "Tempo de banco de dados",
+        "attention": "Precisa de atenção"
+      },
+      "summary": {
+        "databases": "Bancos de dados",
+        "calls": "Chamadas",
+        "time": "Tempo de banco de dados",
+        "failed": "Falhas"
+      },
+      "databaseCount": "1 banco de dados | {count} bancos de dados",
+      "openQueries": "Ver suas consultas",
+      "alertMe": "Alertar-me",
+      "columnHints": {
+        "qps": "Chamadas por segundo — as chamadas desta janela divididas pela sua duração, para que uma visão de 15 minutos e uma de 4 horas permaneçam comparáveis.",
+        "p50": "Metade de todas as chamadas terminou mais rápido do que isto. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
+        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
+        "p99": "As 1% piores chamadas levaram pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução ou que nunca retornou não é medida aqui.",
+        "load": "Tempo total que suas aplicações passaram esperando por este banco de dados. Medido do lado do cliente, então reflete quanto tráfego este banco atendeu — não o quão carregado o servidor está.",
+        "attention": "O quão perto esta instância está de um limite que seu próprio mecanismo publica — hoje, conexões em relação a max_connections. A pior dessas proporções, não uma pontuação combinada. Ordenado do maior para o menor, com as instâncias cuja saúde não pode ser lida no topo, porque uma que você não pode ver não é uma que você sabe que está saudável. Medido no servidor do banco de dados, portanto não é comparável com o Tempo de banco de dados ao lado."
+      },
+      "failedChip": "{count} falhas",
+      "columnSubLabels": {
+        "attention": "servidor",
+        "load": "cliente",
+        "calls": "cliente"
+      },
+      "attention": {
+        "connections": "conexões",
+        "noLimit": "nenhum limite publicado",
+        "unknown": "não medido"
+      }
+    },
+    "queries": {
+      "title": "Principais consultas",
+      "subtitle": "As consultas que mais usam tempo de banco de dados",
+      "subtitleServer": "As instruções que seus bancos de dados executaram, contadas dentro do banco — as executadas com mais frequência primeiro",
+      "searchPlaceholder": "Pesquisar texto da consulta, tabela ou serviço…",
+      "trendLabel": "Como o tempo desta consulta variou ao longo do intervalo",
+      "otherRow": "Todas as outras consultas",
+      "truncatedText": "Esta instrução era longa demais para ser armazenada por completo, então é mostrada abreviada.",
+      "stmtClass": {
+        "query": "Consultas",
+        "queryHint": "Apenas SQL real — SELECT, INSERT, UPDATE e DELETE.",
+        "all": "Consultas + sobrecarga de conexão",
+        "allHint": "Também conta o trabalho de registro que seu driver envia entre consultas: BEGIN e COMMIT, SET e as verificações que mantêm uma conexão em pool ativa."
+      },
+      "completionBias": {
+        "title": "Chamadas caíram {drop}% enquanto as falhas aumentaram",
+        "body": "Isso geralmente significa que as consultas estão travando em vez de terminar — e só podemos medir consultas que terminam. Uma linha em queda aqui pode não significar que está se recuperando."
+      },
+      "columns": {
+        "query": "Consulta",
+        "calls": "Chamadas",
+        "p95": "Chamadas lentas",
+        "errors": "Falhas",
+        "perTrace": "Por requisição",
+        "load": "Tempo no banco de dados",
+        "p99": "1% mais lento",
+        "max": "Pior observado",
+        "services": "Usado por"
+      },
+      "queryCount": "1 tipo de consulta | {count} tipos de consulta",
+      "otherRowDetail": "— {calls} chamadas. Não temos números por consulta para estas, apenas este total combinado. Contabilizado em cada total acima.",
+      "foldRowText": "1 consulta menor | {count} consultas menores",
+      "serverList": {
+        "title": "Consultas informadas pelos seus bancos de dados",
+        "subtitle": "Contado dentro do banco de dados em todos os clientes, as mais executadas primeiro. Nenhuma chamada de aplicação rastreada caiu nesta janela, então a lista habitual está vazia — foi isso que os bancos de dados viram nesse meio tempo.",
+        "truncated": "As {count} instruções mais executadas — mais foram executadas do que são mostradas aqui.",
+        "columns": {
+          "query": "Consulta",
+          "calls": "Chamadas",
+          "totalTime": "Tempo no banco de dados",
+          "meanTime": "Média por chamada"
+        },
+        "columnHints": {
+          "time": "Medido dentro do banco de dados: tempo de execução para PostgreSQL, tempo de espera para MySQL e MariaDB. Não é o que seus aplicativos experimentaram — espera de rede e de conexão não estão incluídas.",
+          "mean": "Tempo no banco dividido pelas chamadas — uma média ao longo da janela, não um percentil."
+        }
+      },
+      "foldRowDetail": "· {share} do tempo de banco · clique para mostrá-las",
+      "foldRowDetailOpen": "· {share} do tempo de banco · clique para recolhê-las",
+      "summary": {
+        "queries": "Tipos de consulta",
+        "calls": "Chamadas",
+        "time": "Tempo no banco de dados",
+        "failed": "Falhas"
+      },
+      "columnHints": {
+        "calls": "Quantas vezes esta consulta foi executada. A contagem do próprio banco de dados quando ele informa uma — isso cobre todos os clientes, não apenas as partes do seu sistema que enviam rastreamentos. As linhas marcadas como observadas pelo cliente são contadas a partir dos rastreamentos, porque seu banco de dados não as informou.",
+        "p50": "Metade de todas as chamadas terminou mais rápido que isto. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
+        "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
+        "p99": "Os piores 1% das chamadas levaram pelo menos este tempo. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou que nunca voltou, não é medida aqui.",
+        "max": "A chamada individual mais lenta nesta janela — uma chamada real, não uma média.",
+        "errors": "Quantas dessas chamadas voltaram com erro.",
+        "perTrace": "Quantas vezes isso é executado dentro de uma única solicitação. Um número alto geralmente significa um loop.",
+        "load": "Tempo total que esta consulta passou no banco de dados. O valor do próprio banco de dados quando ele informa um: tempo de execução no Postgres, mas tempo de ESPERA no MySQL e MariaDB — cada linha indica qual. Linhas marcadas como observadas pelo cliente são medidas a partir dos rastreamentos, portanto incluem ida e volta pela rede."
+      },
+      "errorsNone": "nenhum",
+      "errorsAll": "todos",
+      "actions": {
+        "open": "Abrir detalhes",
+        "traces": "Ver exemplos de rastreamentos",
+        "copy": "Copiar consulta",
+        "copied": "Consulta copiada",
+        "copyFailed": "Não foi possível copiar a consulta.",
+        "alert": "Avise-me se isto ficar lento"
+      },
+      "otherRowTextFor": "Todas as outras consultas em {database}",
+      "otherRowDetailShort": "— {calls} chamadas.",
+      "columnSubLabels": {
+        "calls": "servidor onde foi informado",
+        "load": "servidor onde foi informado"
+      }
+    },
+    "insights": {
+      "showRows": "Mostrar esta consulta | Mostrar estas {count} consultas",
+      "clearFilter": "Limpar filtro",
+      "alsoAffects": "e {count} outra consulta | e {count} outras consultas",
+      "showLess": "Mostrar menos",
+      "more": "{count} mais | {count} mais",
+      "regression": {
+        "title": "{ratio}× mais lento que o normal",
+        "body": "{before} → {after}, mesmo tráfego",
+        "rule": "Exibido porque as chamadas lentas desta consulta ficaram mais de {ratio}× mais lentas que {baseline}, em pelo menos {calls} chamadas."
+      },
+      "new-expensive": {
+        "title": "Nova consulta, já cara",
+        "body": "não executava antes · agora {share} do tempo do banco",
+        "rule": "Exibido porque esta consulta não estava entre as mais pesadas em {baseline} e agora consome pelo menos {share}% do tempo do banco, em pelo menos {calls} chamadas. Ela pode ter sido executada antes — apenas não pesando o suficiente para ser rastreada sozinha."
+      },
+      "n-plus-one": {
+        "title": "Executa pelo menos {multiplier}× por requisição",
+        "body": "{share} do tempo do banco · {service}",
+        "rule": "Exibido porque esta consulta executa pelo menos {ratio} vezes dentro de uma única requisição, em pelo menos {traces} requisições. É um limite inferior, então o número real pode ser maior. Trabalho legítimo em lote pode parecer o mesmo."
+      },
+      "volume-shift": {
+        "title": "Mais ocupada, não mais lenta",
+        "body": "chamada {ratio}× mais vezes, mesma velocidade · {service}",
+        "rule": "Exibido porque esta consulta é chamada mais de {ratio}× vezes do que em {baseline} enquanto sua velocidade permaneceu dentro de {latency}× daquela. A mudança está em quem a chama."
+      },
+      "rank-churn": {
+        "title": "Nova consulta mais pesada",
+        "body": "movida #{from} → #{to}",
+        "rule": "Exibido porque uma consulta subiu para as mais pesadas {into} vinda de fora das mais pesadas {from} em {baseline}, enquanto o tempo total do banco cresceu.",
+        "unranked": "sem classificação"
+      },
+      "hide": "Ocultar",
+      "show": "Mostrar",
+      "findRow": "Encontrar",
+      "all-failing": {
+        "title": "Todas as chamadas estão falhando",
+        "body": "{failed} de {total} chamadas falharam · {query}",
+        "rule": "Exibido porque toda chamada a esta consulta no intervalo retornou com erro."
+      },
+      "baseline": {
+        "label": "Comparar com",
+        "previous": "o período anterior",
+        "yesterday": "as mesmas horas de ontem",
+        "previousShort": "vs anterior",
+        "previousHint": "Compare com o período imediatamente anterior a este, com a mesma duração.",
+        "yesterdayShort": "vs ontem",
+        "yesterdayHint": "Compare com as mesmas horas um dia antes — útil quando o tráfego segue um ciclo diário, ou para ver o que mudou desde um deploy."
+      }
+    },
+    "coverage": {
+      "unknownNote": "Nada para medir no intervalo e nos filtros que você selecionou.",
+      "lineHealthy": "Você está vendo {percent}% do tempo deste banco — os {count} tipos de consulta mais pesados.",
+      "lineRemainder": "Você está vendo {percent}% do tempo deste banco. O restante está em consultas mais leves que não listamos uma a uma.",
+      "lineStale": "Nossa contagem está {minutes} minutos atrasada, então as consultas mais recentes podem ainda não estar aqui.",
+      "lineTruncated": "Havia mais dados no último trecho do que pudemos processar, então os números mais recentes estão subestimados.",
+      "lineTruncatedStale": "Havia mais dados no último trecho do que pudemos processar, e nossa contagem está {minutes} minutos atrasada — os números mais recentes estão subestimados, e as consultas mais recentes podem ainda não estar aqui.",
+      "lineGap": "{minutes} minutos estão faltando nesta janela. Nossa contagem parou em {stopped} e só pode alcançar {reach} minutos, então nada cobre {from}–{to}.",
+      "lineSubset": "Você filtrou para {filter}, então estas porcentagens descrevem as linhas exibidas, não o banco inteiro.",
+      "lineHealthyAll": "Você está vendo todas as consultas que executaram. As velocidades aqui são medidas em cada chamada, então são exatas.",
+      "lineHealthyAllEstimated": "Você está vendo todas as consultas que executaram. As velocidades aqui são combinadas a partir de vários trechos de tempo, então são aproximadas, mas não exatas.",
+      "lineCountedTo": "Contado até {time}; o último meio minuto ainda está chegando.",
+      "lineExact": "Todos os bancos reportando. As velocidades aqui são medidas em cada chamada, então são exatas.",
+      "lineExactEstimated": "Todos os bancos reportando. As velocidades aqui são combinadas a partir de vários trechos de tempo, então são aproximadas, mas não exatas.",
+      "lineSubsetUnnamed": "Seus filtros reduzem isso abaixo do nível em que esses totais são somados, então as porcentagens descrevem as linhas exibidas em vez do banco inteiro.",
+      "lineQuery": "Os tempos são medidos a partir da sua aplicação, então incluem tempo de rede e qualquer espera por uma conexão livre.",
+      "lineUncodedErrors": "{percent} das falhas aqui retornaram sem código de motivo, então podem ser contadas, mas não explicadas.",
+      "lineSubsetStale": "Você filtrou para {filter}, e nossa contagem está {minutes} minutos atrasada — estas porcentagens descrevem as linhas exibidas, e as consultas mais recentes podem ainda não estar aqui.",
+      "lineSubsetUnnamedStale": "Seus filtros reduzem isso abaixo do nível em que esses totais são somados, e nossa contagem está {minutes} minutos atrasada — as porcentagens descrevem as linhas exibidas, e as consultas mais recentes podem ainda não estar aqui.",
+      "lineCountedToBehind": "Contado até {time}; estamos {minutes} minutos atrasados."
+    },
+    "breakdown": {
+      "loading": "Descobrindo para onde o tempo foi…",
+      "noSchema": "Nenhum schema relatado",
+      "noService": "Chamador não identificado",
+      "nothingToAttribute": "Temos os totais deste banco de dados, mas nenhuma linha por consulta nesse intervalo, então não podemos dizer qual serviço gastou o tempo.",
+      "queryCount": "{count} consulta | {count} consultas",
+      "shortfall": "Esses valores somam {percent} a menos que o total deste banco de dados, porque apenas os tipos de consulta mais pesados são rastreados um a um."
+    },
+    "freshness": {
+      "neverAggregated": "Ainda não terminamos de contar este intervalo. Os primeiros números geralmente aparecem em cerca de 15 minutos."
+    },
+    "empty": {
+      "filtered": {
+        "title": "Nenhuma consulta corresponde aos seus filtros",
+        "description": "Nada aqui corresponde à pesquisa e aos filtros que você aplicou.",
+        "action": "Limpar filtros"
+      },
+      "title": "Nada aqui ainda — e aqui está exatamente o porquê",
+      "subtitle": "Verificamos tudo o que precisa ser verdade.",
+      "subtitleCounts": "{pass} passou, {fail} não. | {pass} passaram, {fail} não.",
+      "checklistTitle": "O que verificamos",
+      "showMeHow": "Mostre-me como instrumentar",
+      "checkTrace": "Verificar um dos meus traces",
+      "checks": {
+        "enabled": {
+          "ok": "O monitoramento de banco de dados está ativado",
+          "okDetail": "para esta organização",
+          "no": "O monitoramento de banco de dados está desativado",
+          "noDetail": "Um administrador pode ativá-lo para esta organização e reiniciar o coletor."
+        },
+        "traces": {
+          "ok": "Seus traces estão chegando",
+          "okDetail": "{count} registrados neste intervalo de tempo",
+          "no": "Nenhum trace chegou",
+          "noDetail": "O monitoramento de banco de dados é construído a partir de traces, e esta organização ainda não enviou nenhum."
+        },
+        "permission": {
+          "ok": "Você tem acesso a estes dados",
+          "okDetail": "você é administrador do {org}",
+          "no": "Você não tem acesso a estes dados",
+          "noDetail": "O monitoramento de banco de dados lê seus traces, e sua função não os inclui. Peça a um administrador acesso de leitura."
+        },
+        "dbSpans": {
+          "ok": "Seus traces mencionam um banco de dados",
+          "okDetail": "chamadas de banco de dados estão sendo registradas",
+          "no": "Nenhum dos seus traces menciona um banco de dados",
+          "noDetail": "Seus aplicativos estão sendo rastreados, mas a parte que fala com o banco de dados não está. Adicione a instrumentação de banco de dados para sua linguagem e as consultas aparecerão aqui."
+        },
+        "counted": {
+          "ok": "Terminamos de contar este intervalo",
+          "okDetail": "os números estão atualizados",
+          "no": "Ainda não terminamos de contar",
+          "noDetail": "As chamadas de banco de dados chegaram, mas os primeiros números ainda não estão prontos. Isso geralmente leva alguns minutos."
+        },
+        "window": {
+          "ok": "Algo foi executado neste intervalo de tempo",
+          "okDetail": "chamadas de banco de dados foram registradas",
+          "no": "Nada foi executado no intervalo de tempo que você escolheu",
+          "noDetail": "Tente um intervalo maior."
+        },
+        "alsoWorthKnowing": {
+          "title": "Também vale a pena saber",
+          "detail": "Assim que isso estiver configurado, as primeiras consultas aparecem em cerca de 15 minutos."
+        }
+      },
+      "action": "Tentar novamente",
+      "viewDocs": "Ver documentação"
+    },
+    "detail": {
+      "title": "Detalhes da consulta",
+      "tabs": {
+        "overview": "Visão geral",
+        "overviewHint": "Quão lenta é esta consulta, com que frequência ela é executada e onde.",
+        "plans": "Planos de consulta",
+        "plansHint": "As etapas que seu banco de dados seguiu para executar esta consulta. Comece aqui para descobrir por que ela está lenta.",
+        "callers": "Chamadores e exemplos",
+        "callersHint": "Quais partes do seu aplicativo executaram esta consulta e execuções lentas individuais que você pode abrir como um trace.",
+        "callersLocked": "Execuções individuais vêm do rastreamento. Nada rastreou esta consulta neste intervalo de tempo."
+      },
+      "notFound": {
+        "title": "Esta consulta não está nesta organização",
+        "description": "O endereço nomeia uma consulta que {org} não executou no intervalo que você está vendo. Se você acabou de mudar de organização, ela pertence à que você saiu.",
+        "descriptionNoOrg": "O endereço nomeia uma consulta que esta organização não executou no intervalo que você está vendo. Se você acabou de mudar de organização, ela pertence à que você saiu.",
+        "scopeHint": "Nada correspondeu a ela nesta organização, intervalo de tempo e escopo. Se o endereço veio de outro mecanismo ou instância, limpe esses filtros ou volte para a lista.",
+        "missingTitle": "Nenhuma consulta selecionada",
+        "missingDescription": "Esta página descreve uma consulta, e o endereço não nomeia uma. Se você acabou de mudar de organização, a consulta que você estava lendo pertence à que você saiu.",
+        "action": "Navegar pelas consultas desta organização"
+      },
+      "backToQueries": "Voltar para as principais consultas",
+      "backToActivity": "Voltar para atividade",
+      "backToSamples": "Voltar para chamadas mais lentas",
+      "backToDeadlocks": "Voltar para deadlocks",
+      "latencyTitle": "Velocidade ao longo do tempo",
+      "volumeTitle": "Chamadas e falhas ao longo do tempo",
+      "endpointsTitle": "De onde ela é chamada",
+      "endpointsHint": "As partes do seu aplicativo cujas solicitações executaram esta consulta.",
+      "noEndpoints": "Não foi possível identificar qual parte do seu aplicativo executou isso neste intervalo.",
+      "samplesTitle": "Exemplos mais lentos",
+      "samplesHint": "cada ponto é uma execução real — clique para ver a solicitação completa",
+      "noSamples": "Nenhuma execução individual carregada para este intervalo.",
+      "noSeries": "Nenhum histórico para esta consulta no intervalo selecionado.",
+      "liveSeries": "Os pontos mais recentes ainda estão sendo contados e podem mudar.",
+      "noStream": "Não foi possível determinar qual fluxo de rastreamento carrega esta consulta, então seus chamadores e exemplos não podem ser carregados.",
+      "ambiguousStream": "Esta organização tem mais de um fluxo de rastreamento e não podemos dizer em qual esta consulta é executada. Escolha um fluxo para carregar seus chamadores e rastreamentos de exemplo.",
+      "pickStream": "Escolha um fluxo de rastreamento",
+      "invalidStream": "Esse nome de fluxo de rastreamento não é reconhecido, então não executamos a busca.",
+      "firstSeen": "PRIMEIRA APARIÇÃO NESTA LISTA EM {time}",
+      "firstSeenHint": "O ponto mais antigo neste intervalo em que esta consulta foi pesada o suficiente para ser rastreada por conta própria.",
+      "lastSeen": "ÚLTIMA APARIÇÃO EM {time}",
+      "lastSeenHint": "O ponto mais recente neste intervalo em que esta consulta foi pesada o suficiente para ser rastreada por conta própria. Ela ainda pode estar em execução agora — esta é a última vez que entrou na lista.",
+      "errorsByCode": {
+        "title": "Falhas por código de motivo",
+        "exactHint": "Contado em todas as chamadas neste intervalo.",
+        "sampleHint": "Contado a partir dos exemplos abaixo — uma amostra, não um total.",
+        "noCode": "sem código de motivo"
+      },
+      "whereItRuns": {
+        "title": "Onde ela é executada",
+        "hint": "A atividade desta consulta, dividida pelo banco de dados em que foi executada. Clique em uma linha para focar esta página nela.",
+        "trackedHint": "Estes números cobrem os trechos deste intervalo em que a consulta foi pesada o suficiente para ser rastreada por conta própria — trechos mais calmos não adicionam nada aqui, então leia-os como totais mínimos.",
+        "showAll": "Mostrar todos os locais",
+        "emptyFiltered": "Nada rastreado para esta consulta onde esta página está focada. Mostre todos os locais para ver onde ela foi executada.",
+        "noInstance": "Instância não informada",
+        "focused": "Focado",
+        "focusHint": "Os números desta página estão atualmente restritos a esta linha. Clique novamente para ampliar.",
+        "columns": {
+          "location": "Executa em",
+          "avg": "Média por chamada"
+        }
+      },
+      "qps": "Chamadas por segundo",
+      "errorRate": "Chamadas com falha",
+      "unattributed": "Não atribuído",
+      "sampleOk": "OK",
+      "sampleError": "Falhou",
+      "viewTrace": "Ver a solicitação →",
+      "viewTraces": "Ver rastreamentos de exemplo",
+      "copySummary": "Copiar",
+      "copySummaryHint": "Cada número aqui já está nesta página — isto apenas escreve a frase, então o minuto 13 de um incidente produz uma mensagem em vez de nada.",
+      "summaryCopied": "Resumo copiado",
+      "summaryCopyFailed": "Não foi possível copiar o resumo.",
+      "columns": {
+        "calls": "Chamadas",
+        "time": "Tempo",
+        "duration": "Duração",
+        "status": "Status",
+        "caller": "Chamador",
+        "callShare": "Participação nas chamadas",
+        "p50": "Metade está abaixo de"
+      },
+      "belowTopN": {
+        "title": "Esta consulta não esteve entre as mais pesadas durante parte deste intervalo",
+        "body": "Rastreamos as consultas mais pesadas individualmente; as demais são contadas juntas. Quando esta não era pesada o suficiente, sombreamos o gráfico em vez de desenhar um zero — ela ainda estava em execução.",
+        "capped": "O histórico chega até onde temos registros."
+      },
+      "firstSeenCaveat": "— pode ter estado em execução antes disso, apenas não entre as mais pesadas",
+      "copyQuery": "Copiar consulta",
+      "alertMe": "Alerte-me se isto ficar lento",
+      "stats": {
+        "load": "Tempo de banco de dados",
+        "loadShare": "{percent} deste banco de dados",
+        "calls": "Chamadas",
+        "callsDelta": "{change} do que antes",
+        "p50": "Metade está abaixo de",
+        "p95": "Chamadas lentas",
+        "max": "Pior observado",
+        "errors": "Falhou",
+        "noErrors": "sem erros",
+        "approx": "próximo, não exato",
+        "exact": "exato"
+      },
+      "overlap": {
+        "serverExecution": "Tempo que {engine} gastou executando",
+        "serverWait": "Tempo que {engine} gastou esperando por ela — tempo de espera, não tempo de execução",
+        "serverCounted": "Contado por {engine}, em todos os clientes",
+        "clientObserved": "Observado por chamadores instrumentados — seu banco de dados não reportou isso"
+      },
+      "endpointsConcentrated": "Um endpoint é responsável por {percent} do tempo desta consulta. Corrija {endpoint} e você corrigiu esta consulta.",
+      "typicalMarker": "chamadas lentas {value}",
+      "plans": {
+        "title": "Planos de consulta",
+        "sourceLabel": "Plano estimado genérico",
+        "sourceTooltip": "Este plano foi estimado com todos os parâmetros da consulta definidos como NULL e nunca foi realmente executado. O Postgres pode ter executado um plano diferente para consultas reais. Use-o para ver a forma da consulta, não para explicar quanto tempo levou.",
+        "stableCaveat": "Uma forma de plano foi capturada nesta janela. Isso não descarta um problema de plano — planos estimados podem permanecer estáveis enquanto o plano real muda, e a captura de planos executados só vê comandos lentos o suficiente para serem registrados, então uma mudança de plano que tornou esta consulta mais rápida desapareceria completamente da captura.",
+        "executedLabel": "Plano executado",
+        "executedTooltip": "Este é o plano que o Postgres realmente executou em uma execução real, capturado pelo auto_explain com os valores reais dos parâmetros. As contagens de linhas e durações nesta linha são medidas, não estimadas — mas apenas execuções mais lentas que o limite do auto_explain são capturadas, então elas descrevem a cauda lenta, não todas as execuções.",
+        "capturedDurations": "média {avg} · máx {max} em {count} execuções capturadas",
+        "estVsAct": "estimado {est} → real {act} linhas",
+        "driftCallout": "A forma do plano mudou nesta janela. {count} formas diferentes foram capturadas, o que geralmente significa uma mudança de esquema ou estatísticas, como um índice removido ou uma tabela reparticionada.",
+        "viewPlans": "Ver planos",
+        "noPlans": "Nenhum plano capturado",
+        "noPlansHint": "Nenhum coletor enviou um plano para este banco de dados ainda. Ative a coleta de consultas principais na receita do coletor para começar a capturar planos — a página de configuração explica o processo.",
+        "noPlanForQuery": "Sem plano para esta consulta",
+        "noPlanForQueryHint": "Estamos capturando planos para este banco de dados — esta consulta simplesmente não tem um. Isso é normal para comandos que o banco de dados não pode explicar, como COMMIT, ROLLBACK e SHOW.",
+        "planHash": "Plano",
+        "firstSeen": "Primeira aparição",
+        "lastSeen": "Visto por último",
+        "noTree": "Não foi possível ler o plano",
+        "nodeCost": "custo {cost}"
+      },
+      "serverMetrics": {
+        "title": "O que o próprio banco de dados registrou",
+        "subtitle": "Lado do servidor — todos os clientes",
+        "clientSubtitle": "Observado pelo cliente — apenas chamadores instrumentados, apenas chamadas concluídas. Uma consulta ainda em execução, ou que travou, não está nesses números.",
+        "instance": "Relatado por {instance}",
+        "instanceWide": "Todos os bancos de dados nesta instância",
+        "calls": "Execuções",
+        "rows": "Linhas retornadas",
+        "meanExecution": "Tempo médio de execução",
+        "meanWait": "Tempo médio de espera",
+        "sharedBlksHit": "Blocos do cache",
+        "sharedBlksRead": "Blocos do disco",
+        "tempBlksWritten": "Blocos temporários gravados",
+        "noMatch": "Nenhum registro no lado do servidor para esta consulta",
+        "noMatchHint": "Seu banco de dados relata as declarações que executou, e esta não está entre elas. Isso é normal: as duas visualizações identificam uma consulta de maneiras diferentes, então nem sempre coincidem. Tudo acima ainda é medido a partir do seu aplicativo.",
+        "ambiguous": "Mais de um banco de dados pode ser esta consulta",
+        "ambiguousHint": "Várias instâncias relatam um banco de dados com esse nome, então não há como saber qual delas executou esta consulta. Mostrar números da instância errada seria pior do que não mostrar nenhum. Candidatos: {instances}.",
+        "off": "Nenhuma métrica do lado do servidor coletada",
+        "offHint": "Seu coletor ainda não está coletando métricas por declaração do banco de dados. Ative a coleta de consultas principais na receita do coletor — a página de configuração explica o passo a passo.",
+        "setUp": "Configurar",
+        "readFailed": "Não foi possível ler as métricas do lado do servidor",
+        "readFailedHint": "A leitura falhou, então isso não diz nada sobre se o seu banco de dados está relatando declarações. Tudo acima ainda é medido a partir do seu aplicativo."
+      },
+      "callingServices": {
+        "title": "Qual dos seus serviços chamou isso",
+        "unjoinable": "Não exibido — esta declaração é executada em mais de um tipo de banco de dados aqui, e associar chamadores sem saber qual deles nomearia os serviços errados.",
+        "tracedCalls": "{calls} chamadas rastreadas",
+        "coverage": "{count} serviços vistos em {traced} das {executions} execuções acima. O restante veio de chamadores que você ainda não está rastreando.",
+        "coverageUnknown": "{count} serviços vistos em {traced} chamadas rastreadas. Seu banco de dados não relatou um total para esta declaração, então não há participação a fornecer.",
+        "noneNamed": "{traced} chamadas foram rastreadas, mas nenhuma delas pôde ser vinculada a um serviço — os rastreamentos começam fora deste intervalo de tempo."
+      },
+      "callersEmpty": {
+        "title": "Nenhuma chamada rastreada para esta consulta ainda",
+        "description": "Seu banco de dados relatou esta declaração, mas nada rastreou o aplicativo que a executou — então não há chamador para nomear e nenhuma execução individual para abrir. Instrumente os serviços que falam com este banco de dados e eles aparecerão aqui.",
+        "checklistTitle": "O que precisa ser verdade",
+        "setUp": "Configurar rastreamento",
+        "checks": {
+          "server": {
+            "ok": "Seu banco de dados está relatando esta consulta",
+            "okDetail": "é daí que vêm os tempos nas outras abas"
+          }
+        }
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "tempo de execução",
+        "serverWait": "tempo de espera",
+        "serverCounted": "contagem de servidores",
+        "clientObserved": "observado pelo cliente",
+        "serverReported": "relatado pelos seus bancos de dados"
+      }
+    },
+    "page": {
+      "tabs": {
+        "overview": "Visão geral",
+        "queries": "Principais consultas",
+        "samples": "Chamadas mais lentas",
+        "samplesHintClient": "Chamadas concluídas que seus serviços instrumentados observaram nesta janela — chamadores sem rastreamento não são contados, então este é um mínimo, não o total. A tabela mostra as mais lentas delas.",
+        "samplesHintServer": "Declarações que seus bancos de dados relataram concluídas nesta janela, contadas dentro do banco de dados. A tabela mostra as mais lentas delas.",
+        "samplesHintUnknown": "As chamadas individuais mais lentas ao banco de dados nesta janela.",
+        "deadlocks": "Deadlocks",
+        "blocked": "Consultas bloqueadas",
+        "deadlocksHint": "Deadlocks que seus bancos de dados relataram.",
+        "blockedHint": "Sessões aguardando um lock neste momento.",
+        "activity": "Atividade",
+        "activityHint": "Sessões que seus bancos de dados estão executando agora.",
+        "tableHealth": "Saúde da tabela",
+        "tableHealthHint": "Tamanho da tabela, estado de bloat e vacuum. Bloat e vacuum são exclusivos do PostgreSQL.",
+        "deadlocksLocked": "Deadlocks é um recurso Enterprise. Faça upgrade para ver quais consultas entraram em deadlock entre si e por quê. As outras abas de banco de dados funcionam em todos os planos.",
+        "blockedLocked": "Consultas bloqueadas é um recurso Enterprise. Faça upgrade para ver quais sessões estão esperando por um lock e o que o está segurando. As outras abas de banco de dados funcionam em todos os planos.",
+        "tableHealthLocked": "Saúde da tabela é um recurso Enterprise. Faça upgrade para acompanhar o tamanho da tabela, o estado de bloat e vacuum. As outras abas de banco de dados funcionam em todos os planos."
+      }
+    },
+    "samples": {
+      "title": "Chamadas mais lentas",
+      "subtitle": "As chamadas individuais mais lentas ao banco de dados nesta janela, em todos os bancos de dados e consultas — conforme medidas pelos chamadores, apenas chamadas concluídas",
+      "subtitleServer": "As instruções mais lentas que seus bancos de dados concluíram nesta janela, medidas dentro do banco de dados",
+      "logOffTitle": "Seus bancos de dados ainda não estão registrando instruções lentas",
+      "logOffDescription": "Nada rastreou essas chamadas, então pedimos aos bancos de dados suas próprias instruções mais lentas — e eles não registram nenhuma. Esta lista vem do log de instruções do PostgreSQL (log_min_duration_statement), que está desligado por padrão — a etapa de registro do cartão de configuração o ativa. A captura por instrução é atualmente exclusiva do PostgreSQL, então MySQL e MariaDB ainda não podem alimentar esta lista. As principais consultas ainda podem mostrar o que é executado com mais frequência, pois leem as tabelas de contadores em vez disso.",
+      "searchPlaceholder": "Buscar texto de consulta, serviço ou banco de dados…",
+      "columns": {
+        "query": "Consulta",
+        "when": "Quando",
+        "duration": "Duração",
+        "service": "Serviço",
+        "status": "Status"
+      },
+      "columnHints": {
+        "duration": "Quanto tempo esta chamada levou, medido pelo chamador. Conta apenas chamadas concluídas — uma consulta ainda em execução, ou uma que nunca retornou, não é medida aqui."
+      },
+      "failed": "Falhou",
+      "failedWithCode": "Falhou · {code}",
+      "viewTrace": "Abrir a solicitação da qual esta chamada fez parte",
+      "scatterOk": "Concluída",
+      "partial": "Parte dos seus dados de trace não pôde ser lida, então pode haver chamadas ausentes nesta lista.",
+      "disclosureShort": "Cada linha é uma chamada concluída real",
+      "disclosureDetail": "Medido pelo aplicativo que fez a chamada, a partir dos traces que você envia. Somente chamadas que terminaram estão aqui — uma consulta ainda em execução, ou uma que travou e nunca voltou, não produziu medição.",
+      "counts": {
+        "complete": "Mostrando todas as {count} chamadas ao banco de dados nesta janela, das mais lentas primeiro.",
+        "truncated": "As {count} chamadas mais lentas nesta janela — mais foram executadas do que são mostradas aqui.",
+        "filtered": "Mostrando {count} de {total} chamadas."
+      },
+      "serverList": {
+        "title": "Chamadas mais lentas relatadas pelos seus bancos de dados",
+        "subtitle": "Medido dentro de cada banco de dados no momento em que uma instrução terminou — todos os clientes são contados, mas a espera de rede e conexão não é. Nenhuma chamada de aplicativo rastreada ocorreu nesta janela, então a lista usual está vazia; quais chamadas aparecem aqui é determinado pelo próprio limite de registro do banco de dados. Esses relatórios por instrução atualmente vêm apenas do PostgreSQL — as receitas do coletor ainda não capturam os logs de instrução de outros mecanismos, então chamadas do MySQL e MariaDB não aparecerão aqui.",
+        "truncated": "As {count} chamadas relatadas mais lentas — mais cruzaram o limite do que são mostradas aqui",
+        "columns": {
+          "query": "Consulta",
+          "when": "Quando",
+          "took": "Duração",
+          "user": "Usuário"
+        },
+        "columnHints": {
+          "took": "Tempo no banco de dados do início ao fim da instrução, conforme medido pelo mecanismo. Não é o que qualquer chamador experimentou — espera de rede e conexão não estão incluídas."
+        }
+      }
+    },
+    "rowChips": {
+      "new": "NOVO NESTA LISTA",
+      "slower": "{ratio}× MAIS LENTO QUE O NORMAL",
+      "loop": "EXECUTA {multiplier}× POR REQUISIÇÃO",
+      "allFailed": "TODAS AS {count} FALHARAM",
+      "busier": "MAIS OCUPADO, NÃO MAIS LENTO",
+      "climbed": "NOVA CONSULTA MAIS PESADA"
+    },
+    "deadlocks": {
+      "title": "Bancos de dados",
+      "subtitle": "Transações que se bloquearam mutuamente e foram revertidas",
+      "deadlockCount": "nenhum deadlock | {count} deadlock | {count} deadlocks",
+      "pairCount": "nenhum par de consultas | {count} par de consultas | {count} pares de consultas",
+      "searchPlaceholder": "Buscar texto de consulta, tabela ou aplicativo…",
+      "grouping": {
+        "pairs": "Agrupar por par de consultas",
+        "pairsHint": "Uma linha por par de consultas que entram em deadlock entre si, com a frequência com que isso aconteceu.",
+        "events": "Cada evento",
+        "eventsHint": "Uma linha por deadlock, do mais recente para o mais antigo — use isso quando precisar de um momento específico."
+      },
+      "columns": {
+        "pair": "As duas consultas que entram em deadlock entre si",
+        "applications": "Aplicações",
+        "objects": "Linhas em disputa",
+        "lastSeen": "Último",
+        "count": "Deadlocks",
+        "when": "Quando",
+        "cancelled": "Cancelado",
+        "finished": "Concluído"
+      },
+      "coverage": {
+        "complete": "Todos os deadlocks que seus bancos de dados relataram estão aqui — {deadlocks} nesta janela, de {pairs}.",
+        "capped": "Ocorreram mais deadlocks do que conseguimos ler de uma vez. Esses são os {deadlocks} que temos, de {pairs} — o número real é maior.",
+        "readUpTo": "Lido até {time}.",
+        "mysqlPartial": "Seu banco de dados MySQL mantém apenas o deadlock mais recente, a menos que innodb_print_all_deadlocks esteja ativo."
+      },
+      "chips": {
+        "oppositeOrder": "ORDEM DE LINHAS OPOSTA",
+        "cadence": "A CADA {seconds}s",
+        "noQueries": "CONSULTAS NÃO CAPTURADAS",
+        "partial": "APENAS UM LADO"
+      },
+      "rowActions": {
+        "topQueries": "Encontre essas nas Principais consultas",
+        "copy": "Copiar ambas as consultas",
+        "alert": "Me alertar sobre deadlocks"
+      },
+      "detail": {
+        "mostRecent": "Mais recente · {time}",
+        "nthOf": "{index} de {total}",
+        "earlier": "Anterior",
+        "later": "Posterior",
+        "victim": "Cancelado pelo banco de dados",
+        "survivor": "Permitido concluir",
+        "pid": "pid {pid}",
+        "thread": "thread {pid}",
+        "transaction": "transação {id}",
+        "eachWaits": "cada um espera pelo outro",
+        "deadlock": "deadlock",
+        "noQueryCaptured": "O log registrou este deadlock, mas não a instrução.",
+        "waitingFor": "Estava esperando {target} terminar.",
+        "waitingForRow": "Estava esperando {target} terminar — a outra sessão já havia alterado a linha que queria.",
+        "rawLock": "{mode} · {target}",
+        "plainTitle": "O que aconteceu, em ordem.",
+        "plainBody": "{a} alterou uma linha e a manteve. {b} alterou outra e a manteve. Depois cada um tentou alterar a linha do outro, por isso nenhum conseguiu avançar. O banco de dados desfez o impasse cancelando {victim} — essa aplicação recebeu um erro e toda a transação foi revertida.",
+        "fixTitle": "A correção está no seu código, não no banco de dados.",
+        "fixBody": "Essas duas instruções tocam em linhas de {object} em ordem oposta. Faça com que ambos os lados atualizem na mesma ordem — primeiro o id mais baixo — e este par deixará de entrar em deadlock.",
+        "fixGeneric": "Ambos os lados seguram o que o outro quer. Faça com que cada transação obtenha esses bloqueios na mesma ordem e este par deixará de entrar em deadlock.",
+        "copyForSlack": "Copiar",
+        "occurrencesTitle": "Todas as {count} vezes em que este par entrou em deadlock",
+        "occurrencesHint": "Selecione um ponto para carregar aquele acima",
+        "lostLabel": "{pid} perdeu",
+        "bothSidesLose": "Ambos os lados são cancelados quase igualmente — {a} vs {b}. Nenhuma das aplicações é o problema; a ordem é.",
+        "oneSideLoses": "{pid} é cancelado todas as vezes.",
+        "showAbove": "Mostrar acima",
+        "copy": "Copiar SQL",
+        "seeInTopQueries": "Ver em Principais consultas",
+        "whichService": "Qual serviço?",
+        "partialTitle": "Apenas um lado deste deadlock chegou até nós",
+        "partialBody": "O MySQL escreve cada lado de um deadlock como uma entrada de log separada. A entrada do parceiro não chegou — pode estar fora desta janela, ou o log pode ter sido rotacionado entre os dois. O que é mostrado é real; a outra declaração simplesmente está ausente.",
+        "copyHint": "Copia apenas a declaração deste lado.",
+        "copySqlTooltip": "Copiar a declaração deste lado",
+        "copyForSlackHint": "Ambas as declarações, com que frequência este par entrou em deadlock e quando isso aconteceu pela última vez — escrito como uma mensagem que você pode colar em um canal ou ticket."
+      },
+      "storm": {
+        "title": "Tempestade de deadlocks.",
+        "body": "{count} nesta janela — normalmente nenhum.",
+        "copyForSlack": "Copiar",
+        "biasWarning": "Espere que a aba Principais consultas pareça mais calma do que a realidade agora. Uma consulta cancelada ainda termina, mas as que estão na fila atrás desses bloqueios não terminaram — então as contagens de chamadas lá são menores do que o que seus usuários estão experimentando."
+      },
+      "summary": {
+        "deadlocks": "Deadlocks",
+        "pairs": "Pares de consultas"
+      },
+      "healthy": {
+        "title": "Nenhum deadlock — e definitivamente estamos de olho",
+        "description": "Seus bancos de dados não relataram um único deadlock nesta janela. Isso é o normal saudável, não uma lacuna no que coletamos.",
+        "checklistTitle": "Como sabemos",
+        "collectionHealthy": "Coleta saudável",
+        "checks": {
+          "reading": {
+            "title": "Estamos lendo os logs dos seus bancos de dados",
+            "detail": "{databases} · linha mais recente lida {age}",
+            "detailNoFleet": "Linha mais recente lida {age}",
+            "detailUnknown": "{databases} — o pipeline de logs está conectado",
+            "detailUnknownNoFleet": "O pipeline de logs está conectado"
+          },
+          "reporting": {
+            "title": "O relatório de deadlocks está ativado",
+            "detail": "O Postgres registra deadlocks por padrão, e seu MySQL tem innodb_print_all_deadlocks ativado, então todos são registrados — não apenas o mais recente.",
+            "detailMysqlPartial": "O Postgres registra deadlocks por padrão. Seu MySQL não tem innodb_print_all_deadlocks ativado, então apenas o mais recente seria mantido.",
+            "detailUnknown": "O Postgres registra deadlocks por padrão. No MySQL, execute SELECT {'@@'}innodb_print_all_deadlocks — deve ser 1, ou apenas o deadlock mais recente é mantido. Não podemos ler essa configuração daqui.",
+            "titleUnknown": "Verifique se o relatório de deadlocks está ativado"
+          },
+          "traffic": {
+            "title": "Vimos {lines} outras linhas de log desses bancos de dados",
+            "detail": "então o pipeline está carregando tráfego — um deadlock teria passado por ele",
+            "titleUnknown": "O pipeline de logs está carregando tráfego"
+          },
+          "lastEver": {
+            "title": "Último deadlock que já vimos",
+            "detail": "{when}. Amplie a janela para vê-lo.",
+            "titleNone": "Nunca vimos um deadlock nesses bancos de dados",
+            "detailNone": "Nada para comparar ainda — esta janela não é incomum."
+          }
+        },
+        "widen": "Ampliar para as últimas 24 horas"
+      },
+      "notCollecting": {
+        "title": "Ainda não podemos ver deadlocks — e aqui está exatamente o porquê",
+        "description": "Deadlocks são relatados pelo próprio banco de dados, não pelos seus aplicativos. Verificamos quatro coisas.",
+        "checklistTitle": "O que verificamos",
+        "checks": {
+          "queries": {
+            "ok": "Seus dados de consultas estão chegando",
+            "okDetail": "{queries} de {databases} — a aba Principais consultas funciona",
+            "okDetailNoFleet": "{queries} — a aba Principais consultas funciona",
+            "no": "Também não está chegando nenhum dado de consultas",
+            "noDetail": "Comece pela aba Principais consultas — nada está chegando até nós desses bancos de dados ainda."
+          },
+          "enabled": {
+            "ok": "O monitoramento de banco de dados está ativado",
+            "okDetail": "para esta organização",
+            "no": "O monitoramento de banco de dados está desativado",
+            "noDetail": "Ative-o nas Configurações para começar a coletar."
+          },
+          "log": {
+            "no": "Nenhum banco de dados está nos enviando seu log",
+            "noDetail": "Os tempos de consulta vêm dos seus aplicativos, mas deadlocks são sempre gravados apenas no log do próprio banco de dados. Aponte seu coletor para o arquivo de log do Postgres ou MySQL e esta aba se preenche sozinha.",
+            "ok": "Um log de banco de dados está chegando",
+            "okDetail": "Portanto, um deadlock chegaria até nós — simplesmente não houve nenhum."
+          },
+          "settings": {
+            "title": "Vale a pena saber antes de começar",
+            "detail": "O Postgres escreve um deadlock em duas linhas de log e o MySQL em várias — as consultas participantes estão nas últimas. Uma configuração que corresponde apenas à primeira linha registra que ocorreu um deadlock e perde todas as consultas. Nossa receita lida com ambos."
+          }
+        }
+      }
+    },
+    "blocked": {
+      "title": "Bancos de dados",
+      "subtitle": "Sessões atualmente aguardando um lock",
+      "subtitlePast": "Sessões que aguardavam um lock durante esta janela",
+      "waitingCount": "nenhuma sessão aguardando um lock | {count} sessão aguardando um lock agora | {count} sessões aguardando um lock agora",
+      "waitingCountPast": "nenhuma sessão aguardou um lock | {count} sessão aguardou um lock nesta janela | {count} sessões aguardaram um lock nesta janela",
+      "sessionCount": "nenhuma sessão | {count} sessão | {count} sessões",
+      "searchPlaceholder": "Pesquisar texto da consulta, tabela ou aplicativo…",
+      "perspective": {
+        "waiting": "Quem está travado",
+        "waitingHint": "Uma linha por sessão que está aguardando um lock, começando pela espera mais longa.",
+        "blocking": "Quem está bloqueando",
+        "blockingHint": "A sessão que está segurando o lock, com tudo travado atrás dela."
+      },
+      "columns": {
+        "stuckQuery": "Consulta que está travada",
+        "session": "Sessão",
+        "waitingFor": "Aguardando por",
+        "heldUpBy": "Bloqueado por",
+        "waiting": "Aguardando",
+        "sessionQuery": "Sessão e o que está executando",
+        "application": "Aplicação",
+        "blocking": "Bloqueando"
+      },
+      "coverage": {
+        "summary": "A espera mais longa é {longest}. Cada espera remonta a {roots} mantendo um lock aberto.",
+        "summaryCapped": "Mais sessões estavam esperando do que conseguimos ler de uma vez. Das que temos, a espera mais longa é {longest} e elas remontam a {roots} mantendo um lock aberto.",
+        "summaryOneRoot": "uma sessão",
+        "summaryManyRoots": "{count} sessões",
+        "checked": "Verificado a cada {interval} segundos; última verificação {time}.",
+        "checkedUnknown": "Coletado das tabelas de lock do seu próprio banco de dados."
+      },
+      "rowActions": {
+        "showChain": "Mostrar a cadeia",
+        "copy": "Copiar consulta",
+        "alertMe": "Me alerte sobre esperas de lock"
+      },
+      "waitEvent": {
+        "transaction": "outra transação para terminar",
+        "row": "um lock de linha",
+        "table": "um lock de tabela",
+        "extend": "a tabela crescer",
+        "advisory": "um lock de aplicação",
+        "object": "um lock de objeto",
+        "buffer": "uma página de dados ser lida",
+        "lock": "um lock"
+      },
+      "deep": "{count} de profundidade",
+      "notWaiting": "não aguardando",
+      "longestWait": "ESPERA MAIS LONGA",
+      "holdsTheLock": "SEGURA O LOCK QUE TODOS QUEREM",
+      "lastStatement": "último comando há {age}",
+      "idleInTransaction": "não aguardando nada · ocioso em uma transação aberta",
+      "pills": {
+        "root": "RAIZ — COMECE AQUI",
+        "waitingBlocking": "AGUARDANDO & BLOQUEANDO {count}",
+        "waiting": "AGUARDANDO"
+      },
+      "waitingOn": "aguardando {pid}",
+      "degraded": "Uma sessão está bloqueando {count}. Ela está com uma transação aberta há {age} e não executou uma consulta nesse tempo — provavelmente um aplicativo que esqueceu de fazer commit.",
+      "footer": {
+        "allLeadBack": "Todos os {waits} levam de volta ao pid {pid}",
+        "allLeadBackDetail": "— uma sessão, mantendo um bloqueio em {object}.",
+        "switchToBlocking": "Mudar para “Quem está bloqueando”",
+        "releaseAll": "Encerrar a sessão {pid} libera todos os {count}.",
+        "releaseAllDetail": "Tudo abaixo dela está esperando apenas por causa desse único bloqueio.",
+        "timeLost": "tempo total perdido: {seconds} em {sessions}"
+      },
+      "terminate": {
+        "copied": "Copiado",
+        "hint": "Execute você mesmo em {instance} para encerrar a sessão. Nós nunca executamos isso por você.",
+        "hintNoInstance": "Execute você mesmo para encerrar a sessão. Nós nunca executamos isso por você."
+      },
+      "summary": {
+        "waiting": "Sessões esperando",
+        "longest": "Espera mais longa",
+        "chains": "Cadeias"
+      },
+      "rootCount": "nenhum bloqueador raiz | {count} bloqueador raiz | {count} bloqueadores raiz",
+      "inChain": "{count} sessões na cadeia",
+      "healthy": {
+        "title": "Nada está esperando por um bloqueio",
+        "description": "Nenhuma sessão nos seus bancos de dados está presa atrás de outra agora. Isso é o normal saudável, não uma lacuna no que coletamos.",
+        "descriptionPast": "Nenhuma sessão nos seus bancos de dados estava presa atrás de outra durante esta janela. Isso é o normal saudável, não uma lacuna no que coletamos.",
+        "checklistTitle": "Como sabemos",
+        "collectionHealthy": "Coleta saudável",
+        "checks": {
+          "sampling": {
+            "title": "Estamos verificando as tabelas de bloqueio dos seus bancos de dados",
+            "detail": "a cada {interval} segundos · última verificação {age}",
+            "detailUnknown": "no agendamento configurado para o seu coletor"
+          },
+          "sessions": {
+            "title": "As sessões estão executando normalmente",
+            "detail": "podemos ver sessões ativas, e nenhuma delas está em uma fila de bloqueio"
+          },
+          "meaning": {
+            "title": "O que esta aba mostra quando não está vazia",
+            "detail": "Uma sessão esperando por um bloqueio mantido por outra, e a cadeia de volta para a sessão que o está segurando. Esperas curtas são normais e se resolvem sozinhas — esta aba é para as que não se resolvem."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "Ainda não conseguimos ver consultas bloqueadas — e aqui está o motivo exato",
+        "description": "Uma consulta bloqueada só é visível de dentro do banco de dados, em suas tabelas de bloqueio. Verificamos três coisas.",
+        "checklistTitle": "O que verificamos",
+        "checks": {
+          "queries": {
+            "ok": "Seus dados de consulta estão chegando",
+            "okDetail": "{queries} de {databases} — a aba Principais consultas funciona",
+            "okDetailNoFleet": "{queries} — a aba Principais consultas funciona",
+            "no": "Também não está chegando nenhum dado de consulta",
+            "noDetail": "Comece pela aba Principais consultas — nada está chegando até nós desses bancos de dados ainda."
+          },
+          "enabled": {
+            "ok": "O monitoramento de banco de dados está ativado",
+            "okDetail": "para esta organização",
+            "no": "O monitoramento de banco de dados está desativado",
+            "noDetail": "Ative-o nas Configurações para começar a coletar."
+          },
+          "sampling": {
+            "no": "Nada está coletando amostras das tabelas de bloqueio dos seus bancos de dados",
+            "noDetail": "Quem está esperando por quem existe apenas dentro do banco de dados, e apenas enquanto a espera está acontecendo. Nossa receita de coletor lê isso em um agendamento e ativa log_lock_waits para que esperas longas também sejam registradas.",
+            "ok": "A amostragem das tabelas de bloqueio está em execução",
+            "okDetail": "então uma sessão bloqueada chegaria até nós — simplesmente não há nenhuma."
+          },
+          "settings": {
+            "title": "Vale a pena saber antes de começar",
+            "detail": "log_lock_waits só registra uma espera quando ela dura mais que deadlock_timeout — um segundo por padrão. Esperas mais curtas que isso são normais e permanecem não registradas, por isso esta aba faz amostragem ao vivo em vez de ler apenas o log."
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "Atividade",
+      "subtitle": "O que seus bancos de dados estão fazendo agora, amostrado de suas próprias tabelas de sessão.",
+      "subtitlePast": "O que seus bancos de dados estavam fazendo durante esta janela, amostrado de suas próprias tabelas de sessão.",
+      "searchPlaceholder": "Pesquisar sessões, usuários, aplicativos",
+      "wait": {
+        "onCpu": "Em CPU / sem espera",
+        "qualified": "{type}: {event}",
+        "plain": "{event}",
+        "remainder": "+{count} mais eventos de espera ({share})",
+        "remainderNoShare": "+{count} mais eventos de espera"
+      },
+      "disclosure": {
+        "sampled": "Amostrado a cada {interval} segundos — esta é uma série de instantâneos, não uma gravação contínua, então uma sessão mais curta que o intervalo entre amostras pode ser executada e terminar sem ser vista.",
+        "sampledUnknown": "Amostrado em um cronograma — esta é uma série de instantâneos, não uma gravação contínua. Ainda não vimos amostras suficientes para descobrir com que frequência seu coletor faz polling.",
+        "filtered": "A amostra já é filtrada pelo seu coletor: sessões ociosas mais antigas que a consulta mais recente em execução são deixadas de fora, a menos que estejam bloqueando alguém. Portanto, esta não é uma lista completa de todas as conexões.",
+        "short": "Amostrado a cada {interval}s, e pré-filtrado",
+        "shortUnknown": "Amostrado em um cronograma, e pré-filtrado",
+        "more": "O que isso significa"
+      },
+      "columns": {
+        "session": "Sessão",
+        "user": "Usuário",
+        "application": "Aplicação",
+        "state": "Estado",
+        "waitEvent": "Aguardando por",
+        "running": "Tempo em execução",
+        "lastQuery": "Última consulta",
+        "query": "Consulta",
+        "blockedBy": "Bloqueado por"
+      },
+      "summary": {
+        "sessions": "Sessões",
+        "onCpu": "Na CPU",
+        "waiting": "Aguardando",
+        "idleInTransaction": "Ocioso em transação"
+      },
+      "state": {
+        "unknown": "Estado não informado"
+      },
+      "counts": {
+        "complete": "Mostrando {count} sessões.",
+        "capped": "Mais sessões foram amostradas do que conseguimos ler de uma vez. Estas são as {count} que temos.",
+        "filtered": "Mostrando {count} de {total} sessões."
+      },
+      "transactionOpen": "transação aberta há {age}",
+      "healthy": {
+        "title": "Nada está em execução agora",
+        "description": "Amostramos as tabelas de sessão dos seus bancos de dados e não encontramos sessões ativas. Esse é o normal saudável para um banco de dados ocioso, não uma lacuna no que coletamos.",
+        "descriptionPast": "Amostramos as tabelas de sessão dos seus bancos de dados durante esta janela e não encontramos sessões ativas. Esse é o normal saudável para um banco de dados ocioso, não uma lacuna no que coletamos.",
+        "checklistTitle": "Como sabemos",
+        "collectionHealthy": "Coleta saudável",
+        "checks": {
+          "sampling": {
+            "title": "Estamos amostrando as tabelas de sessão dos seus bancos de dados",
+            "detail": "a cada {interval} segundos · última verificação {age}",
+            "detailUnknown": "no cronograma do seu coletor"
+          },
+          "pipeline": {
+            "title": "Seus bancos de dados estão chegando até nós",
+            "detail": "{lines} outras linhas passaram pelo mesmo pipeline nesta janela",
+            "detailUnknown": "o pipeline que transporta esses dados está em execução"
+          },
+          "meaning": {
+            "title": "O que esta aba mostra quando não está vazia",
+            "detail": "Cada sessão que seus bancos de dados estão executando, em que cada uma está esperando e há quanto tempo está em andamento. Como fazemos amostragem em vez de observar continuamente, consultas muito curtas podem terminar entre duas amostras e nunca aparecer."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "Ainda não podemos ver sessões ao vivo — e aqui está exatamente o porquê",
+        "description": "O que um banco de dados está fazendo agora existe apenas dentro desse banco, em sua própria tabela de sessão. Algo precisa consultá-la. Verificamos três coisas.",
+        "checklistTitle": "O que verificamos",
+        "checks": {
+          "queries": {
+            "ok": "Seus dados de consulta estão chegando",
+            "okDetail": "{queries} de {databases} — a aba Top queries funciona",
+            "okDetailNoFleet": "{queries} — a aba Top queries funciona",
+            "no": "Também não está chegando nenhum dado de consulta",
+            "noDetail": "Comece pela aba Top queries — nada está chegando até nós desses bancos de dados ainda."
+          },
+          "enabled": {
+            "ok": "O monitoramento de banco de dados está ativado",
+            "okDetail": "para esta organização",
+            "no": "O monitoramento do banco de dados está desativado",
+            "noDetail": "Ative-o nas Configurações para começar a coletar."
+          },
+          "sampling": {
+            "no": "Nada está amostrando as tabelas de sessão dos seus bancos de dados",
+            "noDetail": "As amostras de sessão vêm do seu coletor: ative db.server.query_sample na receita do coletor no host do banco de dados — a página de configuração explica o passo a passo. O OpenObserve aceita esse feed sempre que o monitoramento do banco de dados estiver ativo, então a correção está no lado do coletor."
+          }
+        }
+      }
+    },
+    "instanceMetrics": {
+      "columnHeader": "Saúde da instância",
+      "columnHint": "Conexões em relação ao limite, a partir das métricas que seu coletor já envia. Em branco até que um receptor informe esta instância.",
+      "connectionsOf": "{used} de {limit} conexões",
+      "connectionsNoLimit": "{used} conexões",
+      "noLimitHint": "O receptor para este mecanismo não publica um limite de conexão por conta própria, então apenas a contagem é mostrada. A receita de limite de conexão do cartão de configuração (sqlquery/mysql_limits) coleta max_connections e transforma isso em uma porcentagem.",
+      "trendLabel": "Conexões ao longo da janela selecionada",
+      "cacheHit": "Acerto de cache {percent}",
+      "lagBytes": "Réplica {value} atrás",
+      "lagSeconds": "Réplica {value} atrás",
+      "deadlocks": "{count} deadlock | {count} deadlocks",
+      "noTraffic": "Nenhum tráfego de aplicativo nesta janela",
+      "noTrafficHint": "Seu coletor informa esta instância, mas nenhum aplicativo a consultou durante esta janela. Suas colunas de consulta estão vazias porque nada as mediu, não porque estava rápido.",
+      "unmatched": {
+        "pooler": "Nenhuma métrica de instância correspondeu a este endereço",
+        "poolerHint": "Esta linha é o endereço ao qual seu aplicativo se conectou. Seu coletor informa hosts diferentes, que é o que um pooler de conexões no meio parece — o endereço do pooler e o banco de dados real nunca correspondem.",
+        "loopback": "Nenhuma métrica de instância correspondeu a este endereço",
+        "loopbackHint": "Esta linha aponta para localhost. O coletor reescreve um endpoint de loopback para seu próprio hostname, então os dois nomes nunca podem corresponder, mesmo quando ambos estão saudáveis.",
+        "noReceiver": "O receptor {engine} não está reportando",
+        "noReceiverHint": "Seus aplicativos estão consultando este banco de dados, mas nenhum receptor {engine} está enviando métricas de servidor para ele. Adicione o receptor {engine} ao seu coletor para preencher esta coluna.",
+        "noReceiverMariadbHint": "Seus aplicativos estão consultando este servidor MariaDB, mas nada está enviando métricas de servidor para ele. Não há um receptor MariaDB separado — aponte um receptor MySQL para esta instância e as métricas dele preencherão esta coluna.",
+        "engineUnsupported": "Não coletado para {engine}",
+        "engineUnsupportedHint": "As métricas de instância são coletadas para PostgreSQL, MySQL e MariaDB — nenhum receptor está configurado para {engine} ainda, então esta coluna permanece vazia. Isso é uma nota de cobertura, não um veredito de saúde.",
+        "unreadable": "Não foi possível ler as métricas de instância",
+        "unreadableHint": "Os fluxos de métricas existem, mas não puderam ser lidos. Normalmente é um problema de permissão, não algo errado com o banco de dados."
+      },
+      "limitUnknownHint": "A contagem de conexões chegou, mas o limite não, então nenhuma porcentagem pode ser exibida. Verifique se a métrica de limite de conexão está habilitada neste coletor.",
+      "noReading": "Nenhuma leitura nesta janela",
+      "noReadingHint": "Seu coletor informa esta instância, mas não enviou métrica de conexão durante esta janela. A métrica pode estar desativada no receptor, ou a instância pode ter parado de informar.",
+      "lagLabel": "Atraso de réplica",
+      "deadlockLabel": "deadlocks"
+    },
+    "tableHealth": {
+      "title": "Saúde das tabelas",
+      "subtitle": "Tamanho, bloat e estado de vacuum para cada tabela, instantâneo mais recente primeiro.",
+      "searchPlaceholder": "Pesquisar tabelas",
+      "never": "Nunca",
+      "countersCumulative": "As contagens de scan e vacuum são totais acumulados desde a última redefinição de estatísticas, não contagens para o intervalo de tempo selecionado.",
+      "tuplesEstimated": "As contagens de linhas e a porcentagem de bloat são estimativas de estatísticas do mecanismo de banco de dados, não contagens exatas.",
+      "notCollectingTitle": "Nenhuma estatística de tabela ainda",
+      "notCollectingDescription": "Nada relatou estatísticas de tabela neste intervalo de tempo. Este sinal é fornecido como uma receita de coletor separada.",
+      "engineUnsupportedTitle": "Não coletado para este mecanismo",
+      "engineUnsupportedDescription": "A saúde das tabelas é coletada por uma receita de coletor por mecanismo, e nenhuma receita é fornecida para este mecanismo — então nada é coletado para ele. Isso não é um sinal de tudo limpo.",
+      "checklistTitle": "Para começar a coletar",
+      "checkRecipe": "Adicione a receita pg_table_stats do guia de configuração de bancos de dados à configuração do seu coletor.",
+      "checkGrant": "Conceda pg_monitor ao usuário do coletor para que ele possa ler pg_stat_user_tables.",
+      "checkRange": "Amplie o intervalo de tempo — a receita informa uma vez a cada 60 segundos.",
+      "columns": {
+        "relation": "Tabela",
+        "instance": "Instância",
+        "totalBytes": "Tamanho total",
+        "heapBytes": "Tamanho do heap",
+        "overheadBytes": "Índice + TOAST",
+        "liveTuples": "Linhas vivas (est.)",
+        "deadTuples": "Linhas mortas (est.)",
+        "deadTupPct": "Inchaço (est.)",
+        "modSinceAnalyze": "Linhas desde a análise",
+        "seqScanCount": "Varreduras sequenciais (acumulado)",
+        "seqTupRead": "Linhas varridas sequencialmente (acumulado)",
+        "idxScanCount": "Varreduras de índice (acumulado)",
+        "autovacuumCount": "Autovacuums (acumulado)",
+        "frozenXidAge": "Idade do Txid",
+        "lastVacuum": "Último vacuum",
+        "lastAutovacuum": "Último autovacuum",
+        "lastAnalyze": "Última análise"
+      },
+      "countLine": "{count} tabelas"
+    },
+    "recommendations": {
+      "title": "Recomendações",
+      "subtitle": "Verificações determinísticas sobre o que o coletor já relata. Cada uma informa a medição e o limite que foi ultrapassado.",
+      "countersCumulative": "As contagens de varredura de índice são totais desde a última redefinição das estatísticas, não contagens para o período selecionado.",
+      "andMore": "e mais {count} como este",
+      "unused-index": {
+        "title": "Índice não varrido",
+        "body": "{index} em {relation} não tem varreduras registradas e ocupa {size}.",
+        "rule": "A contagem de varredura do índice é 0 desde a última redefinição das estatísticas, e o índice tem pelo menos {bytes} bytes. As contagens de varredura são totais acumulados, não contagens para o período selecionado.",
+        "caveat": "Uma contagem acumulada de zero significa que o planejador não escolheu este índice desde a última redefinição dos contadores. Ele ainda pode servir a uma réplica, a um trabalho periódico ou a uma restrição."
+      },
+      "long-running-query": {
+        "title": "Consulta de longa duração",
+        "body": "A sessão {pid} está em execução há {duration}.",
+        "rule": "Uma sessão ativa está em execução há pelo menos {seconds} segundos. Sessões ociosas são excluídas."
+      },
+      "high-impact-blocker": {
+        "title": "Bloqueador segurando várias sessões",
+        "body": "A sessão {pid} está no início de uma cadeia com {count} sessões aguardando.",
+        "rule": "Um bloqueador raiz — uma sessão que bloqueia outras e não espera por nenhuma — tem pelo menos {sessions} sessões aguardando atrás dele, contadas em toda a cadeia."
+      },
+      "high-row-count": {
+        "title": "Muitas linhas por chamada",
+        "body": "Esta instrução retornou em média {rows} linhas por chamada em {calls} chamadas.",
+        "rule": "A média de linhas por chamada é de pelo menos {rows}, em pelo menos {calls} chamadas. A média é o total de linhas do servidor dividido pelo número de chamadas."
+      },
+      "enginePartialTitle": "Algumas verificações não foram executadas",
+      "enginePartialDescription": "A verificação de índice não utilizado precisa de um contador de varredura de índice, que não é coletado para este mecanismo, portanto uma lista vazia aqui não é um sinal de tudo limpo.",
+      "allClearTitle": "Nenhum limite foi ultrapassado",
+      "allClearDescription": "Todas as verificações foram executadas e nenhuma ultrapassou seu limite neste período."
     }
   }
 }

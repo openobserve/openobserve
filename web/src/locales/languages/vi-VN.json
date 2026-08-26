@@ -1223,7 +1223,10 @@
     "ingestionText": "Tiếp nhận dữ liệu",
     "navigationLink": "Liên kết điều hướng",
     "ariaCurrentPage": "{label} - Trang hiện tại",
-    "ariaWithNotifications": "{label} ({count} thông báo)"
+    "ariaWithNotifications": "{label} ({count} thông báo)",
+    "infra": "Hạ tầng",
+    "databases": "Cơ sở dữ liệu",
+    "topQueries": "Truy vấn hàng đầu"
   },
   "rum": {
     "noSessionReplay": "Không có bản phát lại phiên nào",
@@ -3442,6 +3445,17 @@
     "languagesLabel": "Ngôn ngữ/Khung",
     "otherLabel": "Khác",
     "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "snowflake": "Snowflake",
+    "zookeeper": "Zookeeper",
+    "cassandra": "Cassandra",
+    "aerospike": "Aerospike",
+    "dynamodb": "DynamoDB",
+    "jenkins": "Jenkins",
+    "ansible": "Ansible",
+    "terraform": "Terraform",
+    "gactions": "GitHub Actions",
+    "python": "Python",
     "dotnettracing": ".Net Tracing",
     "dotnetlogs": ".Net Logs",
     "macos": "macOS",
@@ -3703,6 +3717,12 @@
       "k8sTroubleWebhookA": "Webhook của operator OpenTelemetry cần webhook của cert-manager hoạt động trước. Chạy `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook`, sau đó chạy lại cài đặt — nó có tính lũy đẳng (idempotent).",
       "k8sTroubleWebhookQ": "Cài đặt thất bại với lỗi về admission webhook",
       "linuxAgentFixBody": "Trình cài đặt khởi động agent như một dịch vụ systemd. Nếu không có gì đến, hãy xác nhận nó đang chạy và đọc nhật ký của nó để tìm lỗi xác thực hoặc kết nối:",
+      "prepareMariadbTitle": "Chuẩn bị MariaDB",
+      "prepareMariadbDesc": "Tạo người dùng giám sát — chạy trong SQL client, **không phải** shell của bạn.",
+      "runCollectorMariadbDesc": "Khởi động collector (mật khẩu của người dùng qua biến môi trường).",
+      "mariadbHostLabel": "Máy chủ MariaDB",
+      "verifyMariadbMetricsDesc": "Nhấn Test bên dưới, hoặc kiểm tra Streams để xem các số liệu `mysql_*` (MariaDB báo cáo qua bộ thu MySQL).",
+      "mariadbTagline": "Thu thập số liệu MariaDB bằng OpenTelemetry Collector và gửi chúng đến OpenObserve.",
       "logsStreamNameLabel": "Tên Logs Stream",
       "macosAgentFixBody": "Trình cài đặt đăng ký hai daemon launchd: agent và cầu nối nhật ký thống nhất. Nếu không có gì đến, hãy xác nhận cả hai đã được nạp và đọc nhật ký của agent để tìm lỗi xác thực hoặc kết nối:",
       "macosAgentServicesFixTitle": "Kiểm tra Dịch vụ Agent",
@@ -4007,7 +4027,46 @@
       "enableSessionReplayOptionalTitle": "Bật phát lại phiên (Tùy chọn)",
       "enableSessionReplayNativeDesc": "Phát lại phiên được bật **riêng biệt** và **không** kế thừa điểm cuối RUM. Nó cũng không thêm gì, vì vậy nó cần URL `/replay` đầy đủ bên dưới. Việc cấu hình sai là lý do thường gặp khiến các sự kiện RUM đến được nhưng các bản phát lại thì không.",
       "verifyAndroidRumDesc": "Chạy ứng dụng trên trình giả lập hoặc thiết bị, di chuyển qua một vài màn hình, sau đó nhấn Kiểm tra — các sự kiện Android gốc sẽ được ghi vào luồng `_rumdata`.",
-      "verifyIosRumDesc": "Chạy ứng dụng trên trình mô phỏng hoặc thiết bị, di chuyển qua một vài màn hình, sau đó nhấn Kiểm tra — các sự kiện iOS gốc sẽ được ghi vào luồng `_rumdata`."
+      "verifyIosRumDesc": "Chạy ứng dụng trên trình mô phỏng hoặc thiết bị, di chuyển qua một vài màn hình, sau đó nhấn Kiểm tra — các sự kiện iOS gốc sẽ được ghi vào luồng `_rumdata`.",
+      "dbmPreparePostgresTitle": "Giám sát cơ sở dữ liệu · Cấp quyền truy cập (tùy chọn)",
+      "dbmPreparePostgresDesc": "**Mọi thứ ở trên tự nó đã hoàn chỉnh** — thời gian truy vấn đã đến được Databases từ trace của ứng dụng bạn, mà không cần thiết lập gì ở đây. Các bước cuối cùng này bổ sung những gì trace không bao giờ thấy được: deadlock và các truy vấn bị chặn, thứ mà chỉ cơ sở dữ liệu tự ghi lại. Cấp quyền `pg_monitor` để collector có thể đọc các truy vấn của phiên khác — chạy trong SQL client, **không phải** shell của bạn.",
+      "dbmPrepareMysqlTitle": "Giám sát cơ sở dữ liệu · Giữ lịch sử deadlock (tùy chọn)",
+      "dbmPrepareMariadbTitle": "Giám sát cơ sở dữ liệu · Giữ lịch sử deadlock (tùy chọn)",
+      "dbmPrepareMysqlDesc": "**Mọi thứ ở trên tự nó đã hoàn chỉnh** — thời gian truy vấn đã đến được Databases từ trace của ứng dụng bạn, mà không cần thiết lập gì ở đây. Các bước cuối cùng này bổ sung những gì trace không bao giờ thấy được: deadlock và các truy vấn bị chặn, thứ mà chỉ cơ sở dữ liệu tự ghi lại. Bật lịch sử deadlock đầy đủ — chạy trong SQL client, **không phải** shell của bạn.",
+      "dbmPrepareMariadbDesc": "**Mọi thứ ở trên tự nó đã hoàn chỉnh** — thời gian truy vấn đã đến được Databases từ trace của ứng dụng bạn, mà không cần thiết lập gì ở đây. Các bước cuối cùng này bổ sung những gì trace không bao giờ thấy được: deadlock và các truy vấn bị chặn, thứ mà chỉ cơ sở dữ liệu tự ghi lại. Bật lịch sử deadlock đầy đủ — chạy trong SQL client, **không phải** shell của bạn.",
+      "dbmPgLoggingTitle": "Giám sát cơ sở dữ liệu · Cho Postgres ghi lại deadlock (tùy chọn)",
+      "dbmPgLoggingDesc": "Deadlock chỉ được ghi vào nhật ký Postgres, và chỉ khi các cài đặt bên dưới được bật — vì vậy bước này là thứ làm cho tab Deadlocks có dữ liệu. Dòng tiền tố phải khớp chính xác: collector đọc nó để tìm ai đã liên quan, và tiền tố khác có nghĩa là nó không tìm thấy gì trong khi vẫn báo cáo khỏe mạnh.",
+      "dbmPgLoggingVerifyTitle": "Giám sát cơ sở dữ liệu · Kiểm tra các cài đặt đã có hiệu lực (tùy chọn)",
+      "dbmPgLoggingVerifyDesc": "Chạy lệnh này sau khi khởi động lại. Nếu bất kỳ giá trị nào vẫn hiển thị cài đặt cũ, Postgres đã được tải lại thay vì khởi động lại và collector sẽ không có gì để đọc.",
+      "dbmPgAutoExplainTitle": "Giám sát cơ sở dữ liệu · Thu thập các kế hoạch thực thi thực tế (tùy chọn)",
+      "dbmPgAutoExplainDesc": "Không có bước này, các kế hoạch truy vấn chỉ là ước tính chung được tính mà không có giá trị tham số thực của bạn — hữu ích, nhưng không bao giờ là kế hoạch thực sự đã chạy. auto_explain ghi lại kế hoạch mà Postgres thực sự thực thi cho bất kỳ câu lệnh nào chậm hơn ngưỡng, với số hàng thực và thời lượng thực. Nó thêm chi phí thực thi đáng kể cho các câu lệnh được lấy mẫu, vì vậy hãy đọc các chú thích cài đặt trước khi áp dụng chúng vào primary đang bận, và thực hiện trong cùng lần khởi động lại với bước ghi nhật ký ở trên.",
+      "dbmConfigureTitle": "Giám sát cơ sở dữ liệu · Cấu hình collector (tùy chọn)",
+      "dbmConfigurePostgresDesc": "Ghi `dbm-config.yaml` — đặt cơ sở dữ liệu và đường dẫn đến tệp nhật ký Postgres của bạn bên dưới. Bên cạnh deadlock và các truy vấn bị chặn, cấu hình này bật mẫu hoạt động và truy vấn hàng đầu của máy chủ (với kế hoạch ước tính): collector đi kèm với cả hai ở trạng thái TẮT theo mặc định, vì vậy khối `events:` ở cấp cao nhất trong tệp này là thứ kích hoạt chúng — nếu không có nó, collector trông khỏe mạnh nhưng không gửi gì.",
+      "dbmConfigureMysqlDesc": "Ghi `dbm-config.yaml` — đặt cơ sở dữ liệu và đường dẫn đến tệp nhật ký lỗi MySQL của bạn bên dưới. Bên cạnh deadlock và các truy vấn bị chặn, cấu hình này bật mẫu hoạt động và truy vấn hàng đầu của máy chủ: collector đi kèm với cả hai ở trạng thái TẮT theo mặc định, vì vậy khối `events:` ở cấp cao nhất trong tệp này là thứ kích hoạt chúng — nếu không có nó, collector trông khỏe mạnh nhưng không gửi gì.",
+      "dbmConfigureMariadbDesc": "Ghi `dbm-config.yaml` — đặt cơ sở dữ liệu và đường dẫn đến tệp nhật ký lỗi MariaDB của bạn bên dưới. MariaDB có deadlock, truy vấn bị chặn, mẫu hoạt động và truy vấn hàng đầu ở đây: bộ thu mysql nói giao thức của MariaDB và xác định nó một cách chính xác. Một điểm thiếu sót mà bộ thu tự báo cáo — MariaDB không hiển thị văn bản câu lệnh được lấy mẫu, vì vậy một hàng hoạt động chỉ nêu tên phiên mà không có SQL của nó.",
+      "dbmRunTitle": "Giám sát cơ sở dữ liệu · Chạy collector (tùy chọn)",
+      "dbmRunPostgresDesc": "Chạy cả hai cấu hình cùng nhau. Sử dụng cùng vai trò và mật khẩu bạn đã tạo ở bước 1.",
+      "dbmRunMysqlDesc": "Chạy cả hai cấu hình cùng nhau. Sử dụng cùng người dùng và mật khẩu bạn đã tạo ở bước 1.",
+      "dbmRunMariadbDesc": "Chạy cả hai cấu hình cùng nhau. Sử dụng cùng người dùng và mật khẩu bạn đã tạo ở bước 1.",
+      "dbmVerifyTitle": "Giám sát cơ sở dữ liệu · Xem deadlock và các truy vấn bị chặn",
+      "dbmVerifyDesc": "Mở **Infra → Databases** và chọn một tab bên dưới. Sự kiện xuất hiện ngay khi cơ sở dữ liệu của bạn báo cáo một sự kiện — tab trống ở đó cho bạn biết liệu không có gì xảy ra hay không có gì đang được thu thập.",
+      "dbmVerifyFullDesc": "Mở **Infra → Databases** và chọn một tab bên dưới. Deadlock và các truy vấn bị chặn xuất hiện ngay khi cơ sở dữ liệu của bạn báo cáo một sự kiện; tab Hoạt động được điền với các phiên được lấy mẫu trong vòng một phút sau khi collector khởi động, và các kế hoạch ước tính xuất hiện trên trang chi tiết truy vấn trên MySQL 8.0.22 và mới hơn. Sức khỏe bảng được điền sau ảnh chụp 60 giây đầu tiên.",
+      "dbmDatabaseLabel": "Cơ sở dữ liệu",
+      "dbmPgLogPathLabel": "Tệp nhật ký Postgres",
+      "dbmPgLogPathHelp": "Collector phải có thể đọc tệp này. Tìm nó bằng: SHOW log_directory;",
+      "dbmMysqlLogPathLabel": "Nhật ký lỗi MySQL",
+      "dbmMariadbLogPathLabel": "Nhật ký lỗi MariaDB",
+      "dbmMysqlLogPathHelp": "Collector phải có thể đọc tệp này. Tìm nó bằng: SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "Collector phải có thể đọc tệp này. Tìm nó bằng: SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "Giám sát cơ sở dữ liệu · Cấp quyền truy cập (tùy chọn)",
+      "dbmPrepareMssqlDesc": "**Mọi thứ ở trên tự nó đã hoàn chỉnh** — thời gian truy vấn đã đến được mục Databases từ trace của ứng dụng của bạn, không cần cấu hình gì ở đây. Nhóm cuối này bổ sung thứ mà trace không bao giờ thấy được: deadlock và truy vấn bị chặn, chỉ có cơ sở dữ liệu tự ghi lại. Cần cả hai quyền — một quyền cho phép bộ thu đọc các phiên khác, quyền kia cho phép nó đọc lịch sử deadlock. Hãy chạy chúng trong SQL client, **không phải** shell của bạn.",
+      "dbmConfigureMssqlDesc": "Ghi `dbm-config.yaml` — đặt cơ sở dữ liệu muốn kết nối bên dưới. SQL Server sẽ nhận được deadlock, truy vấn bị chặn, mẫu hoạt động, truy vấn hàng đầu và kế hoạch thực thi ở đây. Bộ thu sqlserver đọc trên toàn bộ instance, vì vậy hoạt động và truy vấn hàng đầu không bị giới hạn trong cơ sở dữ liệu bạn nêu ở trên.",
+      "dbmRunMssqlDesc": "Chạy cả hai cấu hình cùng nhau. Sử dụng cùng tên đăng nhập và mật khẩu bạn đã tạo ở bước 1.",
+      "dbmVerifyBlockingDesc": "Mở **Infra → Databases → Blocked queries**. Các phiên đang chờ khóa sẽ xuất hiện ngay khi có phiên được lấy mẫu — một tab trống ở đó cho bạn biết liệu không có gì bị chặn hay không có gì đang được thu thập.",
+      "dbmVerifyFullNoSampleTextDesc": "Mở **Infra → Databases** và chọn một tab bên dưới. Deadlock và truy vấn bị chặn xuất hiện ngay khi cơ sở dữ liệu của bạn báo cáo; tab Activity sẽ đầy các phiên được lấy mẫu trong vòng một phút sau khi bộ thu khởi động, và các truy vấn hàng đầu mang theo kế hoạch thực thi của chúng trên trang chi tiết của truy vấn. MariaDB không hiển thị văn bản câu lệnh được lấy mẫu, vì vậy một hàng hoạt động đặt tên phiên mà không có SQL của nó. Sức khỏe bảng được điền sau khi chụp nhanh 60 giây đầu tiên.",
+      "dbmVerifyFullPlainPlansDesc": "Mở **Infra → Databases** và chọn một tab bên dưới. Deadlock và truy vấn bị chặn xuất hiện ngay khi cơ sở dữ liệu của bạn báo cáo; tab Activity sẽ đầy các phiên được lấy mẫu trong vòng một phút sau khi bộ thu khởi động, và các kế hoạch thực thi xuất hiện trên trang chi tiết của truy vấn. Sức khỏe bảng được điền sau khi chụp nhanh 60 giây đầu tiên.",
+      "dbmVerifyFullSlowTableHealthDesc": "Mở **Infra → Databases** và chọn một tab bên dưới. Deadlock và truy vấn bị chặn xuất hiện ngay khi cơ sở dữ liệu của bạn báo cáo; tab Activity sẽ đầy các phiên được lấy mẫu trong vòng một phút sau khi bộ thu khởi động, và các kế hoạch ước tính xuất hiện trên trang chi tiết của truy vấn. Sức khỏe bảng mất tối đa năm phút — việc đọc kích thước bảng chậm hơn khi schema của bạn phát triển, vì vậy nó chạy ít thường xuyên hơn phần còn lại.",
+      "dbmVerifyTableHealthDesc": "Mở **Infra → Databases** và chọn một tab bên dưới. Deadlock và truy vấn bị chặn xuất hiện ngay khi cơ sở dữ liệu của bạn báo cáo — một tab trống ở đó cho bạn biết liệu không có gì xảy ra hay không có gì đang được thu thập. Sức khỏe bảng được điền sau khi chụp nhanh 60 giây đầu tiên."
     },
     "instrumentBeforeImportTitle": "Cài đặt công cụ đo lường trước khi nhập client",
     "instrumentBeforeImportBody": "Nếu ứng dụng của bạn chạy nhưng không có span nào đến, có thể instrumentation đã được tải sau khi client được nhập. Hãy sắp xếp lại để quá trình khởi tạo chạy trước:",
@@ -4492,6 +4551,8 @@
     "folder": "Thư mục",
     "folders": "Các thư mục",
     "searchFolder": "Tìm kiếm thư mục",
+    "folderIcon": "Biểu tượng",
+    "folderIconAria": "Chọn biểu tượng thư mục",
     "deleteFolder": "Xóa thư mục",
     "deleteFolderMessage": "Bạn có chắc muốn xóa thư mục này?",
     "trellisLayout": "Bố cục Trellis",
@@ -5443,7 +5504,8 @@
     "variableNameAlreadyExists": "Biến có cùng tên đã tồn tại",
     "pivotTotal": "Tổng",
     "pivotOthers": "Khác",
-    "pivotTotalForField": "{total} - {field}"
+    "pivotTotalForField": "{total} - {field}",
+    "tableCellDrilldownTooltip": "Khám phá nhật ký khớp"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -5531,7 +5593,59 @@
     "mapvalue": "Giá trị",
     "source": "Nguồn",
     "target": "Đích",
-    "value": "Giá trị"
+    "value": "Giá trị",
+    "logExplorer": {
+      "title": "Trình khám phá nhật ký",
+      "openInLogs": "Mở trong Nhật ký",
+      "invalidParams": "Tham số drilldown không hợp lệ",
+      "noEvents": "Không có sự kiện nào khớp với bộ lọc này",
+      "filterHint": "Nhấp để khám phá nhật ký liên quan",
+      "timestamp": "Dấu thời gian",
+      "queryMode": "SQL",
+      "runQuery": "Chạy truy vấn",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "sự kiện",
+      "events": "sự kiện",
+      "prevPage": "Trước",
+      "nextPage": "Tiếp theo",
+      "of": "trên",
+      "sqlEditorLabel": "Truy vấn SQL",
+      "resetSql": "Đặt lại",
+      "detail": {
+        "drawerTitle": "Chi tiết sự kiện",
+        "details": "Chi tiết",
+        "json": "JSON",
+        "insights": "Phân tích",
+        "copyLink": "Sao chép liên kết",
+        "copy": "Sao chép",
+        "copyValue": "Sao chép giá trị",
+        "insightsHint": "Tần suất các trường trên {n} sự kiện đã tải"
+      },
+      "insights": {
+        "anomalyTitle": "Hồ sơ bất thường của trường",
+        "anomalyHint": "{n} sự kiện đã lấy mẫu",
+        "colField": "Trường",
+        "colRarity": "Độ hiếm",
+        "colValue": "Giá trị",
+        "rarity": {
+          "anomalous": "Bất thường",
+          "rare": "Hiếm",
+          "uncommon": "Không phổ biến",
+          "common": "Phổ biến"
+        },
+        "timelineTitle": "Dòng thời gian sự kiện",
+        "timelineHint": "Tần suất trong phạm vi đã chọn",
+        "timelineEmpty": "Không có dữ liệu",
+        "patternsTitle": "Mẫu nhật ký",
+        "patternsHint": "Nhóm theo cấu trúc tương tự",
+        "zScore": "z={value}",
+        "patternsEmpty": "Không có mẫu nào được trích xuất cho bộ lọc này",
+        "contextTitle": "Sự kiện xung quanh",
+        "contextHint": "Sự kiện gần dấu thời gian này",
+        "contextTooltip": "Các sự kiện khác từ stream này trong 3 phút trước và sau sự kiện này — cho biết điều gì khác đang diễn ra tại cùng thời điểm.",
+        "contextEmpty": "Không tìm thấy sự kiện xung quanh"
+      }
+    }
   },
   "home": {
     "alertsOverviewSection": "Phần tổng quan cảnh báo",
@@ -6017,6 +6131,7 @@
     "SearchSQLCancelled": "Lỗi: SQL tìm kiếm đã bị hủy."
   },
   "alerts": {
+    "allAlerts": "Tất cả cảnh báo",
     "compositeAlert": "Tổng hợp",
     "import": {
       "anomalyImportSuccess": "Phát hiện bất thường - {index}: \"{name}\" đã được nhập thành công",
@@ -7345,6 +7460,18 @@
         "panel": {
           "label": "Tạo cảnh báo",
           "toast": "Truy vấn được nhập từ bảng điều khiển: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Tùy chỉnh trong trình chỉnh sửa",
+          "toast": "Từ Thư viện cảnh báo: {sourceLabel}"
+        },
+        "dbm": {
+          "label": "Báo cho tôi",
+          "toast": "Được nhập từ Giám sát cơ sở dữ liệu: \"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "Báo cho tôi",
+          "toast": "Được nhập từ Giám sát cơ sở dữ liệu (góc nhìn máy chủ): \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7366,7 +7493,13 @@
         "noQueries": "Bảng điều khiển này không có truy vấn để tạo cảnh báo.",
         "noConstants": "Các mẫu đã chọn không có văn bản đặc trưng để khớp.",
         "sqlModeFilterDropped": "Truy vấn SQL của bạn không được giữ lại — cảnh báo chỉ khớp với các mẫu đã chọn.",
-        "patternsUnusable": "Không có mẫu nào trên trang này có văn bản đặc trưng để khớp, vì vậy cảnh báo chỉ sử dụng tìm kiếm của bạn."
+        "patternsUnusable": "Không có mẫu nào trên trang này có văn bản đặc trưng để khớp, vì vậy cảnh báo chỉ sử dụng tìm kiếm của bạn.",
+        "dbmRollupLag": "Các số liệu cơ sở dữ liệu được tổng hợp mỗi {minutes} phút, vì vậy cảnh báo này chỉ có thể kích hoạt với tần suất đó — đây không phải là trang thời gian thực.",
+        "dbmFingerprintVersion": "Cảnh báo này được gắn với cấu trúc chính xác của một truy vấn. Nếu cách các truy vấn được nhóm thay đổi, cảnh báo có thể ngừng khớp và nên được tạo lại.",
+        "dbmNoFingerprint": "Truy vấn này không có định danh ổn định, vì vậy cảnh báo giám sát toàn bộ cơ sở dữ liệu thay vào đó.",
+        "dbmServerVantage": "Điều này đo lường những gì máy chủ cơ sở dữ liệu tự báo cáo về khóa, không phải thời gian ứng dụng của bạn chờ đợi. Đừng so sánh nó với các cảnh báo độ trễ truy vấn.",
+        "dbmLockSampling": "Hoạt động khóa được lấy mẫu theo khoảng thời gian, vì vậy sự tranh chấp bắt đầu và kết thúc giữa hai lần lấy mẫu sẽ không bao giờ được ghi lại. Một cảnh báo im lặng không phải bằng chứng cho thấy không có sự chặn.",
+        "dbmNoInstance": "Không có instance cơ sở dữ liệu cụ thể nào được xác định, vì vậy cảnh báo này giám sát mọi instance của engine này."
       }
     },
     "saveFailed": "Không thể lưu cảnh báo.",
@@ -7405,6 +7538,112 @@
     "impactTemplate": "Được sử dụng bởi {destinations} · {alerts}",
     "impactDestination": "Được sử dụng bởi {alerts}"
   },
+  "alert_library": {
+    "header": "Thư viện cảnh báo",
+    "subtitle": "Các cảnh báo được tuyển chọn, sẵn sàng cài đặt, khớp với dữ liệu bạn đã thu thập",
+    "sectionTab": "Thư viện",
+    "contribute": "Đóng góp trên GitHub",
+    "searchPlaceholder": "Tìm kiếm theo tên, mô tả hoặc stream",
+    "searchLabel": "Tìm kiếm thư viện cảnh báo",
+    "categories": "Danh mục",
+    "searchCategories": "Tìm kiếm danh mục",
+    "searchCategoriesAria": "Tìm kiếm bộ lọc danh mục",
+    "noCategoryMatch": "Không có danh mục nào khớp.",
+    "selectedCount": "{count} đã chọn",
+    "facetAria": "{label}, {count} cảnh báo",
+    "severity": "Mức độ nghiêm trọng",
+    "severityAll": "Tất cả",
+    "severityCritical": "Nghiêm trọng",
+    "severityWarning": "Cảnh báo",
+    "severityInfo": "Thông tin",
+    "statReady": "Sẵn sàng cài đặt",
+    "statNeedsData": "Chưa được thu thập",
+    "statAll": "Tất cả",
+    "notIngested": "Chưa được thu thập: {stream}",
+    "notIngestedHint": "Tổ chức này không nhận được {stream}, vì vậy cảnh báo này sẽ không bao giờ kích hoạt. Hãy cài đặt nó dù vậy và nó sẽ bắt đầu hoạt động khi dữ liệu đến.",
+    "alertCount": "{count} cảnh báo | {count} cảnh báo",
+    "noCollectorTitle": "Chưa có gì ở đây khớp với dữ liệu của bạn",
+    "noCollectorDescription": "Không có cảnh báo nào trong số {count} cảnh báo này truy vấn một stream mà tổ chức này đang nhận. Gửi telemetry {group} đến OpenObserve và chúng sẽ sáng lên ở đây.",
+    "setupGuide": "Hướng dẫn thu thập dữ liệu",
+    "emptyLibraryTitle": "Thư viện cảnh báo trống",
+    "emptyLibraryDescription": "Danh mục đã tải nhưng không chứa cảnh báo nào. Đây là sự cố xuất bản, không phải bộ lọc — hãy thử lại sớm.",
+    "noMatchesTitle": "Không có cảnh báo nào khớp với các bộ lọc này",
+    "noMatchesDescription": "Thử danh mục, mức độ nghiêm trọng hoặc từ khóa tìm kiếm khác.",
+    "clearFilters": "Xóa bộ lọc",
+    "loadFailedTitle": "Không thể tải thư viện cảnh báo",
+    "retry": "Thử lại",
+    "openDetails": "Mở {title}",
+    "drawer": {
+      "dataAvailable": "Có dữ liệu",
+      "streamNotFound": "Không tìm thấy stream",
+      "detects": "Điều nó phát hiện",
+      "noDescription": "Không có mô tả trong thư viện.",
+      "needsDataCallout": "Cảnh báo này truy vấn {stream}, mà tổ chức này không tiếp nhận. Cài đặt ngay bây giờ sẽ tạo một cảnh báo không bao giờ kích hoạt.",
+      "query": "Truy vấn",
+      "stream": "Stream",
+      "streamType": "Loại stream",
+      "metricCondition": "Điều kiện metric",
+      "matchCount": "Số hàng khớp yêu cầu",
+      "previewBlocked": "{stream} không phải là một stream trong tổ chức này, do đó không có gì để đánh giá.",
+      "wouldTrigger": "Sẽ kích hoạt",
+      "wouldNotTrigger": "Sẽ không kích hoạt",
+      "loading": "Đang tải cảnh báo này từ thư viện",
+      "loadFailed": "Không thể tải cảnh báo này từ thư viện.",
+      "customize": "Tùy chỉnh trong trình chỉnh sửa",
+      "customizeHint": "Mở trình chỉnh sửa cảnh báo tiêu chuẩn được điền sẵn cảnh báo này.",
+      "customizeFailed": "Không thể mở cảnh báo này trong trình chỉnh sửa.",
+      "install": "Cài đặt",
+      "neverIngested": "Chưa có dữ liệu",
+      "neverIngestedCallout": "{stream} tồn tại nhưng chưa bao giờ nhận dữ liệu, do đó cảnh báo này không có gì để kích hoạt.",
+      "lastData": "Dữ liệu cuối cùng {when}",
+      "staleCallout": "{stream} nhận dữ liệu cuối cùng {when}. Cảnh báo này sẽ không kích hoạt cho đến khi việc tiếp nhận dữ liệu trở lại.",
+      "unknownTime": "vào một thời điểm không xác định"
+    },
+    "install": {
+      "title": "Cài đặt từ thư viện",
+      "subtitle": "Chọn nơi cảnh báo thông báo, chọn cảnh báo để cài đặt và nơi chúng được lưu trữ.",
+      "stepDestination": "Điểm đến",
+      "stepAlerts": "Cảnh báo",
+      "stepFolder": "Thư mục",
+      "stepTune": "Tinh chỉnh",
+      "stepInstall": "Cài đặt",
+      "destinationIntro": "Mọi cảnh báo trong đợt này thông báo đến điểm đến bạn chọn ở đây. Các tệp thư viện đặt tên điểm đến của tổ chức mà chúng được xuất ra, vốn không tồn tại trong tổ chức của bạn.",
+      "destinationLabel": "Điểm đến",
+      "destinationPlaceholder": "Chọn điểm đến",
+      "destinationsLoadFailed": "Không thể tải các điểm đến hiện có của bạn.",
+      "retry": "Thử lại",
+      "destinationsNoneBody": "Tổ chức này chưa có điểm đến cảnh báo nào, vì vậy không có nơi để các cảnh báo này thông báo. Hãy tạo một điểm đến trên trang Điểm đến, sau đó quay lại và chọn nó ở đây.",
+      "openDestinations": "Mở Điểm đến",
+      "selectAll": "Chọn tất cả",
+      "clear": "Xóa",
+      "selectedCount": "Đã chọn {count} trong {total}",
+      "folderIntro": "Các cảnh báo đã cài đặt sẽ được xếp vào đây. Tạo một thư mục từ nút + nếu đợt này xứng đáng có thư mục riêng.",
+      "tuneToggle": "Đặt các giá trị này cho mọi cảnh báo trong lô này",
+      "tuneHint": "Chỉ hai mục này an toàn để đặt cho cả lô. Ngưỡng vẫn được đặt riêng cho từng cảnh báo — hãy thay đổi một cảnh báo bằng cách mở nó và cài đặt riêng.",
+      "frequency": "Chạy mỗi",
+      "silence": "Tạm ngưng trong",
+      "minutes": "phút",
+      "summaryTuningNone": "Mặc định thư viện",
+      "summaryTuningOverride": "Mỗi {frequency} phút, tạm ngưng {silence} phút",
+      "run": "Cài đặt {count} cảnh báo | Cài đặt {count} cảnh báo",
+      "retryFailed": "Thử lại {count} lỗi | Thử lại {count} lỗi",
+      "allInstalled": "Đã cài đặt {count} cảnh báo | Đã cài đặt {count} cảnh báo",
+      "someFailed": "Đã cài đặt {installed}, thất bại {failed}",
+      "unknownError": "Không thể tạo cảnh báo.",
+      "unreadableConditions": "Điều kiện lọc của cảnh báo này ở định dạng mà phiên bản này không đọc được. Việc cài đặt nó sẽ tạo một cảnh báo không có bộ lọc, vì vậy nó đã được bỏ qua.",
+      "back": "Quay lại",
+      "next": "Tiếp theo",
+      "cancel": "Hủy",
+      "done": "Hoàn tất"
+    },
+    "error": {
+      "network": "Không thể truy cập thư viện. Kiểm tra kết nối mạng của bạn và thử lại.",
+      "http": "Máy chủ thư viện đã trả về lỗi. Vui lòng thử lại sau ít phút.",
+      "unparseable": "Thư viện phản hồi với dữ liệu không phải là một danh mục.",
+      "unsupported_version": "Danh mục thư viện này mới hơn phiên bản OpenObserve này có thể đọc. Hãy nâng cấp để duyệt nó.",
+      "malformed": "Danh mục thư viện không đầy đủ hoặc bị hỏng."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Xuất Mẫu",
     "selected": "đã chọn",
@@ -7429,7 +7668,7 @@
     "importBodyLabel": "Nội dung Mẫu *",
     "importTypeLabel": "Loại Mẫu *",
     "importTitleLabel": "Tiêu đề Mẫu *",
-    "header": "Mẫu",
+    "header": "Mẫu đích",
     "add": "Mẫu mới",
     "edit": "Chỉnh sửa",
     "name": "Tên",
@@ -7636,6 +7875,7 @@
     "destinationsLoadError": "Lỗi khi tải điểm đến"
   },
   "alert_destinations": {
+    "sectionTab": "Đích đến",
     "chooseTypeTitle": "Chọn Loại",
     "selectDestinationType": "Chọn Loại Điểm Đến",
     "connectionStepTitle": "Kết nối",
@@ -9143,7 +9383,8 @@
       "rowsReturned": "Số hàng trả về",
       "batchSize": "Kích thước lô",
       "querySummary": "Tóm tắt truy vấn",
-      "responseStatus": "Trạng thái phản hồi"
+      "responseStatus": "Trạng thái phản hồi",
+      "viewQueryTrend": "Xem xu hướng truy vấn trong Giám sát cơ sở dữ liệu"
     },
     "index": {
       "clickHere": "Nhấp vào đây",
@@ -9219,6 +9460,7 @@
       "viewRelated": "Xem liên quan",
       "logs": "Nhật ký",
       "traces": "Dấu vết",
+      "databases": "Cơ sở dữ liệu",
       "viewTraces": "Xem dấu vết",
       "operations": "Thao tác",
       "metrics": "Chỉ số",
@@ -9995,7 +10237,7 @@
     "copyPattern": "Sao chép mẫu",
     "copied": "Đã sao chép!",
     "pricingTiers": "Bậc giá",
-    "pricingTiersDesc": "Bậc đầu tiên là mặc định. Các bậc bổ sung được áp dụng khi đáp ứng điều kiện sử dụng.",
+    "pricingTiersDesc": "Bậc đầu tiên là mặc định. Các bậc bổ sung được áp dụng khi đáp ứng điều kiện sử dụng và khung thời gian UTC của chúng.",
     "tierName": "Tên bậc",
     "applyTierWhen": "Áp dụng bậc này khi",
     "quickSetup": "Thiết lập nhanh:",
@@ -10087,7 +10329,25 @@
     "saveShadowedWarning": "Đã lưu, nhưng mục này bị che bởi \"{winner}\" có cùng mẫu và mức ưu tiên cao hơn. Nó sẽ không bao giờ được sử dụng để tính chi phí trừ khi mục kia bị xóa hoặc tắt.",
     "modelPricingSaved": "Giá mô hình đã lưu",
     "errSave": "Không thể lưu",
-    "errLoadModel": "Không thể tải mô hình"
+    "errLoadModel": "Không thể tải mô hình",
+    "tierDefaultName": "Mặc định",
+    "timeWindows": "Giờ hoạt động (UTC)",
+    "timeWindowsDesc": "Giới hạn bậc này trong các giờ UTC định kỳ, dành cho các nhà cung cấp tính phí theo giờ cao điểm và thấp điểm.",
+    "timeWindowFrom": "Từ",
+    "timeWindowTo": "Đến",
+    "addTimeWindow": "Thêm khung thời gian",
+    "removeTimeWindow": "Xóa khung thời gian",
+    "addUsageCondition": "Thêm điều kiện sử dụng",
+    "removeUsageCondition": "Xóa điều kiện sử dụng",
+    "timeWindowInvalid": "Bậc \"{name}\": nhập thời gian theo định dạng HH:MM (UTC 24 giờ).",
+    "timeWindowSameBounds": "Bậc \"{name}\": thời gian bắt đầu và kết thúc phải khác nhau. Xóa khung thời gian để bậc luôn hoạt động.",
+    "timeWindowWrapsHint": "Vượt qua nửa đêm UTC.",
+    "tierNeedsRestriction": "Bậc \"{name}\" không có điều kiện sử dụng và không có khung thời gian, do đó nó sẽ không bao giờ được áp dụng. Hãy thêm một điều kiện hoặc xóa bậc này.",
+    "timeBasedChip": "Theo thời gian",
+    "tierAlwaysActive": "Luôn hoạt động (mặc định)",
+    "testAtTimeLabel": "Kiểm tra tại thời gian UTC",
+    "testAtTimeHint": "Để trống để sử dụng thời gian hiện tại. Các bậc cao điểm / thấp điểm được xác định dựa trên thời gian này.",
+    "localTimeHint": "Trong múi giờ của bạn: {range}"
   },
   "aiObservability": {
     "title": "Khả năng quan sát AI",
@@ -13269,6 +13529,24 @@
     "combobox": {
       "noOptionsFound": "Không tìm thấy tùy chọn"
     },
+    "emojiPicker": {
+      "chooseIcon": "Chọn biểu tượng",
+      "searchPlaceholder": "Tìm kiếm biểu tượng...",
+      "removeIcon": "Xóa biểu tượng",
+      "noResults": "Không có biểu tượng nào khớp với tìm kiếm của bạn",
+      "groups": {
+        "results": "Kết quả",
+        "status": "Trạng thái",
+        "services": "Dịch vụ",
+        "ai": "AI",
+        "creatures": "Sinh vật",
+        "infra": "Hạ tầng",
+        "data": "Dữ liệu",
+        "teams": "Nhóm",
+        "objects": "Đối tượng",
+        "world": "Thế giới"
+      }
+    },
     "input": {
       "clear": "Xóa"
     },
@@ -13647,6 +13925,14 @@
       },
       "variableScope": {
         "global": "Toàn cục"
+      },
+      "dataConfidence": {
+        "estimated": "≈ ước tính",
+        "topNSubset": "tập con top-N",
+        "live": "trực tiếp",
+        "belowTopN": "dưới top-N",
+        "truncated": "bị cắt ngắn",
+        "gap": "khoảng trống"
       }
     }
   },
@@ -14627,6 +14913,1056 @@
     },
     "hover": {
       "deprecated": "**Không dùng nữa** — hãy ưu tiên hàm chuẩn."
+    }
+  },
+  "dbm": {
+    "common": {
+      "reload": "Làm mới",
+      "lastRefreshed": "Làm mới lần cuối {age}",
+      "loadFailed": "Không thể tải dữ liệu cơ sở dữ liệu. Hãy thử lại hoặc thu hẹp phạm vi thời gian."
+    },
+    "ai": {
+      "suggestFix": "Hỏi AI cách khắc phục điều này",
+      "suggestFixHint": "Mở trợ lý AI với truy vấn này, engine của nó và các số liệu độ trễ, đồng thời hỏi cần thay đổi gì. Nó không tự thay đổi bất cứ điều gì.",
+      "rowSuggestFix": "Hỏi AI cách khắc phục điều này",
+      "deadlockFix": "Làm cách nào để dừng deadlock này?",
+      "deadlockFixHint": "Gửi cả hai câu lệnh xung đột và bằng chứng thứ tự hàng cho trợ lý AI.",
+      "blockingFix": "Tại sao cái này đang chặn?",
+      "blockingFixHint": "Gửi câu lệnh của phiên gốc, thời gian rảnh và số phiên bị kẹt phía sau nó đến trợ lý AI."
+    },
+    "filters": {
+      "allEngines": "Tất cả engine",
+      "allInstances": "Tất cả cơ sở dữ liệu",
+      "allNamespaces": "Tất cả lược đồ",
+      "allEnvs": "Tất cả môi trường",
+      "allServices": "Tất cả dịch vụ",
+      "scope": "Bộ lọc",
+      "clearScope": "Xóa tất cả",
+      "removeScope": "Xóa bộ lọc này",
+      "popoverTitle": "Thu hẹp phạm vi này",
+      "dimension": {
+        "system": "engine",
+        "instance": "cơ sở dữ liệu",
+        "namespace": "lược đồ",
+        "env": "môi trường",
+        "service": "dịch vụ",
+        "insight": "thông tin chi tiết"
+      }
+    },
+    "delta": {
+      "new": "mới trong danh sách này",
+      "gone": "đã dừng chạy",
+      "newHint": "Truy vấn này trước đó không nằm trong số nặng nhất, vì vậy không có gì để so sánh với nó. Nó có thể đã chạy trước đó — chỉ là không đủ nặng để theo dõi riêng.",
+      "goneHint": "Truy vấn này đã chạy trước đó trong ngày nhưng không nằm trong phạm vi thời gian bạn đang xem.",
+      "comparison": "Trước đó {previous} → hiện tại {current}",
+      "noChange": "không thay đổi",
+      "timesMore": "{ratio}× nhiều hơn",
+      "timesFewer": "{ratio}× ít hơn",
+      "wasValue": "đã là {value}"
+    },
+    "databases": {
+      "title": "Cơ sở dữ liệu",
+      "subtitle": "Hiệu suất và tình trạng truy vấn theo từng cơ sở dữ liệu",
+      "searchPlaceholder": "Tìm kiếm cơ sở dữ liệu hoặc dịch vụ…",
+      "unnamedInstance": "Phiên bản chưa đặt tên",
+      "unnamedInstanceHint": "Báo cáo câu lệnh của cơ sở dữ liệu chứng minh công cụ này đang chạy, nhưng chúng không đặt tên máy chủ. Hàng sẽ hiển thị địa chỉ khi một nguồn cấp dữ liệu mang địa chỉ đó — lấy mẫu phiên hoặc số liệu phiên bản — được thiết lập.",
+      "moreServices": "+{count}",
+      "columns": {
+        "instance": "Cơ sở dữ liệu",
+        "calls": "Lời gọi",
+        "qps": "Mỗi giây",
+        "errorRate": "Thất bại",
+        "p50": "Một nửa nằm dưới",
+        "p95": "Lời gọi chậm",
+        "p99": "1% chậm nhất",
+        "services": "Được sử dụng bởi",
+        "load": "Thời gian cơ sở dữ liệu",
+        "attention": "Cần chú ý"
+      },
+      "summary": {
+        "databases": "Cơ sở dữ liệu",
+        "calls": "Lời gọi",
+        "time": "Thời gian cơ sở dữ liệu",
+        "failed": "Thất bại"
+      },
+      "databaseCount": "1 cơ sở dữ liệu | {count} cơ sở dữ liệu",
+      "openQueries": "Xem truy vấn của nó",
+      "alertMe": "Cảnh báo tôi",
+      "columnHints": {
+        "qps": "Lời gọi mỗi giây — số lời gọi trong cửa sổ này chia cho độ dài của nó, để chế độ xem 15 phút và chế độ xem 4 giờ vẫn so sánh được.",
+        "p50": "Một nửa số lời gọi hoàn thành nhanh hơn mức này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
+        "p95": "Phần đuôi chậm — 1 trong 20 lời gọi mất ít nhất thời gian này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
+        "p99": "1% tệ nhất các lời gọi mất ít nhất thời gian này. Chỉ tính các lời gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ trả về sẽ không được đo ở đây.",
+        "load": "Tổng thời gian ứng dụng của bạn chờ đợi cơ sở dữ liệu này. Được đo từ phía máy khách, vì vậy nó phản ánh lượng lưu lượng mà cơ sở dữ liệu này phục vụ — không phải mức độ tải của máy chủ.",
+        "attention": "Phiên bản này gần đến mức nào so với giới hạn mà công cụ của chính nó công bố — hôm nay, số kết nối so với max_connections. Tỷ lệ tệ nhất, không phải điểm tổng hợp. Sắp xếp theo thứ tự giảm dần, với các phiên bản không thể đọc tình trạng ở trên cùng, vì một phiên bản bạn không thể thấy không phải là phiên bản bạn biết là khỏe mạnh. Được đo trên máy chủ cơ sở dữ liệu, vì vậy nó không thể so sánh với Thời gian cơ sở dữ liệu bên cạnh."
+      },
+      "failedChip": "{count} thất bại",
+      "columnSubLabels": {
+        "attention": "máy chủ",
+        "load": "máy khách",
+        "calls": "máy khách"
+      },
+      "attention": {
+        "connections": "kết nối",
+        "noLimit": "không có giới hạn được công bố",
+        "unknown": "không được đo"
+      }
+    },
+    "queries": {
+      "title": "Truy vấn hàng đầu",
+      "subtitle": "Các truy vấn sử dụng nhiều thời gian cơ sở dữ liệu nhất",
+      "subtitleServer": "Các câu lệnh mà cơ sở dữ liệu của bạn đã chạy, được đếm bên trong cơ sở dữ liệu — thường chạy nhiều nhất trước tiên",
+      "searchPlaceholder": "Tìm kiếm văn bản truy vấn, bảng hoặc dịch vụ…",
+      "trendLabel": "Thời gian của truy vấn này đã thay đổi như thế nào trong phạm vi",
+      "otherRow": "Tất cả truy vấn khác",
+      "truncatedText": "Câu lệnh này quá dài để lưu trữ đầy đủ, vì vậy nó được hiển thị cắt ngắn.",
+      "stmtClass": {
+        "query": "Truy vấn",
+        "queryHint": "Chỉ SQL thực sự — SELECT, INSERT, UPDATE và DELETE.",
+        "all": "Truy vấn + chi phí kết nối",
+        "allHint": "Cũng tính các hoạt động ghi sổ mà trình điều khiển của bạn gửi giữa các truy vấn: BEGIN và COMMIT, SET, và các kiểm tra giữ cho kết nối nhóm luôn hoạt động."
+      },
+      "completionBias": {
+        "title": "Lời gọi giảm {drop}% trong khi số lần thất bại tăng",
+        "body": "Điều đó thường có nghĩa là truy vấn đang bị kẹt thay vì hoàn thành — và chúng ta chỉ có thể đo các truy vấn hoàn thành. Đường giảm ở đây có thể không có nghĩa là nó đang phục hồi."
+      },
+      "columns": {
+        "query": "Truy vấn",
+        "calls": "Lời gọi",
+        "p95": "Cuộc gọi chậm",
+        "errors": "Thất bại",
+        "perTrace": "Mỗi yêu cầu",
+        "load": "Thời gian cơ sở dữ liệu",
+        "p99": "1% chậm nhất",
+        "max": "Tệ nhất từng thấy",
+        "services": "Được sử dụng bởi"
+      },
+      "queryCount": "1 loại truy vấn | {count} loại truy vấn",
+      "otherRowDetail": "— {calls} cuộc gọi. Chúng tôi không có số liệu cho từng truy vấn cho các mục này, chỉ có tổng kết hợp này. Được tính trong mọi tổng ở trên.",
+      "foldRowText": "1 truy vấn nhỏ hơn | {count} truy vấn nhỏ hơn",
+      "serverList": {
+        "title": "Các truy vấn được báo cáo bởi cơ sở dữ liệu của bạn",
+        "subtitle": "Được đếm bên trong cơ sở dữ liệu trên mọi máy khách, chạy thường xuyên nhất trước. Không có cuộc gọi ứng dụng được theo dõi nào xuất hiện trong cửa sổ này, vì vậy danh sách thông thường trống — đây là những gì cơ sở dữ liệu thấy trong lúc đó.",
+        "truncated": "{count} câu lệnh chạy thường xuyên nhất — nhiều câu đã chạy hơn so với hiển thị ở đây",
+        "columns": {
+          "query": "Truy vấn",
+          "calls": "Cuộc gọi",
+          "totalTime": "Thời gian trong cơ sở dữ liệu",
+          "meanTime": "Trung bình mỗi cuộc gọi"
+        },
+        "columnHints": {
+          "time": "Được đo bên trong cơ sở dữ liệu: thời gian thực thi cho PostgreSQL, thời gian chờ cho MySQL và MariaDB. Không phải những gì ứng dụng của bạn trải qua — thời gian chờ mạng và kết nối không được bao gồm.",
+          "mean": "Thời gian trong cơ sở dữ liệu chia cho số cuộc gọi — trung bình trong cửa sổ, không phải phân vị."
+        }
+      },
+      "foldRowDetail": "· {share} thời gian cơ sở dữ liệu · nhấp để hiển thị chúng",
+      "foldRowDetailOpen": "· {share} thời gian cơ sở dữ liệu · nhấp để thu gọn chúng lại",
+      "summary": {
+        "queries": "Loại truy vấn",
+        "calls": "Cuộc gọi",
+        "time": "Thời gian cơ sở dữ liệu",
+        "failed": "Thất bại"
+      },
+      "columnHints": {
+        "calls": "Số lần truy vấn này chạy. Số đếm của cơ sở dữ liệu của bạn nếu nó báo cáo — bao gồm mọi máy khách, không chỉ các phần của hệ thống gửi trace. Các hàng được đánh dấu là quan sát từ máy khách được đếm từ trace thay vào đó, vì cơ sở dữ liệu của bạn không báo cáo chúng.",
+        "p50": "Một nửa số cuộc gọi hoàn thành nhanh hơn mức này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
+        "p95": "Đuôi chậm — 1 trong 20 cuộc gọi mất ít nhất khoảng thời gian này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
+        "p99": "1% cuộc gọi tệ nhất mất ít nhất khoảng thời gian này. Chỉ đếm các cuộc gọi đã hoàn thành — truy vấn vẫn đang chạy hoặc không bao giờ quay lại không được đo ở đây.",
+        "max": "Cuộc gọi chậm nhất duy nhất trong cửa sổ này — một cuộc gọi thực sự, không phải trung bình.",
+        "errors": "Có bao nhiêu cuộc gọi trong số này trả về lỗi.",
+        "perTrace": "Số lần điều này chạy bên trong một yêu cầu. Số cao thường có nghĩa là một vòng lặp.",
+        "load": "Tổng thời gian truy vấn này dành trong cơ sở dữ liệu. Con số của cơ sở dữ liệu của bạn nếu nó báo cáo: thời gian thực thi trên Postgres, nhưng thời gian CHỜ trên MySQL và MariaDB — mỗi hàng cho biết loại nào. Các hàng được đánh dấu là quan sát từ máy khách được đo từ trace, vì vậy chúng bao gồm khứ hồi mạng."
+      },
+      "errorsNone": "không có",
+      "errorsAll": "tất cả",
+      "actions": {
+        "open": "Mở chi tiết",
+        "traces": "Xem trace ví dụ",
+        "copy": "Sao chép truy vấn",
+        "copied": "Đã sao chép truy vấn",
+        "copyFailed": "Không thể sao chép truy vấn.",
+        "alert": "Cảnh báo tôi nếu điều này chậm lại"
+      },
+      "otherRowTextFor": "Tất cả các truy vấn khác trên {database}",
+      "otherRowDetailShort": "— {calls} cuộc gọi.",
+      "columnSubLabels": {
+        "calls": "máy chủ nơi được báo cáo",
+        "load": "máy chủ nơi được báo cáo"
+      }
+    },
+    "insights": {
+      "showRows": "Hiển thị truy vấn này | Hiển thị {count} truy vấn này",
+      "clearFilter": "Xóa bộ lọc",
+      "alsoAffects": "và {count} truy vấn khác | và {count} truy vấn khác",
+      "showLess": "Hiển thị ít hơn",
+      "more": "{count} nữa | {count} nữa",
+      "regression": {
+        "title": "{ratio}× chậm hơn bình thường",
+        "body": "{before} → {after}, cùng lưu lượng",
+        "rule": "Hiển thị vì các lệnh gọi chậm của truy vấn này chậm hơn {ratio}× so với {baseline}, trên ít nhất {calls} lệnh gọi."
+      },
+      "new-expensive": {
+        "title": "Truy vấn mới, đã tốn kém",
+        "body": "trước đó không chạy · hiện chiếm {share} thời gian cơ sở dữ liệu",
+        "rule": "Hiển thị vì truy vấn này không nằm trong số nặng nhất trong {baseline} và hiện chiếm ít nhất {share}% thời gian cơ sở dữ liệu, trên ít nhất {calls} lệnh gọi. Nó có thể đã chạy trước đó — chỉ là không đủ nặng để theo dõi riêng."
+      },
+      "n-plus-one": {
+        "title": "Chạy ít nhất {multiplier}× mỗi yêu cầu",
+        "body": "{share} thời gian cơ sở dữ liệu · {service}",
+        "rule": "Hiển thị vì truy vấn này chạy ít nhất {ratio} lần trong một yêu cầu, trên ít nhất {traces} yêu cầu. Đây là giới hạn dưới, nên con số thực tế có thể cao hơn. Công việc xử lý hàng loạt hợp lệ có thể trông giống vậy."
+      },
+      "volume-shift": {
+        "title": "Bận hơn, không chậm hơn",
+        "body": "được gọi nhiều hơn {ratio}×, cùng tốc độ · {service}",
+        "rule": "Hiển thị vì truy vấn này được gọi nhiều hơn {ratio}× so với trong {baseline} trong khi tốc độ của nó nằm trong khoảng {latency}×. Thay đổi nằm ở thứ gọi nó."
+      },
+      "rank-churn": {
+        "title": "Truy vấn nặng nhất mới",
+        "body": "di chuyển #{from} → #{to}",
+        "rule": "Hiển thị vì một truy vấn đã leo vào nhóm nặng nhất {into} từ bên ngoài nhóm nặng nhất {from} trong {baseline}, trong khi tổng thời gian cơ sở dữ liệu tăng.",
+        "unranked": "không xếp hạng"
+      },
+      "hide": "Ẩn",
+      "show": "Hiện",
+      "findRow": "Tìm nó",
+      "all-failing": {
+        "title": "Mọi lệnh gọi đều thất bại",
+        "body": "{failed} trên {total} lệnh gọi thất bại · {query}",
+        "rule": "Hiển thị vì mọi lệnh gọi đến truy vấn này trong phạm vi đều trả về lỗi."
+      },
+      "baseline": {
+        "label": "So sánh với",
+        "previous": "khoảng thời gian trước đó",
+        "yesterday": "cùng giờ hôm qua",
+        "previousShort": "so với trước đó",
+        "previousHint": "So sánh với khoảng thời gian ngay trước khoảng này, có cùng độ dài.",
+        "yesterdayShort": "so với hôm qua",
+        "yesterdayHint": "So sánh với cùng giờ một ngày trước — hữu ích khi lưu lượng theo chu kỳ hàng ngày, hoặc để xem điều gì đã thay đổi kể từ khi triển khai."
+      }
+    },
+    "coverage": {
+      "unknownNote": "Không có gì để đo trong phạm vi và bộ lọc bạn đã chọn.",
+      "lineHealthy": "Bạn đang xem {percent}% thời gian của cơ sở dữ liệu này — {count} loại truy vấn nặng nhất.",
+      "lineRemainder": "Bạn đang xem {percent}% thời gian của cơ sở dữ liệu này. Phần còn lại nằm trong các truy vấn nhẹ hơn mà chúng tôi không liệt kê từng cái.",
+      "lineStale": "Việc đếm của chúng tôi chậm {minutes} phút, vì vậy các truy vấn gần đây nhất có thể chưa có ở đây.",
+      "lineTruncated": "Có nhiều dữ liệu hơn trong đoạn cuối so với những gì chúng tôi có thể tiếp nhận, vì vậy các con số mới nhất bị đếm thiếu.",
+      "lineTruncatedStale": "Có nhiều dữ liệu hơn trong đoạn cuối so với những gì chúng tôi có thể tiếp nhận, và việc đếm của chúng tôi chậm {minutes} phút — các con số mới nhất bị đếm thiếu, và các truy vấn gần đây nhất có thể chưa có ở đây.",
+      "lineGap": "{minutes} phút bị thiếu trong cửa sổ này. Việc đếm của chúng tôi dừng lúc {stopped} và chỉ có thể lùi lại {reach} phút, vì vậy không có gì bao phủ {from}–{to}.",
+      "lineSubset": "Bạn đã lọc theo {filter}, vì vậy các tỷ lệ phần trăm này mô tả các hàng được hiển thị, không phải toàn bộ cơ sở dữ liệu.",
+      "lineHealthyAll": "Bạn đang xem mọi truy vấn đã chạy. Tốc độ ở đây được đo trên mọi lệnh gọi, vì vậy chúng chính xác.",
+      "lineHealthyAllEstimated": "Bạn đang xem mọi truy vấn đã chạy. Tốc độ ở đây được kết hợp từ một số khoảng thời gian, vì vậy chúng gần đúng nhưng không chính xác.",
+      "lineCountedTo": "Đã đếm đến {time}; nửa phút cuối vẫn đang được cập nhật.",
+      "lineExact": "Tất cả cơ sở dữ liệu đang báo cáo. Tốc độ ở đây được đo trên mọi lệnh gọi, vì vậy chúng chính xác.",
+      "lineExactEstimated": "Tất cả cơ sở dữ liệu đang báo cáo. Tốc độ ở đây được kết hợp từ một số khoảng thời gian, vì vậy chúng gần đúng nhưng không chính xác.",
+      "lineSubsetUnnamed": "Bộ lọc của bạn thu hẹp phạm vi này xuống dưới mức mà các tổng này cộng lại, vì vậy tỷ lệ phần trăm mô tả các hàng được hiển thị thay vì toàn bộ cơ sở dữ liệu.",
+      "lineQuery": "Thời gian được đo từ ứng dụng của bạn, vì vậy chúng bao gồm thời gian mạng và thời gian chờ kết nối trống.",
+      "lineUncodedErrors": "{percent} số lỗi ở đây trả về mà không có mã lý do, vì vậy chúng có thể được đếm nhưng không giải thích được.",
+      "lineSubsetStale": "Bạn đã lọc theo {filter}, và việc đếm của chúng tôi chậm {minutes} phút — các tỷ lệ phần trăm này mô tả các hàng được hiển thị, và các truy vấn gần đây nhất có thể chưa có ở đây.",
+      "lineSubsetUnnamedStale": "Bộ lọc của bạn thu hẹp phạm vi này xuống dưới mức mà các tổng này cộng lại, và việc đếm của chúng tôi chậm {minutes} phút — các tỷ lệ phần trăm mô tả các hàng được hiển thị, và các truy vấn gần đây nhất có thể chưa có ở đây.",
+      "lineCountedToBehind": "Đã đếm đến {time}; chúng tôi chậm {minutes} phút."
+    },
+    "breakdown": {
+      "loading": "Đang tính toán thời gian đã đi đâu…",
+      "noSchema": "Không có lược đồ nào được báo cáo",
+      "noService": "Không xác định được bên gọi",
+      "nothingToAttribute": "Chúng tôi có tổng của cơ sở dữ liệu này nhưng không có dữ liệu theo từng truy vấn trong phạm vi này, vì vậy không thể biết dịch vụ nào đã dành thời gian.",
+      "queryCount": "{count} truy vấn | {count} truy vấn",
+      "shortfall": "Tổng cộng ít hơn {percent} so với tổng của cơ sở dữ liệu này, vì chỉ những loại truy vấn nặng nhất mới được theo dõi riêng lẻ."
+    },
+    "freshness": {
+      "neverAggregated": "Chúng tôi chưa đếm xong phạm vi này. Các con số đầu tiên thường xuất hiện trong khoảng 15 phút."
+    },
+    "empty": {
+      "filtered": {
+        "title": "Không có truy vấn nào khớp với bộ lọc của bạn",
+        "description": "Không có gì ở đây khớp với tìm kiếm và bộ lọc bạn đã áp dụng.",
+        "action": "Xóa bộ lọc"
+      },
+      "title": "Chưa có gì ở đây — và đây chính xác là lý do",
+      "subtitle": "Chúng tôi đã kiểm tra mọi điều kiện cần đúng.",
+      "subtitleCounts": "{pass} đạt, {fail} không. | {pass} đạt, {fail} không.",
+      "checklistTitle": "Những gì chúng tôi đã kiểm tra",
+      "showMeHow": "Chỉ cho tôi cách thêm đo lường",
+      "checkTrace": "Kiểm tra một trong các trace của tôi",
+      "checks": {
+        "enabled": {
+          "ok": "Tính năng theo dõi cơ sở dữ liệu đã được bật",
+          "okDetail": "cho tổ chức này",
+          "no": "Tính năng theo dõi cơ sở dữ liệu đã bị tắt",
+          "noDetail": "Quản trị viên có thể bật nó cho tổ chức này, sau đó khởi động lại bộ thu thập."
+        },
+        "traces": {
+          "ok": "Các trace của bạn đang được gửi về",
+          "okDetail": "{count} bản ghi trong khoảng thời gian này",
+          "no": "Chưa có trace nào được gửi đến",
+          "noDetail": "Tính năng theo dõi cơ sở dữ liệu được xây dựng từ các trace và tổ chức này chưa gửi bất kỳ trace nào."
+        },
+        "permission": {
+          "ok": "Bạn có quyền truy cập dữ liệu này",
+          "okDetail": "bạn là quản trị viên của {org}",
+          "no": "Bạn không có quyền truy cập dữ liệu này",
+          "noDetail": "Tính năng theo dõi cơ sở dữ liệu đọc các trace của bạn và vai trò của bạn không bao gồm chúng. Hãy yêu cầu quản trị viên cấp quyền đọc."
+        },
+        "dbSpans": {
+          "ok": "Các trace của bạn đề cập đến một cơ sở dữ liệu",
+          "okDetail": "các lệnh gọi cơ sở dữ liệu đang được ghi lại",
+          "no": "Không có trace nào của bạn đề cập đến cơ sở dữ liệu",
+          "noDetail": "Các ứng dụng của bạn đang được theo dõi, nhưng phần giao tiếp với cơ sở dữ liệu thì không. Hãy thêm công cụ đo lường cơ sở dữ liệu cho ngôn ngữ của bạn và các truy vấn sẽ hiển thị ở đây."
+        },
+        "counted": {
+          "ok": "Chúng tôi đã đếm xong phạm vi này",
+          "okDetail": "các con số đã được cập nhật",
+          "no": "Chúng tôi chưa đếm xong",
+          "noDetail": "Các lệnh gọi cơ sở dữ liệu đã đến, nhưng các con số đầu tiên chưa sẵn sàng. Việc này thường mất vài phút."
+        },
+        "window": {
+          "ok": "Có hoạt động đã chạy trong khoảng thời gian này",
+          "okDetail": "các lệnh gọi cơ sở dữ liệu đã được ghi lại",
+          "no": "Không có gì chạy trong khoảng thời gian bạn đã chọn",
+          "noDetail": "Hãy thử khoảng thời gian rộng hơn."
+        },
+        "alsoWorthKnowing": {
+          "title": "Cũng đáng biết",
+          "detail": "Sau khi hoàn tất, các truy vấn đầu tiên sẽ xuất hiện trong khoảng 15 phút."
+        }
+      },
+      "action": "Thử lại",
+      "viewDocs": "Xem tài liệu"
+    },
+    "detail": {
+      "title": "Chi tiết truy vấn",
+      "tabs": {
+        "overview": "Tổng quan",
+        "overviewHint": "Mức độ chậm của truy vấn này, tần suất chạy và nơi chạy.",
+        "plans": "Kế hoạch thực thi truy vấn",
+        "plansHint": "Các bước cơ sở dữ liệu của bạn đã thực hiện để chạy truy vấn này. Bắt đầu từ đây để tìm hiểu tại sao nó chậm.",
+        "callers": "Bên gọi và ví dụ",
+        "callersHint": "Những phần nào của ứng dụng đã chạy truy vấn này và các lần chạy chậm riêng lẻ bạn có thể mở dưới dạng trace.",
+        "callersLocked": "Các lần chạy riêng lẻ có được từ việc theo dõi. Không có trace nào ghi nhận truy vấn này trong khoảng thời gian này."
+      },
+      "notFound": {
+        "title": "Truy vấn này không thuộc tổ chức này",
+        "description": "Địa chỉ này đề cập đến một truy vấn mà {org} chưa chạy trong khoảng thời gian bạn đang xem. Nếu bạn vừa chuyển tổ chức, nó thuộc về tổ chức bạn đã rời khỏi.",
+        "descriptionNoOrg": "Địa chỉ này đề cập đến một truy vấn mà tổ chức này chưa chạy trong khoảng thời gian bạn đang xem. Nếu bạn vừa chuyển tổ chức, nó thuộc về tổ chức bạn đã rời khỏi.",
+        "scopeHint": "Không có gì khớp với nó trong tổ chức, khoảng thời gian và phạm vi này. Nếu địa chỉ đến từ một engine hoặc instance khác, hãy xóa các bộ lọc đó hoặc quay lại danh sách.",
+        "missingTitle": "Chưa chọn truy vấn",
+        "missingDescription": "Trang này mô tả một truy vấn, nhưng địa chỉ không chỉ ra truy vấn nào. Nếu bạn vừa chuyển tổ chức, truy vấn bạn đang đọc thuộc về tổ chức bạn đã rời khỏi.",
+        "action": "Duyệt các truy vấn của tổ chức này"
+      },
+      "backToQueries": "Quay lại các truy vấn hàng đầu",
+      "backToActivity": "Quay lại hoạt động",
+      "backToSamples": "Quay lại các lệnh gọi chậm nhất",
+      "backToDeadlocks": "Quay lại các deadlock",
+      "latencyTitle": "Tốc độ theo thời gian",
+      "volumeTitle": "Lệnh gọi và lỗi theo thời gian",
+      "endpointsTitle": "Nơi nó được gọi",
+      "endpointsHint": "Các phần trong ứng dụng của bạn có các yêu cầu đã chạy truy vấn này.",
+      "noEndpoints": "Chúng tôi không thể xác định phần nào trong ứng dụng của bạn đã chạy truy vấn này trong khoảng thời gian này.",
+      "samplesTitle": "Các ví dụ chậm nhất",
+      "samplesHint": "mỗi chấm là một lần thực thi thực tế — nhấp để xem toàn bộ yêu cầu",
+      "noSamples": "Không có lần thực thi riêng lẻ nào được tải cho khoảng thời gian này.",
+      "noSeries": "Không có lịch sử cho truy vấn này trong khoảng thời gian bạn đã chọn.",
+      "liveSeries": "Các điểm gần đây nhất vẫn đang được tính và có thể thay đổi.",
+      "noStream": "Chúng tôi không thể xác định luồng trace nào mang truy vấn này, vì vậy không thể tải các nơi gọi và các ví dụ của nó.",
+      "ambiguousStream": "Tổ chức này có nhiều hơn một luồng trace và chúng tôi không thể biết truy vấn này chạy trên luồng nào. Hãy chọn một luồng để tải các nơi gọi và các trace mẫu.",
+      "pickStream": "Chọn một luồng trace",
+      "invalidStream": "Tên luồng trace đó không phải là tên chúng tôi nhận ra, vì vậy chúng tôi đã không chạy tìm kiếm.",
+      "firstSeen": "LẦN ĐẦU XUẤT HIỆN TRONG DANH SÁCH NÀY LÚC {time}",
+      "firstSeenHint": "Điểm sớm nhất trong khoảng thời gian này mà truy vấn này đủ nặng để theo dõi riêng.",
+      "lastSeen": "LẦN CUỐI XUẤT HIỆN LÚC {time}",
+      "lastSeenHint": "Điểm gần đây nhất trong khoảng thời gian này mà truy vấn này đủ nặng để theo dõi riêng. Nó có thể vẫn đang chạy — đây là lần cuối cùng nó lọt vào danh sách.",
+      "errorsByCode": {
+        "title": "Lỗi theo mã lý do",
+        "exactHint": "Được đếm trên mọi lệnh gọi trong khoảng thời gian này.",
+        "sampleHint": "Được đếm từ các ví dụ bên dưới — một mẫu, không phải tổng số.",
+        "noCode": "không có mã lý do"
+      },
+      "whereItRuns": {
+        "title": "Nơi nó chạy",
+        "hint": "Hoạt động của truy vấn này, chia theo cơ sở dữ liệu mà nó chạy. Nhấp vào một hàng để tập trung trang này vào nó.",
+        "trackedHint": "Các con số này bao gồm các đoạn trong khoảng thời gian này nơi truy vấn đủ nặng để theo dõi riêng — các đoạn yên tĩnh hơn không thêm gì vào đây, vì vậy hãy đọc chúng như tổng số tối thiểu.",
+        "showAll": "Hiển thị mọi vị trí",
+        "emptyFiltered": "Không có gì được theo dõi cho truy vấn này tại nơi trang này đang tập trung. Hiển thị mọi vị trí để xem nó đã chạy ở đâu.",
+        "noInstance": "Instance không được báo cáo",
+        "focused": "Đang tập trung",
+        "focusHint": "Các con số của trang này hiện đang được thu hẹp vào hàng này. Nhấp lại để mở rộng.",
+        "columns": {
+          "location": "Chạy trên",
+          "avg": "Trung bình mỗi lệnh gọi"
+        }
+      },
+      "qps": "Lệnh gọi mỗi giây",
+      "errorRate": "Lệnh gọi thất bại",
+      "unattributed": "Không được gán",
+      "sampleOk": "OK",
+      "sampleError": "Thất bại",
+      "viewTrace": "Xem yêu cầu →",
+      "viewTraces": "Xem các trace ví dụ",
+      "copySummary": "Sao chép",
+      "copySummaryHint": "Mọi con số ở đây đã có trên trang này — thao tác này chỉ viết câu văn, vì vậy phút thứ 13 của một sự cố sẽ tạo ra thông báo thay vì không có gì.",
+      "summaryCopied": "Đã sao chép tóm tắt",
+      "summaryCopyFailed": "Không thể sao chép tóm tắt.",
+      "columns": {
+        "calls": "Lời gọi",
+        "time": "Thời gian",
+        "duration": "Thời lượng",
+        "status": "Trạng thái",
+        "caller": "Người gọi",
+        "callShare": "Tỷ trọng lời gọi",
+        "p50": "Một nửa nằm dưới"
+      },
+      "belowTopN": {
+        "title": "Truy vấn này không nằm trong số nặng nhất trong một phần của khoảng thời gian này.",
+        "body": "Chúng tôi theo dõi riêng từng truy vấn nặng nhất; phần còn lại được gộp chung. Khi truy vấn này chưa đủ nặng, chúng tôi tô bóng biểu đồ thay vì vẽ số không — nó vẫn đang chạy.",
+        "capped": "Lịch sử trải dài về quá khứ theo phạm vi dữ liệu chúng tôi có."
+      },
+      "firstSeenCaveat": "— nó có thể đã chạy trước đó, chỉ là không nằm trong số nặng nhất",
+      "copyQuery": "Sao chép truy vấn",
+      "alertMe": "Cảnh báo tôi nếu điều này chậm lại",
+      "stats": {
+        "load": "Thời gian cơ sở dữ liệu",
+        "loadShare": "{percent} của cơ sở dữ liệu này",
+        "calls": "Lời gọi",
+        "callsDelta": "{change} so với trước đó",
+        "p50": "Một nửa nằm dưới",
+        "p95": "Lời gọi chậm",
+        "max": "Tệ nhất từng thấy",
+        "errors": "Thất bại",
+        "noErrors": "không có lỗi",
+        "approx": "gần đúng, không chính xác",
+        "exact": "chính xác"
+      },
+      "overlap": {
+        "serverExecution": "Thời gian {engine} dành để thực thi nó",
+        "serverWait": "Thời gian {engine} chờ nó — thời gian chờ, không phải thời gian thực thi",
+        "serverCounted": "Được đếm bởi {engine}, trên mọi máy khách",
+        "clientObserved": "Được quan sát bởi các bên gọi được cài đặt đo lường — cơ sở dữ liệu của bạn không báo cáo điều này."
+      },
+      "endpointsConcentrated": "Một endpoint chiếm {percent} thời gian của truy vấn này. Sửa {endpoint} là bạn đã sửa xong truy vấn này.",
+      "typicalMarker": "lời gọi chậm {value}",
+      "plans": {
+        "title": "Kế hoạch truy vấn",
+        "sourceLabel": "Kế hoạch ước tính chung",
+        "sourceTooltip": "Kế hoạch này được ước tính với mọi tham số truy vấn được đặt thành NULL và chưa bao giờ thực sự chạy. Postgres có thể đã chạy một kế hoạch khác cho các truy vấn thực. Dùng nó để xem hình dạng của truy vấn, không phải để giải thích tại sao nó mất thời gian.",
+        "stableCaveat": "Một dạng kế hoạch đã được ghi lại trong khoảng thời gian này. Điều đó không loại trừ vấn đề về kế hoạch — các kế hoạch ước tính có thể giữ nguyên trong khi kế hoạch thực tế thay đổi, và việc ghi lại kế hoạch đã thực thi chỉ thấy các câu lệnh đủ chậm để được ghi log, vì vậy một thay đổi kế hoạch khiến truy vấn nhanh hơn sẽ hoàn toàn biến mất khỏi bản ghi.",
+        "executedLabel": "Kế hoạch đã thực thi",
+        "executedTooltip": "Đây là kế hoạch Postgres thực sự đã chạy cho một lần thực thi thực tế, được ghi lại bởi auto_explain với các giá trị tham số thực. Số dòng và thời lượng trên dòng này được đo, không phải ước tính — nhưng chỉ các lần thực thi chậm hơn ngưỡng auto_explain mới được ghi lại, vì vậy chúng mô tả phần đuôi chậm, không phải mọi lần chạy.",
+        "capturedDurations": "trung bình {avg} · tối đa {max} trên {count} lần thực thi được ghi lại",
+        "estVsAct": "ước tính {est} → thực tế {act} dòng",
+        "driftCallout": "Hình dạng kế hoạch đã thay đổi trong khoảng thời gian này. {count} hình dạng khác nhau đã được ghi lại, điều này thường có nghĩa là lược đồ hoặc số liệu thống kê thay đổi, chẳng hạn như một chỉ mục bị xóa hoặc một bảng bị phân vùng lại.",
+        "viewPlans": "Xem kế hoạch",
+        "noPlans": "Không có kế hoạch nào được ghi lại",
+        "noPlansHint": "Chưa có collector nào gửi kế hoạch cho cơ sở dữ liệu này. Bật tính năng thu thập truy vấn hàng đầu trong công thức collector của bạn để bắt đầu ghi lại kế hoạch — trang thiết lập sẽ hướng dẫn từng bước.",
+        "noPlanForQuery": "Không có kế hoạch cho truy vấn này",
+        "noPlanForQueryHint": "Chúng tôi đang ghi lại kế hoạch cho cơ sở dữ liệu này — truy vấn này chỉ là không có kế hoạch. Điều đó bình thường đối với các câu lệnh mà cơ sở dữ liệu không thể giải thích, như COMMIT, ROLLBACK và SHOW.",
+        "planHash": "Kế hoạch",
+        "firstSeen": "Lần đầu thấy",
+        "lastSeen": "Lần cuối thấy",
+        "noTree": "Không thể đọc kế hoạch",
+        "nodeCost": "Chi phí {cost}"
+      },
+      "serverMetrics": {
+        "title": "Dữ liệu do cơ sở dữ liệu tự ghi nhận",
+        "subtitle": "Phía máy chủ — mọi máy khách",
+        "clientSubtitle": "Quan sát từ phía máy khách — chỉ các bên gọi được đo lường, chỉ các cuộc gọi hoàn tất. Một truy vấn vẫn đang chạy hoặc bị treo sẽ không nằm trong những con số này.",
+        "instance": "Do {instance} báo cáo",
+        "instanceWide": "Tất cả cơ sở dữ liệu trên instance này",
+        "calls": "Số lần thực thi",
+        "rows": "Số hàng trả về",
+        "meanExecution": "Thời gian thực thi trung bình",
+        "meanWait": "Thời gian chờ trung bình",
+        "sharedBlksHit": "Số khối từ cache",
+        "sharedBlksRead": "Số khối từ đĩa",
+        "tempBlksWritten": "Số khối tạm đã ghi",
+        "noMatch": "Không có bản ghi phía máy chủ cho truy vấn này",
+        "noMatchHint": "Cơ sở dữ liệu của bạn báo cáo các câu lệnh đã chạy, và câu lệnh này không nằm trong số đó. Điều đó bình thường: hai góc nhìn xác định một truy vấn theo cách khác nhau, nên chúng không phải lúc nào cũng khớp nhau. Mọi thứ ở trên vẫn được đo từ ứng dụng của bạn.",
+        "ambiguous": "Nhiều hơn một cơ sở dữ liệu có thể khớp với truy vấn này",
+        "ambiguousHint": "Một số instance báo cáo một cơ sở dữ liệu có tên này, vì vậy không có cách nào để biết instance nào đã chạy truy vấn này. Hiển thị số liệu từ sai instance sẽ tệ hơn là không hiển thị gì. Các ứng viên: {instances}.",
+        "off": "Chưa thu thập số liệu phía máy chủ",
+        "offHint": "Bộ thu thập của bạn chưa thu thập số liệu theo câu lệnh từ cơ sở dữ liệu. Hãy bật tính năng thu thập truy vấn hàng đầu trong công thức bộ thu thập của bạn — trang thiết lập sẽ hướng dẫn từng bước.",
+        "setUp": "Thiết lập",
+        "readFailed": "Không thể đọc số liệu phía máy chủ",
+        "readFailedHint": "Việc đọc thất bại, vì vậy điều này không nói lên điều gì về việc cơ sở dữ liệu của bạn có báo cáo câu lệnh hay không. Mọi thứ ở trên vẫn được đo từ ứng dụng của bạn."
+      },
+      "callingServices": {
+        "title": "Dịch vụ nào của bạn đã gọi truy vấn này",
+        "unjoinable": "Không hiển thị — câu lệnh này chạy trên nhiều loại cơ sở dữ liệu ở đây, và việc khớp các bên gọi mà không biết loại nào sẽ chỉ định sai dịch vụ.",
+        "tracedCalls": "{calls} cuộc gọi được truy vết",
+        "coverage": "{count} dịch vụ xuất hiện trong {traced} trên tổng số {executions} lần thực thi ở trên. Phần còn lại đến từ các bên gọi chưa được truy vết.",
+        "coverageUnknown": "{count} dịch vụ xuất hiện trong {traced} cuộc gọi được truy vết. Cơ sở dữ liệu của bạn không báo cáo tổng cho câu lệnh này, vì vậy không có tỷ lệ nào để hiển thị.",
+        "noneNamed": "{traced} cuộc gọi đã được truy vết, nhưng không cuộc gọi nào trong số đó có thể liên kết ngược với một dịch vụ — dấu vết của chúng bắt đầu ngoài khoảng thời gian này."
+      },
+      "callersEmpty": {
+        "title": "Chưa có cuộc gọi được truy vết nào cho truy vấn này",
+        "description": "Cơ sở dữ liệu của bạn báo cáo câu lệnh này, nhưng không có gì truy vết ứng dụng đã chạy nó — vì vậy không có bên gọi nào để nêu tên và không có lần chạy cụ thể nào để mở. Hãy cài đặt đo lường cho các dịch vụ kết nối với cơ sở dữ liệu này và chúng sẽ xuất hiện ở đây.",
+        "checklistTitle": "Điều gì cần phải đúng",
+        "setUp": "Thiết lập truy vết",
+        "checks": {
+          "server": {
+            "ok": "Cơ sở dữ liệu của bạn đang báo cáo truy vấn này",
+            "okDetail": "đó là nguồn của các số đo thời gian trên các tab khác"
+          }
+        }
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "thời gian thực thi",
+        "serverWait": "thời gian chờ",
+        "serverCounted": "số lượng máy chủ",
+        "clientObserved": "quan sát từ máy khách",
+        "serverReported": "được báo cáo bởi các cơ sở dữ liệu của bạn"
+      }
+    },
+    "page": {
+      "tabs": {
+        "overview": "Tổng quan",
+        "queries": "Truy vấn hàng đầu",
+        "samples": "Cuộc gọi chậm nhất",
+        "samplesHintClient": "Các cuộc gọi hoàn tất mà các dịch vụ được đo lường của bạn quan sát được trong khoảng thời gian này — các bên gọi không được truy vết không được tính, vì vậy đây là mức tối thiểu, không phải tổng số. Bảng hiển thị những cuộc gọi chậm nhất trong số đó.",
+        "samplesHintServer": "Các câu lệnh mà cơ sở dữ liệu của bạn báo cáo đã hoàn thành trong khoảng thời gian này, được đếm trong cơ sở dữ liệu. Bảng hiển thị những câu lệnh chậm nhất.",
+        "samplesHintUnknown": "Các cuộc gọi cơ sở dữ liệu riêng lẻ chậm nhất trong khoảng thời gian này.",
+        "deadlocks": "Bế tắc",
+        "blocked": "Truy vấn bị chặn",
+        "deadlocksHint": "Bế tắc do cơ sở dữ liệu của bạn báo cáo.",
+        "blockedHint": "Phiên đang chờ khóa ngay lúc này.",
+        "activity": "Hoạt động",
+        "activityHint": "Số phiên mà cơ sở dữ liệu của bạn đang chạy ngay lúc này.",
+        "tableHealth": "Sức khỏe bảng",
+        "tableHealthHint": "Kích thước bảng, độ phình và trạng thái dọn dẹp. Độ phình và dọn dẹp chỉ áp dụng cho PostgreSQL.",
+        "deadlocksLocked": "Deadlock là tính năng Enterprise. Nâng cấp để xem truy vấn nào đã khóa lẫn nhau và tại sao. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
+        "blockedLocked": "Truy vấn bị chặn là tính năng Enterprise. Nâng cấp để xem phiên nào đang chờ khóa và điều gì đang giữ khóa. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
+        "tableHealthLocked": "Sức khỏe bảng là tính năng Enterprise. Nâng cấp để theo dõi kích thước bảng, độ phình và trạng thái dọn dẹp. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói."
+      }
+    },
+    "samples": {
+      "title": "Cuộc gọi chậm nhất",
+      "subtitle": "Các cuộc gọi cơ sở dữ liệu chậm nhất trong cửa sổ này, trên mọi cơ sở dữ liệu và truy vấn — theo cách người gọi đo lường, chỉ các cuộc gọi đã hoàn thành",
+      "subtitleServer": "Các câu lệnh chậm nhất mà cơ sở dữ liệu của bạn hoàn thành trong cửa sổ này, được đo bên trong cơ sở dữ liệu",
+      "logOffTitle": "Cơ sở dữ liệu của bạn chưa ghi nhật ký các câu lệnh chậm",
+      "logOffDescription": "Không có gì theo dõi các cuộc gọi này, vì vậy chúng tôi đã hỏi cơ sở dữ liệu về các câu lệnh chậm nhất của chúng — và chúng không ghi nhật ký nào. Danh sách này đến từ nhật ký câu lệnh của PostgreSQL (log_min_duration_statement), mặc định bị tắt — bước ghi nhật ký trong thẻ thiết lập sẽ bật nó. Việc thu thập theo từng câu lệnh hiện chỉ dành cho PostgreSQL, vì vậy MySQL và MariaDB chưa thể cung cấp cho danh sách này. Các truy vấn hàng đầu vẫn có thể cho bạn thấy điều gì chạy nhiều nhất, vì nó đọc bảng đếm thay thế.",
+      "searchPlaceholder": "Tìm kiếm văn bản truy vấn, dịch vụ hoặc cơ sở dữ liệu…",
+      "columns": {
+        "query": "Truy vấn",
+        "when": "Thời điểm",
+        "duration": "Thời gian",
+        "service": "Dịch vụ",
+        "status": "Trạng thái"
+      },
+      "columnHints": {
+        "duration": "Cuộc gọi này mất bao lâu, được đo bởi người gọi. Chỉ tính các cuộc gọi đã hoàn thành — một truy vấn đang chạy hoặc không bao giờ quay lại sẽ không được đo ở đây."
+      },
+      "failed": "Thất bại",
+      "failedWithCode": "Thất bại · {code}",
+      "viewTrace": "Mở yêu cầu chứa cuộc gọi này",
+      "scatterOk": "Hoàn thành",
+      "partial": "Một số dữ liệu trace của bạn không thể đọc được, vì vậy các cuộc gọi có thể bị thiếu trong danh sách này.",
+      "disclosureShort": "Mỗi hàng là một cuộc gọi đã hoàn thành thực tế",
+      "disclosureDetail": "Được đo bởi ứng dụng thực hiện cuộc gọi, từ các trace bạn gửi. Chỉ những cuộc gọi đã hoàn thành ở đây — một truy vấn đang chạy hoặc bị treo và không bao giờ quay lại sẽ không tạo ra phép đo nào.",
+      "counts": {
+        "complete": "Hiển thị tất cả {count} cuộc gọi cơ sở dữ liệu trong cửa sổ này, chậm nhất trước.",
+        "truncated": "{count} cuộc gọi chậm nhất trong cửa sổ này — có nhiều cuộc gọi hơn số hiển thị ở đây.",
+        "filtered": "Hiển thị {count} trong số {total} cuộc gọi."
+      },
+      "serverList": {
+        "title": "Các cuộc gọi chậm nhất do cơ sở dữ liệu của bạn báo cáo",
+        "subtitle": "Được đo bên trong mỗi cơ sở dữ liệu tại thời điểm một câu lệnh hoàn thành — mọi máy khách đều được tính, nhưng thời gian chờ mạng và kết nối thì không. Không có cuộc gọi ứng dụng nào được theo dõi trong cửa sổ này, vì vậy danh sách thông thường trống; cuộc gọi nào xuất hiện ở đây được quyết định bởi ngưỡng ghi nhật ký của chính cơ sở dữ liệu. Các báo cáo theo từng câu lệnh này hiện chỉ đến từ PostgreSQL — các công thức thu thập chưa thu thập nhật ký câu lệnh của các engine khác, vì vậy các cuộc gọi MySQL và MariaDB sẽ không xuất hiện ở đây.",
+        "truncated": "{count} cuộc gọi chậm nhất được báo cáo — có nhiều cuộc gọi vượt ngưỡng hơn số hiển thị ở đây",
+        "columns": {
+          "query": "Truy vấn",
+          "when": "Thời điểm",
+          "took": "Thời gian",
+          "user": "Người dùng"
+        },
+        "columnHints": {
+          "took": "Thời gian trong cơ sở dữ liệu từ khi bắt đầu đến khi hoàn thành câu lệnh, theo phép đo của engine. Không phải thời gian mà người gọi trải nghiệm — thời gian chờ mạng và kết nối không được bao gồm."
+        }
+      }
+    },
+    "rowChips": {
+      "new": "MỚI TRONG DANH SÁCH NÀY",
+      "slower": "{ratio}× CHẬM HƠN THƯỜNG LỆ",
+      "loop": "CHẠY {multiplier}× MỖI YÊU CẦU",
+      "allFailed": "TẤT CẢ {count} THẤT BẠI",
+      "busier": "BẬN HƠN, KHÔNG CHẬM HƠN",
+      "climbed": "TRUY VẤN NẶNG NHẤT MỚI"
+    },
+    "deadlocks": {
+      "title": "Cơ sở dữ liệu",
+      "subtitle": "Các giao dịch chặn lẫn nhau và đã bị hoàn tác",
+      "deadlockCount": "không có deadlock | {count} deadlock | {count} deadlock",
+      "pairCount": "không có cặp truy vấn | {count} cặp truy vấn | {count} cặp truy vấn",
+      "searchPlaceholder": "Tìm kiếm văn bản truy vấn, bảng hoặc ứng dụng…",
+      "grouping": {
+        "pairs": "Nhóm theo cặp truy vấn",
+        "pairsHint": "Một hàng cho mỗi cặp truy vấn gây deadlock lẫn nhau, kèm tần suất xảy ra.",
+        "events": "Mọi sự kiện",
+        "eventsHint": "Một hàng cho mỗi deadlock, mới nhất trước — dùng khi bạn cần một thời điểm cụ thể."
+      },
+      "columns": {
+        "pair": "Hai truy vấn gây deadlock lẫn nhau",
+        "applications": "Ứng dụng",
+        "objects": "Các hàng tranh chấp",
+        "lastSeen": "Lần cuối",
+        "count": "Deadlock",
+        "when": "Khi",
+        "cancelled": "Đã hủy",
+        "finished": "Đã hoàn thành"
+      },
+      "coverage": {
+        "complete": "Mọi deadlock mà cơ sở dữ liệu của bạn báo cáo đều ở đây — {deadlocks} trong khoảng thời gian này, từ {pairs}.",
+        "capped": "Có nhiều deadlock xảy ra hơn mức chúng tôi có thể đọc cùng lúc. Đây là {deadlocks} chúng tôi có, từ {pairs} — con số thực tế cao hơn.",
+        "readUpTo": "Đã đọc đến {time}.",
+        "mysqlPartial": "Cơ sở dữ liệu MySQL của bạn chỉ giữ deadlock gần nhất trừ khi bật innodb_print_all_deadlocks."
+      },
+      "chips": {
+        "oppositeOrder": "THỨ TỰ HÀNG NGƯỢC LẠI",
+        "cadence": "MỖI {seconds}s",
+        "noQueries": "CÁC TRUY VẤN KHÔNG ĐƯỢC GHI LẠI",
+        "partial": "CHỈ MỘT PHÍA"
+      },
+      "rowActions": {
+        "topQueries": "Tìm các truy vấn này trong Top queries",
+        "copy": "Sao chép cả hai truy vấn",
+        "alert": "Cảnh báo tôi về deadlock"
+      },
+      "detail": {
+        "mostRecent": "Gần nhất · {time}",
+        "nthOf": "{index} trên {total}",
+        "earlier": "Trước đó",
+        "later": "Sau đó",
+        "victim": "Bị hủy bởi cơ sở dữ liệu",
+        "survivor": "Được phép hoàn thành",
+        "pid": "pid {pid}",
+        "thread": "thread {pid}",
+        "transaction": "giao dịch {id}",
+        "eachWaits": "mỗi bên chờ đợi bên kia",
+        "deadlock": "deadlock",
+        "noQueryCaptured": "Nhật ký đã ghi lại deadlock này nhưng không ghi lại câu lệnh.",
+        "waitingFor": "Đang chờ {target} hoàn thành.",
+        "waitingForRow": "Đang chờ {target} hoàn thành — phiên khác đã thay đổi hàng mà nó muốn.",
+        "rawLock": "{mode} · {target}",
+        "plainTitle": "Điều gì đã xảy ra, theo thứ tự.",
+        "plainBody": "{a} đã thay đổi một hàng và giữ nó. {b} đã thay đổi một hàng khác và giữ nó. Sau đó, mỗi bên cố gắng thay đổi hàng của bên kia, nên không bên nào có thể di chuyển. Cơ sở dữ liệu đã phá vỡ thế bế tắc bằng cách hủy {victim} — ứng dụng đó nhận được lỗi và toàn bộ giao dịch của nó đã bị rollback.",
+        "fixTitle": "Cách khắc phục nằm trong mã của bạn, không phải trong cơ sở dữ liệu.",
+        "fixBody": "Hai câu lệnh này chạm vào các hàng {object} theo thứ tự ngược nhau. Hãy để cả hai phía cập nhật theo cùng một thứ tự — id thấp nhất trước — và cặp này sẽ không thể deadlock nữa.",
+        "fixGeneric": "Cả hai bên đều giữ thứ mà bên kia muốn. Hãy để mọi giao dịch lấy các khóa này theo cùng một thứ tự và cặp này sẽ không thể deadlock nữa.",
+        "copyForSlack": "Sao chép",
+        "occurrencesTitle": "Tất cả {count} lần cặp này deadlock",
+        "occurrencesHint": "Chọn một điểm để tải cái ở trên",
+        "lostLabel": "{pid} đã thua",
+        "bothSidesLose": "Cả hai bên đều bị hủy gần như tương đương — {a} so với {b}. Không ứng dụng nào là vấn đề; thứ tự mới là vấn đề.",
+        "oneSideLoses": "{pid} bị hủy mỗi lần.",
+        "showAbove": "Hiển thị ở trên",
+        "copy": "Sao chép SQL",
+        "seeInTopQueries": "Xem trong Top queries",
+        "whichService": "Dịch vụ nào?",
+        "partialTitle": "Chỉ một phía của deadlock này đến được với chúng tôi",
+        "partialBody": "MySQL ghi mỗi phía của một deadlock thành một mục nhật ký riêng. Mục đối tác chưa đến — nó có thể nằm ngoài cửa sổ này, hoặc nhật ký có thể đã bị xoay vòng giữa hai mục. Những gì hiển thị là thật; câu lệnh còn lại chỉ đơn giản là thiếu.",
+        "copyHint": "Sao chép chỉ câu lệnh của phía này.",
+        "copySqlTooltip": "Sao chép câu lệnh của phía này",
+        "copyForSlackHint": "Cả hai câu lệnh, tần suất cặp này deadlock và lần cuối xảy ra — được viết thành tin nhắn bạn có thể dán vào kênh hoặc ticket."
+      },
+      "storm": {
+        "title": "Bão deadlock.",
+        "body": "{count} trong cửa sổ này — bình thường không có.",
+        "copyForSlack": "Sao chép",
+        "biasWarning": "Hãy mong đợi tab Top queries trông yên bình hơn thực tế ngay bây giờ. Một truy vấn bị hủy vẫn hoàn thành, nhưng những truy vấn xếp hàng sau các khóa này thì chưa — vì vậy số lần gọi ở đó thấp hơn những gì người dùng của bạn đang trải qua."
+      },
+      "summary": {
+        "deadlocks": "Deadlock",
+        "pairs": "Cặp truy vấn"
+      },
+      "healthy": {
+        "title": "Không có deadlock — và chúng tôi chắc chắn đang theo dõi",
+        "description": "Cơ sở dữ liệu của bạn chưa báo cáo một deadlock nào trong cửa sổ này. Đó là trạng thái bình thường khỏe mạnh, không phải khoảng trống trong những gì chúng tôi thu thập.",
+        "checklistTitle": "Làm sao chúng tôi biết",
+        "collectionHealthy": "Thu thập khỏe mạnh",
+        "checks": {
+          "reading": {
+            "title": "Chúng tôi đang đọc nhật ký cơ sở dữ liệu của bạn",
+            "detail": "{databases} · dòng gần nhất đã đọc {age}",
+            "detailNoFleet": "Dòng gần nhất đã đọc {age}",
+            "detailUnknown": "{databases} — đường ống nhật ký đã kết nối",
+            "detailUnknownNoFleet": "Đường ống nhật ký đã kết nối"
+          },
+          "reporting": {
+            "title": "Báo cáo deadlock đã bật",
+            "detail": "Postgres ghi nhật ký deadlock theo mặc định, và MySQL của bạn có innodb_print_all_deadlocks bật, vì vậy mọi deadlock đều được ghi lại — không chỉ cái mới nhất.",
+            "detailMysqlPartial": "Postgres ghi nhật ký deadlock theo mặc định. MySQL của bạn không bật innodb_print_all_deadlocks, vì vậy chỉ cái mới nhất được giữ lại.",
+            "detailUnknown": "Postgres ghi nhật ký deadlock theo mặc định. Trên MySQL, chạy SELECT {'@@'}innodb_print_all_deadlocks — nó phải là 1, nếu không chỉ deadlock mới nhất được giữ. Chúng tôi không thể đọc cài đặt này từ đây.",
+            "titleUnknown": "Kiểm tra rằng báo cáo deadlock đã bật"
+          },
+          "traffic": {
+            "title": "Chúng tôi thấy {lines} dòng nhật ký khác từ các cơ sở dữ liệu này",
+            "detail": "vì vậy đường ống đang mang lưu lượng — một deadlock sẽ đi qua nó",
+            "titleUnknown": "Đường ống nhật ký đang mang lưu lượng"
+          },
+          "lastEver": {
+            "title": "Deadlock cuối cùng chúng tôi từng thấy",
+            "detail": "{when}. Mở rộng cửa sổ để xem nó.",
+            "titleNone": "Chúng tôi chưa từng thấy deadlock trên các cơ sở dữ liệu này",
+            "detailNone": "Chưa có gì để so sánh — cửa sổ này không bất thường."
+          }
+        },
+        "widen": "Mở rộng đến 24 giờ qua"
+      },
+      "notCollecting": {
+        "title": "Chúng tôi chưa thấy deadlock — và đây chính xác là lý do",
+        "description": "Deadlock được báo cáo bởi chính cơ sở dữ liệu, không phải bởi ứng dụng của bạn. Chúng tôi kiểm tra bốn điều.",
+        "checklistTitle": "Những gì chúng tôi đã kiểm tra",
+        "checks": {
+          "queries": {
+            "ok": "Dữ liệu truy vấn của bạn đang đến",
+            "okDetail": "{queries} từ {databases} — tab Top queries hoạt động",
+            "okDetailNoFleet": "{queries} — tab Top queries hoạt động",
+            "no": "Không có dữ liệu truy vấn nào đến cả",
+            "noDetail": "Bắt đầu với tab Top queries — chưa có gì đến được với chúng tôi từ các cơ sở dữ liệu này."
+          },
+          "enabled": {
+            "ok": "Giám sát cơ sở dữ liệu đã bật",
+            "okDetail": "cho tổ chức này",
+            "no": "Giám sát cơ sở dữ liệu đã tắt",
+            "noDetail": "Bật nó trong Cài đặt để bắt đầu thu thập."
+          },
+          "log": {
+            "no": "Không có cơ sở dữ liệu nào gửi nhật ký cho chúng tôi",
+            "noDetail": "Thời gian truy vấn đến từ ứng dụng của bạn, nhưng deadlock chỉ được ghi vào nhật ký riêng của cơ sở dữ liệu. Trỏ bộ thu thập của bạn vào tệp nhật ký Postgres hoặc MySQL và tab này tự điền.",
+            "ok": "Một nhật ký cơ sở dữ liệu đang đến",
+            "okDetail": "so a deadlock would reach us — there simply hasn't been one."
+          },
+          "settings": {
+            "title": "Điều nên biết trước khi bắt đầu",
+            "detail": "Postgres ghi deadlock trên hai dòng log và MySQL trên nhiều dòng — các truy vấn tham gia nằm ở các dòng sau. Một cấu hình chỉ khớp dòng đầu tiên sẽ ghi nhận deadlock đã xảy ra nhưng mất hết truy vấn. Công thức của chúng tôi xử lý cả hai."
+          }
+        }
+      }
+    },
+    "blocked": {
+      "title": "Cơ sở dữ liệu",
+      "subtitle": "Phiên hiện đang chờ khóa",
+      "subtitlePast": "Các phiên đã chờ khóa trong khoảng thời gian này",
+      "waitingCount": "không có phiên nào đang chờ khóa | {count} phiên đang chờ khóa ngay bây giờ | {count} phiên đang chờ khóa ngay bây giờ",
+      "waitingCountPast": "không có phiên nào đã chờ khóa | {count} phiên đã chờ khóa trong khoảng thời gian này | {count} phiên đã chờ khóa trong khoảng thời gian này",
+      "sessionCount": "không có phiên | {count} phiên | {count} phiên",
+      "searchPlaceholder": "Tìm kiếm văn bản truy vấn, bảng hoặc ứng dụng…",
+      "perspective": {
+        "waiting": "Ai đang bị kẹt",
+        "waitingHint": "Mỗi hàng là một phiên đang chờ khóa, thời gian chờ lâu nhất đầu tiên.",
+        "blocking": "Ai đang chặn",
+        "blockingHint": "Phiên giữ khóa, với mọi thứ bị kẹt phía sau."
+      },
+      "columns": {
+        "stuckQuery": "Truy vấn đang bị kẹt",
+        "session": "Phiên",
+        "waitingFor": "Đang chờ",
+        "heldUpBy": "Bị chặn bởi",
+        "waiting": "Đang chờ",
+        "sessionQuery": "Phiên và những gì nó đang chạy",
+        "application": "Ứng dụng",
+        "blocking": "Đang chặn"
+      },
+      "coverage": {
+        "summary": "Thời gian chờ lâu nhất là {longest}. Mọi sự chờ đợi đều truy về {roots} đang giữ khóa mở.",
+        "summaryCapped": "Có nhiều phiên đang chờ hơn mức chúng tôi có thể đọc cùng lúc. Trong số các phiên chúng tôi có, thời gian chờ lâu nhất là {longest} và chúng truy về {roots} đang giữ khóa mở.",
+        "summaryOneRoot": "một phiên",
+        "summaryManyRoots": "{count} phiên",
+        "checked": "Kiểm tra mỗi {interval} giây; lần kiểm tra cuối {time}.",
+        "checkedUnknown": "Lấy mẫu từ các bảng khóa của chính cơ sở dữ liệu của bạn."
+      },
+      "rowActions": {
+        "showChain": "Hiển thị chuỗi",
+        "copy": "Sao chép truy vấn",
+        "alertMe": "Cảnh báo tôi về tình trạng chờ khóa"
+      },
+      "waitEvent": {
+        "transaction": "một giao dịch khác hoàn thành",
+        "row": "khóa hàng",
+        "table": "khóa bảng",
+        "extend": "bảng cần mở rộng",
+        "advisory": "khóa ứng dụng",
+        "object": "khóa đối tượng",
+        "buffer": "một trang dữ liệu được đọc",
+        "lock": "một khóa"
+      },
+      "deep": "sâu {count}",
+      "notWaiting": "không chờ",
+      "longestWait": "THỜI GIAN CHỜ LÂU NHẤT",
+      "holdsTheLock": "GIỮ KHÓA MÀ MỌI NGƯỜI ĐỀU MUỐN",
+      "lastStatement": "câu lệnh cuối {age} trước",
+      "idleInTransaction": "không chờ gì · rảnh trong một giao dịch mở",
+      "pills": {
+        "root": "GỐC — BẮT ĐẦU TỪ ĐÂY",
+        "waitingBlocking": "ĐANG CHỜ & CHẶN {count}",
+        "waiting": "ĐANG CHỜ"
+      },
+      "waitingOn": "đang chờ {pid}",
+      "degraded": "Một phiên đang chặn {count}. Nó đã có một giao dịch mở trong {age} và không chạy truy vấn nào trong thời gian đó — rất có thể là một ứng dụng quên cam kết.",
+      "footer": {
+        "allLeadBack": "Tất cả {waits} dẫn về pid {pid}",
+        "allLeadBackDetail": "— một phiên, giữ khóa trên {object}.",
+        "switchToBlocking": "Chuyển sang “Ai đang chặn”",
+        "releaseAll": "Kết thúc phiên {pid} sẽ giải phóng tất cả {count}.",
+        "releaseAllDetail": "Mọi thứ bên dưới nó chỉ đang chờ vì một khóa đó.",
+        "timeLost": "tổng thời gian mất: {seconds} trên {sessions}"
+      },
+      "terminate": {
+        "copied": "Đã sao chép",
+        "hint": "Tự chạy lệnh này trên {instance} để kết thúc phiên. Chúng tôi không bao giờ chạy thay bạn.",
+        "hintNoInstance": "Tự chạy lệnh này để kết thúc phiên. Chúng tôi không bao giờ chạy thay bạn."
+      },
+      "summary": {
+        "waiting": "Phiên đang chờ",
+        "longest": "Thời gian chờ lâu nhất",
+        "chains": "Chuỗi"
+      },
+      "rootCount": "không có phiên chặn gốc | {count} phiên chặn gốc | {count} phiên chặn gốc",
+      "inChain": "{count} phiên trong chuỗi",
+      "healthy": {
+        "title": "Không có gì đang chờ khóa",
+        "description": "Hiện không có phiên nào trong cơ sở dữ liệu của bạn bị kẹt sau một phiên khác. Đó là trạng thái bình thường khỏe mạnh, không phải là khoảng trống dữ liệu chúng tôi thu thập.",
+        "descriptionPast": "Trong khoảng thời gian này, không có phiên nào trong cơ sở dữ liệu của bạn bị kẹt sau một phiên khác. Đó là trạng thái bình thường khỏe mạnh, không phải là khoảng trống dữ liệu chúng tôi đã thu thập.",
+        "checklistTitle": "Làm thế nào chúng tôi biết",
+        "collectionHealthy": "Thu thập dữ liệu ổn định",
+        "checks": {
+          "sampling": {
+            "title": "Chúng tôi đang kiểm tra bảng khóa của cơ sở dữ liệu của bạn",
+            "detail": "mỗi {interval} giây · lần kiểm tra cuối {age}",
+            "detailUnknown": "theo lịch trình mà bộ thu thập của bạn được cấu hình"
+          },
+          "sessions": {
+            "title": "Các phiên đang chạy bình thường",
+            "detail": "chúng tôi thấy các phiên hoạt động và không có phiên nào trong hàng đợi khóa"
+          },
+          "meaning": {
+            "title": "Tab này hiển thị gì khi không trống",
+            "detail": "Một phiên chờ một khóa được giữ bởi phiên khác, và chuỗi dẫn về phiên đang giữ khóa đó. Chờ ngắn là bình thường và tự hết — tab này dành cho những phiên không tự hết."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "Chúng tôi chưa thấy truy vấn bị chặn — và đây là lý do chính xác",
+        "description": "Một truy vấn bị chặn chỉ có thể thấy từ bên trong cơ sở dữ liệu, trong bảng khóa của nó. Chúng tôi kiểm tra ba thứ.",
+        "checklistTitle": "Những gì chúng tôi đã kiểm tra",
+        "checks": {
+          "queries": {
+            "ok": "Dữ liệu truy vấn của bạn đang đến",
+            "okDetail": "{queries} từ {databases} — tab Truy vấn hàng đầu hoạt động",
+            "okDetailNoFleet": "{queries} — tab Truy vấn hàng đầu hoạt động",
+            "no": "Dữ liệu truy vấn cũng không đến",
+            "noDetail": "Bắt đầu với tab Truy vấn hàng đầu — chưa có dữ liệu nào từ các cơ sở dữ liệu này đến với chúng tôi."
+          },
+          "enabled": {
+            "ok": "Giám sát cơ sở dữ liệu đã được bật",
+            "okDetail": "cho tổ chức này",
+            "no": "Giám sát cơ sở dữ liệu đã bị tắt",
+            "noDetail": "Bật nó trong Cài đặt để bắt đầu thu thập."
+          },
+          "sampling": {
+            "no": "Không có gì đang lấy mẫu bảng khóa của cơ sở dữ liệu của bạn",
+            "noDetail": "Thông tin ai đang chờ ai chỉ tồn tại bên trong cơ sở dữ liệu và chỉ khi sự chờ đợi đang diễn ra. Phương pháp thu thập của chúng tôi đọc nó theo lịch trình và bật log_lock_waits để các lần chờ lâu cũng được ghi lại.",
+            "ok": "Việc lấy mẫu bảng khóa đang chạy",
+            "okDetail": "vì vậy một phiên bị chặn sẽ đến được với chúng tôi — đơn giản là không có phiên nào."
+          },
+          "settings": {
+            "title": "Điều đáng biết trước khi bắt đầu",
+            "detail": "log_lock_waits chỉ ghi lại một lần chờ khi nó kéo dài lâu hơn deadlock_timeout — mặc định là một giây. Các lần chờ ngắn hơn là bình thường và không được ghi lại, đó là lý do tab này lấy mẫu trực tiếp thay vì chỉ đọc nhật ký."
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "Hoạt động",
+      "subtitle": "Những gì cơ sở dữ liệu của bạn đang làm ngay bây giờ, được lấy mẫu từ bảng phiên của chính chúng.",
+      "subtitlePast": "Những gì cơ sở dữ liệu của bạn đã làm trong khoảng thời gian này, được lấy mẫu từ bảng phiên của chính chúng.",
+      "searchPlaceholder": "Tìm kiếm phiên, người dùng, ứng dụng",
+      "wait": {
+        "onCpu": "Trên CPU / không chờ",
+        "qualified": "{type}: {event}",
+        "plain": "{event}",
+        "remainder": "+{count} sự kiện chờ nữa ({share})",
+        "remainderNoShare": "+{count} sự kiện chờ nữa"
+      },
+      "disclosure": {
+        "sampled": "Lấy mẫu mỗi {interval} giây — đây là một chuỗi các ảnh chụp nhanh, không phải bản ghi liên tục, vì vậy một phiên ngắn hơn khoảng thời gian giữa các lần lấy mẫu có thể chạy và kết thúc mà không bị nhìn thấy.",
+        "sampledUnknown": "Lấy mẫu theo lịch trình — đây là một chuỗi các ảnh chụp nhanh, không phải bản ghi liên tục. Chúng tôi vẫn chưa thấy đủ mẫu để xác định tần suất collector của bạn lấy dữ liệu.",
+        "filtered": "Mẫu đã được collector của bạn lọc trước: các phiên nhàn rỗi cũ hơn truy vấn đang chạy mới nhất sẽ bị bỏ qua trừ khi chúng đang chặn ai đó. Vì vậy, đây không phải là danh sách đầy đủ mọi kết nối.",
+        "short": "Được lấy mẫu mỗi {interval}s và được lọc trước",
+        "shortUnknown": "Được lấy mẫu theo lịch trình và được lọc trước",
+        "more": "Điều này có nghĩa là gì"
+      },
+      "columns": {
+        "session": "Phiên",
+        "user": "Người dùng",
+        "application": "Ứng dụng",
+        "state": "Trạng thái",
+        "waitEvent": "Đang chờ",
+        "running": "Thời gian chạy",
+        "lastQuery": "Truy vấn gần nhất",
+        "query": "Truy vấn",
+        "blockedBy": "Bị chặn bởi"
+      },
+      "summary": {
+        "sessions": "Phiên",
+        "onCpu": "Trên CPU",
+        "waiting": "Đang chờ",
+        "idleInTransaction": "Nhàn rỗi trong giao dịch"
+      },
+      "state": {
+        "unknown": "Trạng thái không được báo cáo"
+      },
+      "counts": {
+        "complete": "Hiển thị {count} phiên.",
+        "capped": "Có nhiều phiên được lấy mẫu hơn mức chúng tôi có thể đọc cùng lúc. Đây là {count} phiên chúng tôi có.",
+        "filtered": "Hiển thị {count} trong tổng số {total} phiên."
+      },
+      "transactionOpen": "giao dịch mở {age}",
+      "healthy": {
+        "title": "Không có gì đang chạy ngay bây giờ",
+        "description": "Chúng tôi đã lấy mẫu các bảng phiên của cơ sở dữ liệu của bạn và không tìm thấy phiên hoạt động nào. Đó là trạng thái bình thường lành mạnh của một cơ sở dữ liệu nhàn rỗi, không phải là khoảng trống trong dữ liệu chúng tôi thu thập.",
+        "descriptionPast": "Chúng tôi đã lấy mẫu các bảng phiên của cơ sở dữ liệu của bạn trong khoảng thời gian này và không tìm thấy phiên hoạt động nào. Đó là trạng thái bình thường lành mạnh của một cơ sở dữ liệu nhàn rỗi, không phải là khoảng trống trong dữ liệu chúng tôi đã thu thập.",
+        "checklistTitle": "Cách chúng tôi biết",
+        "collectionHealthy": "Thu thập dữ liệu khỏe mạnh",
+        "checks": {
+          "sampling": {
+            "title": "Chúng tôi đang lấy mẫu các bảng phiên của cơ sở dữ liệu của bạn",
+            "detail": "mỗi {interval} giây · lần xem gần nhất {age}",
+            "detailUnknown": "theo lịch trình được cấu hình trong collector của bạn"
+          },
+          "pipeline": {
+            "title": "Cơ sở dữ liệu của bạn đang gửi dữ liệu đến chúng tôi",
+            "detail": "{lines} dòng khác đã đi qua cùng pipeline trong khoảng thời gian này",
+            "detailUnknown": "pipeline truyền dữ liệu này đang chạy"
+          },
+          "meaning": {
+            "title": "Tab này hiển thị gì khi không trống",
+            "detail": "Mọi phiên đang chạy trên cơ sở dữ liệu của bạn, từng phiên đang chờ điều gì và đã chạy được bao lâu. Vì chúng tôi lấy mẫu thay vì theo dõi liên tục, các truy vấn rất ngắn có thể kết thúc giữa hai lần lấy mẫu và không bao giờ xuất hiện."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "Chúng tôi chưa thể xem các phiên trực tiếp — và đây chính xác là lý do",
+        "description": "Những gì cơ sở dữ liệu đang làm ngay lúc này chỉ tồn tại bên trong cơ sở dữ liệu đó, trong bảng phiên của chính nó. Cần phải có một thứ gì đó để thăm dò nó. Chúng tôi kiểm tra ba điều.",
+        "checklistTitle": "Những gì chúng tôi đã kiểm tra",
+        "checks": {
+          "queries": {
+            "ok": "Dữ liệu truy vấn của bạn đang được gửi đến",
+            "okDetail": "{queries} từ {databases} — tab Top queries hoạt động",
+            "okDetailNoFleet": "{queries} — tab Top queries hoạt động",
+            "no": "Dữ liệu truy vấn cũng không được gửi đến",
+            "noDetail": "Bắt đầu với tab Top queries — chưa có dữ liệu nào từ các cơ sở dữ liệu này đến với chúng tôi."
+          },
+          "enabled": {
+            "ok": "Giám sát cơ sở dữ liệu đã được bật",
+            "okDetail": "cho tổ chức này",
+            "no": "Giám sát cơ sở dữ liệu đã tắt",
+            "noDetail": "Bật nó trong Cài đặt để bắt đầu thu thập."
+          },
+          "sampling": {
+            "no": "Không có gì đang lấy mẫu các bảng phiên của cơ sở dữ liệu của bạn",
+            "noDetail": "Các mẫu phiên đến từ bộ thu thập của bạn: bật db.server.query_sample trong công thức bộ thu thập trên máy chủ cơ sở dữ liệu — trang thiết lập sẽ hướng dẫn. OpenObserve chấp nhận nguồn dữ liệu này khi giám sát cơ sở dữ liệu được bật, vì vậy cách khắc phục nằm ở phía bộ thu thập."
+          }
+        }
+      }
+    },
+    "instanceMetrics": {
+      "columnHeader": "Tình trạng instance",
+      "columnHint": "Số kết nối so với giới hạn, từ các số liệu mà bộ thu thập của bạn đã gửi. Trống cho đến khi một bộ thu nhận báo cáo instance này.",
+      "connectionsOf": "{used} trên {limit} kết nối",
+      "connectionsNoLimit": "{used} kết nối",
+      "noLimitHint": "Bộ thu nhận cho công cụ này không tự công bố giới hạn kết nối, vì vậy chỉ hiển thị số lượng. Công thức giới hạn kết nối của thẻ thiết lập (sqlquery/mysql_limits) thu thập max_connections và chuyển thành phần trăm.",
+      "trendLabel": "Các kết nối trong khoảng thời gian đã chọn",
+      "cacheHit": "Cache hit {percent}",
+      "lagBytes": "Bản sao tụt lại {value}",
+      "lagSeconds": "Bản sao tụt lại {value}",
+      "deadlocks": "{count} deadlock | {count} deadlock",
+      "noTraffic": "Không có lưu lượng ứng dụng trong khoảng thời gian này",
+      "noTrafficHint": "Bộ thu thập của bạn báo cáo instance này, nhưng không có ứng dụng nào truy vấn nó trong khoảng thời gian này. Các cột truy vấn của nó trống vì không có gì đo chúng, không phải vì nó nhanh.",
+      "unmatched": {
+        "pooler": "Không có số liệu instance nào khớp với địa chỉ này",
+        "poolerHint": "Hàng này là địa chỉ mà ứng dụng của bạn đã kết nối. Bộ thu thập của bạn báo cáo các máy chủ khác nhau, điều này trông giống như một bộ điều phối kết nối ở giữa — địa chỉ của bộ điều phối và cơ sở dữ liệu thực không bao giờ khớp nhau.",
+        "loopback": "Không có số liệu instance nào khớp với địa chỉ này",
+        "loopbackHint": "Hàng này trỏ đến localhost. Bộ thu thập viết lại điểm cuối loopback thành tên máy chủ của riêng nó, vì vậy hai tên không bao giờ khớp ngay cả khi cả hai đều khỏe mạnh.",
+        "noReceiver": "Bộ thu nhận {engine} không báo cáo",
+        "noReceiverHint": "Các ứng dụng của bạn đang truy vấn cơ sở dữ liệu này, nhưng không có bộ thu nhận {engine} nào gửi số liệu máy chủ cho nó. Thêm bộ thu nhận {engine} vào bộ thu thập của bạn để điền cột này.",
+        "noReceiverMariadbHint": "Các ứng dụng của bạn đang truy vấn máy chủ MariaDB này, nhưng không có gì gửi số liệu máy chủ cho nó. Không có bộ thu nhận MariaDB riêng — hãy trỏ bộ thu nhận MySQL vào instance này và số liệu của nó sẽ điền cột này.",
+        "engineUnsupported": "Không được thu thập cho {engine}",
+        "engineUnsupportedHint": "Số liệu instance được thu thập cho PostgreSQL, MySQL và MariaDB — chưa có bộ thu nhận nào được kết nối cho {engine}, vì vậy cột này vẫn trống. Đây là ghi chú về phạm vi bao phủ, không phải đánh giá về tình trạng.",
+        "unreadable": "Không thể đọc số liệu instance",
+        "unreadableHint": "Các luồng số liệu tồn tại nhưng không thể đọc. Đây thường là vấn đề về quyền hơn là bất kỳ điều gì sai với cơ sở dữ liệu."
+      },
+      "limitUnknownHint": "Số kết nối đã đến nhưng giới hạn thì không, vì vậy không thể hiển thị phần trăm. Kiểm tra xem số liệu giới hạn kết nối có được bật trên bộ thu thập này không.",
+      "noReading": "Không có chỉ số nào trong khoảng thời gian này",
+      "noReadingHint": "Bộ thu thập của bạn báo cáo instance này, nhưng không gửi số liệu kết nối nào trong khoảng thời gian này. Số liệu này có thể đã bị tắt trên bộ thu nhận hoặc instance có thể đã ngừng báo cáo.",
+      "lagLabel": "Độ trễ bản sao",
+      "deadlockLabel": "deadlock"
+    },
+    "tableHealth": {
+      "title": "Tình trạng bảng",
+      "subtitle": "Kích thước, độ phình và trạng thái vacuum cho từng bảng, ảnh chụp mới nhất trước tiên.",
+      "searchPlaceholder": "Tìm kiếm bảng",
+      "never": "Không bao giờ",
+      "countersCumulative": "Số lần quét và vacuum là tổng tích lũy kể từ lần đặt lại số liệu thống kê gần nhất, không phải số đếm trong khoảng thời gian đã chọn.",
+      "tuplesEstimated": "Số lượng hàng và phần trăm độ phình là ước tính thống kê từ công cụ cơ sở dữ liệu, không phải số đếm chính xác.",
+      "notCollectingTitle": "Chưa có số liệu thống kê bảng",
+      "notCollectingDescription": "Không có gì báo cáo số liệu thống kê bảng trong khoảng thời gian này. Tín hiệu này được cung cấp dưới dạng một công thức bộ thu thập riêng.",
+      "engineUnsupportedTitle": "Không được thu thập cho công cụ này",
+      "engineUnsupportedDescription": "Tình trạng bảng được thu thập bởi một công thức bộ thu thập theo từng công cụ và không có công thức nào được cung cấp cho công cụ này — vì vậy không có gì được thu thập cho nó. Đây không phải là dấu hiệu an toàn.",
+      "checklistTitle": "Để bắt đầu thu thập",
+      "checkRecipe": "Thêm công thức pg_table_stats từ hướng dẫn thiết lập Cơ sở dữ liệu vào cấu hình bộ thu thập của bạn.",
+      "checkGrant": "Cấp quyền pg_monitor cho người dùng bộ thu thập để nó có thể đọc pg_stat_user_tables.",
+      "checkRange": "Mở rộng khoảng thời gian — công thức báo cáo 60 giây một lần.",
+      "columns": {
+        "relation": "Bảng",
+        "instance": "Instance",
+        "totalBytes": "Tổng kích thước",
+        "heapBytes": "Kích thước heap",
+        "overheadBytes": "Chỉ mục + TOAST",
+        "liveTuples": "Số hàng trực tiếp (ước tính)",
+        "deadTuples": "Số hàng chết (ước tính)",
+        "deadTupPct": "Bloat (ước tính)",
+        "modSinceAnalyze": "Số hàng kể từ lần phân tích",
+        "seqScanCount": "Quét tuần tự (tổng cộng)",
+        "seqTupRead": "Số hàng quét tuần tự (tổng cộng)",
+        "idxScanCount": "Quét chỉ mục (tổng cộng)",
+        "autovacuumCount": "Autovacuum (tổng cộng)",
+        "frozenXidAge": "Tuổi Txid",
+        "lastVacuum": "Lần vacuum gần nhất",
+        "lastAutovacuum": "Lần autovacuum gần nhất",
+        "lastAnalyze": "Lần phân tích gần nhất"
+      },
+      "countLine": "{count} bảng"
+    },
+    "recommendations": {
+      "title": "Khuyến nghị",
+      "subtitle": "Các kiểm tra xác định dựa trên những gì bộ thu thập đã báo cáo. Mỗi kiểm tra nêu rõ phép đo và ngưỡng mà nó vượt qua.",
+      "countersCumulative": "Số lần quét chỉ mục là tổng tích lũy kể từ lần đặt lại thống kê gần nhất, không phải số lần trong khoảng thời gian đã chọn.",
+      "andMore": "và {count} mục khác tương tự",
+      "unused-index": {
+        "title": "Chỉ mục không được quét",
+        "body": "{index} trên {relation} không có bản ghi quét nào và chiếm {size}.",
+        "rule": "Số lần quét chỉ mục là 0 kể từ lần đặt lại thống kê gần nhất, và chỉ mục có kích thước ít nhất {bytes} byte. Số lần quét là tổng tích lũy, không phải số lần trong phạm vi đã chọn.",
+        "caveat": "Số đếm tích lũy bằng 0 có nghĩa là trình lập kế hoạch chưa chọn chỉ mục này kể từ lần đặt lại bộ đếm. Nó vẫn có thể phục vụ bản sao, tác vụ định kỳ hoặc ràng buộc."
+      },
+      "long-running-query": {
+        "title": "Truy vấn chạy lâu",
+        "body": "Phiên {pid} đã thực thi trong {duration}.",
+        "rule": "Một phiên đang thực thi đã chạy ít nhất {seconds} giây. Các phiên nhàn rỗi bị loại trừ."
+      },
+      "high-impact-blocker": {
+        "title": "Phiên chặn giữ nhiều phiên",
+        "body": "Phiên {pid} đứng đầu chuỗi với {count} phiên đang chờ.",
+        "rule": "Một trình chặn gốc — phiên chặn các phiên khác và không chờ đợi ai — có ít nhất {sessions} phiên đang chờ phía sau, tính qua toàn bộ chuỗi."
+      },
+      "high-row-count": {
+        "title": "Số hàng mỗi lần gọi cao",
+        "body": "Câu lệnh này trả về trung bình {rows} hàng mỗi lần gọi trong tổng số {calls} lần gọi.",
+        "rule": "Số hàng trung bình mỗi lần gọi ít nhất là {rows}, trên ít nhất {calls} lần gọi. Giá trị trung bình là tổng số hàng của máy chủ chia cho số lần gọi."
+      },
+      "enginePartialTitle": "Một số kiểm tra không chạy",
+      "enginePartialDescription": "Kiểm tra chỉ mục chưa sử dụng cần bộ đếm quét chỉ mục, không được thu thập cho công cụ này, vì vậy danh sách trống ở đây không có nghĩa là tất cả đều ổn.",
+      "allClearTitle": "Không có gì vượt ngưỡng",
+      "allClearDescription": "Mọi kiểm tra đã chạy và không có kiểm tra nào vượt ngưỡng trong khoảng thời gian này."
     }
   }
 }
