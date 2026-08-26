@@ -567,7 +567,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -1366,5 +1366,8 @@ function openResponse(id: string) {
   });
 }
 
-onMounted(fetchResponse);
+// The origin-response link stays on this same route with a new responseId
+// param, so Vue Router reuses this instance instead of remounting it — the
+// fetch has to key off responseId directly rather than firing once on mount.
+watch(responseId, fetchResponse, { immediate: true });
 </script>
