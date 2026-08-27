@@ -1615,7 +1615,10 @@ fn build_expr(
     };
     // Null/empty checks take no value. On non-string columns "empty" can only
     // mean null, so the empty checks degrade to the null checks there.
-    let is_string_type = matches!(field_type, DataType::Utf8 | DataType::LargeUtf8);
+    let is_string_type = matches!(
+        field_type,
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
+    );
     match cond.operator {
         Operator::IsNull => return Ok(format!("\"{field_alias}\" IS NULL")),
         Operator::IsNotNull => return Ok(format!("\"{field_alias}\" IS NOT NULL")),
@@ -2750,6 +2753,15 @@ mod tests {
 
         let cond = make_cond("msg", Operator::IsNotEmpty, Value::String(String::new()));
         let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NOT NULL AND \"msg\" != '')");
+
+        // Utf8View is a string type too — it must get the empty-string check.
+        let cond = make_cond("msg", Operator::IsEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NULL OR \"msg\" = '')");
+
+        let cond = make_cond("msg", Operator::IsNotEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
         assert_eq!(expr, "(\"msg\" IS NOT NULL AND \"msg\" != '')");
 
         // Non-string columns can only be "empty" by being null.

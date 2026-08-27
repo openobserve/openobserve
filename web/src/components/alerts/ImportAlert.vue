@@ -313,6 +313,7 @@ import {
   convertV0ToV2,
   convertV1ToV2,
   convertV1BEToV2,
+  ensureUnaryConditionValues,
 } from "@/utils/alerts/alertDataTransforms";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
@@ -1002,7 +1003,7 @@ export default defineComponent({
         // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
         input.query_condition.conditions = {
           version: 2,
-          conditions: convertedConditions,
+          conditions: ensureUnaryConditionValues(convertedConditions),
         };
       }
 

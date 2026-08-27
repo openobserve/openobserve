@@ -9,6 +9,7 @@ import {
   convertV1ToV2,
   convertV1BEToV2,
   ensureIds,
+  ensureUnaryConditionValues,
   TransformContext,
 } from "./alertDataTransforms";
 
@@ -2858,5 +2859,29 @@ describe("alertDataTransforms - V2 Structure Tests", () => {
 
       expect(context.formData.query_condition.conditions.conditions).toHaveLength(1);
     });
+  });
+});
+
+describe("ensureUnaryConditionValues", () => {
+  it("backfills value only on unary leaves that omit it, recursively", () => {
+    const tree: any = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [
+        { filterType: "condition", column: "a", operator: "is_null" },
+        { filterType: "condition", column: "b", operator: "=", value: "x" },
+        { filterType: "condition", column: "c", operator: "=" },
+        {
+          filterType: "group",
+          logicalOperator: "OR",
+          conditions: [{ filterType: "condition", column: "d", operator: "is_empty" }],
+        },
+      ],
+    };
+    ensureUnaryConditionValues(tree);
+    expect(tree.conditions[0].value).toBe("");
+    expect(tree.conditions[1].value).toBe("x");
+    expect(tree.conditions[2].value).toBeUndefined();
+    expect(tree.conditions[3].conditions[0].value).toBe("");
   });
 });

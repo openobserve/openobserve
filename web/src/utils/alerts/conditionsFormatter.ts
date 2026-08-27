@@ -50,21 +50,23 @@ const UNARY_OPERATOR_TEXT: Record<string, string> = {
   isnotempty: "is not empty",
 };
 
-// "Empty" only differs from "null" on string columns; on these the empty
-// checks degrade to the null checks (matching the backend's build_expr).
-const NON_STRING_TYPES = ["Int64", "Float64", "Boolean"];
+// "Empty" only differs from "null" on string columns; on any other KNOWN type
+// the empty checks degrade to the null checks (matching the backend's
+// build_expr, where `col = ''` on e.g. an Int64 column fails coercion). An
+// unknown type keeps the string form — the common case for custom columns.
+const STRING_TYPES = ["String", "Utf8", "LargeUtf8", "Utf8View"];
 
 /**
  * Unary null/empty-check operators: they take no value, so completeness
  * checks and formatters must not require one.
  */
 export function isUnaryOperator(operator: unknown): boolean {
-  return typeof operator === "string" && operator.toLowerCase() in UNARY_OPERATOR_TEXT;
+  return typeof operator === "string" && Object.hasOwn(UNARY_OPERATOR_TEXT, operator.toLowerCase());
 }
 
 /** Display text for a unary operator ("is null", "is empty", ...). */
 export function unaryOperatorText(operator: unknown): string {
-  return UNARY_OPERATOR_TEXT[String(operator).toLowerCase()] ?? "";
+  return isUnaryOperator(operator) ? UNARY_OPERATOR_TEXT[(operator as string).toLowerCase()] : "";
 }
 
 /**
@@ -138,7 +140,7 @@ function getFormattedCondition(
   if (isUnaryOperator(operator)) {
     const text = unaryOperatorText(operator);
     if (!sqlMode) return `${column} ${text}`;
-    const nonString = columnType !== undefined && NON_STRING_TYPES.includes(columnType);
+    const nonString = columnType !== undefined && !STRING_TYPES.includes(columnType);
     switch (text) {
       case "is null":
         return `${column} IS NULL`;

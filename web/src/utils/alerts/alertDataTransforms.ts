@@ -7,6 +7,7 @@
  */
 
 import { getUUID } from "@/utils/zincutils";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 export interface TransformContext {
   formData: any;
@@ -188,6 +189,23 @@ export const removeConditionGroup = (
   }
 };
 
+/**
+ * Backfill `value: ""` on unary-operator leaves (imported JSON may omit it,
+ * but the backend's `Condition.value` field is required). Mutates in place.
+ */
+export const ensureUnaryConditionValues = (node: any): any => {
+  if (!node || typeof node !== "object") return node;
+  if (Array.isArray(node)) {
+    node.forEach(ensureUnaryConditionValues);
+    return node;
+  }
+  if (node.value === undefined && isUnaryOperator(node.operator)) {
+    node.value = "";
+  }
+  if (Array.isArray(node.conditions)) node.conditions.forEach(ensureUnaryConditionValues);
+  return node;
+};
+
 export const transformFEToBE = (node: any): any => {
   if (!node || !node.items || !Array.isArray(node.items)) return {};
 
@@ -204,7 +222,8 @@ export const transformFEToBE = (node: any): any => {
     return {
       column: item.column,
       operator: item.operator,
-      value: item.value,
+      // The backend requires `value` even for unary operators.
+      value: item.value === undefined && isUnaryOperator(item.operator) ? "" : item.value,
       ignore_case: !!item.ignore_case,
     };
   });

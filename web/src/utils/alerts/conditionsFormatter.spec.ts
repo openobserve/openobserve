@@ -21,6 +21,12 @@ describe("conditionsFormatter", () => {
       expect(isUnaryOperator("Contains")).toBe(false);
       expect(isUnaryOperator(undefined)).toBe(false);
     });
+
+    it("does not match inherited object properties", () => {
+      expect(isUnaryOperator("constructor")).toBe(false);
+      expect(isUnaryOperator("__proto__")).toBe(false);
+      expect(isUnaryOperator("toString")).toBe(false);
+    });
   });
 
   describe("buildConditionsString", () => {
@@ -385,6 +391,29 @@ describe("conditionsFormatter", () => {
       expect(buildConditionsString(group, { sqlMode: false })).toBe(
         "name is empty and age is not empty",
       );
+    });
+
+    it("treats every known string type as string for empty checks", () => {
+      const typedMap: StreamFieldsMap = {
+        v: { label: "v", value: "v", type: "Utf8View" },
+        n: { label: "n", value: "n", type: "Int32" },
+      };
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          { filterType: "condition", column: "v", operator: "is_empty", logicalOperator: "AND" },
+          { filterType: "condition", column: "n", operator: "is_empty", logicalOperator: "AND" },
+        ],
+      };
+
+      expect(
+        buildConditionsString(group, {
+          sqlMode: true,
+          formatValues: true,
+          streamFieldsMap: typedMap,
+        }),
+      ).toBe("(v IS NULL OR v = '') AND n IS NULL");
     });
 
     it("handles mixed OR and AND operators", () => {

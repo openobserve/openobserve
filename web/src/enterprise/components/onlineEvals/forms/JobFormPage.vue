@@ -358,6 +358,8 @@ import {
   normalizeJobFilterCondition,
 } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import type { StreamFieldsMap } from "@/utils/alerts/alertQueryBuilder";
+import { DEFAULT_JOB_STREAM_FIELDS } from "../utils/defaultStreamFields";
 import {
   buildJobInputMappingPayload,
   mappingUsesSystemProvidedSpans,
@@ -437,6 +439,13 @@ const showActivateChoice = computed(
   () => props.mode === "create" || (props.mode === "edit" && isDraft.value),
 );
 
+// Field types for the SQL formatter: numeric columns must not be quoted and
+// their empty checks must degrade to null checks, or the query fails.
+const filterFieldsMap = computed<StreamFieldsMap>(() => {
+  const fields = streamFields.value.length ? streamFields.value : DEFAULT_JOB_STREAM_FIELDS;
+  return Object.fromEntries(fields.map((field) => [field.value, field]));
+});
+
 // SQL WHERE body built from the filter builder — feeds the live "matched
 // spans" count in the preview panel. Built from the CLEANED group (incomplete
 // conditions stripped) so the SQL is always valid. Same formatter the form's
@@ -447,6 +456,7 @@ const filterWhere = computed<string>(() => {
       sqlMode: true,
       addWherePrefix: false,
       formatValues: true,
+      streamFieldsMap: filterFieldsMap.value,
     });
   } catch {
     return "";

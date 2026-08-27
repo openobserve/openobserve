@@ -423,6 +423,7 @@ import {
   convertV0ToV2,
   convertV1ToV2,
   convertV1BEToV2,
+  ensureUnaryConditionValues,
 } from "@/utils/alerts/alertDataTransforms";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
@@ -1195,6 +1196,8 @@ export default defineComponent({
               // Update node data with converted conditions
               node.data.conditions = convertedConditions;
             }
+
+            ensureUnaryConditionValues(node.data.conditions);
 
             // Ensure version is set as integer (matching Condition.vue structure)
             // Backend expects: node.data = { node_type: "condition", version: 2, conditions: {...} }
