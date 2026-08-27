@@ -263,10 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="mb-2.5 p-2.5" v-if="alertCreators.length > 0">
-            <div
-              class="text-primary mb-2.5 text-base uppercase"
-              data-test="alert-import-creation-title"
-            >
+            <div class="text-primary mb-2.5 text-base" data-test="alert-import-creation-title">
               {{ t("alerts.alertCreationTitle") }}
             </div>
             <div

@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destination Creation Success Messages -->
           <div class="error-section mb-2.5 p-2.5" v-if="destinationCreators.length > 0">
             <div
-              class="text-primary mb-2.5 text-base uppercase"
+              class="text-primary mb-2.5 text-base"
               data-test="destination-import-creation-title"
             >
               {{ t("alert_destinations.import.destinationCreation") }}

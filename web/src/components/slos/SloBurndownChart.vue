@@ -89,7 +89,7 @@
                 <div class="flex flex-col gap-2">
                   <p class="text-xs leading-relaxed">{{ panel.explain }}</p>
                   <div class="flex flex-col gap-1">
-                    <span class="text-text-secondary text-2xs font-semibold uppercase">
+                    <span class="text-text-secondary text-2xs font-semibold">
                       {{ t("slos.chart.formulaLabel") }}
                     </span>
                     <!-- The interpolation hugs the tags: `whitespace-pre-line`
