@@ -296,6 +296,9 @@ pub async fn insert_notice_update(
     Ok(())
 }
 
+/// Admin history view for one notice, newest first — unlike
+/// [`list_notice_updates_for`], which the rebuilder needs oldest-first to
+/// build the public timeline.
 pub async fn list_notice_updates(
     org_id: &str,
     notice_id: &str,
@@ -304,7 +307,7 @@ pub async fn list_notice_updates(
     Ok(status_page_notice_updates::Entity::find()
         .filter(status_page_notice_updates::Column::NoticeId.eq(notice_id))
         .filter(status_page_notice_updates::Column::OrgId.eq(org_id))
-        .order_by_asc(status_page_notice_updates::Column::CreatedAt)
+        .order_by_desc(status_page_notice_updates::Column::CreatedAt)
         .all(conn)
         .await?)
 }

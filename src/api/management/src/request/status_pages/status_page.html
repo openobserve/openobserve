@@ -254,7 +254,19 @@
 <script>
 (function () {
   "use strict";
-  var slug = location.pathname.split("/").pop();
+  // A custom domain serves this same static page at whatever path the
+  // visitor typed (host_route_middleware ignores the path entirely once the
+  // Host matches a verified claim) — there is no real slug in the URL to
+  // read. Only the app's own "/status/{slug}" route carries one; anything
+  // else fetches by Host instead, which the backend already resolves to the
+  // claim's page (host_route_middleware -> resolve_host_route -> snapshot()).
+  // Checked as the last two segments, not the whole path, so a configured
+  // ZO_BASE_URI prefix (the route is nested under it, not replaced by it)
+  // doesn't defeat the check.
+  var pathParts = location.pathname.split("/").filter(Boolean);
+  var slug = (pathParts.length >= 2 && pathParts[pathParts.length - 2] === "status")
+    ? pathParts[pathParts.length - 1]
+    : null;
   var POLL_MS = 60000, STALE_MS = 150000;
 
   var STATUS = {
@@ -392,12 +404,29 @@
     document.getElementById("page-name").textContent = "Status";
   }
 
-  function updatesList(updates) {
+  // The opening post (n.body @ n.starts_at) is itself the first entry in the
+  // thread, not a header sitting above it — merged with real updates and
+  // sorted so the newest post is always on top, whether that's a follow-up
+  // update or (with none yet) the opening post itself.
+  function noticeThread(n) {
+    var openingLabel = n.state === "scheduled" ? "Scheduled for " : "Started ";
+    var entries = [];
+    if (n.body || n.starts_at) {
+      entries.push({
+        body: n.body || "",
+        meta: n.starts_at ? openingLabel + fmtTime(n.starts_at) : "",
+        at: n.starts_at || 0,
+      });
+    }
+    (n.updates || []).forEach(function (u) {
+      entries.push({ body: u.body, meta: fmtTime(u.at), at: u.at || 0 });
+    });
+    entries.sort(function (a, b) { return b.at - a.at; });
     var ul = el("ul", "updates");
-    (updates || []).slice().reverse().forEach(function (u) {
+    entries.forEach(function (e) {
       var li = el("li");
-      li.appendChild(el("p", "body", u.body));
-      li.appendChild(el("p", "meta", fmtTime(u.at)));
+      li.appendChild(el("p", "body", e.body));
+      li.appendChild(el("p", "meta", e.meta));
       ul.appendChild(li);
     });
     return ul;
@@ -411,12 +440,7 @@
     if (n.state === "scheduled") eyebrow.push("Scheduled");
     box.appendChild(el("p", "eyebrow t-" + k.tone, eyebrow.join(" · ")));
     box.appendChild(el("h3", null, n.title || "Notice"));
-    if (n.body) box.appendChild(el("p", "body", n.body));
-    var when = n.state === "scheduled"
-      ? "Scheduled for " + fmtTime(n.starts_at)
-      : "Started " + fmtTime(n.starts_at);
-    if (n.starts_at) box.appendChild(el("p", "meta", when));
-    if (n.updates && n.updates.length) box.appendChild(updatesList(n.updates));
+    box.appendChild(noticeThread(n));
     return box;
   }
 
@@ -444,13 +468,13 @@
       var item = el("div", "pastitem");
       item.appendChild(el("p", "eyebrow t-" + k.tone, k.label));
       item.appendChild(el("h3", null, n.title || "Notice"));
-      if (n.body) item.appendChild(el("p", "body", n.body));
+      // "Started" is already the opening entry inside noticeThread(n) below —
+      // only the facts unique to a resolved notice go in this summary line.
       var meta = [];
-      if (n.starts_at) meta.push("Started " + fmtTime(n.starts_at));
       if (n.resolved_at) meta.push("Resolved " + fmtTime(n.resolved_at));
       if (n.excluded_from_uptime) meta.push("Excluded from uptime");
       if (meta.length) item.appendChild(el("p", "meta", meta.join(" · ")));
-      if (n.updates && n.updates.length) item.appendChild(updatesList(n.updates));
+      item.appendChild(noticeThread(n));
       det.appendChild(item);
     });
     phost.appendChild(det);
@@ -768,7 +792,13 @@
   }
 
   function load() {
-    fetch("/api/status_pages_public/" + encodeURIComponent(slug))
+    // No slug on a custom domain — the by-host endpoint resolves the page
+    // from the Host header alone, the same lookup host_route_middleware
+    // already did server-side to serve this HTML in the first place.
+    var url = slug
+      ? "/api/status_pages_public/" + encodeURIComponent(slug)
+      : "/api/status_pages_public_by_host";
+    fetch(url)
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then(function (data) {
         last.failed = false;
