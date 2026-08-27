@@ -80,22 +80,23 @@ pub fn decide(
     }
 }
 
-/// Routes a blocked user must still reach: their own password change, the config the console needs
-/// to render, logout, and the complexity requirements they are being held to.
+/// Routes a blocked user must still reach: the complexity requirements they are being held to, and
+/// their own password change.
+///
+/// `/config` and `/config/logout` are not listed. They live in a separate nest, and only
+/// `/config/reload` within it is behind `auth_middleware` at all, so neither ever reaches here.
 fn is_remediation_route(uri: &Uri, method: &Method, user_email: &str) -> bool {
-    let path = uri.path();
+    let segments = route_segments(uri.path());
 
-    if method == Method::GET
-        && (path == "/config" || path == "/config/logout" || is_complexity_route(path))
-    {
+    if method == Method::GET && is_complexity_route(&segments) {
         return true;
     }
 
-    // PUT /api/{org_id}/users/{email_id}, and only for the caller's own account. Matched on path
-    // alone — the body is not readable at this layer, so a request that turns out not to be a
-    // password change simply proceeds and is rejected downstream on its own merits.
+    // The caller's own account only. Matched on path alone — the body is not readable at this
+    // layer, so a request that turns out not to be a password change simply proceeds and is
+    // rejected downstream on its own merits.
     if method == Method::PUT
-        && let Some(email) = users_route_email(path)
+        && let Some(email) = users_route_email(&segments)
     {
         return email.eq_ignore_ascii_case(user_email);
     }
@@ -103,28 +104,33 @@ fn is_remediation_route(uri: &Uri, method: &Method, user_email: &str) -> bool {
     false
 }
 
-/// `/api/{org_id}/password_complexity`
-fn is_complexity_route(path: &str) -> bool {
-    let mut segments = path.trim_start_matches('/').split('/');
-    segments.next() == Some("api")
-        && segments.next().is_some_and(|org| !org.is_empty())
-        && segments.next() == Some("password_complexity")
-        && segments.next().is_none()
+/// Split a request path into non-empty segments.
+///
+/// The `/api` prefix is deliberately NOT assumed. `auth_middleware` runs inside
+/// `nest("/api", service_routes())`, and axum strips the matched prefix before inner services see
+/// the request, so the path here is `/{org}/…`. The matchers below accept the prefixed form too,
+/// which keeps them correct if this middleware is ever mounted outside that nest.
+fn route_segments(path: &str) -> Vec<&str> {
+    path.split('/').filter(|s| !s.is_empty()).collect()
 }
 
-/// The `{email_id}` of `/api/{org_id}/users/{email_id}`, if the path is exactly that shape.
-fn users_route_email(path: &str) -> Option<&str> {
-    let mut segments = path.trim_start_matches('/').split('/');
-    if segments.next()? != "api" {
-        return None;
+/// `{org}/password_complexity`, with or without a leading `api`.
+fn is_complexity_route(segments: &[&str]) -> bool {
+    matches!(
+        segments,
+        [_org, "password_complexity"] | ["api", _org, "password_complexity"]
+    )
+}
+
+/// The `{email_id}` of `{org}/users/{email_id}`, with or without a leading `api`.
+///
+/// Deeper paths are rejected so a sub-resource cannot ride in on the same prefix.
+fn users_route_email<'a>(segments: &[&'a str]) -> Option<&'a str> {
+    match segments {
+        [_org, "users", email] => Some(email),
+        ["api", _org, "users", email] => Some(email),
+        _ => None,
     }
-    let _org = segments.next().filter(|org| !org.is_empty())?;
-    if segments.next()? != "users" {
-        return None;
-    }
-    let email = segments.next().filter(|email| !email.is_empty())?;
-    // Reject deeper paths so a sub-resource cannot ride in on the same prefix.
-    segments.next().is_none().then_some(email)
 }
 
 fn is_read_only(method: &Method) -> bool {
@@ -246,17 +252,23 @@ mod tests {
     #[test]
     fn own_password_change_is_allowed() {
         let u = user("a@b.com");
-        assert_eq!(
-            decide_hard(&u, "/api/default/users/a@b.com", Method::PUT),
-            PolicyDecision::Allow
-        );
+        // Stripped form first — this is what the middleware actually receives, since it runs
+        // inside nest("/api", ..). Asserting only the prefixed form is what let a matcher that
+        // never fired in production pass its tests.
+        for path in ["/default/users/a@b.com", "/api/default/users/a@b.com"] {
+            assert_eq!(
+                decide_hard(&u, path, Method::PUT),
+                PolicyDecision::Allow,
+                "{path} must stay reachable"
+            );
+        }
     }
 
     #[test]
     fn own_password_change_matches_case_insensitively() {
         let u = user("a@b.com");
         assert_eq!(
-            decide_hard(&u, "/api/default/users/A@B.com", Method::PUT),
+            decide_hard(&u, "/default/users/A@B.com", Method::PUT),
             PolicyDecision::Allow
         );
     }
@@ -267,7 +279,7 @@ mod tests {
         // their own.
         let u = user("a@b.com");
         assert!(matches!(
-            decide_hard(&u, "/api/default/users/victim@b.com", Method::PUT),
+            decide_hard(&u, "/default/users/victim@b.com", Method::PUT),
             PolicyDecision::Block { .. }
         ));
     }
@@ -276,18 +288,20 @@ mod tests {
     fn users_subresource_does_not_inherit_the_bypass() {
         let u = user("a@b.com");
         assert!(matches!(
-            decide_hard(&u, "/api/default/users/a@b.com/roles", Method::PUT),
+            decide_hard(&u, "/default/users/a@b.com/roles", Method::PUT),
             PolicyDecision::Block { .. }
         ));
     }
 
     #[test]
-    fn complexity_and_config_routes_are_allowed() {
+    fn complexity_route_is_allowed() {
         let u = user("a@b.com");
+        // The stripped form is the one that matters — see own_password_change_is_allowed.
         for path in [
-            "/config",
-            "/config/logout",
+            "/default/password_complexity",
             "/api/default/password_complexity",
+            // A trailing slash is still the same route.
+            "/default/password_complexity/",
         ] {
             assert_eq!(
                 decide_hard(&u, path, Method::GET),
@@ -301,9 +315,19 @@ mod tests {
     fn complexity_route_bypass_is_get_only() {
         let u = user("a@b.com");
         assert!(matches!(
-            decide_hard(&u, "/api/default/password_complexity", Method::POST),
+            decide_hard(&u, "/default/password_complexity", Method::POST),
             PolicyDecision::Block { .. }
         ));
+    }
+
+    #[test]
+    fn an_org_named_api_is_not_mistaken_for_the_prefix() {
+        let u = user("a@b.com");
+        assert_eq!(
+            decide_hard(&u, "/api/password_complexity", Method::GET),
+            PolicyDecision::Allow,
+            "org 'api' must resolve as an org, not as the route prefix"
+        );
     }
 
     #[test]
@@ -326,6 +350,49 @@ mod tests {
                 "{m} should be refused"
             );
         }
+    }
+
+    /// The unit tests above feed `decide` a path string directly, so they cannot catch the case
+    /// where the middleware receives a different string than expected. This one routes a real
+    /// request through `nest("/api", ..)` and asserts on what actually arrives.
+    #[tokio::test]
+    async fn nesting_strips_the_api_prefix_before_the_middleware_sees_it() {
+        use axum::{
+            Router, body::Body, extract::Request, middleware, response::Response, routing::get,
+        };
+        use tower::ServiceExt;
+
+        async fn capture(request: Request, next: middleware::Next) -> Response {
+            let seen = request.uri().path().to_string();
+            let mut response = next.run(request).await;
+            response
+                .headers_mut()
+                .insert("x-seen-path", seen.parse().unwrap());
+            response
+        }
+
+        let app = Router::new().nest(
+            "/api",
+            Router::new()
+                .route("/{org_id}/password_complexity", get(|| async { "ok" }))
+                .layer(middleware::from_fn(capture)),
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/default/password_complexity")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let seen = response.headers()["x-seen-path"].to_str().unwrap();
+        assert_eq!(seen, "/default/password_complexity");
+
+        // And the matcher must accept exactly that string.
+        assert!(is_complexity_route(&route_segments(seen)));
     }
 
     #[test]
