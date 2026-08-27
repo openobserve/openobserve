@@ -4,6 +4,7 @@
 import { expect } from "@playwright/test";
 import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
 import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+import testLogger from "../../playwright-tests/utils/test-logger.js";
 
 export default class DashboardVariables {
   constructor(page) {
@@ -540,7 +541,7 @@ export default class DashboardVariables {
               apiCallDetected = true;
               capturedStartTime = data.query.start_time;
               capturedEndTime = data.query.end_time;
-              console.log('Variable API captured:', {
+              testLogger.info('Variable API captured:', {
                 startTime: capturedStartTime,
                 endTime: capturedEndTime,
                 durationMinutes: (capturedEndTime - capturedStartTime) / 1000 / 1000 / 60,
@@ -600,23 +601,18 @@ export default class DashboardVariables {
    */
   async verifyVariableTimeRange(monitor, expectedDurationMs, successMessage, timeout = 10000) {
     // Wait for the /values API response (longer timeout for parallel test execution)
-    try {
-      await this.page.waitForResponse(
-        response => (response.url().includes('/_values') || response.url().includes('/values')) && response.status() === 200,
-        { timeout }
-      );
-    } catch (error) {
-      console.log('⚠️ Warning: No variable API call detected within timeout');
-      return;
-    }
+    await this.page.waitForResponse(
+      response => (response.url().includes('/_values') || response.url().includes('/values')) && response.status() === 200,
+      { timeout }
+    );
 
     const { apiCallDetected, capturedStartTime, capturedEndTime } = monitor.getResults();
 
     if (apiCallDetected) {
       this.assertTimeRangeMatches(capturedStartTime, capturedEndTime, expectedDurationMs);
-      console.log(`✅ ${successMessage}`);
+      testLogger.info(`${successMessage}`);
     } else {
-      console.log('⚠️ Warning: No variable API call detected, variable may not exist or be loaded');
+      throw new Error('No variable API call captured; /values request did not complete with a 200 response');
     }
   }
 }

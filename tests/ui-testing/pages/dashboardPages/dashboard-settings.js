@@ -502,7 +502,8 @@ export default class DashboardSetting {
   async hideVariable() {
     const toggle = this.page.locator('[data-test="dashboard-variable-hide_on_dashboard"]');
     await toggle.scrollIntoViewIfNeeded();
-    await toggle.click({ force: true });
+    await toggle.waitFor({ state: "visible" });
+    await toggle.click();
   }
 
   //close setting window

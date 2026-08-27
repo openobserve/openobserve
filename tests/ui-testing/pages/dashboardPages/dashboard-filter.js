@@ -107,6 +107,13 @@ export default class DashboardFilter {
       .click();
   }
 
+  // Click an OSelect popover trigger button once it becomes actionable.
+  async clickSelectTrigger(parentLocator, timeout = 30000) {
+    const trigger = parentLocator.locator("button").first();
+    await trigger.waitFor({ state: "visible", timeout });
+    await trigger.click({ timeout });
+  }
+
   // Add filter condition
 
   async addFilterCondition(
@@ -177,9 +184,7 @@ export default class DashboardFilter {
         .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
         .last();
       await conditionLocator.waitFor({ state: "visible", timeout: 10000 });
-      // Reka UI tabs may re-mount during portal transition; retry click with force
-      // to bypass detached-element instability.
-      await conditionLocator.click({ force: true, timeout: 10000 });
+      await conditionLocator.click({ timeout: 10000 });
       // Wait deterministically for the operator dropdown (Step 4's target) to
       // appear instead of a fixed-ms buffer.
       await this.page
@@ -200,12 +205,9 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
-      // OSelect in listbox mode: outer div gets data-test; PopoverTrigger is the inner button.
-      // Use JS click to avoid viewport/portal click interception issues.
-      // 30s: the condition row renders after the field is added and its schema resolves,
-      // which under parallel CI load lands well past 10s.
+      // 30s: the condition row renders only after the field's schema resolves.
       await operatorLocator.waitFor({ state: "visible", timeout: 30000 });
-      await operatorLocator.locator('button').first().evaluate((el) => el.click());
+      await this.clickSelectTrigger(operatorLocator, 30000);
       // Options render in portal with data-test="${parent}-popover"
       const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
       await operatorPopover.waitFor({ state: "visible", timeout: 10000 });
@@ -217,7 +219,7 @@ export default class DashboardFilter {
         .catch(() => {});
       // The virtualizer renders items asynchronously; search then select
       // Type into the search filter to narrow results, then click
-      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const searchInput = operatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const hasSearch = await searchInput.count() > 0;
       if (hasSearch) {
         await searchInput.fill(operator);
@@ -302,7 +304,7 @@ export default class DashboardFilter {
       .locator('[data-test="dashboard-add-condition-list-tab"]')
       .last();
     await listSelect.waitFor({ state: "visible", timeout: 5000 });
-    await listSelect.locator('button').first().evaluate((el) => el.click());
+    await this.clickSelectTrigger(listSelect, 5000);
 
     // 4. Wait for the OSelect popover and its options to load
     const listPopover = this.page.locator(
@@ -401,12 +403,12 @@ export default class DashboardFilter {
               .last();
 
       await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
-      await operatorLocator.locator('button').first().evaluate((el) => el.click());
+      await this.clickSelectTrigger(operatorLocator, 5000);
 
       const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
       await operatorPopover.waitFor({ state: "visible", timeout: 10000 });
 
-      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const searchInput = operatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const hasSearch = await searchInput.count() > 0;
       if (hasSearch) {
         await searchInput.fill(operator);
@@ -488,12 +490,7 @@ export default class DashboardFilter {
         .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
         .last();
       await conditionSelector.waitFor({ state: "visible", timeout: 5000 });
-      // The popover opened by the label click above is still animating in, and
-      // its Reka popper wrapper swallows pointer events until it settles — the
-      // plain click then fails actionability, and by the retry the tab has been
-      // re-mounted and detached. Force past the interception check, then gate on
-      // the operator dropdown (Step 5's target) actually being mounted.
-      await conditionSelector.click({ force: true, timeout: 10000 });
+      await conditionSelector.click({ timeout: 10000 });
       await this.page
         .locator('[data-test="dashboard-add-condition-operator"]')
         .last()
@@ -508,12 +505,12 @@ export default class DashboardFilter {
         .last();
 
       await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
-      await operatorLocator.locator('button').first().evaluate((el) => el.click());
+      await this.clickSelectTrigger(operatorLocator, 5000);
 
       const nestedOperatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
       await nestedOperatorPopover.waitFor({ state: "visible", timeout: 10000 });
 
-      const nestedSearchInput = nestedOperatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const nestedSearchInput = nestedOperatorPopover.locator('[data-test="dashboard-add-condition-operator-search"]').first();
       const nestedHasSearch = await nestedSearchInput.count() > 0;
       if (nestedHasSearch) {
         await nestedSearchInput.fill(operator);

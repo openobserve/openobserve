@@ -1,0 +1,13 @@
+{
+  "action": "extend",
+  "target_spec": "tests/ui-testing/playwright-tests/Dashboards/dashboard-filter.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-filter.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-general-setting.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-join.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-nested-functions.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-transpose.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "This is a test-stabilization run, not a new product feature. The wiring trace in the feature doc shows every headline filter behavior is WIRED and already exercised by the 19 tests in dashboard-filter.spec.js, and the dev's diff has already applied the bulk of the stabilization (deterministic waitForQueryInspector, deleteDashboard/generateDashboardName helpers, cloud-auth 401 retry, Promise.all stream verification). No new test() or new spec is warranted. The remaining work is one concrete hardening gap the wiring trace flagged as NEEDS SELECTOR: dashboard-filter.js still queries the nonexistent [data-test=\"o-select-search-input\"] in three places (lines 220, 409, 516) instead of the real OSelect search input (dashboard-add-condition-operator-search). This degrades gracefully today (operator list < 50 items renders fully) but should be corrected in the page object so the search path actually exercises the OSelect search field. Action = extend: modify the existing spec's supporting page object (and verify the 19 stabilized tests stay green), not add new scenarios. The fuzzy invalid-operator error assertion is PARTIALLY WIRED / FRAGILE (backend-dependent), so it is documented as a stabilization risk rather than planned as a new test or fixme."
+}
