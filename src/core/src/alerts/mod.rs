@@ -1639,7 +1639,7 @@ fn build_expr(
         _ => {}
     }
     let expr = match field_type {
-        DataType::Utf8 | DataType::LargeUtf8 => {
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
             let val = if cond.value.is_string() {
                 cond.value.as_str().unwrap_or_default().to_string()
             } else {
@@ -2743,6 +2743,29 @@ mod tests {
         let cond = make_cond("msg", Operator::IsNotNull, Value::String(String::new()));
         let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
         assert_eq!(expr, "\"msg\" IS NOT NULL");
+    }
+
+    #[test]
+    fn test_build_expr_utf8view_value_comparisons() {
+        let cond = make_cond(
+            "level",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "\"level\" = 'error'");
+
+        let cond = make_cond("msg", Operator::Contains, Value::String("oom".to_string()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "str_match(\"msg\", 'oom')");
+
+        let cond = make_cond(
+            "msg",
+            Operator::NotContains,
+            Value::String("spam".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "\"msg\" NOT LIKE '%spam%'");
     }
 
     #[test]
