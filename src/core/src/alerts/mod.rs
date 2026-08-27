@@ -1080,11 +1080,7 @@ impl ConditionExt for Condition {
                     Operator::LessThanEquals => val <= con_val,
                     Operator::Contains => val.contains(con_val),
                     Operator::NotContains => !val.contains(con_val),
-                    // Handled by the early return above.
-                    Operator::IsNull
-                    | Operator::IsNotNull
-                    | Operator::IsEmpty
-                    | Operator::IsNotEmpty => false,
+                    _ => false,
                 }
             }
             Value::Number(_) => {
@@ -1348,11 +1344,7 @@ async fn evaluate_condition(
                     Operator::LessThanEquals => val_lower <= con_val_lower,
                     Operator::Contains => val_lower.contains(&con_val_lower),
                     Operator::NotContains => !val_lower.contains(&con_val_lower),
-                    // Handled by the early return above.
-                    Operator::IsNull
-                    | Operator::IsNotNull
-                    | Operator::IsEmpty
-                    | Operator::IsNotEmpty => false,
+                    _ => false,
                 }
             } else {
                 match operator {
@@ -1364,11 +1356,7 @@ async fn evaluate_condition(
                     Operator::LessThanEquals => val <= con_val,
                     Operator::Contains => val.contains(con_val),
                     Operator::NotContains => !val.contains(con_val),
-                    // Handled by the early return above.
-                    Operator::IsNull
-                    | Operator::IsNotNull
-                    | Operator::IsEmpty
-                    | Operator::IsNotEmpty => false,
+                    _ => false,
                 }
             }
         }
