@@ -54,8 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="error-header-share-link-btn"
           :url="shareUrl"
           variant="outline"
-          size="sm-action"
-          show-label
+          size="icon-toolbar"
           :tooltip="t('rum.errorDetail.copyLinkHint')"
         />
         <OButton

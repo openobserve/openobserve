@@ -74,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="session-viewer-share-link-btn"
         :url="shareUrl"
         variant="outline"
-        size="sm-action"
-        show-label
+        size="icon-toolbar"
       />
     </template>
     <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
