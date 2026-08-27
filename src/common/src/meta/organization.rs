@@ -222,13 +222,6 @@ pub struct ExtendTrialPeriodRequest {
     pub new_end_date: i64,
 }
 
-#[cfg(feature = "cloud")]
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct SetAiUsageLimitRequest {
-    pub org_id: String,
-    pub credits_limit: u64,
-}
-
 /// `limit` is the pool's new ceiling, not an increment (spent 40 of 50, +20 => 70).
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -940,17 +933,6 @@ mod tests {
 
         assert_eq!(request.org_id, "org-trial");
         assert_eq!(request.new_end_date, 1641081600);
-    }
-
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn test_set_ai_usage_limit_request_roundtrip() {
-        let json = r#"{"org_id":"org-ai","credits_limit":2500}"#;
-        let request: SetAiUsageLimitRequest = serde_json::from_str(json).unwrap();
-
-        assert_eq!(request.org_id, "org-ai");
-        assert_eq!(request.credits_limit, 2_500);
-        assert_eq!(serde_json::to_string(&request).unwrap(), json);
     }
 
     #[cfg(feature = "cloud")]

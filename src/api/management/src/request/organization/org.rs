@@ -37,7 +37,7 @@ use {
     common::meta::organization::{
         AllOrgListDetails, AllOrganizationResponse, CreateExternalContractRequest,
         EnableOrgStorageRequest, ExtendExternalContractRequest, ExtendTrialPeriodRequest,
-        OrganizationInviteUserRecord, SetAiUsageLimitRequest, SetQuotaUsageLimitRequest,
+        OrganizationInviteUserRecord, SetQuotaUsageLimitRequest,
     },
     o2_enterprise::enterprise::cloud::{
         billings::{MeteringProvider, SubscriptionType},
@@ -631,43 +631,6 @@ pub async fn extend_trial_period(
     let key = format!("{ORG_KEY_PREFIX}{}", req.org_id);
     let _ = infra::db::put_into_db_coordinator(&key, Default::default(), true, None).await;
     ret
-}
-
-/// SetAiUsageLimit
-#[cfg(feature = "cloud")]
-#[utoipa::path(
-    put,
-    path = "/{org_id}/ai/usage_limit",
-    context_path = "/api",
-    tag = "Organizations",
-    operation_id = "SetAiUsageLimit",
-    summary = "Set an organization's lifetime AI credit limit",
-    security(("Authorization" = [])),
-    request_body(content = inline(SetAiUsageLimitRequest), content_type = "application/json"),
-    responses(
-        (status = 200, description = "Updated AI credit usage", body = openobserve_core::trial_quota::AiUsageResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Organization not found"),
-    ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
-)]
-pub async fn set_ai_usage_limit(
-    Path(org_id): Path<String>,
-    Json(req): Json<SetAiUsageLimitRequest>,
-) -> Response {
-    use openobserve_core::trial_quota::{AiUsageResponse, TrialQuotaPool};
-
-    match set_pool_limit(
-        &org_id,
-        &req.org_id,
-        TrialQuotaPool::AiCredits,
-        req.credits_limit,
-    )
-    .await
-    {
-        Ok(usage) => MetaHttpResponse::json(AiUsageResponse::from(usage)),
-        Err(response) => response,
-    }
 }
 
 /// Guards and applies a limit change for one pool, shared so the AI and

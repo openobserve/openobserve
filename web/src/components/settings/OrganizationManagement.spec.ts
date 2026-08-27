@@ -64,7 +64,6 @@ vi.mock("@/services/organizations", () => ({
     create_external_contract: vi.fn(),
     extend_external_contract: vi.fn(),
     revoke_external_contract: vi.fn(),
-    set_ai_usage_limit: vi.fn(),
     set_quota_usage_limit: vi.fn(),
   },
 }));
@@ -191,7 +190,6 @@ describe("OrganizationManagement.vue", () => {
   let mockCreateExternalContract: any;
   let mockExtendExternalContract: any;
   let mockRevokeExternalContract: any;
-  let mockSetAiUsageLimit: any;
   let mockSetQuotaUsageLimit: any;
 
   // Global setup to ensure consistent timestamp behavior across environments
@@ -215,7 +213,6 @@ describe("OrganizationManagement.vue", () => {
     mockCreateExternalContract = (mockedOrgService as any).create_external_contract;
     mockExtendExternalContract = (mockedOrgService as any).extend_external_contract;
     mockRevokeExternalContract = (mockedOrgService as any).revoke_external_contract;
-    mockSetAiUsageLimit = (mockedOrgService as any).set_ai_usage_limit;
     mockSetQuotaUsageLimit = (mockedOrgService as any).set_quota_usage_limit;
 
     // Setup default mock responses
@@ -226,9 +223,6 @@ describe("OrganizationManagement.vue", () => {
     mockRevokeExternalContract?.mockResolvedValue?.({ data: true });
     mockSetQuotaUsageLimit?.mockResolvedValue?.({
       data: { pool: "synthetics_steps", mode: "free", used: 0, limit: 0, remaining: 0 },
-    });
-    mockSetAiUsageLimit?.mockResolvedValue?.({
-      data: { credits_used: 0, credits_limit: 1000 },
     });
 
     // Setup default store state
@@ -1229,7 +1223,6 @@ describe("OrganizationManagement.vue", () => {
         org_id: "acme",
         limit: 7500,
       });
-      expect(mockSetAiUsageLimit).not.toHaveBeenCalled();
       expect(wrapper.vm.usageLimitsRow.credits_used).toBe(125);
       expect(wrapper.vm.usageLimitsRow.credits_limit).toBe(7500);
       expect(wrapper.vm.usageLimitsPrompt).toBe(false);
@@ -1338,7 +1331,6 @@ describe("OrganizationManagement.vue", () => {
         "ai_credits",
         expect.anything(),
       );
-      expect(mockSetAiUsageLimit).not.toHaveBeenCalled();
     });
 
     it("keeps the dialog open and reports an API error", async () => {
