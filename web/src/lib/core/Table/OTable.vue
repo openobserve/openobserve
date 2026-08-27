@@ -345,57 +345,56 @@ const {
   columnSizing,
   columnSizeVars,
   columnFilters,
-} =
-  useTableCore<TData>(
-    {
-      get data() {
-        return windowedTableData.value;
-      },
-      get columns() {
-        return props.columns;
-      },
-      get pageSize() {
-        return props.pageSize;
-      },
-      get currentPage() {
-        return props.currentPage;
-      },
-      showIndex: props.showIndex,
-      sortBy: props.sortBy,
-      sortOrder: props.sortOrder,
-      sortFieldMap: props.sortFieldMap,
-      get globalFilter() {
-        return globalFilterLocal.value;
-      },
-      rowKey: props.rowKey,
-      // Getters, not snapshots: TanStack reads `enableColumnResizing` off these,
-      // so a snapshot freezes resize at whatever the flag was on first mount.
-      get enableColumnResize() {
-        return props.enableColumnResize;
-      },
-      get enableColumnReorder() {
-        return props.enableColumnReorder;
-      },
-      enableColumnPin: props.enableColumnPin,
-      get columnVisibility() {
-        return internalColumnVisibility.value;
-      },
-      defaultColumns: props.defaultColumns,
-      initialColumnSizes: persistence.loadColumnSizes(),
-      getSubRows: props.getSubRows,
-      pagination: props.pagination,
-      sorting: props.sorting,
-      rowHeight: props.rowHeight,
-      filterMode: props.filterMode,
-      get horizontalScroll() {
-        return props.horizontalScroll;
-      },
-      get keepPageOnDataChange() {
-        return props.keepPageOnDataChange;
-      },
+} = useTableCore<TData>(
+  {
+    get data() {
+      return windowedTableData.value;
     },
-    emit,
-  );
+    get columns() {
+      return props.columns;
+    },
+    get pageSize() {
+      return props.pageSize;
+    },
+    get currentPage() {
+      return props.currentPage;
+    },
+    showIndex: props.showIndex,
+    sortBy: props.sortBy,
+    sortOrder: props.sortOrder,
+    sortFieldMap: props.sortFieldMap,
+    get globalFilter() {
+      return globalFilterLocal.value;
+    },
+    rowKey: props.rowKey,
+    // Getters, not snapshots: TanStack reads `enableColumnResizing` off these,
+    // so a snapshot freezes resize at whatever the flag was on first mount.
+    get enableColumnResize() {
+      return props.enableColumnResize;
+    },
+    get enableColumnReorder() {
+      return props.enableColumnReorder;
+    },
+    enableColumnPin: props.enableColumnPin,
+    get columnVisibility() {
+      return internalColumnVisibility.value;
+    },
+    defaultColumns: props.defaultColumns,
+    initialColumnSizes: persistence.loadColumnSizes(),
+    getSubRows: props.getSubRows,
+    pagination: props.pagination,
+    sorting: props.sorting,
+    rowHeight: props.rowHeight,
+    filterMode: props.filterMode,
+    get horizontalScroll() {
+      return props.horizontalScroll;
+    },
+    get keepPageOnDataChange() {
+      return props.keepPageOnDataChange;
+    },
+  },
+  emit,
+);
 
 // ── Column resize reset ─────────────────────────────────────────
 const hasResizedColumns = computed(() => Object.keys(table.getState().columnSizing).length > 0);
