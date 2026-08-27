@@ -575,7 +575,6 @@ impl QueryConditionExt for QueryCondition {
                     quick_mode: false,
                     query_type: "".to_string(),
                     track_total_hits: false,
-                    action_id: None,
                     uses_zo_fn: false,
                     query_fn: encode_query_fn,
                     skip_wal: false,
@@ -877,7 +876,6 @@ async fn run_alert_count_query(
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            action_id: None,
             uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts
             skip_wal: false,

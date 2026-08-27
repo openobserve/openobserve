@@ -54,7 +54,7 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
+        ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
         domain_management, eval_jobs, experiments, gen_ai, keys, license, playground, providers,
         remote_tasks, score_configs, scorers, service_streams, workflows,
     },
@@ -1318,16 +1318,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/cipher_keys", get(keys::list).post(keys::save))
             .route("/{org_id}/cipher_keys/bulk", delete(keys::delete_bulk))
             .route("/{org_id}/cipher_keys/{key_name}", get(keys::get).put(keys::update).delete(keys::delete))
-
-            // Actions
-            .route("/{org_id}/actions", get(actions::action::list_actions))
-            .route("/{org_id}/actions/upload", post(actions::action::upload_zipped_action))
-            .route("/{org_id}/actions/bulk", delete(actions::action::delete_action_bulk))
-            .route("/{org_id}/actions/{action_id}", get(actions::action::get_action_from_id).put(actions::action::update_action_details).delete(actions::action::delete_action))
-            .route("/{org_id}/actions/download/{action_id}", get(actions::action::serve_action_zip))
-            .route("/{org_id}/actions/pause/{action_id}", get(actions::operations::pause_action))
-            .route("/{org_id}/actions/resume/{action_id}", get(actions::operations::resume_action))
-            .route("/{org_id}/actions/test/{action_id}", post(actions::operations::test_action))
 
             // Rate limits
             .route("/{org_id}/ratelimit/api_modules", get(ratelimit::api_modules))

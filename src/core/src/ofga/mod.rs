@@ -56,7 +56,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut migrate_native_objects = false;
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
-    let mut need_action_scripts_migration = false;
     let mut need_alert_folders_migration = false;
     let mut need_ratelimit_migration = false;
     let mut need_service_accounts_migration = false;
@@ -243,7 +242,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
                 let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
                 let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
-                let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
                 let v0_0_12 = version_compare::Version::from("0.0.12").unwrap();
                 let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
                 let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
@@ -272,9 +270,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 }
                 if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
                     need_cipher_keys_migration = true;
-                }
-                if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
-                    need_action_scripts_migration = true;
                 }
                 if meta_version > v0_0_12 && existing_model_version < v0_0_13 {
                     log::info!("[OFGA:Local] Alert folders migration needed");
@@ -423,9 +418,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 for org_name in orgs.iter() {
                     if need_cipher_keys_migration {
                         get_ownership_all_org_tuple(org_name, "cipher_keys", &mut tuples);
-                    }
-                    if need_action_scripts_migration {
-                        get_ownership_all_org_tuple(org_name, "actions", &mut tuples);
                     }
                     if need_pipeline_migration {
                         get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);

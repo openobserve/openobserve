@@ -15,7 +15,6 @@
 
 #![cfg(feature = "enterprise")]
 
-mod action_scripts;
 mod alert_states;
 mod alerts;
 mod anomaly_detection;
@@ -59,11 +58,11 @@ mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
-    EvalDatasetsQueue, EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue,
-    EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue,
-    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue,
-    SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
+    AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue, EvalDatasetsQueue,
+    EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue, EvalProvidersQueue,
+    EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue, OrgUsersQueue,
+    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
+    SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(
@@ -168,9 +167,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let destinations_queue = DestinationsQueue {
         on_destination_msg: destinations::process,
     };
-    let action_scripts_queue = ActionScriptsQueue {
-        on_action_script_msg: action_scripts::process,
-    };
     // One topic, three modules: the subscriber routes on the key's module
     // segment, and an unmatched module falls through to `Ok(())` — so a handler
     // left off here does not fail to compile, it silently drops every message
@@ -205,7 +201,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(folders_queue),
         Box::new(templates_queue),
         Box::new(destinations_queue),
-        Box::new(action_scripts_queue),
         Box::new(scheduler_queue),
         Box::new(synthetics_queue),
         Box::new(org_users_queue),

@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
-pub mod action_server;
-pub mod actions;
-#[cfg(feature = "enterprise")]
 pub mod ai;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
