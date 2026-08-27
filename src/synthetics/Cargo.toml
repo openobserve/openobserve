@@ -15,14 +15,9 @@ default = []
 # this crate — cargo rejects the package cycle outright, `optional` and feature
 # gating included. Anything both sides need lives in `config` or `infra`.
 enterprise = ["dep:o2_enterprise", "dep:o2_openfga"]
-# `cloud` ⇒ `enterprise`, never the reverse (spec §8.1): a self-hosted
-# Enterprise build has `enterprise` and not `cloud`. Same shape every sibling
-# crate uses. Without this feature every `#[cfg(feature = "cloud")]` written in
-# this crate compiled to nothing, silently — F6.
-# `infra/cloud` is what makes `OrganizationRecord::trial_ends_at` exist — the
-# trial gate reads it. `src/core` forwards it the same way; the sibling
-# crates that omit it get it transitively through `openobserve-core/cloud`,
-# which this crate does not depend on.
+# `infra/cloud` is needed directly: it gates `OrganizationRecord::trial_ends_at`,
+# which the trial gate reads, and this crate does not depend on openobserve-core
+# to inherit it transitively.
 cloud = ["enterprise", "infra/cloud", "o2_enterprise/cloud"]
 
 [dependencies]
