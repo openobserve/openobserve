@@ -473,6 +473,7 @@ async fn composite_detail_response(
         },
         "children": children,
         "evaluation": evaluation_json,
+        "pending_period_sec": definition.pending_period_sec,
     }))
 }
 

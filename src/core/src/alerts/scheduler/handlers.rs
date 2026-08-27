@@ -1113,6 +1113,7 @@ fn composite_notification_alert(
         .and_then(|value| serde_json::from_value(value).ok())
         .unwrap_or_default();
     alert.trigger_condition.silence = definition.silence_seconds;
+    alert.pending_period_sec = definition.pending_period_sec;
     alert
 }
 

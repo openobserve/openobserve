@@ -154,6 +154,9 @@ export const defaultAlertValue: any = () => {
       frequency_type: "minutes",
       timezone: "UTC",
     },
+    // Minutes while the form is open (matches the input's display unit);
+    // getAlertPayload converts to seconds on save. 0 = fire immediately.
+    pending_period_sec: 0,
     destinations: [],
     // Enterprise-only: workflows linked to this alert (run when it fires).
     workflows: [],
@@ -1027,6 +1030,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         trigger_condition: {
           silence: Number(source.trigger_condition?.silence ?? 0),
         },
+        // Stored and evaluated for composite alerts server-side (see
+        // handle_composite_alert_trigger). Note the detail GET response
+        // doesn't return it yet on edit — see the fallback comment on the
+        // edit-prefill conversion above.
+        pending_period_sec: Math.round((Number(source.pending_period_sec) || 0) * 60),
         owner: source.owner || undefined,
         creates_incident: source.creates_incident ?? false,
         workflows: source.workflows ?? [],
@@ -2274,6 +2282,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // silently wipe existing links. Must run AFTER the swap above, which
       // replaces every key on `data`.
       if (!Array.isArray(data.workflows)) data.workflows = [];
+      // BE stores seconds; the form field displays minutes (mirrors the
+      // frequency field's display unit). Falls back to 0 for any alert type
+      // where the field is absent from the GET response (older cached
+      // response shape, etc.) rather than showing NaN.
+      data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
 
       if (data.query_condition?.promql_condition) {

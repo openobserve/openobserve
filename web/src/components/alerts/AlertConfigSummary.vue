@@ -284,6 +284,15 @@ const sections = computed(() => [
         value: props.alert?.trigger_condition?.silence ?? EMPTY,
       },
       {
+        key: "pending-period",
+        label: t("alerts.queryConfig.pendingPeriod"),
+        // Seconds on the alert, minutes everywhere else in this summary.
+        value:
+          props.alert?.pending_period_sec != null
+            ? props.alert.pending_period_sec / 60
+            : EMPTY,
+      },
+      {
         key: "destinations",
         label: t("alerts.destination"),
         value: props.alert?.destinations?.length ? props.alert.destinations.join(", ") : EMPTY,

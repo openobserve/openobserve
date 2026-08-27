@@ -924,6 +924,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
+
+              <!-- Pending period row -->
+              <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+                <span
+                  class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
+                >
+                  {{ t("alerts.queryConfig.pendingPeriod") }}
+                  <OTooltip
+                    :content="t('alerts.queryConfig.pendingPeriodTooltip')"
+                    :delay="300"
+                    side="top"
+                  />
+                </span>
+                <div class="flex flex-col gap-1">
+                  <div class="flex items-center gap-2">
+                    <OFormInput
+                      name="pending_period_sec"
+                      type="number"
+                      class="max-w-25 min-w-25"
+                      min="0"
+                      data-test="alert-pending-period-input"
+                    >
+                      <template #error />
+                    </OFormInput>
+                    <span class="text-text-secondary text-compact font-semibold whitespace-nowrap">{{
+                      t("alerts.minutes")
+                    }}</span>
+                  </div>
+                  <div
+                    v-if="pendingPeriodWarning"
+                    class="text-status-warning-text text-2xs ml-0"
+                    data-test="alert-pending-period-warning"
+                    role="alert"
+                  >
+                    {{ pendingPeriodWarning }}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Filters section — scheduled -->
@@ -1280,6 +1318,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-status-error-text text-2xs"
                   >
                     {{ cronError }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pending period row -->
+              <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+                <span
+                  class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
+                >
+                  {{ t("alerts.queryConfig.pendingPeriod") }}
+                  <OTooltip
+                    :content="t('alerts.queryConfig.pendingPeriodTooltip')"
+                    :delay="300"
+                    side="top"
+                  />
+                </span>
+                <div class="flex flex-col gap-1">
+                  <div class="flex items-center gap-2">
+                    <OFormInput
+                      name="pending_period_sec"
+                      type="number"
+                      class="max-w-25 min-w-25"
+                      min="0"
+                      data-test="alert-pending-period-input"
+                    >
+                      <template #error />
+                    </OFormInput>
+                    <span class="text-text-secondary text-compact font-semibold whitespace-nowrap">{{
+                      t("alerts.minutes")
+                    }}</span>
+                  </div>
+                  <div
+                    v-if="pendingPeriodWarning"
+                    class="text-status-warning-text text-2xs ml-0"
+                    data-test="alert-pending-period-warning"
+                    role="alert"
+                  >
+                    {{ pendingPeriodWarning }}
                   </div>
                 </div>
               </div>
@@ -2548,6 +2624,45 @@ export default defineComponent({
     checkEveryFrequency.value =
       initialFrequencyMode === "hours" ? Number(initialFreqRaw) / 60 : initialFreqRaw;
 
+    // Pending period — minutes, top-level `pending_period_sec` (no unit
+    // mode of its own; alertPayload.ts converts to seconds on save). Purely
+    // presentational hint, never blocks save: the backend doesn't enforce
+    // this relationship either, a non-multiple value just rounds up to the
+    // next evaluation.
+    const pendingPeriodWarning = computed<string>(() => {
+      const pendingMinutes = Number(fv("pending_period_sec"));
+      if (!Number.isFinite(pendingMinutes) || pendingMinutes <= 0) return "";
+
+      let freqMinutes: number;
+      if (frequencyMode.value === "cron") {
+        // Same interval math validateCron already uses (cron-parser's actual
+        // next-two-runs diff, not a guess from the field pattern) — converted
+        // to seconds, same as every other case, then to minutes for the
+        // comparison below. Skip quietly on an empty/invalid expression:
+        // validateCron's own cronError already owns that message.
+        if (!cronExpression.value || cronError.value) return "";
+        try {
+          freqMinutes = getCronIntervalDifferenceInSeconds(cronExpression.value) / 60;
+        } catch {
+          return "";
+        }
+      } else {
+        const display = checkEveryFrequency.value;
+        freqMinutes = frequencyMode.value === "hours" ? Number(display) * 60 : Number(display);
+      }
+      if (!Number.isFinite(freqMinutes) || freqMinutes <= 0) return "";
+
+      // Float-safe "is a multiple of": a cron interval can be fractional
+      // minutes (e.g. a 30s step), where exact `%` comparisons can miss by
+      // floating-point dust at either edge of the wrap.
+      const remainder = pendingMinutes % freqMinutes;
+      const EPSILON = 1e-6;
+      if (remainder < EPSILON || freqMinutes - remainder < EPSILON) return "";
+      return t("alerts.validation.pendingPeriodNotMultiple", {
+        minutes: Math.round(freqMinutes * 100) / 100,
+      });
+    });
+
     const isUserTriggerChange = ref(false);
     // Rule ②: `cron` + `timezone` are SAVED alert fields, so the ONE form owns
     // them — no local-ref mirror. The visible controls bind by `name=`; these
@@ -3546,6 +3661,7 @@ export default defineComponent({
       checkEveryFrequency,
       onCheckEveryChange,
       restoreDefaultFrequency,
+      pendingPeriodWarning,
       frequencyMode,
       cronExpression,
       cronTimezone,

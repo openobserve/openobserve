@@ -198,6 +198,7 @@ pub struct Alert {
     pub scheduler_job_present: Option<bool>,
 
     #[serde(default)]
+    #[schema(example = 10)]
     pub pending_period_sec: i64,
 }
 
@@ -774,6 +775,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.workflows = value.workflows;
         alert.priority = value.priority;
         alert.tags = value.tags;
+        alert.pending_period_sec = value.pending_period_sec;
 
         alert
     }

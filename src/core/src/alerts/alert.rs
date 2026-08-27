@@ -294,7 +294,7 @@ pub enum AlertError {
     AlertSourceEditBreaksSlos { breakages: String },
     #[error("Realtime alerts cannot have non-zero pending period")]
     PendingPeriodOnRealtimeAlert,
-    #[error("Alert pending period must be >= zioer")]
+    #[error("Alert pending period must be >= 0")]
     NegativePendingPeriod,
 }
 

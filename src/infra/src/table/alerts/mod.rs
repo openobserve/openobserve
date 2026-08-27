@@ -971,6 +971,7 @@ fn update_mutable_fields(
     let align_time = alert.trigger_condition.align_time;
     let updated_at: i64 = chrono::Utc::now().timestamp_micros();
     let workflows = serde_json::to_value(alert.workflows)?;
+    let pending_periond_sec = alert.pending_period_sec;
 
     // Handle deduplication configuration
     // Note: time_window_minutes is stored in a separate column, not in the JSON config
@@ -1040,6 +1041,7 @@ fn update_mutable_fields(
     alert_am.dedup_config = Set(dedup_config);
     alert_am.creates_incident = Set(alert.creates_incident);
     alert_am.workflows = Set(workflows);
+    alert_am.pending_period_sec = Set(pending_periond_sec);
     Ok(())
 }
 

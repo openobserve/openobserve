@@ -71,6 +71,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
+          <!-- Pending period. Composite only — QueryConfig.vue owns it for
+               simple/multi scheduled alerts (tied to Check every, which
+               composite alerts don't have). Same field, label, and tooltip
+               as the scheduled version, intentionally no visual distinction —
+               the backend stores and evaluates it for composite alerts too
+               (handle_composite_alert_trigger). -->
+          <div v-if="isRealTime === 'composite'" class="mb-4 flex items-start justify-start pb-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+              {{ t("alerts.queryConfig.pendingPeriod") }}
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
+            </div>
+            <div class="mr-2 flex w-fit flex-col gap-1">
+              <div class="flex items-center">
+                <div class="w-21.75">
+                  <OFormInput
+                    name="pending_period_sec"
+                    type="number"
+                    min="0"
+                    data-test="alert-settings-pending-period-input"
+                  >
+                    <template #error />
+                  </OFormInput>
+                </div>
+                <div
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Destinations. Deliberately NOT name=-bound: one control writes two
                form fields, so both go up through the parent's setFieldValue via
                the events below. -->
