@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 36] = [
+const QUERIER_ROUTES: [(&str, usize); 37] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
@@ -176,6 +176,7 @@ mod tests {
         assert!(is_querier_route(
             "/api/org1/annotation_queues/queue-1/items/item-1/reviews"
         ));
+        assert!(is_querier_route("/api/org1/playground/run"));
         // Test trace detail routes
         assert!(is_querier_route(
             "/api/org1/default/traces/trace-id/details"
