@@ -1688,10 +1688,13 @@ mod tests {
         // partial-graph scenario - still fails validation today.
         let nodes = vec![trigger_node("t1")];
 
-        let err = validate_nodes_edges(&nodes, &[], true).unwrap_err();
-        assert!(
-            err.to_string()
+        let res = validate_nodes_edges(&nodes, &[], true);
+        assert!(res.is_ok());
+
+        let res = validate_nodes_edges(&nodes, &[], false);
+        assert!(res.is_err_and(|v| {
+            v.to_string()
                 .contains("more than 1 node and at least 1 edge")
-        );
+        }));
     }
 }
