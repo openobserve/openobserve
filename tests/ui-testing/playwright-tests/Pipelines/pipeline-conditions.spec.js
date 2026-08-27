@@ -274,6 +274,10 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await page.waitForTimeout(300);
     await pageManager.pipelinesPage.fillCondition("kubernetes_host", "=", "value-B", 1);
 
+    // Guard: the OR toggle took effect on condition B's join before we rely on
+    // the A OR B combination below.
+    await pageManager.pipelinesPage.verifyOperatorLabel("OR", 0);
+
     // Condition C with AND (default)
     await pageManager.pipelinesPage.addNewCondition();
     await pageManager.pipelinesPage.fillCondition("kubernetes_pod_name", "=", "value-C", 2);
@@ -281,11 +285,10 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Verify 3 conditions exist
     await pageManager.pipelinesPage.verifyConditionCount(3);
 
-    // Verify operators are set correctly
-    const operatorLabels = pageManager.pipelinesPage.operatorLabels;
-    if (await operatorLabels.count() >= 2) {
-      await pageManager.pipelinesPage.verifyOperatorLabel("OR", 0);
-    }
+    // Verify BOTH join operators unconditionally: A OR B AND C. The first join
+    // (B) is OR, the second (C) is AND — no `count() >= 2` guard, both must hold.
+    await pageManager.pipelinesPage.verifyOperatorLabel("OR", 0);
+    await pageManager.pipelinesPage.verifyOperatorLabel("AND", 1);
 
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
 
@@ -389,12 +392,23 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.addNewCondition();
     await pageManager.pipelinesPage.fillCondition("kubernetes_host", "!=", "excluded", 1);
 
+    // Add Contains operator condition
+    await pageManager.pipelinesPage.addNewCondition();
+    await pageManager.pipelinesPage.fillCondition("kubernetes_pod_name", "Contains", "include", 2);
+
     // Add NotContains operator condition
     await pageManager.pipelinesPage.addNewCondition();
-    await pageManager.pipelinesPage.fillCondition("kubernetes_pod_name", "NotContains", "ignore", 2);
+    await pageManager.pipelinesPage.fillCondition("kubernetes_namespace_name", "NotContains", "ignore", 3);
 
-    // Verify all 3 conditions exist
-    await pageManager.pipelinesPage.verifyConditionCount(3);
+    // Verify all 4 conditions exist
+    await pageManager.pipelinesPage.verifyConditionCount(4);
+
+    // Assert each row's operator actually took effect — the count alone would
+    // let a wrong/failed operator selection pass.
+    await pageManager.pipelinesPage.verifyOperatorSelected(">=", 0);
+    await pageManager.pipelinesPage.verifyOperatorSelected("!=", 1);
+    await pageManager.pipelinesPage.verifyOperatorSelected("Contains", 2);
+    await pageManager.pipelinesPage.verifyOperatorSelected("NotContains", 3);
 
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
 

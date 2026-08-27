@@ -1,7 +1,0 @@
-[
-  { "title": "should hide the value input for a unary is_null operator and save without error", "action": "append", "verifies": "selecting is_null removes the value input and the condition saves with no inline error and the drawer closes" },
-  { "title": "should round-trip a saved unary operator on edit and restore the value input for a binary operator", "action": "append", "verifies": "a saved is_null operator reloads with the value input hidden and switching to '=' restores the value input" },
-  { "title": "should offer all four unary operators in the condition operator dropdown", "action": "append", "verifies": "is_null, is_not_null, is_empty, and is_not_empty are all offered in the operator menu" },
-  { "title": "should still require a value for a binary operator after unary operators are added", "action": "append", "verifies": "a binary '=' operator with an empty value still surfaces the inline validation error" },
-  { "title": "should clear a previously entered value when switching to a unary operator", "action": "append", "verifies": "switching from '=' with a stale value to is_null clears the value so switching back leaves the field empty" }
-]

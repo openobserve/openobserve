@@ -280,7 +280,7 @@ export class PipelinesPage {
         this.addConditionDeleteBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-neutral-btn"]');
         this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
         this.nestedGroups = page.locator('.el-border');
-        this.operatorLabels = page.locator('span.tw\\:lowercase');
+        this.operatorLabels = page.locator('[data-test="alert-conditions-operator-label"]');
         this.firstConditionLabel = page.locator('[data-test="add-condition-section"]').getByText('if', { exact: true }).first();
         this.noteContainer = page.locator('[data-test="add-condition-note-container"]');
         this.noteHeading = page.locator('[data-test="add-condition-note-heading"]');
@@ -1953,9 +1953,17 @@ export class PipelinesPage {
     }
 
     async verifyOperatorSelected(operator, index = 0) {
-        // The operator OSelect trigger exposes the selected wire value via
-        // `data-test-selected-value` (e.g. "is_null"), independent of the label.
-        await expect(this.operatorSelectTrigger.nth(index)).toHaveAttribute('data-test-selected-value', operator);
+        // The operator OFormSelect renders in reka-Select mode (non-listbox), so
+        // its trigger carries no `data-test-selected-value`; it shows the selected
+        // label as text. Unary operators map wire value -> display label.
+        const labelByOperator = {
+            is_null: 'Is Null',
+            is_not_null: 'Is Not Null',
+            is_empty: 'Is Empty',
+            is_not_empty: 'Is Not Empty',
+        };
+        const expectedLabel = labelByOperator[operator] ?? operator;
+        await expect(this.operatorSelectTrigger.nth(index)).toContainText(expectedLabel);
     }
 
     async verifyUnaryOperatorsOffered() {
