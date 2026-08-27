@@ -488,6 +488,11 @@ const useHttpStreaming = () => {
     if (traceMap.value[traceId]) {
       delete traceMap.value[traceId];
     }
+    // Also release the controller: leaving it here after a normal completion
+    // leaked it (and the panel state its abort listeners hold) for the session.
+    if (abortControllers.value[traceId]) {
+      delete abortControllers.value[traceId];
+    }
   };
 
   const closeStreamWithError = () => {
