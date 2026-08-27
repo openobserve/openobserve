@@ -138,6 +138,10 @@ pub struct TimeRangeResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<String>,
     pub status: TimeRangeStatus,
+    /// True when the scan timed out while expanding this found range, so the
+    /// range is a lower bound of the real one; retry may extend it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub range: Option<TraceTimeRange>,
 }
@@ -610,6 +614,9 @@ async fn query_inner(
         scan_end = scan_end.min(padded.end_time);
     }
     if scan_start >= scan_end {
+        // The caller bounds don't intersect index coverage: nothing was
+        // scanned, so this miss is not proof of absence.
+        stats.coverage_missing = true;
         return Ok(None);
     }
     if !index_stream_exists(params.org_id, params.stream_name).await {
@@ -658,6 +665,16 @@ async fn run_lookups(
         if resolved[key_index].load(Ordering::Relaxed) {
             return Ok::<_, Error>(None);
         }
+        // Queued pairs must not keep draining work past the shared deadline.
+        if deadline.saturating_duration_since(Instant::now()).is_zero() {
+            return Ok(Some(LookupOutcome {
+                key_index,
+                stream_index,
+                range: None,
+                timed_out: true,
+                coverage_missing: false,
+            }));
+        }
         let lookup = query_instrumented(&LookupParams {
             org_id,
             stream_name: &streams[stream_index],
@@ -696,13 +713,15 @@ fn aggregate_outcomes(
     keys: &[String],
     outcomes: impl IntoIterator<Item = LookupOutcome>,
 ) -> (Vec<TimeRangeResult>, bool) {
-    let mut found: Vec<Vec<(usize, TraceTimeRange)>> = vec![Vec::new(); keys.len()];
+    let mut found: Vec<Vec<(usize, TraceTimeRange, bool)>> = vec![Vec::new(); keys.len()];
     let mut timed_out = vec![false; keys.len()];
     let mut coverage_missing = false;
     for outcome in outcomes {
         coverage_missing |= outcome.coverage_missing;
         match outcome.range {
-            Some(range) => found[outcome.key_index].push((outcome.stream_index, range)),
+            Some(range) => {
+                found[outcome.key_index].push((outcome.stream_index, range, outcome.timed_out))
+            }
             None if outcome.timed_out => timed_out[outcome.key_index] = true,
             None => {}
         }
@@ -715,14 +734,15 @@ fn aggregate_outcomes(
             } else {
                 TimeRangeStatus::NotFound
             };
-            results.push(make_result(kind, key, None, status, None));
+            results.push(make_result(kind, key, None, status, false, None));
         } else {
-            for (stream_index, range) in found {
+            for (stream_index, range, partial) in found {
                 results.push(make_result(
                     kind,
                     key,
                     Some(streams[stream_index].clone()),
                     TimeRangeStatus::Found,
+                    partial,
                     Some(range),
                 ));
             }
@@ -736,6 +756,7 @@ fn make_result(
     key: &str,
     stream: Option<String>,
     status: TimeRangeStatus,
+    partial: bool,
     range: Option<TraceTimeRange>,
 ) -> TimeRangeResult {
     TimeRangeResult {
@@ -743,6 +764,7 @@ fn make_result(
         session_id: matches!(kind, TimeIndexKind::Session).then(|| key.to_string()),
         stream,
         status,
+        partial,
         range,
     }
 }
@@ -877,6 +899,29 @@ fn padded_bounds(kind: TimeIndexKind, bounds: Option<TraceTimeRange>) -> Option<
     })
 }
 
+/// What `searched_range` echoes: the padded caller range intersected with
+/// index coverage. None when no caller range was given, or when the
+/// intersection is empty — nothing was searched, and the per-key lookups
+/// report that as missing coverage.
+async fn effective_searched_range(
+    kind: TimeIndexKind,
+    bounds: Option<TraceTimeRange>,
+) -> Option<TraceTimeRange> {
+    let padded = padded_bounds(kind, bounds)?;
+    let Ok(coverage_start) = infra::db::trace_time_index::get_or_create_coverage_start().await
+    else {
+        return Some(padded);
+    };
+    let start_time = padded.start_time.max(coverage_start);
+    let end_time = padded
+        .end_time
+        .min(now_micros().saturating_add(get_config().limit.ingest_allowed_in_future_micro));
+    (start_time < end_time).then_some(TraceTimeRange {
+        start_time,
+        end_time,
+    })
+}
+
 async fn index_stream_exists(org_id: &str, stream_name: &str) -> bool {
     infra::schema::exists(
         org_id,
@@ -1002,7 +1047,7 @@ pub async fn get_trace_time_range(
         session_id,
         range,
         results,
-        searched_range: padded_bounds(request.kind, request.bounds),
+        searched_range: effective_searched_range(request.kind, request.bounds).await,
         partial_coverage: coverage_missing,
     })
     .into_response()
@@ -1087,7 +1132,7 @@ pub async fn get_org_trace_time_range(
     };
     Json(OrgTraceTimeRangeResponse {
         results,
-        searched_range: padded_bounds(request.kind, request.bounds),
+        searched_range: effective_searched_range(request.kind, request.bounds).await,
         partial_coverage: partial_streams || coverage_missing,
     })
     .into_response()
@@ -1303,7 +1348,12 @@ mod tests {
     #[test]
     fn outcomes_aggregate_into_per_key_statuses() {
         let streams = vec!["a".to_string(), "b".to_string()];
-        let keys = vec!["k1".to_string(), "k2".to_string(), "k3".to_string()];
+        let keys = vec![
+            "k1".to_string(),
+            "k2".to_string(),
+            "k3".to_string(),
+            "k4".to_string(),
+        ];
         let range = TraceTimeRange {
             start_time: 1,
             end_time: 2,
@@ -1323,16 +1373,22 @@ mod tests {
             outcome(1, 1, None, false, false),
             // k3 missed everywhere without timeouts
             outcome(2, 0, None, false, false),
+            // k4 found but expansion timed out: the range may be partial
+            outcome(3, 0, Some(range), true, false),
         ];
         let (results, coverage_missing) =
             aggregate_outcomes(&streams, TimeIndexKind::Trace, &keys, outcomes);
-        assert_eq!(results.len(), 3);
+        assert_eq!(results.len(), 4);
         assert_eq!(results[0].status, TimeRangeStatus::Found);
         assert_eq!(results[0].stream.as_deref(), Some("b"));
         assert_eq!(results[0].range, Some(range));
+        assert!(!results[0].partial);
         assert_eq!(results[1].status, TimeRangeStatus::Timeout);
         assert_eq!(results[2].status, TimeRangeStatus::NotFound);
         assert!(results[2].trace_id.as_deref() == Some("k3"));
+        assert_eq!(results[3].status, TimeRangeStatus::Found);
+        assert!(results[3].partial);
+        assert_eq!(results[3].range, Some(range));
         assert!(coverage_missing);
     }
 
