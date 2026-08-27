@@ -15,7 +15,10 @@
 
 use std::{collections::HashSet, sync::LazyLock as Lazy, time::Duration};
 
-use config::meta::promql::value::{EvalContext, LabelsExt, RangeValue, Sample, Value};
+use config::meta::promql::value::{
+    EvalContext, ExtrapolationKind, LabelsExt, RangeValue, Sample, Value, build_reset_prefix,
+    extrapolated_rate_with_prefix,
+};
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
 use strum::EnumString;
@@ -208,6 +211,12 @@ pub trait RangeFunc: Send + Sync {
     /// * `None` - If the function cannot produce a value (e.g., insufficient samples, invalid data,
     ///   or the result should be omitted)
     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64>;
+
+    /// Counter functions return their extrapolation kind so evaluators can
+    /// replace the per-window reset scan with a per-series prefix.
+    fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
+        None
+    }
 }
 
 /// Constructs the range function for fused aggregate evaluation, or `None` if
@@ -281,6 +290,9 @@ where
             let mut result_samples = Vec::with_capacity(timestamps.len());
             let mut start_index = 0;
             let mut end_index = 0;
+            let reset_prefix = func
+                .counter_extrapolation()
+                .map(|_| build_reset_prefix(&metric.samples));
 
             // For each eval timestamp, compute the function value
             for &eval_ts in &timestamps {
@@ -300,7 +312,20 @@ where
                     continue;
                 }
 
-                if let Some(value) = func.exec(window_samples, eval_ts, &range) {
+                let value = match (&reset_prefix, func.counter_extrapolation()) {
+                    (Some(prefix), Some(kind)) => extrapolated_rate_with_prefix(
+                        &metric.samples,
+                        prefix,
+                        start_index,
+                        end_index,
+                        eval_ts,
+                        range,
+                        Duration::ZERO,
+                        kind,
+                    ),
+                    _ => func.exec(window_samples, eval_ts, &range),
+                };
+                if let Some(value) = value {
                     result_samples.push(Sample::new(eval_ts, value));
                 }
             }

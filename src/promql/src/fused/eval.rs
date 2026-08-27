@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use config::meta::promql::{
     NAME_LABEL,
-    value::{EvalContext, RangeValue, Value},
+    value::{EvalContext, RangeValue, Value, build_reset_prefix, extrapolated_rate_with_prefix},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
@@ -78,6 +80,7 @@ pub(crate) fn fused_range_agg(
 
     let timestamps = eval_ctx.timestamps();
     let groups = group_series_by_labels(&matrix, param);
+    let counter_kind = func.counter_extrapolation();
 
     let results = groups
         .par_iter()
@@ -96,6 +99,7 @@ pub(crate) fn fused_range_agg(
                     let range_micros = micros(range);
                     let mut start_index = 0;
                     let mut end_index = 0;
+                    let reset_prefix = counter_kind.map(|_| build_reset_prefix(&metric.samples));
 
                     for (slot, &eval_ts) in timestamps.iter().enumerate() {
                         let window_samples = advance_sample_window(
@@ -108,7 +112,20 @@ pub(crate) fn fused_range_agg(
                         if window_samples.is_empty() {
                             continue;
                         }
-                        if let Some(value) = func.exec(window_samples, eval_ts, &range) {
+                        let value = match (&reset_prefix, counter_kind) {
+                            (Some(prefix), Some(kind)) => extrapolated_rate_with_prefix(
+                                &metric.samples,
+                                prefix,
+                                start_index,
+                                end_index,
+                                eval_ts,
+                                range,
+                                Duration::ZERO,
+                                kind,
+                            ),
+                            _ => func.exec(window_samples, eval_ts, &range),
+                        };
+                        if let Some(value) = value {
                             acc.push(slot, value);
                         }
                     }
@@ -245,11 +262,13 @@ mod tests {
                 "/one",
                 &zip([0.3, 80.1, 90.6, 170.2, 180.9, 260.5]),
             ),
+            // Contains a counter reset (25.1 -> 3.4) to exercise the
+            // reset-prefix path in both evaluators.
             make_series(
                 "requests_total",
                 "c",
                 "/two",
-                &zip([0.2, 20.4, 25.1, 45.8, 50.3, 70.9]),
+                &zip([0.2, 20.4, 25.1, 3.4, 50.3, 70.9]),
             ),
             // Samples only in the last window: earlier slots stay empty.
             make_series("other_total", "a", "/two", &[(130, 7.5), (170, 11.25)]),

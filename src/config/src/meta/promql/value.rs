@@ -596,7 +596,7 @@ impl RangeValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExtrapolationKind {
     /// Calculate the per-second average rate of increase of the time series.
     /// Adjust for breaks in monotonicity (counter resets).
@@ -644,6 +644,84 @@ pub fn extrapolated_rate(
         return None;
     }
 
+    let first = &samples[0];
+    let last = &samples.last().unwrap();
+    let mut delta = last.value - first.value;
+
+    if matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase) {
+        // Handle counter resets.
+        let mut prev_value = first.value;
+        for sample in &samples[1..] {
+            if sample.value < prev_value {
+                delta += prev_value;
+            }
+            prev_value = sample.value;
+        }
+    }
+
+    extrapolate_from_delta(samples, delta, eval_ts, range, offset, kind)
+}
+
+/// Counter-reset correction prefix: `prefix[i]` is the sum of values dropped by
+/// resets within `samples[..=i]`, so `prefix[r] - prefix[l]` is the correction
+/// for the window `[l, r]`.
+pub fn build_reset_prefix(samples: &[Sample]) -> Vec<f64> {
+    let mut prefix = vec![0.0; samples.len()];
+    for i in 1..samples.len() {
+        let correction = if samples[i].value < samples[i - 1].value {
+            samples[i - 1].value
+        } else {
+            0.0
+        };
+        prefix[i] = prefix[i - 1] + correction;
+    }
+    prefix
+}
+
+/// [`extrapolated_rate`] for the window `samples[start..end]`, with the
+/// per-window reset scan replaced by an O(1) prefix difference.
+#[allow(clippy::too_many_arguments)]
+pub fn extrapolated_rate_with_prefix(
+    samples: &[Sample],
+    reset_prefix: &[f64],
+    start: usize,
+    end: usize,
+    eval_ts: i64,
+    range: Duration,
+    offset: Duration,
+    kind: ExtrapolationKind,
+) -> Option<f64> {
+    let window = &samples[start..end];
+    if window.len() < 2 {
+        return None;
+    }
+    let mut delta = window[window.len() - 1].value - window[0].value;
+    if matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase) {
+        delta += reset_prefix[end - 1] - reset_prefix[start];
+    }
+    extrapolate_from_delta(window, delta, eval_ts, range, offset, kind)
+}
+
+/// Applies Prometheus boundary extrapolation to a counter-corrected delta.
+///
+/// See the diagrams at <https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data>
+///
+/// # Panics
+///
+/// Panics if the samples are not in the range.
+fn extrapolate_from_delta(
+    samples: &[Sample],
+    delta: f64,
+    eval_ts: i64,
+    range: Duration,
+    offset: Duration,
+    kind: ExtrapolationKind,
+) -> Option<f64> {
+    if samples.len() < 2 {
+        // Not enough samples.
+        return None;
+    }
+
     let start = {
         let range_plus_offset = range
             .checked_add(offset)
@@ -675,19 +753,8 @@ pub fn extrapolated_rate(
     assert!(first.timestamp >= start);
     assert!(last.timestamp <= end);
 
-    let mut result = last.value - first.value;
-
+    let mut result = delta;
     let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
-    if is_counter {
-        // Handle counter resets.
-        let mut prev_value = first.value;
-        for sample in &samples[1..] {
-            if sample.value < prev_value {
-                result += prev_value;
-            }
-            prev_value = sample.value;
-        }
-    }
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
@@ -999,6 +1066,193 @@ mod tests {
 
         let delta = extrapolate(&samples, ExtrapolationKind::Delta);
         assert!(approx_eq!(f64, delta, 4.0));
+    }
+
+    #[test]
+    fn test_build_reset_prefix() {
+        let samples = [
+            Sample::new(1, 90.0),
+            Sample::new(2, 100.0),
+            Sample::new(3, 5.0),
+            Sample::new(4, 15.0),
+        ];
+        assert_eq!(build_reset_prefix(&samples), vec![0.0, 0.0, 100.0, 100.0]);
+        assert!(build_reset_prefix(&[]).is_empty());
+        assert_eq!(build_reset_prefix(&samples[..1]), vec![0.0]);
+    }
+
+    #[test]
+    fn test_extrapolated_rate_with_prefix_window_boundaries() {
+        const MICROS: i64 = 1_000_000;
+        // A reset sits between samples 1 and 2. Windows that include it must
+        // count it; windows starting after it must not.
+        let samples = [
+            Sample::new(23 * MICROS, 90.0),
+            Sample::new(38 * MICROS, 100.0),
+            Sample::new(53 * MICROS, 5.0),
+            Sample::new(68 * MICROS, 15.0),
+        ];
+        let prefix = build_reset_prefix(&samples);
+        let range = Duration::from_secs(60);
+
+        for kind in [
+            ExtrapolationKind::Rate,
+            ExtrapolationKind::Increase,
+            ExtrapolationKind::Delta,
+        ] {
+            // Full window: reset included.
+            let legacy =
+                extrapolated_rate(&samples, 75 * MICROS, range, Duration::ZERO, kind).unwrap();
+            let prefixed = extrapolated_rate_with_prefix(
+                &samples,
+                &prefix,
+                0,
+                4,
+                75 * MICROS,
+                range,
+                Duration::ZERO,
+                kind,
+            )
+            .unwrap();
+            assert_eq!(legacy.to_bits(), prefixed.to_bits());
+
+            // Window starting after the reset: prefix difference must exclude it.
+            let legacy =
+                extrapolated_rate(&samples[2..], 110 * MICROS, range, Duration::ZERO, kind)
+                    .unwrap();
+            let prefixed = extrapolated_rate_with_prefix(
+                &samples,
+                &prefix,
+                2,
+                4,
+                110 * MICROS,
+                range,
+                Duration::ZERO,
+                kind,
+            )
+            .unwrap();
+            assert_eq!(legacy.to_bits(), prefixed.to_bits());
+        }
+
+        // Fewer than two samples yields no result.
+        assert!(
+            extrapolated_rate_with_prefix(
+                &samples,
+                &prefix,
+                1,
+                2,
+                75 * MICROS,
+                range,
+                Duration::ZERO,
+                ExtrapolationKind::Rate,
+            )
+            .is_none()
+        );
+        assert!(
+            extrapolated_rate_with_prefix(
+                &samples,
+                &prefix,
+                2,
+                2,
+                75 * MICROS,
+                range,
+                Duration::ZERO,
+                ExtrapolationKind::Rate,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn test_extrapolated_rate_with_prefix_matches_windowed_scan() {
+        const MICROS: i64 = 1_000_000;
+        const BASE: i64 = 1_000_000 * MICROS;
+        let range = Duration::from_secs(300);
+        let range_micros = 300 * MICROS;
+
+        let mut state: u64 = 0x9E3779B97F4A7C15;
+        let mut next = move || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            state >> 11
+        };
+
+        for series in 0..20 {
+            // Counter series with growth, resets, timestamp jitter, and gaps;
+            // half the series use huge values to stress float cancellation.
+            let scale = if series % 2 == 0 { 1.0 } else { 1.0e12 };
+            let mut value = (next() % 1000) as f64 * scale;
+            let mut timestamp = BASE;
+            let samples = (0..120)
+                .map(|_| {
+                    let r = next();
+                    timestamp += 15 * MICROS + ((r % 7) as i64 - 3) * MICROS;
+                    if r % 11 == 0 {
+                        timestamp += 60 * MICROS;
+                    }
+                    if r % 13 == 0 {
+                        value = (r % 5) as f64 * scale;
+                    }
+                    value += (r % 97) as f64 * 0.25 * scale;
+                    Sample::new(timestamp, value)
+                })
+                .collect::<Vec<_>>();
+            let prefix = build_reset_prefix(&samples);
+
+            let mut start_index = 0;
+            let mut end_index = 0;
+            let mut eval_ts = samples[0].timestamp + range_micros;
+            let stop = samples.last().unwrap().timestamp + range_micros;
+            while eval_ts <= stop {
+                while start_index < samples.len()
+                    && samples[start_index].timestamp < eval_ts - range_micros
+                {
+                    start_index += 1;
+                }
+                if end_index < start_index {
+                    end_index = start_index;
+                }
+                while end_index < samples.len() && samples[end_index].timestamp <= eval_ts {
+                    end_index += 1;
+                }
+
+                for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+                    let legacy = extrapolated_rate(
+                        &samples[start_index..end_index],
+                        eval_ts,
+                        range,
+                        Duration::ZERO,
+                        kind,
+                    );
+                    let prefixed = extrapolated_rate_with_prefix(
+                        &samples,
+                        &prefix,
+                        start_index,
+                        end_index,
+                        eval_ts,
+                        range,
+                        Duration::ZERO,
+                        kind,
+                    );
+                    match (legacy, prefixed) {
+                        (None, None) => {}
+                        (Some(legacy), Some(prefixed)) => {
+                            let tolerance =
+                                legacy.abs().max(prefixed.abs()).max(f64::MIN_POSITIVE) * 1.0e-9;
+                            assert!(
+                                (legacy - prefixed).abs() <= tolerance,
+                                "series {series} eval_ts {eval_ts} {kind:?}: {legacy} vs {prefixed}",
+                            );
+                        }
+                        (legacy, prefixed) => {
+                            panic!("presence diverged: {legacy:?} vs {prefixed:?}")
+                        }
+                    }
+                }
+                eval_ts += 15 * MICROS;
+            }
+        }
     }
 
     #[test]
