@@ -287,8 +287,8 @@ mod tests {
                 "owner" varchar(256),
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
-                CHECK (kind <> 'secret' OR env IS NOT NULL),
-                CONSTRAINT "synthetics_variables_env_fk" FOREIGN KEY ("env") REFERENCES "synthetics_environments" ("id")
+                CONSTRAINT "synthetics_variables_env_fk" FOREIGN KEY ("env") REFERENCES "synthetics_environments" ("id"),
+                CHECK (kind <> 'secret' OR env IS NOT NULL)
             )"#
         );
     }
@@ -311,8 +311,8 @@ mod tests {
                 "owner" varchar(256),
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
-                CHECK (kind <> 'secret' OR env IS NOT NULL),
-                FOREIGN KEY ("env") REFERENCES "synthetics_environments" ("id")
+                FOREIGN KEY ("env") REFERENCES "synthetics_environments" ("id"),
+                CHECK (kind <> 'secret' OR env IS NOT NULL)
             )"#
         );
     }
