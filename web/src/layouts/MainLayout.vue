@@ -613,12 +613,17 @@ export default defineComponent({
       !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
       store.state.zoConfig.version == "";
 
+    // Which org the full config was fetched for — the response carries
+    // org-scoped fields (e.g. per-user permission flags), so an org switch
+    // must refetch even when a config is already loaded.
+    let fullConfigOrg = "";
+
     // The full config endpoint is authenticated and org-scoped; on a fresh
     // session the org can resolve after this component mounts.
     watch(
       () => store.state.selectedOrganization?.identifier,
       (identifier) => {
-        if (identifier && needsFullConfig()) {
+        if (identifier && (needsFullConfig() || identifier !== fullConfigOrg)) {
           getConfig();
         }
       },
@@ -1188,6 +1193,7 @@ export default defineComponent({
           }
 
           store.dispatch("setConfig", res.data);
+          fullConfigOrg = orgIdentifier;
           await nextTick();
 
           filterMenus();
