@@ -324,11 +324,31 @@ pub async fn add_member(team_id: &str, user_email: &str) -> Result<TeamMember, e
     Ok(member)
 }
 
+/// Members in the order they were added, which is the order the client sent.
+///
+/// This list seeds a new team's rotation roster, so its order decides who holds
+/// Primary first and who follows. Sorting it by email made that decision
+/// alphabetically: a team added as `[subhradeep, bhargav, …]` came back
+/// `[bhargav, subhradeep, …]`, so the form's preview of the handover and the
+/// handover the team actually got disagreed — and nothing on either screen
+/// explained why. Lexical order of an address is not a statement about who
+/// should be woken first; the order somebody typed is.
+///
+/// Ordered on `created_at` rather than `id`: `ider::uuid()` is a KSUID, whose
+/// timestamp prefix has one-second resolution, so a bulk add lands several rows
+/// in one second and their relative id order is random. `created_at` is
+/// microseconds and the inserts are sequential. `id` breaks the tie so the
+/// answer is stable across nodes rather than left to the database.
+///
+/// This is the roster's *seed* only. Once a schedule exists, the order lives in
+/// `shift_rules[].members` and is already whatever the client last wrote — so
+/// re-ordering an existing rotation does not go through here.
 pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Ok(oncall_team_members::Entity::find()
         .filter(oncall_team_members::Column::TeamId.eq(team_id))
-        .order_by_asc(oncall_team_members::Column::UserEmail)
+        .order_by_asc(oncall_team_members::Column::CreatedAt)
+        .order_by_asc(oncall_team_members::Column::Id)
         .all(client)
         .await?
         .into_iter()
