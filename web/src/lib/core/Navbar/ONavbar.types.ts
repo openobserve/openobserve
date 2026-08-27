@@ -53,8 +53,8 @@ export interface SubnavChild {
   icon: string;
   /** Route name — used for navigation, active-state, and hasRoute gating. */
   name: string;
-  /** Section header this item sits under (mirrors the sub-page nav grouping). */
-  category?: string;
+  /** i18n key for the section header this item sits under (mirrors the sub-page nav grouping). */
+  category?: I18nKey;
   /** Query `tab` for routes that switch sub-views via a query param (AI evals). */
   tab?: string;
   /** Group children only: include only when this top-level item is present. */

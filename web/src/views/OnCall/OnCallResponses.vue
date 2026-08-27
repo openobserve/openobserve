@@ -50,35 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("oncall.myOnCallNav") }}
       </OButton>
-      <!-- The row holds two kinds of control that look alike: one narrows this
-           list, the rest leave it. The rule follows the filter, so the buttons
-           after it are read as somewhere to go rather than something else to
-           switch on. It goes with the filter — with nobody signed in there is
-           no filter, and a rule with nothing on one side of it divides
-           nothing. -->
-      <OSeparator v-if="viewerEmail" vertical class="mx-1 self-stretch" />
-      <!-- The module's own navigation. The rail names On-Call once; who is on
-           call (Teams) and which team a page reaches (Routing) are configuration
-           for this screen, so they are reached from it rather than from three
-           sibling rail entries. -->
-      <OButton
-        variant="outline"
-        size="sm"
-        icon-left="group-work"
-        data-test="oncall-responses-teams-btn"
-        @click="goTo('onCallTeams')"
-      >
-        {{ t("oncall.teams") }}
-      </OButton>
-      <OButton
-        variant="outline"
-        size="sm"
-        icon-left="alt-route"
-        data-test="oncall-responses-routing-btn"
-        @click="goTo('onCallRouting')"
-      >
-        {{ t("oncall.routingNav") }}
-      </OButton>
     </template>
 
     <!-- §G.8.1: the entry fetch is the capability probe. 404 (feature off) and
@@ -753,7 +724,6 @@ import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

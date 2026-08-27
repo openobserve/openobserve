@@ -792,9 +792,10 @@ export default defineComponent({
       immediate: false,
     });
 
-    // On-call has exactly one navigation surface: the four children of the
+    // On-call's Pages/Teams/Routing entries live entirely inside the
     // `reliability` flyout (navGroups.ts), gated there by `gate: "oncall"`.
-    // A second rail entry here would be a second gate to keep in sync.
+    // A separate top-level rail item here would be a second gate to keep in
+    // sync.
     const filterMenus = () => {
       updateIncidentsMenu();
       // After Incidents, so the flat order reads Alerts → SLOs → Incidents.

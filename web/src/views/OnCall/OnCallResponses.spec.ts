@@ -134,10 +134,6 @@ const stubs = {
   ODropdownGroup: { name: "ODropdownGroup", props: ["label"], template: "<div><slot /></div>" },
   ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
-  // Stubbed for the same reason as the dropdown family: unstubbed it pulls
-  // reka-ui into every mount in this file, and the mounts here are already the
-  // slowest part of the suite.
-  OSeparator: { name: "OSeparator", template: "<hr />" },
   OEmptyState: {
     name: "OEmptyState",
     props: ["preset", "filtered"],
@@ -799,23 +795,6 @@ describe("OnCallResponses", () => {
         params: { teamId: "team_1" },
       }),
     );
-  });
-
-  it("always offers a route to Teams", async () => {
-    const wrapper = await withPages([page()]);
-
-    await wrapper.find('[data-test="oncall-responses-teams-btn"]').trigger("click");
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallTeams" }));
-  });
-
-  /// The rail carries a single On-Call entry, so Routing has no other way in:
-  /// this header button is the module's only standing route to it, unlike the
-  /// per-row "assign team" shortcut that exists only on unrouted pages.
-  it("always offers a route to Routing", async () => {
-    const wrapper = await withPages([page()]);
-
-    await wrapper.find('[data-test="oncall-responses-routing-btn"]').trigger("click");
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallRouting" }));
   });
 
   /// "My on-call" narrows THIS list. It used to navigate, which threw away

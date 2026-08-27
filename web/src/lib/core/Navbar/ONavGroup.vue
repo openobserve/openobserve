@@ -45,7 +45,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
@@ -103,7 +103,7 @@ const visibleChildren = computed(() =>
 // changes (mirrors the sub-page's grouped section nav). Items with no category
 // render flat (e.g. the Data group).
 type Row =
-  | { kind: "header"; key: string; label: string }
+  | { kind: "header"; key: string; label: I18nKey }
   | { kind: "item"; key: string; child: SubnavChild };
 const flyoutRows = computed<Row[]>(() => {
   const rows: Row[] = [];
@@ -408,7 +408,7 @@ function onChildMouseenter(event: MouseEvent) {
             class="text-2xs text-tabs-inactive-text px-3 pb-1 font-medium"
             :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
           >
-            {{ row.label }}
+            {{ t(row.label) }}
           </div>
           <router-link
             v-else

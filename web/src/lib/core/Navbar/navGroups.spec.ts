@@ -232,18 +232,23 @@ describe("groupNavLinks", () => {
     ]);
   });
 
-  /// With on-call ON, SLOs is no longer alone: On-Call gives the tile a second
-  /// child, so it becomes a flyout. On-Call contributes exactly one entry —
-  /// Teams and Routing are reached from the On-Call page itself, and escalation
-  /// policies are edited on the team they belong to.
-  it("collapses SLOs into Reliability once on-call supplies the other child", () => {
+  /// With on-call ON, SLOs is no longer alone: On-Call gives the tile its
+  /// other children, so it becomes a flyout. On-Call contributes Pages, Teams
+  /// and Routing as three entries under one category header — escalation
+  /// policies are still edited on the team they belong to, not from the rail.
+  it("collapses SLOs into Reliability once on-call supplies the other children", () => {
     const entries = groupNavLinks([link("home"), link("sloList")], undefined, oncallOn);
     expect(keysOf(entries)).toEqual(["link:home", "linkGroup:reliability"]);
     const reliability = entries.find(
       (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
         e.type === "linkGroup" && e.item.name === "reliability",
     );
-    expect(reliability?.children.map((c) => c.name)).toEqual(["sloList", "onCallResponses"]);
+    expect(reliability?.children.map((c) => c.name)).toEqual([
+      "sloList",
+      "onCallResponses",
+      "onCallTeams",
+      "onCallRouting",
+    ]);
   });
 
   it("groups Incidents with Alert Sources when Incidents is the only other reliability item present", () => {

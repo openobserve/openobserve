@@ -123,16 +123,31 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "incidentList",
       },
       // A page is where an alert escalates to a person, so On-Call sits in the
-      // same workflow tile rather than as its own rail entry. One entry, not
-      // three: Teams and Routing are configuration reached from the On-Call
-      // page's own header, so the rail names the module once and the module
-      // owns its internal navigation. `gate: "oncall"` is the single place the
-      // O2_ONCALL_ENABLED flag is read for navigation, and `router.hasRoute`
-      // already limits this to the enterprise/cloud build.
+      // same workflow tile rather than as its own rail entry. Pages, Teams and
+      // Routing share the "On-Call" category header so the flyout reads as one
+      // module with three destinations, not three unrelated reliability
+      // entries. `gate: "oncall"` is the single place the O2_ONCALL_ENABLED
+      // flag is read for navigation, and `router.hasRoute` already limits this
+      // to the enterprise/cloud build.
       {
-        titleKey: "menu.onCall",
+        titleKey: "oncall.responsesTitle",
         icon: "notifications-active",
         name: "onCallResponses",
+        category: "menu.onCall",
+        gate: "oncall",
+      },
+      {
+        titleKey: "oncall.teams",
+        icon: "group-work",
+        name: "onCallTeams",
+        category: "menu.onCall",
+        gate: "oncall",
+      },
+      {
+        titleKey: "oncall.routingNav",
+        icon: "alt-route",
+        name: "onCallRouting",
+        category: "menu.onCall",
         gate: "oncall",
       },
       // Where an alert is delivered, and the message it delivers. These moved
