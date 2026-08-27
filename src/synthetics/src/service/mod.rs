@@ -33,12 +33,9 @@ use config::meta::{
         for_each_string_at_path, take_strings_at_path,
     },
 };
-use infra::{
-    db::ORM_CLIENT,
-    table::{
-        cipher, folders, synthetics_agents, synthetics_checks, synthetics_jobs,
-        synthetics_locations, synthetics_runs,
-    },
+use infra::table::{
+    cipher, folders, synthetics_agents, synthetics_checks, synthetics_jobs, synthetics_locations,
+    synthetics_runs,
 };
 // ── OpenFGA ───────────────────────────────────────────────────────────────────
 //
@@ -96,12 +93,6 @@ pub use tokens::*;
 
 // ── DB helper ─────────────────────────────────────────────────────────────────
 
-fn db() -> anyhow::Result<&'static sea_orm::DatabaseConnection> {
-    ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))
-}
-
 /// Mints this org's default synthetics folder, in THIS region only.
 ///
 /// It deliberately does not broadcast, and broadcasting would not help.
@@ -120,6 +111,7 @@ async fn create_default_synthetics_folder(org_id: &str) -> anyhow::Result<()> {
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
         description: "default".to_owned(),
+        icon: None,
     };
     folders::put(org_id, None, folder, FolderType::Synthetics)
         .await

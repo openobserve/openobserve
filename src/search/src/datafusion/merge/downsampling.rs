@@ -28,7 +28,6 @@ use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
-use metrics_index::MetricsFileLayout;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -73,12 +72,7 @@ pub(super) async fn write_files(
     Ok(bufs
         .into_iter()
         .zip(file_metas)
-        .map(|(buf, meta)| MergedFile {
-            buf,
-            meta,
-            layout: MetricsFileLayout::Legacy,
-            metrics_index: None,
-        })
+        .map(|(buf, meta)| MergedFile::Standard { data: buf, meta })
         .collect())
 }
 

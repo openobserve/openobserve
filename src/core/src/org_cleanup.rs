@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use config::{meta::stream::StreamType, spawn_pausable_job};
-use infra::{dist_lock, table::org_cleanup_tasks};
+use infra::{db::get_orm_client_rw, dist_lock, table::org_cleanup_tasks};
 
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
 const MAX_ATTEMPTS: i32 = 10;
@@ -378,8 +378,7 @@ async fn step_delete_file_list(org_id: &str) -> Result<(), anyhow::Error> {
 /// each alert's scheduler trigger + OFGA ownership is removed — none of which a
 /// raw table wipe would do.
 async fn delete_org_alerts(org_id: &str) -> Result<(), anyhow::Error> {
-    use infra::db::{ORM_CLIENT, connect_to_orm};
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
 
     // Organization teardown is the sole graph-guard bypass. Remove composite
     // child-index rows and definitions before ordinary alerts so no dangling
@@ -436,15 +435,12 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // build through the storage layer instead, and imports the table module only
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
-    use infra::{
-        db::{ORM_CLIENT, connect_to_orm},
-        table::{
-            action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
-            destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
-            incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
-            re_pattern_stream_map, reports, search_queue, short_urls, slo, slo_backfill_jobs,
-            slo_budget, slos, system_settings, templates, timed_annotations,
-        },
+    use infra::table::{
+        action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
+        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+        incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
+        re_pattern_stream_map, reports, search_queue, short_urls, slo, slo_backfill_jobs,
+        slo_budget, slos, system_settings, templates, timed_annotations,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -463,7 +459,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // Within the SLO tables the order is also fixed: status rows and backfill jobs
     // carry no org column and resolve their org through `slos`, so they are swept
     // before the definitions that identify them.
-    let slo_conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let slo_conn = get_orm_client_rw().await;
     slo::delete_by_org(slo_conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slo_status: {e}"))?;

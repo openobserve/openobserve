@@ -55,6 +55,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pageSizeOptions: () => [20, 50, 100, 250, 500],
   sorting: "client",
   selection: "none",
+  showSelectAll: true,
   expansion: "none",
   virtualScroll: false,
   virtualScrollItemSize: 48,
@@ -1289,6 +1290,7 @@ defineExpose({
             :table="table"
             :column-order="columnOrder"
             :selection-multiple="selection.isMultiple.value"
+            :show-select-all="showSelectAll"
             :is-all-selected="selection.isAllSelected()"
             :is-indeterminate="selection.isIndeterminate()"
             :expansion-enabled="expansion.isEnabled.value"
@@ -1346,6 +1348,7 @@ defineExpose({
             :clickable="isRowClickable"
             :selection-enabled="selection.isEnabled.value"
             :selection-multiple="selection.isMultiple.value"
+            :show-select-all="showSelectAll"
             :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
             :is-row-selectable="props.isRowSelectable"
             :expansion-enabled="expansion.isEnabled.value"
@@ -1430,6 +1433,16 @@ defineExpose({
                 :column="caProps.column"
                 :value="caProps.value"
                 :active="caProps.active"
+              />
+            </template>
+
+            <!-- Inline actions beside the copy button -->
+            <template v-if="slots['copy-actions']" #copy-actions="ccaProps">
+              <slot
+                name="copy-actions"
+                :column-id="ccaProps.columnId"
+                :row="ccaProps.row"
+                :value="ccaProps.value"
               />
             </template>
           </OTableBody>

@@ -539,10 +539,18 @@ describe("DrilldownPopUp", () => {
     });
 
     it("should populate folder list from store", () => {
-      expect(wrapper.vm.folderList).toEqual([
+      expect(wrapper.vm.folderList).toMatchObject([
         { label: "test-folder", value: "test-folder" },
         { label: "demo-folder", value: "demo-folder" },
       ]);
+    });
+
+    it("carries an icon component on every folder option, like the other folder pickers", () => {
+      // Folders with no chosen icon still get one — FolderIcon falls back to
+      // the folder glyph rather than leaving a gap.
+      for (const option of wrapper.vm.folderList) {
+        expect(option.iconComponent).toBeTruthy();
+      }
     });
 
     it("should render pass all variables toggle", () => {

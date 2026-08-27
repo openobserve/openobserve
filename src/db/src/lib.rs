@@ -26,6 +26,7 @@ pub mod authz;
 pub mod backfill;
 pub mod compact;
 pub mod dashboards;
+pub mod db_monitoring;
 pub mod distinct_values;
 pub mod enrichment_table;
 pub mod file_list;

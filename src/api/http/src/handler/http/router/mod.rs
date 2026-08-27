@@ -31,8 +31,8 @@ use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, folders, kv, model_pricing, organization,
-    service_accounts, short_url, slos, sourcemaps, status, stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
+    organization, service_accounts, short_url, slos, sourcemaps, status, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -55,8 +55,8 @@ use {
     },
     openobserve_api_management::request::{
         actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, gen_ai, keys, license, providers, score_configs, scorers,
-        service_streams, workflows,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, providers, remote_tasks,
+        score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -379,6 +379,28 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
     }
 }
 
+/// Whether this request's body carries a Remote Task secret in plaintext.
+///
+/// `audit_middleware` records request bodies verbatim, so the create call and
+/// every write under `auth`, `headers`, or `signing` has to be redacted —
+/// otherwise the audit trail becomes a second, unencrypted copy of the secret
+/// store.
+#[cfg(feature = "enterprise")]
+fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
+    if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {
+        return false;
+    }
+    let segments = path.split('/').collect::<Vec<_>>();
+    let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
+        return false;
+    };
+    let task_path = &segments[tasks + 1..];
+    (method == Method::POST && (task_path.is_empty() || task_path == &["test"]))
+        || task_path
+            .iter()
+            .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
@@ -440,7 +462,9 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         let mut response = next.run(request).await;
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = if path.ends_with("/settings/logo") {
+            let body = if is_remote_task_secret_write(&http_method, &path) {
+                "[REDACTED: remote task secret write]".to_string()
+            } else if path.ends_with("/settings/logo") {
                 general_purpose::STANDARD.encode(&request_body)
             } else {
                 String::from_utf8(request_body).unwrap_or_default()
@@ -803,6 +827,43 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
+        // Database Monitoring — its own top-level module, not under /traces.
+        // The path segment must stay `db_monitoring` to match the OFGA resource
+        // these routes authorize against (`db_monitoring:{org}`, see o2_openfga
+        // ROUTE_PERMISSIONS).
+        //
+        // Every route below is registered in both builds; the build-type gate
+        // lives in the handlers, three of which (deadlocks/blocking/
+        // table_health) are dual-implemented and answer 403 on OSS. Registering
+        // them in the enterprise-gated block instead would 404 them, losing the
+        // distinction between "not licensed" and "no such endpoint". Runtime
+        // off-switch is ZO_DB_MONITORING_ENABLED.
+        .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
+        .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
+        .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
+        .route("/{org_id}/db_monitoring/query/endpoints", get(db_monitoring::handler::get_dbm_query_endpoints))
+        .route("/{org_id}/db_monitoring/samples", get(db_monitoring::handler::get_dbm_samples))
+        // Server-vantage events (read the canonical o2_dbm_* columns)
+        .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
+        .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
+        .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
+        // `query/insights` returns the query-detail page's Logs-side pair in one
+        // round trip; `query/plans` and `query/server_metrics` are superseded by
+        // it (same sections, same envelopes) and stay registered for
+        // compatibility.
+        .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
+        .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
+        .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
+        .route("/{org_id}/db_monitoring/server_queries", get(db_monitoring::handler::get_dbm_server_queries))
+        .route("/{org_id}/db_monitoring/server_samples", get(db_monitoring::handler::get_dbm_server_samples))
+        .route("/{org_id}/db_monitoring/table_health", get(db_monitoring::handler::get_dbm_table_health))
+        .route("/{org_id}/db_monitoring/instances", get(db_monitoring::handler::get_dbm_instances))
+        .route(
+            "/{org_id}/db_monitoring/instance_metrics",
+            get(db_monitoring::handler::get_dbm_instance_metrics),
+        )
+        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges))
+
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
         // NOTE: named routes MUST be registered before {model_id} to avoid being matched as a model ID
@@ -1101,7 +1162,13 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items",
-                    get(datasets::list_dataset_items).post(datasets::push_dataset_item),
+                    get(datasets::list_dataset_items)
+                        .post(datasets::push_dataset_item)
+                        .put(datasets::upsert_dataset_items),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/rows",
+                    get(datasets::get_dataset_snapshot_rows),
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items/{item_id}",
@@ -1115,6 +1182,59 @@ pub fn service_routes() -> Router {
                         .put(datasets::update_dataset)
                         .delete(datasets::delete_dataset),
                 )
+                .route(
+                    "/{org_id}/experiments/preview",
+                    post(experiments::preview_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments",
+                    get(experiments::list_experiments).post(experiments::create_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/compare",
+                    get(experiments::compare_experiments),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}",
+                    get(experiments::get_experiment).delete(experiments::delete_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/baseline",
+                    put(experiments::set_experiment_baseline)
+                        .delete(experiments::clear_experiment_baseline),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
+                    get(experiments::get_experiment_row),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
+                    post(experiments::retry_experiment_slot),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/slots",
+                    get(experiments::list_experiment_slots),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/records",
+                    post(experiments::submit_experiment_records),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/finalize",
+                    post(experiments::finalize_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/cancel",
+                    post(experiments::cancel_experiment),
+                )
+                    .route(
+                        "/{org_id}/experiments/{experiment_id}/retry",
+                        post(experiments::retry_experiment),
+                    )
+                    .route(
+                        "/{org_id}/experiments/{experiment_id}/clone",
+                        post(experiments::clone_experiment),
+                    )
 
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
@@ -1129,7 +1249,22 @@ pub fn service_routes() -> Router {
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
-                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config))
+                .route("/{org_id}/tasks", get(remote_tasks::list_remote_tasks).post(remote_tasks::create_remote_task))
+                .route("/{org_id}/tasks/test", post(remote_tasks::test_remote_task))
+                .route("/{org_id}/tasks/{entity_id}/auth", put(remote_tasks::replace_remote_task_auth_secret).delete(remote_tasks::revoke_remote_task_auth_secret))
+                .route("/{org_id}/tasks/{entity_id}/headers/{header_name}/secret", put(remote_tasks::replace_remote_task_header_secret).delete(remote_tasks::revoke_remote_task_header_secret))
+                .route("/{org_id}/tasks/{entity_id}/signing/rotate", post(remote_tasks::rotate_remote_task_signing_secret))
+                .route("/{org_id}/tasks/{entity_id}/signing/test", post(remote_tasks::test_remote_task_signing_candidate))
+                .route("/{org_id}/tasks/{entity_id}/signing/activate", post(remote_tasks::activate_remote_task_signing_candidate))
+                .route("/{org_id}/tasks/{entity_id}/signing/end_grace", post(remote_tasks::end_remote_task_signing_grace))
+                .route("/{org_id}/tasks/{entity_id}/signing", get(remote_tasks::get_remote_task_signing_status).delete(remote_tasks::revoke_remote_task_signing_secret))
+                .route("/{org_id}/tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
+                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
+                .route("/{org_id}/tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
+                .route("/{org_id}/tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
+                .route("/{org_id}/tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
+                .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
+                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
@@ -1597,6 +1732,28 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn audit_redacts_every_remote_task_secret_write_body() {
+        for (method, path) in [
+            (Method::POST, "api/org/tasks"),
+            (Method::POST, "api/org/tasks/test"),
+            (Method::PUT, "api/org/tasks/task-1/auth"),
+            (Method::PUT, "api/org/tasks/task-1/headers/x-api-key/secret"),
+            (Method::POST, "api/org/tasks/task-1/signing/rotate"),
+        ] {
+            assert!(is_remote_task_secret_write(&method, path));
+        }
+        assert!(!is_remote_task_secret_write(
+            &Method::GET,
+            "api/org/tasks/task-1"
+        ));
+        assert!(!is_remote_task_secret_write(
+            &Method::POST,
+            "api/org/tasks/task-1/test_run"
+        ));
+    }
+
     #[tokio::test]
     async fn test_proxy_routes() {
         let app = proxy_routes(false);
@@ -1801,6 +1958,37 @@ mod tests {
             json.contains("/{org_id}/query_functions"),
             "query_functions is missing from the OpenAPI surface"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn experiment_lifecycle_actions_are_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let paths = spec.paths.paths;
+
+        for path in [
+            "/api/{org_id}/experiments/{experiment_id}/cancel",
+            "/api/{org_id}/experiments/{experiment_id}/retry",
+            "/api/{org_id}/experiments/{experiment_id}/clone",
+        ] {
+            let action = paths
+                .get(path)
+                .unwrap_or_else(|| panic!("missing OpenAPI path {path}"));
+            assert!(action.post.is_some(), "{path} must publish POST metadata");
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn experiment_row_detail_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}")
+            .expect("missing Experiment row-detail OpenAPI path");
+
+        assert!(path.get.is_some());
     }
 
     // ── tmp/code.md B4 — the query-function catalog route ─────────────────────

@@ -444,7 +444,8 @@
       "regexPatterns": "regex patterns",
       "monitors": "monitors",
       "modelPricing": "model pricing definitions",
-      "variables": "variables"
+      "variables": "variables",
+      "experiments": "experiments"
     },
     "demo": {
       "pageTitle": "Empty states — full set for review",
@@ -481,6 +482,12 @@
       "noStreams": "No data ingested",
       "noTraces": "No traces",
       "noUsers": "No users"
+    },
+    "noExperiments": {
+      "title": "No experiments yet",
+      "description": "An experiment runs a change over a dataset, scores every row, and pins the result so you can compare it against a baseline later.",
+      "action": "New Experiment",
+      "actionDesc": "Pick a dataset, describe the task, and choose the scorers to run."
     }
   },
   "common": {
@@ -1223,7 +1230,10 @@
     "ingestionText": "Ingestion",
     "navigationLink": "Navigation link",
     "ariaCurrentPage": "{label} - Current page",
-    "ariaWithNotifications": "{label} ({count} notifications)"
+    "ariaWithNotifications": "{label} ({count} notifications)",
+    "infra": "Infra",
+    "databases": "Databases",
+    "topQueries": "Top Queries"
   },
   "rum": {
     "noSessionReplay": "No session replay available",
@@ -3442,6 +3452,17 @@
     "languagesLabel": "Languages/Frameworks",
     "otherLabel": "Other",
     "mysql": "MySQL",
+    "mariadb": "MariaDB",
+    "snowflake": "Snowflake",
+    "zookeeper": "Zookeeper",
+    "cassandra": "Cassandra",
+    "aerospike": "Aerospike",
+    "dynamodb": "DynamoDB",
+    "jenkins": "Jenkins",
+    "ansible": "Ansible",
+    "terraform": "Terraform",
+    "gactions": "GitHub Actions",
+    "python": "Python",
     "dotnettracing": ".Net Tracing",
     "dotnetlogs": ".Net Logs",
     "macos": "macOS",
@@ -3703,6 +3724,12 @@
       "k8sTroubleWebhookA": "The OpenTelemetry operator's webhook needs cert-manager's webhook to be serving first. Run `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook`, then re-run the install — it is idempotent.",
       "k8sTroubleWebhookQ": "The install fails with an error about the admission webhook",
       "linuxAgentFixBody": "The installer starts the agent as a systemd service. If nothing arrives, confirm it is running and read its logs for an auth or connectivity error:",
+      "prepareMariadbTitle": "Prepare MariaDB",
+      "prepareMariadbDesc": "Create the monitoring user — run it in a SQL client, **not** your shell.",
+      "runCollectorMariadbDesc": "Start the collector (the user's password via env var).",
+      "mariadbHostLabel": "MariaDB Host",
+      "verifyMariadbMetricsDesc": "Hit Test below, or check Streams for the `mysql_*` metrics (MariaDB reports through the MySQL receiver).",
+      "mariadbTagline": "Collect MariaDB metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
       "logsStreamNameLabel": "Logs Stream Name",
       "macosAgentFixBody": "The installer registers two launchd daemons: the agent itself and the unified log bridge. If nothing arrives, confirm both are loaded and read the agent's log for an auth or connectivity error:",
       "macosAgentServicesFixTitle": "Check The Agent Services",
@@ -4007,7 +4034,46 @@
       "enableSessionReplayOptionalTitle": "Enable Session Replay (Optional)",
       "enableSessionReplayNativeDesc": "Session Replay is enabled **separately** and does **not** inherit the RUM endpoint. It also appends nothing, so it needs the full `/replay` URL below. Getting this wrong is the usual reason RUM events arrive but replays never do.",
       "verifyAndroidRumDesc": "Run the app on an emulator or device, move between a few screens, then hit Test — native Android events land in the `_rumdata` stream.",
-      "verifyIosRumDesc": "Run the app on a simulator or device, move between a few screens, then hit Test — native iOS events land in the `_rumdata` stream."
+      "verifyIosRumDesc": "Run the app on a simulator or device, move between a few screens, then hit Test — native iOS events land in the `_rumdata` stream.",
+      "dbmPreparePostgresTitle": "Database Monitoring · Grant access (optional)",
+      "dbmPreparePostgresDesc": "**Everything above is complete on its own** — query timings already reach Databases from your application's traces, with no setup here. These last steps add what a trace can never see: deadlocks and blocked queries, which only the database itself records. Grant `pg_monitor` so the collector can read other sessions' queries — run it in a SQL client, **not** your shell.",
+      "dbmPrepareMysqlTitle": "Database Monitoring · Keep deadlock history (optional)",
+      "dbmPrepareMariadbTitle": "Database Monitoring · Keep deadlock history (optional)",
+      "dbmPrepareMysqlDesc": "**Everything above is complete on its own** — query timings already reach Databases from your application's traces, with no setup here. These last steps add what a trace can never see: deadlocks and blocked queries, which only the database itself records. Turn on full deadlock history — run it in a SQL client, **not** your shell.",
+      "dbmPrepareMariadbDesc": "**Everything above is complete on its own** — query timings already reach Databases from your application's traces, with no setup here. These last steps add what a trace can never see: deadlocks and blocked queries, which only the database itself records. Turn on full deadlock history — run it in a SQL client, **not** your shell.",
+      "dbmPgLoggingTitle": "Database Monitoring · Let Postgres record deadlocks (optional)",
+      "dbmPgLoggingDesc": "Deadlocks are only ever written to the Postgres log, and only when the settings below are on — so this step is what makes the Deadlocks tab fill at all. The prefix line has to match exactly: the collector reads it to find who was involved, and a different prefix means it finds nothing while still reporting healthy.",
+      "dbmPgLoggingVerifyTitle": "Database Monitoring · Check the settings took effect (optional)",
+      "dbmPgLoggingVerifyDesc": "Run this after the restart. If any value still shows the old setting, Postgres was reloaded rather than restarted and the collector will have nothing to read.",
+      "dbmPgAutoExplainTitle": "Database Monitoring · Capture real executed plans (optional)",
+      "dbmPgAutoExplainDesc": "Without this step, query plans are generic estimates computed without your real parameter values — useful, but never the plan that actually ran. auto_explain logs the plan Postgres really executed for any statement slower than the threshold, with real row counts and a real duration. It adds measurable executor overhead to the statements it samples, so read the settings' comments before applying them to a busy primary, and take it in the same restart as the logging step above.",
+      "dbmConfigureTitle": "Database Monitoring · Configure the collector (optional)",
+      "dbmConfigurePostgresDesc": "Writes `dbm-config.yaml` — set the database and the path to your Postgres log file below. Besides deadlocks and blocked queries, this config turns on activity samples and server top queries (with estimated plans): the collector ships both OFF by default, so the top-level `events:` block in this file is what enables them — without it the collector looks healthy and sends nothing.",
+      "dbmConfigureMysqlDesc": "Writes `dbm-config.yaml` — set the database and the path to your MySQL error log below. Besides deadlocks and blocked queries, this config turns on activity samples and server top queries: the collector ships both OFF by default, so the top-level `events:` block in this file is what enables them — without it the collector looks healthy and sends nothing.",
+      "dbmConfigureMariadbDesc": "Writes `dbm-config.yaml` — set the database and the path to your MariaDB error log below. MariaDB gets deadlocks, blocked queries, activity samples and top queries here: the mysql receiver speaks MariaDB's protocol and identifies it correctly. One gap the receiver reports itself — MariaDB does not expose the sampled statement text, so an activity row names the session without its SQL.",
+      "dbmRunTitle": "Database Monitoring · Run the collector (optional)",
+      "dbmRunPostgresDesc": "Runs both configs together. Use the same role and password you created in step 1.",
+      "dbmRunMysqlDesc": "Runs both configs together. Use the same user and password you created in step 1.",
+      "dbmRunMariadbDesc": "Runs both configs together. Use the same user and password you created in step 1.",
+      "dbmVerifyTitle": "Database Monitoring · See deadlocks and blocked queries",
+      "dbmVerifyDesc": "Open **Infra → Databases** and pick a tab below. Events appear as soon as your database reports one — an empty tab there tells you whether nothing happened or nothing is being collected.",
+      "dbmVerifyFullDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and estimated plans appear on a query's detail page on MySQL 8.0.22 and newer. Table health fills after the first 60-second snapshot.",
+      "dbmDatabaseLabel": "Database",
+      "dbmPgLogPathLabel": "Postgres Log File",
+      "dbmPgLogPathHelp": "The collector must be able to read this file. Find it with: SHOW log_directory;",
+      "dbmMysqlLogPathLabel": "MySQL Error Log",
+      "dbmMariadbLogPathLabel": "MariaDB Error Log",
+      "dbmMysqlLogPathHelp": "The collector must be able to read this file. Find it with: SHOW VARIABLES LIKE 'log_error';",
+      "dbmMariadbLogPathHelp": "The collector must be able to read this file. Find it with: SHOW VARIABLES LIKE 'log_error';",
+      "dbmPrepareMssqlTitle": "Database Monitoring · Grant access (optional)",
+      "dbmPrepareMssqlDesc": "**Everything above is complete on its own** — query timings already reach Databases from your application's traces, with no setup here. This last group adds what a trace can never see: deadlocks and blocked queries, which only the database itself records. Both grants are needed — one lets the collector read other sessions, the other lets it read the deadlock history. Run them in a SQL client, **not** your shell.",
+      "dbmConfigureMssqlDesc": "Writes `dbm-config.yaml` — set the database to connect to below. SQL Server gets deadlocks, blocked queries, activity samples, top queries and execution plans here. The sqlserver receiver reads across the whole instance, so activity and top queries are not limited to the database you name above.",
+      "dbmRunMssqlDesc": "Runs both configs together. Use the same login and password you created in step 1.",
+      "dbmVerifyBlockingDesc": "Open **Infra → Databases → Blocked queries**. Sessions waiting on a lock appear as soon as one is sampled — an empty tab there tells you whether nothing is blocked or nothing is being collected.",
+      "dbmVerifyFullNoSampleTextDesc": "Open **Infra \u2192 Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and top queries carry their plans on a query's detail page. MariaDB does not expose the sampled statement text, so an activity row names the session without its SQL. Table health fills after the first 60-second snapshot.",
+      "dbmVerifyFullPlainPlansDesc": "Open **Infra \u2192 Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and execution plans appear on a query's detail page. Table health fills after the first 60-second snapshot.",
+      "dbmVerifyFullSlowTableHealthDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and estimated plans appear on a query's detail page. Table health takes up to five minutes — reading table sizes gets slower as your schema grows, so it runs less often than the rest.",
+      "dbmVerifyTableHealthDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one — an empty tab there tells you whether nothing happened or nothing is being collected. Table health fills after the first 60-second snapshot."
     },
     "instrumentBeforeImportTitle": "Instrument Before Importing The Client",
     "instrumentBeforeImportBody": "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:",
@@ -4492,6 +4558,8 @@
     "folder": "Folder",
     "folders": "Folders",
     "searchFolder": "Search Folder",
+    "folderIcon": "Icon",
+    "folderIconAria": "Choose a folder icon",
     "deleteFolder": "Delete Folder",
     "deleteFolderMessage": "Are you sure you want to delete this Folder?",
     "trellisLayout": "Trellis Layout",
@@ -4539,6 +4607,7 @@
     "mapsNameLabel": "Location Name Label",
     "mapsMapType": "Map Type",
     "tableAggregations": "Table Aggregations",
+    "tableCellDrilldownTooltip": "Explore matching logs",
     "promqlTableMode": "PromQL Table Mode",
     "visibleColumns": "Visible Columns",
     "hiddenColumns": "Hidden Columns",
@@ -5509,6 +5578,58 @@
     "rowFields": "Row Fields",
     "valueFields": "Value Fields",
     "noData": "No Data",
+    "logExplorer": {
+      "title": "Logs Explorer",
+      "openInLogs": "Open in Logs",
+      "invalidParams": "Invalid drilldown parameters",
+      "noEvents": "No events match this filter",
+      "filterHint": "Click to explore related logs",
+      "timestamp": "Timestamp",
+      "queryMode": "SQL",
+      "runQuery": "Run query",
+      "sqlPlaceholder": "SELECT * FROM \"stream\" WHERE ...",
+      "event": "event",
+      "events": "events",
+      "prevPage": "Previous",
+      "nextPage": "Next",
+      "of": "of",
+      "sqlEditorLabel": "SQL Query",
+      "resetSql": "Reset",
+      "detail": {
+        "drawerTitle": "Event Detail",
+        "details": "Details",
+        "json": "JSON",
+        "insights": "Insights",
+        "copyLink": "Copy link",
+        "copy": "Copy",
+        "copyValue": "Copy value",
+        "insightsHint": "Field frequencies across {n} loaded events"
+      },
+      "insights": {
+        "anomalyTitle": "Field Anomaly Profile",
+        "anomalyHint": "{n} events sampled",
+        "colField": "Field",
+        "colRarity": "Rarity",
+        "colValue": "Value",
+        "rarity": {
+          "anomalous": "Anomalous",
+          "rare": "Rare",
+          "uncommon": "Uncommon",
+          "common": "Common"
+        },
+        "timelineTitle": "Event Timeline",
+        "timelineHint": "Frequency over selected range",
+        "timelineEmpty": "No data",
+        "patternsTitle": "Log Patterns",
+        "patternsHint": "Grouped by similar structure",
+        "zScore": "z={value}",
+        "patternsEmpty": "No patterns extracted for this filter",
+        "contextTitle": "Surrounding Events",
+        "contextHint": "Events near this timestamp",
+        "contextTooltip": "Other events from this stream in the 3 minutes before and after this event — shows what else was happening at the same moment in time.",
+        "contextEmpty": "No surrounding events found"
+      }
+    },
     "addJoin": "Add Join",
     "removeJoin": "Remove Join",
     "leftJoin": "Left Join",
@@ -7350,6 +7471,14 @@
         "library": {
           "label": "Customize in editor",
           "toast": "From Alert Library: {sourceLabel}"
+        },
+        "dbm": {
+          "label": "Alert me",
+          "toast": "Imported from Database Monitoring: \"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "Alert me",
+          "toast": "Imported from Database Monitoring (server vantage): \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7371,7 +7500,13 @@
         "noQueries": "This panel has no query to create an alert from.",
         "noConstants": "The selected patterns have no distinctive text to match on.",
         "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
-        "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only."
+        "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only.",
+        "dbmRollupLag": "Database numbers are aggregated every {minutes} minutes, so this alert can only fire that often — it is not a real-time page.",
+        "dbmFingerprintVersion": "This alert is pinned to one query's exact shape. If the way queries are grouped ever changes, the alert may stop matching and should be recreated.",
+        "dbmNoFingerprint": "This query has no stable identifier, so the alert watches the whole database instead.",
+        "dbmServerVantage": "This measures what the database server itself reported about locks, not how long your application waited. Do not compare it with query latency alerts.",
+        "dbmLockSampling": "Lock activity is sampled on an interval, so contention that started and cleared between two samples was never recorded. A quiet alert is not proof there was no blocking.",
+        "dbmNoInstance": "No single database instance was identified, so this alert watches every instance of this engine."
       }
     },
     "saveFailed": "Could not save the alert.",
@@ -9255,7 +9390,8 @@
       "rowsReturned": "Rows Returned",
       "batchSize": "Batch Size",
       "querySummary": "Query Summary",
-      "responseStatus": "Response Status"
+      "responseStatus": "Response Status",
+      "viewQueryTrend": "View query trend in Database Monitoring"
     },
     "index": {
       "clickHere": "Click here",
@@ -9331,6 +9467,7 @@
       "viewRelated": "View Related",
       "logs": "Logs",
       "traces": "Traces",
+      "databases": "Databases",
       "viewTraces": "View Traces",
       "operations": "Operations",
       "metrics": "Metrics",
@@ -9570,7 +9707,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% of trace)",
       "requestCount": "{count} req"
-    }
+    },
+    "spanEventTimeline": "Span event timeline",
+    "eventClusterTooltip": "{count} events",
+    "spanEventCount": "{count} event",
+    "spanEventCountPlural": "{count} events",
+    "spanEventCountWithErrors": "{count} · {errors} error",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} errors",
+    "spanEventErrorCount": "{errors} error",
+    "spanEventErrorCountPlural": "{errors} errors",
+    "eventClusterAriaLabel": "{count} events, {errors} error",
+    "eventClusterAriaLabelPlural": "{count} events, {errors} errors",
+    "eventMarkerTooltip": "Event: {name}",
+    "exceptionMarkerTooltip": "Exception: {type}",
+    "spanEventFallback": "span event"
   },
   "actions": {
     "realTime": "Real Time",
@@ -10107,7 +10257,7 @@
     "copyPattern": "Copy pattern",
     "copied": "Copied!",
     "pricingTiers": "Pricing Tiers",
-    "pricingTiersDesc": "The first tier is the default. Additional tiers apply when usage conditions are met.",
+    "pricingTiersDesc": "The first tier is the default. Additional tiers apply when their usage condition and UTC time window are met.",
     "tierName": "Tier Name",
     "applyTierWhen": "Apply this tier when",
     "quickSetup": "Quick setup:",
@@ -10199,7 +10349,25 @@
     "saveShadowedWarning": "Saved, but this entry is shadowed by \"{winner}\" which has the same pattern and higher priority. It will never be used for cost calculation unless the other entry is deleted or disabled.",
     "modelPricingSaved": "Model pricing saved",
     "errSave": "Failed to save",
-    "errLoadModel": "Failed to load model"
+    "errLoadModel": "Failed to load model",
+    "tierDefaultName": "Default",
+    "timeWindows": "Active hours (UTC)",
+    "timeWindowsDesc": "Restrict this tier to recurring UTC hours, for providers that bill peak and off-peak rates.",
+    "timeWindowFrom": "From",
+    "timeWindowTo": "To",
+    "addTimeWindow": "Add time window",
+    "removeTimeWindow": "Remove time window",
+    "addUsageCondition": "Add usage condition",
+    "removeUsageCondition": "Remove usage condition",
+    "timeWindowInvalid": "Tier \"{name}\": enter a time as HH:MM (24-hour UTC).",
+    "timeWindowSameBounds": "Tier \"{name}\": start and end must differ. Remove the window to make the tier always active.",
+    "timeWindowWrapsHint": "Wraps past midnight UTC.",
+    "tierNeedsRestriction": "Tier \"{name}\" has no usage condition and no time window, so it would never be reached. Add one, or delete the tier.",
+    "timeBasedChip": "Time-based",
+    "tierAlwaysActive": "Always active (default)",
+    "testAtTimeLabel": "Test at UTC time",
+    "testAtTimeHint": "Leave empty to use the current time. Peak / off-peak tiers resolve against this time.",
+    "localTimeHint": "In your timezone: {range}"
   },
   "aiObservability": {
     "title": "AI Observability",
@@ -10255,7 +10423,8 @@
     "sections": {
       "monitor": "Monitor",
       "annotate": "Annotate",
-      "evaluate": "Evaluate"
+      "evaluate": "Evaluate",
+      "experiment": "Experiment"
     },
     "nav": {
       "llmInsights": "Insights",
@@ -10265,6 +10434,7 @@
       "discovery": "Discovery",
       "queues": "Queues",
       "datasets": "Datasets",
+      "experiments": "Experiments",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
@@ -10278,6 +10448,7 @@
       "discovery": "Find unhealthy traces worth reviewing",
       "queues": "Stateful review to-do lists",
       "datasets": "Curate golden datasets from annotated traces and reviews",
+      "experiments": "Preview and create immutable offline evaluation runs",
       "quality": "Track score quality across span, trace, and session evaluations",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
@@ -10543,6 +10714,275 @@
         "allReviewedBody": "Every item in this queue has a completed review."
       }
     },
+    "experiments": {
+      "newButton": "New Experiment",
+      "createTitle": "Create Experiment",
+      "immutableHint": "Experiment definitions are immutable. To rerun with changes, create a new experiment.",
+      "name": "Name",
+      "dataset": "Dataset",
+      "scorers": "Scorers",
+      "provider": "Provider",
+      "model": "Model (optional)",
+      "prompt": "Inline prompt",
+      "trials": "Trials per row",
+      "preview": "Preview slots",
+      "create": "Create",
+      "trial": "trial {index}",
+      "summary": "Dataset v{version} · {trials} trial(s) · {scorers} scorer(s)",
+      "previewCounts": "{rows} rows × {trials} trials = {slots} slots",
+      "viewTrace": "View execution trace",
+      "scoresTitle": "Scores",
+      "taskProgress": "Tasks: {completed}/{total} complete · {skipped} skipped",
+      "scoringProgress": "Scores: {completed}/{total} complete · {skipped} skipped",
+      "skipTiers": "Rows skipped: {full} fully · {partial} partially",
+      "scoreEvidence": "{scorer} · v{version}: {samples} samples, {noReference} no reference, {noTrace} no trace",
+      "scorerApplicability": "{scorer} · v{version}: {eligible} eligible slots, {noReference} without reference",
+      "loadError": "Failed to load experiments",
+      "previewError": "Failed to preview experiment slots",
+      "createSuccess": "Experiment created",
+      "createError": "Failed to create experiment",
+      "cancel": "Cancel",
+      "retry": "Retry failed slots",
+      "clone": "Clone experiment",
+      "cancelSuccess": "Experiment cancelled",
+      "cancelError": "Failed to cancel experiment",
+      "retrySuccess": "Failed slots queued for retry",
+      "retryError": "Failed to retry experiment",
+      "cloneSuccess": "Experiment cloned",
+      "cloneError": "Failed to clone experiment",
+      "datasetFilter": "Dataset",
+      "nameSearch": "Search experiments",
+      "emptyFiltered": "No experiments match these filters.",
+      "groupCount": "{count} experiment(s)",
+      "viewAll": "View experiments",
+      "baseline": "Baseline",
+      "setBaseline": "Set baseline",
+      "selectForComparison": "Select for comparison",
+      "progress": "{done} of {total} slots",
+      "noScores": "No aggregate scores",
+      "numericScoreSummary": "{name}: {value} ({count} samples)",
+      "booleanScoreSummary": "{name}: {trueCount} true, {falseCount} false ({count} samples)",
+      "categoricalScoreSummary": "{name}: {values} ({count} samples)",
+      "noCost": "No cost recorded",
+      "comparisonReasons": {
+        "select_two": "Select two experiments to compare.",
+        "select_only_two": "Select only two experiments to compare.",
+        "different_dataset": "Experiments can only be compared when they use the same dataset."
+      },
+      "form": {
+        "namePlaceholder": "prompt_v4_reranker",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "A short summary of what this run changes.",
+        "identitySection": "Identity",
+        "datasetPlaceholder": "Select a dataset",
+        "datasetPinned": "Pinned at version v{version} — later dataset edits never change this experiment's results.",
+        "datasetRows": "{rows} rows matched.",
+        "sourcesLabel": "Row sources",
+        "sourcesPlaceholder": "All sources",
+        "sourcesHelp": "Leave empty to run every row in the dataset.",
+        "sources": {
+          "trace": "Trace",
+          "annotation": "Annotation",
+          "manual": "Manual"
+        },
+        "tabTask": "Task",
+        "providerPlaceholder": "Select a provider",
+        "modelPlaceholder": "Provider default",
+        "modelHelp": "Leave empty to use the provider's default model.",
+        "trialsHelp": "1–100 runs per row. Multiplies cost.",
+        "systemPromptLabel": "System message",
+        "systemPromptPlaceholder": "Optional instructions sent before every row.",
+        "userPromptLabel": "User message",
+        "userPromptPlaceholder": "Reference dataset fields with {'{{ input }}'}.",
+        "variablesLabel": "Insert a variable:",
+        "scorersPlaceholder": "Select scorers",
+        "scorersHelp": "Scorer versions are pinned now — later scorer edits never change this experiment's scores.",
+        "scorersEmpty": "No scorers available. Create one under Evaluate first.",
+        "applicabilityTitle": "Scorer coverage",
+        "previewTitle": "Preview",
+        "previewEmpty": "Select a dataset to see what will run.",
+        "previewLoading": "Calculating slots…",
+        "previewSlots": "slots to run",
+        "skippedFully": "{count} rows fully skipped — every selected scorer needs an expected output. Skipped rows cost nothing to run.",
+        "skippedPartially": "{count} rows partially skipped — the task still runs, but reference-based scorers cannot score rows without an expected output.",
+        "skippedNone": "Every matched row can be scored on at least one dimension.",
+        "summaryTitle": "Summary",
+        "summaryScorers": "{count} pinned",
+        "summaryEmpty": "Not set",
+        "submit": "Create & run",
+        "leaveTitle": "Discard this experiment?",
+        "leaveMessage": "This experiment has not been created yet. Leaving now discards everything you have entered.",
+        "validation": {
+          "nameRequired": "Name is required",
+          "datasetRequired": "Select a dataset",
+          "scorerRequired": "Select at least one scorer",
+          "providerRequired": "Select a provider",
+          "userPromptRequired": "A user message is required",
+          "trialCountRange": "Trials must be between 1 and 100",
+          "temperatureRange": "Temperature must be between 0 and 2"
+        },
+        "previewIncomplete": "Finish the task section to see what will run.",
+        "providerRefresh": "Refresh providers",
+        "providerRefreshError": "Failed to refresh providers",
+        "providerEndpointLabel": "Endpoint:",
+        "providerDefaultModelLabel": "Default model:",
+        "providerHelp": "Choose the LLM Provider this experiment calls. Manage providers in {settingsLink}.",
+        "providerHelpSettingsLink": "Settings",
+        "temperatureLabel": "Temperature",
+        "temperatureHelp": "0–2. Higher varies the output.",
+        "temperatureDeterministic": "0 — the model answers the same way every time.",
+        "trialsDeterministicWarning": "At temperature 0 every trial returns the same answer.",
+        "pageTitle": "New Experiment",
+        "nameLabel": "Name"
+      },
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "progress": "Progress",
+        "scores": "Scores",
+        "cost": "Cost",
+        "created": "Created",
+        "actions": "Actions"
+      },
+      "datasetFilterPlaceholder": "All Datasets",
+      "nameSearchPlaceholder": "Search by Name",
+      "toggleGroup": "Toggle Dataset Group",
+      "addToDataset": "Add",
+      "detail": {
+        "by": "by {user}",
+        "p50Latency": "P50 Latency",
+        "totalCost": "Total Cost",
+        "highDispersion": "High-Dispersion Cases",
+        "highDispersionHint": "Rows where trials disagree",
+        "scoredRows": "{scored}/{total} rows scored",
+        "columns": {
+          "input": "Input",
+          "output": "Output",
+          "latency": "Latency"
+        },
+        "retryFailed": "Retry Failed Slots",
+        "loadError": "Failed to load the experiment",
+        "skippedCount": "{count} skipped",
+        "datasetVersion": "{dataset} v{version}",
+        "taskType": {
+          "inline_prompt": "Inline Prompt",
+          "remote": "Remote",
+          "sdk": "SDK"
+        },
+        "trialCount": "{count} trial | {count} trials",
+        "scorerCount": "{count} scorer | {count} scorers",
+        "metaLabels": {
+          "dataset": "Dataset",
+          "task": "Task",
+          "model": "Model",
+          "run": "Run"
+        },
+        "runSummary": "{trials} · {scorers}",
+        "progress": "Progress",
+        "scoring": "Scoring",
+        "scoringDistribution": "{success} successful · {failed} failed · {pending} pending · {skipped} skipped",
+        "compare": "Compare",
+        "comparePicker": {
+          "title": "Compare Against a Baseline",
+          "hint": "This run becomes the candidate. Pick the baseline it is measured against — only runs on the same dataset can be compared.",
+          "baselineLabel": "Baseline",
+          "baselinePlaceholder": "Select a baseline run",
+          "confirm": "Compare",
+          "noPeers": "No other runs on this dataset yet, so there is nothing to compare against.",
+          "loadError": "Failed to load the runs available for comparison",
+          "errors": {
+            "baseline": "Select a baseline to compare against."
+          }
+        },
+        "slotStatus": "Status",
+        "searchPlaceholder": "Search input or output",
+        "statusFilter": "Status",
+        "statusFilterAll": "All Statuses"
+      },
+      "rowDetail": {
+        "fallbackTitle": "Experiment Row",
+        "snapshot": "Snapshot v{version}",
+        "previousRow": "Previous Row",
+        "nextRow": "Next Row",
+        "rowPosition": "Row {index} of {total}",
+        "input": "Input",
+        "expectedOutput": "Expected Output",
+        "output": "Output",
+        "notProvided": "Not provided",
+        "trials": "Trials",
+        "trial": "Trial {index}",
+        "retryFailedSlot": "Retry Failed Slot",
+        "viewTrace": "View Trace",
+        "scores": "Scores",
+        "dimension": "Dimension",
+        "unknownDimension": "Unknown dimension",
+        "aggregate": "Aggregate",
+        "latency": "Latency",
+        "inputTokens": "Input Tokens",
+        "outputTokens": "Output Tokens",
+        "cost": "Cost",
+        "noDataAvailable": "No data available",
+        "copyInput": "Copy Input",
+        "copyOutput": "Copy Output",
+        "copied": "{type} copied to clipboard",
+        "copyFailed": "Failed to copy to clipboard",
+        "execution": "Execution",
+        "score": "Score"
+      },
+      "compare": "Compare",
+      "comparePage": {
+        "title": "Compare",
+        "loading": "Loading comparison…",
+        "loadError": "Failed to compare experiments",
+        "rowError": "Failed to load the compared rows",
+        "missing": "Pick two experiments from the list to compare",
+        "baseline": "Baseline",
+        "candidate": "Candidate",
+        "baselinePlaceholder": "Select a baseline",
+        "candidatePlaceholder": "Select a candidate",
+        "commonRows": "Based on {common} of {total} rows",
+        "optionsError": "Failed to load the experiments available for comparison",
+        "swap": "Swap baseline and candidate",
+        "panel": {
+          "bucketTotal": "Total",
+          "bucketRegressed": "Regressed",
+          "bucketImproved": "Improved",
+          "bucketUnchanged": "Unchanged",
+          "bucketInconclusive": "Inconclusive",
+          "bucketNew": "New",
+          "bucketMissing": "Missing",
+          "datasetRow": "Dataset Row",
+          "outcome": "Outcome",
+          "oneSidedCoverage": "{baseline} baseline-only · {candidate} candidate-only",
+          "oneSided": "One-sided",
+          "noRows": "No rows in this bucket",
+          "bucketUncompared": "Not Compared",
+          "tileCost": "Cost",
+          "tileLatency": "Latency (ms)",
+          "tileScoreDimensionsRegressed": "Score Dimensions Regressed",
+          "tileWeakestScoreDimension": "Weakest Score Dimension",
+          "ofScoreDimensions": "of {total} aggregate score dimensions",
+          "noScoreDimensionMoved": "No score dimension moved",
+          "unknownScoreDimension": "Unknown score dimension",
+          "threshold": "Threshold",
+          "measurePerRow": "Mean per row, over trials"
+        },
+        "rowDrawer": {
+          "fallbackTitle": "Comparison Row",
+          "input": "Input",
+          "expectedOutput": "Expected Output",
+          "fromDataset": "From Dataset",
+          "outputHeading": "Output · Baseline vs Candidate",
+          "scores": "Scores",
+          "dimension": "Dimension",
+          "trial": "Trial {index}",
+          "noContent": "Not provided",
+          "noOutput": "No output",
+          "absentSide": "Not present in this run"
+        }
+      },
+      "selectionCount": "{count} of 2 selected"
+    },
     "datasets": {
       "listTitle": "Datasets",
       "searchPlaceholder": "Search Datasets...",
@@ -10589,6 +11029,10 @@
         "meta": "{count} items · updated {updated}",
         "loadError": "Failed to load dataset",
         "footerTitle": "Items",
+        "tabs": {
+          "items": "Items",
+          "experiments": "Experiments"
+        },
         "searchPlaceholder": "Search Items...",
         "columns": {
           "input": "Input (Purified)",
@@ -13381,6 +13825,24 @@
     "combobox": {
       "noOptionsFound": "No options found"
     },
+    "emojiPicker": {
+      "chooseIcon": "Choose an icon",
+      "searchPlaceholder": "Search icons...",
+      "removeIcon": "Remove icon",
+      "noResults": "No icons match your search",
+      "groups": {
+        "results": "Results",
+        "status": "Status",
+        "services": "Services",
+        "ai": "AI",
+        "creatures": "Creatures",
+        "infra": "Infrastructure",
+        "data": "Data",
+        "teams": "Teams",
+        "objects": "Objects",
+        "world": "World"
+      }
+    },
     "input": {
       "clear": "Clear"
     },
@@ -13759,6 +14221,14 @@
       },
       "variableScope": {
         "global": "Global"
+      },
+      "dataConfidence": {
+        "estimated": "≈ estimated",
+        "topNSubset": "top-N subset",
+        "live": "live",
+        "belowTopN": "below top-N",
+        "truncated": "truncated",
+        "gap": "gap"
       }
     }
   },
@@ -14739,6 +15209,1056 @@
     },
     "hover": {
       "deprecated": "**Deprecated** — prefer the canonical function."
+    }
+  },
+  "dbm": {
+    "common": {
+      "reload": "Refresh",
+      "lastRefreshed": "Last refreshed {age}",
+      "loadFailed": "Could not load database data. Try again, or narrow the time range."
+    },
+    "ai": {
+      "suggestFix": "Ask AI how to fix this",
+      "suggestFixHint": "Opens the AI assistant with this query, its engine and its latency numbers, and asks what to change. It does not change anything itself.",
+      "rowSuggestFix": "Ask AI how to fix this",
+      "deadlockFix": "How do I stop this deadlock?",
+      "deadlockFixHint": "Sends both conflicting statements and the row-order evidence to the AI assistant.",
+      "blockingFix": "Why is this blocking?",
+      "blockingFixHint": "Sends the root session's statement, its idle time and how many sessions are stuck behind it to the AI assistant."
+    },
+    "filters": {
+      "allEngines": "All engines",
+      "allInstances": "All databases",
+      "allNamespaces": "All schemas",
+      "allEnvs": "All environments",
+      "allServices": "All services",
+      "scope": "Filters",
+      "clearScope": "Clear all",
+      "removeScope": "Remove this filter",
+      "popoverTitle": "Narrow this down",
+      "dimension": {
+        "system": "engine",
+        "instance": "database",
+        "namespace": "schema",
+        "env": "environment",
+        "service": "service",
+        "insight": "insight"
+      }
+    },
+    "delta": {
+      "new": "new to this list",
+      "gone": "stopped running",
+      "newHint": "This query wasn't among the heaviest earlier, so there's nothing to compare it against. It may have been running before — just not heavily enough to track on its own.",
+      "goneHint": "This query ran earlier in the day but not in the time range you're looking at.",
+      "comparison": "Earlier {previous} → now {current}",
+      "noChange": "no change",
+      "timesMore": "{ratio}× more",
+      "timesFewer": "{ratio}× fewer",
+      "wasValue": "was {value}"
+    },
+    "databases": {
+      "title": "Databases",
+      "subtitle": "Query performance and health per database",
+      "searchPlaceholder": "Search database or service…",
+      "unnamedInstance": "Instance not named",
+      "unnamedInstanceHint": "The database's own statement reports prove this engine is running, but they don't name a host. The row will show an address once a feed that carries one — session sampling or instance metrics — is set up.",
+      "moreServices": "+{count}",
+      "columns": {
+        "instance": "Database",
+        "calls": "Calls",
+        "qps": "Per second",
+        "errorRate": "Failed",
+        "p50": "Half are under",
+        "p95": "Slow calls",
+        "p99": "Slowest 1%",
+        "services": "Used by",
+        "load": "Database time",
+        "attention": "Needs attention"
+      },
+      "summary": {
+        "databases": "Databases",
+        "calls": "Calls",
+        "time": "Database time",
+        "failed": "Failed"
+      },
+      "databaseCount": "1 database | {count} databases",
+      "openQueries": "See its queries",
+      "alertMe": "Alert me",
+      "columnHints": {
+        "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
+        "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "load": "Total time your applications spent waiting on this database. Measured from the client side, so it reflects how much traffic this database served — not how loaded the server is.",
+        "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it."
+      },
+      "failedChip": "{count} failed",
+      "columnSubLabels": {
+        "attention": "server",
+        "load": "client",
+        "calls": "client"
+      },
+      "attention": {
+        "connections": "connections",
+        "noLimit": "no limit published",
+        "unknown": "not measured"
+      }
+    },
+    "queries": {
+      "title": "Top queries",
+      "subtitle": "The queries using the most database time",
+      "subtitleServer": "The statements your databases ran, counted inside the database — most frequently run first",
+      "searchPlaceholder": "Search query text, table or service…",
+      "trendLabel": "How this query's time has moved across the range",
+      "otherRow": "All other queries",
+      "truncatedText": "This statement was too long to store in full, so it's shown cut short.",
+      "stmtClass": {
+        "query": "Queries",
+        "queryHint": "Only real SQL — SELECT, INSERT, UPDATE and DELETE.",
+        "all": "Queries + connection overhead",
+        "allHint": "Also counts the bookkeeping your driver sends between queries: BEGIN and COMMIT, SET, and the checks that keep a pooled connection alive."
+      },
+      "completionBias": {
+        "title": "Calls dropped {drop}% while failures rose",
+        "body": "That usually means queries are getting stuck rather than finishing — and we can only measure queries that finish. A falling line here may not mean it's recovering."
+      },
+      "columns": {
+        "query": "Query",
+        "calls": "Calls",
+        "p95": "Slow calls",
+        "errors": "Failed",
+        "perTrace": "Per request",
+        "load": "Database time",
+        "p99": "Slowest 1%",
+        "max": "Worst seen",
+        "services": "Used by"
+      },
+      "queryCount": "1 kind of query | {count} kinds of query",
+      "otherRowDetail": "— {calls} calls. We don't have per-query numbers for these, only this combined total. Counted in every total above.",
+      "foldRowText": "1 smaller query | {count} smaller queries",
+      "serverList": {
+        "title": "Queries reported by your databases",
+        "subtitle": "Counted inside the database across every client, most frequently run first. No traced application calls landed in this window, so the usual list is empty — this is what the databases saw meanwhile.",
+        "truncated": "The {count} most frequently run statements — more ran than are shown here",
+        "columns": {
+          "query": "Query",
+          "calls": "Calls",
+          "totalTime": "Time in database",
+          "meanTime": "Mean per call"
+        },
+        "columnHints": {
+          "time": "Measured inside the database: execution time for PostgreSQL, wait time for MySQL and MariaDB. Not what your applications experienced — network and connection wait aren't included.",
+          "mean": "Time in database divided by calls — an average across the window, not a percentile."
+        }
+      },
+      "foldRowDetail": "· {share} of database time · click to show them",
+      "foldRowDetailOpen": "· {share} of database time · click to fold them back",
+      "summary": {
+        "queries": "Kinds of query",
+        "calls": "Calls",
+        "time": "Database time",
+        "failed": "Failed"
+      },
+      "columnHints": {
+        "calls": "How many times this query ran. Your database's own count where it reports one — that covers every client, not just the parts of your system sending traces. Rows marked client-observed are counted from traces instead, because your database didn't report them.",
+        "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
+        "max": "The single slowest call in this window — one real call, not an average.",
+        "errors": "How many of these calls came back with an error.",
+        "perTrace": "How many times this runs inside a single request. A high number usually means a loop.",
+        "load": "Total time this query spent in the database. Your database's own figure where it reports one: execution time on Postgres, but WAIT time on MySQL and MariaDB — each row says which. Rows marked client-observed are measured from traces, so they include network round-trip."
+      },
+      "errorsNone": "none",
+      "errorsAll": "all",
+      "actions": {
+        "open": "Open details",
+        "traces": "See example traces",
+        "copy": "Copy query",
+        "copied": "Query copied",
+        "copyFailed": "Could not copy the query.",
+        "alert": "Alert me if this slows"
+      },
+      "otherRowTextFor": "All other queries on {database}",
+      "otherRowDetailShort": "— {calls} calls.",
+      "columnSubLabels": {
+        "calls": "server where reported",
+        "load": "server where reported"
+      }
+    },
+    "insights": {
+      "showRows": "Show this query | Show these {count} queries",
+      "clearFilter": "Clear filter",
+      "alsoAffects": "and {count} other query | and {count} other queries",
+      "showLess": "Show less",
+      "more": "{count} more | {count} more",
+      "regression": {
+        "title": "{ratio}× slower than usual",
+        "body": "{before} → {after}, same traffic",
+        "rule": "Shown because this query's slow calls got more than {ratio}× slower than {baseline}, across at least {calls} calls."
+      },
+      "new-expensive": {
+        "title": "New query, already expensive",
+        "body": "not running earlier · now {share} of database time",
+        "rule": "Shown because this query wasn't among the heaviest in {baseline} and now takes at least {share}% of database time, across at least {calls} calls. It may have been running before — just not heavily enough to track on its own."
+      },
+      "n-plus-one": {
+        "title": "Runs at least {multiplier}× per request",
+        "body": "{share} of database time · {service}",
+        "rule": "Shown because this query runs at least {ratio} times inside a single request, across at least {traces} requests. It's a lower bound, so the real number may be higher. Legitimate batch work can look the same."
+      },
+      "volume-shift": {
+        "title": "Busier, not slower",
+        "body": "called {ratio}× more, same speed · {service}",
+        "rule": "Shown because this query is called more than {ratio}× as often as in {baseline} while its speed stayed within {latency}× of it. The change is in whatever calls it."
+      },
+      "rank-churn": {
+        "title": "New heaviest query",
+        "body": "moved #{from} → #{to}",
+        "rule": "Shown because a query climbed into the heaviest {into} from outside the heaviest {from} in {baseline}, while total database time grew.",
+        "unranked": "unranked"
+      },
+      "hide": "Hide",
+      "show": "Show",
+      "findRow": "Find it",
+      "all-failing": {
+        "title": "Every call is failing",
+        "body": "{failed} of {total} calls failed · {query}",
+        "rule": "Shown because every call to this query in the range came back with an error."
+      },
+      "baseline": {
+        "label": "Compare against",
+        "previous": "the previous period",
+        "yesterday": "the same hours yesterday",
+        "previousShort": "vs previous",
+        "previousHint": "Compare against the period immediately before this one, of the same length.",
+        "yesterdayShort": "vs yesterday",
+        "yesterdayHint": "Compare against the same hours one day earlier — useful when traffic follows a daily cycle, or to see what changed since a deploy."
+      }
+    },
+    "coverage": {
+      "unknownNote": "Nothing to measure in the range and filters you've picked.",
+      "lineHealthy": "You're seeing {percent}% of this database's time — the {count} heaviest kinds of query.",
+      "lineRemainder": "You're seeing {percent}% of this database's time. The rest is in lighter queries we don't list one by one.",
+      "lineStale": "Our counting is {minutes} minutes behind, so the most recent queries may not be here yet.",
+      "lineTruncated": "There was more data in the last stretch than we could take in, so the newest numbers are undercounts.",
+      "lineTruncatedStale": "There was more data in the last stretch than we could take in, and our counting is {minutes} minutes behind — the newest numbers are undercounts, and the most recent queries may not be here yet.",
+      "lineGap": "{minutes} minutes are missing from this window. Our counting stopped at {stopped} and can only reach back {reach} minutes, so nothing covers {from}–{to}.",
+      "lineSubset": "You've filtered to {filter}, so these percentages describe the rows shown, not the whole database.",
+      "lineHealthyAll": "You're seeing every query that ran. Speeds here are measured across every call, so they're exact.",
+      "lineHealthyAllEstimated": "You're seeing every query that ran. Speeds here are blended from several stretches of time, so they're close but not exact.",
+      "lineCountedTo": "Counted up to {time}; the last half-minute is still coming in.",
+      "lineExact": "All databases reporting. Speeds here are measured across every call, so they're exact.",
+      "lineExactEstimated": "All databases reporting. Speeds here are blended from several stretches of time, so they're close but not exact.",
+      "lineSubsetUnnamed": "Your filters narrow this below the level these totals add up at, so the percentages describe the rows shown rather than the whole database.",
+      "lineQuery": "Timings are measured from your application, so they include network time and any wait for a free connection.",
+      "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained.",
+      "lineSubsetStale": "You've filtered to {filter}, and our counting is {minutes} minutes behind — these percentages describe the rows shown, and the most recent queries may not be here yet.",
+      "lineSubsetUnnamedStale": "Your filters narrow this below the level these totals add up at, and our counting is {minutes} minutes behind — the percentages describe the rows shown, and the most recent queries may not be here yet.",
+      "lineCountedToBehind": "Counted up to {time}; we're {minutes} minutes behind."
+    },
+    "breakdown": {
+      "loading": "Working out where the time went…",
+      "noSchema": "No schema reported",
+      "noService": "Caller not identified",
+      "nothingToAttribute": "We have this database's totals but no per-query rows in this range, so we can't say which service spent the time.",
+      "queryCount": "{count} query | {count} queries",
+      "shortfall": "These add up to {percent} less than this database's total, because only the heaviest kinds of query are tracked one by one."
+    },
+    "freshness": {
+      "neverAggregated": "We haven't finished counting this range yet. The first numbers usually appear within about 15 minutes."
+    },
+    "empty": {
+      "filtered": {
+        "title": "No queries match your filters",
+        "description": "Nothing here matches the search and filters you've applied.",
+        "action": "Clear filters"
+      },
+      "title": "Nothing here yet — and here's exactly why",
+      "subtitle": "We checked everything that has to be true.",
+      "subtitleCounts": "{pass} pass, {fail} doesn't. | {pass} pass, {fail} don't.",
+      "checklistTitle": "What we checked",
+      "showMeHow": "Show me how to instrument it",
+      "checkTrace": "Check one of my traces",
+      "checks": {
+        "enabled": {
+          "ok": "Database monitoring is switched on",
+          "okDetail": "for this organization",
+          "no": "Database monitoring is switched off",
+          "noDetail": "An administrator can turn it on for this organization, then restart the collector."
+        },
+        "traces": {
+          "ok": "Your traces are arriving",
+          "okDetail": "{count} recorded in this time range",
+          "no": "No traces have arrived",
+          "noDetail": "Database monitoring is built from traces, and this organization hasn't sent any yet."
+        },
+        "permission": {
+          "ok": "You have access to this data",
+          "okDetail": "you're an admin on {org}",
+          "no": "You don't have access to this data",
+          "noDetail": "Database monitoring reads your traces, and your role doesn't include them. Ask an administrator for read access."
+        },
+        "dbSpans": {
+          "ok": "Your traces mention a database",
+          "okDetail": "database calls are being recorded",
+          "no": "None of your traces mention a database",
+          "noDetail": "Your applications are being traced, but the part that talks to the database isn't. Add the database instrumentation for your language and the queries will show up here."
+        },
+        "counted": {
+          "ok": "We've finished counting this range",
+          "okDetail": "numbers are up to date",
+          "no": "We haven't finished counting yet",
+          "noDetail": "Database calls have arrived, but the first numbers aren't ready. This usually takes a few minutes."
+        },
+        "window": {
+          "ok": "Something ran in this time range",
+          "okDetail": "database calls were recorded",
+          "no": "Nothing ran in the time range you picked",
+          "noDetail": "Try a wider range."
+        },
+        "alsoWorthKnowing": {
+          "title": "Also worth knowing",
+          "detail": "Once that's in place, the first queries appear within about 15 minutes."
+        }
+      },
+      "action": "Try again",
+      "viewDocs": "View documentation"
+    },
+    "detail": {
+      "title": "Query detail",
+      "tabs": {
+        "overview": "Overview",
+        "overviewHint": "How slow this query is, how often it runs, and where it runs.",
+        "plans": "Query plans",
+        "plansHint": "The steps your database took to run this query. Start here to work out why it's slow.",
+        "callers": "Callers and examples",
+        "callersHint": "Which parts of your application ran this query, and individual slow runs you can open as a trace.",
+        "callersLocked": "Individual runs come from tracing. Nothing traced this query in this time range."
+      },
+      "notFound": {
+        "title": "This query isn't in this organization",
+        "description": "The address names a query {org} hasn't run in the range you're looking at. If you just switched organizations, it belongs to the one you left.",
+        "descriptionNoOrg": "The address names a query this organization hasn't run in the range you're looking at. If you just switched organizations, it belongs to the one you left.",
+        "scopeHint": "Nothing matched it in this organization, time range, and scope. If the address came from another engine or instance, clear those filters or return to the list.",
+        "missingTitle": "No query selected",
+        "missingDescription": "This page describes one query, and the address doesn't name one. If you just switched organizations, the query you were reading belongs to the one you left.",
+        "action": "Browse this organization's queries"
+      },
+      "backToQueries": "Back to top queries",
+      "backToActivity": "Back to activity",
+      "backToSamples": "Back to slowest calls",
+      "backToDeadlocks": "Back to deadlocks",
+      "latencyTitle": "Speed over time",
+      "volumeTitle": "Calls and failures over time",
+      "endpointsTitle": "Where it's called from",
+      "endpointsHint": "The parts of your application whose requests ran this query.",
+      "noEndpoints": "We couldn't tell which part of your application ran this in this range.",
+      "samplesTitle": "Slowest examples",
+      "samplesHint": "each dot is one real execution — click to see the whole request",
+      "noSamples": "No individual executions loaded for this range.",
+      "noSeries": "No history for this query in the range you picked.",
+      "liveSeries": "The most recent points are still being counted and may change.",
+      "noStream": "We couldn't work out which trace stream carries this query, so its callers and examples can't be loaded.",
+      "ambiguousStream": "This organization has more than one trace stream, and we can't tell which one this query runs on. Pick a stream to load its callers and sample traces.",
+      "pickStream": "Choose a trace stream",
+      "invalidStream": "That trace stream name isn't one we recognize, so we didn't run the search.",
+      "firstSeen": "FIRST APPEARED IN THIS LIST AT {time}",
+      "firstSeenHint": "The earliest point in this range where this query was heavy enough to track on its own.",
+      "lastSeen": "LAST APPEARED AT {time}",
+      "lastSeenHint": "The most recent point in this range where this query was heavy enough to track on its own. It may still be running now — this is the last time it made the list.",
+      "errorsByCode": {
+        "title": "Failures by reason code",
+        "exactHint": "Counted across every call in this range.",
+        "sampleHint": "Counted from the examples below — a sample, not a total.",
+        "noCode": "no reason code"
+      },
+      "whereItRuns": {
+        "title": "Where it runs",
+        "hint": "This query's activity, split by the database it ran on. Click a row to focus this page on it.",
+        "trackedHint": "These figures cover the stretches of this range where the query was heavy enough to track on its own — quieter stretches add nothing here, so read them as at-least totals.",
+        "showAll": "Show every location",
+        "emptyFiltered": "Nothing tracked for this query where this page is focused. Show every location to see where it ran.",
+        "noInstance": "Instance not reported",
+        "focused": "Focused",
+        "focusHint": "This page's numbers are currently narrowed to this row. Click again to widen.",
+        "columns": {
+          "location": "Runs on",
+          "avg": "Avg per call"
+        }
+      },
+      "qps": "Calls per second",
+      "errorRate": "Failed calls",
+      "unattributed": "Not attributed",
+      "sampleOk": "OK",
+      "sampleError": "Failed",
+      "viewTrace": "See the request →",
+      "viewTraces": "See example traces",
+      "copySummary": "Copy",
+      "copySummaryHint": "Every number here is already on this page — this just writes the sentence, so minute 13 of an incident produces a message instead of nothing.",
+      "summaryCopied": "Summary copied",
+      "summaryCopyFailed": "Could not copy the summary.",
+      "columns": {
+        "calls": "Calls",
+        "time": "Time",
+        "duration": "Duration",
+        "status": "Status",
+        "caller": "Caller",
+        "callShare": "Share of calls",
+        "p50": "Half are under"
+      },
+      "belowTopN": {
+        "title": "This query wasn't among the heaviest for part of this range",
+        "body": "We track the heaviest queries individually; the rest are counted together. Where this one wasn't heavy enough, we shade the chart rather than draw a zero — it was still running.",
+        "capped": "History reaches back as far as we have it."
+      },
+      "firstSeenCaveat": "— it may have been running before that, just not among the heaviest",
+      "copyQuery": "Copy query",
+      "alertMe": "Alert me if this slows",
+      "stats": {
+        "load": "Database time",
+        "loadShare": "{percent} of this database",
+        "calls": "Calls",
+        "callsDelta": "{change} than earlier",
+        "p50": "Half are under",
+        "p95": "Slow calls",
+        "max": "Worst seen",
+        "errors": "Failed",
+        "noErrors": "no errors",
+        "approx": "close, not exact",
+        "exact": "exact"
+      },
+      "overlap": {
+        "serverExecution": "Time {engine} spent executing it",
+        "serverWait": "Time {engine} spent waiting on it — wait time, not execution time",
+        "serverCounted": "Counted by {engine}, across every client",
+        "clientObserved": "Observed by instrumented callers — your database didn't report this one"
+      },
+      "endpointsConcentrated": "One endpoint accounts for {percent} of this query's time. Fix {endpoint} and you've fixed this query.",
+      "typicalMarker": "slow calls {value}",
+      "plans": {
+        "title": "Query plans",
+        "sourceLabel": "Generic estimated plan",
+        "sourceTooltip": "This plan was estimated with every query parameter set to NULL and was never actually run. Postgres may have run a different plan for real queries. Use it to see the query's shape, not to explain how long it took.",
+        "stableCaveat": "One plan shape was captured in this window. That does not rule out a plan problem — estimated plans can stay stable while the real plan changes, and executed-plan capture only sees statements slow enough to be logged, so a plan change that made this query faster would disappear from capture entirely.",
+        "executedLabel": "Executed plan",
+        "executedTooltip": "This is the plan Postgres actually ran for a real execution, captured by auto_explain with the real parameter values. Row counts and durations on this row are measured, not estimated — but only executions slower than the auto_explain threshold are captured, so they describe the slow tail, not every run.",
+        "capturedDurations": "avg {avg} · max {max} across {count} captured executions",
+        "estVsAct": "est {est} → act {act} rows",
+        "driftCallout": "The plan shape changed in this window. {count} different shapes were captured, which usually means a schema or statistics change, such as an index being dropped or a table repartitioned.",
+        "viewPlans": "View plans",
+        "noPlans": "No plans captured",
+        "noPlansHint": "No collector has shipped a plan for this database yet. Turn on top query collection in your collector recipe to start capturing plans — the setup page walks through it.",
+        "noPlanForQuery": "No plan for this query",
+        "noPlanForQueryHint": "We're capturing plans for this database — this query just doesn't have one. That's normal for statements the database can't explain, like COMMIT, ROLLBACK and SHOW.",
+        "planHash": "Plan",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "noTree": "The plan could not be read",
+        "nodeCost": "cost {cost}"
+      },
+      "serverMetrics": {
+        "title": "What the database itself recorded",
+        "subtitle": "Server-side — all clients",
+        "clientSubtitle": "Client-observed — instrumented callers only, finished calls only. A query still running, or one that hung, isn't in these numbers.",
+        "instance": "Reported by {instance}",
+        "instanceWide": "All databases on this instance",
+        "calls": "Executions",
+        "rows": "Rows returned",
+        "meanExecution": "Mean execution time",
+        "meanWait": "Mean wait time",
+        "sharedBlksHit": "Blocks from cache",
+        "sharedBlksRead": "Blocks from disk",
+        "tempBlksWritten": "Temp blocks written",
+        "noMatch": "No server-side record for this query",
+        "noMatchHint": "Your database reports the statements it ran, and this one is not among them. That is normal: the two views identify a query differently, so they do not always line up. Everything above is still measured from your application.",
+        "ambiguous": "More than one database could be this query",
+        "ambiguousHint": "Several instances report a database with this name, so there is no way to tell which one ran this query. Showing numbers from the wrong instance would be worse than showing none. Candidates: {instances}.",
+        "off": "No server-side metrics collected",
+        "offHint": "Your collector is not gathering per-statement metrics from the database yet. Turn on top query collection in your collector recipe — the setup page walks through it.",
+        "setUp": "Set up",
+        "readFailed": "Server-side metrics could not be read",
+        "readFailedHint": "The read failed, so this says nothing about whether your database is reporting statements. Everything above is still measured from your application."
+      },
+      "callingServices": {
+        "title": "Which of your services called this",
+        "unjoinable": "Not shown — this statement runs on more than one kind of database here, and matching callers without knowing which one would name the wrong services.",
+        "tracedCalls": "{calls} calls traced",
+        "coverage": "{count} services seen in {traced} of the {executions} executions above. The rest came from callers you are not tracing yet.",
+        "coverageUnknown": "{count} services seen in {traced} traced calls. Your database did not report a total for this statement, so there is no share to give.",
+        "noneNamed": "{traced} calls were traced, but none of them could be tied back to a service — their traces start outside this time range."
+      },
+      "callersEmpty": {
+        "title": "No traced calls for this query yet",
+        "description": "Your database reported this statement, but nothing traced the application that ran it — so there is no caller to name and no individual run to open. Instrument the services that talk to this database and they appear here.",
+        "checklistTitle": "What has to be true",
+        "setUp": "Set up tracing",
+        "checks": {
+          "server": {
+            "ok": "Your database is reporting this query",
+            "okDetail": "that is where the timings on the other tabs come from"
+          }
+        }
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "exec time",
+        "serverWait": "wait time",
+        "serverCounted": "server count",
+        "clientObserved": "client-observed",
+        "serverReported": "reported by your databases"
+      }
+    },
+    "page": {
+      "tabs": {
+        "overview": "Overview",
+        "queries": "Top queries",
+        "samples": "Slowest calls",
+        "samplesHintClient": "Finished calls your instrumented services observed in this window — callers without tracing are not counted, so this is a floor, not the total. The table shows the slowest of them.",
+        "samplesHintServer": "Statements your databases reported completing in this window, counted inside the database. The table shows the slowest of them.",
+        "samplesHintUnknown": "The slowest individual database calls in this window.",
+        "deadlocks": "Deadlocks",
+        "blocked": "Blocked queries",
+        "deadlocksHint": "Deadlocks your databases reported.",
+        "blockedHint": "Sessions waiting on a lock right now.",
+        "activity": "Activity",
+        "activityHint": "Sessions your databases are running right now.",
+        "tableHealth": "Table health",
+        "tableHealthHint": "Table size, bloat and vacuum state. Bloat and vacuum are PostgreSQL only.",
+        "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
+        "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
+        "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
+      }
+    },
+    "samples": {
+      "title": "Slowest calls",
+      "subtitle": "The slowest individual database calls in this window, across every database and query — as their callers measured them, finished calls only",
+      "subtitleServer": "The slowest statements your databases completed in this window, measured inside the database",
+      "logOffTitle": "Your databases are not logging slow statements yet",
+      "logOffDescription": "Nothing traced these calls, so we asked the databases for their own slowest statements — and they log none. This list comes from PostgreSQL's statement log (log_min_duration_statement), which is off by default — the setup card's logging step turns it on. Per-statement capture is currently PostgreSQL-only, so MySQL and MariaDB can't feed this list yet. Top queries can still show you what runs most, because it reads the counter tables instead.",
+      "searchPlaceholder": "Search query text, service or database…",
+      "columns": {
+        "query": "Query",
+        "when": "When",
+        "duration": "Took",
+        "service": "Service",
+        "status": "Status"
+      },
+      "columnHints": {
+        "duration": "How long this one call took, measured by the caller. Counts finished calls only — a query still running, or one that never came back, isn't measured here."
+      },
+      "failed": "Failed",
+      "failedWithCode": "Failed · {code}",
+      "viewTrace": "Open the request this call was part of",
+      "scatterOk": "Completed",
+      "partial": "Some of your trace data could not be read, so calls may be missing from this list.",
+      "disclosureShort": "Each row is one real completed call",
+      "disclosureDetail": "Measured by the application that made the call, from the traces you send. Only calls that finished are here — a query still running, or one that hung and never came back, produced no measurement.",
+      "counts": {
+        "complete": "Showing all {count} database calls in this window, slowest first.",
+        "truncated": "The {count} slowest calls in this window — more ran than are shown here.",
+        "filtered": "Showing {count} of {total} calls."
+      },
+      "serverList": {
+        "title": "Slowest calls reported by your databases",
+        "subtitle": "Measured inside each database at the moment a statement finished — every client is counted, but network and connection wait are not. No traced application calls landed in this window, so the usual list is empty; which calls appear here is governed by the database's own logging threshold. These per-statement reports currently come from PostgreSQL only — the collector recipes don't capture other engines' statement logs yet, so MySQL and MariaDB calls won't appear here.",
+        "truncated": "The {count} slowest reported calls — more crossed the threshold than are shown here",
+        "columns": {
+          "query": "Query",
+          "when": "When",
+          "took": "Took",
+          "user": "User"
+        },
+        "columnHints": {
+          "took": "In-database time from statement start to completion, as the engine measured it. Not what any caller experienced — network and connection wait aren't included."
+        }
+      }
+    },
+    "rowChips": {
+      "new": "NEW TO THIS LIST",
+      "slower": "{ratio}× SLOWER THAN USUAL",
+      "loop": "RUNS {multiplier}× PER REQUEST",
+      "allFailed": "ALL {count} FAILED",
+      "busier": "BUSIER, NOT SLOWER",
+      "climbed": "NEW HEAVIEST QUERY"
+    },
+    "deadlocks": {
+      "title": "Databases",
+      "subtitle": "Transactions that blocked each other and were rolled back",
+      "deadlockCount": "no deadlocks | {count} deadlock | {count} deadlocks",
+      "pairCount": "no query pairs | {count} query pair | {count} query pairs",
+      "searchPlaceholder": "Search query text, table or application…",
+      "grouping": {
+        "pairs": "Group by query pair",
+        "pairsHint": "One row per pair of queries that deadlock each other, with how often it happened.",
+        "events": "Every event",
+        "eventsHint": "One row per deadlock, newest first — use this when you need a specific time."
+      },
+      "columns": {
+        "pair": "The two queries that deadlock each other",
+        "applications": "Applications",
+        "objects": "Rows fought over",
+        "lastSeen": "Last one",
+        "count": "Deadlocks",
+        "when": "When",
+        "cancelled": "Cancelled",
+        "finished": "Finished"
+      },
+      "coverage": {
+        "complete": "Every deadlock your databases reported is here — {deadlocks} in this window, from {pairs}.",
+        "capped": "More deadlocks happened than we could read at once. These are the {deadlocks} we have, from {pairs} — the real number is higher.",
+        "readUpTo": "Read up to {time}.",
+        "mysqlPartial": "Your MySQL database keeps only the most recent deadlock unless innodb_print_all_deadlocks is on."
+      },
+      "chips": {
+        "oppositeOrder": "OPPOSITE ROW ORDER",
+        "cadence": "EVERY {seconds}s",
+        "noQueries": "QUERIES NOT CAPTURED",
+        "partial": "ONE SIDE ONLY"
+      },
+      "rowActions": {
+        "topQueries": "Find these in Top queries",
+        "copy": "Copy both queries",
+        "alert": "Alert me about deadlocks"
+      },
+      "detail": {
+        "mostRecent": "Most recent · {time}",
+        "nthOf": "{index} of {total}",
+        "earlier": "Earlier",
+        "later": "Later",
+        "victim": "Cancelled by the database",
+        "survivor": "Allowed to finish",
+        "pid": "pid {pid}",
+        "thread": "thread {pid}",
+        "transaction": "transaction {id}",
+        "eachWaits": "each waits for the other",
+        "deadlock": "deadlock",
+        "noQueryCaptured": "The log recorded this deadlock but not the statement.",
+        "waitingFor": "Was waiting for {target} to finish.",
+        "waitingForRow": "Was waiting for {target} to finish — the other session had already changed the row it wanted.",
+        "rawLock": "{mode} · {target}",
+        "plainTitle": "What happened, in order.",
+        "plainBody": "{a} changed one row and kept it. {b} changed another and kept it. Then each tried to change the other's row, so neither could move. The database broke the tie by cancelling {victim} — that application received an error and its whole transaction was rolled back.",
+        "fixTitle": "The fix is in your code, not the database.",
+        "fixBody": "These two statements touch {object} rows in opposite order. Make both sides update in the same order — lowest id first — and this pair can no longer deadlock.",
+        "fixGeneric": "Both sides hold what the other wants. Make every transaction take these locks in the same order and this pair can no longer deadlock.",
+        "copyForSlack": "Copy",
+        "occurrencesTitle": "All {count} times this pair deadlocked",
+        "occurrencesHint": "Select a point to load that one above",
+        "lostLabel": "{pid} lost",
+        "bothSidesLose": "Both sides get cancelled about equally — {a} vs {b}. Neither application is the problem; the ordering is.",
+        "oneSideLoses": "{pid} is cancelled every time.",
+        "showAbove": "Show above",
+        "copy": "Copy SQL",
+        "seeInTopQueries": "See in Top queries",
+        "whichService": "Which service?",
+        "partialTitle": "Only one side of this deadlock reached us",
+        "partialBody": "MySQL writes each side of a deadlock as a separate log entry. The partner entry has not arrived — it may fall outside this window, or the log may have been rotated between the two. What is shown is real; the other statement is simply missing.",
+        "copyHint": "Copies just this side's statement.",
+        "copySqlTooltip": "Copy this side's statement",
+        "copyForSlackHint": "Both statements, how often this pair has deadlocked and when it last happened — written as a message you can paste into a channel or a ticket."
+      },
+      "storm": {
+        "title": "Deadlock storm.",
+        "body": "{count} in this window — normally none.",
+        "copyForSlack": "Copy",
+        "biasWarning": "Expect the Top queries tab to look calmer than reality right now. A cancelled query still finishes, but the ones queued behind these locks haven't — so call counts there are lower than what your users are experiencing."
+      },
+      "summary": {
+        "deadlocks": "Deadlocks",
+        "pairs": "Query pairs"
+      },
+      "healthy": {
+        "title": "No deadlocks — and we are definitely looking",
+        "description": "Your databases haven't reported a single deadlock in this window. That is the healthy normal, not a gap in what we collect.",
+        "checklistTitle": "How we know",
+        "collectionHealthy": "Collection healthy",
+        "checks": {
+          "reading": {
+            "title": "We are reading your databases' logs",
+            "detail": "{databases} · most recent line read {age}",
+            "detailNoFleet": "Most recent line read {age}",
+            "detailUnknown": "{databases} — the log pipeline is connected",
+            "detailUnknownNoFleet": "The log pipeline is connected"
+          },
+          "reporting": {
+            "title": "Deadlock reporting is switched on",
+            "detail": "Postgres logs deadlocks by default, and your MySQL has innodb_print_all_deadlocks on, so every one is recorded — not just the latest.",
+            "detailMysqlPartial": "Postgres logs deadlocks by default. Your MySQL does not have innodb_print_all_deadlocks on, so only the most recent one would be kept.",
+            "detailUnknown": "Postgres logs deadlocks by default. On MySQL, run SELECT {'@@'}innodb_print_all_deadlocks — it must be 1, or only the most recent deadlock is kept. We cannot read this setting from here.",
+            "titleUnknown": "Check that deadlock reporting is switched on"
+          },
+          "traffic": {
+            "title": "We saw {lines} other log lines from these databases",
+            "detail": "so the pipeline is carrying traffic — a deadlock would have come through it",
+            "titleUnknown": "The log pipeline is carrying traffic"
+          },
+          "lastEver": {
+            "title": "Last deadlock we ever saw",
+            "detail": "{when}. Widen the window to look at it.",
+            "titleNone": "We have never seen a deadlock on these databases",
+            "detailNone": "Nothing to compare against yet — this window is not unusual."
+          }
+        },
+        "widen": "Widen to the last 24 hours"
+      },
+      "notCollecting": {
+        "title": "We can't see deadlocks yet — and here's exactly why",
+        "description": "Deadlocks are reported by the database itself, not by your applications. We check four things.",
+        "checklistTitle": "What we checked",
+        "checks": {
+          "queries": {
+            "ok": "Your query data is arriving",
+            "okDetail": "{queries} from {databases} — the Top queries tab works",
+            "okDetailNoFleet": "{queries} — the Top queries tab works",
+            "no": "No query data is arriving either",
+            "noDetail": "Start with the Top queries tab — nothing is reaching us from these databases yet."
+          },
+          "enabled": {
+            "ok": "Database monitoring is switched on",
+            "okDetail": "for this organization",
+            "no": "Database monitoring is switched off",
+            "noDetail": "Turn it on in Settings to start collecting."
+          },
+          "log": {
+            "no": "No database is sending us its log",
+            "noDetail": "Query timings come from your applications, but deadlocks are only ever written to the database's own log. Point your collector at the Postgres or MySQL log file and this tab fills itself in.",
+            "ok": "A database log is arriving",
+            "okDetail": "so a deadlock would reach us — there simply hasn't been one."
+          },
+          "settings": {
+            "title": "Worth knowing before you start",
+            "detail": "Postgres writes a deadlock across two log lines and MySQL across several — the participant queries are in the later ones. A setup that only matches the first line records that a deadlock happened and loses every query. Our recipe handles both."
+          }
+        }
+      }
+    },
+    "blocked": {
+      "title": "Databases",
+      "subtitle": "Sessions currently waiting on a lock",
+      "subtitlePast": "Sessions that were waiting on a lock during this window",
+      "waitingCount": "no sessions waiting on a lock | {count} session waiting on a lock right now | {count} sessions waiting on a lock right now",
+      "waitingCountPast": "no sessions waited on a lock | {count} session waited on a lock in this window | {count} sessions waited on a lock in this window",
+      "sessionCount": "no sessions | {count} session | {count} sessions",
+      "searchPlaceholder": "Search query text, table or application…",
+      "perspective": {
+        "waiting": "Who's stuck",
+        "waitingHint": "One row per session that is waiting on a lock, longest wait first.",
+        "blocking": "Who's blocking",
+        "blockingHint": "The session holding the lock, with everything stuck behind it."
+      },
+      "columns": {
+        "stuckQuery": "Query that is stuck",
+        "session": "Session",
+        "waitingFor": "Waiting for",
+        "heldUpBy": "Held up by",
+        "waiting": "Waiting",
+        "sessionQuery": "Session and what it's running",
+        "application": "Application",
+        "blocking": "Blocking"
+      },
+      "coverage": {
+        "summary": "The longest wait is {longest}. Every wait traces back to {roots} holding a lock open.",
+        "summaryCapped": "More sessions were waiting than we could read at once. Of the ones we have, the longest wait is {longest} and they trace back to {roots} holding a lock open.",
+        "summaryOneRoot": "one session",
+        "summaryManyRoots": "{count} sessions",
+        "checked": "Checked every {interval} seconds; last look {time}.",
+        "checkedUnknown": "Sampled from your database's own lock tables."
+      },
+      "rowActions": {
+        "showChain": "Show the chain",
+        "copy": "Copy query",
+        "alertMe": "Alert me about lock waits"
+      },
+      "waitEvent": {
+        "transaction": "another transaction to finish",
+        "row": "a row lock",
+        "table": "a table lock",
+        "extend": "the table to grow",
+        "advisory": "an application lock",
+        "object": "an object lock",
+        "buffer": "a data page to be read",
+        "lock": "a lock"
+      },
+      "deep": "{count} deep",
+      "notWaiting": "not waiting",
+      "longestWait": "LONGEST WAIT",
+      "holdsTheLock": "HOLDS THE LOCK EVERYONE WANTS",
+      "lastStatement": "last statement {age} ago",
+      "idleInTransaction": "not waiting for anything · idle in an open transaction",
+      "pills": {
+        "root": "ROOT — START HERE",
+        "waitingBlocking": "WAITING & BLOCKING {count}",
+        "waiting": "WAITING"
+      },
+      "waitingOn": "waiting on {pid}",
+      "degraded": "One session is holding up {count}. It has had an open transaction for {age} and hasn't run a query in that time — most likely an application that forgot to commit.",
+      "footer": {
+        "allLeadBack": "All {waits} lead back to pid {pid}",
+        "allLeadBackDetail": "— one session, holding a lock on {object}.",
+        "switchToBlocking": "Switch to “Who's blocking”",
+        "releaseAll": "Ending session {pid} releases all {count}.",
+        "releaseAllDetail": "Everything below it is waiting only because of that one lock.",
+        "timeLost": "total time lost: {seconds} across {sessions}"
+      },
+      "terminate": {
+        "copied": "Copied",
+        "hint": "Run this yourself against {instance} to end the session. We never run it for you.",
+        "hintNoInstance": "Run this yourself to end the session. We never run it for you."
+      },
+      "summary": {
+        "waiting": "Sessions waiting",
+        "longest": "Longest wait",
+        "chains": "Chains"
+      },
+      "rootCount": "no root blockers | {count} root blocker | {count} root blockers",
+      "inChain": "{count} sessions in the chain",
+      "healthy": {
+        "title": "Nothing is waiting on a lock",
+        "description": "No session in your databases is stuck behind another one right now. That is the healthy normal, not a gap in what we collect.",
+        "descriptionPast": "No session in your databases was stuck behind another one during this window. That is the healthy normal, not a gap in what we collected.",
+        "checklistTitle": "How we know",
+        "collectionHealthy": "Collection healthy",
+        "checks": {
+          "sampling": {
+            "title": "We are checking your databases' lock tables",
+            "detail": "every {interval} seconds · last look {age}",
+            "detailUnknown": "on the schedule your collector is configured with"
+          },
+          "sessions": {
+            "title": "Sessions are running normally",
+            "detail": "we can see active sessions, and none of them is in a lock queue"
+          },
+          "meaning": {
+            "title": "What this tab shows when it is not empty",
+            "detail": "A session waiting on a lock held by another, and the chain back to whichever session is holding it. Short waits are normal and clear on their own — this tab is for the ones that don't."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "We can't see blocked queries yet — and here's exactly why",
+        "description": "A blocked query is only visible from inside the database, in its lock tables. We check three things.",
+        "checklistTitle": "What we checked",
+        "checks": {
+          "queries": {
+            "ok": "Your query data is arriving",
+            "okDetail": "{queries} from {databases} — the Top queries tab works",
+            "okDetailNoFleet": "{queries} — the Top queries tab works",
+            "no": "No query data is arriving either",
+            "noDetail": "Start with the Top queries tab — nothing is reaching us from these databases yet."
+          },
+          "enabled": {
+            "ok": "Database monitoring is switched on",
+            "okDetail": "for this organization",
+            "no": "Database monitoring is switched off",
+            "noDetail": "Turn it on in Settings to start collecting."
+          },
+          "sampling": {
+            "no": "Nothing is sampling your databases' lock tables",
+            "noDetail": "Who is waiting on whom exists only inside the database, and only while the wait is happening. Our collector recipe reads it on a schedule and turns on log_lock_waits so long waits are recorded too.",
+            "ok": "Lock-table sampling is running",
+            "okDetail": "so a blocked session would reach us — there simply isn't one."
+          },
+          "settings": {
+            "title": "Worth knowing before you start",
+            "detail": "log_lock_waits only records a wait once it lasts longer than deadlock_timeout — one second by default. Waits shorter than that are normal and stay unlogged, which is why this tab samples live rather than reading the log alone."
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "Activity",
+      "subtitle": "What your databases are doing right now, sampled from their own session tables.",
+      "subtitlePast": "What your databases were doing during this window, sampled from their own session tables.",
+      "searchPlaceholder": "Search sessions, users, applications",
+      "wait": {
+        "onCpu": "On CPU / no wait",
+        "qualified": "{type}: {event}",
+        "plain": "{event}",
+        "remainder": "+{count} more wait events ({share})",
+        "remainderNoShare": "+{count} more wait events"
+      },
+      "disclosure": {
+        "sampled": "Sampled every {interval} seconds — this is a series of snapshots, not a continuous recording, so a session shorter than the gap between samples can run and finish unseen.",
+        "sampledUnknown": "Sampled on a schedule — this is a series of snapshots, not a continuous recording. We have not seen enough samples yet to work out how often your collector polls.",
+        "filtered": "The sample is already filtered by your collector: idle sessions older than the newest running query are left out unless they are blocking someone. So this is not a full list of every connection.",
+        "short": "Sampled every {interval}s, and pre-filtered",
+        "shortUnknown": "Sampled on a schedule, and pre-filtered",
+        "more": "What this means"
+      },
+      "columns": {
+        "session": "Session",
+        "user": "User",
+        "application": "Application",
+        "state": "State",
+        "waitEvent": "Waiting on",
+        "running": "Running for",
+        "lastQuery": "Last query",
+        "query": "Query",
+        "blockedBy": "Blocked by"
+      },
+      "summary": {
+        "sessions": "Sessions",
+        "onCpu": "On CPU",
+        "waiting": "Waiting",
+        "idleInTransaction": "Idle in transaction"
+      },
+      "state": {
+        "unknown": "State not reported"
+      },
+      "counts": {
+        "complete": "Showing {count} sessions.",
+        "capped": "More sessions were sampled than we could read at once. These are the {count} we have.",
+        "filtered": "Showing {count} of {total} sessions."
+      },
+      "transactionOpen": "transaction open {age}",
+      "healthy": {
+        "title": "Nothing is running right now",
+        "description": "We sampled your databases' session tables and found no active sessions. That is the healthy normal for an idle database, not a gap in what we collect.",
+        "descriptionPast": "We sampled your databases' session tables during this window and found no active sessions. That is the healthy normal for an idle database, not a gap in what we collected.",
+        "checklistTitle": "How we know",
+        "collectionHealthy": "Collection healthy",
+        "checks": {
+          "sampling": {
+            "title": "We are sampling your databases' session tables",
+            "detail": "every {interval} seconds · last look {age}",
+            "detailUnknown": "on the schedule your collector is configured with"
+          },
+          "pipeline": {
+            "title": "Your databases are reaching us",
+            "detail": "{lines} other lines came through the same pipeline in this window",
+            "detailUnknown": "the pipeline that carries this data is running"
+          },
+          "meaning": {
+            "title": "What this tab shows when it is not empty",
+            "detail": "Every session your databases are running, what each one is waiting on, and how long it has been going. Because we sample rather than watch continuously, very short queries can finish between two samples and never appear."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "We can't see live sessions yet — and here's exactly why",
+        "description": "What a database is doing right now exists only inside that database, in its own session table. Something has to poll it. We check three things.",
+        "checklistTitle": "What we checked",
+        "checks": {
+          "queries": {
+            "ok": "Your query data is arriving",
+            "okDetail": "{queries} from {databases} — the Top queries tab works",
+            "okDetailNoFleet": "{queries} — the Top queries tab works",
+            "no": "No query data is arriving either",
+            "noDetail": "Start with the Top queries tab — nothing is reaching us from these databases yet."
+          },
+          "enabled": {
+            "ok": "Database monitoring is switched on",
+            "okDetail": "for this organization",
+            "no": "Database monitoring is switched off",
+            "noDetail": "Turn it on in Settings to start collecting."
+          },
+          "sampling": {
+            "no": "Nothing is sampling your databases' session tables",
+            "noDetail": "Session samples come from your collector: enable db.server.query_sample in the collector recipe on the database host — the setup page walks through it. OpenObserve accepts this feed whenever database monitoring is on, so the fix is on the collector side."
+          }
+        }
+      }
+    },
+    "instanceMetrics": {
+      "columnHeader": "Instance health",
+      "columnHint": "Connections against the limit, from the metrics your collector already sends. Blank until a receiver reports this instance.",
+      "connectionsOf": "{used} of {limit} connections",
+      "connectionsNoLimit": "{used} connections",
+      "noLimitHint": "The receiver for this engine does not publish a connection limit on its own, so only the count is shown. The setup card's connection-limit recipe (sqlquery/mysql_limits) collects max_connections and turns this into a percentage.",
+      "trendLabel": "Connections across the selected window",
+      "cacheHit": "Cache hit {percent}",
+      "lagBytes": "Replica {value} behind",
+      "lagSeconds": "Replica {value} behind",
+      "deadlocks": "{count} deadlock | {count} deadlocks",
+      "noTraffic": "No application traffic in this window",
+      "noTrafficHint": "Your collector reports this instance, but no application queried it during this window. Its query columns are empty because nothing measured them, not because it was fast.",
+      "unmatched": {
+        "pooler": "No instance metrics matched this address",
+        "poolerHint": "This row is the address your application connected to. Your collector reports different hosts, which is what a connection pooler in between looks like — the pooler's address and the real database never match.",
+        "loopback": "No instance metrics matched this address",
+        "loopbackHint": "This row points at localhost. The collector rewrites a loopback endpoint to its own hostname, so the two names can never match even when both are healthy.",
+        "noReceiver": "The {engine} receiver is not reporting",
+        "noReceiverHint": "Your applications are querying this database, but no {engine} receiver is sending server metrics for it. Add the {engine} receiver to your collector to fill this column.",
+        "noReceiverMariadbHint": "Your applications are querying this MariaDB server, but nothing is sending server metrics for it. There is no separate MariaDB receiver — point a MySQL receiver at this instance and its metrics fill this column.",
+        "engineUnsupported": "Not collected for {engine}",
+        "engineUnsupportedHint": "Instance metrics are collected for PostgreSQL, MySQL and MariaDB — no receiver is wired up for {engine} yet, so this column stays empty. That is a coverage note, not a health verdict.",
+        "unreadable": "Instance metrics could not be read",
+        "unreadableHint": "The metrics streams exist but could not be read. This is usually a permission problem rather than anything wrong with the database."
+      },
+      "limitUnknownHint": "The connection count arrived but the limit did not, so no percentage can be shown. Check that the connection-limit metric is enabled on this collector.",
+      "noReading": "No reading in this window",
+      "noReadingHint": "Your collector reports this instance, but sent no connection metric during this window. The metric may be switched off on the receiver, or the instance may have stopped reporting.",
+      "lagLabel": "Replica lag",
+      "deadlockLabel": "deadlocks"
+    },
+    "tableHealth": {
+      "title": "Table health",
+      "subtitle": "Size, bloat and vacuum state for every table, newest snapshot first.",
+      "searchPlaceholder": "Search tables",
+      "never": "Never",
+      "countersCumulative": "Scan and vacuum counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
+      "tuplesEstimated": "Row counts and bloat percentage are statistics estimates from the database engine, not exact counts.",
+      "notCollectingTitle": "No table statistics yet",
+      "notCollectingDescription": "Nothing has reported table statistics in this time range. This signal ships as a separate collector recipe.",
+      "engineUnsupportedTitle": "Not collected for this engine",
+      "engineUnsupportedDescription": "Table health is collected by a per-engine collector recipe, and no recipe ships for this engine — so nothing is collected for it. This is not an all-clear.",
+      "checklistTitle": "To start collecting",
+      "checkRecipe": "Add the pg_table_stats recipe from the Databases setup guide to your collector config.",
+      "checkGrant": "Grant pg_monitor to the collector user so it can read pg_stat_user_tables.",
+      "checkRange": "Widen the time range — the recipe reports once every 60 seconds.",
+      "columns": {
+        "relation": "Table",
+        "instance": "Instance",
+        "totalBytes": "Total size",
+        "heapBytes": "Heap size",
+        "overheadBytes": "Index + TOAST",
+        "liveTuples": "Live rows (est.)",
+        "deadTuples": "Dead rows (est.)",
+        "deadTupPct": "Bloat (est.)",
+        "modSinceAnalyze": "Rows since analyze",
+        "seqScanCount": "Seq scans (lifetime)",
+        "seqTupRead": "Rows seq-scanned (lifetime)",
+        "idxScanCount": "Index scans (lifetime)",
+        "autovacuumCount": "Autovacuums (lifetime)",
+        "frozenXidAge": "Txid age",
+        "lastVacuum": "Last vacuum",
+        "lastAutovacuum": "Last autovacuum",
+        "lastAnalyze": "Last analyze"
+      },
+      "countLine": "{count} tables"
+    },
+    "recommendations": {
+      "title": "Recommendations",
+      "subtitle": "Deterministic checks over what the collector already reports. Each states the measurement and the threshold it crossed.",
+      "countersCumulative": "Index scan counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
+      "andMore": "and {count} more like it",
+      "unused-index": {
+        "title": "Index not scanned",
+        "body": "{index} on {relation} has no recorded scans and occupies {size}.",
+        "rule": "Index scan count is 0 since the statistics were last reset, and the index is at least {bytes} bytes. Scan counts are lifetime totals, not counts for the selected range.",
+        "caveat": "A lifetime count of zero means the planner has not chosen this index since the counters were last reset. It may still serve a replica, a periodic job, or a constraint."
+      },
+      "long-running-query": {
+        "title": "Long-running query",
+        "body": "Session {pid} has been executing for {duration}.",
+        "rule": "An executing session has been running for at least {seconds} seconds. Idle sessions are excluded."
+      },
+      "high-impact-blocker": {
+        "title": "Blocker holding several sessions",
+        "body": "Session {pid} is at the head of a chain with {count} sessions waiting.",
+        "rule": "A root blocker — a session that blocks others and waits for none — has at least {sessions} sessions waiting behind it, counted through the whole chain."
+      },
+      "high-row-count": {
+        "title": "High rows per call",
+        "body": "This statement returned {rows} rows per call on average across {calls} calls.",
+        "rule": "Mean rows per call is at least {rows}, over at least {calls} calls. The mean is the server's total rows divided by its call count."
+      },
+      "enginePartialTitle": "Some checks did not run",
+      "enginePartialDescription": "The unused-index check needs an index scan counter, which is not collected for this engine, so an empty list here is not an all-clear.",
+      "allClearTitle": "Nothing crossed a threshold",
+      "allClearDescription": "Every check ran and none crossed its threshold in this time range."
     }
   }
 }

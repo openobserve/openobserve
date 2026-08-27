@@ -47,7 +47,7 @@ pub(super) fn metrics_index_merge_scope(
 ) -> MetricsIndexMergeScope {
     let indexed_files = files
         .iter()
-        .filter(|f| MetricsFileLayout::of(&f.key) == MetricsFileLayout::Indexed)
+        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::Indexed))
         .count();
     let total_original_size: i64 = files.iter().map(|f| f.meta.original_size.max(0)).sum();
     let ideal_file_count = (total_original_size as usize).div_ceil(max_file_size.max(1));

@@ -38,9 +38,9 @@ use metrics_index::MetricsFileLayout;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
-    merge::{self, MergeMode, MergeOutput, MergeParquetResult, MergedFile},
+    merge::{self, MergeMode, MergeOutput, MergeResult},
 };
-use tantivy_utils::index_builder::create_tantivy_index;
+use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
 use tokio::sync::Semaphore;
 
 // merge small files into big file, upload to storage, returns the big file key and merged files
@@ -281,7 +281,13 @@ pub async fn merge_files(
         log::debug!("skip index generation for stream: {org_id}/{stream_type}/{stream_name}");
     }
 
-    let MergeParquetResult {
+    let storage_tier = if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
+        storage::StorageTier::InfrequentAccess
+    } else {
+        storage::StorageTier::Default
+    };
+
+    let MergeResult {
         files: merged_files,
         file_format,
     } = buf;
@@ -292,13 +298,11 @@ pub async fn merge_files(
         ));
     }
     let mut new_files = Vec::with_capacity(merged_files.len());
-    for MergedFile {
-        buf,
-        meta: mut new_file_meta,
-        layout,
-        metrics_index,
-    } in merged_files
-    {
+    for file in merged_files {
+        let id = ider::generate_file_name();
+        let new_file_key = format!("{prefix}/{}", file.file_name(&id, file_format));
+        let (data, mut new_file_meta, metrics_index_path) = file.into_upload_parts().await?;
+        let buf = Bytes::from(data);
         new_file_meta.compressed_size = buf.len() as i64;
         if new_file_meta.compressed_size == 0 {
             return Err(anyhow::anyhow!(
@@ -306,11 +310,7 @@ pub async fn merge_files(
             ));
         }
 
-        let id = ider::generate_file_name();
-        let new_file_key = format!("{prefix}/{}", layout.file_name(&id, file_format));
-
         // upload file to storage
-        let buf = Bytes::from(buf);
         if cfg.cache_latest_files.enabled
             && cfg.cache_latest_files.cache_parquet
             && cfg.cache_latest_files.download_from_node
@@ -319,29 +319,24 @@ pub async fn merge_files(
             log::debug!("merge_files {new_file_key} file_data::disk::set success");
         }
 
-        // TODO: check how compliance will interact with org storage
         let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
-        let compliance = cfg.s3.feature_force_infrequent_access && storage_type.is_compliance();
-        if compliance {
-            storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
-        } else {
-            storage::put(&account, &new_file_key, buf.clone()).await?;
-        }
+        storage::put_with_tier(&account, &new_file_key, buf.clone(), storage_tier).await?;
 
         // Indexed metrics files own a `.midx` metrics index; it is not tracked in
         // file_list and is deleted together with the data file
-        if let Some(metrics_index) = metrics_index {
+        if let Some(metrics_index_path) = metrics_index_path {
             let metrics_index_key = MetricsFileLayout::metrics_index_path(&new_file_key)
                 .ok_or_else(|| {
                     anyhow::anyhow!("metrics index for a non-indexed metrics file: {new_file_key}")
                 })?;
-            let metrics_index = Bytes::from(metrics_index);
-            if compliance {
-                storage::put_with_compliance(&account, &metrics_index_key, metrics_index.clone())
-                    .await?;
-            } else {
-                storage::put(&account, &metrics_index_key, metrics_index.clone()).await?;
-            }
+            let metrics_index = Bytes::from(tokio::fs::read(&metrics_index_path).await?);
+            storage::put_with_tier(
+                &account,
+                &metrics_index_key,
+                metrics_index.clone(),
+                storage_tier,
+            )
+            .await?;
             log::debug!(
                 "[COMPACTOR:WORKER:{thread_id}] wrote metrics index {metrics_index_key}, size: {}",
                 metrics_index.len()
@@ -358,6 +353,7 @@ pub async fn merge_files(
                 &mut new_file_meta,
                 latest_schema.clone(),
                 buf,
+                storage_tier,
             )
             .await?;
         }
@@ -389,11 +385,15 @@ async fn generate_inverted_index(
     new_file_meta: &mut FileMeta,
     latest_schema: Arc<Schema>,
     buf: Bytes,
+    storage_tier: storage::StorageTier,
 ) -> Result<(), anyhow::Error> {
     let index_size = create_tantivy_index(
-        "COMPACTOR",
-        org_id,
-        new_file_key,
+        TantivyIndexOptions {
+            caller: "COMPACTOR",
+            org_id,
+            data_file_name: new_file_key,
+            storage_tier,
+        },
         fts_fields,
         index_fields,
         latest_schema, // Use stream schema to include all configured fields

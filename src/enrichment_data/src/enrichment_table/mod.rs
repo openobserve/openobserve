@@ -16,14 +16,10 @@
 use std::{collections::HashMap, io::Error, sync::Arc};
 
 use arrow_schema::Schema;
-use axum::{
-    extract::Multipart,
-    http::{self, StatusCode},
-    response::Response as HttpResponse,
-};
+use axum::{extract::Multipart, http::StatusCode, response::Response as HttpResponse};
 use bytes::Bytes;
 use chrono::Utc;
-use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
+use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -70,12 +66,10 @@ pub async fn save_enrichment_data(
     let stream_name = format_stream_name(table_name.to_string());
 
     if !LOCAL_NODE.is_ingester() {
-        let mut resp = MetaHttpResponse::internal_error("not an ingester");
-        resp.headers_mut().insert(
-            ERROR_HEADER,
-            http::HeaderValue::from_str("not an ingester").unwrap(),
-        );
-        return Ok(resp);
+        return Ok(MetaHttpResponse::error_with_header(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "not an ingester",
+        ));
     }
 
     // check if we are allowed to ingest
@@ -85,13 +79,10 @@ pub async fn save_enrichment_data(
         &stream_name,
         None,
     ) {
-        let error_msg = format!("enrichment table [{stream_name}] is being deleted");
-        let mut resp = MetaHttpResponse::bad_request(&error_msg);
-        resp.headers_mut().insert(
-            ERROR_HEADER,
-            http::HeaderValue::from_str(&error_msg).unwrap(),
-        );
-        return Ok(resp);
+        return Ok(MetaHttpResponse::error_with_header(
+            StatusCode::BAD_REQUEST,
+            format!("enrichment table [{stream_name}] is being deleted"),
+        ));
     }
 
     // Estimate the size of the payload in json format in bytes
@@ -189,13 +180,10 @@ pub async fn save_enrichment_data(
         .unwrap_or(Schema::empty());
     if !db_schema.fields().is_empty() && db_schema.fields().ne(inferred_schema.fields()) {
         log::error!("Schema mismatch for enrichment table {org_id}/{stream_name}");
-        let error_msg = format!("Schema mismatch for enrichment table {org_id}/{stream_name}");
-        let mut resp = MetaHttpResponse::internal_error(&error_msg);
-        resp.headers_mut().insert(
-            ERROR_HEADER,
-            http::HeaderValue::from_str(&error_msg).unwrap(),
-        );
-        return Ok(resp);
+        return Ok(MetaHttpResponse::error_with_header(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Schema mismatch for enrichment table {org_id}/{stream_name}"),
+        ));
     }
 
     // check for schema evolution
@@ -236,12 +224,11 @@ pub async fn save_enrichment_data(
                 .await
         {
             log::error!("Error writing enrichment table to database: {e}");
-            let error_msg = format!("Error writing enrichment table to database: {e}");
             let mut resp =
                 MetaHttpResponse::internal_error("Error writing enrichment table to database");
             resp.headers_mut().insert(
                 ERROR_HEADER,
-                http::HeaderValue::from_str(&error_msg).unwrap(),
+                error_header_value(&format!("Error writing enrichment table to database: {e}")),
             );
             return Ok(resp);
         }

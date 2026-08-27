@@ -25,9 +25,9 @@ use sea_orm::{
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
-use super::{entity::org_ai_toolsets::*, get_lock};
+use super::entity::org_ai_toolsets::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
     table::cipher,
 };
@@ -130,27 +130,22 @@ pub async fn add(mut entry: OrgToolset) -> Result<(), errors::Error> {
         updated_at: Set(entry.updated_at),
     };
 
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => {}
-        Err(e) => {
-            drop(_lock);
-            match e.sql_err() {
-                Some(SqlErr::UniqueConstraintViolation(_)) => {
-                    return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
-                }
-                _ => return Err(e.into()),
+        Err(e) => match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => {
+                return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
             }
-        }
+            _ => return Err(e.into()),
+        },
     }
-    drop(_lock);
     Ok(())
 }
 
 /// Fetch a toolset by its KSUID `id`. Returns the record with plaintext `data`.
 pub async fn get(org: &str, id: &str) -> Result<Option<OrgToolset>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let row = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(id))
@@ -170,7 +165,7 @@ pub async fn get(org: &str, id: &str) -> Result<Option<OrgToolset>, errors::Erro
 /// Fetch a toolset by its unique `(org, name)` pair. Returns the record with
 /// plaintext `data`.
 pub async fn get_by_name(org: &str, name: &str) -> Result<Option<OrgToolset>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let row = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(name))
@@ -200,7 +195,7 @@ pub async fn list(
     filter: ListFilter,
     limit: Option<i64>,
 ) -> Result<Vec<OrgToolset>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find()
         .filter(Column::Org.eq(org))
         .order_by(Column::CreatedAt, Order::Desc);
@@ -249,23 +244,19 @@ pub async fn update(entry: OrgToolset) -> Result<(), errors::Error> {
         updated_at: Set(entry.updated_at),
     };
 
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     record.update(client).await?;
-    drop(_lock);
     Ok(())
 }
 
 /// Delete a toolset by its KSUID `id`.
 pub async fn remove(org: &str, id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(id))
         .exec(client)
         .await?;
-    drop(_lock);
     Ok(())
 }
 

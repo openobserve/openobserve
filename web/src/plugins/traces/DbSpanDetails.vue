@@ -1,19 +1,60 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 const { t } = useI18nTyped();
+// This panel is mounted inside the trace sidebar and in isolation, so the store
+// and router are not guaranteed to be installed. Both are optional here: the
+// pivot is an enhancement, and a missing provider must hide it rather than
+// break the span details around it.
+const store = useStore();
+const route = useRoute();
+const router = useRouter();
 
 const performanceOpen = ref(false);
 
 const props = defineProps<{
   span: Record<string, any>;
+  /** Trace stream the span came from — the detail page needs it for raw reads. */
+  stream?: string;
 }>();
+
+/**
+ * The trace→query pivot. Offered only when the span carries a fingerprint AND
+ * the feature is on: without the fingerprint there is nothing to look up, and
+ * the detail route bounces to Traces when the flag is off, which would make
+ * this button look broken rather than absent.
+ */
+const dbmEnabled = computed(() => Boolean(store?.state?.zoConfig?.database_monitoring_enabled));
+
+const fingerprint = computed(() => String(props.span.o2_db_fingerprint ?? ""));
+
+const canViewTrend = computed(() => dbmEnabled.value && !!fingerprint.value && !!router);
+
+const openQueryTrend = () => {
+  if (!router) return;
+  router
+    .push({
+      name: "dbmQueryDetail",
+      query: {
+        org_identifier: route?.query?.org_identifier,
+        fingerprint: fingerprint.value,
+        stream: props.stream,
+        system: props.span.o2_db_system ?? props.span.db_system,
+        instance: props.span.o2_db_instance,
+        namespace: props.span.o2_db_namespace ?? props.span.db_namespace,
+      },
+    })
+    .catch(() => {});
+};
 
 const dbSystem = computed(() => props.span.db_system ?? "");
 
@@ -91,6 +132,18 @@ const metadataRows = computed(() =>
 
 <template>
   <div class="flex h-full flex-col gap-3 overflow-auto">
+    <div v-if="canViewTrend" class="flex justify-end">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        icon-left="trending-up"
+        data-test="traces-db-span-details-view-trend"
+        @click="openQueryTrend"
+      >
+        {{ t("traces.dbSpanDetails.viewQueryTrend") }}
+      </OButton>
+    </div>
+
     <OCard data-test="traces-db-span-details-metadata-grid">
       <OCardSection class="px-0! py-0!">
         <div class="flex flex-wrap gap-2">

@@ -19,9 +19,9 @@ use sea_orm::{
     QuerySelect, Schema, Set,
 };
 
-use super::{entity::system_prompts::Model, get_lock};
+use super::entity::system_prompts::Model;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
     table::entity::system_prompts::{ActiveModel, Column, Entity},
 };
@@ -38,7 +38,7 @@ impl TryFrom<Model> for AIPrompt {
     }
 }
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -58,10 +58,8 @@ pub async fn add(prompt: &AIPrompt) -> Result<(), errors::Error> {
         content: Set(prompt.content.clone()),
         updated_at: Set(prompt.updated_at),
     };
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record).exec(client).await?;
 
     Ok(())
@@ -74,19 +72,13 @@ pub async fn update(prompt: &AIPrompt) -> Result<(), errors::Error> {
         updated_at: Set(prompt.updated_at),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update(record).exec(client).await?;
 
     Ok(())
 }
 pub async fn remove(_org_id: &str, r#type: PromptType) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let _ = Entity::delete_many()
         .filter(Column::Type.eq(r#type.to_string()))
         .exec(client)
@@ -96,7 +88,7 @@ pub async fn remove(_org_id: &str, r#type: PromptType) -> Result<(), errors::Err
 }
 
 pub async fn get(r#type: PromptType) -> Result<Option<AIPrompt>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let record = Entity::find()
         .filter(Column::Type.eq(r#type.to_string()))
@@ -112,7 +104,7 @@ pub async fn get(r#type: PromptType) -> Result<Option<AIPrompt>, errors::Error> 
 ///
 /// If the user prompt is not found, it returns None
 pub async fn get_all() -> Result<(Option<AIPrompt>, Option<AIPrompt>), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         // This limit doesn't matter much, but still
         .limit(2)
@@ -135,7 +127,7 @@ pub async fn get_all() -> Result<(Option<AIPrompt>, Option<AIPrompt>), errors::E
 }
 
 pub async fn exists(r#type: PromptType) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Type.eq(r#type.to_string()))
         .one(client)
@@ -145,16 +137,13 @@ pub async fn exists(r#type: PromptType) -> Result<bool, errors::Error> {
 }
 
 pub async fn len() -> Result<usize, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await?;
     Ok(len as usize)
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())

@@ -286,6 +286,10 @@ function onRowMouseleave() {
       <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
         <slot name="cell-hover-actions" v-bind="caProps" />
       </template>
+      <!-- Inline actions beside the copy button — forwarded to every cell -->
+      <template v-if="slots['copy-actions']" #copy-actions="ccaProps">
+        <slot name="copy-actions" v-bind="ccaProps" />
+      </template>
     </OTableBodyCell>
   </tr>
 
