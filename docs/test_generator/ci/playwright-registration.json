@@ -1,6 +1,0 @@
-{
-  "group": "Workflows",
-  "spec_filename": "workflows-canvas.spec.js",
-  "create_group": true,
-  "browser": "chrome"
-}
