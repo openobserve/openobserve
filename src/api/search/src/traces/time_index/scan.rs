@@ -189,6 +189,11 @@ impl BatchScanner {
             if let Some(pending) = self.next_island_window() {
                 break pending;
             }
+            // Island completions may have just retired the last active key;
+            // don't emit a phantom main window for nobody.
+            if !self.has_active_keys() {
+                return None;
+            }
             if self.main_done {
                 return None;
             }
@@ -700,6 +705,31 @@ mod tests {
     fn probe_spans_merge_and_clamp() {
         let merged = merge_and_clamp(vec![(5, 10), (8, 20), (30, 40), (-5, 2)], 0, 35);
         assert_eq!(merged, vec![(0, 2), (5, 20), (30, 35)]);
+    }
+
+    #[test]
+    fn exact_hint_hit_costs_exactly_one_window() {
+        let hint = W * 20;
+        let mut scanner = BatchScanner::new(
+            TimeIndexKind::Trace,
+            2,
+            bounds(0, W * 40),
+            Some(hint),
+            &[None, None],
+        );
+        let data = [(0usize, range(hint, hint)), (1usize, range(hint, hint))];
+        let windows = drive(&mut scanner, &data);
+        assert_eq!(
+            windows.len(),
+            1,
+            "a full hint hit must not emit a phantom main window: {windows:?}"
+        );
+        let outcomes = scanner.finish();
+        assert!(
+            outcomes
+                .iter()
+                .all(|o| matches!(o, Some(ScanOutcome::Found { partial: false, .. })))
+        );
     }
 
     #[test]
