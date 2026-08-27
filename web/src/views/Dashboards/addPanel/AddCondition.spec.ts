@@ -320,6 +320,19 @@ describe("AddCondition.vue", () => {
       expect(result).toBe("required_field IS NOT NULL");
     });
 
+    it("should return the null-or-empty compound for Is Empty operator", () => {
+      wrapper = createWrapper({
+        condition: {
+          ...defaultProps.condition,
+          operator: "Is Empty",
+          column: { field: "optional_field", streamAlias: "" },
+        },
+      });
+
+      const result = wrapper.vm.computedLabel(wrapper.props().condition);
+      expect(result).toBe("(optional_field IS NULL OR optional_field = '')");
+    });
+
     it("should return str_match condition for Contains operator", () => {
       wrapper = createWrapper({
         condition: {
@@ -518,6 +531,8 @@ describe("AddCondition.vue", () => {
       "Not Contains",
       "Is Null",
       "Is Not Null",
+      "Is Empty",
+      "Is Not Empty",
     ];
 
     it("should contain all expected operators", () => {

@@ -102,7 +102,11 @@
                       />
                     </div>
                     <div
-                      v-if="!['Is Null', 'Is Not Null'].includes(condition.operator)"
+                      v-if="
+                        !['Is Null', 'Is Not Null', 'Is Empty', 'Is Not Empty'].includes(
+                          condition.operator,
+                        )
+                      "
                       class="flex flex-col gap-1"
                     >
                       <div class="text-2xs text-text-secondary font-semibold">
@@ -258,6 +262,8 @@ export default defineComponent({
       { label: t("dashboard.filterOperators.notContains"), value: "Not Contains" },
       { label: t("dashboard.filterOperators.isNull"), value: "Is Null" },
       { label: t("dashboard.filterOperators.isNotNull"), value: "Is Not Null" },
+      { label: t("dashboard.filterOperators.isEmpty"), value: "Is Empty" },
+      { label: t("dashboard.filterOperators.isNotEmpty"), value: "Is Not Empty" },
     ]);
 
     const filterOptions = [

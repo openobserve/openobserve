@@ -145,6 +145,10 @@ export const addLabelToSQlQuery = async (
     condition = `re_match(${label}, ${formatValue(value)})`;
   } else if (operator === "re_not_match") {
     condition = `re_not_match(${label}, ${formatValue(value)})`;
+  } else if (operator === "Is Empty") {
+    condition = `(${label} IS NULL OR ${label} = '')`;
+  } else if (operator === "Is Not Empty") {
+    condition = `(${label} IS NOT NULL AND ${label} != '')`;
   } else {
     switch (operator) {
       // case "Contains":

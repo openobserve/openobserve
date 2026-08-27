@@ -4694,7 +4694,9 @@
       "endsWith": "Ends With",
       "notContains": "Not Contains",
       "isNull": "Is Null",
-      "isNotNull": "Is Not Null"
+      "isNotNull": "Is Not Null",
+      "isEmpty": "Is Empty",
+      "isNotEmpty": "Is Not Empty"
     },
     "filterValueRequired": "Required",
     "labelRequired": "Label is required.",

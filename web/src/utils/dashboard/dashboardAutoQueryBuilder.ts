@@ -625,17 +625,22 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
       .join(", ")})`;
   } else if (condition.type === "condition" && condition.operator != null) {
     let selectFilter = "";
-    if (["Is Null", "Is Not Null"].includes(condition.operator)) {
+    if (["Is Null", "Is Not Null", "Is Empty", "Is Not Empty"].includes(condition.operator)) {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
-      selectFilter += `${fieldRef} `;
       switch (condition.operator) {
         case "Is Null":
-          selectFilter += `IS NULL`;
+          selectFilter += `${fieldRef} IS NULL`;
           break;
         case "Is Not Null":
-          selectFilter += `IS NOT NULL`;
+          selectFilter += `${fieldRef} IS NOT NULL`;
+          break;
+        case "Is Empty":
+          selectFilter += `(${fieldRef} IS NULL OR ${fieldRef} = '')`;
+          break;
+        case "Is Not Empty":
+          selectFilter += `(${fieldRef} IS NOT NULL AND ${fieldRef} != '')`;
           break;
       }
     } else if (condition.operator === "IN") {
