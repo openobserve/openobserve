@@ -332,6 +332,12 @@ async fn maybe_serve_password_page(
 // ── Password unlock (R-5, R-7) ───────────────────────────────────────────────
 
 const UNLOCK_COOKIE_TTL_SECS: i64 = 24 * 3600;
+/// A single fixed name, not `o2_sp_{slug}`: the cookie *value* already binds
+/// and HMAC-verifies the slug (see `issue_unlock_cookie`), so the name doesn't
+/// need to repeat it — and on a custom domain the real slug never otherwise
+/// appears anywhere the visitor can see, so echoing it into a cookie name
+/// (visible in devtools) would undo that.
+const UNLOCK_COOKIE_NAME: &str = "o2_sp_unlock";
 /// Per-IP+slug password attempts allowed per window before lockout.
 const AUTH_MAX_ATTEMPTS: u32 = 5;
 const AUTH_WINDOW: Duration = Duration::from_secs(60);
@@ -392,7 +398,7 @@ pub async fn auth(
                 .header(
                     header::SET_COOKIE,
                     format!(
-                        "o2_sp_{slug}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={UNLOCK_COOKIE_TTL_SECS}"
+                        "{UNLOCK_COOKIE_NAME}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={UNLOCK_COOKIE_TTL_SECS}"
                     ),
                 )
                 .header(header::CONTENT_TYPE, "application/json")
@@ -445,19 +451,17 @@ fn attempt_allowed(ip: &str, slug: &str) -> bool {
 
 /// Does the request carry a valid unlock cookie for this password page?
 async fn has_valid_unlock(headers: &axum::http::HeaderMap, slug: &str, pw_hash: &str) -> bool {
-    let cookie_name = format!("o2_sp_{slug}");
     let Some(cookies) = headers.get(header::COOKIE).and_then(|v| v.to_str().ok()) else {
         return false;
     };
-    let Some(val) = cookies.split(';').find_map(|c| {
-        let c = c.trim();
-        c.strip_prefix(&format!("{cookie_name}="))
-            .map(str::to_string)
-    }) else {
+    let Some(val) = cookies
+        .split(';')
+        .find_map(|c| c.trim().strip_prefix(&format!("{UNLOCK_COOKIE_NAME}=")))
+    else {
         return false;
     };
     let pwv = openobserve_core::status_pages::pw_version(pw_hash);
-    openobserve_core::status_pages::verify_unlock_cookie(&val, slug, &pwv).await
+    openobserve_core::status_pages::verify_unlock_cookie(val, slug, &pwv).await
 }
 
 fn unauthorized() -> Response {
