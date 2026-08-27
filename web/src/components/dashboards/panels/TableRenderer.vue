@@ -404,8 +404,7 @@ export default defineComponent({
 
     const copiedCellKey = ref<string | null>(null);
     let copiedTimer: ReturnType<typeof setTimeout> | null = null;
-    const cellKey = (column: any, row: any) =>
-      `${column?.id}#${sortedRows.value.indexOf(row)}`;
+    const cellKey = (column: any, row: any) => `${column?.id}#${sortedRows.value.indexOf(row)}`;
 
     const copyCellValue = async (value: any, column: any, row: any) => {
       const text = String(formatCellValue(value, column, row) ?? "");
