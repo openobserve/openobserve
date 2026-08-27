@@ -304,11 +304,10 @@ export class AlertsPage {
             // TODO: replace with context-specific dialog data-test attribute
             qDialogLocator: '[data-test$="-dialog"]',
 
-            // v3 list page tab locators
-            // Note: AppTabs.vue generates data-test="tab-{value}" (not alert-list-tab-*)
-            alertListTabAll: '[data-test="tab-all"]',
-            alertListTabScheduled: '[data-test="tab-scheduled"]',
-            alertListTabRealtime: '[data-test="tab-realTime"]',
+            // v3 list page tab locators — the OToggleGroup renders data-test="alert-list-tab-{value}"
+            alertListTabAll: '[data-test="alert-list-tab-all"]',
+            alertListTabScheduled: '[data-test="alert-list-tab-scheduled"]',
+            alertListTabRealtime: '[data-test="alert-list-tab-realTime"]',
             alertListFilterChip: '[data-test="alert-list-filter-chip"]',
 
             // v3 AddAlert wizard tabs (OToggleGroupItem with data-test="add-alert-tab-{key}")
@@ -1597,7 +1596,7 @@ export class AlertsPage {
         // Click Scheduled tab and count rows
 
         // Wait for tabs to be visible first (handle slow page loads)
-        const scheduledTab = this.page.locator('[data-test="tab-scheduled"]');
+        const scheduledTab = this.page.locator('[data-test="alert-list-tab-scheduled"]');
         try {
             await scheduledTab.waitFor({ state: 'visible', timeout: 15000 });
         } catch {
@@ -1617,7 +1616,7 @@ export class AlertsPage {
         const scheduledAlertsCount = String(await scheduledRows.count());
 
         // Click Real-time tab and count rows
-        await this.page.locator('[data-test="tab-realTime"]').click();
+        await this.page.locator('[data-test="alert-list-tab-realTime"]').click();
         await this.page.waitForTimeout(1000);
         const realTimeRows = this.page.locator('tbody tr[data-index]');
         const realTimeAlertsCount = String(await realTimeRows.count());
@@ -1783,11 +1782,11 @@ export class AlertsPage {
     }
 
     async verifyTabContents() {
-        await this.page.locator('[data-test="tab-scheduled"]').click();
+        await this.page.locator('[data-test="alert-list-tab-scheduled"]').click();
         await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
-        await this.page.locator('[data-test="tab-realTime"]').click();
+        await this.page.locator('[data-test="alert-list-tab-realTime"]').click();
         await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
-        await this.page.locator('[data-test="tab-all"]').click();
+        await this.page.locator('[data-test="alert-list-tab-all"]').click();
         await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
     }
 

@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   it would change the page's DOM wholesale, which is the opposite of what a
   dedup is for.
 
-  Two containers, one tile. `standalone` is the client block — a `rounded-surface`
-  card with a border all round. `attached` is the server block, which sits INSIDE a
+  Two containers, one tile. `standalone` is a `rounded-surface` card with a
+  border all round. `attached` is the server block, which sits INSIDE a
   `DbmSection` under its heading, so it carries only the rule that separates it
   from that heading.
 -->
@@ -46,14 +46,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the quiet weight — the tile says what it means and what it is. Only
            the grid that HAS sub-labels pays for the row that holds them. -->
       <div v-if="withSubLabels" class="flex items-baseline gap-1">
-        <span class="text-text-label text-3xs font-semibold tracking-wide uppercase">
+        <span class="text-text-secondary text-3xs font-semibold">
           {{ item.label }}
         </span>
-        <span v-if="item.sub" class="text-text-muted text-3xs" :data-test="`${tileDataTest}-sub`">
+        <span
+          v-if="item.sub"
+          class="text-text-secondary text-3xs"
+          :data-test="`${tileDataTest}-sub`"
+        >
           {{ item.sub }}
         </span>
       </div>
-      <div v-else class="text-text-label text-3xs font-semibold tracking-wide uppercase">
+      <div v-else class="text-text-secondary text-3xs font-semibold">
         {{ item.label }}
       </div>
       <div
@@ -62,7 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ item.value }}
       </div>
-      <div v-if="withSubLabels" class="text-text-secondary text-3xs">{{ item.detail }}</div>
+      <div v-if="withSubLabels" class="text-3xs" :class="item.detailTone ?? 'text-text-secondary'">
+        {{ item.detail }}
+      </div>
     </div>
   </div>
 </template>
@@ -70,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nText } from "@/types/i18n";
 
 /** One figure: what it is, what it reads, and what it is worth. */
@@ -83,6 +90,10 @@ export interface DbmMetricTile {
   detail?: I18nText;
   /** A colour class, applied only where the page's own threshold fired. */
   tone?: string;
+  /** Colour class for the caption, to tint a signed delta by direction (rise red, fall green); neutral when unset. */
+  detailTone?: string;
+  /** Corner icon (OIcon name) for the KPI-card rendering of this figure. */
+  icon?: IconName;
 }
 
 const props = withDefaults(

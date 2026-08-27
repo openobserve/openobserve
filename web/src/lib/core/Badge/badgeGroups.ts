@@ -1544,7 +1544,6 @@ export const BADGE_GROUPS = {
   // is an open vocabulary and a new engine must still render.
   dbSystem: {
     mode: "plain",
-    shape: "rounded",
     size: "xs",
     values: {
       postgresql: { variant: "blue-soft", label: raw("PostgreSQL") },

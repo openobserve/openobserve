@@ -18,9 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   DbmPageChrome — the header every DBM list tab wears.
 
   All seven list pages opened with the same twenty lines: an OPageLayout with the
-  database icon, tabs on a second row, a bleeding body, the shared tab strip in
-  `#header-tabs`, and the same six-prop DateTime in `#actions`. Only the title,
-  the subtitle and two data-tests differed, so those are the props.
+  database icon, tabs on a second row, a bleeding body and the shared tab strip
+  in `#header-tabs`. Title and subtitle are one constant "Databases" header for
+  the whole section — the tab strip already names the view. Only the title's
+  data-test differs per page, for the e2e selectors that key off it.
 
   Two things deliberately stay in the page. The tab strip's markup lives HERE
   rather than in `DbmShell` for the reason `dbmTabCounts.ts` documents — it
@@ -30,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OPageLayout
-    :title="title"
-    :subtitle="subtitle"
+    :title="t('dbm.header.title')"
+    :subtitle="t('dbm.header.subtitle')"
     icon="database"
     :title-data-test="titleDataTest"
     tabs-below
@@ -43,42 +44,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DbmSectionTabs v-bind="tabCounts" />
     </template>
 
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        :data-test-name="dateTimeDataTest"
-        class="h-8"
-        @on:date-change="emit('dateChange', $event)"
-      />
-      <slot name="actions-extra" />
-    </template>
-
     <slot />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import DateTime from "@/components/DateTime.vue";
 import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
-import type { DbmDateChange, DbmRange } from "@/composables/dbm/useDbmScope";
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import type { I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 defineProps<{
-  title: I18nText;
-  subtitle: I18nText;
+  /** Per-tab data-test on the shared title, for the e2e selectors that key off it. */
   titleDataTest: string;
-  dateTimeDataTest: string;
   /** What the tab strip paints — the shell's fan-out with this page's own count substituted. */
   tabCounts: DbmTabCountProps;
-  /** The window the picker opens on. */
-  range: DbmRange;
 }>();
 
-const emit = defineEmits<{ dateChange: [value: DbmDateChange] }>();
+const { t } = useI18nTyped();
 </script>

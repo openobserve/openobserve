@@ -14923,6 +14923,7 @@
       "disabled": "Đã tắt",
       "emptyTitle": "Chưa có cảnh báo nào trên SLO này",
       "emptyHint": "Cảnh báo tỷ lệ đốt sẽ nhắn tin cho bạn khi vẫn còn ngân sách để bảo vệ.",
+      "emptyActionDesc": "Nhận cảnh báo trước khi ngân sách hết",
       "loadFailed": "Không thể tải cảnh báo của SLO này.",
       "editTargetMissing": "Cảnh báo đó không còn trên SLO này.",
       "describeBurn": "Tỷ lệ đốt > {critical} trong {long} và {short}",
@@ -15215,7 +15216,12 @@
     "common": {
       "reload": "Làm mới",
       "lastRefreshed": "Làm mới lần cuối {age}",
-      "loadFailed": "Không thể tải dữ liệu cơ sở dữ liệu. Hãy thử lại hoặc thu hẹp phạm vi thời gian."
+      "loadFailed": "Không thể tải dữ liệu cơ sở dữ liệu. Hãy thử lại hoặc thu hẹp phạm vi thời gian.",
+      "actions": "Hành động"
+    },
+    "header": {
+      "title": "Cơ sở dữ liệu",
+      "subtitle": "Hiệu suất và tình trạng truy vấn trên các cơ sở dữ liệu của bạn"
     },
     "ai": {
       "suggestFix": "Hỏi AI cách khắc phục điều này",
@@ -15237,12 +15243,12 @@
       "removeScope": "Xóa bộ lọc này",
       "popoverTitle": "Thu hẹp phạm vi này",
       "dimension": {
-        "system": "engine",
-        "instance": "cơ sở dữ liệu",
-        "namespace": "lược đồ",
-        "env": "môi trường",
-        "service": "dịch vụ",
-        "insight": "thông tin chi tiết"
+        "system": "Công cụ",
+        "instance": "Cơ sở dữ liệu",
+        "namespace": "Lược đồ",
+        "env": "Môi trường",
+        "service": "Dịch vụ",
+        "insight": "Thông tin chuyên sâu"
       }
     },
     "delta": {
@@ -15257,8 +15263,6 @@
       "wasValue": "đã là {value}"
     },
     "databases": {
-      "title": "Cơ sở dữ liệu",
-      "subtitle": "Hiệu suất và tình trạng truy vấn theo từng cơ sở dữ liệu",
       "searchPlaceholder": "Tìm kiếm cơ sở dữ liệu hoặc dịch vụ…",
       "unnamedInstance": "Phiên bản chưa đặt tên",
       "unnamedInstanceHint": "Báo cáo câu lệnh của cơ sở dữ liệu chứng minh công cụ này đang chạy, nhưng chúng không đặt tên máy chủ. Hàng sẽ hiển thị địa chỉ khi một nguồn cấp dữ liệu mang địa chỉ đó — lấy mẫu phiên hoặc số liệu phiên bản — được thiết lập.",
@@ -15305,9 +15309,6 @@
       }
     },
     "queries": {
-      "title": "Truy vấn hàng đầu",
-      "subtitle": "Các truy vấn sử dụng nhiều thời gian cơ sở dữ liệu nhất",
-      "subtitleServer": "Các câu lệnh mà cơ sở dữ liệu của bạn đã chạy, được đếm bên trong cơ sở dữ liệu — thường chạy nhiều nhất trước tiên",
       "searchPlaceholder": "Tìm kiếm văn bản truy vấn, bảng hoặc dịch vụ…",
       "trendLabel": "Thời gian của truy vấn này đã thay đổi như thế nào trong phạm vi",
       "otherRow": "Tất cả truy vấn khác",
@@ -15316,7 +15317,8 @@
         "query": "Truy vấn",
         "queryHint": "Chỉ SQL thực sự — SELECT, INSERT, UPDATE và DELETE.",
         "all": "Truy vấn + chi phí kết nối",
-        "allHint": "Cũng tính các hoạt động ghi sổ mà trình điều khiển của bạn gửi giữa các truy vấn: BEGIN và COMMIT, SET, và các kiểm tra giữ cho kết nối nhóm luôn hoạt động."
+        "allHint": "Cũng tính các hoạt động ghi sổ mà trình điều khiển của bạn gửi giữa các truy vấn: BEGIN và COMMIT, SET, và các kiểm tra giữ cho kết nối nhóm luôn hoạt động.",
+        "overheadLabel": "Bao gồm chi phí kết nối"
       },
       "completionBias": {
         "title": "Lời gọi giảm {drop}% trong khi số lần thất bại tăng",
@@ -15562,10 +15564,10 @@
       "noStream": "Chúng tôi không thể xác định luồng trace nào chứa truy vấn này, vì vậy không thể tải caller và ví dụ của nó.",
       "ambiguousStream": "Tổ chức này có nhiều hơn một luồng trace, và chúng tôi không thể biết truy vấn này chạy trên luồng nào. Hãy chọn một luồng để tải caller và trace mẫu.",
       "pickStream": "Chọn một luồng trace",
-      "invalidStream": "Tên luồng trace đó không được chúng tôi nhận diện, nên chúng tôi đã không chạy tìm kiếm.",
-      "firstSeen": "LẦN ĐẦU XUẤT HIỆN TRONG DANH SÁCH NÀY LÚC {time}",
+      "invalidStream": "Tên luồng trace đó không phải là tên chúng tôi nhận ra, vì vậy chúng tôi đã không chạy tìm kiếm.",
+      "firstSeen": "Xuất hiện lần đầu trong danh sách này lúc {time}",
       "firstSeenHint": "Điểm sớm nhất trong khoảng thời gian này mà truy vấn này đủ nặng để theo dõi riêng.",
-      "lastSeen": "LẦN CUỐI XUẤT HIỆN LÚC {time}",
+      "lastSeen": "Xuất hiện lần cuối lúc {time}",
       "lastSeenHint": "Điểm gần đây nhất trong khoảng thời gian này mà truy vấn này đủ nặng để theo dõi riêng. Nó có thể vẫn đang chạy — đây là lần cuối cùng nó lọt vào danh sách.",
       "errorsByCode": {
         "title": "Lỗi theo mã lý do",
@@ -15732,9 +15734,6 @@
       }
     },
     "samples": {
-      "title": "Cuộc gọi chậm nhất",
-      "subtitle": "Các cuộc gọi cơ sở dữ liệu chậm nhất trong cửa sổ này, trên mọi cơ sở dữ liệu và truy vấn — theo cách người gọi đo lường, chỉ các cuộc gọi đã hoàn thành",
-      "subtitleServer": "Các câu lệnh chậm nhất mà cơ sở dữ liệu của bạn hoàn thành trong cửa sổ này, được đo bên trong cơ sở dữ liệu",
       "logOffTitle": "Cơ sở dữ liệu của bạn chưa ghi nhật ký các câu lệnh chậm",
       "logOffDescription": "Không có gì theo dõi các cuộc gọi này, vì vậy chúng tôi đã hỏi cơ sở dữ liệu về các câu lệnh chậm nhất của chúng — và chúng không ghi nhật ký nào. Danh sách này đến từ nhật ký câu lệnh của PostgreSQL (log_min_duration_statement), mặc định bị tắt — bước ghi nhật ký trong thẻ thiết lập sẽ bật nó. Việc thu thập theo từng câu lệnh hiện chỉ dành cho PostgreSQL, vì vậy MySQL và MariaDB chưa thể cung cấp cho danh sách này. Các truy vấn hàng đầu vẫn có thể cho bạn thấy điều gì chạy nhiều nhất, vì nó đọc bảng đếm thay thế.",
       "searchPlaceholder": "Tìm kiếm văn bản truy vấn, dịch vụ hoặc cơ sở dữ liệu…",
@@ -15776,16 +15775,14 @@
       }
     },
     "rowChips": {
-      "new": "MỚI TRONG DANH SÁCH NÀY",
-      "slower": "{ratio}× CHẬM HƠN THƯỜNG LỆ",
-      "loop": "CHẠY {multiplier}× MỖI YÊU CẦU",
-      "allFailed": "TẤT CẢ {count} THẤT BẠI",
-      "busier": "BẬN HƠN, KHÔNG CHẬM HƠN",
-      "climbed": "TRUY VẤN NẶNG NHẤT MỚI"
+      "new": "Mới xuất hiện trong danh sách này",
+      "slower": "Chậm hơn thông thường {ratio}×",
+      "loop": "Chạy {multiplier}× mỗi yêu cầu",
+      "allFailed": "Tất cả {count} đều thất bại",
+      "busier": "Bận rộn hơn, không chậm hơn",
+      "climbed": "Truy vấn nặng nhất mới"
     },
     "deadlocks": {
-      "title": "Cơ sở dữ liệu",
-      "subtitle": "Các giao dịch chặn lẫn nhau và đã bị hoàn tác",
       "deadlockCount": "không có deadlock | {count} deadlock | {count} deadlock",
       "pairCount": "không có cặp truy vấn | {count} cặp truy vấn | {count} cặp truy vấn",
       "searchPlaceholder": "Tìm kiếm văn bản truy vấn, bảng hoặc ứng dụng…",
@@ -15812,10 +15809,10 @@
         "mysqlPartial": "Cơ sở dữ liệu MySQL của bạn chỉ giữ deadlock gần nhất trừ khi bật innodb_print_all_deadlocks."
       },
       "chips": {
-        "oppositeOrder": "THỨ TỰ HÀNG NGƯỢC LẠI",
-        "cadence": "MỖI {seconds}s",
-        "noQueries": "CÁC TRUY VẤN KHÔNG ĐƯỢC GHI LẠI",
-        "partial": "CHỈ MỘT PHÍA"
+        "oppositeOrder": "Thứ tự hàng đảo ngược",
+        "cadence": "Mỗi {seconds}s",
+        "noQueries": "Các truy vấn không được thu thập",
+        "partial": "Chỉ một phía"
       },
       "rowActions": {
         "topQueries": "Tìm các truy vấn này trong Top queries",
@@ -15832,8 +15829,8 @@
         "pid": "pid {pid}",
         "thread": "thread {pid}",
         "transaction": "giao dịch {id}",
-        "eachWaits": "mỗi bên chờ đợi bên kia",
-        "deadlock": "deadlock",
+        "eachWaits": "Mỗi bên chờ đợi bên kia",
+        "deadlock": "Bế tắc",
         "noQueryCaptured": "Nhật ký đã ghi lại deadlock này nhưng không ghi lại câu lệnh.",
         "waitingFor": "Đang chờ {target} hoàn thành.",
         "waitingForRow": "Đang chờ {target} hoàn thành — phiên khác đã thay đổi hàng mà nó muốn.",
@@ -15935,9 +15932,6 @@
       }
     },
     "blocked": {
-      "title": "Cơ sở dữ liệu",
-      "subtitle": "Phiên hiện đang chờ khóa",
-      "subtitlePast": "Các phiên đã chờ khóa trong khoảng thời gian này",
       "waitingCount": "không có phiên nào đang chờ khóa | {count} phiên đang chờ khóa ngay bây giờ | {count} phiên đang chờ khóa ngay bây giờ",
       "waitingCountPast": "không có phiên nào đã chờ khóa | {count} phiên đã chờ khóa trong khoảng thời gian này | {count} phiên đã chờ khóa trong khoảng thời gian này",
       "sessionCount": "không có phiên | {count} phiên | {count} phiên",
@@ -15983,14 +15977,14 @@
       },
       "deep": "sâu {count}",
       "notWaiting": "không chờ",
-      "longestWait": "THỜI GIAN CHỜ LÂU NHẤT",
-      "holdsTheLock": "GIỮ KHÓA MÀ MỌI NGƯỜI ĐỀU MUỐN",
+      "longestWait": "Thời gian chờ lâu nhất",
+      "holdsTheLock": "Giữ khóa mà mọi người đều muốn",
       "lastStatement": "câu lệnh cuối {age} trước",
       "idleInTransaction": "không chờ gì · rảnh trong một giao dịch mở",
       "pills": {
-        "root": "GỐC — BẮT ĐẦU TỪ ĐÂY",
-        "waitingBlocking": "ĐANG CHỜ & CHẶN {count}",
-        "waiting": "ĐANG CHỜ"
+        "root": "Gốc — bắt đầu từ đây",
+        "waitingBlocking": "Đang chờ & chặn {count}",
+        "waiting": "Đang chờ"
       },
       "waitingOn": "đang chờ {pid}",
       "degraded": "Một phiên đang chặn {count}. Nó đã có một giao dịch mở trong {age} và không chạy truy vấn nào trong thời gian đó — rất có thể là một ứng dụng quên cam kết.",
@@ -16068,9 +16062,6 @@
       }
     },
     "activity": {
-      "title": "Hoạt động",
-      "subtitle": "Những gì cơ sở dữ liệu của bạn đang làm ngay bây giờ, được lấy mẫu từ bảng phiên của chính chúng.",
-      "subtitlePast": "Những gì cơ sở dữ liệu của bạn đã làm trong khoảng thời gian này, được lấy mẫu từ bảng phiên của chính chúng.",
       "searchPlaceholder": "Tìm kiếm phiên, người dùng, ứng dụng",
       "wait": {
         "onCpu": "Trên CPU / không chờ",
@@ -16194,8 +16185,6 @@
       "deadlockLabel": "deadlock"
     },
     "tableHealth": {
-      "title": "Tình trạng bảng",
-      "subtitle": "Kích thước, độ phình và trạng thái vacuum cho từng bảng, ảnh chụp mới nhất trước tiên.",
       "searchPlaceholder": "Tìm kiếm bảng",
       "never": "Không bao giờ",
       "countersCumulative": "Số lần quét và vacuum là tổng tích lũy kể từ lần đặt lại số liệu thống kê gần nhất, không phải số đếm trong khoảng thời gian đã chọn.",

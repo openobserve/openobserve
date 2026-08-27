@@ -41,15 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   "everything is slow" — which demand different responses — look different.
 -->
 <template>
-  <DbmPageChrome
-    :title="t('dbm.samples.title')"
-    :subtitle="t(serverListShown ? 'dbm.samples.subtitleServer' : 'dbm.samples.subtitle')"
-    title-data-test="dbm-samples-title"
-    date-time-data-test="dbm-samples-date-time"
-    :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
-  >
+  <DbmPageChrome title-data-test="dbm-samples-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Scope lives ABOVE both tables, not inside either one's toolbar. It
            used to sit in the client table's `#toolbar`, so it unmounted with
@@ -62,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 items-center gap-2 pb-1.5">
+      <div class="px-page-edge flex shrink-0 items-center gap-2 py-1.5">
         <div class="w-64 shrink-0">
           <OSearchInput
             :model-value="search"
@@ -75,8 +67,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
         <DbmRefreshButton
+          mode="status"
           :loading="loading"
           :last-run-at="lastRunAt"
+          data-test="dbm-samples-refresh"
+        />
+        <DateTime
+          auto-apply
+          menu-align="end"
+          :default-type="range.type"
+          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+          :default-relative-time="range.relativeTimePeriod ?? undefined"
+          data-test-name="dbm-samples-date-time"
+          class="h-8"
+          @on:date-change="onDateChange"
+        />
+        <DbmRefreshButton
+          mode="button"
+          :loading="loading"
           data-test="dbm-samples-refresh"
           @refresh="onRefresh"
         />
@@ -89,11 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            why the usual list is empty. -->
       <OTable
         v-if="!serverListShown"
+        :enable-column-resize="true"
         :data="rows"
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
+        :toolbar-bordered="false"
         :error="error"
         sorting="client"
         :show-global-filter="false"
@@ -191,8 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dbm.samples.partial") }}
             </span>
             <div class="flex-1"></div>
-            <span class="text-text-label flex shrink-0 items-center gap-1">
-              <OIcon name="info-outline" class="size-3 shrink-0" />
+            <span class="text-text-secondary flex shrink-0 items-center gap-1">
+              <OIcon name="info-outline" class="shrink-0" size="sm" />
               {{ t("dbm.samples.disclosureShort") }}
               <OTooltip side="top" :content="t('dbm.samples.disclosureDetail')" />
             </span>
@@ -249,15 +259,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h2 class="text-text-heading text-sm font-semibold">
             {{ t("dbm.samples.serverList.title") }}
           </h2>
-          <p class="text-text-label text-xs">
+          <p class="text-text-secondary text-xs">
             {{ t("dbm.samples.serverList.subtitle") }}
           </p>
         </div>
         <OTable
+          :enable-column-resize="true"
           :data="filteredServerRows"
           :columns="serverColumns"
           row-key="rowKey"
           :frame="false"
+          :toolbar-bordered="false"
           sorting="client"
           :show-global-filter="false"
           table-id="dbm-server-samples"
@@ -295,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body block truncate text-xs">{{ raw(row.db_user || "—") }}</span>
           </template>
           <template #bottom>
-            <div v-if="serverTruncated" class="text-text-label px-page-edge py-1.5 text-xs">
+            <div v-if="serverTruncated" class="text-text-secondary px-page-edge py-1.5 text-xs">
               {{ t("dbm.samples.serverList.truncated", { count: serverRows.length }) }}
             </div>
           </template>
@@ -318,6 +330,7 @@ import { useStore } from "vuex";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
@@ -562,7 +575,13 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
     size: 120,
     sortable: true,
   },
-  { id: "actions", header: raw(""), size: 60, isAction: true },
+  {
+    id: "actions",
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 84,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+  },
 ]);
 
 // ─── The database-reported fallback list ─────────────────────────────────────
@@ -693,7 +712,7 @@ const scatterSamples = computed(() =>
 );
 
 const samplesOption = computed(() =>
-  buildSamplesOption(scatterSamples.value, chartTheme.value, formatNs, formatWhen, {
+  buildSamplesOption(scatterSamples.value, chartTheme.value, formatNs, {
     ok: t("dbm.samples.scatterOk"),
     error: t("dbm.samples.failed"),
   }),
@@ -705,8 +724,9 @@ const scatterData = computed(() => ({ options: samplesOption.value }));
 const onScatterClick = (params: unknown) => {
   const value = (params as { value?: [number, number] })?.value;
   if (!value) return;
+  // Scatter plots epoch-ms but rows carry micros, so match ms back to micros; duration disambiguates.
   const sample = rows.value.find(
-    (row) => row.timestamp === value[0] && row.durationNs === value[1],
+    (row) => Math.floor(row.timestamp / 1000) === value[0] && row.durationNs === value[1],
   );
   if (sample) openSampleTrace(sample);
 };
