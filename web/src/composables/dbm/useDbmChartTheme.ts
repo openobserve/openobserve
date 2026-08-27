@@ -45,7 +45,11 @@ export const useDbmChartTheme = (): ComputedRef<DbmChartTheme> => {
       calls: chartColor("--color-chart-series-1"),
       errors: chartColor("--color-severity-error-color"),
       axisLabel: chartColor("--color-text-secondary"),
-      splitLine: chartColor("--color-border-default"),
+      splitLine: chartColor("--color-chart-gridline"),
+      tooltipBg: chartColor("--color-tooltip-bg"),
+      tooltipBorder: chartColor("--color-tooltip-border"),
+      tooltipText: chartColor("--color-tooltip-text"),
+      crosshairBg: chartColor("--color-chart-crosshair-bg"),
     };
   });
 };

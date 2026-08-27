@@ -22,37 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.header')"
       title-data-test="alert-destinations-list-title"
       icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
-      <!-- Section-level title, identical on all four alerting pages, so the
-           peer tabs anchor at the same x — see AlertList.vue for the rationale.
-           Subtitle-free for the same reason. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
 
       <template #actions>
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="
-            (v) => {
-              activeTab = v as 'all' | 'prebuilt' | 'custom';
-            }
-          "
-          data-test="destination-list-tabs"
-        >
-          <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
-            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-            {{ t("alert_destinations.filterAll") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
-            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-            {{ t("alert_destinations.filterPrebuilt") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
-            <template #icon-left><OIcon name="settings" size="sm" /></template>
-            {{ t("alert_destinations.filterCustom") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
         <OButton
           variant="outline"
           size="sm"
@@ -64,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-destination-list-add-alert-btn"
           variant="primary"
           size="sm"
+          icon-left="add"
           :disabled="!templates.length"
           @click="editDestination(null)"
           >{{ t(`alert_destinations.add`) }}</OButton
@@ -92,12 +70,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <OSearchInput
-              v-model="filterQuery"
-              data-test="destination-list-search-input"
-              class="flex-1"
-              :placeholder="t('alert_destinations.search')"
-            />
+            <div class="flex w-full items-center gap-2">
+              <OToggleGroup
+                :model-value="activeTab"
+                @update:model-value="
+                  (v) => {
+                    activeTab = v as 'all' | 'prebuilt' | 'custom';
+                  }
+                "
+                data-test="destination-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("alert_destinations.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+                  <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                  {{ t("alert_destinations.filterPrebuilt") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+                  <template #icon-left><OIcon name="settings" size="sm" /></template>
+                  {{ t("alert_destinations.filterCustom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <OSearchInput
+                v-model="filterQuery"
+                data-test="destination-list-search-input"
+                class="flex-1"
+                :placeholder="t('alert_destinations.search')"
+              />
+            </div>
           </template>
           <template #toolbar-trailing>
             <OButton

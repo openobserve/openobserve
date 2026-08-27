@@ -14923,6 +14923,7 @@
       "disabled": "已禁用",
       "emptyTitle": "此 SLO 上还没有告警",
       "emptyHint": "燃烧速率告警会在仍有剩余预算时提醒您。",
+      "emptyActionDesc": "在预算用完前收到提醒",
       "loadFailed": "无法加载此 SLO 的告警。",
       "editTargetMissing": "该告警已不在此 SLO 上。",
       "describeBurn": "燃烧速率 > {critical} 在 {long} 和 {short} 期间",
@@ -15215,7 +15216,12 @@
     "common": {
       "reload": "刷新",
       "lastRefreshed": "上次刷新于 {age}",
-      "loadFailed": "无法加载数据库数据。请重试，或缩小时间范围。"
+      "loadFailed": "无法加载数据库数据。请重试，或缩小时间范围。",
+      "actions": "操作"
+    },
+    "header": {
+      "title": "数据库",
+      "subtitle": "数据库的查询性能与运行状况"
     },
     "ai": {
       "suggestFix": "向 AI 询问如何修复",
@@ -15257,8 +15263,6 @@
       "wasValue": "原为 {value}"
     },
     "databases": {
-      "title": "数据库",
-      "subtitle": "每个数据库的查询性能和健康状况",
       "searchPlaceholder": "搜索数据库或服务…",
       "unnamedInstance": "实例未命名",
       "unnamedInstanceHint": "数据库自身的语句报告证明该引擎正在运行，但未指明主机。一旦设置了包含主机信息的源——如会话采样或实例指标——该行将显示地址。",
@@ -15305,9 +15309,6 @@
       }
     },
     "queries": {
-      "title": "热门查询",
-      "subtitle": "使用数据库时间最多的查询",
-      "subtitleServer": "您的数据库执行的语句，在数据库内部统计——按运行频率最高的排前面",
       "searchPlaceholder": "搜索查询文本、表或服务…",
       "trendLabel": "此查询耗时在此范围内的变化",
       "otherRow": "所有其他查询",
@@ -15316,7 +15317,8 @@
         "query": "查询",
         "queryHint": "仅限真实 SQL——SELECT、INSERT、UPDATE 和 DELETE。",
         "all": "查询 + 连接开销",
-        "allHint": "同时计入驱动程序在查询之间发送的簿记信息：BEGIN 和 COMMIT、SET，以及保持连接池存活的检查。"
+        "allHint": "同时计入驱动程序在查询之间发送的簿记信息：BEGIN 和 COMMIT、SET，以及保持连接池存活的检查。",
+        "overheadLabel": "包含连接开销"
       },
       "completionBias": {
         "title": "调用量下降 {drop}%，而失败率上升",
@@ -15559,11 +15561,11 @@
       "noSamples": "此范围未加载单个执行记录。",
       "noSeries": "在您选择的时间范围内没有此查询的历史记录。",
       "liveSeries": "最近的点仍在统计中，可能会发生变化。",
-      "noStream": "我们无法确定哪个追踪数据流承载了这条查询，因此无法加载其调用方和示例。",
-      "ambiguousStream": "此组织有多个追踪数据流，我们无法确定此查询运行在哪个数据流上。请选择一个数据流以加载其调用方和示例追踪。",
-      "pickStream": "选择追踪数据流",
-      "invalidStream": "我们无法识别该追踪数据流名称，因此未执行搜索。",
-      "firstSeen": "首次出现在此列表中于 {time}",
+      "noStream": "我们无法确定哪个跟踪流承载此查询，因此无法加载其调用方和示例。",
+      "ambiguousStream": "此组织有多个跟踪流，我们无法确定此查询运行在哪个上。选择一个流以加载其调用方和示例跟踪。",
+      "pickStream": "选择跟踪流",
+      "invalidStream": "该跟踪流名称无法识别，因此我们未运行搜索。",
+      "firstSeen": "在 {time} 首次出现在此列表中",
       "firstSeenHint": "此范围内此查询负载足够高以至于需要单独跟踪的最早点。",
       "lastSeen": "最后出现于 {time}",
       "lastSeenHint": "此范围内此查询负载足够高以至于需要单独跟踪的最近点。它可能仍在运行——这是它最后一次出现在列表中。",
@@ -15732,9 +15734,6 @@
       }
     },
     "samples": {
-      "title": "最慢的调用",
-      "subtitle": "该时间窗口内最慢的各个数据库调用，跨所有数据库和查询——由调用方测量，仅统计已完成的调用",
-      "subtitleServer": "您的数据库在此时间窗口内完成的最慢的语句，在数据库内部测量",
       "logOffTitle": "您的数据库尚未记录慢语句",
       "logOffDescription": "目前没有追踪到这些调用，因此我们向数据库询问其自身最慢的语句——但它们没有记录任何内容。此列表来自 PostgreSQL 的语句日志（log_min_duration_statement），该日志默认关闭——设置卡中的日志记录步骤会将其打开。目前仅 PostgreSQL 支持按语句捕获，因此 MySQL 和 MariaDB 还无法提供此列表。热门查询仍然可以显示哪些内容运行最多，因为它改为读取计数器表。",
       "searchPlaceholder": "搜索查询文本、服务或数据库…",
@@ -15776,16 +15775,14 @@
       }
     },
     "rowChips": {
-      "new": "此列表中的新条目",
+      "new": "新加入此列表",
       "slower": "比平时慢 {ratio}×",
-      "loop": "每个请求运行 {multiplier}× 次",
-      "allFailed": "所有 {count} 次均失败",
-      "busier": "更繁忙，而非更慢",
-      "climbed": "新的最高负载查询"
+      "loop": "每次请求运行 {multiplier}×",
+      "allFailed": "全部 {count} 个失败",
+      "busier": "更繁忙，并非更慢",
+      "climbed": "新的最重查询"
     },
     "deadlocks": {
-      "title": "数据库",
-      "subtitle": "相互阻塞并被回滚的事务",
       "deadlockCount": "无死锁 | {count} 次死锁 | {count} 次死锁",
       "pairCount": "无查询对 | {count} 个查询对 | {count} 个查询对",
       "searchPlaceholder": "搜索查询文本、表或应用程序…",
@@ -15812,7 +15809,7 @@
         "mysqlPartial": "除非启用了 innodb_print_all_deadlocks，否则您的 MySQL 数据库仅保留最近的死锁。"
       },
       "chips": {
-        "oppositeOrder": "相反的行顺序",
+        "oppositeOrder": "相反行序",
         "cadence": "每 {seconds} 秒",
         "noQueries": "未捕获的查询",
         "partial": "仅单侧"
@@ -15935,9 +15932,6 @@
       }
     },
     "blocked": {
-      "title": "数据库",
-      "subtitle": "当前正在等待锁的会话",
-      "subtitlePast": "在此窗口期内等待过锁的会话",
       "waitingCount": "没有会话在等待锁 | {count} 个会话当前正在等待锁 | {count} 个会话当前正在等待锁",
       "waitingCountPast": "没有会话等待过锁 | {count} 个会话在此窗口期内等待过锁 | {count} 个会话在此窗口期内等待过锁",
       "sessionCount": "没有会话 | {count} 个会话 | {count} 个会话",
@@ -15988,9 +15982,9 @@
       "lastStatement": "最后一条语句在 {age} 前",
       "idleInTransaction": "未等待任何内容 · 在打开的事务中空闲",
       "pills": {
-        "root": "根 — 从此处开始",
-        "waitingBlocking": "等待并阻塞 {count}",
-        "waiting": "等待中"
+        "root": "根因 — 从这里开始",
+        "waitingBlocking": "等待与阻塞 {count}",
+        "waiting": "等待"
       },
       "waitingOn": "等待 {pid}",
       "degraded": "一个会话阻塞了 {count}。它的事务保持打开状态已有 {age}，且在此期间未运行任何查询——很可能是应用程序忘记提交。",
@@ -16068,9 +16062,6 @@
       }
     },
     "activity": {
-      "title": "活动",
-      "subtitle": "你的数据库当前正在做什么，从它们自己的会话表中采样。",
-      "subtitlePast": "你的数据库在此时间窗口内正在做什么，从它们自己的会话表中采样。",
       "searchPlaceholder": "搜索会话、用户、应用程序",
       "wait": {
         "onCpu": "在 CPU 上 / 无等待",
@@ -16194,8 +16185,6 @@
       "deadlockLabel": "死锁"
     },
     "tableHealth": {
-      "title": "表健康",
-      "subtitle": "每个表的大小、膨胀和 vacuum 状态，最新快照优先。",
       "searchPlaceholder": "搜索表",
       "never": "从未",
       "countersCumulative": "扫描和 vacuum 计数是自上次统计重置以来的累计总数，而不是所选时间范围内的计数。",

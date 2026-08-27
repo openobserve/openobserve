@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="storage"
     title-data-test="dbm-detail-title"
     scroll
+    bleed
   >
     <!-- With no query to scope, refresh, copy and the window picker all act on
          nothing — copy in particular composes its summary from a row that is
@@ -112,20 +113,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Identity: the statement, then the dimensions that locate it. -->
-      <section v-if="hasQuery" class="flex flex-col gap-2" data-test="dbm-detail-identity">
+      <section
+        v-if="hasQuery"
+        class="px-page-edge flex flex-col gap-2"
+        data-test="dbm-detail-identity"
+      >
         <div class="flex flex-wrap items-center gap-1.5">
-          <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" />
-          <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="xs" />
-          <span v-if="firstSeenLabel" class="text-text-secondary text-xs">
-            {{ firstSeenLabel }}
+          <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" size="md" />
+          <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="md" />
+          <span v-if="firstSeenTime" class="text-text-secondary text-xs">
+            <i18n-t keypath="dbm.detail.firstSeen" tag="span">
+              <template #time>
+                <span class="text-text-heading font-semibold tabular-nums">{{
+                  firstSeenTime
+                }}</span>
+              </template>
+            </i18n-t>
             <OTooltip side="bottom" :content="t('dbm.detail.firstSeenHint')" />
           </span>
           <span
-            v-if="lastSeenLabel"
+            v-if="lastSeenTime"
             class="text-text-secondary text-xs"
             data-test="dbm-detail-last-seen"
           >
-            {{ lastSeenLabel }}
+            <i18n-t keypath="dbm.detail.lastSeen" tag="span">
+              <template #time>
+                <span class="text-text-heading font-semibold tabular-nums">{{ lastSeenTime }}</span>
+              </template>
+            </i18n-t>
             <OTooltip side="bottom" :content="t('dbm.detail.lastSeenHint')" />
           </span>
           <div class="flex-1"></div>
@@ -154,15 +169,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            is, why it is slow, who ran it. Same primitives as the L2 strip in
            DbmSectionTabs, one level down — OTabs/OTab with a hint tooltip, and
            the Callers tab locked with the same lock+tooltip treatment when the
-           vantage that fills it reported nothing.
-
-           No horizontal padding: a tab strip's first label self-aligns to the
-           page-edge grid, so the labels line up with the statement above. -->
+           vantage that fills it reported nothing. -->
       <OTabs
         v-if="hasQuery"
         :model-value="activeTab"
         align="left"
-        class="shrink-0"
+        bordered
+        class="px-page-edge shrink-0"
         data-test="dbm-detail-tabs"
         @change="onTabChange"
       >
@@ -196,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              column: they are the two vantages on the same two measures, and
              the `order-*` classes that hoist the populated one on a zero-trace
              fleet only work while they share a flex parent. -->
-        <OTabPanel name="overview" layout="flex-col" class="gap-4">
+        <OTabPanel name="overview" layout="flex-col" content-class="gap-4 px-page-edge">
           <!-- The headline numbers, before the charts: minute 0 of an incident is
            "how bad and how much of the database is it", and that is figures,
            not a graph.
@@ -220,20 +233,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            in a second branch: one copy of each section, one source of truth for
            its states, and the trace-led order restored the moment traces
            return. -->
+          <!-- The provenance caption stays CONDITIONAL: it describes the
+               trace-derived tiles, so it renders nothing over the two
+               server-sourced figures rather than misattributing them. The order-2
+               swap hoists the server block on a zero-trace fleet. -->
           <div
-            v-if="traceVantage"
-            class="text-text-muted text-xs"
-            data-test="dbm-detail-stats-provenance"
-          >
-            {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
-          </div>
-          <DbmMetricTiles
-            :items="visibleHeadlineStats"
-            with-sub-labels
+            class="flex flex-col gap-2"
             :class="traceVantage ? '' : 'order-2'"
-            tile-data-test="dbm-detail-stat"
             data-test="dbm-detail-stats"
-          />
+          >
+            <div
+              v-if="traceVantage"
+              class="text-text-secondary text-xs"
+              data-test="dbm-detail-stats-provenance"
+            >
+              {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
+            </div>
+            <KpiCardRow>
+              <KpiCard
+                v-for="tile in summaryCards"
+                :key="tile.id"
+                :icon="tile.icon"
+                :data-test="`dbm-detail-stat-${tile.id}`"
+              >
+                <template #label>
+                  {{ tile.label
+                  }}<span v-if="tile.sub" class="ml-1 font-normal opacity-70">{{ tile.sub }}</span>
+                </template>
+                <template #value>
+                  <OSkeleton v-if="loading" type="text" class="h-6 w-16" />
+                  <template v-else>
+                    <span
+                      class="text-2xl leading-none font-bold tabular-nums"
+                      :class="tile.tone || 'text-text-heading'"
+                      >{{ tile.num }}</span
+                    >
+                    <span v-if="tile.unit" class="text-compact text-text-secondary font-semibold">{{
+                      tile.unit
+                    }}</span>
+                  </template>
+                </template>
+                <template v-if="loading || tile.detail" #trend>
+                  <OSkeleton v-if="loading" type="text" class="h-3 w-20" />
+                  <span v-else :class="tile.detailTone ?? 'text-text-secondary'">{{
+                    tile.detail
+                  }}</span>
+                </template>
+              </KpiCard>
+            </KpiCardRow>
+          </div>
 
           <!-- Plan drift, promoted. "It got slow because the plan changed" is the
            most actionable finding on this page, and the section that computes it
@@ -283,13 +331,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="traceVantage ? '' : 'order-1'"
             data-test="dbm-detail-server-metrics"
           >
-            <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-off">
+            <span class="text-text-secondary text-xs" data-test="dbm-detail-server-metrics-off">
               {{ t("dbm.detail.serverMetrics.off") }}
               <OTooltip side="top" :content="t('dbm.detail.serverMetrics.offHint')" />
             </span>
             <OButton
               variant="outline"
-              size="sm"
+              size="xs"
+              icon-right="open-in-new"
               class="shrink-0"
               data-test="dbm-detail-server-metrics-setup"
               @click="openDbmSetup"
@@ -466,6 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            coverage to be stale about. -->
           <DbmCoverageLine
             v-if="traceVantage && (clientRowFound || !serverAnswering)"
+            class="-mx-page-edge"
             :freshness="freshness"
             :hits="row ? [row] : []"
             :top-n-subset="topNSubset"
@@ -500,7 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Hidden entirely rather than shown as two empty axes labelled "No
            history for this query" — there is no history because nothing traced
            it, and an empty chart reads as a gap in data we should have. -->
-          <div v-if="traceVantage" class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div v-if="traceVantage" class="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <DbmHistoryPanel
               :title="t('dbm.detail.latencyTitle')"
               :empty-label="t('dbm.detail.noSeries')"
@@ -570,12 +620,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              needs the way back, not a page that quietly hid the exit. -->
             <div
               v-if="!whereRows.length"
-              class="text-text-muted p-6 pt-2 text-sm"
+              class="text-text-secondary p-6 pt-2 text-sm"
               data-test="dbm-detail-where-empty"
             >
               {{ t("dbm.detail.whereItRuns.emptyFiltered") }}
             </div>
             <OTable
+              :enable-column-resize="true"
               v-else
               :data="whereRows"
               :columns="whereColumns"
@@ -597,7 +648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="whereRow.isChild"
                     name="database"
                     size="xs"
-                    class="text-text-label shrink-0"
+                    class="text-text-secondary shrink-0"
                   />
                   <span
                     class="min-w-0 truncate"
@@ -616,14 +667,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t("dbm.detail.whereItRuns.noInstance")
                     }}
                   </span>
-                  <OTag
+                  <!-- Tooltip is a SIBLING of the tag: OTag's default slot overrides the `label` prop, so a tooltip inside would blank the "focused" text. -->
+                  <span
                     v-if="isWhereRowActive(whereRow, whereScope)"
-                    :label="t('dbm.detail.whereItRuns.focused')"
-                    size="xs"
+                    class="inline-flex shrink-0"
                     :data-test="`dbm-detail-where-focused-${whereRow.rowKey}`"
                   >
+                    <OTag :label="t('dbm.detail.whereItRuns.focused')" size="sm" />
                     <OTooltip side="top" :content="t('dbm.detail.whereItRuns.focusHint')" />
-                  </OTag>
+                  </span>
                 </div>
               </template>
               <template #cell-load="{ row: whereRow }">
@@ -655,7 +707,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     isCriticalErrorRate(whereRow.errors, whereRow.calls)
                       ? 'text-status-error-text font-semibold'
-                      : 'text-text-muted'
+                      : whereRow.errorRate === null
+                        ? 'text-text-muted'
+                        : 'text-text-secondary'
                   "
                 >
                   <template v-if="whereRow.errorRate === null">{{ raw("—") }}</template>
@@ -723,7 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              three tables. It is SERVER-vantage, so it is populated on a fleet
              with no traced traffic at all — exactly where the Overview panel
              collapses to two tiles and the Callers tab locks. -->
-        <OTabPanel name="plans" layout="flex-col" class="gap-4">
+        <OTabPanel name="plans" layout="flex-col" content-class="gap-4 px-page-edge">
           <!-- Query plans. Provenance is PER ROW now (W-E3): generic NULL-bound
            estimates keep the gap tag — the statement EXPLAINed with every bind
            set to NULL, never executed, no latency ever shown beside it.
@@ -910,7 +964,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              together because they share one dependency: the resolved trace
              stream. The picker below is literally the control for the two
              tables under it, so it lives on their tab and nowhere else. -->
-        <OTabPanel name="callers" layout="flex-col" class="gap-4">
+        <OTabPanel name="callers" layout="flex-col" content-class="gap-4 px-page-edge">
           <!-- The two panels below read RAW traces, so they need to know which
            trace stream this fingerprint lives on — and the queries endpoint does
            not carry it. With several streams in the org there is no way to tell,
@@ -955,6 +1009,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs">{{ t("dbm.detail.endpointsHint") }}</span>
             </template>
             <OTable
+              :enable-column-resize="true"
               :data="endpoints"
               :columns="endpointColumns"
               row-key="rowKey"
@@ -1033,6 +1088,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <OTable
+              :enable-column-resize="true"
               :data="samples"
               :columns="sampleColumns"
               row-key="rowKey"
@@ -1123,6 +1179,9 @@ import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
 import DbmMetricTiles, { type DbmMetricTile } from "@/components/dbm/DbmMetricTiles.vue";
+import KpiCard from "@/components/common/KpiCard.vue";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmSection from "@/components/dbm/DbmSection.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
@@ -1787,10 +1846,9 @@ const identityChips = computed(() => {
  * the cut by a traffic shift would otherwise be labelled new, and mislabeling
  * it is the fastest way this page loses a DBA's trust.
  */
-const firstSeenLabel = computed(() => {
+const firstSeenTime = computed<string | null>(() => {
   const first = history.value?.points.find((point) => point.plottable);
-  if (!first) return null;
-  return t("dbm.detail.firstSeen", { time: formatClock(first.timestamp) });
+  return first ? formatClock(first.timestamp) : null;
 });
 
 /**
@@ -1799,12 +1857,12 @@ const firstSeenLabel = computed(() => {
  * most recent tracked activity). Suppressed when it would restate first-seen's
  * timestamp: one tracked window means the two chips would print one fact twice.
  */
-const lastSeenLabel = computed(() => {
+const lastSeenTime = computed<string | null>(() => {
   const points = history.value?.points ?? [];
   const first = points.find((point) => point.plottable);
   const last = [...points].reverse().find((point) => point.plottable);
   if (!first || !last || last.timestamp === first.timestamp) return null;
-  return t("dbm.detail.lastSeen", { time: formatClock(last.timestamp) });
+  return formatClock(last.timestamp);
 });
 
 const hasSeries = computed(() => (history.value?.points.length ?? 0) > 0);
@@ -1906,7 +1964,7 @@ const volumeInjectedData = computed(() => {
 const chartTheme = useDbmChartTheme();
 
 const samplesOption = computed(() =>
-  buildSamplesOption(samples.value, chartTheme.value, formatNs, formatClock, {
+  buildSamplesOption(samples.value, chartTheme.value, formatNs, {
     ok: t("dbm.detail.sampleOk"),
     error: t("dbm.detail.sampleError"),
   }),
@@ -2029,7 +2087,16 @@ const visibleHeadlineStats = computed(() =>
     : headlineStats.value.filter((tile) => tile.id === "load" || tile.id === "calls"),
 );
 
-const headlineStats = computed(() => {
+// Split the FORMATTED value into leading number and trailing unit, so "none" and "—" pass through as a number with no unit.
+const summaryCards = computed(() =>
+  visibleHeadlineStats.value.map((tile) => {
+    const formatted = String(tile.value ?? "");
+    const match = formatted.match(/^(-?[\d.,]+)(.*)$/);
+    return { ...tile, num: match ? match[1] : formatted, unit: match ? match[2].trim() : "" };
+  }),
+);
+
+const headlineStats = computed<DbmMetricTile[]>(() => {
   const current = row.value;
   const share = scopeTotalNs.value > 0 ? (current?.total_time_ns ?? 0) / scopeTotalNs.value : 0;
   // ABSENT stays absent. With no client row these tiles have no measurement to
@@ -2053,6 +2120,13 @@ const headlineStats = computed(() => {
         ratio: factor >= DELTA_PHRASING.roundFrom ? Math.round(factor) : factor.toFixed(1),
       });
     return raw(formatSignedPercent(delta.ratio));
+  };
+
+  // Colour a signed delta by direction — a rise in a cost metric reddens, a fall greens; below the deadband it stays neutral. Same rule as the delta column.
+  const deltaTone = (delta: ReturnType<typeof deltaFor>): string | undefined => {
+    if (delta.state !== "changed" || delta.ratio === undefined) return undefined;
+    if (Math.abs(delta.ratio) < DELTA_PHRASING.deadband) return undefined;
+    return delta.ratio > 0 ? "text-status-error-text" : "text-status-success-text";
   };
 
   // On a seeded first paint the VALUES are the clicked row's and correct, but
@@ -2088,6 +2162,7 @@ const headlineStats = computed(() => {
   return [
     {
       id: "load",
+      icon: "query-stats",
       label: t("dbm.detail.stats.load"),
       sub: undefined,
       value: raw(formatNs(databaseTime.value.value ?? undefined)),
@@ -2106,6 +2181,7 @@ const headlineStats = computed(() => {
     },
     {
       id: "calls",
+      icon: "bar-chart",
       label: t("dbm.detail.stats.calls"),
       sub: undefined,
       value: raw(formatCount(callCount.value.value ?? undefined)),
@@ -2120,10 +2196,13 @@ const headlineStats = computed(() => {
                 : raw(""),
             )
           : overlapDetail(callCount.value.qualifierKey),
+      // Only the client delta is signed; the server overlap caption is not.
+      detailTone: callCount.value.source === "client" ? deltaTone(callsChange) : undefined,
       tone: "",
     },
     {
       id: "p50",
+      icon: "access-time",
       label: t("dbm.detail.stats.p50"),
       sub: raw("p50"),
       value: raw(formatNs(current?.p50_ns)),
@@ -2135,16 +2214,19 @@ const headlineStats = computed(() => {
     },
     {
       id: "p95",
+      icon: "hourglass-empty",
       label: t("dbm.detail.stats.p95"),
       sub: raw("p95"),
       value: raw(formatNs(current?.p95_ns)),
       detail: captionFor(current?.p95_ns, () =>
         rowStatsReady.value ? changeWords(latencyChange) : raw(""),
       ),
+      detailTone: deltaTone(latencyChange),
       tone: "",
     },
     {
       id: "max",
+      icon: "trending-up",
       label: t("dbm.detail.stats.max"),
       sub: raw("max"),
       value: raw(formatNs(current?.max_ns)),
@@ -2154,6 +2236,7 @@ const headlineStats = computed(() => {
     },
     {
       id: "errors",
+      icon: "error-outline",
       label: t("dbm.detail.stats.errors"),
       sub: undefined,
       // No row, no error count: "none" would be an all-clear nobody measured.
@@ -2175,7 +2258,7 @@ const headlineStats = computed(() => {
       // would make one failure in a million read as loudly as a total outage.
       tone: isCriticalErrorRate(errorsForRate, callsForRate)
         ? "text-status-error-text"
-        : "text-text-label",
+        : "text-text-secondary",
     },
   ];
 });
@@ -2234,7 +2317,13 @@ const endpointColumns = computed<OTableColumnDef<EndpointCallerRow>[]>(() => [
       headerTooltip: t("dbm.queries.columnHints.p95"),
     },
   },
-  { id: "actions", header: raw(""), size: 60, isAction: true },
+  {
+    id: "actions",
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 84,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+  },
 ]);
 
 // ─── Where it runs ───────────────────────────────────────────────────────────
@@ -2344,7 +2433,13 @@ const sampleColumns = computed<OTableColumnDef<SampleRow>[]>(() => [
     meta: { align: "right" },
   },
   { id: "status", header: t("dbm.detail.columns.status"), size: 120, sortable: false },
-  { id: "actions", header: raw(""), size: 60, isAction: true },
+  {
+    id: "actions",
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 84,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+  },
 ]);
 
 // ─── Loading ─────────────────────────────────────────────────────────────────
@@ -2869,10 +2964,11 @@ const loadQueryInsights = async (token: number = requestSeq.current()) => {
  * setup page instead of describing an env var and stopping there.
  */
 const openDbmSetup = () => {
-  router.push({
+  const href = router.resolve({
     name: DBM_SETUP_ROUTE,
     query: { org_identifier: store.state.selectedOrganization.identifier },
-  });
+  }).href;
+  window.open(href, "_blank", "noopener");
 };
 
 /**
@@ -2967,8 +3063,9 @@ const openEndpointTraces = (endpoint: EndpointCallerRow) => {
 const onSampleClick = (params: unknown) => {
   const value = (params as { value?: [number, number] })?.value;
   if (!value) return;
+  // The scatter plots epoch-ms (samples carry micros), so match the datum's ms back to the sample's micros; duration disambiguates.
   const sample = samples.value.find(
-    (entry) => entry.timestamp === value[0] && entry.durationNs === value[1],
+    (entry) => Math.floor(entry.timestamp / 1000) === value[0] && entry.durationNs === value[1],
   );
   if (sample) openSampleTrace(sample);
 };

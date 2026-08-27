@@ -40,22 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       list is the HEALTHY normal and is rendered as reassurance.
 -->
 <template>
-  <DbmPageChrome
-    :title="t('dbm.deadlocks.title')"
-    :subtitle="t('dbm.deadlocks.subtitle')"
-    title-data-test="dbm-deadlocks-title"
-    date-time-data-test="dbm-deadlocks-date-time"
-    :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
-  >
+  <DbmPageChrome title-data-test="dbm-deadlocks-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
+        :enable-column-resize="true"
         :data="tableRows"
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
+        :toolbar-bordered="false"
         :error="error"
         sorting="client"
         expansion="multiple"
@@ -95,12 +89,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            :last-run-at="lastRunAt"
-            data-test="dbm-deadlocks-refresh"
-            @refresh="onRefresh"
-          />
+          <div class="flex items-center gap-1.5">
+            <DbmRefreshButton
+              mode="status"
+              :loading="loading"
+              :last-run-at="lastRunAt"
+              data-test="dbm-deadlocks-refresh"
+            />
+            <DateTime
+              auto-apply
+              menu-align="end"
+              :default-type="range.type"
+              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+              :default-relative-time="range.relativeTimePeriod ?? undefined"
+              data-test-name="dbm-deadlocks-date-time"
+              class="h-8"
+              @on:date-change="onDateChange"
+            />
+            <DbmRefreshButton
+              mode="button"
+              :loading="loading"
+              data-test="dbm-deadlocks-refresh"
+              @refresh="onRefresh"
+            />
+          </div>
         </template>
 
         <template #subheader>
@@ -160,17 +172,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              with the ⇄ between them rather than sitting in two columns. -->
         <template #cell-pair="{ row }">
           <div class="flex min-w-0 flex-col gap-px">
-            <div class="text-text-code min-w-0 truncate font-mono text-xs" :title="row.pairTitle">
+            <div class="text-text-code min-w-0 truncate font-mono text-xs">
+              <OTooltip v-if="row.pairTitle" :content="raw(row.pairTitle)" />
               <template v-if="row.queries[0]">
                 {{ raw(row.queries[0]) }}
-                <span v-if="row.queries[1]" class="text-text-label px-1">{{ raw("⇄") }}</span>
+                <span v-if="row.queries[1]" class="text-text-secondary px-1">{{ raw("⇄") }}</span>
                 {{ raw(row.queries[1] ?? "") }}
               </template>
               <span v-else class="text-text-secondary italic">
                 {{ t("dbm.deadlocks.detail.noQueryCaptured") }}
               </span>
             </div>
-            <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <template v-if="row.db_instance">
                 <span class="opacity-45">·</span>
@@ -179,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-for="chip in row.chips"
                 :key="chip.id"
-                class="rounded-default text-3xs ml-0.5 px-1 py-px font-semibold tracking-wide uppercase"
+                class="rounded-default text-3xs ml-0.5 px-1 py-px font-semibold"
                 :class="chip.tone"
               >
                 {{ chip.label }}
@@ -207,7 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
               {{ row.objects.length || raw("—") }}
             </span>
-            <span class="text-text-label text-3xs truncate">{{ raw(row.objects[0] ?? "") }}</span>
+            <span class="text-text-secondary text-3xs truncate">{{
+              raw(row.objects[0] ?? "")
+            }}</span>
           </div>
         </template>
 
@@ -216,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body font-mono text-xs tabular-nums">
               {{ formatClock(row.lastSeen) }}
             </span>
-            <span class="text-text-label text-3xs">{{ formatAge(row.lastSeen) }}</span>
+            <span class="text-text-secondary text-3xs">{{ formatAge(row.lastSeen) }}</span>
           </div>
         </template>
 
@@ -227,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex flex-col items-end leading-tight">
               <span class="text-text-heading text-compact font-mono font-semibold tabular-nums">
                 {{ row.count }}
-                <span class="text-text-label text-3xs font-normal">
+                <span class="text-text-secondary text-3xs font-normal">
                   {{ formatPercent(row.share, 0) }}
                 </span>
               </span>
@@ -313,18 +328,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dbm-deadlocks-occurrences"
               >
                 <div class="mb-1.5 flex items-center gap-2">
-                  <h4 class="text-text-label text-2xs font-semibold tracking-wide uppercase">
+                  <h4 class="text-text-secondary text-2xs font-semibold">
                     {{ t("dbm.deadlocks.detail.occurrencesTitle", { count: row.count }) }}
                   </h4>
                   <div class="flex-1"></div>
-                  <span class="text-text-label text-3xs">
+                  <span class="text-text-secondary text-3xs">
                     {{ t("dbm.deadlocks.detail.occurrencesHint") }}
                   </span>
                 </div>
 
                 <div class="flex flex-col gap-1">
                   <div v-for="lane in row.lanes" :key="lane.pid" class="flex items-center gap-2">
-                    <span class="text-text-label text-3xs w-16 shrink-0 text-right font-mono">
+                    <span class="text-text-secondary text-3xs w-16 shrink-0 text-right font-mono">
                       {{ t("dbm.deadlocks.detail.lostLabel", { pid: lane.pid }) }}
                     </span>
                     <div
@@ -355,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <p class="text-text-label text-3xs mt-1.5">
+                <p class="text-text-secondary text-3xs mt-1.5">
                   {{ row.victimSummary }}
                 </p>
               </div>
@@ -405,6 +420,7 @@ import { useStore } from "vuex";
 import DbmDeadlockCycle from "@/components/dbm/DbmDeadlockCycle.vue";
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
@@ -747,10 +763,11 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
-    size: 96,
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 108,
     enableSorting: false,
-    meta: { align: "right" },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
 

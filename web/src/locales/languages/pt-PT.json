@@ -14923,6 +14923,7 @@
       "disabled": "Desativado",
       "emptyTitle": "Ainda não há alertas neste SLO",
       "emptyHint": "Os alertas de taxa de consumo avisam você enquanto ainda há orçamento restante para proteger.",
+      "emptyActionDesc": "Seja avisado antes que o orçamento acabe",
       "loadFailed": "Não foi possível carregar os alertas deste SLO.",
       "editTargetMissing": "Esse alerta não está mais neste SLO.",
       "describeBurn": "Taxa de consumo > {critical} em {long} e {short}",
@@ -15215,7 +15216,12 @@
     "common": {
       "reload": "Atualizar",
       "lastRefreshed": "Última atualização {age}",
-      "loadFailed": "Não foi possível carregar os dados do banco de dados. Tente novamente ou reduza o intervalo de tempo."
+      "loadFailed": "Não foi possível carregar os dados do banco de dados. Tente novamente ou reduza o intervalo de tempo.",
+      "actions": "Ações"
+    },
+    "header": {
+      "title": "Bancos de dados",
+      "subtitle": "Desempenho e saúde das consultas em seus bancos de dados"
     },
     "ai": {
       "suggestFix": "Pergunte à IA como corrigir isso",
@@ -15237,12 +15243,12 @@
       "removeScope": "Remover este filtro",
       "popoverTitle": "Restringir isso",
       "dimension": {
-        "system": "mecanismo",
-        "instance": "banco de dados",
-        "namespace": "esquema",
-        "env": "ambiente",
-        "service": "serviço",
-        "insight": "insight"
+        "system": "Mecanismo",
+        "instance": "Banco de dados",
+        "namespace": "Esquema",
+        "env": "Ambiente",
+        "service": "Serviço",
+        "insight": "Insight"
       }
     },
     "delta": {
@@ -15257,8 +15263,6 @@
       "wasValue": "era {value}"
     },
     "databases": {
-      "title": "Bancos de dados",
-      "subtitle": "Desempenho e saúde de consultas por banco de dados",
       "searchPlaceholder": "Pesquisar banco de dados ou serviço…",
       "unnamedInstance": "Instância sem nome",
       "unnamedInstanceHint": "Os relatórios de instruções do próprio banco provam que este mecanismo está em execução, mas não identificam um host. A linha mostrará um endereço quando um feed que o contenha — amostragem de sessão ou métricas de instância — for configurado.",
@@ -15305,9 +15309,6 @@
       }
     },
     "queries": {
-      "title": "Principais consultas",
-      "subtitle": "As consultas que mais usam tempo de banco de dados",
-      "subtitleServer": "As instruções que seus bancos de dados executaram, contadas dentro do banco — as executadas com mais frequência primeiro",
       "searchPlaceholder": "Pesquisar texto da consulta, tabela ou serviço…",
       "trendLabel": "Como o tempo desta consulta variou ao longo do intervalo",
       "otherRow": "Todas as outras consultas",
@@ -15316,7 +15317,8 @@
         "query": "Consultas",
         "queryHint": "Apenas SQL real — SELECT, INSERT, UPDATE e DELETE.",
         "all": "Consultas + sobrecarga de conexão",
-        "allHint": "Também conta o trabalho de registro que seu driver envia entre consultas: BEGIN e COMMIT, SET e as verificações que mantêm uma conexão em pool ativa."
+        "allHint": "Também conta o trabalho de registro que seu driver envia entre consultas: BEGIN e COMMIT, SET e as verificações que mantêm uma conexão em pool ativa.",
+        "overheadLabel": "Incluir sobrecarga de conexão"
       },
       "completionBias": {
         "title": "Chamadas caíram {drop}% enquanto as falhas aumentaram",
@@ -15559,13 +15561,13 @@
       "noSamples": "Nenhuma execução individual carregada para este intervalo.",
       "noSeries": "Nenhum histórico para esta consulta no intervalo selecionado.",
       "liveSeries": "Os pontos mais recentes ainda estão sendo contados e podem mudar.",
-      "noStream": "Não conseguimos descobrir qual stream de trace contém esta consulta, então seus chamadores e exemplos não podem ser carregados.",
-      "ambiguousStream": "Esta organização tem mais de um stream de trace, e não conseguimos identificar em qual deles esta consulta é executada. Escolha um stream para carregar seus chamadores e traces de exemplo.",
-      "pickStream": "Escolha um stream de trace",
-      "invalidStream": "Esse nome de stream de trace não é reconhecido, então não executamos a busca.",
-      "firstSeen": "PRIMEIRA APARIÇÃO NESTA LISTA EM {time}",
+      "noStream": "Não foi possível determinar qual fluxo de rastreamento carrega esta consulta, então seus chamadores e exemplos não podem ser carregados.",
+      "ambiguousStream": "Esta organização tem mais de um fluxo de rastreamento e não podemos dizer em qual esta consulta é executada. Escolha um fluxo para carregar seus chamadores e rastreamentos de exemplo.",
+      "pickStream": "Escolha um fluxo de rastreamento",
+      "invalidStream": "Esse nome de fluxo de rastreamento não é reconhecido, então não executamos a busca.",
+      "firstSeen": "Apareceu pela primeira vez nesta lista às {time}",
       "firstSeenHint": "O ponto mais antigo neste intervalo em que esta consulta foi pesada o suficiente para ser rastreada por conta própria.",
-      "lastSeen": "ÚLTIMA APARIÇÃO EM {time}",
+      "lastSeen": "Apareceu pela última vez às {time}",
       "lastSeenHint": "O ponto mais recente neste intervalo em que esta consulta foi pesada o suficiente para ser rastreada por conta própria. Ela ainda pode estar em execução agora — esta é a última vez que entrou na lista.",
       "errorsByCode": {
         "title": "Falhas por código de motivo",
@@ -15732,9 +15734,6 @@
       }
     },
     "samples": {
-      "title": "Chamadas mais lentas",
-      "subtitle": "As chamadas individuais mais lentas ao banco de dados nesta janela, em todos os bancos de dados e consultas — conforme medidas pelos chamadores, apenas chamadas concluídas",
-      "subtitleServer": "As instruções mais lentas que seus bancos de dados concluíram nesta janela, medidas dentro do banco de dados",
       "logOffTitle": "Seus bancos de dados ainda não estão registrando instruções lentas",
       "logOffDescription": "Nada rastreou essas chamadas, então pedimos aos bancos de dados suas próprias instruções mais lentas — e eles não registram nenhuma. Esta lista vem do log de instruções do PostgreSQL (log_min_duration_statement), que está desligado por padrão — a etapa de registro do cartão de configuração o ativa. A captura por instrução é atualmente exclusiva do PostgreSQL, então MySQL e MariaDB ainda não podem alimentar esta lista. As principais consultas ainda podem mostrar o que é executado com mais frequência, pois leem as tabelas de contadores em vez disso.",
       "searchPlaceholder": "Buscar texto de consulta, serviço ou banco de dados…",
@@ -15776,16 +15775,14 @@
       }
     },
     "rowChips": {
-      "new": "NOVO NESTA LISTA",
-      "slower": "{ratio}× MAIS LENTO QUE O NORMAL",
-      "loop": "EXECUTA {multiplier}× POR REQUISIÇÃO",
-      "allFailed": "TODAS AS {count} FALHARAM",
-      "busier": "MAIS OCUPADO, NÃO MAIS LENTO",
-      "climbed": "NOVA CONSULTA MAIS PESADA"
+      "new": "Novo nesta lista",
+      "slower": "{ratio}× mais lento que o normal",
+      "loop": "Executa {multiplier}× por requisição",
+      "allFailed": "Todas as {count} falharam",
+      "busier": "Mais ocupado, não mais lento",
+      "climbed": "Nova consulta mais pesada"
     },
     "deadlocks": {
-      "title": "Bancos de dados",
-      "subtitle": "Transações que se bloquearam mutuamente e foram revertidas",
       "deadlockCount": "nenhum deadlock | {count} deadlock | {count} deadlocks",
       "pairCount": "nenhum par de consultas | {count} par de consultas | {count} pares de consultas",
       "searchPlaceholder": "Buscar texto de consulta, tabela ou aplicativo…",
@@ -15812,10 +15809,10 @@
         "mysqlPartial": "Seu banco de dados MySQL mantém apenas o deadlock mais recente, a menos que innodb_print_all_deadlocks esteja ativo."
       },
       "chips": {
-        "oppositeOrder": "ORDEM DE LINHAS OPOSTA",
-        "cadence": "A CADA {seconds}s",
-        "noQueries": "CONSULTAS NÃO CAPTURADAS",
-        "partial": "APENAS UM LADO"
+        "oppositeOrder": "Ordem inversa de linhas",
+        "cadence": "A cada {seconds}s",
+        "noQueries": "Consultas não capturadas",
+        "partial": "Apenas um lado"
       },
       "rowActions": {
         "topQueries": "Encontre essas nas Principais consultas",
@@ -15832,8 +15829,8 @@
         "pid": "pid {pid}",
         "thread": "thread {pid}",
         "transaction": "transação {id}",
-        "eachWaits": "cada um espera pelo outro",
-        "deadlock": "deadlock",
+        "eachWaits": "Cada um espera pelo outro",
+        "deadlock": "Deadlock",
         "noQueryCaptured": "O log registrou este deadlock, mas não a instrução.",
         "waitingFor": "Estava esperando {target} terminar.",
         "waitingForRow": "Estava esperando {target} terminar — a outra sessão já havia alterado a linha que queria.",
@@ -15935,9 +15932,6 @@
       }
     },
     "blocked": {
-      "title": "Bancos de dados",
-      "subtitle": "Sessões atualmente aguardando um lock",
-      "subtitlePast": "Sessões que aguardavam um lock durante esta janela",
       "waitingCount": "nenhuma sessão aguardando um lock | {count} sessão aguardando um lock agora | {count} sessões aguardando um lock agora",
       "waitingCountPast": "nenhuma sessão aguardou um lock | {count} sessão aguardou um lock nesta janela | {count} sessões aguardaram um lock nesta janela",
       "sessionCount": "nenhuma sessão | {count} sessão | {count} sessões",
@@ -15983,14 +15977,14 @@
       },
       "deep": "{count} de profundidade",
       "notWaiting": "não aguardando",
-      "longestWait": "ESPERA MAIS LONGA",
-      "holdsTheLock": "SEGURA O LOCK QUE TODOS QUEREM",
+      "longestWait": "Maior espera",
+      "holdsTheLock": "Mantém o bloqueio que todos querem",
       "lastStatement": "último comando há {age}",
       "idleInTransaction": "não aguardando nada · ocioso em uma transação aberta",
       "pills": {
-        "root": "RAIZ — COMECE AQUI",
-        "waitingBlocking": "AGUARDANDO & BLOQUEANDO {count}",
-        "waiting": "AGUARDANDO"
+        "root": "Raiz — comece aqui",
+        "waitingBlocking": "Aguardando e bloqueando {count}",
+        "waiting": "Aguardando"
       },
       "waitingOn": "aguardando {pid}",
       "degraded": "Uma sessão está bloqueando {count}. Ela está com uma transação aberta há {age} e não executou uma consulta nesse tempo — provavelmente um aplicativo que esqueceu de fazer commit.",
@@ -16068,9 +16062,6 @@
       }
     },
     "activity": {
-      "title": "Atividade",
-      "subtitle": "O que seus bancos de dados estão fazendo agora, amostrado de suas próprias tabelas de sessão.",
-      "subtitlePast": "O que seus bancos de dados estavam fazendo durante esta janela, amostrado de suas próprias tabelas de sessão.",
       "searchPlaceholder": "Pesquisar sessões, usuários, aplicativos",
       "wait": {
         "onCpu": "Em CPU / sem espera",
@@ -16194,8 +16185,6 @@
       "deadlockLabel": "deadlocks"
     },
     "tableHealth": {
-      "title": "Saúde das tabelas",
-      "subtitle": "Tamanho, bloat e estado de vacuum para cada tabela, instantâneo mais recente primeiro.",
       "searchPlaceholder": "Pesquisar tabelas",
       "never": "Nunca",
       "countersCumulative": "As contagens de scan e vacuum são totais acumulados desde a última redefinição de estatísticas, não contagens para o intervalo de tempo selecionado.",
