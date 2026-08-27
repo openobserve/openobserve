@@ -27,8 +27,8 @@ use openobserve_core as service;
 /// `#[cfg(feature = "cloud")]` in a crate that does not DEFINE `cloud` compiles
 /// to nothing silently, taking the synthetics billing emit with it. This crate
 /// defines `cloud` and depends on that crate, so it is a place that can tell.
-/// Do not remove or silence it: `src/synthetics/tests/build_shapes.sh` relies on
-/// this assert firing during THIS crate's compile, and silencing re-opens F6.
+/// Do not remove or silence it: only this assert firing during THIS crate's
+/// `--features cloud` compile closes F6 — no runtime test can see an absent `cfg`.
 #[cfg(feature = "cloud")]
 const _: () = assert!(
     openobserve_synthetics::BUILT_WITH_CLOUD,

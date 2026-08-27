@@ -39,6 +39,7 @@ pub mod orphan;
 
 use std::time::Duration;
 
+use config::META_ORG_ID;
 use infra::{
     db::get_orm_client_rw,
     table::{org_ingestion_tokens, synthetics_checks, synthetics_jobs, synthetics_runs},
@@ -46,9 +47,6 @@ use infra::{
 
 use crate::MAX_DISPATCH_ATTEMPTS as MAX_ATTEMPTS;
 const TICK: Duration = Duration::from_secs(30);
-
-/// "Internal" meta org that OO uses for platform-level self-reporting streams.
-const META_ORG: &str = "_meta";
 
 pub async fn run() {
     tracing::info!("[synthetics reaper] started");
@@ -519,7 +517,7 @@ async fn write_triggers_stream(
     }]);
 
     let client = reqwest::Client::new();
-    for org in [row.org_id.as_str(), META_ORG] {
+    for org in [row.org_id.as_str(), META_ORG_ID] {
         let url = format!("{}/api/{}/triggers/_json", api_endpoint, org);
         if let Err(e) = client
             .post(&url)

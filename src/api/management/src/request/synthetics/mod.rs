@@ -907,7 +907,7 @@ pub async fn job_ack(
             let job_id = ack.job_id.clone();
             match process_ack(ack, &org_id).await {
                 Ok(mut resp) => {
-                    take_usage(&mut resp, &mut usage);
+                    usage.append(&mut resp.usage_events);
                     results.push(serde_json::json!({
                         "job_id": job_id,
                         "ok": true,
@@ -938,10 +938,7 @@ pub async fn job_ack(
     };
     match process_ack(req, &org_id).await {
         Ok(mut resp) => {
-            // Same two steps as the batch arm, so the source guard counts both.
-            let mut usage = Vec::new();
-            take_usage(&mut resp, &mut usage);
-            report_step_usage(usage);
+            report_step_usage(std::mem::take(&mut resp.usage_events));
             MetaHttpResponse::json(resp)
         }
         Err(e) => {
@@ -953,16 +950,6 @@ pub async fn job_ack(
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
         }
     }
-}
-
-/// Moves the usage rows one ack produced into a batch accumulator. Named rather
-/// than an inline `append` so a source guard can count both `job_ack` arms:
-/// dropping the call still sends an empty vector and still returns 200.
-fn take_usage(
-    resp: &mut openobserve_synthetics::job_api::AckResponse,
-    into: &mut Vec<config::meta::self_reporting::usage::UsageData>,
-) {
-    into.append(&mut resp.usage_events);
 }
 
 /// Emits the synthetics step-billing usage rows an ack produced — SPEC §4.1
@@ -1030,24 +1017,18 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
 ///
 /// Ordering matters: the `customer_billings` read (the only way to spot an
 /// ExternalContract org, which §7.3 says to never pool-gate) is issued ONLY while
-/// the org still has grant left, so past that an ack costs one counter read.
+/// the org still has grant left, so past that a request costs one counter read.
 #[cfg(feature = "cloud")]
 async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolView {
     let remaining = openobserve_core::trial_quota::synthetics_steps_remaining(org_id);
-    let is_contract = needs_plan_read(remaining)
+    // `remaining > 0` first: a spent grant is billable whatever the plan says.
+    let is_contract = remaining > 0
         && o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
             org_id,
         )
         .await
         .requires_additional_credits();
     step_pool_view(remaining, is_contract)
-}
-
-/// Whether the org's PLAN still has to be read to answer [`step_pool_view`].
-/// False once the grant is spent: the ack is billable either way.
-#[cfg(feature = "cloud")]
-fn needs_plan_read(remaining: u64) -> bool {
-    remaining > 0
 }
 
 /// SPEC §6.1 / §7.3 — the free/billable decision for one ack, as arithmetic.
@@ -1779,8 +1760,6 @@ mod tests {
     use config::meta::self_reporting::usage::{UsageData, UsageEvent};
     use openobserve_synthetics::job_api::{AckResponse, AlertDecision};
 
-    use super::take_usage;
-
     fn ack_response(usage_events: Vec<UsageData>) -> AckResponse {
         AckResponse {
             run_complete: false,
@@ -1829,12 +1808,9 @@ mod tests {
             Ok(ack_response(vec![steps(28.0)])),
         ];
 
-        // Reached through a function pointer so this call does not count
-        // towards the source guard below, which counts calls by name.
-        let drain: fn(&mut AckResponse, &mut Vec<UsageData>) = take_usage;
         let mut usage = Vec::new();
         for mut resp in batch.into_iter().flatten() {
-            drain(&mut resp, &mut usage);
+            usage.append(&mut resp.usage_events);
         }
 
         assert_eq!(
@@ -1852,15 +1828,10 @@ mod tests {
     #[test]
     fn every_ack_path_reports_the_usage_it_produced() {
         let source = include_str!("mod.rs");
-        // One definition plus one call per path, for each of three steps: run
-        // the ack, take its usage rows, send them.
+        // One definition plus one call per path: run the ack, send its usage rows.
         for (needle, what) in [
             (["process", "_ack("].concat(), "runs an ack"),
-            (
-                ["take", "_usage("].concat(),
-                "takes the usage rows it returned",
-            ),
-            (["report_step", "_usage("].concat(), "sends them"),
+            (["report_step", "_usage("].concat(), "sends its usage rows"),
         ] {
             assert_eq!(
                 source.matches(&needle).count(),
@@ -2087,23 +2058,9 @@ mod tests {
         assert_eq!(step_pool_view(0, false), StepPoolView::Spent);
 
         // A contract org with grant left is never pool-gated (E18/T36). It cannot
-        // be asked about a SPENT grant: `needs_plan_read` short-circuits at
+        // be asked about a SPENT grant: `resolve_step_pool` short-circuits at
         // `remaining == 0`, so `is_contract` is never computed there.
         assert_eq!(step_pool_view(10_000, true), StepPoolView::NotApplicable);
-    }
-
-    /// The plan read is one `customer_billings` query and this runs on EVERY
-    /// ack, so it is issued only while its answer can still change anything.
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn the_plan_is_read_only_while_the_grant_can_still_fund_an_ack() {
-        use super::needs_plan_read;
-
-        assert!(needs_plan_read(1));
-        assert!(
-            !needs_plan_read(0),
-            "a spent grant is billable whatever the plan says",
-        );
     }
 
     /// No compiler checks that the two crates' directions map the right way
@@ -2140,22 +2097,20 @@ mod tests {
     fn every_ack_path_applies_the_pool_reconcile_it_computed() {
         let source = include_str!("mod.rs");
         // Two `cfg`-split definitions plus one call, for each half.
-        for (needle, what) in [
-            (
-                ["resolve_step", "_pool("].concat(),
-                "resolves the org's grant before the ack",
-            ),
-            (
-                ["apply_pool", "_adjustment("].concat(),
-                "applies the movement the ack returned",
-            ),
-        ] {
-            assert_eq!(
-                source.matches(&needle).count(),
-                3,
-                "one `cloud` definition, one non-`cloud` definition and exactly one call site                  are expected for the step that {what}"
-            );
-        }
+        assert_eq!(
+            source.matches(&["resolve_step", "_pool("].concat()).count(),
+            3,
+            "one `cloud` definition, one non-`cloud` definition and exactly one call site are \
+             expected for the step that resolves the org's grant"
+        );
+        assert_eq!(
+            source
+                .matches(&["apply_pool", "_adjustment("].concat())
+                .count(),
+            3,
+            "one `cloud` definition, one non-`cloud` definition and exactly one call site are \
+             expected for the step that applies the movement the ack returned"
+        );
 
         // The hand-off to the pool itself; emptying it never reconciles anything.
         assert_eq!(

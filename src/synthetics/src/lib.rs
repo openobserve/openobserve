@@ -61,8 +61,8 @@ pub(crate) static CONFIG_SWAP_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new
 ///
 /// Known limit: those downstream assertions are themselves
 /// `#[cfg(feature = "cloud")]`, so a root that stopped forwarding `cloud` to
-/// either crate would not compile them at all. `tests/build_shapes.sh` builds
-/// both with `--features cloud` to cover that (T39, opt-in).
+/// either crate would not compile them at all — only a `--features cloud` build
+/// of `openobserve-jobs` and `openobserve-api-management` covers that (T39).
 pub const BUILT_WITH_CLOUD: bool = cfg!(feature = "cloud");
 
 pub mod alerting;

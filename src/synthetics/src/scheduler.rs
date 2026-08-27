@@ -27,6 +27,7 @@
 use std::time::Duration;
 
 use config::{
+    META_ORG_ID,
     meta::synthetics::{SyntheticFrequency, SyntheticFrequencyType, SyntheticType},
     utils::hash::{Sum64, fnv},
 };
@@ -39,9 +40,6 @@ use infra::{
 };
 use serde::Serialize;
 use svix_ksuid::KsuidLike as _;
-
-/// The org every dead letter is copied to, so operators see them all.
-const META_ORG: &str = "_meta";
 
 const TICK: Duration = Duration::from_secs(5);
 /// Max synthetics to pull per tick.
@@ -216,7 +214,7 @@ impl LogCooldown {
 /// here instead would move that out of the pure function and leave its arm 3
 /// unreachable from production.
 pub fn trial_gate_reads_needed(trial_period_enabled: bool, org_id: &str) -> bool {
-    trial_period_enabled && org_id != config::META_ORG_ID
+    trial_period_enabled && org_id != META_ORG_ID
 }
 
 /// Gate 1 of §7.1 — may this check run at all?
@@ -227,7 +225,7 @@ pub fn trial_gate_reads_needed(trial_period_enabled: bool, org_id: &str) -> bool
 ///
 /// Mirrors `is_org_in_free_trial_period` arm for arm:
 ///   1. `trial_period_enabled` off      => `Run` (checking disabled fleet-wide)
-///   2. `org_id == config::META_ORG_ID` => `Run` (the meta org is never gated)
+///   2. `org_id == META_ORG_ID` => `Run` (the meta org is never gated)
 ///   3. [`BillingSubscription::Paid`]   => `Run` (the dates are irrelevant)
 ///   4. `Absent` or `Free`              => `Run` iff `now_us <= trial_ends_at`
 ///
@@ -244,7 +242,7 @@ pub fn trial_gate_decision(
         return TrialGate::Run;
     }
 
-    if org_id == config::META_ORG_ID {
+    if org_id == META_ORG_ID {
         return TrialGate::Run;
     }
 
@@ -841,7 +839,7 @@ async fn report_quota_skips(
     };
     // The `_meta` copy authenticates as `_meta`: ingest resolves a token against
     // the URL's org, so the org's own token posted to `/api/_meta/...` 401s.
-    let meta_token = match org_ingestion_tokens::find_default_enabled(META_ORG).await {
+    let meta_token = match org_ingestion_tokens::find_default_enabled(META_ORG_ID).await {
         Ok(Some(t)) => Some(t.token),
         Ok(None) | Err(_) => None,
     };
@@ -874,7 +872,7 @@ async fn report_quota_skips(
         if let Some(meta_token) = meta_token.as_deref() {
             post_json(
                 &client,
-                &format!("{api_endpoint}/api/{META_ORG}/triggers/_json"),
+                &format!("{api_endpoint}/api/{META_ORG_ID}/triggers/_json"),
                 meta_token,
                 &trigger,
                 &synthetic.id,
