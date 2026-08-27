@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use axum::{
     body::Body,
-    extract::Query,
+    extract::{Path, Query},
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
@@ -48,7 +48,10 @@ use infra::{
     },
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{auth::UserEmail, cache::STREAM_EXECUTABLE_PIPELINES};
+use openobserve_core::{
+    auth::{AuthExtractor, UserEmail},
+    cache::STREAM_EXECUTABLE_PIPELINES,
+};
 use search::{
     datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
     tantivy::cache as tantivy_result_cache,
@@ -416,10 +419,19 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
     })
 }
 
-/// Full UI configuration; org-scoped so auth applies, though the payload is
-/// instance-level.
-pub async fn zo_config() -> impl IntoResponse {
+/// Full UI configuration; mostly instance-level, but `search_inspector_enabled`
+/// is computed per requesting user in the URL org.
+pub async fn zo_config(
+    Path(org_id): Path<String>,
+    user_email: Option<Headers<UserEmail>>,
+) -> impl IntoResponse {
     let cfg = get_config();
+
+    // per-user value: false unless this caller may use the search inspector
+    let search_inspector_enabled = match &user_email {
+        Some(Headers(user)) => search_inspector_permitted(&org_id, &user.user_id).await,
+        None => false,
+    };
     #[cfg(feature = "enterprise")]
     let o2cfg = get_o2_config();
     #[cfg(feature = "enterprise")]
@@ -594,7 +606,7 @@ pub async fn zo_config() -> impl IntoResponse {
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
-        search_inspector_enabled: cfg.common.search_inspector_enabled,
+        search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
@@ -607,6 +619,38 @@ pub async fn zo_config() -> impl IntoResponse {
         #[cfg(feature = "enterprise")]
         workflows_enabled,
     })
+}
+
+// mirrors the route check for GET /{org}/search/profile so the UI can hide
+// inspector entry points the caller may not use
+async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
+    if !get_config().common.search_inspector_enabled {
+        return false;
+    }
+    if is_root_user(user_id) {
+        return true;
+    }
+    let Some(user) = openobserve_core::users::get_user(Some(org_id), user_id).await else {
+        return false;
+    };
+    openobserve_core::authz::check_permissions(
+        user_id,
+        AuthExtractor {
+            auth: "".to_string(),
+            method: "GET".to_string(),
+            o2_type: format!("search_inspector:{org_id}"),
+            org_id: org_id.to_string(),
+            bypass_check: false,
+            parent_id: "".to_string(),
+            // module-level grants live on `search_inspector:_all_{org}`
+            use_all_org: true,
+            use_self_context: false,
+            use_self_parent: false,
+        },
+        user.role,
+        user.is_external,
+    )
+    .await
 }
 
 pub async fn cache_status() -> impl IntoResponse {

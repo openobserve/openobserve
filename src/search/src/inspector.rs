@@ -48,6 +48,8 @@ pub struct SearchInspectorFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub org_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
@@ -107,6 +109,11 @@ impl SearchInspectorFieldsBuilder {
 
     pub fn trace_id(mut self, trace_id: String) -> Self {
         self.fields.trace_id = Some(trace_id);
+        self
+    }
+
+    pub fn org_id(mut self, org_id: String) -> Self {
+        self.fields.org_id = Some(org_id);
         self
     }
 
@@ -278,6 +285,7 @@ mod tests {
     fn test_search_inspector_fields_all_none_absent() {
         let fields = SearchInspectorFields {
             trace_id: None,
+            org_id: None,
             timestamp: None,
             node_name: None,
             search_role: None,
@@ -296,6 +304,7 @@ mod tests {
         let json = serde_json::to_value(&fields).unwrap();
         let obj = json.as_object().unwrap();
         assert!(!obj.contains_key("trace_id"));
+        assert!(!obj.contains_key("org_id"));
         assert!(!obj.contains_key("timestamp"));
         assert!(!obj.contains_key("node_name"));
         assert!(!obj.contains_key("search_role"));
@@ -316,6 +325,7 @@ mod tests {
     fn test_search_inspector_fields_some_present() {
         let fields = SearchInspectorFields {
             trace_id: Some("t1".to_string()),
+            org_id: Some("org1".to_string()),
             timestamp: Some("2024-01-01".to_string()),
             node_name: Some("node1".to_string()),
             search_role: Some("leader".to_string()),
@@ -334,6 +344,7 @@ mod tests {
         let json = serde_json::to_value(&fields).unwrap();
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("org_id"));
         assert!(obj.contains_key("timestamp"));
         assert!(obj.contains_key("node_name"));
         assert!(obj.contains_key("search_role"));
