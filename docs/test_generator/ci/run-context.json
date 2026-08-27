@@ -1,0 +1,22 @@
+{
+  "feature_slug": "workflows-rework",
+  "feature_title": "Workflows Rebuild (Canvas, Nodes, Runs Panel)",
+  "area": "Workflows",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "workflows-canvas.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Workflows/workflows-canvas.spec.js",
+  "playwright_group": "Workflows",
+  "source_files": [
+    "web/src/plugins/workflows/WorkflowCanvas.vue",
+    "web/src/plugins/workflows/WorkflowNode.vue",
+    "web/src/components/workflows/WorkflowEditor.vue",
+    "web/src/components/workflows/WorkflowNodeDrawer.vue",
+    "web/src/components/workflows/WorkflowRuns.vue",
+    "web/src/components/workflows/WorkflowRunsPanel.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

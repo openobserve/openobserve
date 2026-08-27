@@ -66,9 +66,14 @@ class WorkflowsPage {
     // picker instead.
     this.triggerNode = '[data-test="workflow-node-workflow_trigger"]';
     this.triggerDelete = '[data-test="workflow-node-workflow_trigger-delete-btn"]';
-    // Empty-canvas start node -> trigger picker. The editor no longer pre-places
-    // an Alert Trigger on create, so a workflow now BEGINS by choosing one here.
-    this.startNode = '[data-test="workflow-flow-start-node"]';
+    // Empty-canvas start scaffold (two dashed cards: Trigger + Action). The editor
+    // no longer pre-places an Alert Trigger on create, so a workflow now BEGINS by
+    // choosing a trigger from the top card of this scaffold.
+    this.startScaffold = '[data-test="workflow-flow-start-scaffold"]';
+    this.startTriggerCard = '[data-test="workflow-flow-start-trigger"]';
+    this.stepDialog = '[data-test="workflow-step-dialog"]';
+    // Persistent Action slot shown under a just-placed trigger (first step).
+    this.actionSlotCard = '[data-test="workflow-flow-action-slot-card"]';
     // Trigger-picker items are keyed by TRIGGER KIND (alert_fired, incident_event) —
     // the picker offers one row per enabled kind (all of node_type workflow_trigger).
     this.stepTriggerFor = (kind = 'alert_fired') => `[data-test="workflow-step-${kind}"]`;
@@ -79,9 +84,20 @@ class WorkflowsPage {
     // Node config drawer (generic O2 drawer). An overlay (o-drawer-overlay) intercepts canvas
     // clicks while a drawer is open, and the trigger drawer auto-opens on /add — close it first.
     this.nodeDrawer = '[data-test="workflow-node-drawer"]';
+    // The rework node panel is an ODialog (NDV), closed via the dialog's X (commit).
+    this.dialogClose = '[data-test="o-dialog-close-btn"]';
     this.drawerClose = '[data-test="o-drawer-close-btn"]';
     this.drawerPrimary = '[data-test="o-drawer-primary-btn"]';
     this.drawerSecondary = '[data-test="o-drawer-secondary-btn"]';
+    // Rework node / list / runs selectors.
+    this.destinationNode = '[data-test="workflow-node-destination"]';
+    this.saveDraftBtn = '[data-test="workflow-editor-save-draft"]';
+    this.draftTag = '[data-test="workflow-list-draft-tag"]';
+    this.listTableEl = '[data-test="workflow-list-table"]';
+    this.runsPage = '[data-test="workflow-runs-page"]';
+    this.runsPanel = '[data-test="workflow-runs-panel"]';
+    this.runsLoadError = '[data-test="workflow-runs-load-error"]';
+    this.destinationIncompleteBadge = '[data-test="workflow-node-destination-incomplete-badge"]';
     // Destination picker (inside node drawer). OSelect/OToggle put the consumer data-test on a
     // wrapper div; the interactive element is the `-trigger`/`-btn` child — use those to click.
     this.destPicker = '[data-test="destination-picker"]';
@@ -141,10 +157,10 @@ class WorkflowsPage {
    * panel is a read-only payload reference, so it is dismissed, not saved.
    */
   async chooseTrigger(kind = 'alert_fired') {
-    await this.page.locator(this.startNode).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.startTriggerCard).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.stepDialog).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.stepTriggerFor(kind)).click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.triggerNode).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
-    await this.closeOpenDrawer();
   }
 
   async waitForListReady() {
@@ -282,6 +298,9 @@ class WorkflowsPage {
     await nameField.fill(name);
     await this.page.locator(this.destUrlField).fill(url);
     await this.page.locator(this.destSubmitBtn).click({ timeout: DRAWER_TIMEOUT_MS });
+    // The create form unmounts once the destination is created + auto-selected;
+    // wait for it so the picker is back in "select" mode before the NDV commits.
+    await nameField.waitFor({ state: 'detached', timeout: DRAWER_TIMEOUT_MS });
   }
 
   /**
@@ -422,6 +441,98 @@ class WorkflowsPage {
   // ---------- enable / disable ----------
   async toggleEnable(name) {
     await this.page.locator(`[data-test="workflow-list-${name}-pause-start-action"]`).first().click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  // ---------- rebuild (canvas) journeys ----------
+  async expectStartScaffoldVisible() {
+    await expect(this.page.locator(this.startScaffold)).toBeVisible({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Add a Destination as the first step after the trigger via the Action slot card. */
+  async addDestinationViaActionSlot() {
+    await this.page.locator(this.actionSlotCard).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.stepDialog).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.stepDestination).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.destinationNode).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Click the destination node to open its config panel (NDV). */
+  async openDestinationNode() {
+    await this.page.locator(this.destinationNode).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Commit the open node config panel by closing it (the NDV has no Save button). */
+  async commitNodeDrawer() {
+    await this.page.locator(this.dialogClose).first().click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeDrawer)
+      .waitFor({ state: 'detached', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
+  }
+
+  /** Build a Trigger -> Destination graph (destination created inline); no publish. */
+  async buildTriggerToDestination({ destName, url }) {
+    await this.goToAddEmpty();
+    await this.chooseTrigger();
+    await this.addDestinationViaActionSlot();
+    await this.openDestinationNode();
+    await this.createDestinationInline({ name: destName, url });
+    await this.commitNodeDrawer();
+  }
+
+  /** Save-as-Draft (lenient — persists an incomplete graph). */
+  async clickSaveDraft() {
+    await this.page.locator(this.saveDraftBtn).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Publish via a normal click (the rework Publish button has no tooltip overlay). */
+  async publish() {
+    await this.page.locator(this.publishBtn).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  // ---------- list assertions ----------
+  async expectWorkflowPresent(name) {
+    await this.search(name);
+    await expect(this.rowByName(name).first()).toBeVisible({ timeout: LIST_TIMEOUT_MS });
+  }
+
+  async expectDraftTag(name) {
+    await this.search(name);
+    await expect(this.page.locator(this.draftTag).first()).toBeVisible({ timeout: LIST_TIMEOUT_MS });
+  }
+
+  async expectNotDraftTag() {
+    await expect(this.page.locator(this.draftTag)).toHaveCount(0);
+  }
+
+  /** Row-click a published workflow to open its read-only Runs view. */
+  async openRunsView(name) {
+    await this.search(name);
+    const nameCell = this.page.locator(this.listTableEl).getByText(name, { exact: true }).first();
+    await nameCell.waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+    await nameCell.click({ timeout: LIST_TIMEOUT_MS });
+    await this.page.locator(this.runsPage).waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+  }
+
+  // ---------- runs assertions ----------
+  async expectRunsPageVisible() {
+    await expect(this.page.locator(this.runsPage)).toBeVisible();
+  }
+
+  async expectRunsPanelVisible() {
+    await expect(this.page.locator(this.runsPanel)).toBeVisible();
+  }
+
+  async expectRunsPageShowsName(name) {
+    await expect(this.page.locator(this.runsPage)).toContainText(name);
+  }
+
+  async expectNoRunsLoadError() {
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await expect(this.page.locator(this.runsLoadError)).toHaveCount(0);
+  }
+
+  async expectIncompleteDestinationBadge() {
+    await expect(this.page.locator(this.destinationIncompleteBadge)).toBeVisible({ timeout: DRAWER_TIMEOUT_MS });
   }
 }
 

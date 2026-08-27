@@ -451,5 +451,23 @@
       "slo-alerts.spec.js"
     ],
     "disabled": []
+  },
+  {
+    "testfolder": "Workflows",
+    "actual_folder": "Workflows",
+    "browser": "chrome",
+    "run_files": [
+      "workflows-canvas.spec.js"
+    ],
+    "disabled": [
+      {
+        "file": "workflows-crud.spec.js",
+        "reason": "Workflows feature under rework — v1 selectors, migrate later"
+      },
+      {
+        "file": "workflows-negative.spec.js",
+        "reason": "Workflows feature under rework — v1 selectors, migrate later"
+      }
+    ]
   }
 ]

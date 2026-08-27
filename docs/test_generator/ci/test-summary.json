@@ -1,0 +1,27 @@
+[
+  {
+    "title": "builds and publishes a Trigger → Destination workflow",
+    "action": "new",
+    "verifies": "the rebuilt canvas (empty scaffold → trigger → destination) publishes a workflow that lands in the list without a draft tag"
+  },
+  {
+    "title": "Test dry-run paints per-node ✓/✗ badges",
+    "action": "new",
+    "verifies": "POST /workflows/test paints a ✓ on the trigger and an ✗ on a dead destination"
+  },
+  {
+    "title": "Save-as-Draft persists a trigger-only workflow with the draft tag",
+    "action": "new",
+    "verifies": "Save-as-Draft persists an incomplete trigger-only graph and tags it as draft"
+  },
+  {
+    "title": "Runs inspection surface renders with no load error",
+    "action": "new",
+    "verifies": "the read-only Runs page + panel render and the history endpoint returns without a load error"
+  },
+  {
+    "title": "Publish blocks a destination saved without a destination",
+    "action": "new",
+    "verifies": "Publish rejects an incomplete destination node (badge shown, editor stays mounted)"
+  }
+]
