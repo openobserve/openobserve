@@ -900,14 +900,19 @@ fn padded_bounds(kind: TimeIndexKind, bounds: Option<TraceTimeRange>) -> Option<
 }
 
 /// What `searched_range` echoes: the padded caller range intersected with
-/// index coverage. None when no caller range was given, or when the
-/// intersection is empty — nothing was searched, and the per-key lookups
-/// report that as missing coverage.
+/// index coverage. None when no caller range was given, when indexing is
+/// disabled, or when the intersection is empty — nothing was searched, and
+/// the per-key lookups report that as missing coverage.
 async fn effective_searched_range(
     kind: TimeIndexKind,
     bounds: Option<TraceTimeRange>,
 ) -> Option<TraceTimeRange> {
     let padded = padded_bounds(kind, bounds)?;
+    // Reading through get_or_create while disabled would re-create the
+    // coverage marker that initialize(false) deleted.
+    if !get_config().common.trace_time_index_enabled {
+        return None;
+    }
     let Ok(coverage_start) = infra::db::trace_time_index::get_or_create_coverage_start().await
     else {
         return Some(padded);
