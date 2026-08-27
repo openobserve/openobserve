@@ -89,9 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-xs-circle"
           :data-test="`dashboard-table-cell-copy-${column.id}`"
-          @click.stop="copyCellValue(value)"
+          :data-copied="copiedCellKey === cellKey(column, row) ? 'true' : undefined"
+          @click.stop="copyCellValue(value, column, row)"
         >
-          <OIcon name="content-copy" size="xs" />
+          <OIcon
+            :name="copiedCellKey === cellKey(column, row) ? 'check' : 'content-copy'"
+            size="xs"
+          />
           <OTooltip :content="t('common.copy')" />
         </OButton>
         <OButton
@@ -395,11 +399,24 @@ export default defineComponent({
       emit("explore-cell", params, sortedRows.value.indexOf(params.row));
     };
 
-    // Empty cells get no copy affordance, matching the shared table's inline copy.
     const isCopyableCellValue = (value: any) =>
       value !== null && value !== undefined && String(value).trim() !== "";
 
-    const copyCellValue = (value: any) => copyToClipboard(String(value), t);
+    const copiedCellKey = ref<string | null>(null);
+    let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+    const cellKey = (column: any, row: any) =>
+      `${column?.id}#${sortedRows.value.indexOf(row)}`;
+
+    const copyCellValue = async (value: any, column: any, row: any) => {
+      const text = String(formatCellValue(value, column, row) ?? "");
+      const ok = await copyToClipboard(text, t, { silent: true });
+      if (!ok) return;
+      copiedCellKey.value = cellKey(column, row);
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => {
+        copiedCellKey.value = null;
+      }, 2000);
+    };
 
     const cellStyleFn = computed(
       () =>
@@ -602,6 +619,8 @@ export default defineComponent({
       isCellDrillable,
       isCopyableCellValue,
       copyCellValue,
+      copiedCellKey,
+      cellKey,
       getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,

@@ -1682,10 +1682,6 @@ export default defineComponent({
     onMounted(async () => {
       mountedAt = performance.now();
       syncTimeRange();
-      // Force a fresh fetch: the stream list is cached in-memory for the whole
-      // SPA session, so a plain load re-serves a stale list and metrics ingested
-      // since the last hard reload are missing — which mis-groups the prefix rail
-      // (a prefix qualifies only with enough sibling names loaded) until refresh.
       await grid.loadStreams(true);
 
       track("metrics_explorer_opened", {

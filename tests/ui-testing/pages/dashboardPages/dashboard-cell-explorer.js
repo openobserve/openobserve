@@ -15,8 +15,10 @@ export default class DashboardCellExplorerPage {
     // Interactive table (TableRenderer)
     this.tablePanel = page.locator('[data-test="dashboard-panel-table"]').first();
     this.firstRow = this.tablePanel.locator('[data-test^="o2-table-row-"]').first();
-    // The per-cell drilldown search icon — dynamic id, matched by prefix.
-    this.drilldownButtons = this.tablePanel.locator(
+    this.firstRowCells = this.firstRow.locator(
+      '[data-test^="o2-table-cell-"]:not([data-test^="o2-table-cell-copy-"]):not([data-test^="o2-table-cell-hover-actions-"])'
+    );
+    this.drilldownButtons = page.locator(
       '[data-test^="dashboard-table-cell-drilldown-"]'
     );
 
@@ -51,23 +53,37 @@ export default class DashboardCellExplorerPage {
     await this.firstRow.waitFor({ state: "visible", timeout: 30000 });
   }
 
+  async revealFirstDrilldownButton() {
+    const count = await this.firstRowCells.count();
+    for (let i = 0; i < count; i++) {
+      const box = await this.firstRowCells.nth(i).boundingBox();
+      if (!box) continue;
+      await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      const button = this.drilldownButtons.first();
+      try {
+        await button.waitFor({ state: "visible", timeout: 1500 });
+        return button;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
   /** True when at least one drillable cell (search icon) exists in the table. */
   async hasDrillableCell() {
-    return (await this.drilldownButtons.count()) > 0;
+    return (await this.revealFirstDrilldownButton()) !== null;
   }
 
   async expectDrillableCellVisible() {
-    await expect(this.drilldownButtons.first()).toBeAttached({ timeout: 15000 });
+    const button = await this.revealFirstDrilldownButton();
+    expect(button, "expected a drillable cell with a search icon").not.toBeNull();
+    await expect(button).toBeVisible({ timeout: 15000 });
   }
 
-  /**
-   * Hover the first data row so the (opacity-0) cell icons reveal, then click
-   * the first drilldown search icon to open the cell-explorer drawer.
-   */
   async openDrawerFromFirstDrillableCell() {
-    await this.firstRow.hover();
-    const button = this.drilldownButtons.first();
-    await button.waitFor({ state: "attached", timeout: 15000 });
+    const button = await this.revealFirstDrilldownButton();
+    expect(button, "expected a drillable cell with a search icon").not.toBeNull();
     await button.click();
     await this.expectDrawerOpen();
   }

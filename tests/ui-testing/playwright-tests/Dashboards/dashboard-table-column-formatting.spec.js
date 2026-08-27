@@ -264,9 +264,9 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
 
     const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
     await firstRow.waitFor({ state: "visible", timeout: 15000 });
-    const wrapperDiv = firstRow.locator("td").last().locator("div").first();
-    await expect(wrapperDiv).toHaveClass(/justify-center/);
-    testLogger.info("Table cell wrapper reflects Center alignment class");
+    const cell = firstRow.locator("td").last();
+    await expect(cell).toHaveClass(/text-center/);
+    testLogger.info("Table cell reflects Center alignment class");
 
     // This environment's backend build doesn't yet accept the alignment
     // override_config variant on save (version-skew, not a product bug) — the
