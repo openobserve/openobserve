@@ -1780,18 +1780,6 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             .merge(proxy_routes(true))
     };
 
-    // Custom-domain host routing runs ahead of EVERYTHING below, including the
-    // UI's own "/" redirect — a vanity Host and OpenObserve's own hostname
-    // answer at identical paths, so Host is the only signal that can tell
-    // them apart, and it has to be checked before normal routing claims the
-    // request. See `host_route_middleware`'s doc comment for the fall-through
-    // guarantee that keeps this safe for ordinary (non-custom-domain) traffic.
-    if config::get_config().synthetics.enabled {
-        app = app.layer(middleware::from_fn(
-            status_pages::public::host_route_middleware,
-        ));
-    }
-
     // Ensure redirect takes into account base_uri
     let web_path = format!("{}/web/", cfg.common.base_uri);
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
@@ -1814,7 +1802,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
     // Apply base_uri if configured
-    if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
+    let mut outer = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
         app
     } else {
         // In axum 0.8, nest("/abc", app) maps the inner "/" route to exactly "/abc",
@@ -1829,7 +1817,18 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             );
         }
         outer
+    };
+
+    // Must be the LAST `.layer()` call in this function: `Router::layer` only
+    // wraps routes that exist at call time, so this has to come after the
+    // "/" redirect, "/web" mount, and base_uri trailing-slash redirect above
+    // or a custom domain's Host falls through to those unchecked.
+    if config::get_config().synthetics.enabled {
+        outer = outer.layer(middleware::from_fn(
+            status_pages::public::host_route_middleware,
+        ));
     }
+    outer
 }
 
 #[cfg(test)]
