@@ -10168,10 +10168,13 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      */
     async selectChartType(chartId) {
-        // Use .first() to handle multiple matching elements (e.g., from cached panels)
-        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
+        // Scope to the build page: the Visualize tab's PanelEditor renders a second
+        // (display:none) ChartSelection earlier in the DOM, so an unscoped .first()
+        // matches that hidden copy and fails Playwright's visibility check.
+        const chartItem = this.page
+            .locator(`${this.buildQueryPage} ${this.chartTypeItem(chartId)}`)
+            .first();
 
-        // Click the chart item (tests should check visibility before calling this)
         await chartItem.click();
         await this.page.waitForTimeout(500);
         testLogger.info(`Selected chart type: ${chartId}`);

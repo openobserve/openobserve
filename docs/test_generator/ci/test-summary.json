@@ -1,7 +1,0 @@
-[
-  { "title": "should save a builder chart as a Saved View and restore it in full when applied", "action": "new", "verifies": "a build-mode view saved with a non-default area chart restores the area chart type, builder mode, and x/y layouts when applied after the build tab was already visited" },
-  { "title": "Custom-SQL (customQuery) saved view restores Custom mode, table chart and the saved SQL", "action": "new", "verifies": "a build-mode view saved with customQuery=true restores Custom-SQL mode, the table chart, and the saved SQL verbatim" },
-  { "title": "toggling away and back does not re-apply the saved chart (one-shot consumption)", "action": "new", "verifies": "savedBuildConfig is consumed once — a later toggle back to Build re-derives the default bar chart instead of re-applying the saved area chart" },
-  { "title": "applying a view with no buildData falls back to defaults without crashing", "action": "new", "verifies": "a view saved in Logs mode (no buildData) applies without error and the Build tab falls back to default builder mode" },
-  { "title": "a saved view wins over a stale URL build_data", "action": "new", "verifies": "applying a saved view overrides a stale bar build_data in the URL and restores the saved area chart" }
-]

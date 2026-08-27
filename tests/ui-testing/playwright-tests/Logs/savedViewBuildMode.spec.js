@@ -22,6 +22,11 @@ async function saveView(pm, name) {
 async function applyView(pm, name) {
   await pm.logsPage.clickSavedViewsExpand();
   await pm.logsPage.fillSavedViewSearchInput(name);
+  // The saved-views name filter is debounced (~300ms); clicking the apply button
+  // before the list re-renders can land on a detached row and be swallowed (the
+  // dialog stays open, the build page never mounts). Wait for the filter to
+  // settle first — mirrors monaco-query-prefill.spec.js:191.
+  await pm.page.waitForTimeout(1000);
   await pm.logsPage.clickSavedViewByName(name);
 }
 
