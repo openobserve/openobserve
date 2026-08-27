@@ -15,8 +15,7 @@
 
 use promql_parser::parser::token::{self, TokenId};
 
-/// Aggregations that can fold range-function output incrementally through one
-/// dense per-timestamp state per output group.
+/// Aggregations the fused path can fold through dense per-timestamp state.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum FusedAggOp {
     Avg,

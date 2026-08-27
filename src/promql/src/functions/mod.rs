@@ -211,12 +211,8 @@ pub trait RangeFunc: Send + Sync {
 }
 
 /// Constructs the range function for fused aggregate evaluation, or `None` if
-/// the function is not eligible.
-///
-/// Only single-argument range functions whose engine path is exactly
-/// [`eval_range`] qualify: the fused path reproduces that evaluation, so
-/// functions with extra parameters (`quantile_over_time`, `predict_linear`,
-/// `holt_winters`) or special semantics (`absent_over_time`) stay generic.
+/// it is not eligible: only single-argument functions whose engine path is
+/// exactly [`eval_range`] qualify.
 pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
     Some(match name {
         "avg_over_time" => Box::new(avg_over_time::AvgOverTimeFunc::new()),

@@ -18,13 +18,10 @@ use config::meta::promql::value::Sample;
 use super::op::FusedAggOp;
 use crate::common::{kahan_sum_increment, std_deviation2, std_variance2};
 
-/// Dense per-timestamp aggregation state for one output group, indexed by the
-/// evaluation-timestamp slot.
+/// Dense per-timestamp aggregation state for one output group.
 ///
-/// Each variant mirrors the matching [`crate::aggregations::Accumulate`]
-/// implementation exactly (Kahan sums, min/max comparison direction and
-/// infinity seeds, two-pass stddev), so for the same accumulation order the
-/// fused result is bit-for-bit identical to the generic evaluator's.
+/// Each variant mirrors its [`crate::aggregations::Accumulate`] counterpart
+/// exactly, so the same accumulation order yields bit-for-bit identical results.
 pub(super) enum FusedAccumulator {
     Avg {
         sums: Vec<(f64, f64)>,
@@ -120,11 +117,9 @@ impl FusedAccumulator {
         }
     }
 
-    /// Folds `other` in as if its chunk's series had been pushed here, after
-    /// this accumulator's own. Chunks are always merged in series order, so
-    /// every variant except the Kahan-compensated `Sum`/`Avg` stays bit-equal
-    /// to the sequential fold; those two stay deterministic for a fixed chunk
-    /// size.
+    /// Folds `other` in as if its series had been pushed after this chunk's own.
+    /// Bit-equal to the sequential fold except the Kahan `Sum`/`Avg`, which stay
+    /// deterministic for a fixed chunk size.
     pub(super) fn merge(&mut self, other: Self) {
         match (self, other) {
             (
@@ -140,8 +135,7 @@ impl FusedAccumulator {
                     }
                     let (other_sum, other_c) = other_sums[slot];
                     let (sum, c) = &mut sums[slot];
-                    // Two separate compensated increments: a plain `c + other_c`
-                    // add rounds residuals away before the main sums cancel.
+                    // Separate compensated increments; `c + other_c` would round residuals away.
                     (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
                     (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
                     counts[slot] += other_count;

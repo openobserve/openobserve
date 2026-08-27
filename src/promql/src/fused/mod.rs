@@ -14,9 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Fused evaluation of `agg(range_func(...))`: range-function values fold
-//! incrementally into one dense per-timestamp accumulator per output group,
-//! never materializing the intermediate per-series samples. The generic
-//! evaluator remains the correctness reference for every other shape.
+//! straight into dense per-group accumulators, skipping the generic
+//! evaluator's intermediate per-series materialization.
 
 mod accumulator;
 mod eval;

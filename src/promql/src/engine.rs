@@ -837,12 +837,12 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
-        // Avoid materializing one range-function output sample per source
-        // series and evaluation timestamp when the parent aggregation folds
-        // those values immediately. Kept as a narrow AST match so the generic
-        // evaluator remains the correctness fallback for every other
-        // expression shape.
-        if let Some(agg_op) = fused::FusedAggOp::from_token(op.id())
+        // Fold range-function output straight into the aggregation instead of
+        // materializing per-series samples; every other shape stays generic.
+        if config::get_config()
+            .search
+            .feature_metrics_fused_agg_enabled
+            && let Some(agg_op) = fused::FusedAggOp::from_token(op.id())
             && let PromExpr::Call(Call { func, args }) = expr
             && args.len() == 1
             && let Some(range_func) = functions::fusable_range_func(func.name)

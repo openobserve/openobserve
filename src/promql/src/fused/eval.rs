@@ -28,20 +28,15 @@ use crate::{
     micros,
 };
 
-/// Series per parallel fold chunk inside one large group. Fused per-series
-/// work includes the range-function window evaluation, so chunks are much
-/// smaller than the generic path's accumulate-only `AGG_PARALLEL_CHUNK`.
-const FUSED_PARALLEL_CHUNK: usize = 2048;
+/// Series per parallel fold chunk; smaller than the generic `AGG_PARALLEL_CHUNK`
+/// because a fused chunk also pays the range-function evaluation.
+const FUSED_PARALLEL_CHUNK: usize = 1024;
 
 /// Evaluates a range function and folds its values straight into aggregation
-/// groups.
+/// groups, skipping the generic path's per-series sample materialization.
 ///
-/// The generic evaluator materializes one output `Sample` per input series and
-/// evaluation timestamp, only for the parent aggregation to scan and discard
-/// those samples immediately. This path keeps one dense per-timestamp state
-/// per output group instead. The engine selects it only for the exact
-/// `agg(range_func(...))` shape; every other expression tree stays on the
-/// generic evaluator, which remains the correctness reference.
+/// The engine selects this only for the exact `agg(range_func(...))` shape;
+/// everything else stays on the generic evaluator, the correctness reference.
 pub(crate) fn fused_range_agg(
     param: &Option<LabelModifier>,
     data: Value,
@@ -65,9 +60,8 @@ pub(crate) fn fused_range_agg(
         return Ok(Value::None);
     }
 
-    // The range function drops the metric name before the parent aggregation
-    // sees the labels. Apply the same transformation before computing group
-    // signatures, including the uncommon `sum by(__name__) (rate(...))` case.
+    // Strip the metric name before grouping, as the range function would have;
+    // visible to `sum by(__name__) (...)`.
     if !KEEP_METRIC_NAME_FUNC.contains(func_name) {
         matrix.par_iter_mut().for_each(|series| {
             series.labels.retain(|label| label.name != NAME_LABEL);
@@ -81,8 +75,7 @@ pub(crate) fn fused_range_agg(
         .par_iter()
         .filter_map(|(_, series_indices)| {
             let labels = projected_labels(param, &matrix[series_indices[0]].labels);
-            // Fold a chunk of the group in series order, then timestamp order,
-            // matching the generic path's accumulation order within the chunk.
+            // Series order first, timestamps second — the generic accumulation order.
             let fold_chunk = |chunk: &[usize]| {
                 let mut acc = FusedAccumulator::new(op, timestamps.len());
                 for &series_idx in chunk {
@@ -115,10 +108,8 @@ pub(crate) fn fused_range_agg(
                 acc
             };
 
-            // A huge group (e.g. `sum(rate(...))` without a modifier puts every
-            // series in one group) would otherwise evaluate the range function
-            // on one thread; fold it in parallel chunks and merge the partials
-            // sequentially in chunk order so the result stays deterministic.
+            // An ungrouped `sum(rate(...))` puts every series in one group; fold large
+            // groups in parallel chunks, merging partials in chunk order for determinism.
             let acc = if series_indices.len() >= 2 * FUSED_PARALLEL_CHUNK {
                 let mut chunks = series_indices
                     .par_chunks(FUSED_PARALLEL_CHUNK)
@@ -135,8 +126,7 @@ pub(crate) fn fused_range_agg(
             };
 
             let samples = acc.into_samples(&timestamps);
-            // The generic range function drops series that produce no values,
-            // which removes their groups from the aggregation input entirely.
+            // The generic range function drops no-output series, and their groups with them.
             if samples.is_empty() {
                 return None;
             }
@@ -149,8 +139,7 @@ pub(crate) fn fused_range_agg(
         })
         .collect::<Vec<_>>();
 
-    // Dropping many per-series allocations single-threaded is slow at high
-    // cardinality; free them on the rayon pool like the generic path does.
+    // Free the per-series allocations on the rayon pool; dropping them single-threaded is slow.
     matrix.into_par_iter().for_each(drop);
     if results.is_empty() {
         return Ok(Value::None);
@@ -248,11 +237,9 @@ mod tests {
                 "/two",
                 &zip([0.2, 20.4, 25.1, 45.8, 50.3, 70.9]),
             ),
-            // Sparse series: samples exist only in the last evaluation window,
-            // so earlier slots stay empty for this series.
+            // Samples only in the last window: earlier slots stay empty.
             make_series("other_total", "a", "/two", &[(130, 7.5), (170, 11.25)]),
-            // Every sample sits before the first window: the generic range
-            // function drops this series, and with it the whole `/zzz` group.
+            // All samples precede every window: generic drops this series and its `/zzz` group.
             make_series("stale_total", "z", "/zzz", &[(-100, 1.0), (-50, 2.0)]),
         ]
     }
@@ -339,9 +326,8 @@ mod tests {
     #[test]
     fn test_fused_chunked_large_group_matches_generic_and_is_deterministic() {
         let eval_ctx = eval_ctx();
-        // Both the ungrouped fold and each `by(path)` group cross the parallel
-        // chunk threshold. Integer-valued samples keep every float operation
-        // exact, so chunk-merged results must equal the generic path's bits.
+        // Ungrouped and per-`by(path)` folds both cross the chunk threshold;
+        // integer values keep float ops exact, so results must match generic bits.
         let series_count = 2 * (2 * FUSED_PARALLEL_CHUNK) + 100;
         let matrix = (0..series_count)
             .map(|i| {
