@@ -51,6 +51,14 @@ pub enum ExperimentComparisonDimensionKindBody {
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+pub enum ExperimentComparisonScoreDataTypeBody {
+    Numeric,
+    Categorical,
+    Boolean,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum ExperimentComparisonAssignmentBody {
     Regressed,
     Improved,
@@ -66,11 +74,17 @@ pub enum ExperimentComparisonAssignmentBody {
 pub struct ExperimentComparisonDimensionBody {
     pub name: String,
     pub kind: ExperimentComparisonDimensionKindBody,
+    /// Score value type. `null` for cost and latency dimensions.
+    pub data_type: Option<ExperimentComparisonScoreDataTypeBody>,
     pub score_config_id: Option<String>,
     pub score_config_name: Option<String>,
     pub score_config_version: Option<String>,
     pub baseline: Option<f64>,
     pub candidate: Option<f64>,
+    /// Original category names for categorical dimensions when each side has
+    /// one unambiguous label; `null` otherwise.
+    pub baseline_label: Option<String>,
+    pub candidate_label: Option<String>,
     pub delta: Option<f64>,
     /// Change in the better direction; positive always means improved.
     pub oriented_delta: Option<f64>,
@@ -120,11 +134,17 @@ pub struct ExperimentComparisonCountsBody {
 pub struct ExperimentComparisonSummaryDimensionBody {
     pub name: String,
     pub kind: ExperimentComparisonDimensionKindBody,
+    /// Score value type. `null` for cost and latency dimensions.
+    pub data_type: Option<ExperimentComparisonScoreDataTypeBody>,
     pub score_config_id: Option<String>,
     pub score_config_name: Option<String>,
     pub score_config_version: Option<String>,
     pub baseline: Option<f64>,
     pub candidate: Option<f64>,
+    /// Original category names when every value represented by that side's
+    /// aggregate has the same label; `null` otherwise.
+    pub baseline_label: Option<String>,
+    pub candidate_label: Option<String>,
     pub delta: Option<f64>,
     /// Aggregate change in the better direction over comparable rows.
     pub oriented_delta: Option<f64>,
@@ -182,6 +202,16 @@ impl From<domain::ExperimentComparisonDimensionKind> for ExperimentComparisonDim
     }
 }
 
+impl From<domain::ExperimentComparisonScoreDataType> for ExperimentComparisonScoreDataTypeBody {
+    fn from(value: domain::ExperimentComparisonScoreDataType) -> Self {
+        match value {
+            domain::ExperimentComparisonScoreDataType::Numeric => Self::Numeric,
+            domain::ExperimentComparisonScoreDataType::Categorical => Self::Categorical,
+            domain::ExperimentComparisonScoreDataType::Boolean => Self::Boolean,
+        }
+    }
+}
+
 impl From<domain::ExperimentComparisonAssignment> for ExperimentComparisonAssignmentBody {
     fn from(value: domain::ExperimentComparisonAssignment) -> Self {
         match value {
@@ -201,11 +231,14 @@ impl From<domain::ExperimentComparisonDimension> for ExperimentComparisonDimensi
         Self {
             name: value.name,
             kind: value.kind.into(),
+            data_type: value.data_type.map(Into::into),
             score_config_id: value.score_config_id,
             score_config_name: value.score_config_name,
             score_config_version: value.score_config_version,
             baseline: value.baseline,
             candidate: value.candidate,
+            baseline_label: value.baseline_label,
+            candidate_label: value.candidate_label,
             delta: value.delta,
             oriented_delta: value.oriented_delta,
             gating: value.gating,
@@ -249,11 +282,14 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
                 .map(|dimension| ExperimentComparisonSummaryDimensionBody {
                     name: dimension.name,
                     kind: dimension.kind.into(),
+                    data_type: dimension.data_type.map(Into::into),
                     score_config_id: dimension.score_config_id,
                     score_config_name: dimension.score_config_name,
                     score_config_version: dimension.score_config_version,
                     baseline: dimension.baseline,
                     candidate: dimension.candidate,
+                    baseline_label: dimension.baseline_label,
+                    candidate_label: dimension.candidate_label,
                     delta: dimension.delta,
                     oriented_delta: dimension.oriented_delta,
                     gating: dimension.gating,
@@ -278,5 +314,74 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
                 })
                 .collect(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn dimension_json_exposes_score_type_and_categorical_labels() {
+        let body = ExperimentComparisonDimensionBody::from(domain::ExperimentComparisonDimension {
+            name: "verdict · v1".to_string(),
+            kind: domain::ExperimentComparisonDimensionKind::Score,
+            data_type: Some(domain::ExperimentComparisonScoreDataType::Categorical),
+            score_config_id: Some("verdict-config".to_string()),
+            score_config_name: Some("Verdict".to_string()),
+            score_config_version: Some("1".to_string()),
+            baseline: Some(1.0),
+            candidate: Some(0.0),
+            baseline_label: Some("good".to_string()),
+            candidate_label: Some("poor".to_string()),
+            delta: Some(-1.0),
+            oriented_delta: Some(-1.0),
+            gating: true,
+            normalized: false,
+            baseline_sample_count: 1,
+            candidate_sample_count: 1,
+            baseline_dispersion: None,
+            candidate_dispersion: None,
+            within_noise: false,
+            assignment: domain::ExperimentComparisonAssignment::Regressed,
+        });
+
+        let value = serde_json::to_value(body).unwrap();
+        assert_eq!(value["dataType"], json!("categorical"));
+        assert_eq!(value["baselineLabel"], json!("good"));
+        assert_eq!(value["candidateLabel"], json!("poor"));
+    }
+
+    #[test]
+    fn intrinsic_dimension_json_keeps_type_and_labels_null() {
+        let body = ExperimentComparisonDimensionBody::from(domain::ExperimentComparisonDimension {
+            name: "cost".to_string(),
+            kind: domain::ExperimentComparisonDimensionKind::Cost,
+            data_type: None,
+            score_config_id: None,
+            score_config_name: None,
+            score_config_version: None,
+            baseline: Some(0.1),
+            candidate: Some(0.2),
+            baseline_label: None,
+            candidate_label: None,
+            delta: Some(0.1),
+            oriented_delta: Some(-0.1),
+            gating: true,
+            normalized: false,
+            baseline_sample_count: 1,
+            candidate_sample_count: 1,
+            baseline_dispersion: None,
+            candidate_dispersion: None,
+            within_noise: false,
+            assignment: domain::ExperimentComparisonAssignment::Regressed,
+        });
+
+        let value = serde_json::to_value(body).unwrap();
+        assert_eq!(value["dataType"], serde_json::Value::Null);
+        assert_eq!(value["baselineLabel"], serde_json::Value::Null);
+        assert_eq!(value["candidateLabel"], serde_json::Value::Null);
     }
 }
