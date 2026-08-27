@@ -1,6 +1,0 @@
-{
-  "group": "RUM",
-  "spec_filename": "rumShareLink.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
