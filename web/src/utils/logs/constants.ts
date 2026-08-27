@@ -103,6 +103,8 @@ export const DEFAULT_LOGS_CONFIG = {
   meta: {
     logsVisualizeToggle: "logs" as const,
     buildModeQueryEditorDisabled: false, // true when in build mode and customQuery is false
+    // One-shot hand-off of a saved view's builder chart to BuildQueryPage; not persisted.
+    savedBuildConfig: null as any,
     refreshInterval: 0 as number,
     refreshIntervalLabel: "Off",
     refreshHistogram: false,

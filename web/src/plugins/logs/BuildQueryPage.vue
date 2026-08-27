@@ -63,6 +63,7 @@ import {
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
 import { parseWhereClauseToFilter } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
+import { searchState } from "@/composables/useLogs/searchState";
 
 // ============================================================================
 // Component Imports
@@ -174,6 +175,7 @@ const {
 } = useDashboardPanelData("build");
 
 const { showErrorNotification } = useNotifications();
+const { searchObj } = searchState();
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", "build");
@@ -235,11 +237,17 @@ const initializeFromQuery = async () => {
     dashboardPanelData.meta.dateTime = { ...props.selectedDateTime };
   }
 
-  // Restore config/chart type from URL params (similar to visualization's preservedConfig)
-  // NOTE: This only restores config, NOT fields. Fields are always parsed from props.searchQuery.
-  // Chart type is only restored on FIRST toggle (for shared links). On subsequent tab switches,
-  // chart type is always auto-selected based on the query.
-  const urlConfig = restoreConfigFromUrl();
+  // Restore config/chart type from the saved view being applied, else from URL
+  // params (similar to visualization's preservedConfig). Fields and chart type are
+  // only restored on the FIRST toggle (shared links); on later tab switches they
+  // are re-derived from props.searchQuery. A saved view is the exception: it wins
+  // over the URL — which still holds the build_data of whatever was open before —
+  // and restores in full even when the build tab was already visited. Consumed
+  // once, so later toggles go back to re-deriving from the logs query.
+  const savedViewConfig = searchObj.meta.savedBuildConfig;
+  searchObj.meta.savedBuildConfig = null;
+  const urlConfig = savedViewConfig ?? restoreConfigFromUrl();
+  const restoreFields = props.isFirstToggle || !!savedViewConfig;
   let shouldAutoSelectChartType = true;
 
   // Always restore config from URL (for settings like table_dynamic_columns, etc.)
@@ -249,17 +257,15 @@ const initializeFromQuery = async () => {
       ...urlConfig.config,
     };
   }
-  // Only restore chart type from URL on FIRST toggle (shared link scenario)
-  // On subsequent toggles, always re-parse and auto-select chart type
-  if (urlConfig.type && props.isFirstToggle) {
+  if (urlConfig.type && restoreFields) {
     dashboardPanelData.data.type = urlConfig.type;
     shouldAutoSelectChartType = false;
   }
 
-  // On FIRST toggle (shared link): if URL has saved fields, restore them directly
-  // instead of parsing searchQuery. This preserves the exact builder/custom state.
+  // Restore saved fields directly instead of parsing searchQuery, preserving the
+  // exact builder/custom state.
   if (
-    props.isFirstToggle &&
+    restoreFields &&
     urlConfig.fields &&
     (urlConfig.fields.x?.length ||
       urlConfig.fields.y?.length ||
