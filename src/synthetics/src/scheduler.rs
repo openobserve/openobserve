@@ -786,14 +786,6 @@ fn refund_planned(
 pub(crate) async fn resolve_pool_gate(
     org_id: &str,
 ) -> Option<(crate::pool::StepPoolHooks, PoolExhaustionPolicy)> {
-    // §9A / §9D: the master switch gates ENFORCEMENT as it gates the ack's emit.
-    // Off — the default — means no read, no deduct, no gate.
-    if !o2_enterprise::enterprise::common::config::get_config()
-        .cloud
-        .synthetics_billing_enabled
-    {
-        return None;
-    }
     // No pool here. Fail open: an unmetered fleet beats dark monitoring.
     let hooks = crate::pool::hooks()?;
 

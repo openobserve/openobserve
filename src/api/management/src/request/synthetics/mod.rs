@@ -1033,44 +1033,31 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
 /// the org still has grant left, so past that an ack costs one counter read.
 #[cfg(feature = "cloud")]
 async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolView {
-    // The §9A/§9D master switch; off by default, which is the Phase 1 state.
-    let billing_enabled = o2_enterprise::enterprise::common::config::get_config()
-        .cloud
-        .synthetics_billing_enabled;
-    let remaining = if billing_enabled {
-        openobserve_core::trial_quota::synthetics_steps_remaining(org_id)
-    } else {
-        0
-    };
-    let is_contract = needs_plan_read(billing_enabled, remaining)
+    let remaining = openobserve_core::trial_quota::synthetics_steps_remaining(org_id);
+    let is_contract = needs_plan_read(remaining)
         && o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
             org_id,
         )
         .await
         .requires_additional_credits();
-    step_pool_view(billing_enabled, remaining, is_contract)
+    step_pool_view(remaining, is_contract)
 }
 
 /// Whether the org's PLAN still has to be read to answer [`step_pool_view`].
-/// False once the answer cannot change: nothing is metered on this node, or the
-/// grant is spent and the ack is billable either way.
+/// False once the grant is spent: the ack is billable either way.
 #[cfg(feature = "cloud")]
-fn needs_plan_read(billing_enabled: bool, remaining: u64) -> bool {
-    billing_enabled && remaining > 0
+fn needs_plan_read(remaining: u64) -> bool {
+    remaining > 0
 }
 
 /// SPEC §6.1 / §7.3 — the free/billable decision for one ack, as arithmetic.
 #[cfg(feature = "cloud")]
 fn step_pool_view(
-    billing_enabled: bool,
     remaining: u64,
     is_contract: bool,
 ) -> openobserve_synthetics::job_api::StepPoolView {
     use openobserve_synthetics::job_api::StepPoolView;
 
-    if !billing_enabled {
-        return StepPoolView::NotApplicable;
-    }
     if remaining == 0 {
         // §7.3, E16/T31 — grant gone, so metered overage. A Free org never got
         // here; its slot was skipped at the enqueue.
@@ -2092,25 +2079,17 @@ mod tests {
 
         use super::step_pool_view;
 
-        // §9A/§9D master switch off — the Phase 1 state, nothing is consulted.
-        assert_eq!(
-            step_pool_view(false, 10_000, false),
-            StepPoolView::NotApplicable,
-        );
-        assert_eq!(step_pool_view(false, 0, true), StepPoolView::NotApplicable);
-
         // The grant still has room.
-        assert_eq!(step_pool_view(true, 1, false), StepPoolView::Funded);
-        assert_eq!(step_pool_view(true, 10_000, false), StepPoolView::Funded);
+        assert_eq!(step_pool_view(1, false), StepPoolView::Funded);
+        assert_eq!(step_pool_view(10_000, false), StepPoolView::Funded);
 
         // Spent ⇒ metered overage (E16/T31).
-        assert_eq!(step_pool_view(true, 0, false), StepPoolView::Spent);
+        assert_eq!(step_pool_view(0, false), StepPoolView::Spent);
 
-        // A contract org is never pool-gated (E18/T36), grant or no grant.
-        assert_eq!(
-            step_pool_view(true, 10_000, true),
-            StepPoolView::NotApplicable,
-        );
+        // A contract org with grant left is never pool-gated (E18/T36). It cannot
+        // be asked about a SPENT grant: `needs_plan_read` short-circuits at
+        // `remaining == 0`, so `is_contract` is never computed there.
+        assert_eq!(step_pool_view(10_000, true), StepPoolView::NotApplicable);
     }
 
     /// The plan read is one `customer_billings` query and this runs on EVERY
@@ -2120,14 +2099,10 @@ mod tests {
     fn the_plan_is_read_only_while_the_grant_can_still_fund_an_ack() {
         use super::needs_plan_read;
 
-        assert!(needs_plan_read(true, 1));
+        assert!(needs_plan_read(1));
         assert!(
-            !needs_plan_read(true, 0),
+            !needs_plan_read(0),
             "a spent grant is billable whatever the plan says",
-        );
-        assert!(
-            !needs_plan_read(false, 10_000),
-            "nothing is metered on this node",
         );
     }
 

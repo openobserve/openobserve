@@ -57,11 +57,6 @@ pub(crate) mod billing {
     /// both positions of both are testable without touching the environment.
     #[derive(Debug, Clone, Copy)]
     pub(crate) struct BillingFlags {
-        /// `O2_SYNTHETICS_BILLING_ENABLED`, default **false**. Must gate the
-        /// emit path ITSELF, not only enforcement: it is the only rollback for a
-        /// mis-metering incident short of a redeploy, and the only way to halt
-        /// metering fleet-wide while the probe fleet is mixed. False ⇒ no events.
-        pub billing_enabled: bool,
         /// `O2_SYNTHETICS_STEP_CLAMP_ENABLED`, default **true** — disables the
         /// clamp in an incident without a deploy. False bills the probe's raw
         /// count; the `warn` still fires, because with the clamp off the
@@ -393,13 +388,6 @@ pub(crate) mod billing {
     /// stale or duplicate ack never reaches here; [`super::stale_lease_response`]
     /// answers it, and that carries no events.
     pub(crate) fn events_for_ack(flags: BillingFlags, i: BillingInputs<'_>) -> Vec<UsageData> {
-        // The master switch. Authoritative: `ack` re-checks it before the
-        // registry read only to avoid that read on a node that is not metering
-        // at all; the two must agree, and THIS is the one that decides.
-        if !flags.billing_enabled {
-            return Vec::new();
-        }
-
         // d. Venue.
         match i.venue {
             Venue::Public => {}
@@ -532,11 +520,6 @@ pub(crate) mod billing {
         flags: BillingFlags,
         i: &BillingInputs<'_>,
     ) -> Option<super::PoolMovement> {
-        // The master switch, same authority as in `events_for_ack`.
-        if !flags.billing_enabled {
-            return None;
-        }
-
         // Only a grant currently funding this org may be moved. `Spent` and
         // `NotApplicable` both mean the enqueue reserved nothing: an exhausted
         // org runs as overage, a contract org is never pool-gated at all.
@@ -1696,16 +1679,9 @@ pub async fn ack(
     let (usage_events, pool_adjustment) = {
         let ent = o2_enterprise::enterprise::common::config::get_config();
         let flags = billing::BillingFlags {
-            billing_enabled: ent.cloud.synthetics_billing_enabled,
             clamp_enabled: ent.cloud.synthetics_step_clamp_enabled,
         };
-        // `events_for_ack` re-checks the master switch and THAT is authoritative.
-        // This one only avoids the registry read on a non-metering node.
-        let venue = if flags.billing_enabled {
-            billing::resolve_venue(&check.location).await
-        } else {
-            billing::Venue::Unresolved
-        };
+        let venue = billing::resolve_venue(&check.location).await;
         // The region whose node WROTE the row. Only a super cluster has one, so
         // a single-region deployment leaves it `None` rather than stamping the
         // `"default"` placeholder. It is NOT the probe's execution region — that
@@ -2067,7 +2043,6 @@ mod tests {
 
         /// As deployed once the operator flips the switch: emit live, clamp on.
         const LIVE: BillingFlags = BillingFlags {
-            billing_enabled: true,
             clamp_enabled: true,
         };
 
@@ -2704,10 +2679,7 @@ mod tests {
         /// incident is a config flip, which is a no-op unless it gates the WRITE.
         #[test]
         fn the_master_switch_off_emits_nothing() {
-            let off = BillingFlags {
-                billing_enabled: false,
-                ..LIVE
-            };
+            let off = BillingFlags { ..LIVE };
             assert!(events_for_ack(off, browser(14, 1, 0, 14)).is_empty());
             assert!(events_for_ack(off, protocol(0, 1)).is_empty());
         }
@@ -2717,18 +2689,12 @@ mod tests {
         #[test]
         fn both_flag_positions_are_supported_and_the_two_flags_are_independent() {
             for clamp_enabled in [true, false] {
-                let off = BillingFlags {
-                    billing_enabled: false,
-                    clamp_enabled,
-                };
+                let off = BillingFlags { clamp_enabled };
                 assert!(
                     events_for_ack(off, browser(14, 1, 0, 9_999)).is_empty(),
                     "the master switch wins regardless of the clamp switch"
                 );
-                let on = BillingFlags {
-                    billing_enabled: true,
-                    clamp_enabled,
-                };
+                let on = BillingFlags { clamp_enabled };
                 let expected = if clamp_enabled { 14.0 } else { 9_999.0 };
                 assert_eq!(
                     billed(&events_for_ack(on, browser(14, 1, 0, 9_999))),
@@ -3139,7 +3105,6 @@ mod tests {
         #[test]
         fn the_master_switch_off_moves_no_pool_at_all() {
             const DARK: BillingFlags = BillingFlags {
-                billing_enabled: false,
                 clamp_enabled: true,
             };
             let i = funded(browser(14, 1, 0, 4));
@@ -3301,7 +3266,6 @@ mod tests {
                 .expect("zero-fallback counter");
 
             for (guard, what) in [
-                ("if !flags.billing_enabled {", "the §9A/§9D master switch"),
                 ("match i.venue {", "the §8.2 venue gate"),
                 (r#"if i.error_source == "queue" {"#, "the E11 queue guard"),
             ] {
@@ -3363,7 +3327,6 @@ mod tests {
 
             // …and the switch still does what it says.
             const UNCLAMPED: BillingFlags = BillingFlags {
-                billing_enabled: true,
                 clamp_enabled: false,
             };
             assert_eq!(
