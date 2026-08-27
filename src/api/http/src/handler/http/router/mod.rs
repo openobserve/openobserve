@@ -818,6 +818,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
 
         // Traces
+        .route("/{org_id}/traces/time_range", get(traces::time_index::get_org_trace_time_range))
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
         .route("/{org_id}/{stream_name}/traces/latest_stream", get(traces::get_latest_traces_stream))
         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
