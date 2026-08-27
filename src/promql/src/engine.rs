@@ -36,7 +36,7 @@ use super::{
     load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     promql::label_usage::labels_dropped_at_root,
 };
-use crate::{aggregations, binaries, functions, micros, promql::rewrite::remove_filter_all};
+use crate::{aggregations, binaries, functions, fused, micros, promql::rewrite::remove_filter_all};
 
 pub struct Engine {
     trace_id: String,
@@ -842,7 +842,7 @@ impl Engine {
         // those values immediately. Kept as a narrow AST match so the generic
         // evaluator remains the correctness fallback for every other
         // expression shape.
-        if let Some(agg_op) = aggregations::FusedAggOp::from_token(op.id())
+        if let Some(agg_op) = fused::FusedAggOp::from_token(op.id())
             && let PromExpr::Call(Call { func, args }) = expr
             && args.len() == 1
             && let Some(range_func) = functions::fusable_range_func(func.name)
@@ -851,7 +851,7 @@ impl Engine {
                 .last()
                 .expect("promql-parser validated the function argument");
             let range_input = self.exec_expr(&range_arg).await?;
-            return aggregations::fused_range_agg(
+            return fused::fused_range_agg(
                 modifier,
                 range_input,
                 range_func.as_ref(),

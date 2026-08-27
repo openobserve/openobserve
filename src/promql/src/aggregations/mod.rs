@@ -30,7 +30,6 @@ mod avg;
 mod bottomk;
 mod count;
 mod count_values;
-mod fused;
 mod group;
 mod max;
 mod min;
@@ -44,7 +43,6 @@ pub(crate) use avg::avg;
 pub(crate) use bottomk::bottomk;
 pub(crate) use count::count;
 pub(crate) use count_values::count_values;
-pub(crate) use fused::{FusedAggOp, fused_range_agg};
 pub(crate) use group::group;
 pub(crate) use max::max;
 pub(crate) use min::min;
@@ -181,7 +179,7 @@ pub fn labels_to_exclude(
 
 /// Projects a series' labels onto the grouping set of the label modifier
 /// (`by(...)` keeps them, `without(...)` drops them, none drops all).
-fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels) -> Labels {
+pub(crate) fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels) -> Labels {
     match modifier {
         Some(LabelModifier::Include(include)) => labels_to_include(&include.labels, labels.clone()),
         Some(LabelModifier::Exclude(exclude)) => labels_to_exclude(&exclude.labels, labels.clone()),
