@@ -308,6 +308,10 @@ export class AlertsPage {
             alertListTabAll: '[data-test="alert-list-tab-all"]',
             alertListTabScheduled: '[data-test="alert-list-tab-scheduled"]',
             alertListTabRealtime: '[data-test="alert-list-tab-realTime"]',
+            alertListTabComposite: '[data-test="alert-list-tab-composite"]',
+            alertListTabAnomalyDetection: '[data-test="alert-list-tab-anomalyDetection"]',
+            alertSectionTabs: '[data-test="alert-section-tabs"]',
+            searchScopeCurrent: '[data-test="alert-list-search-scope-current"]',
             alertListFilterChip: '[data-test="alert-list-filter-chip"]',
 
             // v3 AddAlert wizard tabs (OToggleGroupItem with data-test="add-alert-tab-{key}")
@@ -1984,6 +1988,139 @@ export class AlertsPage {
      */
     async expectSearchAcrossFoldersToggleHidden() {
         await expect(this.page.locator(this.locators.searchAcrossFoldersToggle)).not.toBeVisible();
+    }
+
+    // ==================== ALERT LIST TAB CONTROL (OToggleGroup migration) ====================
+
+    /**
+     * Click an alert-type tab by its value (all | scheduled | realTime | composite).
+     */
+    async clickAlertListTab(value) {
+        await this.page.locator(`[data-test="alert-list-tab-${value}"]`).click();
+    }
+
+    /**
+     * Assert the given alert-type tab carries data-state="on" (reka-ui ToggleGroupItem).
+     */
+    async expectAlertListTabActive(value) {
+        await expect(this.page.locator(`[data-test="alert-list-tab-${value}"][data-state="on"]`)).toBeVisible();
+    }
+
+    /**
+     * Assert the four OSS alert-type tabs render and the enterprise-only Anomaly tab is absent.
+     */
+    async expectAlertListTabsRender() {
+        await expect(this.page.locator(this.locators.alertListTabAll)).toBeVisible();
+        await expect(this.page.locator(this.locators.alertListTabScheduled)).toBeVisible();
+        await expect(this.page.locator(this.locators.alertListTabRealtime)).toBeVisible();
+        await expect(this.page.locator(this.locators.alertListTabComposite)).toBeVisible();
+        await expect(this.page.locator(this.locators.alertListTabAnomalyDetection)).toHaveCount(0);
+    }
+
+    /**
+     * Assert an alert row name cell is visible (the list renders the alert).
+     */
+    async expectAlertNameCellVisible(name) {
+        await expect(this.page.locator(`[data-test="alert-list-${name}-name-cell"]`)).toBeVisible();
+    }
+
+    /**
+     * Assert an alert row name cell is absent (filtered out by the active tab).
+     */
+    async expectAlertNameCellHidden(name) {
+        await expect(this.page.locator(`[data-test="alert-list-${name}-name-cell"]`)).not.toBeVisible();
+    }
+
+    /**
+     * Assert a composite alert's badge is visible by alert id.
+     */
+    async expectCompositeBadgeVisible(alertId) {
+        await expect(this.page.locator(`[data-test="alert-list-composite-badge-${alertId}"]`)).toBeVisible();
+    }
+
+    /**
+     * Assert a composite alert's badge is absent by alert id.
+     */
+    async expectCompositeBadgeHidden(alertId) {
+        await expect(this.page.locator(`[data-test="alert-list-composite-badge-${alertId}"]`)).not.toBeVisible();
+    }
+
+    // ==================== HEADER SUBTITLE + SECTION SWITCHER ====================
+
+    /**
+     * Assert the shared page header title ("Alerts") renders.
+     */
+    async expectHeaderTitleVisible() {
+        await expect(this.page.getByRole('heading', { name: 'Alerts', exact: true }).first()).toBeVisible();
+    }
+
+    /**
+     * Assert the shared page header subtitle ("Alert rules and notification channels") renders.
+     */
+    async expectHeaderSubtitleVisible() {
+        await expect(this.page.getByText('Alert rules and notification channels', { exact: true }).first()).toBeVisible();
+    }
+
+    /**
+     * Assert the four sibling section tabs render.
+     */
+    async expectSectionTabsVisible() {
+        await expect(this.page.locator(this.locators.alertSectionTabs)).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-section-tab-alertList"]')).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-section-tab-alertDestinations"]')).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-section-tab-alertTemplates"]')).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-section-tab-alertLibrary"]')).toBeVisible();
+    }
+
+    /**
+     * Click a sibling section tab by route key (alertList | alertDestinations | alertTemplates | alertLibrary).
+     */
+    async clickSectionTab(key) {
+        await this.page.locator(`[data-test="alert-section-tab-${key}"]`).click();
+    }
+
+    /**
+     * Assert the given section tab is active (reka-ui TabsTrigger data-state="active").
+     */
+    async expectSectionTabActive(key) {
+        await expect(this.page.locator(`[data-test="alert-section-tab-${key}"][data-state="active"]`)).toBeVisible();
+    }
+
+    /**
+     * Assert the current URL contains the given fragment (route path).
+     */
+    async expectCurrentUrlContains(fragment) {
+        await expect(this.page).toHaveURL(new RegExp(fragment));
+    }
+
+    // ==================== SEARCH SCOPE TOGGLE ====================
+
+    /**
+     * Click the "This folder" search scope item.
+     */
+    async clickSearchScopeCurrent() {
+        await this.page.locator(this.locators.searchScopeCurrent).click();
+    }
+
+    /**
+     * Click the "All folders" search scope item.
+     */
+    async clickSearchScopeAcrossFolders() {
+        await this.page.locator(this.locators.searchAcrossFoldersToggle).click();
+    }
+
+    /**
+     * Assert the "This folder" scope item carries data-state="on".
+     */
+    async expectSearchScopeCurrentActive() {
+        await expect(this.page.locator(`${this.locators.searchScopeCurrent}[data-state="on"]`)).toBeVisible();
+    }
+
+    /**
+     * Assert the "All folders" scope item carries data-state="on".
+     */
+    async expectSearchScopeAcrossFoldersActive() {
+        await expect(this.page.locator(`${this.locators.searchAcrossFoldersToggle}[data-state="on"]`)).toBeVisible();
     }
 
     /**

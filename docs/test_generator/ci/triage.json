@@ -1,0 +1,33 @@
+{
+  "feature_slug": "alerts-ui-refactor",
+  "feature_title": "Alerts UI refactor (design-system pass)",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-list-tabs.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-list-tabs.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/views/AlertLibrary/AlertLibrary.vue",
+    "web/src/components/alertLibrary/LibraryDrawer.vue",
+    "web/src/components/alertLibrary/LibraryCard.vue",
+    "web/src/lib/core/RefreshButton/ORefreshButton.vue",
+    "web/src/lib/core/Table/OTable.vue",
+    "web/src/lib/forms/Select/OSelect.vue",
+    "web/src/lib/core/Badge/badgeGroups.ts",
+    "web/src/lib/styles/tokens/component.css"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 107 changed paths are OSS frontend/test files under web/src/** and tests/ui-testing/**; none live under enterprise/, o2_enterprise/, src/enterprise/, or any enterprise-owned module, and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) appear in the changed paths or symbol names. Classified OSS.",
+    "skip": "Not skipped. There is no explicit opt-out (feature_hint.txt and trigger_comment.txt are both empty, no tests-added label), and the change is clearly user-facing: it rewrites alert list tabs, page headers, tables, refresh buttons, selects, and visual tokens across web/src.",
+    "e2e": "E2E is warranted. The alert list page's tab control was migrated from AppTabs to OToggleGroup/OToggleGroupItem (changing data-test attributes), page headers gained subtitles and tabs-below, and shared core components (OTable, ORefreshButton, OSelect, OTag) gained new props, tooltips, and empty states — all user-visible behavior that needs verification.",
+    "area": "Alerts is the primary area. The most concrete behavioral change is the AlertList tab migration plus the AlertLibrary header changes, and the E2E page object tests/ui-testing/pages/alertsPages/alertsPage.js was updated in the same diff. Note the change is cross-cutting and also touches DatabaseMonitoring and SLO views.",
+    "group": "The Alerts matrix shard (actual_folder Alerts) already exists in the playwright matrix and is the closest fit for the alert list/library pages this change rewrites.",
+    "existing_tests": "No Playwright E2E specs under tests/ui-testing/playwright-tests/** are changed in the diff. The only test-file changes are Vitest unit specs (web/src/**/*.spec.ts) and the Alerts page-object helper tests/ui-testing/pages/alertsPages/alertsPage.js, neither of which counts as E2E spec coverage — so no E2E specs in the diff."
+  }
+}

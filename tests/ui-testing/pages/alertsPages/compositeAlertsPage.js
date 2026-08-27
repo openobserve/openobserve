@@ -22,7 +22,7 @@ export class CompositeAlertsPage {
       previewResult: '[data-test="alerts-composite-preview-result"]',
       previewRow: (id) => `[data-test="alerts-composite-preview-child-${id}"]`,
       save: '[data-test="add-alert-submit-btn"]',
-      listCompositeTab: '[data-test="tab-composite"]',
+      listCompositeTab: '[data-test="alert-list-tab-composite"]',
       listBadge: (id) => `[data-test="alert-list-composite-badge-${id}"]`,
       listChildCount: (id) => `[data-test="alert-list-child-count-${id}"]`,
       listReferenceCount: (id) => `[data-test="alert-list-reference-count-${id}"]`,
