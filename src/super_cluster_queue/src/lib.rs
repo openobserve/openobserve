@@ -29,8 +29,8 @@ mod enrichment_table;
 mod eval_annotation_queues;
 mod eval_datasets;
 mod eval_experiments;
-mod eval_playground_snapshots;
 mod eval_jobs;
+mod eval_playground_snapshots;
 mod eval_providers;
 mod eval_score_configs;
 mod eval_scorers;
@@ -60,11 +60,10 @@ mod user;
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
-    EvalDatasetsQueue, EvalExperimentsQueue, EvalJobsQueue, EvalProvidersQueue,
-    EvalPlaygroundSnapshotsQueue, EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue,
-    MetaQueue, OrgUsersQueue,
-    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
-    SyntheticsQueue, TemplatesQueue,
+    EvalDatasetsQueue, EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue,
+    EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue,
+    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue,
+    SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(

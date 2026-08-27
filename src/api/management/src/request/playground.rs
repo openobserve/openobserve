@@ -29,8 +29,8 @@ use openobserve_core::{
         experiment_runner::render_prompt,
         playground::{self, PlaygroundError},
         provider::{
-            PreparedProvider, ProviderChatMessage, ProviderChatParams,
-            ProviderStreamStartError, RawProviderConfig,
+            PreparedProvider, ProviderChatMessage, ProviderChatParams, ProviderStreamStartError,
+            RawProviderConfig,
         },
         provider_stream::ProviderChatDelta,
         sync_scoring::{self, SyncScoringError},
@@ -43,9 +43,8 @@ use crate::{
     models::playground::{
         ListPlaygroundSnapshotsQuery, ListPlaygroundSnapshotsResponseBody, PlaygroundColumnBody,
         PlaygroundRunRequestBody, PlaygroundScoreRequestBody, PlaygroundScoreResponseBody,
-        PlaygroundSnapshotDiffResponseBody,
-        PlaygroundSnapshotResponseBody, ProviderModelsResponseBody,
-        SharePlaygroundSnapshotRequestBody,
+        PlaygroundSnapshotDiffResponseBody, PlaygroundSnapshotResponseBody,
+        ProviderModelsResponseBody, SharePlaygroundSnapshotRequestBody,
     },
 };
 
@@ -57,9 +56,7 @@ const MAX_LIST_SIZE: u64 = 200;
 
 fn playground_error_response(error: PlaygroundError) -> Response {
     match error {
-        PlaygroundError::NotFound => {
-            MetaHttpResponse::not_found("Playground snapshot not found")
-        }
+        PlaygroundError::NotFound => MetaHttpResponse::not_found("Playground snapshot not found"),
         PlaygroundError::NoParent => MetaHttpResponse::bad_request(
             "Playground snapshot was not forked from another snapshot",
         ),
@@ -67,9 +64,7 @@ fn playground_error_response(error: PlaygroundError) -> Response {
         | PlaygroundError::TooManyColumns { .. }
         | PlaygroundError::TooManyRows { .. }
         | PlaygroundError::PayloadNotAnObject
-        | PlaygroundError::MalformedPayload(_)) => {
-            MetaHttpResponse::bad_request(error.to_string())
-        }
+        | PlaygroundError::MalformedPayload(_)) => MetaHttpResponse::bad_request(error.to_string()),
         PlaygroundError::InfraError(error) => {
             log::error!("[Playground] infrastructure error: {error}");
             MetaHttpResponse::internal_error("Internal server error")
@@ -122,8 +117,12 @@ async fn require_snapshot_visibility(
     .await
     {
         Ok(permitted) => {
-            if is_ofga_object_visible(org_id, PLAYGROUND_RESOURCE, snapshot_id, permitted.as_deref())
-            {
+            if is_ofga_object_visible(
+                org_id,
+                PLAYGROUND_RESOURCE,
+                snapshot_id,
+                permitted.as_deref(),
+            ) {
                 Ok(())
             } else {
                 // Answered as "not found" so a hidden snapshot cannot be
@@ -197,9 +196,7 @@ async fn require_scorer_provider_visibility(
 ) -> Result<(), Response> {
     let provider_ids = scorers
         .iter()
-        .filter(|scorer| {
-            scorer.scorer_type == infra::table::scorers::ScorerType::LlmJudge
-        })
+        .filter(|scorer| scorer.scorer_type == infra::table::scorers::ScorerType::LlmJudge)
         .filter_map(|scorer| scorer.params.get("provider_id").and_then(Value::as_str))
         .collect::<std::collections::HashSet<_>>();
     if provider_ids.is_empty() {
@@ -292,7 +289,10 @@ pub async fn list_playground_snapshots(
         Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
     };
 
-    let size = query.size.unwrap_or(DEFAULT_LIST_SIZE).clamp(1, MAX_LIST_SIZE);
+    let size = query
+        .size
+        .unwrap_or(DEFAULT_LIST_SIZE)
+        .clamp(1, MAX_LIST_SIZE);
     let all_object = format!("{PLAYGROUND_RESOURCE}:_all_{org_id}");
     let visible_ids = permitted.as_ref().and_then(|objects| {
         if objects.contains(&all_object) {
@@ -427,10 +427,7 @@ fn sse(payload: &Value) -> bytes::Bytes {
 }
 
 /// Resolve a provider that belongs to this organization.
-async fn load_provider(
-    org_id: &str,
-    provider_id: &str,
-) -> Result<PreparedProvider, Response> {
+async fn load_provider(org_id: &str, provider_id: &str) -> Result<PreparedProvider, Response> {
     let provider = match infra::table::providers::get(provider_id).await {
         Ok(Some(provider)) if provider.org_id == org_id => provider,
         // A provider in another organization is reported as absent rather than
@@ -442,9 +439,8 @@ async fn load_provider(
         }
     };
 
-    PreparedProvider::parse(RawProviderConfig::from(&provider)).map_err(|error| {
-        MetaHttpResponse::bad_request(format!("Provider is not usable: {error}"))
-    })
+    PreparedProvider::parse(RawProviderConfig::from(&provider))
+        .map_err(|error| MetaHttpResponse::bad_request(format!("Provider is not usable: {error}")))
 }
 
 /// Bind the row's input into each message.
@@ -461,14 +457,14 @@ fn render_messages(
         .iter()
         .map(|message| {
             let content = match &message.content {
-                Some(Value::String(text)) => Value::String(
-                    render_prompt(text, input).map_err(|error| {
+                Some(Value::String(text)) => {
+                    Value::String(render_prompt(text, input).map_err(|error| {
                         MetaHttpResponse::bad_request(format!(
                             "Message for role '{}' could not be rendered: {error}",
                             message.role
                         ))
-                    })?,
-                ),
+                    })?)
+                }
                 Some(other) => other.clone(),
                 None => Value::String(String::new()),
             };
@@ -684,9 +680,7 @@ pub async fn score_playground_cell(
         Err(error) => return json_rejection_response(error),
     };
     let scorer_ids = body.scorer_ids.clone();
-    if let Err(response) =
-        require_scorer_visibility(&org_id, &scorer_ids, &user.user_id).await
-    {
+    if let Err(response) = require_scorer_visibility(&org_id, &scorer_ids, &user.user_id).await {
         return response;
     }
 
@@ -738,9 +732,7 @@ pub async fn list_provider_models(
     Path((org_id, provider_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
-    if let Err(response) =
-        require_provider_visibility(&org_id, &provider_id, &user.user_id).await
-    {
+    if let Err(response) = require_provider_visibility(&org_id, &provider_id, &user.user_id).await {
         return response;
     }
 
@@ -794,13 +786,12 @@ mod tests {
         assert!(split_params(&column(json!({"temperature": 2.1}))).is_err());
         assert!(split_params(&column(json!({"max_tokens": -1}))).is_err());
         assert!(split_params(&column(json!({"max_tokens": 1_u64 << 32}))).is_err());
-        assert!(
-            split_params(&column(json!({"max_tokens": 10, "maxTokens": 11}))).is_err()
-        );
+        assert!(split_params(&column(json!({"max_tokens": 10, "maxTokens": 11}))).is_err());
 
-        let (temperature, max_tokens, extra) =
-            split_params(&column(json!({"temperature": 0.7, "maxTokens": 64, "top_p": 0.9})))
-                .unwrap();
+        let (temperature, max_tokens, extra) = split_params(&column(
+            json!({"temperature": 0.7, "maxTokens": 64, "top_p": 0.9}),
+        ))
+        .unwrap();
         assert_eq!(temperature, 0.7);
         assert_eq!(max_tokens, 64);
         assert_eq!(extra["top_p"], json!(0.9));

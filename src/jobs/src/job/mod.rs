@@ -44,9 +44,9 @@ mod incidents;
 #[cfg(feature = "enterprise")]
 mod llm_experiment_cleanup;
 #[cfg(feature = "enterprise")]
-mod llm_playground_cleanup;
-#[cfg(feature = "enterprise")]
 mod llm_idempotency_purge;
+#[cfg(feature = "enterprise")]
+mod llm_playground_cleanup;
 #[cfg(feature = "enterprise")]
 mod llm_review_reconciliation;
 #[cfg(feature = "enterprise")]

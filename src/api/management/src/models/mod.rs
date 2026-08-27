@@ -35,9 +35,9 @@ pub mod eval_jobs;
 pub mod experiment_comparison;
 #[cfg(feature = "enterprise")]
 pub mod experiments;
+pub mod folders;
 #[cfg(feature = "enterprise")]
 pub mod playground;
-pub mod folders;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
