@@ -970,74 +970,21 @@ pub async fn revoke_external_contract(
         }
     };
 
-    // Members first, and awaited *here* rather than inside `revoke_contract_billing`: members
-    // meter through the `SuperOrg` provider, which resolves the payer's billing row to find the
-    // real provider (`metering/super_org.rs`), so the payer's row must outlive every member flush.
-    // Flushing the payer any earlier would also open a window of N member round-trips in which
-    // fresh payer usage accumulates and is then deleted unflushed.
-    let members_removed =
+    // first try removing the billing members
+    if let Err(e) =
         o2_enterprise::enterprise::cloud::billing_group::remove_member_billing_of(&target_org_id)
-            .await;
-
-    revoke_contract_billing(&target_org_id, members_removed, |org| async move {
-        o2_enterprise::enterprise::cloud::flush_then_delete_customer_billing(&org).await
-    })
-    .await
-}
-
-/// Finish revoking one external contract: given the outcome of removing its billing-group members,
-/// tear down the contract org's own billing row and build the endpoint's response.
-///
-/// Mirrors `jobs::job::cloud::delete_expired_contract_billing`, the automatic expiry path, so the
-/// two ways a contract ends share one shape. The only difference is the return type: this path
-/// answers an admin HTTP request, so it reports failure instead of logging and moving on.
-///
-/// `members_removed` is a value, not a future: by the time this function is entered the member
-/// teardown has already run to completion, so it cannot be left lazy or raced with `tokio::join!`,
-/// and the naive reordering — swapping the two statements at the call site above — is now a
-/// compile error (E0425, "cannot find value `members_removed` in this scope"; verified) rather
-/// than a silent behaviour change.
-///
-/// It does **not** make the ordering unconditional: `revoke_contract_billing(org, Ok(()), …)`
-/// followed by `remove_member_billing_of(org).await` type-checks and is wrong. What the value buys
-/// is that the ordering is decided at the single call site above, in plain sight, instead of being
-/// hidden inside this function, and that it cannot be broken by accident.
-///
-/// The contract org's own billing row carries `metering_offset`, so its final usage window has to
-/// be flushed while that row still exists (spec §7.4, F12). `teardown` is
-/// `cloud::flush_then_delete_customer_billing` in production, which owns that ordering and takes
-/// only an org id, so the flush and the delete cannot be transposed here. It is injected only so
-/// this control flow is testable without a database.
-///
-/// When `members_removed` is an `Err`, `teardown` is never invoked: a member whose row survived is
-/// still entitled, and deleting the payer's row on top of that would orphan it — every subsequent
-/// `SuperOrg::meter` for that member would fail to resolve a payer.
-#[cfg(feature = "cloud")]
-async fn revoke_contract_billing<F, Fut>(
-    target_org_id: &str,
-    members_removed: Result<(), anyhow::Error>,
-    teardown: F,
-) -> Response
-where
-    F: FnOnce(String) -> Fut,
-    Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
-{
-    if let Err(e) = members_removed {
+            .await
+    {
         log::error!("error removing members of the billing group for org_id {target_org_id} : {e}");
         return MetaHttpResponse::internal_error(format!(
             "Failed to remove billing group members for {target_org_id} : {e}"
         ));
     }
 
-    match teardown(target_org_id.to_string()).await {
-        Ok(_) => {
-            // The only trace an admin revoke leaves. The automatic expiry path opens with its own
-            // `[EXT_CONTRACT] External contract expired for org ...` line, and the AWS Marketplace
-            // unsubscribe path logs likewise; without this, a manual revoke — the one that
-            // succeeds — is the only way a contract can end with nothing in the log.
-            log::info!("[EXT_CONTRACT] Revoked external contract for org {target_org_id}");
-            MetaHttpResponse::json(serde_json::json!({"status": "ok"}))
-        }
+    match o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(&target_org_id)
+        .await
+    {
+        Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),
         Err(e) => {
             MetaHttpResponse::internal_error(format!("Failed to revoke external contract: {e}"))
         }
@@ -1646,155 +1593,4 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
     }
 
     Ok(response)
-}
-
-#[cfg(all(test, feature = "cloud"))]
-mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use super::*;
-
-    /// Ordered record of the org ids the injected teardown was handed.
-    type CallLog = Arc<Mutex<Vec<String>>>;
-
-    fn call_log() -> CallLog {
-        Arc::new(Mutex::new(Vec::new()))
-    }
-
-    fn calls(log: &CallLog) -> Vec<String> {
-        log.lock().unwrap().clone()
-    }
-
-    async fn body_of(response: Response) -> String {
-        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        String::from_utf8(bytes.to_vec()).unwrap()
-    }
-
-    /// Spec §7.4 / F12: the admin revoke path must tear the contract org's own row down through
-    /// the shared flush-then-delete helper, handing it the target org's id — not the `_meta` org's
-    /// and not a member's.
-    #[tokio::test]
-    async fn revoked_contract_org_is_torn_down_with_its_own_org_id() {
-        let log = call_log();
-        let log_c = log.clone();
-
-        let response = revoke_contract_billing("contract-org", Ok(()), move |org| async move {
-            log_c.lock().unwrap().push(org);
-            Ok(())
-        })
-        .await;
-
-        assert_eq!(calls(&log), ["contract-org"]);
-        assert_eq!(response.status().as_u16(), 200);
-    }
-
-    /// The success body is part of the endpoint's contract. Byte-identical to what the handler
-    /// returned before the extraction (`git show HEAD:…` — `MetaHttpResponse::json(json!({"status":
-    /// "ok"}))`).
-    #[tokio::test]
-    async fn success_response_body_is_unchanged() {
-        let response =
-            revoke_contract_billing("contract-org", Ok(()), |_org| async move { Ok(()) }).await;
-
-        assert_eq!(response.status().as_u16(), 200);
-        assert_eq!(body_of(response).await, r#"{"status":"ok"}"#);
-    }
-
-    /// A teardown failure must surface as a 500 carrying the original wording, unchanged.
-    #[tokio::test]
-    async fn teardown_failure_response_body_is_unchanged() {
-        let response = revoke_contract_billing("contract-org", Ok(()), |_org| async move {
-            Err(anyhow::anyhow!("delete blew up"))
-        })
-        .await;
-
-        assert_eq!(response.status().as_u16(), 500);
-        assert_eq!(
-            body_of(response).await,
-            r#"{"code":500,"message":"Failed to revoke external contract: delete blew up"}"#
-        );
-    }
-
-    /// **This is the ordering guard.** If the members could not be removed, the payer's own row
-    /// must be left alone.
-    ///
-    /// Deleting it anyway would orphan every surviving member billing row: `SuperOrg::meter`
-    /// resolves the payer's row to find the real provider, so with the payer gone every member
-    /// flush returns `no customer billing entry found...`, that error is swallowed by the
-    /// best-effort log in `flush_then_delete_customer_billing`, and each member's final window is
-    /// lost. The members also stay fully entitled with no payer.
-    ///
-    /// Before the extraction the ordering rested on nothing but the order of two statements, and
-    /// swapping them compiled and passed every test in both repos. It no longer compiles: the call
-    /// consumes `members_removed`, so moving it above the `let` is E0425, "cannot find value
-    /// `members_removed` in this scope" (verified). Reordering is still expressible — pass
-    /// `Ok(())` and call `remove_member_billing_of` afterwards — but it can no longer happen by
-    /// accident, and this test pins what the value is for.
-    #[tokio::test]
-    async fn member_removal_failure_leaves_the_contract_org_row_alone() {
-        let log = call_log();
-        let log_c = log.clone();
-
-        let response = revoke_contract_billing(
-            "contract-org",
-            Err(anyhow::anyhow!("member delete blew up")),
-            move |org| async move {
-                log_c.lock().unwrap().push(org);
-                Ok(())
-            },
-        )
-        .await;
-
-        assert!(
-            calls(&log).is_empty(),
-            "the payer's row must survive a failed member teardown: {:?}",
-            calls(&log)
-        );
-        assert_eq!(response.status().as_u16(), 500);
-    }
-
-    /// The member-failure body is also part of the endpoint's contract and unchanged from HEAD.
-    #[tokio::test]
-    async fn member_removal_failure_response_body_is_unchanged() {
-        let response = revoke_contract_billing(
-            "contract-org",
-            Err(anyhow::anyhow!("member delete blew up")),
-            |_org| async move { Ok(()) },
-        )
-        .await;
-
-        assert_eq!(response.status().as_u16(), 500);
-        assert_eq!(
-            body_of(response).await,
-            r#"{"code":500,"message":"Failed to remove billing group members for contract-org : member delete blew up"}"#
-        );
-    }
-
-    /// A member failure must not be reported as a revoke failure — the two 500s say different
-    /// things to the operator, and only one of them means the payer's row is gone.
-    #[tokio::test]
-    async fn member_failure_and_teardown_failure_are_distinguishable() {
-        let member = body_of(
-            revoke_contract_billing(
-                "contract-org",
-                Err(anyhow::anyhow!("boom")),
-                |_org| async move { Ok(()) },
-            )
-            .await,
-        )
-        .await;
-        let teardown = body_of(
-            revoke_contract_billing("contract-org", Ok(()), |_org| async move {
-                Err(anyhow::anyhow!("boom"))
-            })
-            .await,
-        )
-        .await;
-
-        assert_ne!(member, teardown);
-        assert!(member.contains("Failed to remove billing group members"));
-        assert!(teardown.contains("Failed to revoke external contract"));
-    }
 }

@@ -432,23 +432,24 @@ async fn check_external_contract_expiry() {
                 "[EXT_CONTRACT] External contract expired for org {org_id}, reverting to Free tier"
             );
 
-            // Members first, and awaited *here* rather than inside
-            // `delete_expired_contract_billing`: members meter through the `SuperOrg` provider,
-            // which resolves the payer's billing row to find the real provider
-            // (`metering/super_org.rs`), so the payer's row must outlive every member flush.
-            // Passing the finished `Result` in keeps that ordering here and out of
-            // `delete_expired_contract_billing`: the value cannot exist without awaiting the
-            // member teardown first, so these two statements cannot be swapped without a
-            // compile error. Wrong ordering is still expressible — pass `Ok(())` and remove the
-            // members afterwards — just no longer reachable by accident.
-            let members_removed =
+            // try cancelling subscription of member orgs
+            if let Err(e) =
                 o2_enterprise::enterprise::cloud::billing_group::remove_member_billing_of(org_id)
-                    .await;
+                    .await
+            {
+                log::error!(
+                    "[EXT_CONTRACT] Failed to delete members of expired billing for org {org_id}: {e}",
+                );
+                continue;
+            }
 
-            delete_expired_contract_billing(org_id, members_removed, |org| async move {
-                o2_enterprise::enterprise::cloud::flush_then_delete_customer_billing(&org).await
-            })
-            .await;
+            if let Err(e) =
+                o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(org_id).await
+            {
+                log::error!(
+                    "[EXT_CONTRACT] Failed to delete expired billing for org {org_id}: {e}"
+                );
+            }
             continue;
         }
 
@@ -570,51 +571,6 @@ fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
-}
-
-/// Finish expiring one external contract: given the outcome of removing its billing-group members,
-/// tear down the contract org's own billing row.
-///
-/// `members_removed` is a value, not a future: by the time this function is entered the member
-/// teardown has already run to completion, so it cannot be left lazy or raced with `tokio::join!`,
-/// and the naive reordering — swapping the two statements at the call site — is a compile error
-/// (E0425, "cannot find value `members_removed` in this scope") rather than a silent behaviour
-/// change.
-///
-/// It does **not** make the ordering unconditional: `delete_expired_contract_billing(org_id,
-/// Ok(()), teardown)` followed by `remove_member_billing_of(org_id).await` type-checks and is
-/// wrong. What the value buys is that the ordering is decided at the single call site above, in
-/// plain sight, instead of being hidden inside this function, and that it cannot be broken by
-/// accident.
-/// When it is an `Err`, `teardown` is never invoked: a member whose row survived is still entitled,
-/// and deleting the payer's row on top of that would orphan it. The hourly sweep retries the whole
-/// org on its next tick.
-///
-/// Returns `()`. `check_external_contract_expiry` walks every contract org in the deployment, and
-/// one org's failure must not stop the rest, so every error is logged here and swallowed rather
-/// than propagated into the loop.
-///
-/// `teardown` is `cloud::flush_then_delete_customer_billing` in production; it is injected only so
-/// this control flow is testable without a database. It takes just an org id, so the flush and the
-/// delete cannot be transposed at any call site.
-async fn delete_expired_contract_billing<F, Fut>(
-    org_id: &str,
-    members_removed: Result<(), anyhow::Error>,
-    teardown: F,
-) where
-    F: FnOnce(String) -> Fut,
-    Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
-{
-    if let Err(e) = members_removed {
-        log::error!(
-            "[EXT_CONTRACT] Failed to delete members of expired billing for org {org_id}: {e}",
-        );
-        return;
-    }
-
-    if let Err(e) = teardown(org_id.to_string()).await {
-        log::error!("[EXT_CONTRACT] Failed to delete expired billing for org {org_id}: {e}");
-    }
 }
 
 /// Pick the most-urgent expiry warning stage that should fire, given the current
@@ -873,8 +829,6 @@ async fn run_synthetics_step_reconcile() {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
-
     use o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage;
 
     use super::*;
@@ -1184,98 +1138,6 @@ mod tests {
                 .count(),
             2,
             "one definition and exactly one spawn are expected for the §9B.3 job",
-        );
-    }
-
-    /// Ordered record of the org ids the injected teardown was handed.
-    type CallLog = Arc<Mutex<Vec<String>>>;
-
-    fn call_log() -> CallLog {
-        Arc::new(Mutex::new(Vec::new()))
-    }
-
-    fn calls(log: &CallLog) -> Vec<String> {
-        log.lock().unwrap().clone()
-    }
-
-    /// Spec §7.4 / F12 / E19: the automatic expiry path must tear the contract org's own row down
-    /// through the shared flush-then-delete helper, handing it the expiring org's id.
-    #[tokio::test]
-    async fn expired_contract_org_is_torn_down_with_its_own_org_id() {
-        let log = call_log();
-        let log_c = log.clone();
-
-        delete_expired_contract_billing("contract-org", Ok(()), move |org| async move {
-            log_c.lock().unwrap().push(org);
-            Ok(())
-        })
-        .await;
-
-        assert_eq!(calls(&log), ["contract-org"]);
-    }
-
-    /// The `continue`-on-member-failure rule: if the members could not be removed, the payer's own
-    /// row must be left alone. Deleting it anyway would orphan every surviving member billing row —
-    /// `metering/super_org.rs` resolves the payer's row and would then error for each of them, and
-    /// the members would stay entitled with no payer.
-    #[tokio::test]
-    async fn member_removal_failure_skips_the_contract_org_teardown() {
-        let log = call_log();
-        let log_c = log.clone();
-
-        delete_expired_contract_billing(
-            "contract-org",
-            Err(anyhow::anyhow!("member delete blew up")),
-            move |org| async move {
-                log_c.lock().unwrap().push(org);
-                Ok(())
-            },
-        )
-        .await;
-
-        assert!(
-            calls(&log).is_empty(),
-            "the contract org's row must survive a failed member teardown: {:?}",
-            calls(&log)
-        );
-    }
-
-    /// One org's failure must not stop the sweep. `check_external_contract_expiry` iterates every
-    /// contract org in the deployment; a teardown error is logged and swallowed, and a member
-    /// failure only skips that org's own row.
-    ///
-    /// This walks three orgs the way the loop does: one whose teardown fails, one whose members
-    /// failed, and one healthy org that must still be processed last.
-    #[tokio::test]
-    async fn one_orgs_failure_does_not_stop_the_sweep() {
-        let log = call_log();
-
-        let orgs: Vec<(&str, Result<(), anyhow::Error>)> = vec![
-            ("teardown-fails", Ok(())),
-            (
-                "members-fail",
-                Err(anyhow::anyhow!("member delete blew up")),
-            ),
-            ("healthy", Ok(())),
-        ];
-
-        for (org_id, members_removed) in orgs {
-            let log_c = log.clone();
-            delete_expired_contract_billing(org_id, members_removed, move |org| async move {
-                log_c.lock().unwrap().push(org.clone());
-                if org == "teardown-fails" {
-                    Err(anyhow::anyhow!("delete blew up"))
-                } else {
-                    Ok(())
-                }
-            })
-            .await;
-        }
-
-        assert_eq!(
-            calls(&log),
-            ["teardown-fails", "healthy"],
-            "every org must be visited; only the member-failure org skips its own teardown"
         );
     }
 
