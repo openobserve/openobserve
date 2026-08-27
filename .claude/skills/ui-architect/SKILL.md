@@ -77,7 +77,9 @@ read it once, it is the backbone of everything below.
 
 1. **Every page/module header is `OPageHeader`** — never a hand-rolled
    `<div class="header">…<h1>` or a `q-toolbar`. One header contract keeps the
-   title in the same place across list → detail → edit.
+   title in the same place across list → detail → edit. Peer/section tabs need
+   **`tabs-below`** (the slot alone renders them inline beside the title), and the
+   header `icon` must be the SAME `IconName` the page's nav entry declares.
 2. **Build from O2 components in `web/src/lib`** — never a bare HTML control
    (`<button>`, `<input>`) or a third-party UI primitive when an `O*` equivalent
    exists. Drive them by **intent**
@@ -195,6 +197,23 @@ read it once, it is the backbone of everything below.
      Default to `text-sm` for body. Go smaller only for genuinely dense/secondary UI,
      larger only for titles. If a design needs a size not on the scale, snap to the
      nearest step — do **not** reintroduce an arbitrary `text-[..]`.
+   - **Casing — never uppercase anywhere in the app, except an established short
+     form.** This is app-wide and strict. No shouting: don't bake caps into a string
+     (`"FIRST APPEARED AT {time}"`, `"NEW TO THIS LIST"`) and don't force it with the
+     `uppercase` utility. Write copy in **sentence case** (`"First appeared at {time}"`)
+     — capitalize the first word and proper nouns only, not Every Word.
+     **The one exception is an established short form** — an acronym, initialism, or
+     abbreviation that is conventionally written in caps (`SQL`, `API`, `URL`, `ID`,
+     `CPU`, `AI`, `HTTP`, `JSON`) and metric tokens (`p95`, `p99`) — which keep their
+     canonical casing inside otherwise-sentence-case copy. A full word is never a short
+     form: `DELETE`, `SAVE`, `NEW`, `SERVER` are violations; `Delete`, `Save`, `New`,
+     `Server` are correct. This applies everywhere text renders: micro-labels,
+     stat/tile captions, table headers, chips, badges, buttons, tooltips, empty states.
+     Make a label quiet with `text-text-label`/`text-xs` weight + colour, not caps.
+     `tracking-wide uppercase` is **not** the house label style. (The transform is a
+     legibility cost — caps runs slow the reader and break at small sizes — and a
+     baked-in caps string also can't be sentence-cased per locale.) `capitalize` is
+     acceptable only for a single data token that must render title-cased.
    - **Corner radius — exactly two tiers + circle, never an arbitrary value:**
      `rounded-default` (**4px** — controls: buttons, inputs, chips, small icon
      buttons), `rounded-surface` (**12px** — surfaces: dialogs, drawers, cards,
@@ -504,7 +523,8 @@ and each domain has its own reference below.
 | Decision | The rule | Detail |
 | --- | --- | --- |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
-| **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
+| **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY when you need chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit — annotate the site with why, and convert once the schema renderer forwards clicks. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
+| **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
 | **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
 | **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered` | [page-recipes](references/page-recipes.md) |
@@ -554,6 +574,13 @@ Run this in your head before writing template markup, and again before
 considering the UI done:
 
 - [ ] Page/module header is `OPageHeader` (not a hand-built header bar).
+- [ ] Peer/section tabs pass **`tabs-below`** so the strip is the full-width
+      row-2 band — the bare `#header-tabs`/`#tabs` slot renders them inline
+      beside the title, where they shift as the title's width changes.
+- [ ] The header **`icon` matches the page's nav entry** verbatim
+      (`navGroups.ts` / `linksList` / `settingsItems` / SectionRail). A module
+      showing one glyph in the rail and another in its header reads as two
+      places — see [navigation-menus](references/navigation-menus.md#icon-parity).
 - [ ] Every interactive control is an O2 component if one exists in
       `web/src/lib` — no bare HTML controls or third-party primitives with an O2 equivalent.
 - [ ] A self-contained/repeated UI element with no matching component was
@@ -562,6 +589,11 @@ considering the UI done:
       from `<div>` + utility classes. Classes are for layout only.
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns; server mode
       only for backend-paginated data.
+- [ ] **Every data chart goes through `PanelSchemaRenderer`** (panel schema) — no
+      `echarts.init` / `<v-chart>` / ApexCharts / D3 / hand-rolled `<canvas>`/`<svg>`
+      plot in a feature page. Low-level `panels/ChartRenderer.vue` only as the
+      annotated escape hatch for chart-click forwarding. Sparklines/progress/data
+      bars stay `OSparkline`/`OProgressBar`/`ODataBarCell` (not charts).
 - [ ] **Server mode was checked against the backend**: every `sortable: true`
       column has a real sort key in the handler (an unknown key falls back
       silently and orders by something else), and any page-relative device
@@ -582,9 +614,12 @@ considering the UI done:
       (`#toolbar-trailing`, wired to fetch), and the **column show/hide toggle**
       (`:persist-columns` + `table-id` + a `hideable` column). Non-essential
       columns hidden by default via `:column-visibility`.
-- [ ] Empty state is a single `OEmptyState` with a `preset` + **`:filtered`**
+- [ ] Every empty/zero state is a single `OEmptyState` (never a hand-rolled
+      `<div>` + centered text + button). Use a `preset` + **`:filtered`**
       (search/filter active) + `@action` resetting on `clear-filters`; `#error` if
-      fetch can fail.
+      fetch can fail. Its actions use the standard layout — an `EmptyStateActionCard`
+      (`actions` prop / `#actions` slot) for a primary CTA, or `actionLabel`, never
+      a custom button row.
 - [ ] Page is **registered in navigation** (route + one of rail item / Settings
       sub-page / flyout child) and **gated** for env/role
       (`config.isEnterprise` / `config.isCloud` / `zoConfig.*`), with the route,
@@ -615,6 +650,12 @@ considering the UI done:
 - [ ] Corner radius is `rounded-default` / `rounded-surface` / `rounded-full`
       only — no bare `rounded`, no `rounded-[..]`, no retired
       `rounded-{sm,md,lg,xl}`.
+- [ ] **No uppercase anywhere except established short forms** — no caps baked
+      into a string and no `uppercase` utility on labels/headers/chips/badges/
+      buttons/tooltips. Copy is sentence case; the only caps allowed are acronyms/
+      abbreviations (`SQL`, `API`, `URL`, `ID`, `AI`) and metric tokens (`p95`).
+      A full word (`DELETE`, `SAVE`, `NEW`) is never a short form. Make labels
+      quiet with size/weight/colour, not capitals.
 - [ ] No `<style scoped>` block added. No `style="…"` attribute added.
 - [ ] No literal colors anywhere. Colours come from `--color-*` token **utilities**
       (`bg-surface-base`, `text-text-secondary`) — not a raw `var(--color-*)` in a
@@ -622,6 +663,12 @@ considering the UI done:
       keyframes, `color-mix`, `calc`, SVG `fill`/`stroke`, `v-html`). No raw
       Tailwind palette (`bg-gray-*`) and no raw `grey-*`/`primary-*` ramp — use a
       semantic token.
+- [ ] **Text colour matches its semantic role** — `heading` (titles/emphasis),
+      `body` (main content), `secondary` (labels, captions, metadata, units),
+      `muted` ONLY for disabled/absent content (disabled control, em-dash /
+      "none" / "not measured" placeholder). Never `muted` on a live value or a
+      label; make text quieter by dropping one tier + size/weight, not opacity.
+      See [design-tokens § text colour](references/design-tokens.md).
 - [ ] **Calm Signal** — the screen's *primary signal* is coloured (state /
       category / role / progress) via the shared toolkit (`OStatStrip`/`OStatCard`,
       `OTag` chips, row rail + exception tint, relative `OTimeCell`), and the rest
@@ -662,7 +709,11 @@ considering the UI done:
       a re-telling of the code or the history of the PR that added it (no ticket
       ids, "review finding", "as discussed"). Same in specs. See
       [conventions § Comments stay short](references/conventions.md).
-- [ ] `cd web && npm run lint && npm run type-check` pass.
+- [ ] `cd web && npm run lint && npm run type-check:app` pass. **`type-check:app`,
+      not `type-check`** — the latter runs `tsconfig.vitest.json`, whose `include`
+      is only `src/**/*.spec.{ts,js}`, so it never checks a `.vue` file and a
+      green run says nothing about the component you just wrote. `type-check:app`
+      (`tsconfig.app.json`) is the one that covers `src/**/*.vue`.
 
 ## When a rule can't be satisfied
 

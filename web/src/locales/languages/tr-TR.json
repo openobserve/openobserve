@@ -14923,6 +14923,7 @@
       "disabled": "Devre Dışı",
       "emptyTitle": "Bu SLO'da henüz uyarı yok",
       "emptyHint": "Tükenme oranı uyarıları, bütçe henüz tükenmemişken sizi uyarır.",
+      "emptyActionDesc": "Bütçe tükenmeden önce uyarı alın",
       "loadFailed": "Bu SLO'nun uyarıları yüklenemedi.",
       "editTargetMissing": "Bu uyarı artık bu SLO'da değil.",
       "describeBurn": "Tükenme oranı > {critical}, {long} ve {short} boyunca",
@@ -15215,7 +15216,12 @@
     "common": {
       "reload": "Yenile",
       "lastRefreshed": "Son yenileme {age}",
-      "loadFailed": "Veritabanı verileri yüklenemedi. Tekrar deneyin veya zaman aralığını daraltın."
+      "loadFailed": "Veritabanı verileri yüklenemedi. Tekrar deneyin veya zaman aralığını daraltın.",
+      "actions": "Eylemler"
+    },
+    "header": {
+      "title": "Veritabanları",
+      "subtitle": "Veritabanlarınızdaki sorgu performansı ve sağlığı"
     },
     "ai": {
       "suggestFix": "Bunu nasıl düzelteceğini AI'ya sor",
@@ -15237,12 +15243,12 @@
       "removeScope": "Bu filtreyi kaldır",
       "popoverTitle": "Bunu daralt",
       "dimension": {
-        "system": "motor",
-        "instance": "veritabanı",
-        "namespace": "şema",
-        "env": "ortam",
-        "service": "hizmet",
-        "insight": "içgörü"
+        "system": "Motor",
+        "instance": "Veritabanı",
+        "namespace": "Şema",
+        "env": "Ortam",
+        "service": "Servis",
+        "insight": "İçgörü"
       }
     },
     "delta": {
@@ -15257,8 +15263,6 @@
       "wasValue": "{value} idi"
     },
     "databases": {
-      "title": "Veritabanları",
-      "subtitle": "Veritabanı başına sorgu performansı ve sağlığı",
       "searchPlaceholder": "Veritabanı veya hizmet ara…",
       "unnamedInstance": "Örnek adlandırılmamış",
       "unnamedInstanceHint": "Veritabanının kendi ifade raporları bu motorun çalıştığını kanıtlıyor, ancak bir ana bilgisayar adı vermiyorlar. Satır, bir adres taşıyan bir akış — oturum örnekleme veya örnek ölçümleri — kurulduğunda bir adres gösterecek.",
@@ -15305,9 +15309,6 @@
       }
     },
     "queries": {
-      "title": "En yoğun sorgular",
-      "subtitle": "En fazla veritabanı süresi kullanan sorgular",
-      "subtitleServer": "Veritabanlarınızın çalıştırdığı ifadeler, veritabanı içinde sayılır — en sık çalıştırılanlar ilk sırada",
       "searchPlaceholder": "Sorgu metni, tablo veya hizmet ara…",
       "trendLabel": "Bu sorgunun süresinin aralık boyunca nasıl değiştiği",
       "otherRow": "Diğer tüm sorgular",
@@ -15316,7 +15317,8 @@
         "query": "Sorgular",
         "queryHint": "Yalnızca gerçek SQL — SELECT, INSERT, UPDATE ve DELETE.",
         "all": "Sorgular + bağlantı ek yükü",
-        "allHint": "Ayrıca sürücünüzün sorgular arasında gönderdiği kayıt işlemlerini sayar: BEGIN ve COMMIT, SET ve havuzlanmış bağlantıyı canlı tutan kontroller."
+        "allHint": "Ayrıca sürücünüzün sorgular arasında gönderdiği kayıt işlemlerini sayar: BEGIN ve COMMIT, SET ve havuzlanmış bağlantıyı canlı tutan kontroller.",
+        "overheadLabel": "Bağlantı yükünü dahil et"
       },
       "completionBias": {
         "title": "Çağrılar {drop}% düşerken hatalar arttı",
@@ -15562,10 +15564,10 @@
       "noStream": "Bu sorguyu hangi iz akışının taşıdığını belirleyemedik, bu nedenle çağıranları ve örnekleri yüklenemiyor.",
       "ambiguousStream": "Bu kuruluşun birden fazla iz akışı var ve bu sorgunun hangisinde çalıştığını söyleyemiyoruz. Çağıranları ve örnek izleri yüklemek için bir akış seçin.",
       "pickStream": "Bir iz akışı seçin",
-      "invalidStream": "Bu iz akışı adı tanımadığımız bir ad, bu nedenle aramayı çalıştırmadık.",
-      "firstSeen": "BU LİSTEDE İLK GÖRÜNME: {time}",
+      "invalidStream": "Bu iz akışı adı tanıdığımız bir ad değil, bu yüzden aramayı çalıştırmadık.",
+      "firstSeen": "Bu listede ilk kez {time} görüldü",
       "firstSeenHint": "Bu sorgunun kendi başına izlenecek kadar ağır olduğu bu aralıktaki en erken nokta.",
-      "lastSeen": "SON GÖRÜNME: {time}",
+      "lastSeen": "Son görülme: {time}",
       "lastSeenHint": "Bu sorgunun kendi başına izlenecek kadar ağır olduğu bu aralıktaki en son nokta. Hâlâ çalışıyor olabilir — listeye girdiği son zaman budur.",
       "errorsByCode": {
         "title": "Sebep koduna göre hatalar",
@@ -15732,9 +15734,6 @@
       }
     },
     "samples": {
-      "title": "En yavaş çağrılar",
-      "subtitle": "Bu penceredeki en yavaş bireysel veritabanı çağrıları, her veritabanı ve sorgu genelinde — çağıranların ölçtüğü şekliyle, yalnızca tamamlanan çağrılar",
-      "subtitleServer": "Bu pencerede veritabanlarınızın tamamladığı en yavaş ifadeler, veritabanı içinde ölçülmüştür",
       "logOffTitle": "Veritabanlarınız henüz yavaş ifadeleri günlüğe kaydetmiyor",
       "logOffDescription": "Hiçbir şey bu çağrıları izlemedi, bu yüzden veritabanlarına kendi en yavaş ifadelerini sorduk — ve hiçbirini günlüğe kaydetmiyorlar. Bu liste PostgreSQL'in ifade günlüğünden (log_min_duration_statement) gelir; varsayılan olarak kapalıdır — kurulum kartının günlüğe kaydetme adımı onu açar. İfade başına yakalama şu anda yalnızca PostgreSQL'e özgüdür, bu nedenle MySQL ve MariaDB henüz bu listeyi besleyemez. En çok çalışan sorgular size neyin en çok çalıştığını gösterebilir, çünkü bunun yerine sayaç tablolarını okur.",
       "searchPlaceholder": "Sorgu metni, hizmet veya veritabanı ara…",
@@ -15776,16 +15775,14 @@
       }
     },
     "rowChips": {
-      "new": "BU LİSTEDE YENİ",
-      "slower": "{ratio}× NORMALDEN DAHA YAVAŞ",
-      "loop": "İSTEK BAŞINA {multiplier}× ÇALIŞIR",
-      "allFailed": "TÜM {count} BAŞARISIZ",
-      "busier": "DAHA YOĞUN, DAHA YAVAŞ DEĞİL",
-      "climbed": "YENİ EN AĞIR SORGU"
+      "new": "Bu listede yeni",
+      "slower": "Normalden {ratio}× daha yavaş",
+      "loop": "İstek başına {multiplier}× çalışır",
+      "allFailed": "Tüm {count} başarısız oldu",
+      "busier": "Daha yoğun, daha yavaş değil",
+      "climbed": "Yeni en ağır sorgu"
     },
     "deadlocks": {
-      "title": "Veritabanları",
-      "subtitle": "Birbirini engelleyen ve geri alınan işlemler",
       "deadlockCount": "kilitlenme yok | {count} kilitlenme | {count} kilitlenme",
       "pairCount": "sorgu çifti yok | {count} sorgu çifti | {count} sorgu çifti",
       "searchPlaceholder": "Sorgu metni, tablo veya uygulama ara…",
@@ -15812,10 +15809,10 @@
         "mysqlPartial": "MySQL veritabanınız, innodb_print_all_deadlocks açık olmadığı sürece yalnızca en son deadlock'u tutar."
       },
       "chips": {
-        "oppositeOrder": "TERS SATIR SIRASI",
-        "cadence": "HER {seconds}s",
-        "noQueries": "YAKALANMAYAN SORGULAR",
-        "partial": "YALNIZCA TEK TARAF"
+        "oppositeOrder": "Ters satır sırası",
+        "cadence": "Her {seconds}s",
+        "noQueries": "Yakalanmayan sorgular",
+        "partial": "Yalnızca tek taraf"
       },
       "rowActions": {
         "topQueries": "Bunları En İyi Sorgular'da bulun",
@@ -15832,8 +15829,8 @@
         "pid": "pid {pid}",
         "thread": "thread {pid}",
         "transaction": "transaction {id}",
-        "eachWaits": "her biri diğerini bekliyor",
-        "deadlock": "deadlock",
+        "eachWaits": "Her biri diğerini bekliyor",
+        "deadlock": "Kilitlenme",
         "noQueryCaptured": "Günlük bu deadlock'u kaydetti ancak ifadeyi kaydetmedi.",
         "waitingFor": "{target} tamamlanmasını bekliyordu.",
         "waitingForRow": "{target} tamamlanmasını bekliyordu — diğer oturum istediği satırı zaten değiştirmişti.",
@@ -15935,9 +15932,6 @@
       }
     },
     "blocked": {
-      "title": "Veritabanları",
-      "subtitle": "Şu anda bir kilit üzerinde bekleyen oturumlar",
-      "subtitlePast": "Bu zaman aralığında bir kilit üzerinde bekleyen oturumlar",
       "waitingCount": "kilidi bekleyen oturum yok | şu anda kilidi bekleyen {count} oturum | şu anda kilidi bekleyen {count} oturum",
       "waitingCountPast": "kilidi bekleyen oturum olmadı | bu zaman aralığında kilidi bekleyen {count} oturum | bu zaman aralığında kilidi bekleyen {count} oturum",
       "sessionCount": "oturum yok | {count} oturum | {count} oturum",
@@ -15983,14 +15977,14 @@
       },
       "deep": "{count} derin",
       "notWaiting": "beklemiyor",
-      "longestWait": "EN UZUN BEKLEME",
-      "holdsTheLock": "HERKESİN İSTEDİĞİ KİLİDİ TUTUYOR",
+      "longestWait": "En uzun bekleme",
+      "holdsTheLock": "Herkesin istediği kilidi tutuyor",
       "lastStatement": "son ifade {age} önce",
       "idleInTransaction": "hiçbir şey beklemiyor · açık bir işlemde boşta",
       "pills": {
-        "root": "KÖK — BURADAN BAŞLAYIN",
-        "waitingBlocking": "BEKLİYOR VE ENGELLİYOR {count}",
-        "waiting": "BEKLİYOR"
+        "root": "Kök — buradan başlayın",
+        "waitingBlocking": "Bekleyen ve engelleyen {count}",
+        "waiting": "Bekliyor"
       },
       "waitingOn": "{pid} bekleniyor",
       "degraded": "Bir oturum {count} oturumu engelliyor. {age} süredir açık bir işlemi var ve bu süre içinde sorgu çalıştırmadı — büyük olasılıkla commit etmeyi unutan bir uygulama.",
@@ -16068,9 +16062,6 @@
       }
     },
     "activity": {
-      "title": "Etkinlik",
-      "subtitle": "Veritabanlarınızın şu anda ne yaptığı, kendi oturum tablolarından alınan örneklerle gösterilir.",
-      "subtitlePast": "Veritabanlarınızın bu zaman aralığında ne yaptığı, kendi oturum tablolarından alınan örneklerle gösterilir.",
       "searchPlaceholder": "Oturumları, kullanıcıları, uygulamaları ara",
       "wait": {
         "onCpu": "CPU'da / bekleme yok",
@@ -16194,8 +16185,6 @@
       "deadlockLabel": "Kilitlenmeler"
     },
     "tableHealth": {
-      "title": "Tablo sağlığı",
-      "subtitle": "Her tablo için boyut, şişkinlik ve vakum durumu, en yeni anlık görüntü önce.",
       "searchPlaceholder": "Tabloları ara",
       "never": "Asla",
       "countersCumulative": "Tarama ve vakum sayıları, son istatistik sıfırlamasından bu yana ömür boyu toplamlardır, seçilen zaman aralığı için sayılar değildir.",

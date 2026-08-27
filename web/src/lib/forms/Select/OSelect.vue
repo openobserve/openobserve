@@ -1869,6 +1869,10 @@ const fieldWidthClass = computed(() => {
               />
             </template>
 
+            <div v-else-if="!slots.default" class="text-select-placeholder px-3 py-2 text-sm">
+              <slot name="empty">{{ t("components.select.noOptionsFound") }}</slot>
+            </div>
+
             <slot />
           </SelectViewport>
 

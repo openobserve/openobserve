@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Description (only show if exists) -->
             <div v-if="alertDetails.description" class="mt-3 shrink-0">
               <div
-                class="mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase"
+                class="mb-1 flex items-center gap-1.5 text-xs font-semibold"
                 :class="'text-text-secondary'"
               >
                 <OIcon name="info-outline" size="xs" />

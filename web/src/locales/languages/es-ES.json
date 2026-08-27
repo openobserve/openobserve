@@ -14923,6 +14923,7 @@
       "disabled": "Deshabilitado",
       "emptyTitle": "Este SLO aún no tiene alertas",
       "emptyHint": "Las alertas de tasa de consumo te avisan mientras todavía queda presupuesto que proteger.",
+      "emptyActionDesc": "Recibe una advertencia antes de que se agote el presupuesto",
       "loadFailed": "No se pudieron cargar las alertas de este SLO.",
       "editTargetMissing": "Esa alerta ya no está en este SLO.",
       "describeBurn": "Tasa de consumo > {critical} en {long} y {short}",
@@ -15215,7 +15216,12 @@
     "common": {
       "reload": "Actualizar",
       "lastRefreshed": "Última actualización {age}",
-      "loadFailed": "No se pudieron cargar los datos de la base de datos. Vuelva a intentarlo o reduzca el intervalo de tiempo."
+      "loadFailed": "No se pudieron cargar los datos de la base de datos. Vuelva a intentarlo o reduzca el intervalo de tiempo.",
+      "actions": "Acciones"
+    },
+    "header": {
+      "title": "Bases de datos",
+      "subtitle": "Rendimiento y salud de las consultas en tus bases de datos"
     },
     "ai": {
       "suggestFix": "Preguntar a la IA cómo solucionar esto",
@@ -15237,12 +15243,12 @@
       "removeScope": "Eliminar este filtro",
       "popoverTitle": "Reducir esto",
       "dimension": {
-        "system": "motor",
-        "instance": "base de datos",
-        "namespace": "esquema",
-        "env": "entorno",
-        "service": "servicio",
-        "insight": "información"
+        "system": "Motor",
+        "instance": "Base de datos",
+        "namespace": "Esquema",
+        "env": "Entorno",
+        "service": "Servicio",
+        "insight": "Análisis"
       }
     },
     "delta": {
@@ -15257,8 +15263,6 @@
       "wasValue": "era {value}"
     },
     "databases": {
-      "title": "Bases de datos",
-      "subtitle": "Rendimiento y salud de consultas por base de datos",
       "searchPlaceholder": "Buscar base de datos o servicio…",
       "unnamedInstance": "Instancia sin nombre",
       "unnamedInstanceHint": "Los reportes de sentencias de la propia base de datos demuestran que este motor está en ejecución, pero no nombran un host. La fila mostrará una dirección una vez que se configure una fuente que la incluya — muestreo de sesión o métricas de instancia —.",
@@ -15305,9 +15309,6 @@
       }
     },
     "queries": {
-      "title": "Consultas principales",
-      "subtitle": "Las consultas que más tiempo de base de datos usan",
-      "subtitleServer": "Las sentencias que ejecutaron sus bases de datos, contadas dentro de la base de datos — las ejecutadas con más frecuencia primero",
       "searchPlaceholder": "Buscar texto de consulta, tabla o servicio…",
       "trendLabel": "Cómo se ha movido el tiempo de esta consulta a lo largo del rango",
       "otherRow": "Todas las demás consultas",
@@ -15316,7 +15317,8 @@
         "query": "Consultas",
         "queryHint": "Solo SQL real — SELECT, INSERT, UPDATE y DELETE.",
         "all": "Consultas + sobrecarga de conexión",
-        "allHint": "También cuenta el trabajo de contabilidad que su controlador envía entre consultas: BEGIN y COMMIT, SET y las comprobaciones que mantienen viva una conexión agrupada."
+        "allHint": "También cuenta el trabajo de contabilidad que su controlador envía entre consultas: BEGIN y COMMIT, SET y las comprobaciones que mantienen viva una conexión agrupada.",
+        "overheadLabel": "Incluir la sobrecarga de conexión"
       },
       "completionBias": {
         "title": "Las llamadas cayeron un {drop}% mientras los fallos aumentaron",
@@ -15559,13 +15561,13 @@
       "noSamples": "No se cargaron ejecuciones individuales para este rango.",
       "noSeries": "No hay historial para esta consulta en el rango que seleccionaste.",
       "liveSeries": "Los puntos más recientes aún se están contando y pueden cambiar.",
-      "noStream": "No pudimos determinar qué stream de trazas transporta esta consulta, por lo que sus llamadores y ejemplos no se pueden cargar.",
-      "ambiguousStream": "Esta organización tiene más de un stream de trazas y no podemos saber en cuál se ejecuta esta consulta. Elige un stream para cargar sus llamadores y trazas de muestra.",
-      "pickStream": "Elige un stream de trazas",
-      "invalidStream": "Ese nombre de stream de trazas no es uno que reconozcamos, por lo que no ejecutamos la búsqueda.",
-      "firstSeen": "PRIMERA APARICIÓN EN ESTA LISTA A LAS {time}",
+      "noStream": "No pudimos determinar qué flujo de trazas transporta esta consulta, por lo que sus llamantes y ejemplos no se pueden cargar.",
+      "ambiguousStream": "Esta organización tiene más de un flujo de trazas y no podemos saber en cuál se ejecuta esta consulta. Elige un flujo para cargar sus llamantes y trazas de muestra.",
+      "pickStream": "Elige un flujo de trazas",
+      "invalidStream": "Ese nombre de flujo de trazas no es reconocido, por lo que no ejecutamos la búsqueda.",
+      "firstSeen": "Apareció por primera vez en esta lista en {time}",
       "firstSeenHint": "El punto más temprano en este rango donde esta consulta fue lo suficientemente pesada como para rastrearse por sí sola.",
-      "lastSeen": "ÚLTIMA APARICIÓN A LAS {time}",
+      "lastSeen": "Apareció por última vez en {time}",
       "lastSeenHint": "El punto más reciente en este rango donde esta consulta fue lo suficientemente pesada como para rastrearse por sí sola. Puede que aún se esté ejecutando ahora — esta es la última vez que entró en la lista.",
       "errorsByCode": {
         "title": "Fallos por código de motivo",
@@ -15732,9 +15734,6 @@
       }
     },
     "samples": {
-      "title": "Llamadas más lentas",
-      "subtitle": "Las llamadas individuales a base de datos más lentas en esta ventana, en todas las bases de datos y consultas — tal como las midieron quienes las llamaron, solo llamadas finalizadas",
-      "subtitleServer": "Las declaraciones más lentas que sus bases de datos completaron en esta ventana, medidas dentro de la base de datos",
       "logOffTitle": "Sus bases de datos aún no registran declaraciones lentas",
       "logOffDescription": "Nada rastreó estas llamadas, así que preguntamos a las bases de datos por sus propias declaraciones más lentas — y no registran ninguna. Esta lista proviene del registro de declaraciones de PostgreSQL (log_min_duration_statement), que está desactivado por defecto — el paso de registro de la tarjeta de configuración lo activa. La captura por declaración actualmente es solo de PostgreSQL, por lo que MySQL y MariaDB no pueden alimentar esta lista aún. Las consultas principales pueden mostrarle qué se ejecuta más, porque leen las tablas de contadores en su lugar.",
       "searchPlaceholder": "Buscar texto de consulta, servicio o base de datos…",
@@ -15776,16 +15775,14 @@
       }
     },
     "rowChips": {
-      "new": "NUEVO EN ESTA LISTA",
-      "slower": "{ratio}× MÁS LENTO DE LO HABITUAL",
-      "loop": "SE EJECUTA {multiplier}× POR SOLICITUD",
-      "allFailed": "TODAS LAS {count} FALLARON",
-      "busier": "MÁS OCUPADO, NO MÁS LENTO",
-      "climbed": "NUEVA CONSULTA MÁS PESADA"
+      "new": "Nuevo en esta lista",
+      "slower": "{ratio}× más lento de lo habitual",
+      "loop": "Se ejecuta {multiplier}× por solicitud",
+      "allFailed": "Todos los {count} fallaron",
+      "busier": "Más ocupado, no más lento",
+      "climbed": "Nueva consulta más pesada"
     },
     "deadlocks": {
-      "title": "Bases de datos",
-      "subtitle": "Transacciones que se bloquearon entre sí y se revirtieron",
       "deadlockCount": "sin interbloqueos | {count} interbloqueo | {count} interbloqueos",
       "pairCount": "sin pares de consultas | {count} par de consultas | {count} pares de consultas",
       "searchPlaceholder": "Buscar texto de consulta, tabla o aplicación…",
@@ -15812,10 +15809,10 @@
         "mysqlPartial": "Tu base de datos MySQL guarda solo el interbloqueo más reciente a menos que innodb_print_all_deadlocks esté activado."
       },
       "chips": {
-        "oppositeOrder": "ORDEN OPUESTO DE FILAS",
-        "cadence": "CADA {seconds}s",
-        "noQueries": "CONSULTAS NO CAPTURADAS",
-        "partial": "SOLO UN LADO"
+        "oppositeOrder": "Orden de filas opuesto",
+        "cadence": "Cada {seconds} s",
+        "noQueries": "Consultas no capturadas",
+        "partial": "Solo un lado"
       },
       "rowActions": {
         "topQueries": "Encuentra estos en Consultas principales.",
@@ -15832,8 +15829,8 @@
         "pid": "pid {pid}",
         "thread": "hilo {pid}",
         "transaction": "transacción {id}",
-        "eachWaits": "cada uno espera al otro",
-        "deadlock": "interbloqueo",
+        "eachWaits": "Cada uno espera al otro",
+        "deadlock": "Interbloqueo",
         "noQueryCaptured": "El registro capturó este interbloqueo pero no la sentencia.",
         "waitingFor": "Estaba esperando que {target} terminara.",
         "waitingForRow": "Estaba esperando que {target} terminara — la otra sesión ya había cambiado la fila que quería.",
@@ -15935,9 +15932,6 @@
       }
     },
     "blocked": {
-      "title": "Bases de datos",
-      "subtitle": "Sesiones que esperan actualmente un bloqueo",
-      "subtitlePast": "Sesiones que esperaban un bloqueo durante esta ventana",
       "waitingCount": "ninguna sesión esperando un bloqueo | {count} sesión esperando un bloqueo ahora mismo | {count} sesiones esperando un bloqueo ahora mismo",
       "waitingCountPast": "ninguna sesión esperó un bloqueo | {count} sesión esperó un bloqueo en esta ventana | {count} sesiones esperaron un bloqueo en esta ventana",
       "sessionCount": "ninguna sesión | {count} sesión | {count} sesiones",
@@ -15983,14 +15977,14 @@
       },
       "deep": "{count} de profundidad",
       "notWaiting": "no esperando",
-      "longestWait": "ESPERA MÁS LARGA",
-      "holdsTheLock": "TIENE EL BLOQUEO QUE TODOS QUIEREN",
+      "longestWait": "Espera más larga",
+      "holdsTheLock": "Mantiene el bloqueo que todos quieren",
       "lastStatement": "última sentencia hace {age}",
       "idleInTransaction": "no esperando nada · inactivo en una transacción abierta",
       "pills": {
-        "root": "RAÍZ — EMPIEZA AQUÍ",
-        "waitingBlocking": "ESPERANDO Y BLOQUEANDO {count}",
-        "waiting": "ESPERANDO"
+        "root": "Raíz — comienza aquí",
+        "waitingBlocking": "Esperando y bloqueando {count}",
+        "waiting": "Esperando"
       },
       "waitingOn": "esperando a {pid}",
       "degraded": "Una sesión está bloqueando {count}. Ha tenido una transacción abierta durante {age} y no ha ejecutado una consulta en ese tiempo — muy probablemente una aplicación que olvidó confirmar.",
@@ -16068,9 +16062,6 @@
       }
     },
     "activity": {
-      "title": "Actividad",
-      "subtitle": "Lo que tus bases de datos están haciendo ahora mismo, muestreado de sus propias tablas de sesiones.",
-      "subtitlePast": "Lo que tus bases de datos estaban haciendo durante esta ventana, muestreado de sus propias tablas de sesiones.",
       "searchPlaceholder": "Buscar sesiones, usuarios, aplicaciones",
       "wait": {
         "onCpu": "En CPU / sin espera",
@@ -16194,8 +16185,6 @@
       "deadlockLabel": "interbloqueos"
     },
     "tableHealth": {
-      "title": "Salud de las tablas",
-      "subtitle": "Tamaño, bloat y estado de vacuum para cada tabla, primero la instantánea más reciente.",
       "searchPlaceholder": "Buscar tablas",
       "never": "Nunca",
       "countersCumulative": "Los recuentos de escaneo y vacuum son totales de por vida desde el último restablecimiento de estadísticas, no recuentos del rango de tiempo seleccionado.",

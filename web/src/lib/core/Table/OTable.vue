@@ -71,6 +71,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   // content, and CRUD listing tables sit flush to the edges. Row dividers (the
   // `bordered` row-bottom hairlines) stay; only the surrounding border is gone.
   frame: false,
+  toolbarBordered: true,
   striped: false,
   stickyHeader: true,
   wrap: false,
@@ -1054,7 +1055,10 @@ defineExpose({
       <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
-        class="px-page-edge border-table-row-divider flex items-center gap-2 border-b py-2"
+        :class="[
+          'px-page-edge flex items-center gap-2 py-2',
+          props.toolbarBordered ? 'border-table-row-divider border-b' : '',
+        ]"
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />
