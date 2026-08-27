@@ -257,6 +257,11 @@ export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<st
       example: example ?? "",
     })),
 
+    // Round-tripped, not edited here. The browser builder carries it through
+    // `...rest`; this one names every field, so leaving it out would silently
+    // unpin an API-configured check the first time it is saved from the form.
+    environments: check.environments ?? [],
+
     frequency: buildFrequency(check.schedule),
     config: buildProtocolConfig(check),
 

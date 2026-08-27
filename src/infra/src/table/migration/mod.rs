@@ -173,6 +173,7 @@ mod m20260824_000001_create_llm_playground_snapshots;
 mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
+mod m20260827_000001_create_synthetics_shared_variables;
 mod m20260827_000001_drop_table_action_scripts;
 
 #[cfg(test)]
@@ -431,6 +432,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260827_000001_drop_table_action_scripts::Migration),
             Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260827_000001_create_synthetics_shared_variables::Migration),
         ]
     }
 }
