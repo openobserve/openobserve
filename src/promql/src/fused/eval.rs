@@ -78,7 +78,10 @@ pub(crate) fn fused_range_agg(
 
     let timestamps = eval_ctx.timestamps();
     let groups = group_series_by_labels(&matrix, param);
-    let counter_kind = func.counter_extrapolation();
+    // A single-window query has no overlapping scans to amortize.
+    let counter_kind = func
+        .counter_extrapolation()
+        .filter(|_| timestamps.len() > 1);
 
     let results = groups
         .par_iter()

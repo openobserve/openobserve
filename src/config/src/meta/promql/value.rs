@@ -663,24 +663,38 @@ pub fn extrapolated_rate(
 }
 
 /// Per-series counter state for reset-corrected extrapolation across sliding
-/// windows: one prefix pass replaces the per-window reset scan.
+/// windows: resets are located once, then each window sums only its own
+/// corrections in scan order, so results are bit-identical to
+/// [`extrapolated_rate`].
 pub struct CounterSeries<'a> {
     samples: &'a [Sample],
-    reset_prefix: Vec<f64>,
+    // (sample index, value dropped by the reset ending at that index)
+    resets: Vec<(usize, f64)>,
     kind: ExtrapolationKind,
 }
 
 impl<'a> CounterSeries<'a> {
     pub fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
+        let mut resets = Vec::new();
+        for i in 1..samples.len() {
+            if samples[i].value < samples[i - 1].value {
+                resets.push((i, samples[i - 1].value));
+            }
+        }
         Self {
             samples,
-            reset_prefix: build_reset_prefix(samples),
+            resets,
             kind,
         }
     }
 
-    /// [`extrapolated_rate`] for the window `samples[start..end]`, with the
-    /// reset scan replaced by an O(1) prefix difference.
+    /// [`extrapolated_rate`] for the window `samples[start..end]`.
+    ///
+    /// Returns `None` for windows with fewer than two samples.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start..end` is out of bounds or the window is not in range.
     pub fn extrapolate(
         &self,
         start: usize,
@@ -697,26 +711,17 @@ impl<'a> CounterSeries<'a> {
             self.kind,
             ExtrapolationKind::Rate | ExtrapolationKind::Increase
         ) {
-            delta += self.reset_prefix[end - 1] - self.reset_prefix[start];
+            // Resets strictly inside the window, added in scan order.
+            let from = self.resets.partition_point(|&(index, _)| index <= start);
+            for &(index, correction) in &self.resets[from..] {
+                if index >= end {
+                    break;
+                }
+                delta += correction;
+            }
         }
         extrapolate_from_delta(window, delta, eval_ts, range, Duration::ZERO, self.kind)
     }
-}
-
-/// Counter-reset correction prefix: `prefix[i]` is the sum of values dropped by
-/// resets within `samples[..=i]`, so `prefix[r] - prefix[l]` is the correction
-/// for the window `[l, r]`.
-fn build_reset_prefix(samples: &[Sample]) -> Vec<f64> {
-    let mut prefix = vec![0.0; samples.len()];
-    for i in 1..samples.len() {
-        let correction = if samples[i].value < samples[i - 1].value {
-            samples[i - 1].value
-        } else {
-            0.0
-        };
-        prefix[i] = prefix[i - 1] + correction;
-    }
-    prefix
 }
 
 /// Applies Prometheus boundary extrapolation to a counter-corrected delta.
@@ -1086,16 +1091,72 @@ mod tests {
     }
 
     #[test]
-    fn test_build_reset_prefix() {
+    fn test_counter_series_reset_locations() {
         let samples = [
             Sample::new(1, 90.0),
             Sample::new(2, 100.0),
             Sample::new(3, 5.0),
             Sample::new(4, 15.0),
         ];
-        assert_eq!(build_reset_prefix(&samples), vec![0.0, 0.0, 100.0, 100.0]);
-        assert!(build_reset_prefix(&[]).is_empty());
-        assert_eq!(build_reset_prefix(&samples[..1]), vec![0.0]);
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        assert_eq!(counter.resets, vec![(2, 100.0)]);
+        assert!(
+            CounterSeries::new(&[], ExtrapolationKind::Rate)
+                .resets
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn test_counter_series_preserves_small_resets_next_to_huge_ones() {
+        const MICROS: i64 = 1_000_000;
+        // A 1e16 reset before the window must not absorb the small reset
+        // inside it: a shared running prefix would round the +1 away.
+        let values = [1e16, 0.0, 0.0, 1.0, 0.0, 2.0];
+        let samples = values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
+            .collect::<Vec<_>>();
+        let range = Duration::from_secs(60);
+        let eval_ts = 100 * MICROS;
+
+        for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+            let legacy =
+                extrapolated_rate(&samples[2..6], eval_ts, range, Duration::ZERO, kind).unwrap();
+            let counter = CounterSeries::new(&samples, kind);
+            let windowed = counter.extrapolate(2, 6, eval_ts, range).unwrap();
+            assert_eq!(legacy.to_bits(), windowed.to_bits());
+            assert!(legacy.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_counter_series_infinite_reset_outside_window() {
+        const MICROS: i64 = 1_000_000;
+        // The +Inf -> 2.0 reset sits before the window; a shared prefix would
+        // produce inf - inf = NaN where the legacy scan stays finite.
+        let values = [f64::INFINITY, 2.0, 5.0, 9.0];
+        let samples = values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
+            .collect::<Vec<_>>();
+        let range = Duration::from_secs(60);
+        let eval_ts = 80 * MICROS;
+
+        let legacy = extrapolated_rate(
+            &samples[1..4],
+            eval_ts,
+            range,
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        )
+        .unwrap();
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        let windowed = counter.extrapolate(1, 4, eval_ts, range).unwrap();
+        assert!(legacy.is_finite());
+        assert_eq!(legacy.to_bits(), windowed.to_bits());
     }
 
     #[test]
@@ -1165,6 +1226,9 @@ mod tests {
                     timestamp += 15 * MICROS + ((r % 7) as i64 - 3) * MICROS;
                     if r % 11 == 0 {
                         timestamp += 60 * MICROS;
+                    }
+                    if r % 29 == 0 {
+                        value += 1.0e16;
                     }
                     if r % 13 == 0 {
                         value = (r % 5) as f64 * scale;

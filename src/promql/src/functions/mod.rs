@@ -289,8 +289,10 @@ where
             let mut result_samples = Vec::with_capacity(timestamps.len());
             let mut start_index = 0;
             let mut end_index = 0;
+            // A single-window query has no overlapping scans to amortize.
             let counter = func
                 .counter_extrapolation()
+                .filter(|_| timestamps.len() > 1)
                 .map(|kind| CounterSeries::new(&metric.samples, kind));
 
             // For each eval timestamp, compute the function value
