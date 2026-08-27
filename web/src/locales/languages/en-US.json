@@ -491,7 +491,7 @@
     },
     "noRemoteTasks": {
       "title": "No remote tasks yet",
-      "description": "A remote task is an HTTP service your experiments call to produce outputs. Register it once, prove the connection works, and every experiment can pin the exact version it ran against.",
+      "description": "A remote task is an HTTP service your experiments call to produce outputs. Publish it once, prove the connection works, and every experiment can pin the exact version it ran against.",
       "action": "New Task",
       "actionDesc": "Point OpenObserve at your endpoint and test the connection."
     }
@@ -10514,7 +10514,7 @@
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations",
-      "remoteTasks": "HTTP services experiments can call — registered once, versioned, reused"
+      "remoteTasks": "HTTP services experiments can call — published once, versioned, reused"
     },
     "annotate": {
       "button": "Annotate",
@@ -10903,12 +10903,12 @@
         "taskTypeRemote": "Remote Task",
         "taskTypeRemoteHelp": "Call your own HTTP service to produce outputs.",
         "remoteTaskLabel": "Remote Task",
-        "remoteTaskPlaceholder": "Pick a registered task",
+        "remoteTaskPlaceholder": "Pick a published task",
         "remoteTaskHelp": "Pinned at this version. Publishing a new version later never changes this run.",
-        "remoteTaskEmpty": "No remote task has a published version yet. Register one and pass its test connection before an experiment can use it.",
+        "remoteTaskEmpty": "No remote task has a published version yet. Publish one and pass its test connection before an experiment can use it.",
         "taskTimeoutLabel": "Timeout (seconds)",
         "taskConcurrencyLabel": "Max Concurrency",
-        "taskOverrideHelp": "Overrides the task's registered value for this run."
+        "taskOverrideHelp": "Overrides the task's published value for this run."
       },
       "columns": {
         "name": "Name",
@@ -11542,7 +11542,7 @@
       },
       "testRun": {
         "title": "Test Run",
-        "hint": "Runs the latest published version against up to ten samples using the registered contract. Nothing is recorded: no experiment, no execution records, no history.",
+        "hint": "Runs the latest published version against up to ten samples using its published contract. Nothing is recorded: no experiment, no execution records, no history.",
         "samplesLabel": "Samples",
         "addSample": "Add Sample",
         "removeSample": "Remove Sample",

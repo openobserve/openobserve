@@ -104,7 +104,7 @@ describe("RemoteTasksPage", () => {
     expect(list).toHaveBeenCalledWith("acme");
     // The real OTable virtualizes its body, so the page-level assertion is that
     // it mounted and fetched; row rendering is asserted against the stub below.
-    expect(wrapper.text()).toContain("Register Task");
+    expect(wrapper.text()).toContain("New Task");
   });
 
   it("renders the task name in the table", async () => {

@@ -233,12 +233,11 @@ describe("RemoteTaskFormPage — registering", () => {
     expect((wrapper.vm as any).draftEntityId).toBe("head-1");
   });
 
-  // Generated HMAC material is returned exactly once and never again.
-  it("blocks navigation on the one-time signing key until it is dismissed", async () => {
-    create.mockResolvedValue({
-      entityId: "head-1",
-      generatedSigningSecret: { keyId: "k1", material: { type: "token", value: "s3cr3t" } },
-    });
+  // The HMAC key is made in the browser the moment signing is switched on, so
+  // the operator can put it in their own service BEFORE the test connection —
+  // which is signed — ever runs. Nothing about it comes back from the server.
+  it("generates the signing key up front and registers with it", async () => {
+    create.mockResolvedValue({ entityId: "head-1" });
     testConnection.mockResolvedValue({
       published: true,
       versionBumped: true,
@@ -246,18 +245,36 @@ describe("RemoteTaskFormPage — registering", () => {
       report,
     });
     const wrapper = mountForm();
-    await fillValid(wrapper, { signingEnabled: true, signingGenerate: true });
+    await fillValid(wrapper);
+    (wrapper.vm as any).form.setFieldValue("signingEnabled", true);
+    await flushPromises();
+
+    const generated = (wrapper.vm as any).form.state.values.signingKey as string;
+    expect(generated).toBeTruthy();
+
     await submit(wrapper);
 
-    expect((wrapper.vm as any).generatedSecretOpen).toBe(true);
-    expect((wrapper.vm as any).generatedKey).toBe("s3cr3t");
-    expect(push).not.toHaveBeenCalled();
-
-    (wrapper.vm as any).dismissGeneratedSecret();
-    await flushPromises();
+    expect(create).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({
+        signing: { enabled: true, secret: { type: "token", value: generated } },
+      }),
+    );
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({ name: "aiRemoteTaskDetail", params: { id: "head-1" } }),
     );
+  });
+
+  it("clears the key when signing is switched back off", async () => {
+    const wrapper = mountForm();
+    await fillValid(wrapper);
+    (wrapper.vm as any).form.setFieldValue("signingEnabled", true);
+    await flushPromises();
+    expect((wrapper.vm as any).form.state.values.signingKey).toBeTruthy();
+
+    (wrapper.vm as any).form.setFieldValue("signingEnabled", false);
+    await flushPromises();
+    expect((wrapper.vm as any).form.state.values.signingKey).toBe("");
   });
 
   it("saves a draft without testing, and says it is not referenceable yet", async () => {

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 
 const runPlayground = vi.fn();
+const scorePlayground = vi.fn();
+const scorersList = vi.fn();
 const providersList = vi.fn();
 const datasetsList = vi.fn();
 const push = vi.fn();
@@ -15,13 +17,16 @@ vi.mock("@/services/llm-playground.service", async () => {
   );
   return {
     ...actual,
-    PLAYGROUND_USE_MOCK: true,
     runPlayground: (...args: unknown[]) => runPlayground(...args),
+    scorePlayground: (...args: unknown[]) => scorePlayground(...args),
   };
 });
 
 vi.mock("@/services/online-evals.service", () => ({
-  default: { providers: { list: (...args: unknown[]) => providersList(...args) } },
+  default: {
+    providers: { list: (...args: unknown[]) => providersList(...args) },
+    scorers: { list: (...args: unknown[]) => scorersList(...args) },
+  },
 }));
 
 vi.mock("@/services/llm-datasets.service", () => ({
@@ -111,15 +116,19 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     addRow: (input: string, expected: string | null) => void;
     removeRow: (id: string) => void;
     createExperiment: (id: string) => void;
-    runGateOpen: boolean;
+    updateVariant: (variant: import("./playgroundDraft").PlaygroundVariant) => void;
+    scoreAll: () => Promise<void>;
     totalCells: number;
   };
 }
 
 describe("PlaygroundPage", () => {
   beforeEach(() => {
+    localStorage.clear();
     providersList.mockResolvedValue([PROVIDER]);
     datasetsList.mockResolvedValue([]);
+    scorersList.mockResolvedValue([]);
+    scorePlayground.mockReset();
     runPlayground.mockReset();
     push.mockReset();
     toast.mockReset();
@@ -134,10 +143,11 @@ describe("PlaygroundPage", () => {
     vi.clearAllMocks();
   });
 
-  it("starts as a single-variant editor bench", async () => {
+  it("starts as a single-variant bench", async () => {
     const page = vm(await mountPage());
     expect(page.draft.variants).toHaveLength(1);
-    expect(page.draft.rows).toBeNull();
+    expect(page.draft.scorerIds).toEqual([]);
+    expect(page.draft.autoScore).toBe(false);
   });
 
   it("seeds the first variant with the default provider, so Run is reachable", async () => {
@@ -166,15 +176,15 @@ describe("PlaygroundPage", () => {
     expect(cell.usage?.promptTokens).toBe(5);
   });
 
-  it("clears staleness once the run that matches the config finishes", async () => {
+  it("clears the previous verdicts when a fresh run starts", async () => {
     const wrapper = await mountPage();
     const page = vm(wrapper);
-    page.draft.variants[0].stale = true;
 
     page.onRunAll();
     await flushPromises();
-
-    expect(page.draft.variants[0].stale).toBe(false);
+    const cell = page.results[page.draft.variants[0].id][SINGLE_ROW_KEY];
+    expect(cell.scores).toBeUndefined();
+    expect(cell.scoredKey).toBeUndefined();
   });
 
   it("sends only non-empty messages — a blank system prompt is not a message", async () => {
@@ -217,7 +227,7 @@ describe("PlaygroundPage", () => {
 
   it("caps variants at four", async () => {
     const page = vm(await mountPage());
-    for (let i = 0; i < 8; i += 1) page.addVariant();
+    for (let i = 0; i < 8; i += 1) page.duplicate(page.draft.variants[0].id);
     expect(page.draft.variants).toHaveLength(4);
   });
 
@@ -230,7 +240,7 @@ describe("PlaygroundPage", () => {
   it("drops a removed variant's results with it", async () => {
     const wrapper = await mountPage();
     const page = vm(wrapper);
-    page.addVariant();
+    page.duplicate(page.draft.variants[0].id);
     const doomed = page.draft.variants[1].id;
 
     page.onRunAll();
@@ -241,76 +251,40 @@ describe("PlaygroundPage", () => {
     expect(page.results[doomed]).toBeUndefined();
   });
 
-  it("inserts a duplicate directly after its source", async () => {
+  it("inserts a duplicate directly after its source, with an id of its own", async () => {
     const page = vm(await mountPage());
-    page.addVariant();
     const first = page.draft.variants[0].id;
+    page.draft.variants[0].messages[1].content = "Summarise {{input}}";
 
     page.duplicate(first);
 
-    expect(page.draft.variants).toHaveLength(3);
+    expect(page.draft.variants).toHaveLength(2);
+    expect(page.draft.variants[0].id).toBe(first);
     expect(page.draft.variants[1].id).not.toBe(first);
+    expect(page.draft.variants[1].messages[1].content).toBe("Summarise {{input}}");
   });
 
-  it("switches to table mode on the first row and back when the last one goes", async () => {
-    const page = vm(await mountPage());
-
-    page.addRow("first question", null);
-    expect(page.draft.rows).toHaveLength(1);
-
-    page.removeRow(page.draft.rows![0].id);
-    expect(page.draft.rows).toBeNull();
-  });
-
-  it("gates a run whose template references no row field", async () => {
-    const page = vm(await mountPage());
-    page.draft.variants[0].messages[1].content = "Summarise the policy.";
-    page.addRow("a question", null);
-
-    page.onRunAll();
-    await flushPromises();
-
-    expect(page.runGateOpen).toBe(true);
-    expect(runPlayground).not.toHaveBeenCalled();
-  });
-
-  it("does not gate once the template binds a row field", async () => {
+  it("binds the bench variables into the prompt it sends", async () => {
     const page = vm(await mountPage());
     page.draft.variants[0].messages[1].content = "Summarise {{input}}";
-    page.addRow("a question", null);
+    page.draft.vars = { input: "the refund policy" };
 
     page.onRunAll();
     await flushPromises();
 
-    expect(page.runGateOpen).toBe(false);
-    expect(runPlayground).toHaveBeenCalledTimes(1);
-  });
-
-  it("runs every row against every variant", async () => {
-    const page = vm(await mountPage());
-    page.draft.variants[0].messages[1].content = "Summarise {{input}}";
-    page.addVariant();
-    page.addRow("one", null);
-    page.addRow("two", null);
-
-    page.onRunAll();
-    await flushPromises();
-
-    expect(runPlayground).toHaveBeenCalledTimes(4);
-  });
-
-  it("substitutes the row's input into the prompt it sends", async () => {
-    const page = vm(await mountPage());
-    page.draft.variants[0].messages[1].content = "Summarise {{input}}";
-    page.addRow("the refund policy", null);
-
-    page.onRunAll();
-    await flushPromises();
-
-    const request = runPlayground.mock.calls[0][1] as {
-      messages: { content: string }[];
-    };
+    const request = runPlayground.mock.calls[0][1] as { messages: { content: string }[] };
     expect(request.messages[0].content).toBe("Summarise the refund policy");
+  });
+
+  it("runs every variant on the bench", async () => {
+    const page = vm(await mountPage());
+    page.draft.variants[0].messages[1].content = "Hello";
+    page.duplicate(page.draft.variants[0].id);
+
+    page.onRunAll();
+    await flushPromises();
+
+    expect(runPlayground).toHaveBeenCalledTimes(2);
   });
 
   it("hands the variant's config to the experiment form", async () => {
@@ -325,5 +299,58 @@ describe("PlaygroundPage", () => {
     expect(target.query.model).toBe("gpt-4o-mini");
     expect(target.query.systemPrompt).toBe("You are terse.");
     expect(target.query.userPrompt).toBe("Summarise {{input}}");
+  });
+
+  // The route is keepAlive:false, so leaving the page unmounts it. The bench is
+  // unsaved work; only Reset is allowed to clear it.
+  it("restores the bench after the page is left and reopened", async () => {
+    const first = await mountPage();
+    const page = vm(first);
+    page.draft.variants[0].messages[1].content = "keep me";
+    page.draft.vars = { input: "bound" };
+    first.unmount();
+
+    const second = vm(await mountPage());
+    expect(second.draft.variants[0].messages[1].content).toBe("keep me");
+    expect(second.draft.vars).toEqual({ input: "bound" });
+  });
+
+  // Ids outlive the page load now (session, recent drafts, snapshots) while the
+  // counter restarts at 1 — without adoption a NEW column takes an id the bench
+  // already holds and every lookup resolves to the first match.
+  it("gives a column added after a restore an id of its own", async () => {
+    const first = await mountPage();
+    vm(first).draft.variants[0].messages[1].content = "restored";
+    first.unmount();
+
+    const page = vm(await mountPage());
+    page.duplicate(page.draft.variants[0].id);
+    const [a, b] = page.draft.variants;
+    expect(b.id).not.toBe(a.id);
+
+    page.updateVariant({ ...b, model: "claude-3" });
+    expect(page.draft.variants[1].model).toBe("claude-3");
+    expect(page.draft.variants[0].model).toBe("gpt-4o-mini");
+  });
+
+  it("re-scores when an expected output is added, without needing another run", async () => {
+    scorePlayground.mockResolvedValue([]);
+    const page = vm(await mountPage());
+    page.draft.scorerIds = ["scorer-1"];
+    page.draft.variants[0].messages[1].content = "Hello";
+
+    page.onRunAll();
+    await flushPromises();
+    await page.scoreAll();
+    expect(scorePlayground).toHaveBeenCalledTimes(1);
+
+    // Same answer, same scorers: nothing the judge sees has changed.
+    await page.scoreAll();
+    expect(scorePlayground).toHaveBeenCalledTimes(1);
+
+    page.draft.expectedSingle = "the golden answer";
+    await page.scoreAll();
+    expect(scorePlayground).toHaveBeenCalledTimes(2);
+    expect(scorePlayground.mock.calls[1][1].expectedOutput).toBe("the golden answer");
   });
 });

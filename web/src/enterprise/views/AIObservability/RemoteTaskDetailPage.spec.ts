@@ -163,8 +163,17 @@ describe("RemoteTaskDetailPage", () => {
     );
   });
 
-  it("disables Edit for a task the platform cannot round-trip", async () => {
+  it("edits a task that carries a secret — the form preserves what it cannot read", async () => {
     get.mockResolvedValue(task({ auth: { type: "bearer", usesSecret: true } }));
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(
+      wrapper.get('[data-test="ai-remote-task-detail-edit-btn"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("disables Edit once the task is retired", async () => {
+    get.mockResolvedValue(task({ isActive: false }));
     const wrapper = mountPage();
     await flushPromises();
     expect(
@@ -192,15 +201,14 @@ describe("RemoteTaskDetailPage", () => {
     expect(discardDraft).toHaveBeenCalledWith("acme", "head-1");
   });
 
-  it("returns to the list after deleting", async () => {
-    confirm.mockResolvedValue(true);
-    remove.mockResolvedValue(undefined);
+  // Deleting moved to the list page — the detail header offers Edit and Refresh
+  // only. See the note in the review: the removal rode along in a Playground
+  // commit, so it is worth confirming it was meant.
+  it("offers no delete action of its own", async () => {
     const wrapper = mountPage();
     await flushPromises();
-    await wrapper.get('[data-test="ai-remote-task-detail-delete-btn"]').trigger("click");
-    await flushPromises();
-    expect(remove).toHaveBeenCalledWith("acme", "head-1");
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "aiRemoteTasks" }));
+    expect(wrapper.find('[data-test="ai-remote-task-detail-delete-btn"]').exists()).toBe(false);
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it("reports a failed load", async () => {

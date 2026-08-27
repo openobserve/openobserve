@@ -53,9 +53,10 @@ const OTextarea = {
     '<textarea :data-error="error" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 };
 
-function mountDialog(tools: PlaygroundTool[]) {
+/** `index` picks the tool being edited; `null` defines a new one. */
+function mountDialog(tools: PlaygroundTool[], index: number | null = null) {
   return mount(PlaygroundToolsDialog, {
-    props: { open: true, tools },
+    props: { open: true, tools, index },
     global: { stubs: { ODialog, OButton, OInput, OTextarea } },
   });
 }
@@ -67,57 +68,90 @@ const VALID: PlaygroundTool = {
 };
 
 describe("PlaygroundToolsDialog", () => {
-  it("shows an empty state before any tool is defined", () => {
-    expect(mountDialog([]).text()).toContain("aiObservability.playground.toolsEmpty");
-  });
-
-  it("loads the current tools when it opens", () => {
+  it("opens blank when a new tool is being defined", () => {
     const wrapper = mountDialog([VALID]);
-    expect(wrapper.find('[data-test="ai-playground-tool-0"]').exists()).toBe(true);
+    expect(
+      (wrapper.find('[data-test="ai-playground-tool-name"]').element as HTMLInputElement).value,
+    ).toBe("");
+    // No list and no add button: the Tools button means "add one", the menu
+    // beside it means "open that one".
+    expect(wrapper.find('[data-test="ai-playground-tool-add"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-playground-tool-0"]').exists()).toBe(false);
   });
 
-  it("blocks Apply while any parameter schema is unparseable", async () => {
-    const wrapper = mountDialog([{ ...VALID, parameters: "{ not json" }]);
+  it("loads the tool it was opened on", () => {
+    const wrapper = mountDialog([VALID], 0);
+    expect(
+      (wrapper.find('[data-test="ai-playground-tool-name"]').element as HTMLInputElement).value,
+    ).toBe("lookup_order");
+    expect(
+      (wrapper.find('[data-test="ai-playground-tool-description"]').element as HTMLInputElement)
+        .value,
+    ).toBe("Find an order");
+  });
+
+  it("blocks Apply while the parameter schema is unparseable", async () => {
+    const wrapper = mountDialog([], null);
+    await wrapper.find('[data-test="ai-playground-tool-parameters"]').setValue("{ not json");
     expect(wrapper.find(".o-dialog").attributes("data-primary-disabled")).toBe("true");
   });
 
-  it("allows empty parameters — a tool may take none", () => {
-    const wrapper = mountDialog([{ ...VALID, parameters: "" }]);
+  it("allows an empty schema — a tool may take no arguments", () => {
+    const wrapper = mountDialog([], null);
     expect(wrapper.find(".o-dialog").attributes("data-primary-disabled")).toBe("false");
   });
 
-  it("drops unnamed tools on apply — a tool that cannot be called is not a tool", async () => {
-    const wrapper = mountDialog([VALID, { name: "  ", description: "", parameters: "" }]);
-    await wrapper.find(".o-dialog .primary").trigger("click");
+  it("appends the new tool on apply, leaving the existing ones alone", async () => {
+    const wrapper = mountDialog([VALID], null);
+    await wrapper.find('[data-test="ai-playground-tool-name"]').setValue("refund_order");
+    await wrapper.find(".primary").trigger("click");
+
+    const applied = wrapper.emitted("apply")?.[0]?.[0] as PlaygroundTool[];
+    expect(applied.map((tool) => tool.name)).toEqual(["lookup_order", "refund_order"]);
+  });
+
+  it("drops an unnamed tool — one that cannot be called is not a tool", async () => {
+    const wrapper = mountDialog([VALID], null);
+    await wrapper.find('[data-test="ai-playground-tool-description"]').setValue("no name given");
+    await wrapper.find(".primary").trigger("click");
 
     const applied = wrapper.emitted("apply")?.[0]?.[0] as PlaygroundTool[];
     expect(applied).toHaveLength(1);
     expect(applied[0].name).toBe("lookup_order");
   });
 
-  it("closes itself after applying", async () => {
-    const wrapper = mountDialog([VALID]);
-    await wrapper.find(".o-dialog .primary").trigger("click");
-    expect(wrapper.emitted("update:open")).toEqual([[false]]);
-  });
-
   it("edits a local copy, so the source tools are untouched until Apply", async () => {
     const source = [{ ...VALID }];
-    const wrapper = mountDialog(source);
+    const wrapper = mountDialog(source, 0);
 
-    await wrapper.find('[data-test="ai-playground-tool-name-0"]').setValue("renamed");
-
+    await wrapper.find('[data-test="ai-playground-tool-name"]').setValue("renamed");
     expect(source[0].name).toBe("lookup_order");
-    expect(wrapper.emitted("apply")).toBeUndefined();
+
+    await wrapper.find(".primary").trigger("click");
+    const applied = wrapper.emitted("apply")?.[0]?.[0] as PlaygroundTool[];
+    expect(applied[0].name).toBe("renamed");
   });
 
-  it("adds and removes rows", async () => {
-    const wrapper = mountDialog([VALID]);
+  it("removes the tool it was opened on", async () => {
+    const wrapper = mountDialog([VALID, { ...VALID, name: "refund_order" }], 0);
+    await wrapper.find('[data-test="ai-playground-tool-remove"]').trigger("click");
 
-    await wrapper.find('[data-test="ai-playground-tool-add"]').trigger("click");
-    expect(wrapper.find('[data-test="ai-playground-tool-1"]').exists()).toBe(true);
+    const applied = wrapper.emitted("apply")?.[0]?.[0] as PlaygroundTool[];
+    expect(applied.map((tool) => tool.name)).toEqual(["refund_order"]);
+  });
 
-    await wrapper.find('[data-test="ai-playground-tool-remove-0"]').trigger("click");
-    expect(wrapper.find('[data-test="ai-playground-tool-1"]').exists()).toBe(false);
+  it("offers Remove only for a tool that exists", () => {
+    expect(
+      mountDialog([VALID], null).find('[data-test="ai-playground-tool-remove"]').exists(),
+    ).toBe(false);
+    expect(mountDialog([VALID], 0).find('[data-test="ai-playground-tool-remove"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("closes on apply", async () => {
+    const wrapper = mountDialog([VALID], 0);
+    await wrapper.find(".primary").trigger("click");
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
   });
 });

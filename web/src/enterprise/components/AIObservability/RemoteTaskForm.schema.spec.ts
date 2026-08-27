@@ -111,13 +111,13 @@ describe("makeRemoteTaskSchema", () => {
     );
   });
 
-  it("asks for a signing key only when the operator supplies one", () => {
-    expect(schema.safeParse(values({ signingEnabled: true, signingGenerate: true })).success).toBe(
-      true,
-    );
-    expect(issuePaths(values({ signingEnabled: true, signingGenerate: false }))).toContain(
-      "signingKey",
-    );
+  // The form generates the key the moment signing is switched on, so an empty
+  // one means the generator failed rather than that a field was skipped.
+  it("refuses signing without key material", () => {
+    expect(
+      schema.safeParse(values({ signingEnabled: true, signingKey: "generated-key" })).success,
+    ).toBe(true);
+    expect(issuePaths(values({ signingEnabled: true, signingKey: "" }))).toContain("signingKey");
   });
 });
 
@@ -135,27 +135,22 @@ describe("toCreatePayload", () => {
     expect(JSON.stringify(payload)).not.toContain("secret_ref");
   });
 
-  // Omitting `secret` is what asks the server to generate the HMAC material and
-  // hand it back exactly once.
-  it("omits the secret when the server should generate the signing key", () => {
-    const payload = toCreatePayload(values({ signingEnabled: true, signingGenerate: true }));
-    expect(payload.signing).toEqual({ enabled: true });
+  // The key is made in the browser and registered with the task: the operator
+  // needs it in their own service before the signed test connection runs.
+  it("sends the signing material the form generated", () => {
+    const payload = toCreatePayload(values({ signingEnabled: true, signingKey: "k" }));
+    expect(payload.signing).toEqual({ enabled: true, secret: { type: "token", value: "k" } });
   });
 
-  it("sends supplied signing material and its key id", () => {
-    const payload = toCreatePayload(
-      values({
-        signingEnabled: true,
-        signingGenerate: false,
-        signingKey: "k",
-        signingKeyId: "k1",
-      }),
-    );
-    expect(payload.signing).toEqual({
-      enabled: true,
-      secret: { type: "token", value: "k" },
-      keyId: "k1",
-    });
+  // A first registration has exactly one key, so a client-chosen `kid` names
+  // nothing. The server assigns one; naming keys matters at rotation.
+  it("sends no key id", () => {
+    const payload = toCreatePayload(values({ signingEnabled: true, signingKey: "k" }));
+    expect(payload.signing).not.toHaveProperty("keyId");
+  });
+
+  it("omits signing entirely when it is off", () => {
+    expect(toCreatePayload(values({ signingEnabled: false })).signing).toBeUndefined();
   });
 
   it("omits signing entirely when it is off", () => {

@@ -84,11 +84,47 @@ describe("PlaygroundOutputCell", () => {
     expect(usage.text()).toContain("0.0001");
   });
 
-  it("dims the text when the config has moved on since the run", () => {
-    const wrapper = mountCell(doneCell(), { stale: true });
-    expect(wrapper.find('[data-test="ai-playground-output-text"]').classes()).toContain(
-      "opacity-40",
+  it("lists a verdict per scorer, including the ones that could not run", () => {
+    const wrapper = mountCell(
+      doneCell({
+        scores: [
+          {
+            scorerId: "s1",
+            scorerName: "correctness",
+            scorerVersion: 2,
+            status: "scored",
+            numeric: 0.75,
+            categorical: null,
+            boolean: null,
+            reasoning: "close enough",
+            reason: null,
+            error: null,
+          },
+          {
+            scorerId: "s2",
+            scorerName: "policy",
+            scorerVersion: 1,
+            status: "skipped",
+            numeric: null,
+            categorical: null,
+            boolean: null,
+            reasoning: null,
+            reason: "no_reference",
+            error: null,
+          },
+        ],
+      }),
     );
+
+    const scores = wrapper.find('[data-test="ai-playground-output-scores"]');
+    expect(scores.exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-playground-score-s1"]').text()).toContain("close enough");
+    expect(wrapper.find('[data-test="ai-playground-score-s2"]').exists()).toBe(true);
+  });
+
+  it("says so while the judges are still running", () => {
+    const wrapper = mountCell(doneCell({ scoring: true }));
+    expect(wrapper.find('[data-test="ai-playground-output-scores"]').exists()).toBe(true);
   });
 
   it("offers a retry on error and emits it", async () => {
@@ -116,22 +152,15 @@ describe("PlaygroundOutputCell", () => {
     expect(wrapper.find('[data-test="ai-playground-output-text"]').exists()).toBe(false);
   });
 
-  it("hides the action row unless it is asked for", () => {
-    expect(mountCell(doneCell()).find('[data-test="ai-playground-output-copy"]').exists()).toBe(
+  // Copy / Continue Conversation / Create Experiment live on the Output label
+  // row now, which PlaygroundVariantColumn owns — see its spec. The cell shows
+  // the answer and nothing else, so a long output can never push them away.
+  it("carries no action row of its own", () => {
+    const wrapper = mountCell(doneCell());
+    expect(wrapper.find('[data-test="ai-playground-output-copy"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-playground-output-add-to-messages"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-playground-output-create-experiment"]').exists()).toBe(
       false,
     );
-    expect(
-      mountCell(doneCell(), { showActions: true })
-        .find('[data-test="ai-playground-output-copy"]')
-        .exists(),
-    ).toBe(true);
-  });
-
-  it("does not offer 'add to messages' for a tool call — there is no answer to append", () => {
-    const wrapper = mountCell(
-      doneCell({ text: "", toolCall: { name: "lookup_order", arguments: "{}" } }),
-      { showActions: true },
-    );
-    expect(wrapper.find('[data-test="ai-playground-output-add-to-messages"]').exists()).toBe(false);
   });
 });
