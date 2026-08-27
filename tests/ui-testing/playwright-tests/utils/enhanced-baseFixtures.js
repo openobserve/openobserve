@@ -28,12 +28,18 @@ const test = baseTest.extend({
         testLogger.info('Using saved authentication state');
         context = await browser.newContext({
           storageState: authFile,
-          viewport: { width: 1500, height: 1024 }
+          viewport: { width: 1500, height: 1024 },
+          // browser.newContext() does NOT inherit the project's `use.permissions`,
+          // so overriding this fixture silently drops them. Specs that read the
+          // clipboard (share-link, legends-copy, table-copy-cell) then fail on a
+          // rejected navigator.clipboard.readText().
+          permissions: ['clipboard-read', 'clipboard-write']
         });
       } else {
         testLogger.warn('No saved auth state found, creating fresh context');
         context = await browser.newContext({
-          viewport: { width: 1500, height: 1024 }
+          viewport: { width: 1500, height: 1024 },
+          permissions: ['clipboard-read', 'clipboard-write']
         });
       }
       
