@@ -55,6 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </OButton>
+      <ShareButton
+        data-test="rum-performance-share-link-btn"
+        :url="shareUrl"
+        variant="outline"
+        size="icon-toolbar"
+      />
     </template>
     <OTabs
       class="px-page-edge border-border-default shrink-0 border-b"
@@ -104,6 +110,8 @@ import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import { useRumShareUrl } from "@/composables/rum/useRumShareUrl";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -115,6 +123,7 @@ export default defineComponent({
     OButton,
     OTooltip,
     OPageLayout,
+    ShareButton,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -123,6 +132,7 @@ export default defineComponent({
     const activePerformanceComponent = ref(null);
     const { performanceState } = usePerformance();
     useRum();
+    const { shareUrl } = useRumShareUrl();
 
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);
@@ -406,6 +416,7 @@ export default defineComponent({
       activePerformanceTab,
       activePerformanceComponent,
       isVariablesChanged,
+      shareUrl,
     };
   },
 });

@@ -5,6 +5,7 @@ import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import AppPerformance from "./AppPerformance.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 
 // Mock the composables
 const mockPerformanceState = {
@@ -214,6 +215,15 @@ describe("AppPerformance.vue", () => {
     it("should render refresh button", () => {
       const refreshBtn = wrapper.find('[data-test="rum-performance-refresh"]');
       expect(refreshBtn.exists()).toBe(true);
+    });
+
+    it("shares a URL carrying the active tab and its time range", () => {
+      const shareButton = wrapper.findComponent(ShareButton);
+
+      expect(shareButton.exists()).toBe(true);
+      expect(shareButton.props("url")).toBe(
+        `${window.location.origin}/rum/performance?org_identifier=test-org-123&period=15m`,
+      );
     });
 
     it("should have correct key attribute based on organization", () => {

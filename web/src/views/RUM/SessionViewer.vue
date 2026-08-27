@@ -69,6 +69,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
+    <template #actions>
+      <ShareButton
+        data-test="session-viewer-share-link-btn"
+        :url="shareUrl"
+        variant="outline"
+        size="sm-action"
+        show-label
+      />
+    </template>
     <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
       <OSplitter
         v-model="splitterSize"
@@ -140,6 +149,8 @@ import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import { useRumShareUrl } from "@/composables/rum/useRumShareUrl";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
@@ -164,6 +175,7 @@ const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
 const { t } = useI18nTyped();
+const { shareUrl } = useRumShareUrl();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
