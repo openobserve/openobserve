@@ -79,7 +79,8 @@ const organizations = {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
   },
   // `limit` is the pool's new ceiling, not an increment. `pool` is a
-  // TrialQuotaPool key: "ai_credits" | "synthetics_steps".
+  // TrialQuotaPool key: "ai_credits" | "synthetics_browser_steps" |
+  // "synthetics_protocol_steps".
   set_quota_usage_limit: (
     orgIdentifier: string,
     pool: string,

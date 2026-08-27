@@ -239,13 +239,21 @@ pub async fn all_organizations(
                 .unwrap_or_default(),
             credits_used: openobserve_core::trial_quota::get_used(&org.identifier),
             credits_limit: openobserve_core::trial_quota::get_limit(&org.identifier),
-            steps_used: openobserve_core::trial_quota::get_used_for_pool(
+            browser_steps_used: openobserve_core::trial_quota::get_used_for_pool(
                 &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsSteps,
+                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsBrowserSteps,
             ),
-            steps_limit: openobserve_core::trial_quota::get_limit_for_pool(
+            browser_steps_limit: openobserve_core::trial_quota::get_limit_for_pool(
                 &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsSteps,
+                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsBrowserSteps,
+            ),
+            protocol_steps_used: openobserve_core::trial_quota::get_used_for_pool(
+                &org.identifier,
+                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsProtocolSteps,
+            ),
+            protocol_steps_limit: openobserve_core::trial_quota::get_limit_for_pool(
+                &org.identifier,
+                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsProtocolSteps,
             ),
             created_at: org.created_at,
             updated_at: org.updated_at,
@@ -688,9 +696,10 @@ pub async fn set_quota_usage_limit(
     // Rejected rather than defaulted: a fallback would credit the wrong pool.
     let Some(pool) = TrialQuotaPool::from_key(&pool) else {
         return MetaHttpResponse::bad_request(format!(
-            "unknown quota pool '{pool}' (expected one of: {}, {})",
+            "unknown quota pool '{pool}' (expected one of: {}, {}, {})",
             TrialQuotaPool::AiCredits.key(),
-            TrialQuotaPool::SyntheticsSteps.key(),
+            TrialQuotaPool::SyntheticsBrowserSteps.key(),
+            TrialQuotaPool::SyntheticsProtocolSteps.key(),
         ));
     };
 

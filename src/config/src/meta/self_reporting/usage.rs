@@ -643,12 +643,20 @@ pub enum UsageEvent {
     AiChat,
     AiCredits,
     AiFreeCredits,
-    /// Synthetics steps EXECUTED across every attempt, excluding skipped.
-    /// `size` carries the step count. **The billed quantity** — SPEC §4.2.
-    SyntheticsSteps,
-    /// Synthetics steps executed against the free pool. `size` carries the same
-    /// executed-step count as `SyntheticsSteps`; reported, never billed.
-    SyntheticsFreeSteps,
+    /// Browser-check steps EXECUTED across every attempt, excluding skipped.
+    /// `size` carries the step count. **Billed, at the browser rate** — SPEC §4.2.
+    SyntheticsBrowserSteps,
+    /// Protocol-check steps EXECUTED across every attempt, excluding skipped.
+    /// `size` carries the step count. **Billed, at the protocol rate** — SPEC §4.2.
+    /// Separate from the browser event because only `event` is part of
+    /// [`GroupKey`]: a shared event with a type field would be first-row-wins.
+    SyntheticsProtocolSteps,
+    /// Browser-check steps executed against the free pool. `size` carries the
+    /// same executed-step count as `SyntheticsBrowserSteps`; never billed.
+    SyntheticsFreeBrowserSteps,
+    /// Protocol-check steps executed against the free pool. `size` carries the
+    /// same executed-step count as `SyntheticsProtocolSteps`; never billed.
+    SyntheticsFreeProtocolSteps,
     /// Steps the journey DEFINES (`configured × combos`). `size` carries that
     /// product. Reported, never billed — the leading `_` is the non-billable
     /// marker, matching `MeteringEventName::_AiChat` and friends. Separate event
@@ -683,8 +691,10 @@ impl std::fmt::Display for UsageEvent {
             UsageEvent::AiChat => write!(f, "AiChat"),
             UsageEvent::AiCredits => write!(f, "AiCredits"),
             UsageEvent::AiFreeCredits => write!(f, "AiFreeCredits"),
-            UsageEvent::SyntheticsSteps => write!(f, "SyntheticsSteps"),
-            UsageEvent::SyntheticsFreeSteps => write!(f, "SyntheticsFreeSteps"),
+            UsageEvent::SyntheticsBrowserSteps => write!(f, "SyntheticsBrowserSteps"),
+            UsageEvent::SyntheticsProtocolSteps => write!(f, "SyntheticsProtocolSteps"),
+            UsageEvent::SyntheticsFreeBrowserSteps => write!(f, "SyntheticsFreeBrowserSteps"),
+            UsageEvent::SyntheticsFreeProtocolSteps => write!(f, "SyntheticsFreeProtocolSteps"),
             UsageEvent::_SyntheticsStepsDefined => write!(f, "_SyntheticsStepsDefined"),
             UsageEvent::_SyntheticsBrowserMs => write!(f, "_SyntheticsBrowserMs"),
             UsageEvent::Other => write!(f, "Other"),
@@ -2436,10 +2446,21 @@ mod tests {
 
     #[test]
     fn test_usage_event_display_synthetics() {
-        assert_eq!(UsageEvent::SyntheticsSteps.to_string(), "SyntheticsSteps");
         assert_eq!(
-            UsageEvent::SyntheticsFreeSteps.to_string(),
-            "SyntheticsFreeSteps"
+            UsageEvent::SyntheticsBrowserSteps.to_string(),
+            "SyntheticsBrowserSteps"
+        );
+        assert_eq!(
+            UsageEvent::SyntheticsProtocolSteps.to_string(),
+            "SyntheticsProtocolSteps"
+        );
+        assert_eq!(
+            UsageEvent::SyntheticsFreeBrowserSteps.to_string(),
+            "SyntheticsFreeBrowserSteps"
+        );
+        assert_eq!(
+            UsageEvent::SyntheticsFreeProtocolSteps.to_string(),
+            "SyntheticsFreeProtocolSteps"
         );
         assert_eq!(
             UsageEvent::_SyntheticsStepsDefined.to_string(),
@@ -2454,8 +2475,22 @@ mod tests {
     #[test]
     fn test_usage_event_synthetics_serde_roundtrip() {
         for (event, wire) in [
-            (UsageEvent::SyntheticsSteps, "\"SyntheticsSteps\""),
-            (UsageEvent::SyntheticsFreeSteps, "\"SyntheticsFreeSteps\""),
+            (
+                UsageEvent::SyntheticsBrowserSteps,
+                "\"SyntheticsBrowserSteps\"",
+            ),
+            (
+                UsageEvent::SyntheticsProtocolSteps,
+                "\"SyntheticsProtocolSteps\"",
+            ),
+            (
+                UsageEvent::SyntheticsFreeBrowserSteps,
+                "\"SyntheticsFreeBrowserSteps\"",
+            ),
+            (
+                UsageEvent::SyntheticsFreeProtocolSteps,
+                "\"SyntheticsFreeProtocolSteps\"",
+            ),
             (
                 UsageEvent::_SyntheticsStepsDefined,
                 "\"_SyntheticsStepsDefined\"",
@@ -2483,8 +2518,10 @@ mod tests {
             UsageEvent::AiChat,
             UsageEvent::AiCredits,
             UsageEvent::AiFreeCredits,
-            UsageEvent::SyntheticsSteps,
-            UsageEvent::SyntheticsFreeSteps,
+            UsageEvent::SyntheticsBrowserSteps,
+            UsageEvent::SyntheticsProtocolSteps,
+            UsageEvent::SyntheticsFreeBrowserSteps,
+            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
             UsageEvent::Other,
@@ -2504,22 +2541,28 @@ mod tests {
 
     /// o2-enterprise (`MeteringEventName::is_billable`) keys off the naming
     /// convention this side owns: a leading `_` marks reported-but-never-billed,
-    /// `Free` marks free-pool consumption. Exactly one synthetics event —
-    /// `SyntheticsSteps` — carries neither, and it is the only billable one.
+    /// `Free` marks free-pool consumption. Exactly two synthetics events — the
+    /// browser and protocol billable pair — carry neither.
     #[test]
     fn test_synthetics_event_naming_convention_marks_non_billable() {
-        let billable = UsageEvent::SyntheticsSteps.to_string();
-        assert!(
-            !billable.starts_with('_'),
-            "billable `{billable}` must not carry the `_` non-billable marker"
-        );
-        assert!(
-            !billable.contains("Free"),
-            "billable `{billable}` must not carry the `Free` marker"
-        );
+        for event in [
+            UsageEvent::SyntheticsBrowserSteps,
+            UsageEvent::SyntheticsProtocolSteps,
+        ] {
+            let billable = event.to_string();
+            assert!(
+                !billable.starts_with('_'),
+                "billable `{billable}` must not carry the `_` non-billable marker"
+            );
+            assert!(
+                !billable.contains("Free"),
+                "billable `{billable}` must not carry the `Free` marker"
+            );
+        }
 
         for event in [
-            UsageEvent::SyntheticsFreeSteps,
+            UsageEvent::SyntheticsFreeBrowserSteps,
+            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
         ] {
@@ -2550,8 +2593,10 @@ mod tests {
         };
 
         let keys: HashSet<GroupKey> = [
-            UsageEvent::SyntheticsSteps,
-            UsageEvent::SyntheticsFreeSteps,
+            UsageEvent::SyntheticsBrowserSteps,
+            UsageEvent::SyntheticsProtocolSteps,
+            UsageEvent::SyntheticsFreeBrowserSteps,
+            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
         ]
@@ -2561,14 +2606,15 @@ mod tests {
 
         assert_eq!(
             keys.len(),
-            4,
+            6,
             "each synthetics event must aggregate into its own bucket"
         );
         // Same event => one bucket. (`GroupKey` has no `Debug`, so `assert!`
         // rather than `assert_eq!`.)
         assert!(
-            key_for(UsageEvent::SyntheticsSteps) == key_for(UsageEvent::SyntheticsSteps),
-            "repeated SyntheticsSteps acks must share one bucket"
+            key_for(UsageEvent::SyntheticsBrowserSteps)
+                == key_for(UsageEvent::SyntheticsBrowserSteps),
+            "repeated browser-step acks must share one bucket"
         );
     }
 
@@ -2615,7 +2661,7 @@ mod tests {
         // The metering loop's exact collect: the batch survives intact.
         let rows = vec![
             serde_json::json!({"org_id": "org_a", "event": "Ingestion", "value": 10.0}),
-            serde_json::json!({"org_id": "org_a", "event": "SyntheticsSteps", "value": 84.0}),
+            serde_json::json!({"org_id": "org_a", "event": "SyntheticsBrowserSteps", "value": 84.0}),
             serde_json::json!({"org_id": "org_b", "event": UNKNOWN_TO_THIS_BUILD, "value": 7.0}),
             serde_json::json!({"org_id": "org_c", "event": "Pipeline", "value": 3.0}),
         ];

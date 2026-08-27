@@ -81,11 +81,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-ai_credits_total="{ row }">
             {{ formatCredits(row.credits_limit) }}
           </template>
-          <template #cell-synthetics_steps_used="{ row }">
-            {{ formatCredits(row.steps_used) }}
+          <template #cell-browser_steps_used="{ row }">
+            {{ formatCredits(row.browser_steps_used) }}
           </template>
-          <template #cell-synthetics_steps_total="{ row }">
-            {{ formatCredits(row.steps_limit) }}
+          <template #cell-browser_steps_total="{ row }">
+            {{ formatCredits(row.browser_steps_limit) }}
+          </template>
+          <template #cell-protocol_steps_used="{ row }">
+            {{ formatCredits(row.protocol_steps_used) }}
+          </template>
+          <template #cell-protocol_steps_total="{ row }">
+            {{ formatCredits(row.protocol_steps_limit) }}
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
@@ -232,9 +238,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="org-management-set-ai-credits-btn"
           />
           <OTab
-            name="synthetics_steps"
-            :label="t('settings.organizationManagementPage.syntheticsStepsTab')"
-            data-test="org-management-set-synthetics-steps-btn"
+            name="synthetics_browser_steps"
+            :label="t('settings.organizationManagementPage.syntheticsBrowserStepsTab')"
+            data-test="org-management-set-synthetics-browser-steps-btn"
+          />
+          <OTab
+            name="synthetics_protocol_steps"
+            :label="t('settings.organizationManagementPage.syntheticsProtocolStepsTab')"
+            data-test="org-management-set-synthetics-protocol-steps-btn"
           />
         </OTabs>
 
@@ -275,12 +286,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="stepsLimit"
               type="number"
               data-test="synthetics-steps-limit-input"
-              :label="t('settings.organizationManagementPage.totalSyntheticsSteps')"
+              :label="
+                isBrowserStepsTab
+                  ? t('settings.organizationManagementPage.totalBrowserSteps')
+                  : t('settings.organizationManagementPage.totalProtocolSteps')
+              "
               required
             />
             <div class="text-text-secondary text-xs">
               {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
-              {{ formatCredits(usageLimitsRow?.steps_used) }}
+              {{ formatCredits(stepsUsed) }}
               {{ t("settings.organizationManagementPage.steps") }}
             </div>
           </div>
@@ -384,7 +399,7 @@ import {
 } from "./OrganizationManagement.schema";
 
 /** Backend TrialQuotaPool keys — also the usage-allowance dialog's tab names. */
-type QuotaPool = "ai_credits" | "synthetics_steps";
+type QuotaPool = "ai_credits" | "synthetics_browser_steps" | "synthetics_protocol_steps";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -421,6 +436,15 @@ export default defineComponent({
     const usageLimitsRow = ref<any>({});
     const usageLimitsTab = ref<QuotaPool>("ai_credits");
     const isAiCreditsTab = computed(() => usageLimitsTab.value === "ai_credits");
+    // Browser and protocol are independent grants, so the step tabs differ only in
+    // which pair of row fields they read and write.
+    const isBrowserStepsTab = computed(() => usageLimitsTab.value === "synthetics_browser_steps");
+    const stepFields = computed(() =>
+      isBrowserStepsTab.value
+        ? { used: "browser_steps_used", limit: "browser_steps_limit" }
+        : { used: "protocol_steps_used", limit: "protocol_steps_limit" },
+    );
+    const stepsUsed = computed(() => usageLimitsRow.value?.[stepFields.value.used] ?? 0);
     const aiCreditsFormDefaults = computed(() =>
       aiCreditsDefaults(usageLimitsRow.value?.credits_limit ?? 0),
     );
@@ -439,7 +463,7 @@ export default defineComponent({
     const aiCreditsSchema = makeAiCreditsSchema(t);
 
     const syntheticsStepsFormDefaults = computed(() =>
-      syntheticsStepsDefaults(usageLimitsRow.value?.steps_limit ?? 0),
+      syntheticsStepsDefaults(usageLimitsRow.value?.[stepFields.value.limit] ?? 0),
     );
     const syntheticsStepsSchema = makeSyntheticsStepsSchema(t);
 
@@ -448,7 +472,12 @@ export default defineComponent({
     const usageLimitsTitle = computed(() =>
       isAiCreditsTab.value
         ? t("settings.setAiCreditsFor", { name: usageLimitsRow.value?.name })
-        : t("settings.setSyntheticsStepsFor", { name: usageLimitsRow.value?.name }),
+        : t(
+            isBrowserStepsTab.value
+              ? "settings.setSyntheticsBrowserStepsFor"
+              : "settings.setSyntheticsProtocolStepsFor",
+            { name: usageLimitsRow.value?.name },
+          ),
     );
     const usageLimitsSubtitle = computed(() =>
       isAiCreditsTab.value
@@ -553,9 +582,9 @@ export default defineComponent({
         meta: { align: "right" },
       },
       {
-        id: "synthetics_steps_used",
-        header: t("settings.organizationManagementPage.syntheticsStepsUsed"),
-        accessorKey: "steps_used",
+        id: "browser_steps_used",
+        header: t("settings.organizationManagementPage.browserStepsUsed"),
+        accessorKey: "browser_steps_used",
         sortable: true,
         resizable: true,
         hideable: true,
@@ -563,9 +592,29 @@ export default defineComponent({
         meta: { align: "right" },
       },
       {
-        id: "synthetics_steps_total",
-        header: t("settings.organizationManagementPage.syntheticsStepsTotal"),
-        accessorKey: "steps_limit",
+        id: "browser_steps_total",
+        header: t("settings.organizationManagementPage.browserStepsTotal"),
+        accessorKey: "browser_steps_limit",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "protocol_steps_used",
+        header: t("settings.organizationManagementPage.protocolStepsUsed"),
+        accessorKey: "protocol_steps_used",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "protocol_steps_total",
+        header: t("settings.organizationManagementPage.protocolStepsTotal"),
+        accessorKey: "protocol_steps_limit",
         sortable: true,
         resizable: true,
         hideable: true,
@@ -655,8 +704,10 @@ export default defineComponent({
               billing_provider: responseData[i].billing_provider || "-",
               credits_used: Number(responseData[i].credits_used ?? 0),
               credits_limit: Number(responseData[i].credits_limit ?? 0),
-              steps_used: Number(responseData[i].steps_used ?? 0),
-              steps_limit: Number(responseData[i].steps_limit ?? 0),
+              browser_steps_used: Number(responseData[i].browser_steps_used ?? 0),
+              browser_steps_limit: Number(responseData[i].browser_steps_limit ?? 0),
+              protocol_steps_used: Number(responseData[i].protocol_steps_used ?? 0),
+              protocol_steps_limit: Number(responseData[i].protocol_steps_limit ?? 0),
               created_at: timestampToTimezoneDate(responseData[i].created_at, "UTC", "yyyy-MM-dd"),
               trial_expires_at: timestampToTimezoneDate(
                 responseData[i].trial_expires_at,
@@ -751,11 +802,13 @@ export default defineComponent({
 
     const submitSyntheticsSteps = (value: SyntheticsStepsForm) =>
       submitUsageLimit(
-        "synthetics_steps",
+        usageLimitsTab.value,
         Number(value.stepsLimit),
         (used, granted) => {
-          usageLimitsRow.value.steps_used = used;
-          usageLimitsRow.value.steps_limit = granted;
+          // Written through the active tab's field pair: applying one grant's
+          // response to the other would overstate it and strand the real one.
+          usageLimitsRow.value[stepFields.value.used] = used;
+          usageLimitsRow.value[stepFields.value.limit] = granted;
         },
         {
           pending: t("toastMessages.settings.updatingSyntheticsSteps"),
@@ -1029,6 +1082,8 @@ export default defineComponent({
       aiCreditsFormDefaults,
       aiCreditsSchema,
       submitAiCredits,
+      isBrowserStepsTab,
+      stepsUsed,
       syntheticsStepsFormDefaults,
       syntheticsStepsSchema,
       submitSyntheticsSteps,

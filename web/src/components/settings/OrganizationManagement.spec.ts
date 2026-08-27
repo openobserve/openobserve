@@ -222,7 +222,7 @@ describe("OrganizationManagement.vue", () => {
     mockExtendExternalContract?.mockResolvedValue?.({ data: true });
     mockRevokeExternalContract?.mockResolvedValue?.({ data: true });
     mockSetQuotaUsageLimit?.mockResolvedValue?.({
-      data: { pool: "synthetics_steps", mode: "free", used: 0, limit: 0, remaining: 0 },
+      data: { pool: "synthetics_browser_steps", mode: "free", used: 0, limit: 0, remaining: 0 },
     });
 
     // Setup default store state
@@ -301,19 +301,21 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(12);
+      expect(columns).toHaveLength(14);
       expect(columns[0].id).toBe("name");
       expect(columns[1].id).toBe("identifier");
       expect(columns[2].id).toBe("subscription_status");
       expect(columns[3].id).toBe("billing_provider");
       expect(columns[4].id).toBe("ai_credits_used");
       expect(columns[5].id).toBe("ai_credits_total");
-      expect(columns[6].id).toBe("synthetics_steps_used");
-      expect(columns[7].id).toBe("synthetics_steps_total");
-      expect(columns[8].id).toBe("created_on");
-      expect(columns[9].id).toBe("trial_expiry");
-      expect(columns[10].id).toBe("contract_end_date");
-      expect(columns[11].id).toBe("actions");
+      expect(columns[6].id).toBe("browser_steps_used");
+      expect(columns[7].id).toBe("browser_steps_total");
+      expect(columns[8].id).toBe("protocol_steps_used");
+      expect(columns[9].id).toBe("protocol_steps_total");
+      expect(columns[10].id).toBe("created_on");
+      expect(columns[11].id).toBe("trial_expiry");
+      expect(columns[12].id).toBe("contract_end_date");
+      expect(columns[13].id).toBe("actions");
     });
 
     it("should have subscription plans mapping", () => {
@@ -459,8 +461,10 @@ describe("OrganizationManagement.vue", () => {
         billing_provider: "-",
         credits_used: 125,
         credits_limit: 5000,
-        steps_used: 0,
-        steps_limit: 0,
+        browser_steps_used: 0,
+        browser_steps_limit: 0,
+        protocol_steps_used: 0,
+        protocol_steps_limit: 0,
         created_at: "2023-12-01",
         trial_expires_at: "2023-12-01",
         contract_end_date: 0,
@@ -1166,12 +1170,15 @@ describe("OrganizationManagement.vue", () => {
       wrapper.vm.toggleUsageLimitsDialog({ name: "Acme", identifier: "acme" });
       await nextTick();
 
-      // The two Actions-column buttons became tabs; the e2e selectors moved with
-      // them rather than being dropped.
+      // The Actions-column buttons became tabs; the e2e selectors moved with them
+      // rather than being dropped. The step tab is now one per grant.
       expect(wrapper.find('[data-test="org-management-set-ai-credits-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="org-management-set-synthetics-steps-btn"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="org-management-set-synthetics-browser-steps-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="org-management-set-synthetics-protocol-steps-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("defaults to the AI credits tab — the pre-existing behaviour of the icon", async () => {
@@ -1263,51 +1270,55 @@ describe("OrganizationManagement.vue", () => {
         {
           name: "Acme",
           identifier: "acme",
-          steps_used: 400,
-          steps_limit: 10000,
+          browser_steps_used: 400,
+          browser_steps_limit: 10000,
         },
-        "synthetics_steps",
+        "synthetics_browser_steps",
       );
       await nextTick();
 
       expect(wrapper.vm.usageLimitsPrompt).toBe(true);
-      expect(wrapper.vm.usageLimitsTab).toBe("synthetics_steps");
+      expect(wrapper.vm.usageLimitsTab).toBe("synthetics_browser_steps");
       expect(wrapper.vm.syntheticsStepsFormDefaults).toEqual({ stepsLimit: 10000 });
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((item: any) =>
-          (item.attributes("data-title") || "").startsWith("Set Synthetics Steps"),
-        );
-      expect(dialog?.attributes("data-title")).toBe("Set Synthetics Steps for Acme");
+        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set Browser Steps"));
+      expect(dialog?.attributes("data-title")).toBe("Set Browser Steps for Acme");
       expect(dialog?.attributes("data-primary-label")).toBe("Save Steps");
     });
 
-    it("targets the synthetics_steps pool and updates the row from the response", async () => {
+    it("targets the browser step pool and updates the row from the response", async () => {
       mockSetQuotaUsageLimit.mockResolvedValue({
-        data: { pool: "synthetics_steps", mode: "free", used: 400, limit: 25000, remaining: 24600 },
+        data: {
+          pool: "synthetics_browser_steps",
+          mode: "free",
+          used: 400,
+          limit: 25000,
+          remaining: 24600,
+        },
       });
       wrapper = createWrapper();
       wrapper.vm.toggleUsageLimitsDialog(
         {
           name: "Acme",
           identifier: "acme",
-          steps_used: 400,
-          steps_limit: 10000,
+          browser_steps_used: 400,
+          browser_steps_limit: 10000,
         },
-        "synthetics_steps",
+        "synthetics_browser_steps",
       );
 
       await wrapper.vm.submitSyntheticsSteps({ stepsLimit: "25000" } as any);
 
       // The pool is an explicit argument, not implied by the route: sending
       // this to the AI pool would credit the wrong allowance silently.
-      expect(mockSetQuotaUsageLimit).toHaveBeenCalledWith("default", "synthetics_steps", {
+      expect(mockSetQuotaUsageLimit).toHaveBeenCalledWith("default", "synthetics_browser_steps", {
         org_id: "acme",
         limit: 25000,
       });
       // Neutral response field names — `credits_*` would be the wrong noun.
-      expect(wrapper.vm.usageLimitsRow.steps_used).toBe(400);
-      expect(wrapper.vm.usageLimitsRow.steps_limit).toBe(25000);
+      expect(wrapper.vm.usageLimitsRow.browser_steps_used).toBe(400);
+      expect(wrapper.vm.usageLimitsRow.browser_steps_limit).toBe(25000);
       expect(wrapper.vm.usageLimitsPrompt).toBe(false);
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "success",
@@ -1315,12 +1326,58 @@ describe("OrganizationManagement.vue", () => {
       });
     });
 
-    it("does not touch the AI pool", async () => {
+    it("writes the protocol grant without disturbing the browser one", async () => {
       mockSetQuotaUsageLimit.mockResolvedValue({
-        data: { pool: "synthetics_steps", mode: "free", used: 0, limit: 25000, remaining: 25000 },
+        data: {
+          pool: "synthetics_protocol_steps",
+          mode: "free",
+          used: 90,
+          limit: 40000,
+          remaining: 39910,
+        },
       });
       wrapper = createWrapper();
-      wrapper.vm.toggleUsageLimitsDialog({ name: "Acme", identifier: "acme" }, "synthetics_steps");
+      wrapper.vm.toggleUsageLimitsDialog(
+        {
+          name: "Acme",
+          identifier: "acme",
+          browser_steps_used: 400,
+          browser_steps_limit: 10000,
+          protocol_steps_used: 90,
+          protocol_steps_limit: 20000,
+        },
+        "synthetics_protocol_steps",
+      );
+
+      await wrapper.vm.submitSyntheticsSteps({ stepsLimit: "40000" } as any);
+
+      expect(mockSetQuotaUsageLimit).toHaveBeenCalledWith("default", "synthetics_protocol_steps", {
+        org_id: "acme",
+        limit: 40000,
+      });
+      expect(wrapper.vm.usageLimitsRow.protocol_steps_used).toBe(90);
+      expect(wrapper.vm.usageLimitsRow.protocol_steps_limit).toBe(40000);
+      // The grants are independent: applying this response to the browser pair
+      // would overstate that grant and silently strand the protocol one.
+      expect(wrapper.vm.usageLimitsRow.browser_steps_used).toBe(400);
+      expect(wrapper.vm.usageLimitsRow.browser_steps_limit).toBe(10000);
+    });
+
+    it("does not touch the AI pool", async () => {
+      mockSetQuotaUsageLimit.mockResolvedValue({
+        data: {
+          pool: "synthetics_browser_steps",
+          mode: "free",
+          used: 0,
+          limit: 25000,
+          remaining: 25000,
+        },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog(
+        { name: "Acme", identifier: "acme" },
+        "synthetics_browser_steps",
+      );
 
       await wrapper.vm.submitSyntheticsSteps({ stepsLimit: 25000 } as any);
 
@@ -1342,10 +1399,10 @@ describe("OrganizationManagement.vue", () => {
         {
           name: "Acme",
           identifier: "acme",
-          steps_used: 400,
-          steps_limit: 10000,
+          browser_steps_used: 400,
+          browser_steps_limit: 10000,
         },
-        "synthetics_steps",
+        "synthetics_browser_steps",
       );
 
       await wrapper.vm.submitSyntheticsSteps({ stepsLimit: 25000 } as any);

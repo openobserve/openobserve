@@ -668,17 +668,20 @@ fn publish_step_reconciliation(rows: &[StepReconciliation]) {
 
 /// The `SUM(size)` half of §9B.3, as SQL.
 ///
-/// BOTH of §4.2's step events: §6.1's grant is spent by whichever one the ack
-/// emitted — `SyntheticsFreeSteps` while the grant has room, `SyntheticsSteps`
-/// once it is gone — so summing only the billable one reports every org still
-/// inside its evaluation budget as diverging by its entire consumption. Names
-/// come from `UsageEvent`'s `Display`, so a rename cannot silently zero this.
+/// ALL FOUR of §4.2's step events: §6.1's grant is spent by whichever one the ack
+/// emitted — a free event while the grant has room, a billable one once it is
+/// gone, each split again by browser/protocol — so summing only the billable
+/// pair reports every org still inside its evaluation budget as diverging by its
+/// entire consumption. Names come from `UsageEvent`'s `Display`, so a rename
+/// cannot silently zero this.
 fn step_usage_sql() -> String {
     format!(
-        "SELECT org_id, SUM(size) AS value FROM \"{USAGE_STREAM}\" WHERE event IN ('{}', '{}') \
-         GROUP BY org_id",
-        UsageEvent::SyntheticsSteps,
-        UsageEvent::SyntheticsFreeSteps,
+        "SELECT org_id, SUM(size) AS value FROM \"{USAGE_STREAM}\" WHERE event IN ('{}', '{}', \
+         '{}', '{}') GROUP BY org_id",
+        UsageEvent::SyntheticsBrowserSteps,
+        UsageEvent::SyntheticsProtocolSteps,
+        UsageEvent::SyntheticsFreeBrowserSteps,
+        UsageEvent::SyntheticsFreeProtocolSteps,
     )
 }
 
@@ -729,10 +732,15 @@ async fn reconcile_synthetics_steps() {
     let pool = match infra::table::trial_quota_usage::load_all().await {
         Ok(rows) => rows
             .into_iter()
+            // BOTH step pools: §9B.3 reconciles total synthetics consumption, and
+            // dropping either half reports every org using it as diverging.
             .filter(|row| {
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsSteps
-                    .feature_keys()
-                    .contains(&row.feature.as_str())
+                [
+                    openobserve_core::trial_quota::TrialQuotaPool::SyntheticsBrowserSteps,
+                    openobserve_core::trial_quota::TrialQuotaPool::SyntheticsProtocolSteps,
+                ]
+                .iter()
+                .any(|pool| pool.feature_keys().contains(&row.feature.as_str()))
             })
             .map(|row| (row.org_id, row.usage_count))
             .collect::<Vec<_>>(),

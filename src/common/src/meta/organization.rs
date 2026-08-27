@@ -184,11 +184,16 @@ pub struct AllOrgListDetails {
     pub credits_used: u64,
     #[cfg(feature = "cloud")]
     pub credits_limit: u64,
-    /// Separate allowance from the AI pool, in a different unit.
+    /// Separate allowances from the AI pool, in a different unit. Browser and
+    /// protocol hold independent grants — a browser step costs ~52x a protocol one.
     #[cfg(feature = "cloud")]
-    pub steps_used: u64,
+    pub browser_steps_used: u64,
     #[cfg(feature = "cloud")]
-    pub steps_limit: u64,
+    pub browser_steps_limit: u64,
+    #[cfg(feature = "cloud")]
+    pub protocol_steps_used: u64,
+    #[cfg(feature = "cloud")]
+    pub protocol_steps_limit: u64,
     pub trial_expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_end_date: Option<i64>,
@@ -817,9 +822,13 @@ mod tests {
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
             #[cfg(feature = "cloud")]
-            steps_used: 0,
+            browser_steps_used: 0,
             #[cfg(feature = "cloud")]
-            steps_limit: 0,
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -877,9 +886,13 @@ mod tests {
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
             #[cfg(feature = "cloud")]
-            steps_used: 0,
+            browser_steps_used: 0,
             #[cfg(feature = "cloud")]
-            steps_limit: 0,
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -902,9 +915,13 @@ mod tests {
             #[cfg(feature = "cloud")]
             credits_limit: 2_500,
             #[cfg(feature = "cloud")]
-            steps_used: 0,
+            browser_steps_used: 0,
             #[cfg(feature = "cloud")]
-            steps_limit: 0,
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -982,9 +999,13 @@ mod tests {
             #[cfg(feature = "cloud")]
             credits_limit: 5_000,
             #[cfg(feature = "cloud")]
-            steps_used: 0,
+            browser_steps_used: 0,
             #[cfg(feature = "cloud")]
-            steps_limit: 0,
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -1017,9 +1038,13 @@ mod tests {
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
             #[cfg(feature = "cloud")]
-            steps_used: 0,
+            browser_steps_used: 0,
             #[cfg(feature = "cloud")]
-            steps_limit: 0,
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),

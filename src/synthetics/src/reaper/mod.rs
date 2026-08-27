@@ -387,7 +387,7 @@ fn refund_dead_letter_with(
         row.scheduled_ts,
         &row.id,
     );
-    if (hooks.dead_letter_refund)(&row.org_id, steps, &key) {
+    if (hooks.dead_letter_refund)(&row.org_id, row.browser_devices.is_some(), steps, &key) {
         DeadLetterRefund::Refunded(steps)
     } else {
         DeadLetterRefund::AlreadyRefunded(steps)
@@ -407,7 +407,7 @@ async fn refund_dead_letter(row: &synthetics_jobs::DeadLetteredRow) {
         return;
     };
     let venue = crate::job_api::billing::resolve_venue(&row.location).await;
-    let remaining = (hooks.remaining)(&row.org_id);
+    let remaining = (hooks.remaining)(&row.org_id, row.browser_devices.is_some());
 
     match refund_dead_letter_with(gate, venue, remaining, row) {
         // The steady state for every paid, contract and private-venue job.
@@ -564,18 +564,23 @@ mod pool_refund_tests {
     static SEEN_KEYS: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static POOL_ACCEPTS: AtomicBool = AtomicBool::new(true);
 
-    fn fake_try_deduct(_org_id: &str, _steps: u64) -> bool {
+    fn fake_try_deduct(_org_id: &str, _is_browser: bool, _steps: u64) -> bool {
         true
     }
 
-    fn fake_refund(_org_id: &str, _steps: u64) {}
+    fn fake_refund(_org_id: &str, _is_browser: bool, _steps: u64) {}
 
-    fn fake_remaining(_org_id: &str) -> u64 {
+    fn fake_remaining(_org_id: &str, _is_browser: bool) -> u64 {
         unreachable!("the pure decision takes `remaining` as data; the hook is only wiring")
     }
 
     /// The real contract: apply at most once per key, report whether it moved.
-    fn fake_dead_letter_refund(org_id: &str, steps: u64, idempotency_key: &str) -> bool {
+    fn fake_dead_letter_refund(
+        org_id: &str,
+        _is_browser: bool,
+        steps: u64,
+        idempotency_key: &str,
+    ) -> bool {
         REFUND_CALLS.fetch_add(1, Ordering::Relaxed);
         *LAST_KEY.lock().unwrap_or_else(|e| e.into_inner()) = idempotency_key.to_string();
         *LAST_ORG.lock().unwrap_or_else(|e| e.into_inner()) = org_id.to_string();

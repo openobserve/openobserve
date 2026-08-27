@@ -759,18 +759,18 @@ mod tests {
         };
 
         let before = (
-            count(UsageEvent::SyntheticsSteps),
-            count(UsageEvent::SyntheticsFreeSteps),
+            count(UsageEvent::SyntheticsBrowserSteps),
+            count(UsageEvent::SyntheticsFreeBrowserSteps),
         );
-        record(UsageEvent::SyntheticsSteps, &"channel closed");
+        record(UsageEvent::SyntheticsBrowserSteps, &"channel closed");
 
         assert_eq!(
-            count(UsageEvent::SyntheticsSteps) - before.0,
+            count(UsageEvent::SyntheticsBrowserSteps) - before.0,
             1,
             "A4's counter did not move for the event that was refused",
         );
         assert_eq!(
-            count(UsageEvent::SyntheticsFreeSteps) - before.1,
+            count(UsageEvent::SyntheticsFreeBrowserSteps) - before.1,
             0,
             "the failure was attributed to the wrong event — A4 would page for the free pool \
              while the billable row is the one being lost",

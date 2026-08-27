@@ -133,7 +133,7 @@ pub enum PoolGate {
     /// venue, or a node that does not meter). Only a non-zero reserve refunds.
     Run,
     /// The grant is spent and the org can be charged for the overage. Enqueue
-    /// with NO reservation, so the ack meters it as `SyntheticsSteps` (E16/T31).
+    /// with NO reservation, so the ack meters it as a BILLABLE step event (E16/T31).
     RunAsOverage,
     /// An ExternalContract org: no reservation, notify, **never** block (E18/T36).
     RunAndNotify,
@@ -145,9 +145,9 @@ pub enum PoolGate {
 }
 
 /// Whether this org's plan lets the free pool be consulted for a slot at all.
-/// False for **ExternalContract** only: §7.4 needs their acks to carry BILLABLE
-/// `SyntheticsSteps`, so reserving would emit `SyntheticsFreeSteps` instead and
-/// silently shorten the true-up by up to a whole grant (E18/T36).
+/// False for **ExternalContract** only: §7.4 needs their acks to carry a BILLABLE
+/// step event, so reserving would emit the free one instead and silently shorten
+/// the true-up by up to a whole grant (E18/T36).
 pub fn pool_reserves(policy: PoolExhaustionPolicy) -> bool {
     !matches!(policy, PoolExhaustionPolicy::AdditionalCreditsRequired)
 }
@@ -678,14 +678,15 @@ pub(crate) fn reserve_for_slot(
 ) -> (PoolGate, u32) {
     // Not metered on this node, or the customer's own hardware ran it. A private
     // venue is NOT "funded", it is "not billed at all" — calling it funded would
-    // make the ack emit `SyntheticsFreeSteps` for work we never paid for.
+    // make the ack emit a FREE step event for work we never paid for.
     let Some((hooks, policy)) = gate.filter(|_| !is_private) else {
         return (PoolGate::Run, 0);
     };
 
     let want = crate::job_api::enqueue_reservation(steps_configured, combos);
     // §7.3: an ExternalContract org is never pool-gated, so `&&` short-circuits.
-    let took = pool_reserves(policy) && (hooks.try_deduct)(org_id, u64::from(want));
+    let took =
+        pool_reserves(policy) && (hooks.try_deduct)(org_id, combos.is_some(), u64::from(want));
     let verdict = pool_gate_decision(policy, took);
     // Only a funded slot holds anything, so only it has anything to refund.
     let reserved = if verdict == PoolGate::Run { want } else { 0 };
@@ -759,7 +760,11 @@ fn refund_slot(
         steps = slot.reserved,
         "[synthetics scheduler] enqueue did not land — refunding the free-pool reservation"
     );
-    (hooks.refund)(org_id, u64::from(slot.reserved));
+    (hooks.refund)(
+        org_id,
+        slot.browser_devices.is_some(),
+        u64::from(slot.reserved),
+    );
 }
 
 /// Give back every reservation, for a run row that could not be written at all.
@@ -2372,7 +2377,7 @@ mod pool_gate_tests {
     static REFUNDED: AtomicU64 = AtomicU64::new(0);
     static GRANT_HAS_ROOM: AtomicBool = AtomicBool::new(true);
 
-    fn fake_try_deduct(_org_id: &str, steps: u64) -> bool {
+    fn fake_try_deduct(_org_id: &str, _is_browser: bool, steps: u64) -> bool {
         if !GRANT_HAS_ROOM.load(Ordering::Relaxed) {
             return false;
         }
@@ -2380,17 +2385,17 @@ mod pool_gate_tests {
         true
     }
 
-    fn fake_refund(_org_id: &str, steps: u64) {
+    fn fake_refund(_org_id: &str, _is_browser: bool, steps: u64) {
         REFUNDED.fetch_add(steps, Ordering::Relaxed);
     }
 
     /// The enqueue path never reads these — they are the REAPER's (§6.3 / E10).
     /// Unreachable, so a new dependency on them fails loudly, not quietly.
-    fn fake_remaining(_org_id: &str) -> u64 {
+    fn fake_remaining(_org_id: &str, _is_browser: bool) -> u64 {
         unreachable!("gate 3 asks `try_deduct`, never the balance")
     }
 
-    fn fake_dead_letter_refund(_org_id: &str, _steps: u64, _key: &str) -> bool {
+    fn fake_dead_letter_refund(_org_id: &str, _is_browser: bool, _steps: u64, _key: &str) -> bool {
         unreachable!("the keyed refund belongs to the reaper, not to the enqueue")
     }
 

@@ -466,9 +466,9 @@ pub(crate) mod billing {
         let row = RowTemplate::new(&i);
         let mut events = Vec::with_capacity(3);
 
-        // Exactly ONE of `SyntheticsSteps` / `SyntheticsFreeSteps` per ack. The
-        // free one is non-billable in `MeteringEventName::is_billable`, so it
-        // burns down the grant without reaching an invoice. The predicate is the
+        // Exactly ONE step event per ack, picked on two axes. The free ones are
+        // non-billable in `MeteringEventName::is_billable`, so they burn down the
+        // grant without reaching an invoice. The free/billable predicate is the
         // POOL, not the plan:
         //
         //   Funded         the grant still had room  ⇒ free
@@ -478,10 +478,15 @@ pub(crate) mod billing {
         // `NotApplicable` covers a non-metering build or node, the master switch
         // being off, and — deliberately — an **ExternalContract** org: never
         // pool-gated, and its acks must stay billable for the true-up.
-        let step_event = if i.pool_funded() {
-            UsageEvent::SyntheticsFreeSteps
-        } else {
-            UsageEvent::SyntheticsSteps
+        //
+        // Browser and protocol are separate events because they carry different
+        // Stripe meters and so different rates; the free pair splits too, since
+        // a trial org's mix is what predicts its invoice on conversion.
+        let step_event = match (i.pool_funded(), i.is_browser()) {
+            (true, true) => UsageEvent::SyntheticsFreeBrowserSteps,
+            (true, false) => UsageEvent::SyntheticsFreeProtocolSteps,
+            (false, true) => UsageEvent::SyntheticsBrowserSteps,
+            (false, false) => UsageEvent::SyntheticsProtocolSteps,
         };
         events.push(row.build(step_event, f64::from(steps.billable), "steps"));
 
@@ -1090,6 +1095,36 @@ pub enum StepPoolView {
     Spent,
 }
 
+/// Both step grants as the caller resolved them. Two, because the caller cannot
+/// know a job's check type — that is frozen on the row `ack` itself reads — and
+/// browser and protocol draw on independent pools.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StepPoolViews {
+    pub browser: StepPoolView,
+    pub protocol: StepPoolView,
+}
+
+impl StepPoolViews {
+    /// Both sides the same — a build or node that consults no pool at all.
+    pub fn uniform(view: StepPoolView) -> Self {
+        Self {
+            browser: view,
+            protocol: view,
+        }
+    }
+
+    /// The grant this job spends from. `browser_devices` is written iff the check
+    /// is a browser check, and unlike the live `check_type` it cannot change under
+    /// an in-flight job.
+    fn for_job(&self, browser_devices: Option<&str>) -> StepPoolView {
+        if browser_devices.is_some() {
+            self.browser
+        } else {
+            self.protocol
+        }
+    }
+}
+
 /// Which way a [`PoolMovement`] moves the grant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepPoolDirection {
@@ -1115,6 +1150,9 @@ pub struct PoolMovement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StepPoolAdjustment {
     pub org_id: String,
+    /// Which grant to move — the two are independent and a movement applied to
+    /// the wrong one both overstates that grant and silently strands the other.
+    pub is_browser: bool,
     pub movement: PoolMovement,
     /// See [`adjustment_key`].
     pub idempotency_key: String,
@@ -1524,13 +1562,14 @@ fn stale_lease_response(
 /// notifications. Returns `run_complete = true` when all jobs in the run have
 /// acked.
 ///
-/// `pool` is the org's free step grant as the CALLER resolved it. A parameter
+/// `pools` carries BOTH free step grants as the CALLER resolved them. Parameters
 /// rather than a global because a `OnceCell` installed from `init()` would be
 /// unset on the API nodes that serve acks; a required argument cannot be unset.
+/// Both, because only the row read below says which grant this job spends from.
 pub async fn ack(
     req: AckRequest,
     token_org: &str,
-    pool: StepPoolView,
+    pools: StepPoolViews,
 ) -> anyhow::Result<AckResponse> {
     let conn = get_orm_client_rw().await;
 
@@ -1693,6 +1732,9 @@ pub async fn ack(
         // number of super-cluster PUBLISHES, and this is a read.
         let sc = &ent.super_cluster;
         let region = (sc.enabled && !sc.region.is_empty()).then(|| sc.region.clone());
+        // The grant is chosen from the FROZEN row, so the reserve, the reconcile
+        // and this ack cannot disagree about which pool the job spends from.
+        let pool = pools.for_job(check.browser_devices.as_deref());
         let inputs =
             billing::inputs_from(&check, &req, synthetic.retries, venue, now_us, region, pool);
         // Built BEFORE `events_for_ack` consumes `inputs`. The two read the same
@@ -1700,6 +1742,7 @@ pub async fn ack(
         let adjustment =
             billing::pool_adjustment_for_ack(flags, &inputs).map(|movement| StepPoolAdjustment {
                 org_id: inputs.org_id.to_string(),
+                is_browser: check.browser_devices.is_some(),
                 movement,
                 idempotency_key: adjustment_key(
                     inputs.synthetics_id,
@@ -1714,8 +1757,8 @@ pub async fn ack(
     // `enterprise` would write usage rows onto every customer's own cluster.
     #[cfg(not(feature = "cloud"))]
     let (usage_events, pool_adjustment) = {
-        // `pool` is the caller's answer for a pool this build does not have.
-        let _ = pool;
+        // `pools` is the caller's answer for grants this build does not have.
+        let _ = pools;
         (Vec::new(), None)
     };
 
@@ -2095,8 +2138,10 @@ mod tests {
             Some(first)
         }
 
+        /// Whichever billable step event the ack emitted — the check type picks it.
         fn billed(events: &[UsageData]) -> Option<f64> {
-            size_for(events, UsageEvent::SyntheticsSteps)
+            size_for(events, UsageEvent::SyntheticsBrowserSteps)
+                .or_else(|| size_for(events, UsageEvent::SyntheticsProtocolSteps))
         }
 
         fn defined(events: &[UsageData]) -> Option<f64> {
@@ -2536,16 +2581,18 @@ mod tests {
             assert_eq!(
                 names,
                 vec![
-                    "SyntheticsSteps".to_string(),
+                    "SyntheticsBrowserSteps".to_string(),
                     "_SyntheticsStepsDefined".to_string(),
                     "_SyntheticsBrowserMs".to_string(),
                 ]
             );
             assert!(
-                !events
-                    .iter()
-                    .any(|e| e.event == UsageEvent::SyntheticsFreeSteps),
-                "the free-pool branch is Phase 2 item 2.3 and must not be emitted yet"
+                !events.iter().any(|e| matches!(
+                    e.event,
+                    UsageEvent::SyntheticsFreeBrowserSteps
+                        | UsageEvent::SyntheticsFreeProtocolSteps
+                )),
+                "an unfunded pool must not emit a free step event"
             );
         }
 
@@ -2557,7 +2604,10 @@ mod tests {
                 .filter(|e| {
                     matches!(
                         e.event,
-                        UsageEvent::SyntheticsSteps | UsageEvent::SyntheticsFreeSteps
+                        UsageEvent::SyntheticsBrowserSteps
+                            | UsageEvent::SyntheticsProtocolSteps
+                            | UsageEvent::SyntheticsFreeBrowserSteps
+                            | UsageEvent::SyntheticsFreeProtocolSteps
                     )
                 })
                 .count();
@@ -2781,7 +2831,11 @@ mod tests {
             let obj = wire.as_object().unwrap();
             assert!(!obj.contains_key("usage_events"));
             let text = wire.to_string();
-            for leaked in ["usage_events", "SyntheticsSteps", "_SyntheticsStepsDefined"] {
+            for leaked in [
+                "usage_events",
+                "SyntheticsBrowserSteps",
+                "_SyntheticsStepsDefined",
+            ] {
                 assert!(!text.contains(leaked), "`{leaked}` leaked to the probe");
             }
         }
@@ -2824,8 +2878,10 @@ mod tests {
             }
         }
 
+        /// Whichever free step event the ack emitted — the check type picks it.
         fn free_billed(events: &[UsageData]) -> Option<f64> {
-            size_for(events, UsageEvent::SyntheticsFreeSteps)
+            size_for(events, UsageEvent::SyntheticsFreeBrowserSteps)
+                .or_else(|| size_for(events, UsageEvent::SyntheticsFreeProtocolSteps))
         }
 
         /// MUST be exactly one whenever the ack bills at all.
@@ -2835,7 +2891,10 @@ mod tests {
                 .filter(|e| {
                     matches!(
                         e.event,
-                        UsageEvent::SyntheticsSteps | UsageEvent::SyntheticsFreeSteps
+                        UsageEvent::SyntheticsBrowserSteps
+                            | UsageEvent::SyntheticsProtocolSteps
+                            | UsageEvent::SyntheticsFreeBrowserSteps
+                            | UsageEvent::SyntheticsFreeProtocolSteps
                     )
                 })
                 .count()

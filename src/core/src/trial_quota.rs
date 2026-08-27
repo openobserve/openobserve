@@ -23,7 +23,7 @@
 //!
 //! ## Pools
 //!
-//! [`TrialQuotaPool::AiCredits`] and [`TrialQuotaPool::SyntheticsSteps`] are
+//! [`TrialQuotaPool::AiCredits`] and the two synthetics step pools are
 //! independent: every counter, limit, DB read and HA message is keyed
 //! `(org, pool)`, so spending one grant cannot drain the other, and
 //! [`TrialQuotaFeature::pool`] is the only feature-to-pool mapping. No
@@ -124,8 +124,12 @@ struct FlushRecord {
 pub enum TrialQuotaPool {
     /// AI chat, incident analysis and incident re-analysis. The original pool.
     AiCredits,
-    /// Synthetics steps — SPEC §6.1. One-time, never resets (E23).
-    SyntheticsSteps,
+    /// Browser-check steps — SPEC §6.1. One-time, never resets (E23).
+    SyntheticsBrowserSteps,
+    /// Protocol-check steps — SPEC §6.1. One-time, never resets (E23). Separate
+    /// from the browser grant because a browser step costs ~52x a protocol one,
+    /// so a shared pool let the org's mix decide our free-tier cost.
+    SyntheticsProtocolSteps,
 }
 
 impl TrialQuotaPool {
@@ -133,14 +137,20 @@ impl TrialQuotaPool {
     pub fn key(&self) -> &'static str {
         match self {
             TrialQuotaPool::AiCredits => "ai_credits",
-            TrialQuotaPool::SyntheticsSteps => "synthetics_steps",
+            TrialQuotaPool::SyntheticsBrowserSteps => "synthetics_browser_steps",
+            TrialQuotaPool::SyntheticsProtocolSteps => "synthetics_protocol_steps",
         }
     }
 
     pub fn from_key(key: &str) -> Option<Self> {
         match key {
             "ai_credits" => Some(TrialQuotaPool::AiCredits),
-            "synthetics_steps" => Some(TrialQuotaPool::SyntheticsSteps),
+            "synthetics_browser_steps" => Some(TrialQuotaPool::SyntheticsBrowserSteps),
+            // Pre-split key. Resolved to PROTOCOL so an existing balance keeps
+            // draining the cheap grant rather than handing out free browser steps.
+            "synthetics_steps" | "synthetics_protocol_steps" => {
+                Some(TrialQuotaPool::SyntheticsProtocolSteps)
+            }
             _ => None,
         }
     }
@@ -148,9 +158,13 @@ impl TrialQuotaPool {
     /// Which pool a `trial_quota_usage.feature` value belongs to. `None` for a
     /// key a NEWER node wrote: guessing would spend one grant on another's usage.
     pub fn from_key_of_feature(feature: &str) -> Option<Self> {
-        [TrialQuotaPool::AiCredits, TrialQuotaPool::SyntheticsSteps]
-            .into_iter()
-            .find(|pool| pool.feature_keys().contains(&feature))
+        [
+            TrialQuotaPool::AiCredits,
+            TrialQuotaPool::SyntheticsBrowserSteps,
+            TrialQuotaPool::SyntheticsProtocolSteps,
+        ]
+        .into_iter()
+        .find(|pool| pool.feature_keys().contains(&feature))
     }
 
     /// Every `trial_quota_usage.feature` value that spends from this pool; each
@@ -159,7 +173,12 @@ impl TrialQuotaPool {
     pub fn feature_keys(&self) -> &'static [&'static str] {
         match self {
             TrialQuotaPool::AiCredits => &["ai_chat", "new_incident", "incident_reanalysis"],
-            TrialQuotaPool::SyntheticsSteps => &["synthetics_steps"],
+            TrialQuotaPool::SyntheticsBrowserSteps => &["synthetics_browser_steps"],
+            // `synthetics_steps` is the pre-split feature key: existing rows keep
+            // counting here, so no migration is needed and no balance is reset.
+            TrialQuotaPool::SyntheticsProtocolSteps => {
+                &["synthetics_protocol_steps", "synthetics_steps"]
+            }
         }
     }
 
@@ -180,7 +199,8 @@ impl TrialQuotaPool {
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         match self {
             TrialQuotaPool::AiCredits => cfg.cloud.ai_free_credit_pool,
-            TrialQuotaPool::SyntheticsSteps => cfg.cloud.synthetics_free_step_pool,
+            TrialQuotaPool::SyntheticsBrowserSteps => cfg.cloud.synthetics_free_browser_step_pool,
+            TrialQuotaPool::SyntheticsProtocolSteps => cfg.cloud.synthetics_free_protocol_step_pool,
         }
     }
 }
@@ -198,8 +218,10 @@ pub enum TrialQuotaFeature {
     AiChat,
     NewIncident,
     IncidentReAnalysis,
-    /// One unit is one EXECUTED step, so a 14-step journey over 2 combos costs 28.
-    SyntheticsSteps,
+    /// One unit is one EXECUTED browser step, so a 14-step journey over 2 combos costs 28.
+    SyntheticsBrowserSteps,
+    /// One unit is one EXECUTED protocol step.
+    SyntheticsProtocolSteps,
 }
 
 impl TrialQuotaFeature {
@@ -209,7 +231,8 @@ impl TrialQuotaFeature {
             TrialQuotaFeature::AiChat => "ai_chat",
             TrialQuotaFeature::NewIncident => "new_incident",
             TrialQuotaFeature::IncidentReAnalysis => "incident_reanalysis",
-            TrialQuotaFeature::SyntheticsSteps => "synthetics_steps",
+            TrialQuotaFeature::SyntheticsBrowserSteps => "synthetics_browser_steps",
+            TrialQuotaFeature::SyntheticsProtocolSteps => "synthetics_protocol_steps",
         }
     }
 
@@ -219,7 +242,8 @@ impl TrialQuotaFeature {
             TrialQuotaFeature::AiChat
             | TrialQuotaFeature::NewIncident
             | TrialQuotaFeature::IncidentReAnalysis => TrialQuotaPool::AiCredits,
-            TrialQuotaFeature::SyntheticsSteps => TrialQuotaPool::SyntheticsSteps,
+            TrialQuotaFeature::SyntheticsBrowserSteps => TrialQuotaPool::SyntheticsBrowserSteps,
+            TrialQuotaFeature::SyntheticsProtocolSteps => TrialQuotaPool::SyntheticsProtocolSteps,
         }
     }
 
@@ -232,19 +256,20 @@ impl TrialQuotaFeature {
             TrialQuotaFeature::AiChat => cfg.cloud.ai_credit_cost_chat,
             TrialQuotaFeature::NewIncident => cfg.cloud.ai_credit_cost_incident,
             TrialQuotaFeature::IncidentReAnalysis => cfg.cloud.ai_credit_cost_incident_reanalysis,
-            TrialQuotaFeature::SyntheticsSteps => 1,
+            TrialQuotaFeature::SyntheticsBrowserSteps
+            | TrialQuotaFeature::SyntheticsProtocolSteps => 1,
         }
     }
 
-    /// Get the corresponding UsageEvent variant
-    pub fn usage_event(&self) -> UsageEvent {
+    /// The feature-breakdown `UsageEvent`, or `None` where this path does not emit one.
+    pub fn usage_event(&self) -> Option<UsageEvent> {
         match self {
-            TrialQuotaFeature::AiChat => UsageEvent::AiChat,
-            TrialQuotaFeature::NewIncident => UsageEvent::NewIncident,
-            TrialQuotaFeature::IncidentReAnalysis => UsageEvent::IncidentReAnalysis,
-            // `SyntheticsSteps` is the BILLABLE event; emitting it here would
-            // invoice work the free grant already paid for (§4.2).
-            TrialQuotaFeature::SyntheticsSteps => UsageEvent::SyntheticsFreeSteps,
+            TrialQuotaFeature::AiChat => Some(UsageEvent::AiChat),
+            TrialQuotaFeature::NewIncident => Some(UsageEvent::NewIncident),
+            TrialQuotaFeature::IncidentReAnalysis => Some(UsageEvent::IncidentReAnalysis),
+            // Synthetics emits from `job_api::events_for_ack`, never here.
+            TrialQuotaFeature::SyntheticsBrowserSteps
+            | TrialQuotaFeature::SyntheticsProtocolSteps => None,
         }
     }
 }
@@ -978,20 +1003,39 @@ pub fn get_limit(org_id: &str) -> u64 {
 // pointers and must NOT depend on `openobserve-core`; `openobserve-jobs` wires
 // the two together.
 
-/// Steps left in the org's one-time synthetics grant (§6.1).
-pub fn synthetics_steps_remaining(org_id: &str) -> u64 {
-    get_remaining_for_pool(org_id, TrialQuotaPool::SyntheticsSteps)
+/// The grant a check of this kind spends from. Browser and protocol hold separate
+/// one-time pools: a browser step costs ~52x a protocol one, so a shared grant let
+/// the org's mix decide our free-tier cost.
+fn synthetics_pool(is_browser: bool) -> TrialQuotaPool {
+    if is_browser {
+        TrialQuotaPool::SyntheticsBrowserSteps
+    } else {
+        TrialQuotaPool::SyntheticsProtocolSteps
+    }
+}
+
+fn synthetics_feature(is_browser: bool) -> TrialQuotaFeature {
+    if is_browser {
+        TrialQuotaFeature::SyntheticsBrowserSteps
+    } else {
+        TrialQuotaFeature::SyntheticsProtocolSteps
+    }
+}
+
+/// Steps left in the org's one-time synthetics grant for this check kind (§6.1).
+pub fn synthetics_steps_remaining(org_id: &str, is_browser: bool) -> u64 {
+    get_remaining_for_pool(org_id, synthetics_pool(is_browser))
 }
 
 /// Reserve `steps` from the org's synthetics grant — all or nothing. `false`
 /// means the grant cannot cover this run (§7.1 gate 3).
-pub fn synthetics_steps_try_deduct(org_id: &str, steps: u64) -> bool {
-    try_deduct_units(org_id, TrialQuotaFeature::SyntheticsSteps, steps).is_ok()
+pub fn synthetics_steps_try_deduct(org_id: &str, is_browser: bool, steps: u64) -> bool {
+    try_deduct_units(org_id, synthetics_feature(is_browser), steps).is_ok()
 }
 
 /// Give `steps` back — the enqueue never happened (E10/E11, T29).
-pub fn synthetics_steps_refund(org_id: &str, steps: u64) {
-    refund_units(org_id, TrialQuotaFeature::SyntheticsSteps, steps);
+pub fn synthetics_steps_refund(org_id: &str, is_browser: bool, steps: u64) {
+    refund_units(org_id, synthetics_feature(is_browser), steps);
 }
 
 /// Give back the reservation of a job that will NEVER ack — SPEC §6.3, E10.
@@ -1002,12 +1046,13 @@ pub fn synthetics_steps_refund(org_id: &str, steps: u64) {
 /// back. `false` means the key was already used.
 pub fn synthetics_steps_dead_letter_refund(
     org_id: &str,
+    is_browser: bool,
     steps: u64,
     idempotency_key: &str,
 ) -> bool {
     apply_pool_adjustment(
         org_id,
-        TrialQuotaFeature::SyntheticsSteps,
+        synthetics_feature(is_browser),
         PoolAdjustment::Refund(steps),
         idempotency_key,
     )
@@ -1016,12 +1061,13 @@ pub fn synthetics_steps_dead_letter_refund(
 /// Apply one idempotent ack-side reconcile — SPEC §6.3.
 pub fn synthetics_steps_adjust(
     org_id: &str,
+    is_browser: bool,
     adjustment: PoolAdjustment,
     idempotency_key: &str,
 ) -> bool {
     apply_pool_adjustment(
         org_id,
-        TrialQuotaFeature::SyntheticsSteps,
+        synthetics_feature(is_browser),
         adjustment,
         idempotency_key,
     )
@@ -1118,14 +1164,17 @@ fn record_usage_internal(
     };
 
     // Feature breakdown event (informational, not billed)
-    let feature_event = UsageData {
-        event: feature.usage_event(),
-        size: 1.0,
-        unit: "count".to_string(),
-        ..credit_event.clone()
-    };
+    let mut events = vec![credit_event.clone()];
+    if let Some(event) = feature.usage_event() {
+        events.push(UsageData {
+            event,
+            size: 1.0,
+            unit: "count".to_string(),
+            ..credit_event
+        });
+    }
 
-    usage_reporting::report_usage(vec![credit_event, feature_event]);
+    usage_reporting::report_usage(events);
 }
 
 /// Record free credit usage (all orgs). Writes `AiFreeCredits` — not billed.
@@ -1388,11 +1437,11 @@ mod tests {
     /// A per-test org with an explicit pool size, not the deployment default.
     fn steps_org(name: &str, limit: u64) -> String {
         let org_id = format!("pool-test-{name}");
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsSteps, limit);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, limit);
         org_id
     }
 
-    const STEPS: TrialQuotaFeature = TrialQuotaFeature::SyntheticsSteps;
+    const STEPS: TrialQuotaFeature = TrialQuotaFeature::SyntheticsBrowserSteps;
 
     /// `TrialQuotaFeature::pool` and `TrialQuotaPool::feature_keys` MUST agree,
     /// or a feature deducts from one pool and reports into another in the table.
@@ -1402,7 +1451,7 @@ mod tests {
             TrialQuotaFeature::AiChat,
             TrialQuotaFeature::NewIncident,
             TrialQuotaFeature::IncidentReAnalysis,
-            TrialQuotaFeature::SyntheticsSteps,
+            TrialQuotaFeature::SyntheticsBrowserSteps,
         ] {
             let pool = feature.pool();
             assert!(
@@ -1420,7 +1469,10 @@ mod tests {
 
     #[test]
     fn pool_keys_round_trip_and_unknown_keys_are_rejected() {
-        for pool in [TrialQuotaPool::AiCredits, TrialQuotaPool::SyntheticsSteps] {
+        for pool in [
+            TrialQuotaPool::AiCredits,
+            TrialQuotaPool::SyntheticsBrowserSteps,
+        ] {
             assert_eq!(TrialQuotaPool::from_key(pool.key()), Some(pool));
         }
         assert_eq!(TrialQuotaPool::from_key("ingest"), None);
@@ -1431,12 +1483,12 @@ mod tests {
     #[test]
     fn ai_and_synthetics_pools_do_not_drain_each_other() {
         let org_id = format!("pool-test-{}", "isolation");
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsSteps, 100);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, 100);
         set_cached_limit(&org_id, TrialQuotaPool::AiCredits, 100);
 
         assert!(try_deduct_units(&org_id, STEPS, 100).is_ok());
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
 
@@ -1447,7 +1499,7 @@ mod tests {
         assert!(try_deduct_units(&org_id, TrialQuotaFeature::AiChat, 1).is_ok());
 
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             100
         );
     }
@@ -1456,7 +1508,7 @@ mod tests {
     fn scope_keys_cannot_collide_across_orgs_or_pools() {
         assert_ne!(
             scope("acme", TrialQuotaPool::AiCredits),
-            scope("acme", TrialQuotaPool::SyntheticsSteps),
+            scope("acme", TrialQuotaPool::SyntheticsBrowserSteps),
         );
         assert_ne!(
             scope("acme", TrialQuotaPool::AiCredits),
@@ -1464,14 +1516,14 @@ mod tests {
         );
     }
 
-    /// §4.2: emitting `SyntheticsSteps` here would invoice work the free grant
-    /// already paid for.
+    /// §4.2: this path must emit NO step event. It cannot know browser from
+    /// protocol, and guessing would invoice at the wrong rate — the real events
+    /// come from `job_api::events_for_ack`.
     #[test]
-    fn synthetics_feature_reports_free_steps_never_billable_steps() {
-        assert_eq!(STEPS.usage_event(), UsageEvent::SyntheticsFreeSteps);
-        assert_ne!(STEPS.usage_event(), UsageEvent::SyntheticsSteps);
-        assert_eq!(STEPS.feature_key(), "synthetics_steps");
-        assert_eq!(STEPS.pool(), TrialQuotaPool::SyntheticsSteps);
+    fn synthetics_feature_emits_no_step_event_of_its_own() {
+        assert_eq!(STEPS.usage_event(), None);
+        assert_eq!(STEPS.feature_key(), "synthetics_browser_steps");
+        assert_eq!(STEPS.pool(), TrialQuotaPool::SyntheticsBrowserSteps);
         // One unit is one step; any per-step cost but 1 rescales the §6.1 grant.
         assert_eq!(STEPS.cost(), 1);
     }
@@ -1481,21 +1533,22 @@ mod tests {
         let org_id = steps_org("t25", 1_000);
         assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             14
         );
 
         assert!(synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::Refund(10),
             "t25|job-1"
         ));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             4
         );
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             996
         );
     }
@@ -1507,16 +1560,18 @@ mod tests {
 
         assert!(synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::Refund(10),
             "t25-idem|job-1"
         ));
         assert!(!synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::Refund(10),
             "t25-idem|job-1"
         ));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             4
         );
     }
@@ -1528,15 +1583,16 @@ mod tests {
 
         assert!(synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::TopUp(4),
             "t26|job-1"
         ));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             18
         );
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             982
         );
     }
@@ -1548,16 +1604,18 @@ mod tests {
 
         assert!(synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::TopUp(4),
             "t26-idem|job-1"
         ));
         assert!(!synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::TopUp(4),
             "t26-idem|job-1"
         ));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             18
         );
     }
@@ -1570,24 +1628,24 @@ mod tests {
         let org_id = steps_org("e10-reaper", 1_000);
         assert!(try_deduct_units(&org_id, STEPS, 28).is_ok());
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             28
         );
 
         // Distinct per test: the ledger is process-global.
         let key = "chk_1\u{1f}aws-us-east-1\u{1f}1787665631000000\u{1f}job-reaper";
-        assert!(synthetics_steps_dead_letter_refund(&org_id, 28, key));
+        assert!(synthetics_steps_dead_letter_refund(&org_id, true, 28, key));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0,
             "a refund must give the reservation BACK — a top-up here would charge the org twice \
              for a run that never happened",
         );
 
-        assert!(!synthetics_steps_dead_letter_refund(&org_id, 28, key));
-        assert!(!synthetics_steps_dead_letter_refund(&org_id, 28, key));
+        assert!(!synthetics_steps_dead_letter_refund(&org_id, true, 28, key));
+        assert!(!synthetics_steps_dead_letter_refund(&org_id, true, 28, key));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
     }
@@ -1601,13 +1659,13 @@ mod tests {
         assert!(try_deduct_units(&org_id, STEPS, 28).is_ok());
 
         let key = "chk_1\u{1f}aws-us-east-1\u{1f}1787665631000000\u{1f}job-onekey";
-        assert!(synthetics_steps_dead_letter_refund(&org_id, 28, key));
+        assert!(synthetics_steps_dead_letter_refund(&org_id, true, 28, key));
         assert!(
-            !synthetics_steps_adjust(&org_id, PoolAdjustment::Refund(28), key),
+            !synthetics_steps_adjust(&org_id, true, PoolAdjustment::Refund(28), key),
             "the ack-side reconcile must find the reaper's key already applied",
         );
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
     }
@@ -1624,31 +1682,35 @@ mod tests {
 
         assert!(synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::Refund(10),
             job_a
         ));
         assert!(!synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::Refund(10),
             job_a
         ));
         assert!(!synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::Refund(10),
             job_a
         ));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             18
         );
 
         assert!(synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::Refund(10),
             job_b
         ));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             8
         );
     }
@@ -1662,20 +1724,21 @@ mod tests {
 
         assert!(synthetics_steps_adjust(
             &org_id,
+            true,
             PoolAdjustment::TopUp(12),
             "t28|job-1"
         ));
         // RECORDED, past the limit. `try_deduct_units` would have refused it.
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             26
         );
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
 
-        assert!(!synthetics_steps_try_deduct(&org_id, 1));
+        assert!(!synthetics_steps_try_deduct(&org_id, true, 1));
         let err = try_deduct_units(&org_id, STEPS, 1).unwrap_err();
         assert_eq!(err.usage_count, 26);
         assert_eq!(err.usage_limit, 20);
@@ -1684,14 +1747,14 @@ mod tests {
     #[test]
     fn an_enqueue_deduct_that_does_not_fit_takes_nothing() {
         let org_id = steps_org("partial", 10);
-        assert!(!synthetics_steps_try_deduct(&org_id, 14));
+        assert!(!synthetics_steps_try_deduct(&org_id, true, 14));
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
-        assert!(synthetics_steps_try_deduct(&org_id, 10));
+        assert!(synthetics_steps_try_deduct(&org_id, true, 10));
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
     }
@@ -1701,14 +1764,14 @@ mod tests {
     #[test]
     fn a_refund_larger_than_the_usage_saturates_at_zero() {
         let org_id = steps_org("saturate", 1_000);
-        assert!(synthetics_steps_try_deduct(&org_id, 14));
-        synthetics_steps_refund(&org_id, 999_999);
+        assert!(synthetics_steps_try_deduct(&org_id, true, 14));
+        synthetics_steps_refund(&org_id, true, 999_999);
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             1_000
         );
     }
@@ -1718,13 +1781,13 @@ mod tests {
     #[test]
     fn t32_raising_the_limit_reopens_an_exhausted_org_without_a_restart() {
         let org_id = steps_org("t32", 10);
-        assert!(synthetics_steps_try_deduct(&org_id, 10));
-        assert!(!synthetics_steps_try_deduct(&org_id, 1));
+        assert!(synthetics_steps_try_deduct(&org_id, true, 10));
+        assert!(!synthetics_steps_try_deduct(&org_id, true, 1));
 
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsSteps, 50);
-        assert!(synthetics_steps_try_deduct(&org_id, 1));
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, 50);
+        assert!(synthetics_steps_try_deduct(&org_id, true, 1));
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             39
         );
     }
@@ -1732,24 +1795,24 @@ mod tests {
     #[test]
     fn t32_the_ha_queue_carries_the_new_limit_to_every_other_node() {
         let org_id = steps_org("t32-ha", 10);
-        assert!(synthetics_steps_try_deduct(&org_id, 10));
-        assert!(!synthetics_steps_try_deduct(&org_id, 1));
+        assert!(synthetics_steps_try_deduct(&org_id, true, 10));
+        assert!(!synthetics_steps_try_deduct(&org_id, true, 1));
 
         apply_ha_msg(&TrialQuotaHaMsg {
             org_id: org_id.clone(),
             cost: 0,
             usage_limit: Some(50),
-            pool: Some(TrialQuotaPool::SyntheticsSteps.key().to_string()),
+            pool: Some(TrialQuotaPool::SyntheticsBrowserSteps.key().to_string()),
             delta: 0,
             source_node: LOCAL_NODE.clone(),
             timestamp: 1,
         });
 
         assert_eq!(
-            get_limit_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_limit_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             50
         );
-        assert!(synthetics_steps_try_deduct(&org_id, 1));
+        assert!(synthetics_steps_try_deduct(&org_id, true, 1));
         assert_eq!(
             get_limit_for_pool(&org_id, TrialQuotaPool::AiCredits),
             TrialQuotaPool::AiCredits.default_limit(),
@@ -1763,27 +1826,27 @@ mod tests {
     #[test]
     fn t33_a_month_boundary_leaves_the_one_time_pool_unchanged() {
         let org_id = steps_org("t33", 100);
-        assert!(synthetics_steps_try_deduct(&org_id, 60));
-        let before = get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps);
+        assert!(synthetics_steps_try_deduct(&org_id, true, 60));
+        let before = get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps);
 
         // None of these reads takes a timestamp, so none of them can reset.
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             before
         );
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             40
         );
         assert_eq!(
-            get_limit_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_limit_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             100
         );
         // A grant that reset would let 60 more through on top of 60.
-        assert!(!synthetics_steps_try_deduct(&org_id, 41));
-        assert!(synthetics_steps_try_deduct(&org_id, 40));
+        assert!(!synthetics_steps_try_deduct(&org_id, true, 41));
+        assert!(synthetics_steps_try_deduct(&org_id, true, 40));
         assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
     }
@@ -1879,17 +1942,17 @@ mod tests {
 
     #[test]
     fn an_ha_refund_travels_as_a_negative_delta() {
-        let msg = ha_msg("acme", TrialQuotaPool::SyntheticsSteps, -10, None);
+        let msg = ha_msg("acme", TrialQuotaPool::SyntheticsBrowserSteps, -10, None);
         assert_eq!(msg.delta, -10);
         // `cost` is the positive part, so an old node applies nothing, not a charge.
         assert_eq!(msg.cost, 0);
         assert_eq!(msg.resolved_delta(), -10);
-        assert_eq!(msg.resolved_pool(), TrialQuotaPool::SyntheticsSteps);
+        assert_eq!(msg.resolved_pool(), TrialQuotaPool::SyntheticsBrowserSteps);
     }
 
     #[test]
     fn an_ha_deduction_is_readable_by_a_node_that_predates_pool_scoping() {
-        let msg = ha_msg("acme", TrialQuotaPool::SyntheticsSteps, 14, None);
+        let msg = ha_msg("acme", TrialQuotaPool::SyntheticsBrowserSteps, 14, None);
         assert_eq!(
             msg.cost, 14,
             "an old node reads `cost` and must see the deduction"
@@ -1904,13 +1967,13 @@ mod tests {
             org_id: org_id.clone(),
             cost: 14,
             usage_limit: None,
-            pool: Some(TrialQuotaPool::SyntheticsSteps.key().to_string()),
+            pool: Some(TrialQuotaPool::SyntheticsBrowserSteps.key().to_string()),
             delta: 14,
             source_node: LOCAL_NODE.clone(),
             timestamp: 1,
         });
         assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             14
         );
         assert_eq!(get_used_for_pool(&org_id, TrialQuotaPool::AiCredits), 0);
@@ -1926,17 +1989,27 @@ mod tests {
         let cfg = o2_enterprise::enterprise::common::config::get_config();
 
         assert_eq!(
-            get_limit_for_pool(org_id, TrialQuotaPool::SyntheticsSteps),
-            cfg.cloud.synthetics_free_step_pool,
+            get_limit_for_pool(org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            cfg.cloud.synthetics_free_browser_step_pool,
+        );
+        assert_eq!(
+            get_limit_for_pool(org_id, TrialQuotaPool::SyntheticsProtocolSteps),
+            cfg.cloud.synthetics_free_protocol_step_pool,
         );
         assert_eq!(
             get_limit_for_pool(org_id, TrialQuotaPool::AiCredits),
             cfg.cloud.ai_free_credit_pool,
         );
-        // §6.1 sizes the grant at 50,000 STEPS; the AI pool is 1,000 credits.
-        assert_eq!(cfg.cloud.synthetics_free_step_pool, 50_000);
+        // §6.1: 10,000 browser steps and 20,000 protocol; the AI pool is 1,000 credits.
+        assert_eq!(cfg.cloud.synthetics_free_browser_step_pool, 10_000);
+        assert_eq!(cfg.cloud.synthetics_free_protocol_step_pool, 20_000);
+        // The three grants must not collapse onto one knob.
         assert_ne!(
-            cfg.cloud.synthetics_free_step_pool,
+            cfg.cloud.synthetics_free_browser_step_pool,
+            cfg.cloud.synthetics_free_protocol_step_pool,
+        );
+        assert_ne!(
+            cfg.cloud.synthetics_free_browser_step_pool,
             cfg.cloud.ai_free_credit_pool,
         );
     }
@@ -1959,11 +2032,12 @@ mod tests {
     /// A node that reloads its counters folded per ORG has one pool again the
     /// moment it restarts, and nothing at runtime would say so.
     #[test]
-    fn the_startup_fold_keeps_the_two_pools_apart() {
+    fn the_startup_fold_keeps_the_pools_apart() {
         let rows = vec![
             db_row("acme", "ai_chat", 40),
             db_row("acme", "new_incident", 50),
-            db_row("acme", "synthetics_steps", 900),
+            db_row("acme", "synthetics_browser_steps", 900),
+            db_row("acme", "synthetics_protocol_steps", 700),
         ];
         let (totals, _) = fold_db_records(&rows);
 
@@ -1973,8 +2047,32 @@ mod tests {
             "the AI pool sums its own features and nothing else",
         );
         assert_eq!(
-            totals.get(&scope("acme", TrialQuotaPool::SyntheticsSteps)),
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
             Some(&900),
+        );
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsProtocolSteps)),
+            Some(&700),
+            "the two step grants are independent — one must not fold into the other",
+        );
+    }
+
+    /// The pre-split `synthetics_steps` feature key. Existing rows must keep
+    /// counting rather than resetting every org to a fresh grant, and they land
+    /// on PROTOCOL so nobody is handed free browser capacity they never earned.
+    #[test]
+    fn the_startup_fold_reads_the_pre_split_key_as_protocol() {
+        let rows = vec![db_row("acme", "synthetics_steps", 900)];
+        let (totals, _) = fold_db_records(&rows);
+
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsProtocolSteps)),
+            Some(&900),
+        );
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
+            None,
+            "a legacy balance must not become free browser steps",
         );
     }
 
@@ -2003,10 +2101,10 @@ mod tests {
     /// below zero; `as u64` on that is an org exhausted forever, by a refund.
     #[test]
     fn the_startup_fold_reads_a_negative_row_as_zero() {
-        let rows = vec![db_row("acme", "synthetics_steps", -12)];
+        let rows = vec![db_row("acme", "synthetics_browser_steps", -12)];
         let (totals, _) = fold_db_records(&rows);
         assert_eq!(
-            totals.get(&scope("acme", TrialQuotaPool::SyntheticsSteps)),
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
             Some(&0),
         );
     }
@@ -2025,7 +2123,7 @@ mod tests {
             Some(&50_000),
         );
         assert_eq!(
-            limits.get(&scope("acme", TrialQuotaPool::SyntheticsSteps)),
+            limits.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
             None,
             "the step grant keeps its deployment default",
         );
@@ -2044,18 +2142,18 @@ mod tests {
         };
 
         let before = (
-            dropped(TrialQuotaFeature::SyntheticsSteps),
+            dropped(TrialQuotaFeature::SyntheticsBrowserSteps),
             dropped(TrialQuotaFeature::AiChat),
         );
         record(
             "acme",
-            TrialQuotaFeature::SyntheticsSteps,
+            TrialQuotaFeature::SyntheticsBrowserSteps,
             14,
             &"channel full",
         );
 
         assert_eq!(
-            dropped(TrialQuotaFeature::SyntheticsSteps) - before.0,
+            dropped(TrialQuotaFeature::SyntheticsBrowserSteps) - before.0,
             1,
             "A5's counter did not move for the pool that lost the record",
         );

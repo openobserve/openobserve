@@ -989,10 +989,12 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
         // guards a future negative one, not a case that fires now.
         let size = if row.size > 0.0 { row.size as u64 } else { 0 };
         match row.event {
-            // All three step events share a counter: §4.3's `executed / defined`
-            // ratio is then one PromQL division.
-            UsageEvent::SyntheticsSteps
-            | UsageEvent::SyntheticsFreeSteps
+            // All five step events share a counter, labelled by event: §4.3's
+            // `executed / defined` ratio is then one PromQL division.
+            UsageEvent::SyntheticsBrowserSteps
+            | UsageEvent::SyntheticsProtocolSteps
+            | UsageEvent::SyntheticsFreeBrowserSteps
+            | UsageEvent::SyntheticsFreeProtocolSteps
             | UsageEvent::_SyntheticsStepsDefined => {
                 config::metrics::SYNTHETICS_STEPS_TOTAL
                     .with_label_values(&[row.org_id.as_str(), row.event.to_string().as_str()])
@@ -1005,7 +1007,7 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
                     .inc_by(size);
             }
             // Other dimensions' rows travel through the shared usage type. The
-            // catch-all does mean a FIFTH synthetics event would be silently
+            // catch-all does mean a SIXTH synthetics event would be silently
             // uncounted until added above.
             _ => {}
         }
@@ -1019,16 +1021,26 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
 /// ExternalContract org, which §7.3 says to never pool-gate) is issued ONLY while
 /// the org still has grant left, so past that a request costs one counter read.
 #[cfg(feature = "cloud")]
-async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolView {
-    let remaining = openobserve_core::trial_quota::synthetics_steps_remaining(org_id);
-    // `remaining > 0` first: a spent grant is billable whatever the plan says.
-    let is_contract = remaining > 0
+async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolViews {
+    // Both grants: this runs before `ack` reads the row that says which one the
+    // job spends from. Two in-memory counter reads, not two DB round trips.
+    let browser = openobserve_core::trial_quota::synthetics_steps_remaining(org_id, true);
+    let protocol = openobserve_core::trial_quota::synthetics_steps_remaining(org_id, false);
+    // Each grant decides for itself — summing would report an org whose browser
+    // pool is spent as still funded, and bill its browser steps as free.
+    //
+    // `> 0` first: a spent grant is billable whatever the plan says, so the
+    // `customer_billings` read is skipped once BOTH are gone.
+    let is_contract = (browser > 0 || protocol > 0)
         && o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
             org_id,
         )
         .await
         .requires_additional_credits();
-    step_pool_view(remaining, is_contract)
+    openobserve_synthetics::job_api::StepPoolViews {
+        browser: step_pool_view(browser, is_contract),
+        protocol: step_pool_view(protocol, is_contract),
+    }
 }
 
 /// SPEC §6.1 / §7.3 — the free/billable decision for one ack, as arithmetic.
@@ -1054,8 +1066,10 @@ fn step_pool_view(
 
 /// §8.1: a build without `cloud` has no pool, so every ack is `NotApplicable`.
 #[cfg(not(feature = "cloud"))]
-async fn resolve_step_pool(_org_id: &str) -> openobserve_synthetics::job_api::StepPoolView {
-    openobserve_synthetics::job_api::StepPoolView::NotApplicable
+async fn resolve_step_pool(_org_id: &str) -> openobserve_synthetics::job_api::StepPoolViews {
+    openobserve_synthetics::job_api::StepPoolViews::uniform(
+        openobserve_synthetics::job_api::StepPoolView::NotApplicable,
+    )
 }
 
 /// Applies the free-pool movement one ack owes — SPEC §6.3, item 2.3.
@@ -1070,6 +1084,7 @@ fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
     };
     openobserve_core::trial_quota::synthetics_steps_adjust(
         &adjustment.org_id,
+        adjustment.is_browser,
         core_movement(adjustment.movement),
         &adjustment.idempotency_key,
     );
@@ -1788,7 +1803,7 @@ mod tests {
 
     fn steps(size: f64) -> UsageData {
         UsageData {
-            event: UsageEvent::SyntheticsSteps,
+            event: UsageEvent::SyntheticsBrowserSteps,
             size,
             ..UsageData::init_for_reflection()
         }
@@ -1863,8 +1878,8 @@ mod tests {
                 .get()
         };
         (
-            steps("SyntheticsSteps"),
-            steps("SyntheticsFreeSteps"),
+            steps("SyntheticsBrowserSteps"),
+            steps("SyntheticsFreeBrowserSteps"),
             steps("_SyntheticsStepsDefined"),
             config::metrics::SYNTHETICS_BROWSER_MS_TOTAL
                 .with_label_values(&[org])
@@ -1899,7 +1914,7 @@ mod tests {
         let before = recorded(org);
 
         record(&[
-            usage_row(org, UsageEvent::SyntheticsSteps, 4.0),
+            usage_row(org, UsageEvent::SyntheticsBrowserSteps, 4.0),
             usage_row(org, UsageEvent::_SyntheticsStepsDefined, 14.0),
             usage_row(org, UsageEvent::_SyntheticsBrowserMs, 9_100.0),
         ]);
@@ -1911,17 +1926,17 @@ mod tests {
         assert_eq!(after.3 - before.3, 9_100, "browser milliseconds");
     }
 
-    /// **§9B.1 row 4.** §4.2 emits exactly one of `SyntheticsSteps` /
-    /// `SyntheticsFreeSteps` per ack and they answer opposite questions — the
-    /// invoice line versus §6.1's grant burning down. Folded together, a free
-    /// org would show as generating revenue.
+    /// **§9B.1 row 4.** §4.2 emits exactly one step event per ack, and the free
+    /// and billable ones answer opposite questions — the invoice line versus
+    /// §6.1's grant burning down. Folded together, a free org would show as
+    /// generating revenue.
     #[test]
     fn free_pool_consumption_is_counted_apart_from_billable_steps() {
         let org = "o9b1-free";
         let before = recorded(org);
 
         record(&[
-            usage_row(org, UsageEvent::SyntheticsFreeSteps, 28.0),
+            usage_row(org, UsageEvent::SyntheticsFreeBrowserSteps, 28.0),
             usage_row(org, UsageEvent::_SyntheticsStepsDefined, 28.0),
         ]);
 
@@ -1996,8 +2011,8 @@ mod tests {
         let (before_a, before_b) = (recorded(a), recorded(b));
 
         record(&[
-            usage_row(a, UsageEvent::SyntheticsSteps, 3.0),
-            usage_row(b, UsageEvent::SyntheticsSteps, 7.0),
+            usage_row(a, UsageEvent::SyntheticsBrowserSteps, 3.0),
+            usage_row(b, UsageEvent::SyntheticsBrowserSteps, 7.0),
         ]);
 
         assert_eq!(recorded(a).0 - before_a.0, 3);

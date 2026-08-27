@@ -458,7 +458,7 @@ pub static METERING_CYCLES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// SPEC §9B.3's reconciliation, published as three gauges — **A8**'s input.
-/// `SUM(size)` over `SyntheticsSteps` + `SyntheticsFreeSteps` in the usage
+/// `SUM(size)` over all four synthetics step events in the usage
 /// stream, per org. See `openobserve-jobs`' `synthetics_step_reconcile` for why
 /// this side is read REGION-LOCAL even though metering reads it federated.
 pub static SYNTHETICS_STEP_RECONCILE_STREAM_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {

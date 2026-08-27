@@ -36,9 +36,9 @@ pub struct StepPoolHooks {
     /// Reserve `steps` from the org's one-time grant — SPEC §7.1 gate 3, the
     /// `configured x combos` no-retry baseline of §6.3. All or nothing: a
     /// partial reservation would let a run start the grant cannot pay for.
-    pub try_deduct: fn(org_id: &str, steps: u64) -> bool,
+    pub try_deduct: fn(org_id: &str, is_browser: bool, steps: u64) -> bool,
     /// Give `steps` back — the enqueue did not happen (E10/E11, T29).
-    pub refund: fn(org_id: &str, steps: u64),
+    pub refund: fn(org_id: &str, is_browser: bool, steps: u64),
     /// Steps left in the org's one-time grant — SPEC §6.1.
     ///
     /// Read by the REAPER, not the enqueue, to ask what neither side records:
@@ -47,7 +47,7 @@ pub struct StepPoolHooks {
     /// [`crate::job_api::StepPoolView::Spent`] and does not reconcile, the
     /// reaper does not refund. A job either acks or is reaped; it must not be
     /// treated as funded by one path and unfunded by the other.
-    pub remaining: fn(org_id: &str) -> u64,
+    pub remaining: fn(org_id: &str, is_browser: bool) -> u64,
     /// Give back the reservation of a job that will NEVER ack — SPEC §6.3, E10.
     ///
     /// Idempotent, unlike [`Self::refund`]: applied at most once per
@@ -55,7 +55,8 @@ pub struct StepPoolHooks {
     /// joined by `\u{1f}`, the same key built by the same
     /// [`crate::job_api::adjustment_key`] the ack-side reconcile uses. Returns
     /// whether the refund MOVED the grant; `false` means already applied.
-    pub dead_letter_refund: fn(org_id: &str, steps: u64, idempotency_key: &str) -> bool,
+    pub dead_letter_refund:
+        fn(org_id: &str, is_browser: bool, steps: u64, idempotency_key: &str) -> bool,
 }
 
 impl std::fmt::Debug for StepPoolHooks {
