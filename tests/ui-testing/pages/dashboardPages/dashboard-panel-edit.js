@@ -78,6 +78,20 @@ export default class DashboardPanel {
     await this.dataViewQueryInspectorBtn.click();
   }
 
+  // Wait for the query inspector to be open AND its query rows rendered. The
+  // dialog becomes visible before the rows are populated, so waiting on the
+  // dialog alone lets an assertion run against an empty body.
+  async waitForQueryInspector(index = 0) {
+    await this.page
+      .locator('[data-test="query-inspector-dialog"]')
+      .first()
+      .waitFor({ state: "visible", timeout: 15000 });
+    await this.getExecutedQuery(index).waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+  }
+
   // Query inspector editor content locator (chain .filter()/.last() as needed)
   getInspectorQueryEditor() {
     return this.inspectorQueryEditor;
