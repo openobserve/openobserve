@@ -27,7 +27,12 @@ EOF
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
     cargo nextest --version >/dev/null || cargo install cargo-nextest
-    cargo run -- init-db
+    # share one instrumented build between init-db and nextest instead of building the workspace twice
+    source <(cargo llvm-cov show-env --export-prefix --no-cfg-coverage --no-cfg-coverage-nightly)
+    # show-env mode disables llvm-cov's automatic cleanup, so drop stale profraw explicitly
+    cargo llvm-cov clean --workspace
+    # profile output goes outside the scanned tree so the init-db run stays out of coverage
+    LLVM_PROFILE_FILE="$(mktemp -d)/init-db-%p.profraw" cargo run -- init-db
     cargo llvm-cov nextest \
         --workspace \
         --verbose \
