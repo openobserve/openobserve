@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 
-import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 const isFilled = (v: any): boolean => v !== undefined && v !== null && String(v).trim() !== "";
 
@@ -49,7 +49,7 @@ const isBlankCondition = (c: any): boolean => !isFilled(c?.column) && !isFilled(
 const isCompleteCondition = (c: any): boolean =>
   isFilled(c?.column) &&
   isFilled(c?.operator) &&
-  (isFilled(c?.value) || isNullOperator(c?.operator));
+  (isFilled(c?.value) || isUnaryOperator(c?.operator));
 
 export const makeConditionSchema = (t: (_key: string) => string) =>
   z

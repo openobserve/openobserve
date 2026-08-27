@@ -37,20 +37,34 @@ export interface FormatOptions {
   streamFieldsMap?: StreamFieldsMap;
 }
 
+// Keys tolerate the backend's serde aliases ("IsNull", ...) alongside the
+// canonical lowercase spellings; values are the display text.
+const UNARY_OPERATOR_TEXT: Record<string, string> = {
+  is_null: "is null",
+  isnull: "is null",
+  is_not_null: "is not null",
+  isnotnull: "is not null",
+  is_empty: "is empty",
+  isempty: "is empty",
+  is_not_empty: "is not empty",
+  isnotempty: "is not empty",
+};
+
+// "Empty" only differs from "null" on string columns; on these the empty
+// checks degrade to the null checks (matching the backend's build_expr).
+const NON_STRING_TYPES = ["Int64", "Float64", "Boolean"];
+
 /**
- * Unary null-check operators: they take no value, so completeness checks and
- * formatters must not require one. Tolerates the backend's serde aliases
- * ("IsNull"/"IsNotNull") alongside the canonical "is_null"/"is_not_null".
+ * Unary null/empty-check operators: they take no value, so completeness
+ * checks and formatters must not require one.
  */
-export function isNullOperator(operator: unknown): boolean {
-  if (typeof operator !== "string") return false;
-  const op = operator.toLowerCase();
-  return op === "is_null" || op === "isnull" || op === "is_not_null" || op === "isnotnull";
+export function isUnaryOperator(operator: unknown): boolean {
+  return typeof operator === "string" && operator.toLowerCase() in UNARY_OPERATOR_TEXT;
 }
 
-/** Display text for a null-check operator; the SQL form is its uppercase. */
-export function nullOperatorText(operator: unknown): "is null" | "is not null" {
-  return String(operator).toLowerCase().includes("not") ? "is not null" : "is null";
+/** Display text for a unary operator ("is null", "is empty", ...). */
+export function unaryOperatorText(operator: unknown): string {
+  return UNARY_OPERATOR_TEXT[String(operator).toLowerCase()] ?? "";
 }
 
 /**
@@ -119,10 +133,22 @@ function getFormattedCondition(
   operator: string,
   value: string,
   sqlMode: boolean = false,
+  columnType?: string,
 ): string {
-  if (isNullOperator(operator)) {
-    const text = nullOperatorText(operator);
-    return sqlMode ? `${column} ${text.toUpperCase()}` : `${column} ${text}`;
+  if (isUnaryOperator(operator)) {
+    const text = unaryOperatorText(operator);
+    if (!sqlMode) return `${column} ${text}`;
+    const nonString = columnType !== undefined && NON_STRING_TYPES.includes(columnType);
+    switch (text) {
+      case "is null":
+        return `${column} IS NULL`;
+      case "is not null":
+        return `${column} IS NOT NULL`;
+      case "is empty":
+        return nonString ? `${column} IS NULL` : `(${column} IS NULL OR ${column} = '')`;
+      default:
+        return nonString ? `${column} IS NOT NULL` : `(${column} IS NOT NULL AND ${column} != '')`;
+    }
   }
 
   let condition = "";
@@ -207,7 +233,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
           item.filterType === "condition" &&
           item.column &&
           item.operator &&
-          (item.value !== undefined || isNullOperator(item.operator))
+          (item.value !== undefined || isUnaryOperator(item.operator))
         ) {
           // Step 1: Format the value (add quotes if needed, based on type)
           const formattedValue = formatValues
@@ -217,7 +243,13 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
               : "''";
 
           // Step 2: Build the condition string (column operator value)
-          conditionStr = getFormattedCondition(item.column, item.operator, formattedValue, sqlMode);
+          conditionStr = getFormattedCondition(
+            item.column,
+            item.operator,
+            formattedValue,
+            sqlMode,
+            streamFieldsMap?.[item.column]?.type,
+          );
         }
 
         // Step 3: Add logical operator prefix (except for first item at index 0)
@@ -245,7 +277,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
       node.filterType === "condition" &&
       node.column &&
       node.operator &&
-      (node.value !== undefined || isNullOperator(node.operator))
+      (node.value !== undefined || isUnaryOperator(node.operator))
     ) {
       const formattedValue = formatValues
         ? formatValue(node.column, node.operator, node.value, streamFieldsMap)
@@ -253,7 +285,13 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
           ? `'${node.value}'`
           : "''";
 
-      return getFormattedCondition(node.column, node.operator, formattedValue, sqlMode);
+      return getFormattedCondition(
+        node.column,
+        node.operator,
+        formattedValue,
+        sqlMode,
+        streamFieldsMap?.[node.column]?.type,
+      );
     }
 
     return "";

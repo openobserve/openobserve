@@ -18,13 +18,13 @@
 // Handles the V2 group format ({filterType:"group", conditions:[...]}), the V1
 // backend formats (and/or/not, items), a single condition, and the V0 array.
 
-import { isNullOperator, nullOperatorText } from "@/utils/alerts/conditionsFormatter";
+import { isUnaryOperator, unaryOperatorText } from "@/utils/alerts/conditionsFormatter";
 
 const leafPreview = (item: any): string => {
   const column = item.column || "field";
   const operator = item.operator || "=";
-  if (isNullOperator(operator)) {
-    return `${column} ${nullOperatorText(operator)}`;
+  if (isUnaryOperator(operator)) {
+    return `${column} ${unaryOperatorText(operator)}`;
   }
   const value =
     item.value !== undefined && item.value !== null && item.value !== "" ? `'${item.value}'` : "''";

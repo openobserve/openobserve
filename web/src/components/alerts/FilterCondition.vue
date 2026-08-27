@@ -75,7 +75,7 @@
       />
       <OTooltip v-if="condition.operator" :content="condition.operator" />
     </div>
-    <div v-if="!isNullOperator(condition.operator)" class="ml-0">
+    <div v-if="!isUnaryOperator(condition.operator)" class="ml-0">
       <OFormInput
         :name="`${namePrefix}.value`"
         :placeholder="t('common.value')"
@@ -161,7 +161,7 @@ import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
-import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 const emits = defineEmits(["input:update"]);
 
@@ -200,11 +200,13 @@ const triggerOperators = computed<SelectOptionInput[]>(() => [
   "NotContains",
   { label: t("dashboard.filterOperators.isNull"), value: "is_null" },
   { label: t("dashboard.filterOperators.isNotNull"), value: "is_not_null" },
+  { label: t("dashboard.filterOperators.isEmpty"), value: "is_empty" },
+  { label: t("dashboard.filterOperators.isNotEmpty"), value: "is_not_empty" },
 ]);
 
 // Null checks take no value; drop a stale one so it can't leak into the payload.
 const onOperatorChange = (operator: unknown) => {
-  if (isNullOperator(operator)) {
+  if (isUnaryOperator(operator)) {
     form?.setFieldValue(`${props.namePrefix}.value`, "");
   }
   emits("input:update", "conditions", props.condition);

@@ -314,7 +314,7 @@ import {
   convertV1ToV2,
   convertV1BEToV2,
 } from "@/utils/alerts/alertDataTransforms";
-import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 export default defineComponent({
   name: "ImportAlert",
@@ -701,7 +701,7 @@ export default defineComponent({
             if (
               !item.column ||
               !item.operator ||
-              (item.value === undefined && !isNullOperator(item.operator))
+              (item.value === undefined && !isUnaryOperator(item.operator))
             ) {
               alertErrors.push(t("alerts.import.v2ConditionFieldsRequired", { index }));
               return false;
@@ -721,7 +721,7 @@ export default defineComponent({
                 "contains",
                 "not_contains",
               ].includes(item.operator) &&
-              !isNullOperator(item.operator)
+              !isUnaryOperator(item.operator)
             ) {
               alertErrors.push(
                 t("alerts.import.invalidOperator", { index, operator: item.operator }),
@@ -738,7 +738,7 @@ export default defineComponent({
           if (
             condition.column &&
             condition.operator &&
-            (condition.value !== undefined || isNullOperator(condition.operator))
+            (condition.value !== undefined || isUnaryOperator(condition.operator))
           ) {
             if (
               input.query_condition.type === "custom" &&
@@ -754,7 +754,7 @@ export default defineComponent({
                 "contains",
                 "not_contains",
               ].includes(condition.operator) &&
-              !isNullOperator(condition.operator)
+              !isUnaryOperator(condition.operator)
             ) {
               alertErrors.push(t("alerts.import.invalidQueryConditionOperator", { index }));
             }
@@ -791,7 +791,7 @@ export default defineComponent({
             if (
               !condition.column ||
               !condition.operator ||
-              (condition.value === undefined && !isNullOperator(condition.operator))
+              (condition.value === undefined && !isUnaryOperator(condition.operator))
             ) {
               alertErrors.push(t("alerts.import.queryConditionFieldsRequired", { index }));
             }

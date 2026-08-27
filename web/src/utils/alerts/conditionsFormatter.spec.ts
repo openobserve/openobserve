@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildConditionsString, isNullOperator } from "./conditionsFormatter";
+import { buildConditionsString, isUnaryOperator } from "./conditionsFormatter";
 import type { StreamFieldsMap } from "./alertQueryBuilder";
 
 describe("conditionsFormatter", () => {
@@ -9,15 +9,17 @@ describe("conditionsFormatter", () => {
     city: { label: "city", value: "city", type: "String" },
   };
 
-  describe("isNullOperator", () => {
+  describe("isUnaryOperator", () => {
     it("matches the canonical spellings and the serde aliases", () => {
-      expect(isNullOperator("is_null")).toBe(true);
-      expect(isNullOperator("is_not_null")).toBe(true);
-      expect(isNullOperator("IsNull")).toBe(true);
-      expect(isNullOperator("IsNotNull")).toBe(true);
-      expect(isNullOperator("=")).toBe(false);
-      expect(isNullOperator("Contains")).toBe(false);
-      expect(isNullOperator(undefined)).toBe(false);
+      expect(isUnaryOperator("is_null")).toBe(true);
+      expect(isUnaryOperator("is_not_null")).toBe(true);
+      expect(isUnaryOperator("is_empty")).toBe(true);
+      expect(isUnaryOperator("is_not_empty")).toBe(true);
+      expect(isUnaryOperator("IsNull")).toBe(true);
+      expect(isUnaryOperator("IsNotEmpty")).toBe(true);
+      expect(isUnaryOperator("=")).toBe(false);
+      expect(isUnaryOperator("Contains")).toBe(false);
+      expect(isUnaryOperator(undefined)).toBe(false);
     });
   });
 
@@ -347,6 +349,41 @@ describe("conditionsFormatter", () => {
 
       expect(buildConditionsString(group, { sqlMode: false })).toBe(
         "name is null and city is not null",
+      );
+    });
+
+    it("handles empty-check operators, degrading to null checks on numeric columns", () => {
+      const group = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "name",
+            operator: "is_empty",
+            value: "",
+            logicalOperator: "AND",
+          },
+          {
+            filterType: "condition",
+            column: "age",
+            operator: "is_not_empty",
+            logicalOperator: "AND",
+          },
+        ],
+      };
+
+      expect(
+        buildConditionsString(group, {
+          sqlMode: true,
+          addWherePrefix: true,
+          formatValues: true,
+          streamFieldsMap,
+        }),
+      ).toBe("WHERE (name IS NULL OR name = '') AND age IS NOT NULL");
+
+      expect(buildConditionsString(group, { sqlMode: false })).toBe(
+        "name is empty and age is not empty",
       );
     });
 

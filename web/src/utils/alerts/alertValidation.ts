@@ -8,7 +8,7 @@ import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import type { I18nText } from "@/types/i18n";
 
 /**
@@ -171,7 +171,7 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
                 if (
                   !item.column ||
                   !item.operator ||
-                  (item.value === undefined && !isNullOperator(item.operator))
+                  (item.value === undefined && !isUnaryOperator(item.operator))
                 ) {
                   result.errors.push(
                     t("alerts.validation.conditionItemIncomplete", { index: index + 1 }),
@@ -179,7 +179,7 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
                 }
 
                 const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
-                if (!validOperators.includes(item.operator) && !isNullOperator(item.operator)) {
+                if (!validOperators.includes(item.operator) && !isUnaryOperator(item.operator)) {
                   result.errors.push(
                     t("alerts.validation.invalidOperatorInConditionItem", {
                       operator: item.operator,
@@ -201,7 +201,7 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
                 if (
                   !condition.column ||
                   !condition.operator ||
-                  (condition.value === undefined && !isNullOperator(condition.operator))
+                  (condition.value === undefined && !isUnaryOperator(condition.operator))
                 ) {
                   result.errors.push(
                     t("alerts.validation.conditionIncomplete", { index: index + 1 }),
@@ -211,7 +211,7 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
                 const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
                 if (
                   !validOperators.includes(condition.operator) &&
-                  !isNullOperator(condition.operator)
+                  !isUnaryOperator(condition.operator)
                 ) {
                   result.errors.push(
                     t("alerts.validation.invalidOperatorInCondition", {

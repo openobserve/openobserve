@@ -509,6 +509,8 @@ pub enum Operator {
     NotContains,
     IsNull,
     IsNotNull,
+    IsEmpty,
+    IsNotEmpty,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -707,6 +709,8 @@ impl From<meta_alerts::Operator> for Operator {
             meta_alerts::Operator::NotContains => Self::NotContains,
             meta_alerts::Operator::IsNull => Self::IsNull,
             meta_alerts::Operator::IsNotNull => Self::IsNotNull,
+            meta_alerts::Operator::IsEmpty => Self::IsEmpty,
+            meta_alerts::Operator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -902,6 +906,8 @@ impl From<Operator> for meta_alerts::Operator {
             Operator::NotContains => Self::NotContains,
             Operator::IsNull => Self::IsNull,
             Operator::IsNotNull => Self::IsNotNull,
+            Operator::IsEmpty => Self::IsEmpty,
+            Operator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }

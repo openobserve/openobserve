@@ -49,7 +49,7 @@ import {
 } from "@/utils/zincutils";
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
-import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
@@ -861,7 +861,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (conditions.filterType === "condition") {
       return !!(
         conditions.column &&
-        (isNullOperator(conditions.operator) ||
+        (isUnaryOperator(conditions.operator) ||
           (conditions.value !== undefined && conditions.value !== ""))
       );
     }

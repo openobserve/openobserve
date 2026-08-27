@@ -6,7 +6,7 @@ import {
   ensureIds,
   type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
-import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 export function createEmptyJobFilterGroup(): V2Group {
   return ensureIds(convertV0ToV2([])) as V2Group;
@@ -55,7 +55,7 @@ export function normalizeJobFilterCondition(value: any): V2Group {
 }
 
 const conditionHasValue = (item: any): boolean =>
-  isNullOperator(item?.operator) ||
+  isUnaryOperator(item?.operator) ||
   (item?.value !== undefined && item?.value !== null && item?.value !== "");
 
 export function cleanFilterGroup(group: any): V2Group {

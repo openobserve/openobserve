@@ -424,7 +424,7 @@ import {
   convertV1ToV2,
   convertV1BEToV2,
 } from "@/utils/alerts/alertDataTransforms";
-import { isNullOperator } from "@/utils/alerts/conditionsFormatter";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 export default defineComponent({
   name: "ImportPipeline",
@@ -1054,7 +1054,7 @@ export default defineComponent({
                 if (
                   !item.column ||
                   !item.operator ||
-                  (item.value === undefined && !isNullOperator(item.operator))
+                  (item.value === undefined && !isUnaryOperator(item.operator))
                 ) {
                   pipelineErrors.push({
                     message: t("pipeline.importErrors.v2ConditionFields", { index, nodeIndex }),
@@ -1071,7 +1071,7 @@ export default defineComponent({
               if (
                 condition.column &&
                 condition.operator &&
-                (condition.value !== undefined || isNullOperator(condition.operator))
+                (condition.value !== undefined || isUnaryOperator(condition.operator))
               ) {
                 return true;
               }
@@ -1098,7 +1098,7 @@ export default defineComponent({
                 return (
                   condition.column &&
                   condition.operator &&
-                  (condition.value !== undefined || isNullOperator(condition.operator))
+                  (condition.value !== undefined || isUnaryOperator(condition.operator))
                 );
               });
               if (!valid) {

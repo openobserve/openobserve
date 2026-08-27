@@ -85,6 +85,14 @@ describe("buildConditionPreview", () => {
       expect(buildConditionPreview(node)).toBe("err is null and host is not null");
     });
 
+    it("renders empty-check operators without a value", () => {
+      const node = group([
+        cond("gen_ai_input", "is_empty", ""),
+        cond("host", "is_not_empty", "", "AND"),
+      ]);
+      expect(buildConditionPreview(node)).toBe("gen_ai_input is empty and host is not empty");
+    });
+
     it("lowercases an OR logicalOperator", () => {
       const node = group([cond("a", "=", "1"), cond("b", "=", "2", "OR")]);
       expect(buildConditionPreview(node)).toBe("a = '1' or b = '2'");

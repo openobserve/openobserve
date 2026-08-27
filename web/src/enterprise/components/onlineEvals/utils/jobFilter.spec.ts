@@ -141,16 +141,17 @@ describe("cleanFilterGroup", () => {
     expect((cleaned.conditions[0] as any).column).toBe("b");
   });
 
-  it("keeps null-check conditions that have no value", () => {
+  it("keeps null/empty-check conditions that have no value", () => {
     const cleaned = cleanFilterGroup({
       filterType: "group",
       logicalOperator: "AND",
       conditions: [
         { filterType: "condition", column: "err", operator: "is_null", value: "" },
         { filterType: "condition", column: "host", operator: "is_not_null" },
+        { filterType: "condition", column: "gen_ai_input", operator: "is_empty" },
       ],
     });
-    expect(cleaned.conditions).toHaveLength(2);
+    expect(cleaned.conditions).toHaveLength(3);
     expect((cleaned.conditions[1] as any).value).toBe("");
   });
 
