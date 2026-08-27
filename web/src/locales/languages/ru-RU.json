@@ -1442,10 +1442,8 @@
       "location": "Местоположение",
       "pageUrl": "URL страницы",
       "noMessage": "Сообщение об ошибке не было зафиксировано.",
-      "copyLink": "Копировать ссылку",
       "copyLinkHint": "Скопировать постоянную ссылку на эту ошибку",
-      "copyEventId": "Копировать идентификатор события",
-      "linkCopied": "Ссылка скопирована в буфер обмена"
+      "copyEventId": "Копировать идентификатор события"
     },
     "translatingStackTrace": "Перевод стек-трейса с исходными картами...",
     "translatingStackTraceHint": "Это может занять некоторое время",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "Обновить список",
       "orgManagementRefresh": "Обновить список",
       "rumErrorsRefresh": "Обновить список",
+      "rumErrorsCopyUrl": "Скопировать общий URL отслеживания ошибок",
       "rumSessionsRefresh": "Обновить список",
+      "rumSessionsCopyUrl": "Скопировать общий URL повтора сеанса",
       "sourceMapsRefresh": "Обновить список"
     }
   },

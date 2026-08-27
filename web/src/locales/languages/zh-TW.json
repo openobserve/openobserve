@@ -1442,10 +1442,8 @@
       "location": "位置",
       "pageUrl": "頁面 URL",
       "noMessage": "未擷取到錯誤訊息。",
-      "copyLink": "複製連結",
       "copyLinkHint": "複製此錯誤的永久連結",
-      "copyEventId": "複製事件 ID",
-      "linkCopied": "連結已複製到剪貼簿"
+      "copyEventId": "複製事件 ID"
     },
     "translatingStackTrace": "正在使用原始碼映射翻譯堆疊追蹤……",
     "translatingStackTraceHint": "這可能需要一些時間",
@@ -13859,7 +13857,9 @@
       "aiToolsetsRefresh": "刷新列表",
       "orgManagementRefresh": "刷新列表",
       "rumErrorsRefresh": "刷新列表",
+      "rumErrorsCopyUrl": "複製錯誤追蹤分享 URL",
       "rumSessionsRefresh": "刷新列表",
+      "rumSessionsCopyUrl": "複製工作階段重播分享 URL",
       "sourceMapsRefresh": "刷新列表"
     }
   },

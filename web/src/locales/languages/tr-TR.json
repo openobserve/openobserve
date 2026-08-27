@@ -1442,10 +1442,8 @@
       "location": "Konum",
       "pageUrl": "Sayfa URL'si",
       "noMessage": "Hata mesajı yakalanmadı.",
-      "copyLink": "Bağlantıyı kopyala",
       "copyLinkHint": "Bu hataya kalıcı bağlantıyı kopyala",
-      "copyEventId": "Olay kimliğini kopyala",
-      "linkCopied": "Bağlantı panoya kopyalandı"
+      "copyEventId": "Olay kimliğini kopyala"
     },
     "translatingStackTrace": "Kaynak haritaları ile yığın izi çevriliyor...",
     "translatingStackTraceHint": "Bu birkaç dakika sürebilir",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "Listeyi yenileme",
       "orgManagementRefresh": "Listeyi yenileme",
       "rumErrorsRefresh": "Listeyi yenileme",
+      "rumErrorsCopyUrl": "Hata izleme paylaşım URL'sini kopyala",
       "rumSessionsRefresh": "Listeyi yenileme",
+      "rumSessionsCopyUrl": "Oturum kaydı paylaşım URL'sini kopyala",
       "sourceMapsRefresh": "Listeyi yenileme"
     }
   },

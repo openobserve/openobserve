@@ -1442,10 +1442,8 @@
       "location": "Vị trí",
       "pageUrl": "URL trang",
       "noMessage": "Không có thông điệp lỗi nào được ghi lại.",
-      "copyLink": "Sao chép liên kết",
       "copyLinkHint": "Sao chép liên kết cố định tới lỗi này",
-      "copyEventId": "Sao chép ID sự kiện",
-      "linkCopied": "Đã sao chép liên kết vào bảng tạm"
+      "copyEventId": "Sao chép ID sự kiện"
     },
     "translatingStackTrace": "Đang dịch stack trace với source maps...",
     "translatingStackTraceHint": "Quá trình này có thể mất vài giây",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "Làm mới danh sách",
       "orgManagementRefresh": "Làm mới danh sách",
       "rumErrorsRefresh": "Làm mới danh sách",
+      "rumErrorsCopyUrl": "Sao chép URL chia sẻ theo dõi lỗi",
       "rumSessionsRefresh": "Làm mới danh sách",
+      "rumSessionsCopyUrl": "Sao chép URL chia sẻ phát lại phiên",
       "sourceMapsRefresh": "Làm mới danh sách"
     }
   },

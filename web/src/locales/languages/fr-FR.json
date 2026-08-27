@@ -1442,10 +1442,8 @@
       "location": "Localisation",
       "pageUrl": "URL de la page",
       "noMessage": "Aucun message d'erreur n'a été capturé.",
-      "copyLink": "Copier le lien",
       "copyLinkHint": "Copier un lien permanent vers cette erreur",
-      "copyEventId": "Copier l'ID de l'événement",
-      "linkCopied": "Lien copié dans le presse-papiers"
+      "copyEventId": "Copier l'ID de l'événement"
     },
     "translatingStackTrace": "Traduction de la trace de pile avec les source maps...",
     "translatingStackTraceHint": "Cela peut prendre quelques instants",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "Actualiser la liste",
       "orgManagementRefresh": "Actualiser la liste",
       "rumErrorsRefresh": "Actualiser la liste",
+      "rumErrorsCopyUrl": "Copier l'URL de partage du suivi des erreurs",
       "rumSessionsRefresh": "Actualiser la liste",
+      "rumSessionsCopyUrl": "Copier l'URL de partage de session replay",
       "sourceMapsRefresh": "Actualiser la liste"
     }
   },

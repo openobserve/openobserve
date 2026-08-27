@@ -1442,10 +1442,8 @@
       "location": "위치",
       "pageUrl": "페이지 URL",
       "noMessage": "오류 메시지가 캡처되지 않았습니다.",
-      "copyLink": "링크 복사",
       "copyLinkHint": "이 오류에 대한 고정 링크 복사",
-      "copyEventId": "이벤트 ID 복사",
-      "linkCopied": "링크가 클립보드에 복사되었습니다"
+      "copyEventId": "이벤트 ID 복사"
     },
     "translatingStackTrace": "소스 맵으로 스택 트레이스 변환 중...",
     "translatingStackTraceHint": "몇 분 정도 걸릴 수 있습니다",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "목록 새로 고침",
       "orgManagementRefresh": "목록 새로 고침",
       "rumErrorsRefresh": "목록 새로 고침",
+      "rumErrorsCopyUrl": "오류 추적 공유 URL 복사",
       "rumSessionsRefresh": "목록 새로 고침",
+      "rumSessionsCopyUrl": "세션 재생 공유 URL 복사",
       "sourceMapsRefresh": "목록 새로 고침"
     }
   },
