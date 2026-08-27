@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           variant="outline"
-          size="sm-action"
+          size="sm-toolbar"
           icon-left="content-copy"
           :disabled="!error.error_id"
           data-test="error-header-copy-id-btn"
