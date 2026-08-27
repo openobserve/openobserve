@@ -53,6 +53,19 @@ export interface V1Group {
  * Ensures all groups have groupId and all conditions have id
  * This is needed because data from backend might not have these fields
  */
+// The backend serializes operators in canonical lowercase ("contains",
+// "is_null", ...) while the operator select's option values use the FE
+// spellings — a loaded tree must be mapped back or the select renders empty.
+const OPERATOR_DISPLAY_MAP: Record<string, string> = {
+  contains: "Contains",
+  not_contains: "NotContains",
+  notcontains: "NotContains",
+  isnull: "is_null",
+  isnotnull: "is_not_null",
+  isempty: "is_empty",
+  isnotempty: "is_not_empty",
+};
+
 export const ensureIds = (group: any): any => {
   if (!group) return group;
 
@@ -71,6 +84,10 @@ export const ensureIds = (group: any): any => {
         // Ensure condition has an id
         if (!item.id) {
           item.id = getUUID();
+        }
+        const opKey = String(item.operator ?? "").toLowerCase();
+        if (Object.hasOwn(OPERATOR_DISPLAY_MAP, opKey)) {
+          item.operator = OPERATOR_DISPLAY_MAP[opKey];
         }
         return item;
       }

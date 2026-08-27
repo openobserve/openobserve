@@ -80,14 +80,16 @@ describe("ConditionBuilder", () => {
     expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
   });
 
-  it("leaves operators untouched when normalizeOperators is false", () => {
+  it("canonicalizes operator spelling on load even without normalizeOperators", () => {
+    // ensureIds maps backend spellings to the select's option values on every
+    // load path now, so the select never renders empty for a saved operator.
     const saved = {
       filterType: "group",
       logicalOperator: "AND",
       conditions: [{ filterType: "condition", column: "msg", operator: "contains", value: "x" }],
     };
     const wrapper = createWrapper({ initialConditions: saved });
-    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("contains");
+    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
   });
 
   it("submit resolves { version, conditions } for a valid rule", async () => {

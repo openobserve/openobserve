@@ -2862,6 +2862,30 @@ describe("alertDataTransforms - V2 Structure Tests", () => {
   });
 });
 
+describe("ensureIds operator spelling", () => {
+  it("maps backend lowercase operators to the select's option values", () => {
+    const tree: any = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [
+        { filterType: "condition", column: "a", operator: "contains", value: "x" },
+        { filterType: "condition", column: "b", operator: "not_contains", value: "y" },
+        { filterType: "condition", column: "c", operator: "IsNull", value: "" },
+        { filterType: "condition", column: "d", operator: "is_empty", value: "" },
+        { filterType: "condition", column: "e", operator: "=", value: "z" },
+      ],
+    };
+    ensureIds(tree);
+    expect(tree.conditions.map((c: any) => c.operator)).toEqual([
+      "Contains",
+      "NotContains",
+      "is_null",
+      "is_empty",
+      "=",
+    ]);
+  });
+});
+
 describe("ensureUnaryConditionValues", () => {
   it("backfills value only on unary leaves that omit it, recursively", () => {
     const tree: any = {
