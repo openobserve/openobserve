@@ -422,7 +422,10 @@ impl EvalContext {
 
     /// More than one evaluation window, and consecutive windows overlap.
     pub fn windows_overlap(&self, range_micros: i64) -> bool {
-        self.end - self.start >= self.step && self.step <= range_micros
+        !self.is_instant()
+            && self.step > 0
+            && self.end - self.start >= self.step
+            && self.step <= range_micros
     }
 
     /// Get all evaluation timestamps
@@ -1196,6 +1199,8 @@ mod tests {
         // Disjoint windows (1h step, 5m range) or a single window cannot.
         assert!(!ctx(7 * 24 * 60 * MINUTE, 60 * MINUTE).windows_overlap(5 * MINUTE));
         assert!(!ctx(0, MINUTE / 4).windows_overlap(5 * MINUTE));
+        assert!(!ctx(0, 0).windows_overlap(5 * MINUTE));
+        assert!(!ctx(MINUTE, 0).windows_overlap(5 * MINUTE));
     }
 
     #[test]
