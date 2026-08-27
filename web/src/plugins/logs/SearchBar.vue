@@ -1960,7 +1960,9 @@ import { debounce } from "lodash-es";
 import savedviewsService from "@/services/saved_views";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import useDashboardPanelData, {
+  getPanelDataForPageKey,
+} from "@/composables/dashboard/useDashboardPanel";
 import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
@@ -1980,6 +1982,8 @@ import { searchState } from "@/composables/useLogs/searchState";
 import {
   getVisualizationConfig,
   encodeVisualizationConfig,
+  getBuildConfig,
+  encodeBuildConfig,
 } from "@/composables/useLogs/logsVisualization";
 
 import useSearchBar from "@/composables/useLogs/useSearchBar";
@@ -3577,6 +3581,24 @@ export default defineComponent({
       }
     };
 
+    // Point build_data at the view being applied. Without this the URL keeps the
+    // build_data of whatever was open before, which a later toggle back to the
+    // build tab would restore instead of the view the user opened.
+    const restoreBuildData = async (buildData) => {
+      const currentQuery = { ...router.currentRoute.value.query };
+      const encoded = buildData ? encodeBuildConfig(buildData) : null;
+      if (encoded) {
+        currentQuery.build_data = encoded;
+      } else {
+        delete currentQuery.build_data;
+      }
+
+      await router.replace({
+        name: router.currentRoute.value.name,
+        query: currentQuery,
+      });
+    };
+
     const applySavedView = async (item) => {
       savedViewDropdownModel.value = false;
       await cancelQuery();
@@ -3675,10 +3697,17 @@ export default defineComponent({
               mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
 
+              // Hand the saved builder chart to BuildQueryPage. Must be set
+              // synchronously after the merge: the merge flips
+              // logsVisualizeToggle to "build", and the first await below lets
+              // Vue mount BuildQueryPage, which reads this on mount.
+              searchObj.meta.savedBuildConfig = extractedObj.data.buildData ?? null;
+
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
                 await restoreVisualizationData(extractedObj.data.visualizationData);
               }
+              await restoreBuildData(extractedObj.data.buildData ?? null);
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -3858,10 +3887,17 @@ export default defineComponent({
               mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
 
+              // Hand the saved builder chart to BuildQueryPage. Must be set
+              // synchronously after the merge: the merge flips
+              // logsVisualizeToggle to "build", and the first await below lets
+              // Vue mount BuildQueryPage, which reads this on mount.
+              searchObj.meta.savedBuildConfig = extractedObj.data.buildData ?? null;
+
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
                 await restoreVisualizationData(extractedObj.data.visualizationData);
               }
+              await restoreBuildData(extractedObj.data.buildData ?? null);
 
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
               searchObj.data.streamResults = streamData;
@@ -4087,6 +4123,19 @@ export default defineComponent({
             savedSearchObj.data.visualizationData = visualizationData;
           }
         }
+
+        // Include the builder chart (stream, fields, joins, chart type, config) when
+        // in build mode — without it the builder is re-derived from the logs query on
+        // restore and loses everything the user configured.
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          const buildData = getBuildConfig(getPanelDataForPageKey("build"));
+          if (buildData) {
+            savedSearchObj.data.buildData = buildData;
+          }
+        }
+
+        // Transient hand-off to BuildQueryPage, never part of a saved view.
+        delete savedSearchObj.meta.savedBuildConfig;
 
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
