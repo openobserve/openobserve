@@ -839,9 +839,9 @@ impl Engine {
     ) -> Result<Value> {
         // Avoid materializing one range-function output sample per source
         // series and evaluation timestamp when the parent aggregation folds
-        // those values immediately (VictoriaMetrics-style incremental
-        // aggregation). Kept as a narrow AST match so the generic evaluator
-        // remains the correctness fallback for every other expression shape.
+        // those values immediately. Kept as a narrow AST match so the generic
+        // evaluator remains the correctness fallback for every other
+        // expression shape.
         if let Some(agg_op) = aggregations::FusedAggOp::from_token(op.id())
             && let PromExpr::Call(Call { func, args }) = expr
             && args.len() == 1

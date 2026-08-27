@@ -253,7 +253,7 @@ fn dispersion_sample(
 }
 
 /// Evaluates a range function and folds its values straight into aggregation
-/// groups, modeled on VictoriaMetrics' incremental aggregation.
+/// groups.
 ///
 /// The generic evaluator materializes one output `Sample` per input series and
 /// evaluation timestamp, only for the parent aggregation to scan and discard
