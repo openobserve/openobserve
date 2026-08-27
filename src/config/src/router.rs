@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 35] = [
+const QUERIER_ROUTES: [(&str, usize); 36] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
@@ -29,6 +29,7 @@ const QUERIER_ROUTES: [(&str, usize); 35] = [
     ("dag", 5),                  // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
     ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
     ("traces/time_range", 3),    // /api/{org_id}/{stream_name}/traces/time_range
+    ("traces/time_range", 2),    // /api/{org_id}/traces/time_range
     ("clusters", 1),             // /api/clusters
     ("query_manager", 2),        // /api/{org_id}/query_manager/...
     ("_search", 2),              // /api/{org_id}/_search
@@ -184,6 +185,11 @@ mod tests {
         assert!(is_querier_route(
             "/api/org1/default/traces/time_range?session_id=session-id"
         ));
+        assert!(is_querier_route(
+            "/api/org1/traces/time_range?trace_id=a,b,c"
+        ));
+        // the org-level entry must not swallow the OTLP ingest route
+        assert!(!is_querier_route("/api/org1/traces"));
     }
 
     #[test]
