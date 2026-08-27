@@ -16,11 +16,11 @@
 
 use axum::{
     body::Body,
-    extract::{Path, Query, rejection::JsonRejection},
+    extract::{Path, rejection::JsonRejection},
     http::{HeaderValue, StatusCode, header::RETRY_AFTER},
     response::Response,
 };
-use db::authz::{remove_ownership, set_ownership};
+use db::authz::set_ownership;
 use futures::StreamExt;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
@@ -41,25 +41,18 @@ use serde_json::{Value, json};
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::playground::{
-        ListPlaygroundSnapshotsQuery, ListPlaygroundSnapshotsResponseBody, PlaygroundColumnBody,
-        PlaygroundRunRequestBody, PlaygroundScoreRequestBody, PlaygroundScoreResponseBody,
-        PlaygroundSnapshotDiffResponseBody, PlaygroundSnapshotResponseBody,
-        ProviderModelsResponseBody, SharePlaygroundSnapshotRequestBody,
+        PlaygroundColumnBody, PlaygroundRunRequestBody, PlaygroundScoreRequestBody,
+        PlaygroundScoreResponseBody, PlaygroundSnapshotResponseBody,
+        SharePlaygroundSnapshotRequestBody,
     },
 };
 
 /// FGA object type for everything under `/playground`.
 const PLAYGROUND_RESOURCE: &str = "playground";
 
-const DEFAULT_LIST_SIZE: u64 = 50;
-const MAX_LIST_SIZE: u64 = 200;
-
 fn playground_error_response(error: PlaygroundError) -> Response {
     match error {
         PlaygroundError::NotFound => MetaHttpResponse::not_found("Playground snapshot not found"),
-        PlaygroundError::NoParent => MetaHttpResponse::bad_request(
-            "Playground snapshot was not forked from another snapshot",
-        ),
         error @ (PlaygroundError::PayloadTooLarge { .. }
         | PlaygroundError::TooManyColumns { .. }
         | PlaygroundError::TooManyRows { .. }
@@ -98,20 +91,15 @@ fn json_rejection_response(error: JsonRejection) -> Response {
 }
 
 /// Confirm the caller may see this snapshot.
-///
-/// `method` is the permission the route already resolved to, not the HTTP
-/// verb, so a route that maps a POST onto `PUT` must pass `PUT` here or it
-/// would deny a caller the middleware already admitted.
 async fn require_snapshot_visibility(
     org_id: &str,
     snapshot_id: &str,
     user_id: &str,
-    method: &str,
 ) -> Result<(), Response> {
     match openobserve_api_common::auth::validator::list_objects_for_user(
         org_id,
         user_id,
-        method,
+        "GET",
         PLAYGROUND_RESOURCE,
     )
     .await
@@ -264,64 +252,6 @@ pub async fn share_playground_snapshot(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/playground/snapshots",
-    context_path = "/api",
-    tag = "Playground",
-    operation_id = "ListPlaygroundSnapshots",
-    security(("Authorization" = [])),
-    params(("org_id" = String, Path, description = "Organization name"), ListPlaygroundSnapshotsQuery),
-    responses((status = 200, body = inline(ListPlaygroundSnapshotsResponseBody))),
-)]
-pub async fn list_playground_snapshots(
-    Path(org_id): Path<String>,
-    Query(query): Query<ListPlaygroundSnapshotsQuery>,
-    Headers(user): Headers<UserEmail>,
-) -> Response {
-    let permitted = match openobserve_api_common::auth::validator::list_objects_for_user(
-        &org_id,
-        &user.user_id,
-        "GET",
-        PLAYGROUND_RESOURCE,
-    )
-    .await
-    {
-        Ok(permitted) => permitted,
-        Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
-    };
-
-    let size = query
-        .size
-        .unwrap_or(DEFAULT_LIST_SIZE)
-        .clamp(1, MAX_LIST_SIZE);
-    let all_object = format!("{PLAYGROUND_RESOURCE}:_all_{org_id}");
-    let visible_ids = permitted.as_ref().and_then(|objects| {
-        if objects.contains(&all_object) {
-            None
-        } else {
-            let prefix = format!("{PLAYGROUND_RESOURCE}:");
-            Some(
-                objects
-                    .iter()
-                    .filter_map(|object| object.strip_prefix(&prefix).map(str::to_string))
-                    .collect::<Vec<_>>(),
-            )
-        }
-    });
-    match playground::list_visible(
-        &org_id,
-        query.from.unwrap_or(0),
-        size,
-        visible_ids.as_deref(),
-    )
-    .await
-    {
-        Ok(page) => MetaHttpResponse::json(ListPlaygroundSnapshotsResponseBody::from(page)),
-        Err(error) => playground_error_response(error),
-    }
-}
-
-#[utoipa::path(
-    get,
     path = "/{org_id}/playground/snapshots/{snapshot_id}",
     context_path = "/api",
     tag = "Playground",
@@ -340,79 +270,11 @@ pub async fn get_playground_snapshot(
     Path((org_id, snapshot_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
-    if let Err(response) =
-        require_snapshot_visibility(&org_id, &snapshot_id, &user.user_id, "GET").await
-    {
+    if let Err(response) = require_snapshot_visibility(&org_id, &snapshot_id, &user.user_id).await {
         return response;
     }
     match playground::get(&org_id, &snapshot_id).await {
         Ok(snapshot) => MetaHttpResponse::json(PlaygroundSnapshotResponseBody::from(snapshot)),
-        Err(error) => playground_error_response(error),
-    }
-}
-
-#[utoipa::path(
-    get,
-    path = "/{org_id}/playground/snapshots/{snapshot_id}/diff",
-    context_path = "/api",
-    tag = "Playground",
-    operation_id = "DiffPlaygroundSnapshot",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("snapshot_id" = String, Path, description = "Snapshot id"),
-    ),
-    responses(
-        (status = 200, body = inline(PlaygroundSnapshotDiffResponseBody)),
-        (status = 400, description = "Snapshot has no parent to compare against", body = ()),
-        (status = 404, description = "Snapshot not found", body = ()),
-    ),
-)]
-pub async fn diff_playground_snapshot(
-    Path((org_id, snapshot_id)): Path<(String, String)>,
-    Headers(user): Headers<UserEmail>,
-) -> Response {
-    if let Err(response) =
-        require_snapshot_visibility(&org_id, &snapshot_id, &user.user_id, "GET").await
-    {
-        return response;
-    }
-    match playground::diff(&org_id, &snapshot_id).await {
-        Ok(diff) => MetaHttpResponse::json(PlaygroundSnapshotDiffResponseBody::from(diff)),
-        Err(error) => playground_error_response(error),
-    }
-}
-
-#[utoipa::path(
-    delete,
-    path = "/{org_id}/playground/snapshots/{snapshot_id}",
-    context_path = "/api",
-    tag = "Playground",
-    operation_id = "DeletePlaygroundSnapshot",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("snapshot_id" = String, Path, description = "Snapshot id"),
-    ),
-    responses(
-        (status = 200, description = "Snapshot deleted", body = ()),
-        (status = 404, description = "Snapshot not found", body = ()),
-    ),
-)]
-pub async fn delete_playground_snapshot(
-    Path((org_id, snapshot_id)): Path<(String, String)>,
-    Headers(user): Headers<UserEmail>,
-) -> Response {
-    if let Err(response) =
-        require_snapshot_visibility(&org_id, &snapshot_id, &user.user_id, "DELETE").await
-    {
-        return response;
-    }
-    match playground::delete(&org_id, &snapshot_id).await {
-        Ok(()) => {
-            remove_ownership(&org_id, "playground", Authz::new(&snapshot_id)).await;
-            MetaHttpResponse::ok("Playground snapshot deleted")
-        }
         Err(error) => playground_error_response(error),
     }
 }
@@ -704,64 +566,6 @@ pub async fn score_playground_cell(
     MetaHttpResponse::json(PlaygroundScoreResponseBody {
         results: results.into_iter().map(Into::into).collect(),
     })
-}
-
-// ---------------------------------------------------------------------------
-// Provider model catalogue
-// ---------------------------------------------------------------------------
-
-#[utoipa::path(
-    get,
-    path = "/{org_id}/providers/{provider_id}/models",
-    context_path = "/api",
-    tag = "Providers",
-    operation_id = "ListProviderModels",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("provider_id" = String, Path, description = "Provider id"),
-    ),
-    responses(
-        (status = 200, body = inline(ProviderModelsResponseBody)),
-        (status = 403, description = "Provider is not visible to the caller", body = ()),
-        (status = 404, description = "Provider not found", body = ()),
-        (status = 502, description = "The provider could not be reached", body = ()),
-    ),
-)]
-pub async fn list_provider_models(
-    Path((org_id, provider_id)): Path<(String, String)>,
-    Headers(user): Headers<UserEmail>,
-) -> Response {
-    if let Err(response) = require_provider_visibility(&org_id, &provider_id, &user.user_id).await {
-        return response;
-    }
-
-    let configured_models = match infra::table::providers::get(&provider_id).await {
-        Ok(Some(provider)) if provider.org_id == org_id => provider.available_models.clone(),
-        Ok(_) => return MetaHttpResponse::not_found("Provider not found"),
-        Err(error) => {
-            log::error!("[Playground] failed to load provider {provider_id}: {error}");
-            return MetaHttpResponse::internal_error("Internal server error");
-        }
-    };
-
-    let provider = match load_provider(&org_id, &provider_id).await {
-        Ok(provider) => provider,
-        Err(response) => return response,
-    };
-
-    match provider.list_models().await {
-        Ok(models) => MetaHttpResponse::json(ProviderModelsResponseBody {
-            models,
-            configured_models,
-        }),
-        Err(error) => {
-            // The provider being unreachable is the provider's problem, not
-            // ours, so it is reported as an upstream failure.
-            log::warn!("[Playground] model listing failed for {provider_id}: {error}");
-            MetaHttpResponse::bad_gateway(error.to_string())
-        }
-    }
 }
 
 #[cfg(test)]

@@ -10,8 +10,7 @@
  *
  * Sharing writes the bench by value and hands back a short-link id. The stored
  * payload is kept verbatim, so the server neither owns nor validates most of
- * its shape; it only reads `columns` and `rows` to enforce the workbench limits
- * and to diff a snapshot against its parent.
+ * its shape; it only reads `columns` and `rows` to enforce the workbench limits.
  */
 
 import http from "@/services/http";

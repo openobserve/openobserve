@@ -354,9 +354,9 @@ export const PLAYGROUND_SNAPSHOT_VERSION = 1;
 /**
  * What a shared snapshot carries.
  *
- * `columns` and `rows` are the only parts the server reads — it counts them
- * against the workbench limits and diffs a snapshot against its parent — so
- * they are written in ITS vocabulary and duplicate what the draft already says.
+ * `columns` and `rows` are the only parts the server reads. It counts them
+ * against the workbench limits, so they are written in ITS vocabulary and
+ * duplicate what the draft already says.
  * Everything the bench needs to rebuild itself travels beside them in `draft`
  * and `results`, which the server stores verbatim and never interprets.
  */
