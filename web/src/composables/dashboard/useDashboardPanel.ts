@@ -40,6 +40,11 @@ let parser: any;
 
 const dashboardPanelDataObj: any = {};
 
+// Read-only handle on a page's shared panel state for callers that must not
+// register this composable's watchers (SearchBar reading the build page).
+export const getPanelDataForPageKey = (pageKey: string) =>
+  dashboardPanelDataObj[pageKey] ?? null;
+
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
