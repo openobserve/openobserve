@@ -31,6 +31,11 @@ use crate::{
     micros,
 };
 
+/// Series per parallel fold chunk inside one large group. Fused per-series
+/// work includes the range-function window evaluation, so chunks are much
+/// smaller than the generic path's accumulate-only [`super::AGG_PARALLEL_CHUNK`].
+const FUSED_PARALLEL_CHUNK: usize = 2048;
+
 /// Aggregations that can fold range-function output incrementally through one
 /// dense per-timestamp state per output group.
 #[derive(Clone, Copy, Debug)]
@@ -176,6 +181,122 @@ impl FusedAccumulator {
         }
     }
 
+    /// Folds `other` in as if its chunk's series had been pushed here, after
+    /// this accumulator's own. Chunks are always merged in series order, so
+    /// every variant except the Kahan-compensated `Sum`/`Avg` stays bit-equal
+    /// to the sequential fold; those two stay deterministic for a fixed chunk
+    /// size.
+    fn merge(&mut self, other: Self) {
+        match (self, other) {
+            (
+                Self::Avg { sums, counts },
+                Self::Avg {
+                    sums: other_sums,
+                    counts: other_counts,
+                },
+            ) => {
+                for (slot, other_count) in other_counts.into_iter().enumerate() {
+                    if other_count == 0 {
+                        continue;
+                    }
+                    let (other_sum, other_c) = other_sums[slot];
+                    let (sum, c) = &mut sums[slot];
+                    // Two separate compensated increments: a plain `c + other_c`
+                    // add rounds residuals away before the main sums cancel.
+                    (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
+                    (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
+                    counts[slot] += other_count;
+                }
+            }
+            (
+                Self::Count { counts },
+                Self::Count {
+                    counts: other_counts,
+                },
+            ) => {
+                for (slot, other_count) in other_counts.into_iter().enumerate() {
+                    counts[slot] += other_count;
+                }
+            }
+            (
+                Self::Group { present },
+                Self::Group {
+                    present: other_present,
+                },
+            ) => {
+                for (slot, other_present) in other_present.into_iter().enumerate() {
+                    present[slot] |= other_present;
+                }
+            }
+            (
+                Self::Max { maxes, present },
+                Self::Max {
+                    maxes: other_maxes,
+                    present: other_present,
+                },
+            ) => {
+                for (slot, other_present) in other_present.into_iter().enumerate() {
+                    if !other_present {
+                        continue;
+                    }
+                    if other_maxes[slot] > maxes[slot] {
+                        maxes[slot] = other_maxes[slot];
+                    }
+                    present[slot] = true;
+                }
+            }
+            (
+                Self::Min { mins, present },
+                Self::Min {
+                    mins: other_mins,
+                    present: other_present,
+                },
+            ) => {
+                for (slot, other_present) in other_present.into_iter().enumerate() {
+                    if !other_present {
+                        continue;
+                    }
+                    if other_mins[slot] < mins[slot] {
+                        mins[slot] = other_mins[slot];
+                    }
+                    present[slot] = true;
+                }
+            }
+            (
+                Self::Stddev { values } | Self::Stdvar { values },
+                Self::Stddev {
+                    values: other_values,
+                }
+                | Self::Stdvar {
+                    values: other_values,
+                },
+            ) => {
+                for (slot, other_values) in other_values.into_iter().enumerate() {
+                    values[slot].extend(other_values);
+                }
+            }
+            (
+                Self::Sum { sums, present },
+                Self::Sum {
+                    sums: other_sums,
+                    present: other_present,
+                },
+            ) => {
+                for (slot, other_present) in other_present.into_iter().enumerate() {
+                    if !other_present {
+                        continue;
+                    }
+                    let (other_sum, other_c) = other_sums[slot];
+                    let (sum, c) = &mut sums[slot];
+                    (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
+                    (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
+                    present[slot] = true;
+                }
+            }
+            _ => unreachable!("merge of mismatched fused accumulator variants"),
+        }
+    }
+
     fn into_samples(self, timestamps: &[i64]) -> Vec<Sample> {
         match self {
             Self::Avg { sums, counts } => sums
@@ -300,37 +421,58 @@ pub(crate) fn fused_range_agg(
         .par_iter()
         .filter_map(|(_, series_indices)| {
             let labels = projected_labels(param, &matrix[series_indices[0]].labels);
-            let mut acc = FusedAccumulator::new(op, timestamps.len());
-            // Match the generic path's accumulation order (series first,
-            // timestamps second) so order-sensitive floating-point folds stay
-            // bit-for-bit identical for the same input ordering.
-            for &series_idx in series_indices {
-                let metric = &matrix[series_idx];
-                let range = metric
-                    .time_window
-                    .as_ref()
-                    .expect("range function input must have a time window")
-                    .range;
-                let range_micros = micros(range);
-                let mut start_index = 0;
-                let mut end_index = 0;
+            // Fold a chunk of the group in series order, then timestamp order,
+            // matching the generic path's accumulation order within the chunk.
+            let fold_chunk = |chunk: &[usize]| {
+                let mut acc = FusedAccumulator::new(op, timestamps.len());
+                for &series_idx in chunk {
+                    let metric = &matrix[series_idx];
+                    let range = metric
+                        .time_window
+                        .as_ref()
+                        .expect("range function input must have a time window")
+                        .range;
+                    let range_micros = micros(range);
+                    let mut start_index = 0;
+                    let mut end_index = 0;
 
-                for (slot, &eval_ts) in timestamps.iter().enumerate() {
-                    let window_samples = advance_sample_window(
-                        &metric.samples,
-                        eval_ts - range_micros,
-                        eval_ts,
-                        &mut start_index,
-                        &mut end_index,
-                    );
-                    if window_samples.is_empty() {
-                        continue;
-                    }
-                    if let Some(value) = func.exec(window_samples, eval_ts, &range) {
-                        acc.push(slot, value);
+                    for (slot, &eval_ts) in timestamps.iter().enumerate() {
+                        let window_samples = advance_sample_window(
+                            &metric.samples,
+                            eval_ts - range_micros,
+                            eval_ts,
+                            &mut start_index,
+                            &mut end_index,
+                        );
+                        if window_samples.is_empty() {
+                            continue;
+                        }
+                        if let Some(value) = func.exec(window_samples, eval_ts, &range) {
+                            acc.push(slot, value);
+                        }
                     }
                 }
-            }
+                acc
+            };
+
+            // A huge group (e.g. `sum(rate(...))` without a modifier puts every
+            // series in one group) would otherwise evaluate the range function
+            // on one thread; fold it in parallel chunks and merge the partials
+            // sequentially in chunk order so the result stays deterministic.
+            let acc = if series_indices.len() >= 2 * FUSED_PARALLEL_CHUNK {
+                let mut chunks = series_indices
+                    .par_chunks(FUSED_PARALLEL_CHUNK)
+                    .map(fold_chunk)
+                    .collect::<Vec<_>>()
+                    .into_iter();
+                let mut acc = chunks.next().expect("group has at least one chunk");
+                for chunk in chunks {
+                    acc.merge(chunk);
+                }
+                acc
+            } else {
+                fold_chunk(series_indices)
+            };
 
             let samples = acc.into_samples(&timestamps);
             // The generic range function drops series that produce no values,
@@ -530,6 +672,73 @@ mod tests {
                         op.name(),
                     );
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn test_fused_chunked_large_group_matches_generic_and_is_deterministic() {
+        let eval_ctx = eval_ctx();
+        // Both the ungrouped fold and each `by(path)` group cross the parallel
+        // chunk threshold. Integer-valued samples keep every float operation
+        // exact, so chunk-merged results must equal the generic path's bits.
+        let series_count = 2 * (2 * FUSED_PARALLEL_CHUNK) + 100;
+        let matrix = (0..series_count)
+            .map(|i| {
+                let value = (i % 97) as f64;
+                let path = if i % 2 == 0 { "/one" } else { "/two" };
+                make_series(
+                    "requests_total",
+                    &format!("host-{i}"),
+                    path,
+                    &[10, 50, 70, 110, 130, 170]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(n, timestamp)| (timestamp, value + n as f64))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let agg_cases: [(FusedAggOp, GenericAgg); 8] = [
+            (FusedAggOp::Avg, aggregations::avg),
+            (FusedAggOp::Count, aggregations::count),
+            (FusedAggOp::Group, aggregations::group),
+            (FusedAggOp::Max, aggregations::max),
+            (FusedAggOp::Min, aggregations::min),
+            (FusedAggOp::Stddev, aggregations::stddev),
+            (FusedAggOp::Stdvar, aggregations::stdvar),
+            (FusedAggOp::Sum, aggregations::sum),
+        ];
+        let func = functions::fusable_range_func("sum_over_time").unwrap();
+        for (op, generic_agg) in agg_cases {
+            for modifier in [None, by(&["path"])] {
+                let generic_input =
+                    functions::sum_over_time(Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+                let expected = generic_agg(&modifier, generic_input, &eval_ctx).unwrap();
+                let run = || {
+                    fused_range_agg(
+                        &modifier,
+                        Value::Matrix(matrix.clone()),
+                        func.as_ref(),
+                        op,
+                        &eval_ctx,
+                    )
+                    .unwrap()
+                };
+                let first = canonical_matrix(run());
+                assert_eq!(
+                    canonical_matrix(expected),
+                    first,
+                    "chunked fused {}(sum_over_time) diverged from generic (modifier: {modifier:?})",
+                    op.name(),
+                );
+                assert_eq!(
+                    first,
+                    canonical_matrix(run()),
+                    "chunked fused {}(sum_over_time) must be deterministic",
+                    op.name(),
+                );
             }
         }
     }
