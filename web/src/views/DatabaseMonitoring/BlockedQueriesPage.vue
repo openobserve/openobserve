@@ -36,22 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   reasoning. The destructive action is copyable SQL, never an execution.
 -->
 <template>
-  <DbmPageChrome
-    :title="t('dbm.blocked.title')"
-    :subtitle="t(isLiveWindow ? 'dbm.blocked.subtitle' : 'dbm.blocked.subtitlePast')"
-    title-data-test="dbm-blocked-title"
-    date-time-data-test="dbm-blocked-date-time"
-    :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
-  >
+  <DbmPageChrome title-data-test="dbm-blocked-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
+        :enable-column-resize="true"
         :data="tableRows"
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
+        :toolbar-bordered="false"
         :error="error"
         sorting="client"
         :show-global-filter="false"
@@ -92,12 +86,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            :last-run-at="lastRunAt"
-            data-test="dbm-blocked-refresh"
-            @refresh="onRefresh"
-          />
+          <div class="flex items-center gap-1.5">
+            <DbmRefreshButton
+              mode="status"
+              :loading="loading"
+              :last-run-at="lastRunAt"
+              data-test="dbm-blocked-refresh"
+            />
+            <DateTime
+              auto-apply
+              menu-align="end"
+              :default-type="range.type"
+              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+              :default-relative-time="range.relativeTimePeriod ?? undefined"
+              data-test-name="dbm-blocked-date-time"
+              class="h-8"
+              @on:date-change="onDateChange"
+            />
+            <DbmRefreshButton
+              mode="button"
+              :loading="loading"
+              data-test="dbm-blocked-refresh"
+              @refresh="onRefresh"
+            />
+          </div>
         </template>
 
         <template #subheader>
@@ -157,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex min-w-0 flex-1 flex-col gap-px">
               <div v-if="row.pill" class="flex min-w-0 items-center gap-1.5">
                 <span
-                  class="text-3xs shrink-0 rounded-full px-1.5 py-px font-bold tracking-wide uppercase"
+                  class="text-3xs shrink-0 rounded-full px-1.5 py-px font-bold"
                   :class="row.pill.tone"
                   :data-test="`dbm-blocked-pill-${row.kind}`"
                 >
@@ -168,14 +180,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
 
-              <span
-                class="text-text-code min-w-0 truncate font-mono text-xs"
-                :title="row.query ?? ''"
-              >
+              <span class="text-text-code min-w-0 truncate font-mono text-xs">
+                <OTooltip v-if="row.query" :content="raw(row.query)" />
                 {{ raw(row.query ?? "—") }}
               </span>
 
-              <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+              <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
                 <OTag type="dbSystem" :value="row.db_system" size="xs" />
                 <template v-if="row.application">
                   <span class="opacity-45">·</span>
@@ -191,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <span
                   v-if="row.longestWait"
-                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ml-0.5 px-1 py-px font-semibold tracking-wide uppercase"
+                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ml-0.5 px-1 py-px font-semibold"
                 >
                   {{ t("dbm.blocked.longestWait") }}
                 </span>
@@ -234,9 +244,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
             <span
               v-if="row.waitEventLabel && row.waitEventRaw"
-              class="text-text-label text-3xs font-mono"
-              :title="row.waitEventRaw"
+              class="text-text-secondary text-3xs font-mono"
             >
+              <OTooltip :content="raw(row.waitEventRaw)" />
               {{ raw(row.waitEventRaw) }}
             </span>
           </div>
@@ -263,10 +273,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-application="{ row }">
-          <span
-            class="text-text-body block truncate font-mono text-xs"
-            :title="row.application ?? ''"
-          >
+          <span class="text-text-body block truncate font-mono text-xs">
+            <OTooltip v-if="row.application" :content="raw(row.application)" />
             {{ raw(row.application ?? "—") }}
           </span>
         </template>
@@ -279,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ row.blockingCount }}
             </span>
-            <span class="text-text-label text-3xs">
+            <span class="text-text-secondary text-3xs">
               {{ t("dbm.blocked.sessionCount", { count: row.blockingCount }, row.blockingCount) }}
             </span>
           </div>
@@ -301,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-else class="flex flex-col items-end leading-tight">
             <span class="text-text-muted">{{ raw("—") }}</span>
-            <span class="text-text-label text-3xs">{{ t("dbm.blocked.notWaiting") }}</span>
+            <span class="text-text-secondary text-3xs">{{ t("dbm.blocked.notWaiting") }}</span>
           </div>
         </template>
 
@@ -413,6 +421,7 @@ import { useStore } from "vuex";
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
@@ -721,10 +730,11 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "actions",
-          header: raw(""),
-          size: 200,
+          header: t("dbm.common.actions"),
+          isAction: true,
+          size: 92,
           enableSorting: false,
-          meta: { align: "right" },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
         },
       ]
     : [
@@ -764,10 +774,11 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
         },
         {
           id: "actions",
-          header: raw(""),
-          size: 112,
+          header: t("dbm.common.actions"),
+          isAction: true,
+          size: 92,
           enableSorting: false,
-          meta: { align: "right" },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
         },
       ],
 );

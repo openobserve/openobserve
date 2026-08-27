@@ -27,7 +27,7 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    icon="track-changes"
+    icon="target"
     :subtitle="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
@@ -294,7 +294,7 @@
 
       <template #empty>
         <OEmptyState
-          icon="track-changes"
+          icon="target"
           :title="t('slos.empty.title')"
           :description="t('slos.empty.description')"
         >
@@ -404,7 +404,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -424,6 +424,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -546,11 +547,11 @@ function folderName(folderId: string): string {
   return folders.find((f: any) => f.folderId === folderId)?.name || folderId;
 }
 
-const typeOptions = computed(() => [
-  { value: "all", label: t("slos.type.all"), icon: "format_list_bulleted" },
+const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
+  { value: "all", label: t("slos.type.all"), icon: "format-list-bulleted" },
   { value: "count", label: t("slos.type.count"), icon: "functions" },
-  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timelapse" },
-  { value: "alert", label: t("slos.type.alert"), icon: "gpp_maybe" },
+  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timeline" },
+  { value: "alert", label: t("slos.type.alert"), icon: "shield-alert-outline" },
 ]);
 
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [

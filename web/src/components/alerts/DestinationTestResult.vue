@@ -102,9 +102,7 @@ limitations under the License. -->
 
           <div data-test="test-failure-details" class="pt-2">
             <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
-              <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
-              >
+              <div class="text-3xs text-text-secondary mb-1 font-semibold">
                 {{ t("alerts.error") }}
               </div>
               <div class="text-2xs text-text-body leading-[1.5] break-words">
@@ -113,9 +111,7 @@ limitations under the License. -->
             </div>
 
             <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
-              <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
-              >
+              <div class="text-3xs text-text-secondary mb-1 font-semibold">
                 {{ t("alerts.httpStatus") }}
               </div>
               <div class="text-2xs text-text-body leading-[1.5] break-words">
@@ -124,9 +120,7 @@ limitations under the License. -->
             </div>
 
             <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
-              <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
-              >
+              <div class="text-3xs text-text-secondary mb-1 font-semibold">
                 {{ t("alerts.responseBody") }}
               </div>
               <pre
