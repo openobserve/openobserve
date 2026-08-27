@@ -67,8 +67,13 @@
       </OButton>
     </template>
 
-    <template #header-tabs>
-      <OTabs v-model="currentTab" dense align="left" data-test="ai-remote-task-detail-tabs">
+    <!-- A full-width strip under the header, like every other detail page in
+         this module. `#header-tabs` is the MODULE-nav slot the list pages use to
+         switch between siblings; inline beside the title it crowded the badges
+         and the actions, and said "these tabs change the page" when they change
+         a section of it. -->
+    <template #subnav>
+      <OTabs v-model="currentTab" data-test="ai-remote-task-detail-tabs">
         <OTab
           name="configuration"
           :label="t('aiObservability.remoteTasks.detail.tabs.overview')"
@@ -95,7 +100,7 @@
     <div v-if="task" class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <!-- What the task IS, in one line: the call it makes, and why it exists. -->
       <div
-        class="border-border-default flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b px-3 py-2.5 text-xs"
+        class="border-border-default px-page-edge flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b py-2.5 text-xs"
         data-test="ai-remote-task-detail-meta"
       >
         <span class="text-text-secondary">
@@ -108,7 +113,7 @@
         </span>
       </div>
 
-      <div class="border-border-default border-b px-3 py-2.5">
+      <div class="border-border-default px-page-edge border-b py-2.5">
         <OStatStrip :items="stats" :loading="loading" data-test="ai-remote-task-detail-stats" />
       </div>
 
