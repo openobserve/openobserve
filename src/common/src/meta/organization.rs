@@ -184,10 +184,7 @@ pub struct AllOrgListDetails {
     pub credits_used: u64,
     #[cfg(feature = "cloud")]
     pub credits_limit: u64,
-    /// Synthetics free step pool. Reported alongside the AI pool rather than
-    /// folded into it: the two are separate allowances in different units, and
-    /// summing them would show an org that only runs checks as having spent AI
-    /// credits.
+    /// Separate allowance from the AI pool, in a different unit.
     #[cfg(feature = "cloud")]
     pub steps_used: u64,
     #[cfg(feature = "cloud")]
@@ -232,11 +229,8 @@ pub struct SetAiUsageLimitRequest {
     pub credits_limit: u64,
 }
 
-/// Body for the pool-generic usage-limit route.
-///
-/// `limit` is the pool's new **ceiling**, not an increment: an org that has
-/// spent 40 of 50 and should get 20 more is set to 70, not 20. Sending 20 there
-/// would cut it off below what it has already used.
+/// `limit` is the pool's new ceiling, not an increment: an org that has spent
+/// 40 of 50 and should get 20 more is set to 70.
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct SetQuotaUsageLimitRequest {

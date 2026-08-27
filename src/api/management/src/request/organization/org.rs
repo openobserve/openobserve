@@ -655,18 +655,42 @@ pub async fn set_ai_usage_limit(
     Path(org_id): Path<String>,
     Json(req): Json<SetAiUsageLimitRequest>,
 ) -> Response {
-    if org_id != "_meta" {
-        return MetaHttpResponse::unauthorized("not authorized to access this resource");
-    }
-    if infra::table::organizations::get(&req.org_id).await.is_err() {
-        return MetaHttpResponse::not_found("organization not found");
-    }
+    use openobserve_core::trial_quota::{AiUsageResponse, TrialQuotaPool};
 
-    if let Err(err) = openobserve_core::trial_quota::set_limit(&req.org_id, req.credits_limit).await
+    match set_pool_limit(
+        &org_id,
+        &req.org_id,
+        TrialQuotaPool::AiCredits,
+        req.credits_limit,
+    )
+    .await
     {
-        return MetaHttpResponse::internal_error(err);
+        Ok(usage) => MetaHttpResponse::json(AiUsageResponse::from(usage)),
+        Err(response) => response,
     }
-    MetaHttpResponse::json(openobserve_core::trial_quota::get_usage(&req.org_id).await)
+}
+
+/// Guards and applies a limit change for one pool, shared by the AI and
+/// pool-generic routes so they cannot drift apart on who may call them.
+#[cfg(feature = "cloud")]
+async fn set_pool_limit(
+    caller_org: &str,
+    target_org: &str,
+    pool: openobserve_core::trial_quota::TrialQuotaPool,
+    limit: u64,
+) -> Result<openobserve_core::trial_quota::PoolUsageResponse, Response> {
+    if caller_org != "_meta" {
+        return Err(MetaHttpResponse::unauthorized(
+            "not authorized to access this resource",
+        ));
+    }
+    if infra::table::organizations::get(target_org).await.is_err() {
+        return Err(MetaHttpResponse::not_found("organization not found"));
+    }
+    openobserve_core::trial_quota::set_limit_for_pool(target_org, pool, limit)
+        .await
+        .map_err(MetaHttpResponse::internal_error)?;
+    Ok(openobserve_core::trial_quota::get_pool_usage(target_org, pool).await)
 }
 
 /// SetQuotaUsageLimit
@@ -701,11 +725,7 @@ pub async fn set_quota_usage_limit(
 ) -> Response {
     use openobserve_core::trial_quota::TrialQuotaPool;
 
-    if org_id != "_meta" {
-        return MetaHttpResponse::unauthorized("not authorized to access this resource");
-    }
-    // Rejected rather than defaulted: silently falling back to one pool would
-    // credit the wrong allowance and read as a no-op to whoever called it.
+    // Rejected rather than defaulted: a fallback would credit the wrong pool.
     let Some(pool) = TrialQuotaPool::from_key(&pool) else {
         return MetaHttpResponse::bad_request(format!(
             "unknown quota pool '{pool}' (expected one of: {}, {})",
@@ -713,16 +733,11 @@ pub async fn set_quota_usage_limit(
             TrialQuotaPool::SyntheticsSteps.key(),
         ));
     };
-    if infra::table::organizations::get(&req.org_id).await.is_err() {
-        return MetaHttpResponse::not_found("organization not found");
-    }
 
-    if let Err(err) =
-        openobserve_core::trial_quota::set_limit_for_pool(&req.org_id, pool, req.limit).await
-    {
-        return MetaHttpResponse::internal_error(err);
+    match set_pool_limit(&org_id, &req.org_id, pool, req.limit).await {
+        Ok(usage) => MetaHttpResponse::json(usage),
+        Err(response) => response,
     }
-    MetaHttpResponse::json(openobserve_core::trial_quota::get_pool_usage(&req.org_id, pool).await)
 }
 
 /// CreateExternalContract

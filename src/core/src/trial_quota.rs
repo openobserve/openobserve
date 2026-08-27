@@ -1311,13 +1311,8 @@ pub struct AiUsageResponse {
     pub requires_additional_credits: bool,
 }
 
-/// One pool's usage for an org, in that pool's own unit.
-///
-/// The unit is named by `pool` rather than baked into the field names: AI
-/// counts credits, synthetics counts steps, and a `credits_used` field
-/// reporting a step count is the kind of thing a support engineer reads
-/// literally. [`AiUsageResponse`] keeps the old names for the AI-only route
-/// that already ships them.
+/// One pool's usage for an org. Field names are unit-neutral because AI counts
+/// credits and synthetics counts steps.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PoolUsageResponse {
     /// Stable pool identifier — `"ai_credits"` or `"synthetics_steps"`.
@@ -1330,20 +1325,12 @@ pub struct PoolUsageResponse {
     pub requires_additional_credits: bool,
 }
 
-/// Get one pool's usage for an org.
+/// Get one pool's usage for an org. Uses the greater of persisted and in-memory
+/// usage so a pending flush is never reported as unspent.
 ///
-/// Uses the greater of persisted and in-memory usage so a pending flush is
-/// never reported as unspent.
-///
-/// Mode is derived from actual state:
-/// - `"free"`: allowance remaining in the pool
-/// - `"pay_as_you_go"`: allowance exhausted + active subscription
-/// - `"exhausted"`: allowance exhausted + no subscription
-///
-/// The exhaustion policy is resolved from `(subscription_type, provider)`, which
-/// is a property of the org's billing and not of the pool — so the AI-named
-/// resolver is correct for every pool. The synthetics scheduler mirrors the same
-/// mapping in its own `PoolExhaustionPolicy`.
+/// The exhaustion policy is resolved from `(subscription_type, provider)`, a
+/// property of the org's billing rather than of the pool, so the AI-named
+/// resolver is correct for every pool.
 pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResponse {
     let limit = get_pool_limit(org_id, pool);
     let in_memory_used = get_pool_used(org_id, pool);
@@ -1415,20 +1402,24 @@ pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResp
     }
 }
 
-/// Get AI usage info for an org (for the AI usage API endpoint).
-///
-/// Thin wrapper over [`get_pool_usage`] that keeps the `credits_*` field names
-/// the existing AI route and UI already consume. New callers should prefer
-/// `get_pool_usage`.
-pub async fn get_usage(org_id: &str) -> AiUsageResponse {
-    let usage = get_pool_usage(org_id, TrialQuotaPool::AiCredits).await;
-    AiUsageResponse {
-        mode: usage.mode,
-        credits_used: usage.used,
-        credits_limit: usage.limit,
-        credits_remaining: usage.remaining,
-        requires_additional_credits: usage.requires_additional_credits,
+impl From<PoolUsageResponse> for AiUsageResponse {
+    fn from(usage: PoolUsageResponse) -> Self {
+        Self {
+            mode: usage.mode,
+            credits_used: usage.used,
+            credits_limit: usage.limit,
+            credits_remaining: usage.remaining,
+            requires_additional_credits: usage.requires_additional_credits,
+        }
     }
+}
+
+/// AI usage in the `credits_*` field names the existing AI route and UI consume.
+/// New callers should prefer [`get_pool_usage`].
+pub async fn get_usage(org_id: &str) -> AiUsageResponse {
+    get_pool_usage(org_id, TrialQuotaPool::AiCredits)
+        .await
+        .into()
 }
 
 /// Get the current usage percentage for an org (0–100, clamped).
