@@ -440,10 +440,16 @@ const showActivateChoice = computed(
 );
 
 // Field types for the SQL formatter: numeric columns must not be quoted and
-// their empty checks must degrade to null checks, or the query fails.
+// their empty checks must degrade to null checks, or the query fails. Labels
+// are field names (raw identifiers), never prose.
 const filterFieldsMap = computed<StreamFieldsMap>(() => {
   const fields = streamFields.value.length ? streamFields.value : DEFAULT_JOB_STREAM_FIELDS;
-  return Object.fromEntries(fields.map((field) => [field.value, field]));
+  return Object.fromEntries(
+    fields.map((field) => [
+      field.value,
+      { label: raw(String(field.label)), value: field.value, type: field.type },
+    ]),
+  );
 });
 
 // SQL WHERE body built from the filter builder — feeds the live "matched
