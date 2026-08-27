@@ -106,9 +106,9 @@ describe("WorkflowDestination", () => {
       expect(picker(wrapper).props("forcedType")).toBe("custom");
     });
 
-    it("renders the 'Set up later' toggle", () => {
+    it("renders the picker as optional (empty selection = dummy node)", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="workflow-destination-set-up-later"]').exists()).toBe(true);
+      expect(picker(wrapper).props("optional")).toBe(true);
     });
   });
 
@@ -181,15 +181,31 @@ describe("WorkflowDestination", () => {
     });
   });
 
-  describe("submit() — required destination (drawer Save)", () => {
-    it("blocks Save (null) when the picker has no destination", async () => {
-      // the required picker resolves null on empty — Save is blocked, no placeholder
-      pickerSubmit.mockResolvedValue(null);
+  // Dummy-node model (C1): no "Set up later" toggle. An empty picker result saves
+  // the node as a placeholder (empty destination_id + meta.incomplete); a real
+  // selection clears it. submit() always defers to the (optional) picker, and only
+  // returns null while the inline create form is open (picker resolves null).
+  describe("dummy-node placeholder (no toggle)", () => {
+    it("does not render a 'Set up later' toggle", () => {
       const wrapper = createWrapper();
-      await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+      expect(wrapper.find('[data-test="workflow-destination-set-up-later"]').exists()).toBe(false);
     });
 
-    it("clears meta.incomplete when set-up-later is turned off and a real destination is chosen", async () => {
+    it("flags meta.incomplete when the picker returns an empty destination", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "d1",
+        data: { node_type: "destination" },
+      } as any;
+      pickerSubmit.mockResolvedValue({ org_id: "default", destination_name: "" });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        destination_id: "",
+        template_override: null,
+      });
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
+    });
+
+    it("clears meta.incomplete when a real destination is chosen", async () => {
       workflowObj.currentSelectedNodeData = {
         id: "d1",
         data: { node_type: "destination" },
@@ -197,60 +213,17 @@ describe("WorkflowDestination", () => {
       } as any;
       pickerSubmit.mockResolvedValue({ org_id: "default", destination_name: "sink-a" });
       const wrapper = createWrapper();
-      // reopening a placeholder defaults the toggle ON — turn it OFF to pick a real one
-      wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", false);
-      await wrapper.vm.$nextTick();
       await expect((wrapper.vm as any).submit()).resolves.toEqual({
         destination_id: "sink-a",
         template_override: null,
       });
       expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBeUndefined();
     });
-  });
 
-  describe("'Set up later' toggle — placeholder", () => {
-    // The toggle is a real OSwitch; drive it through its v-model emit.
-    const toggle = (wrapper: any, on: boolean) =>
-      wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", on);
-
-    it("greys the picker (disabled + optional) when toggled on", async () => {
+    it("blocks Save (null) while the inline create form is open (picker null)", async () => {
+      pickerSubmit.mockResolvedValue(null);
       const wrapper = createWrapper();
-      expect(picker(wrapper).props("disabled")).toBe(false);
-      toggle(wrapper, true);
-      await wrapper.vm.$nextTick();
-      expect(picker(wrapper).props("disabled")).toBe(true);
-      expect(picker(wrapper).props("optional")).toBe(true);
-    });
-
-    it("Save (submit) returns an empty placeholder and flags meta.incomplete", async () => {
-      workflowObj.currentSelectedNodeData = {
-        id: "d1",
-        data: { node_type: "destination" },
-      } as any;
-      const wrapper = createWrapper();
-      toggle(wrapper, true);
-      await wrapper.vm.$nextTick();
-      // the picker is NOT consulted while set-up-later is on
-      await expect((wrapper.vm as any).submit()).resolves.toEqual({
-        destination_id: "",
-        template_override: null,
-      });
-      expect(pickerSubmit).not.toHaveBeenCalled();
-      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
-    });
-
-    it("defaults ON (picker greyed) when reopening a placeholder node", async () => {
-      workflowObj.currentSelectedNodeData = {
-        id: "d1",
-        data: { node_type: "destination" },
-        meta: { incomplete: "true" },
-      } as any;
-      const wrapper = createWrapper();
-      expect(picker(wrapper).props("disabled")).toBe(true);
-      await expect((wrapper.vm as any).submit()).resolves.toEqual({
-        destination_id: "",
-        template_override: null,
-      });
+      await expect((wrapper.vm as any).submit()).resolves.toBeNull();
     });
   });
 });

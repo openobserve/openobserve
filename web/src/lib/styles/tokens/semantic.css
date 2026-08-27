@@ -34,6 +34,11 @@
   --color-surface-overlay: var(--color-white);
   --color-surface-subtle: var(--color-grey-100);
   --color-surface-subtle-hover: var(--color-grey-200);
+  /* Floating chip/pill (e.g. the NDV's prev/next node buttons over the white
+     Input/Output panes) — a WHITE fill that reads via its border + shadow in light
+     mode; flips to a lifted grey on the dark canvas (dark.css). */
+  --color-surface-chip: var(--color-white);
+  --color-surface-chip-hover: var(--color-grey-100);
   /* Accent-tinted interaction surfaces. The ONE place the "hover/active on an
      accent-tinted control" treatment lives, so buttons, menu items, tabs, selected
      rows etc. share it — change it here and every accent hover/active surface moves. */
@@ -129,6 +134,8 @@
   --color-surface-overlay: var(--color-surface-overlay);
   --color-surface-subtle: var(--color-surface-subtle);
   --color-surface-subtle-hover: var(--color-surface-subtle-hover);
+  --color-surface-chip: var(--color-surface-chip);
+  --color-surface-chip-hover: var(--color-surface-chip-hover);
   --color-surface-accent-hover: var(--color-surface-accent-hover);
   --color-surface-accent-active: var(--color-surface-accent-active);
   --color-icon-chip-primary-bg: var(--color-icon-chip-primary-bg);

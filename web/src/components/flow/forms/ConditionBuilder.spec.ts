@@ -101,6 +101,45 @@ describe("ConditionBuilder", () => {
     expect(payload.conditions.conditions[0].column).toBe("level");
   });
 
+  // Optional mode (Workflows dummy node): submit never blocks — it returns the rule
+  // with a `complete` flag so the host can save an incomplete rule as a placeholder.
+  it("optional: returns complete:true and the payload for a valid rule", async () => {
+    const saved = {
+      filterType: "group",
+      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
+    };
+    const wrapper = createWrapper({ initialConditions: saved, optional: true });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.version).toBe(2);
+    expect(payload.complete).toBe(true);
+    expect(payload.conditions.conditions[0].column).toBe("level");
+  });
+
+  it("optional: returns complete:false (not null) for an incomplete rule", async () => {
+    const wrapper = createWrapper({
+      initialConditions: {
+        filterType: "group",
+        conditions: [{ filterType: "condition", column: "", operator: "" }],
+      },
+      optional: true,
+    });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.version).toBe(2);
+    expect(payload.complete).toBe(false);
+  });
+
+  it("does not add a complete flag in the default (non-optional) payload", async () => {
+    const saved = {
+      filterType: "group",
+      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
+    };
+    const wrapper = createWrapper({ initialConditions: saved });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).toEqual({ version: 2, conditions: expect.any(Object) });
+    expect("complete" in payload).toBe(false);
+  });
+
   it("normalizes dotted columns on submit when normalizeColumnNames is on", async () => {
     const saved = {
       filterType: "group",

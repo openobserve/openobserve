@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Neues Ziel erstellen",
       "select": "Ziel",
-      "loadError": "Fehler beim Abrufen der Ziele."
+      "loadError": "Fehler beim Abrufen der Ziele.",
+      "unsupportedType": "Nicht unterstützter Typ — Workflows unterstützen nur benutzerdefinierte Ziele"
     },
     "function": {
       "createNew": "Neue Funktion erstellen",
       "createNewNoteWorkflow": "Hinweis: Die Funktion wird erstellt, dann werden Sie zum vorherigen Formular weitergeleitet, um die neu erstellte Funktion mit dem Workflow zu verknüpfen.",
       "select": "Funktion auswählen",
       "loadError": "Fehler beim Laden der Funktionen",
+      "saved": "Funktion erfolgreich gespeichert",
+      "updated": "Funktion erfolgreich aktualisiert",
+      "saveError": "Speichern der Funktion fehlgeschlagen",
       "flatten": "Nach der Abflachung",
       "guidelinesTitle": "Richtlinien zur Funktionsausführung:",
       "rbf": "RBF (Ausführung vor der Abflachung):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "Workflow-Ausführungen",
       "edit": "Workflow bearbeiten",
+      "debugInEditor": "Im Editor debuggen",
       "staleGraphWarning": "Dieser Workflow wurde seit diesem Lauf bearbeitet — der {count} Schritt, den er ausgeführt hat, existiert nicht mehr, daher wird sein Status hier nicht angezeigt. | Dieser Workflow wurde seit diesem Lauf bearbeitet — die {count} Schritte, die er ausgeführt hat, existieren nicht mehr, daher wird ihr Status hier nicht angezeigt."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Erfolg",
       "failed": "Fehlgeschlagen",
       "open": "Verlauf",
+      "openFullView": "Vollständige Ausführungsansicht öffnen",
       "loadError": "Fehler beim Laden der Ausführungen",
       "loadRunError": "Fehler beim Laden dieser Ausführung"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "Ein Trigger ist erforderlich",
     "addStepRequired": "Fügen Sie mindestens einen Schritt nach dem Trigger hinzu",
     "connectAllNodes": "Verbinden Sie alle Knoten vor dem Speichern",
-    "finishStepsBeforePublish": "Schließe die Konfiguration aller Schritte ab, bevor du veröffentlichst",
+    "finishStepsBeforePublish": "{count} Schritt benötigt Einrichtung vor der Veröffentlichung — auf der Arbeitsfläche hervorgehoben. | {count} Schritte benötigen Einrichtung vor der Veröffentlichung — auf der Arbeitsfläche hervorgehoben.",
     "draft": "Entwurf",
     "saveDraft": "Als Entwurf speichern",
     "publish": "Veröffentlichen",
@@ -2708,6 +2714,11 @@
       "linkError": "Alarme konnten nicht verknüpft werden."
     },
     "chooseTrigger": "Trigger auswählen",
+    "start": {
+      "triggerHint": "Wählen Sie das Ereignis aus, das Ihren Workflow startet.",
+      "chooseAction": "Aktion auswählen",
+      "actionHint": "Wählen Sie aus, was nach dem Trigger passiert."
+    },
     "node": {
       "kindTrigger": "Auslöser",
       "kindLogic": "Logik",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Ereignisspezifische Felder",
       "incidentNoExtraFields": "Dieses Ereignis fügt keine Felder über die üblichen hinaus hinzu.",
       "conditionNoteTitle": "Richtlinien für Bedingungen",
+      "functionFlattenTitle": "Vor vs. nach dem Abflachen",
       "conditionNoteEmpty": "Um einen leeren Wert zu prüfen, verwenden Sie \"\". Beispiel:",
       "conditionNoteNull": "Um einen Null-Wert zu prüfen, verwenden Sie null. Beispiel:",
       "conditionNoteCustom": "Um eine benutzerdefinierte Spalte hinzuzufügen, geben Sie ihren Namen ein und drücken Sie die Eingabetaste.",
@@ -2755,19 +2767,56 @@
       "enable": "Schritt aktivieren",
       "disabledBadge": "Deaktiviert",
       "incompleteBadge": "Später einrichten",
-      "destinationSetUpLater": "Später einrichten",
-      "destinationSetUpLaterPrompt": "Sie haben noch kein Ziel? Aktivieren Sie diese Option, um es später einzurichten — Sie können jetzt einen Entwurf speichern und testen.",
-      "destinationSetUpLaterActive": "Das Ziel wird vorerst übersprungen — Name und Kommentar werden trotzdem gespeichert. Sie benötigen ein Ziel, bevor Sie veröffentlichen.",
-      "functionSetUpLater": "Später einrichten",
-      "functionSetUpLaterPrompt": "Noch keine Funktion? Aktiviere dies, um sie später einzurichten — du kannst einen Entwurf speichern und jetzt testen.",
-      "functionSetUpLaterActive": "Die Funktion wird vorerst übersprungen — Name und Kommentar werden weiterhin gespeichert. Du brauchst eine Funktion, bevor du veröffentlichst."
+      "unsavedFnTitle": "Ungespeicherte Funktionsänderungen",
+      "unsavedFnMessage": "Dieser Schritt enthält Funktionscode, der nicht in Ihrer Bibliothek gespeichert ist. Speichern Sie ihn, verwerfen Sie die Änderungen oder bearbeiten Sie weiter.",
+      "unsavedFnSave": "Funktion speichern",
+      "unsavedFnDiscard": "Änderungen verwerfen",
+      "unsavedFnKeep": "Weiter bearbeiten"
     },
     "commonFieldsAbove": "gemeinsame Felder oben",
     "canvas": {
       "undo": "Rückgängig machen",
       "tidyUp": "Aufräumen",
-      "insertStep": "Schritt einfügen",
-      "deleteEdge": "Verbindung löschen"
+      "edgeDeleteHint": "Drücken Sie Backspace/Entf, um die Kante zu entfernen."
+    },
+    "ndv": {
+      "input": "Eingabe",
+      "output": "Ausgabe",
+      "config": "Konfiguration",
+      "noInput": "Keine Eingabedatensätze.",
+      "noOutput": "Keine Datensätze weitergeleitet.",
+      "prevStep": "Vorheriger Schritt · {name}",
+      "nextStep": "Nächster Schritt · {name}",
+      "prevStepBtn": "Vorheriger Schritt",
+      "nextStepBtn": "Nächster Schritt",
+      "collapseSteps": "Schritte einklappen",
+      "expandSteps": "Schritte ausklappen",
+      "inputTag": "Eingabe",
+      "openStep": "{name} öffnen",
+      "runToView": "Führen Sie einen Test aus, um diese Daten anzuzeigen.",
+      "noBranchItems": "Keine Elemente in diesem Zweig.",
+      "noUpstream": "Keine vorgelagerten Schritte.",
+      "noRunYet": "Noch kein Lauf.",
+      "runLabel": "Ausführen",
+      "switchRun": "Lauf wechseln",
+      "notInRun": "Dieser Schritt ist in diesem Lauf nicht enthalten.",
+      "runTest": "Test ausführen",
+      "noItems": "Keine Elemente",
+      "itemsCount": "{count} Element | {count} Elemente",
+      "viewTable": "Tabelle",
+      "viewJson": "JSON",
+      "itemN": "Element {n}",
+      "executeStep": "Schritt ausführen",
+      "sample": "Beispiel",
+      "editStep": "Schritt bearbeiten",
+      "testInputHint": "Testeingabe — Bearbeiten, dann Schritt ausführen.",
+      "noRunsList": "Noch keine Läufe."
+    },
+    "runOverlay": {
+      "banner": "Es werden Schrittdaten aus einem früheren Lauf ({run}) angezeigt. Sie können frei bearbeiten — dieser Lauf wird nie geändert.",
+      "clear": "Laufdaten löschen",
+      "ghostNodes": "{count} Schritt aus diesem Lauf existiert nicht mehr im Workflow, daher wird sein Status nicht angezeigt. | {count} Schritte aus diesem Lauf existieren nicht mehr im Workflow, daher wird ihr Status nicht angezeigt.",
+      "missingNode": "Dieser Schritt existiert nicht mehr in diesem Workflow — er wurde nach diesem Lauf entfernt."
     },
     "unsaved": {
       "title": "Nicht gespeicherte Änderungen",
@@ -2781,7 +2830,20 @@
       "expand": "Aufklappen",
       "close": "Ergebnisse löschen und schließen",
       "nodesTitle": "Schritte",
-      "empty": "Führen Sie einen Test aus, um hier die Schrittergebnisse zu sehen."
+      "empty": "Führen Sie einen Test aus, um hier die Schrittergebnisse zu sehen.",
+      "openNode": "Knoten öffnen",
+      "viewConfig": "Konfiguration anzeigen",
+      "hideConfig": "Konfiguration ausblenden",
+      "noConfig": "Keine Konfiguration",
+      "functionLabel": "Funktion",
+      "destinationLabel": "Ziel",
+      "destinationUnsupported": "Nicht unterstützter Typ",
+      "destinationMissing": "Dieses Ziel existiert nicht mehr oder kann nicht gelesen werden.",
+      "headersLabel": "Header",
+      "templateLabel": "Vorlage",
+      "outputFormatLabel": "Ausgabeformat",
+      "tlsVerifyLabel": "TLS-Verifizierung",
+      "tlsDisabled": "Deaktiviert"
     }
   },
   "pipeline": {

@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Créer une nouvelle destination",
       "select": "Destination",
-      "loadError": "Erreur lors de la récupération des destinations."
+      "loadError": "Erreur lors de la récupération des destinations.",
+      "unsupportedType": "Type non pris en charge — Les Workflows ne prennent en charge que les destinations personnalisées"
     },
     "function": {
       "createNew": "Créer une nouvelle fonction",
       "createNewNoteWorkflow": "Remarque : La fonction sera créée, puis vous serez redirigé vers le formulaire précédent pour associer la fonction nouvellement créée au workflow.",
       "select": "Sélectionner une fonction",
       "loadError": "Échec du chargement des fonctions",
+      "saved": "Fonction enregistrée avec succès",
+      "updated": "Fonction mise à jour avec succès",
+      "saveError": "Échec de l'enregistrement de la fonction",
       "flatten": "Après aplatissement",
       "guidelinesTitle": "Directives d'exécution de la fonction :",
       "rbf": "RBF (Exécution avant aplatissement) :",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "Exécutions du workflow",
       "edit": "Modifier le workflow",
+      "debugInEditor": "Déboguer dans l'éditeur",
       "staleGraphWarning": "Ce workflow a été modifié depuis cette exécution — {count} étape qu'il a exécutée n'existe plus, donc son statut n'est pas affiché ici. | Ce workflow a été modifié depuis cette exécution — {count} étapes qu'il a exécutées n'existent plus, donc leur statut n'est pas affiché ici."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Succès",
       "failed": "Échoué",
       "open": "Historique",
+      "openFullView": "Ouvrir la vue complète des exécutions",
       "loadError": "Erreur lors du chargement des exécutions",
       "loadRunError": "Erreur lors du chargement de cette exécution"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "Un déclencheur est requis",
     "addStepRequired": "Ajoutez au moins une étape après le déclencheur",
     "connectAllNodes": "Connectez tous les nœuds avant d'enregistrer",
-    "finishStepsBeforePublish": "Terminez la configuration de toutes les étapes avant de publier",
+    "finishStepsBeforePublish": "{count} étape nécessite une configuration avant la publication — mise en évidence sur le canevas. | {count} étapes nécessitent une configuration avant la publication — mises en évidence sur le canevas.",
     "draft": "Brouillon",
     "saveDraft": "Enregistrer comme brouillon",
     "publish": "Publier",
@@ -2708,6 +2714,11 @@
       "linkError": "Impossible de lier les alertes."
     },
     "chooseTrigger": "Choisir un déclencheur",
+    "start": {
+      "triggerHint": "Sélectionnez l'événement qui démarre votre workflow",
+      "chooseAction": "Choisir une action",
+      "actionHint": "Sélectionnez ce qui se passe après le déclencheur"
+    },
     "node": {
       "kindTrigger": "Déclencheur",
       "kindLogic": "Logique",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Champs spécifiques de l'événement",
       "incidentNoExtraFields": "Cet événement n'ajoute aucun champ au-delà des champs courants.",
       "conditionNoteTitle": "Directives de condition",
+      "functionFlattenTitle": "Avant vs Après aplatissement",
       "conditionNoteEmpty": "Pour vérifier une valeur vide, utilisez \"\". Exemple :",
       "conditionNoteNull": "Pour vérifier une valeur nulle, utilisez null. Exemple :",
       "conditionNoteCustom": "Pour ajouter une colonne personnalisée, tapez son nom et appuyez sur Entrée.",
@@ -2755,19 +2767,56 @@
       "enable": "Activer l'étape",
       "disabledBadge": "Désactivé",
       "incompleteBadge": "Configurer plus tard",
-      "destinationSetUpLater": "Configurer plus tard",
-      "destinationSetUpLaterPrompt": "Vous n'avez pas encore de destination ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
-      "destinationSetUpLaterActive": "La destination est ignorée pour le moment — le nom et le commentaire sont quand même enregistrés. Vous aurez besoin d'une destination avant de publier.",
-      "functionSetUpLater": "Configurer plus tard",
-      "functionSetUpLaterPrompt": "Vous n'avez pas encore de fonction ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
-      "functionSetUpLaterActive": "La fonction est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une fonction avant de publier."
+      "unsavedFnTitle": "Modifications de fonction non enregistrées",
+      "unsavedFnMessage": "Cette étape contient un code de fonction non enregistré dans votre bibliothèque. Enregistrez-le, abandonnez les modifications ou continuez à modifier.",
+      "unsavedFnSave": "Enregistrer la fonction",
+      "unsavedFnDiscard": "Abandonner les modifications",
+      "unsavedFnKeep": "Continuer à modifier"
     },
     "commonFieldsAbove": "champs communs ci-dessus",
     "canvas": {
       "undo": "Défaire",
       "tidyUp": "Nettoyer",
-      "insertStep": "Insérer une étape",
-      "deleteEdge": "Supprimer la connexion"
+      "edgeDeleteHint": "Appuyez sur Retour arrière/Suppr pour supprimer la connexion"
+    },
+    "ndv": {
+      "input": "Entrée",
+      "output": "Sortie",
+      "config": "Configuration",
+      "noInput": "Aucun enregistrement d'entrée.",
+      "noOutput": "Aucun enregistrement transmis.",
+      "prevStep": "Étape précédente · {name}",
+      "nextStep": "Étape suivante · {name}",
+      "prevStepBtn": "Étape précédente",
+      "nextStepBtn": "Étape suivante",
+      "collapseSteps": "Réduire les étapes",
+      "expandSteps": "Développer les étapes",
+      "inputTag": "Entrée",
+      "openStep": "Ouvrir {name}",
+      "runToView": "Exécutez un test pour afficher ces données.",
+      "noBranchItems": "Aucun élément sur cette branche.",
+      "noUpstream": "Aucune étape en amont.",
+      "noRunYet": "Aucune exécution pour l'instant.",
+      "runLabel": "Exécuter",
+      "switchRun": "Changer d'exécution",
+      "notInRun": "Cette étape n'est pas incluse dans cette exécution.",
+      "runTest": "Exécuter le test",
+      "noItems": "Aucun élément",
+      "itemsCount": "{count} élément | {count} éléments",
+      "viewTable": "Tableau",
+      "viewJson": "JSON",
+      "itemN": "Élément {n}",
+      "executeStep": "Exécuter l'étape",
+      "sample": "Échantillon",
+      "editStep": "Modifier l'étape",
+      "testInputHint": "Entrée de test — Modifiez, puis exécutez l'étape.",
+      "noRunsList": "Aucune exécution pour l'instant."
+    },
+    "runOverlay": {
+      "banner": "Affichage des données d'étape d'une exécution passée ({run}). Vous pouvez modifier librement — cette exécution n'est jamais modifiée.",
+      "clear": "Effacer les données d'exécution",
+      "ghostNodes": "{count} étape de cette exécution n'existe plus dans le workflow, son statut n'est donc pas affiché. | {count} étapes de cette exécution n'existent plus dans le workflow, leur statut n'est donc pas affiché.",
+      "missingNode": "Cette étape n'existe plus dans ce workflow — elle a été supprimée après cette exécution."
     },
     "unsaved": {
       "title": "Modifications non enregistrées",
@@ -2781,7 +2830,20 @@
       "expand": "Développer",
       "close": "Effacer et fermer les résultats",
       "nodesTitle": "Étapes",
-      "empty": "Exécutez un test pour voir les résultats des étapes ici."
+      "empty": "Exécutez un test pour voir les résultats des étapes ici.",
+      "openNode": "Ouvrir le nœud",
+      "viewConfig": "Afficher la configuration",
+      "hideConfig": "Masquer la configuration",
+      "noConfig": "Aucune configuration",
+      "functionLabel": "Fonction",
+      "destinationLabel": "Destination",
+      "destinationUnsupported": "Type non pris en charge",
+      "destinationMissing": "Cette destination n'existe plus ou ne peut pas être lue.",
+      "headersLabel": "En-têtes",
+      "templateLabel": "Modèle",
+      "outputFormatLabel": "Format de sortie",
+      "tlsVerifyLabel": "Vérification TLS",
+      "tlsDisabled": "Désactivé"
     }
   },
   "pipeline": {
