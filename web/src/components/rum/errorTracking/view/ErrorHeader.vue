@@ -50,13 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #actions>
-        <ShareButton
-          data-test="error-header-share-link-btn"
-          :url="shareUrl"
-          variant="outline"
-          size="icon-toolbar"
-          :tooltip="t('rum.errorDetail.copyLinkHint')"
-        />
         <OButton
           variant="outline"
           size="sm-action"
@@ -68,6 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("rum.errorDetail.copyEventId") }}
           <OTooltip :content="raw(error.error_id) || t('rum.errorDetail.copyEventId')" />
         </OButton>
+        <ShareButton
+          data-test="error-header-share-link-btn"
+          :url="shareUrl"
+          variant="outline"
+          size="icon-toolbar"
+          :tooltip="t('rum.errorDetail.copyLinkHint')"
+        />
       </template>
     </OPageHeader>
 
