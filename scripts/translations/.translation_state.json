@@ -7483,7 +7483,8 @@
     "destination": {
       "createNew": "1d3633323c8f0077",
       "loadError": "c16f9b31b93a10fe",
-      "select": "293d404a500f5f9a"
+      "select": "293d404a500f5f9a",
+      "unsupportedType": "e621e27b8dbececc"
     },
     "function": {
       "createNew": "b608eeb53fcc68bd",
@@ -7495,7 +7496,10 @@
       "rafDesc": "1a2371e8a8288336",
       "rbf": "49d2a6cb57aa0a5d",
       "rbfDesc": "85b0d4dffb8da524",
-      "select": "91e946d9c38e8cc0"
+      "saveError": "f3c121cdbebe8a9e",
+      "saved": "294fa2f6e1e6930a",
+      "select": "91e946d9c38e8cc0",
+      "updated": "2842652ab6f4de5e"
     },
     "stepPicker": {
       "noMatch": "dc5fd200953aaea5",
@@ -16009,8 +16013,7 @@
     "actions": "ff8059dc6752afdd",
     "addStepRequired": "6792f09c3a1457f4",
     "canvas": {
-      "deleteEdge": "b8d070f14e6a3f75",
-      "insertStep": "4920f14b3361eba2",
+      "edgeDeleteHint": "3dc4596d874740ea",
       "tidyUp": "ccb75b518c626e67",
       "undo": "a8283ade31856f71"
     },
@@ -16034,7 +16037,7 @@
     "draftSaveSuccess": "9a8b645b5b805984",
     "edit": "464c4ffd019e1e96",
     "editMode": "e7945ee25eb63c57",
-    "finishStepsBeforePublish": "53e9da9d81f56b62",
+    "finishStepsBeforePublish": "a5fc67e0214af8f6",
     "header": "e2073645cb0dbbdd",
     "history": {
       "button": "848f54e89660cea4",
@@ -16049,6 +16052,7 @@
       "loadError": "8760fa8bffc6db1e",
       "loadRunError": "8a811f7af06daad1",
       "open": "0e76960093379060",
+      "openFullView": "fd43711ac463dacb",
       "started": "ecbc89cd37a03734",
       "status": "920e413c7d411b61",
       "success": "c88a0b907419a70c",
@@ -16077,6 +16081,39 @@
     "name": "43d40c5c912ac933",
     "namePlaceholder": "942ce282b041e034",
     "nameRequired": "d9485c0343d2208f",
+    "ndv": {
+      "collapseSteps": "8e27273ad3edae3f",
+      "config": "b332c3492d5eb10a",
+      "editStep": "0b36814508f01168",
+      "executeStep": "3835a6edeef58d4b",
+      "expandSteps": "d5deb3a53554c0b5",
+      "input": "36ecb4f8669133ce",
+      "inputTag": "36ecb4f8669133ce",
+      "itemN": "446bc9b826d4ef6e",
+      "itemsCount": "23d3c9ed2692ec54",
+      "nextStep": "d04049749d1556c5",
+      "nextStepBtn": "226366c3301a2d1f",
+      "noBranchItems": "7b46b1c0de3baef7",
+      "noInput": "f43a93940fcdf323",
+      "noItems": "9e2909c61c5af49b",
+      "noOutput": "e4e80b1a04844da0",
+      "noRunYet": "4b04cc4a2d55011d",
+      "noRunsList": "dc67471b3ab6175c",
+      "noUpstream": "9b19447b3c82b3f1",
+      "notInRun": "9e790df5c0e4e65a",
+      "openStep": "f687d18152a5b541",
+      "output": "b2439bcb8dee14b6",
+      "prevStep": "165a9b6293bb0ec5",
+      "prevStepBtn": "f1fe8694fccd3947",
+      "runLabel": "00d60e31a4e6b834",
+      "runTest": "f3c5e08fb592ef7b",
+      "runToView": "b5cadca1291d4f47",
+      "sample": "95a2f1edb08a7612",
+      "switchRun": "998597a30b6bd22f",
+      "testInputHint": "8194a23c7c24941c",
+      "viewJson": "db1a21a0bc2ef8fb",
+      "viewTable": "16d1c9050a0b32e8"
+    },
     "node": {
       "commentAdd": "e596e6256a50ea78",
       "commentLabel": "0a64e30504e36b7b",
@@ -16097,9 +16134,6 @@
       "destinationLoadError": "71d36dc93bcbc3f2",
       "destinationRequired": "c8e1c09e97aee2b2",
       "destinationSelect": "293d404a500f5f9a",
-      "destinationSetUpLater": "eb5e104944c17e59",
-      "destinationSetUpLaterActive": "604d2ea3c5c6b18f",
-      "destinationSetUpLaterPrompt": "f7f6a34ee3238bc7",
       "disable": "0dcb89a146396e1a",
       "disabledBadge": "75081b593d15cf6e",
       "enable": "2cb515be8c376129",
@@ -16108,12 +16142,10 @@
       "functionBodySet": "5933fc01fb4ca2d0",
       "functionCreateNew": "b608eeb53fcc68bd",
       "functionDesc": "4ced4a80ca5617e7",
+      "functionFlattenTitle": "716ac2fcdbf0dcc6",
       "functionLoadError": "8cdd38319d8c63f3",
       "functionRequired": "fc91c369d3852cdb",
       "functionSelect": "91e946d9c38e8cc0",
-      "functionSetUpLater": "eb5e104944c17e59",
-      "functionSetUpLaterActive": "9ddd8f4caa9a49b5",
-      "functionSetUpLaterPrompt": "c3862cfb10e9929e",
       "incidentCommonTitle": "baa999e86c583ac2",
       "incidentEventTypeLabel": "9c85b75fdf0bf48c",
       "incidentNoExtraFields": "7a50b4db5cb51c41",
@@ -16129,7 +16161,12 @@
       "stepNoMatch": "b617336f2394e926",
       "stepSearchPlaceholder": "0e01c94a0a506dda",
       "triggerBody": "9beedd43f580d986",
-      "triggerDataExampleNote": "85f8d73cb6774334"
+      "triggerDataExampleNote": "85f8d73cb6774334",
+      "unsavedFnDiscard": "e07e053c2e10b3f1",
+      "unsavedFnKeep": "624a83c761415dc9",
+      "unsavedFnMessage": "a0dd222d86ad8302",
+      "unsavedFnSave": "738fd39e529fc714",
+      "unsavedFnTitle": "627d4344eeac32a1"
     },
     "pauseSuccess": "91e07e6cc429f4b1",
     "publish": "859390eb495b2ead",
@@ -16140,13 +16177,33 @@
     "results": {
       "close": "9de7725d62abd9b7",
       "collapse": "be6eb1fc3b05bf9d",
+      "destinationLabel": "293d404a500f5f9a",
+      "destinationMissing": "2058c56fd4ba3f10",
+      "destinationUnsupported": "68263fb831c819ae",
       "empty": "7f201223918e9b11",
       "expand": "07548c2c6511d4d1",
+      "functionLabel": "c803710302d5769d",
+      "headersLabel": "194e9fe656a1bcab",
+      "hideConfig": "e01fa663d5f71a8e",
+      "noConfig": "ff20686abbd903ae",
       "nodesTitle": "1de3df70ddf4faab",
-      "title": "9930295f98218365"
+      "openNode": "f75325ca06d612ea",
+      "outputFormatLabel": "ef22a51c869f0983",
+      "templateLabel": "0575f29df888a27e",
+      "title": "9930295f98218365",
+      "tlsDisabled": "75081b593d15cf6e",
+      "tlsVerifyLabel": "2294e8ee95e587ae",
+      "viewConfig": "a711fc6c69c8c4a7"
     },
     "resumeSuccess": "e4002848f1307954",
+    "runOverlay": {
+      "banner": "b8f29597b17a2b8f",
+      "clear": "9cd21f6f5000f6c4",
+      "ghostNodes": "c60de049dae5dd7d",
+      "missingNode": "c3f9cfedd833eba2"
+    },
     "runs": {
+      "debugInEditor": "521fb552f4ddc5d7",
       "edit": "e7945ee25eb63c57",
       "staleGraphWarning": "e954ce70f907b190",
       "title": "a444842d2c72b82f"
@@ -16154,6 +16211,11 @@
     "saveDraft": "6c462142d3681836",
     "saveError": "2be35bc8ec574ba7",
     "search": "a5b9f624c06b9981",
+    "start": {
+      "actionHint": "3ebd524d3730efcc",
+      "chooseAction": "f3009e224e14fc87",
+      "triggerHint": "b7cc692397818e23"
+    },
     "subtitle": "42349f7319e8d8fe",
     "test": {
       "button": "532eaabd9574880d",

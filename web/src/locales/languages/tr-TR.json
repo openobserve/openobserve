@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Yeni Hedef Oluştur",
       "select": "Hedef",
-      "loadError": "Hedefler getirilirken hata oluştu."
+      "loadError": "Hedefler getirilirken hata oluştu.",
+      "unsupportedType": "Desteklenmeyen Tür — İş Akışları Yalnızca Özel Hedefleri Destekler"
     },
     "function": {
       "createNew": "Yeni İşlev Oluştur",
       "createNewNoteWorkflow": "Not: İşlev oluşturulacak, ardından yeni oluşturulan işlevi iş akışıyla ilişkilendirmek için önceki forma yönlendirileceksiniz.",
       "select": "İşlev Seç",
       "loadError": "İşlevler yüklenemedi",
+      "saved": "Fonksiyon Başarıyla Kaydedildi",
+      "updated": "Fonksiyon Başarıyla Güncellendi",
+      "saveError": "Fonksiyon Kaydedilemedi",
       "flatten": "Düzleştirmeden Sonra",
       "guidelinesTitle": "İşlev Yürütme Yönergeleri:",
       "rbf": "RBF (Düzleştirmeden Önce Çalıştır):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "İş Akışı Çalıştırmaları",
       "edit": "İş Akışını Düzenle",
+      "debugInEditor": "Düzenleyicide Hata Ayıkla",
       "staleGraphWarning": "Bu iş akışı bu çalıştırmadan bu yana düzenlendi — yürüttüğü {count} adım artık mevcut değil, bu yüzden durumu burada gösterilmiyor. | Bu iş akışı bu çalıştırmadan bu yana düzenlendi — yürüttüğü {count} adım artık mevcut değil, bu yüzden durumu burada gösterilmiyor."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Başarılı",
       "failed": "Başarısız",
       "open": "Geçmiş",
+      "openFullView": "Çalıştırmaların Tam Görünümünü Aç",
       "loadError": "Yürütmeler Yüklenirken Hata",
       "loadRunError": "Bu Çalıştırma Yüklenirken Hata"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "Bir Tetikleyici Gerekli",
     "addStepRequired": "Tetikleyiciden Sonra En Az Bir Adım Ekleyin",
     "connectAllNodes": "Kaydetmeden Önce Tüm Düğümleri Bağlayın",
-    "finishStepsBeforePublish": "Yayınlamadan önce tüm adımları yapılandırmayı bitirin",
+    "finishStepsBeforePublish": "{count} adım yayınlamadan önce kurulum gerektiriyor — tuval üzerinde vurgulanır. | {count} adım yayınlamadan önce kurulum gerektiriyor — tuval üzerinde vurgulanır.",
     "draft": "Taslak",
     "saveDraft": "Taslak Olarak Kaydet",
     "publish": "Yayınla",
@@ -2708,6 +2714,11 @@
       "linkError": "Uyarılar Bağlanamıyor."
     },
     "chooseTrigger": "Tetikleyici Seç",
+    "start": {
+      "triggerHint": "İş akışınızı başlatan olayı seçin",
+      "chooseAction": "Bir Eylem Seçin",
+      "actionHint": "Tetikleyiciden sonra ne olacağını seçin"
+    },
     "node": {
       "kindTrigger": "Tetikleyici",
       "kindLogic": "Mantık",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Olay Özel Alanları",
       "incidentNoExtraFields": "Bu olay, ortak alanların dışında herhangi bir alan eklemez.",
       "conditionNoteTitle": "Koşul Yönergeleri",
+      "functionFlattenTitle": "Düzleştirme Öncesi ve Sonrası",
       "conditionNoteEmpty": "Boş Bir Değer Kontrol Etmek İçin \"\" Kullanın. Örnek:",
       "conditionNoteNull": "Null Bir Değer Kontrol Etmek İçin null Kullanın. Örnek:",
       "conditionNoteCustom": "Özel Bir Sütun Eklemek İçin Adını Yazın ve Enter'a Basın.",
@@ -2755,19 +2767,56 @@
       "enable": "Adımı Etkinleştir",
       "disabledBadge": "Devre Dışı",
       "incompleteBadge": "Daha Sonra Kur",
-      "destinationSetUpLater": "Daha Sonra Kur",
-      "destinationSetUpLaterPrompt": "Henüz bir hedefiniz yok mu? Daha sonra ayarlamak için bunu açın — şimdi bir taslak kaydedip test edebilirsiniz.",
-      "destinationSetUpLaterActive": "Hedef şimdilik atlanıyor — ad ve yorum yine de kaydedilir. Yayınlamadan önce bir hedefe ihtiyacınız olacak.",
-      "functionSetUpLater": "Daha Sonra Kur",
-      "functionSetUpLaterPrompt": "Henüz bir fonksiyonunuz yok mu? Bunu açın ve daha sonra ayarlayın — şimdi taslak kaydedip test edebilirsiniz.",
-      "functionSetUpLaterActive": "Fonksiyon şimdilik atlanıyor — ad ve yorum yine de kaydedilir. Yayınlamadan önce bir fonksiyona ihtiyacınız olacak."
+      "unsavedFnTitle": "Kaydedilmemiş Fonksiyon Değişiklikleri",
+      "unsavedFnMessage": "Bu adım, kitaplığınıza kaydedilmemiş fonksiyon kodu içeriyor. Kaydedin, değişiklikleri atın veya düzenlemeye devam edin.",
+      "unsavedFnSave": "Fonksiyonu Kaydet",
+      "unsavedFnDiscard": "Değişiklikleri At",
+      "unsavedFnKeep": "Düzenlemeye Devam Et"
     },
     "commonFieldsAbove": "yukarıdaki ortak alanlar",
     "canvas": {
       "undo": "Geri Al",
       "tidyUp": "Toparla",
-      "insertStep": "Adım Ekle",
-      "deleteEdge": "Bağlantıyı Sil"
+      "edgeDeleteHint": "Bağlantıyı kaldırmak için Backspace/Delete tuşuna basın"
+    },
+    "ndv": {
+      "input": "Girdi",
+      "output": "Çıktı",
+      "config": "Yapılandırma",
+      "noInput": "Girdi kaydı yok.",
+      "noOutput": "İletilen kayıt yok.",
+      "prevStep": "Önceki Adım · {name}",
+      "nextStep": "Sonraki Adım · {name}",
+      "prevStepBtn": "Önceki Adım",
+      "nextStepBtn": "Sonraki Adım",
+      "collapseSteps": "Adımları Daralt",
+      "expandSteps": "Adımları Genişlet",
+      "inputTag": "Girdi",
+      "openStep": "Aç {name}",
+      "runToView": "Bu Veriyi Görüntülemek İçin Bir Test Çalıştırın.",
+      "noBranchItems": "Bu Daldaki Öğe Yok.",
+      "noUpstream": "Yukarı Akış Adımı Yok.",
+      "noRunYet": "Henüz Çalıştırma Yok.",
+      "runLabel": "Çalıştır",
+      "switchRun": "Çalıştırmayı Değiştir",
+      "notInRun": "Bu Adım Bu Çalıştırmaya Dahil Değil.",
+      "runTest": "Testi Çalıştır",
+      "noItems": "Öğe Yok",
+      "itemsCount": "{count} Öğe | {count} Öğe",
+      "viewTable": "Tablo",
+      "viewJson": "JSON",
+      "itemN": "Öğe {n}",
+      "executeStep": "Adımı Çalıştır",
+      "sample": "Örnek",
+      "editStep": "Adımı Düzenle",
+      "testInputHint": "Test Girdisi — Düzenleyin, Sonra Adımı Çalıştırın.",
+      "noRunsList": "Henüz Çalıştırma Yok."
+    },
+    "runOverlay": {
+      "banner": "Geçmiş bir çalıştırmadaki ({run}) adım verileri gösteriliyor. Serbestçe düzenleyebilirsiniz — bu çalıştırma asla değiştirilmez.",
+      "clear": "Çalıştırma Verilerini Temizle",
+      "ghostNodes": "{count} adım bu çalıştırmadan artık iş akışında mevcut değil, bu yüzden durumu gösterilmiyor. | {count} adım bu çalıştırmadan artık iş akışında mevcut değil, bu yüzden durumları gösterilmiyor.",
+      "missingNode": "Bu adım artık bu iş akışında mevcut değil — bu çalıştırmadan sonra kaldırıldı."
     },
     "unsaved": {
       "title": "Kaydedilmemiş Değişiklikler",
@@ -2781,7 +2830,20 @@
       "expand": "Genişlet",
       "close": "Sonuçları Temizle ve Kapat",
       "nodesTitle": "Adımlar",
-      "empty": "Burada adım sonuçlarını görmek için bir test çalıştırın."
+      "empty": "Burada adım sonuçlarını görmek için bir test çalıştırın.",
+      "openNode": "Düğümü Aç",
+      "viewConfig": "Yapılandırmayı Görüntüle",
+      "hideConfig": "Yapılandırmayı Gizle",
+      "noConfig": "Yapılandırma Yok",
+      "functionLabel": "İşlev",
+      "destinationLabel": "Hedef",
+      "destinationUnsupported": "Desteklenmeyen Tür",
+      "destinationMissing": "Bu hedef artık mevcut değil veya okunamıyor.",
+      "headersLabel": "Başlıklar",
+      "templateLabel": "Şablon",
+      "outputFormatLabel": "Çıktı Biçimi",
+      "tlsVerifyLabel": "TLS Doğrulaması",
+      "tlsDisabled": "Devre Dışı"
     }
   },
   "pipeline": {

@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Crear nuevo destino",
       "select": "Destino",
-      "loadError": "Error al obtener los destinos."
+      "loadError": "Error al obtener los destinos.",
+      "unsupportedType": "Tipo no compatible — los flujos de trabajo solo admiten destinos personalizados"
     },
     "function": {
       "createNew": "Crear nueva función",
       "createNewNoteWorkflow": "Nota: La función se creará y luego serás redirigido al formulario anterior para asociar la función recién creada con el flujo de trabajo.",
       "select": "Seleccionar función",
       "loadError": "Error al cargar las funciones",
+      "saved": "Función guardada correctamente",
+      "updated": "Función actualizada correctamente",
+      "saveError": "Error al guardar la función",
       "flatten": "Después del aplanamiento",
       "guidelinesTitle": "Directrices de ejecución de funciones:",
       "rbf": "RBF (Ejecutar antes del aplanamiento):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "Ejecuciones de flujo de trabajo",
       "edit": "Editar flujo de trabajo",
+      "debugInEditor": "Depurar en el editor",
       "staleGraphWarning": "Este flujo de trabajo ha sido editado desde esta ejecución — {count} paso que ejecutó ya no existe, por lo que su estado no se muestra aquí. | Este flujo de trabajo ha sido editado desde esta ejecución — {count} pasos que ejecutó ya no existen, por lo que sus estados no se muestran aquí."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Éxito",
       "failed": "Fallido",
       "open": "Historial",
+      "openFullView": "Abrir vista completa de ejecuciones",
       "loadError": "Error al cargar ejecuciones",
       "loadRunError": "Error al cargar esta ejecución"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "Se requiere un desencadenante",
     "addStepRequired": "Agrega al menos un paso después del desencadenante",
     "connectAllNodes": "Conecta todos los nodos antes de guardar",
-    "finishStepsBeforePublish": "Termina de configurar todos los pasos antes de publicar",
+    "finishStepsBeforePublish": "{count} paso necesita configuración antes de publicar — resaltado en el lienzo. | {count} pasos necesitan configuración antes de publicar — resaltados en el lienzo.",
     "draft": "Borrador",
     "saveDraft": "Guardar como borrador",
     "publish": "Publicar",
@@ -2708,6 +2714,11 @@
       "linkError": "No se pueden vincular las alertas."
     },
     "chooseTrigger": "Elige un disparador",
+    "start": {
+      "triggerHint": "Seleccione el evento que inicia su flujo de trabajo",
+      "chooseAction": "Seleccione una acción",
+      "actionHint": "Seleccione lo que sucede después del disparador"
+    },
     "node": {
       "kindTrigger": "Disparador",
       "kindLogic": "Lógica",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Campos específicos del evento",
       "incidentNoExtraFields": "Este evento no añade campos más allá de los comunes.",
       "conditionNoteTitle": "Directrices de condición",
+      "functionFlattenTitle": "Antes vs Después del Aplanado",
       "conditionNoteEmpty": "Para verificar un valor vacío, use \"\". Ejemplo:",
       "conditionNoteNull": "Para verificar un valor nulo, use null. Ejemplo:",
       "conditionNoteCustom": "Para agregar una columna personalizada, escriba su nombre y presione Enter.",
@@ -2755,19 +2767,56 @@
       "enable": "Activar paso",
       "disabledBadge": "Desactivado",
       "incompleteBadge": "Configurar más tarde",
-      "destinationSetUpLater": "Configurar más tarde",
-      "destinationSetUpLaterPrompt": "¿No tienes un destino todavía? Activa esto para configurarlo más tarde: puedes guardar un borrador y probar ahora.",
-      "destinationSetUpLaterActive": "El destino se omite por ahora: el nombre y el comentario aún se guardan. Necesitarás un destino antes de publicar.",
-      "functionSetUpLater": "Configurar más tarde",
-      "functionSetUpLaterPrompt": "¿Aún no tienes una función? Activa esto para configurarla más tarde — puedes guardar un borrador y probar ahora.",
-      "functionSetUpLaterActive": "La función se omite por ahora — el nombre y el comentario se guardan igualmente. Necesitarás una función antes de publicar."
+      "unsavedFnTitle": "Cambios de función sin guardar",
+      "unsavedFnMessage": "Este paso tiene código de función que no está guardado en su biblioteca. Guárdelo, descarte los cambios o siga editando.",
+      "unsavedFnSave": "Guardar función",
+      "unsavedFnDiscard": "Descartar cambios",
+      "unsavedFnKeep": "Seguir editando"
     },
     "commonFieldsAbove": "campos comunes arriba",
     "canvas": {
       "undo": "Deshacer",
       "tidyUp": "Limpiar",
-      "insertStep": "Insertar paso",
-      "deleteEdge": "Eliminar conexión"
+      "edgeDeleteHint": "Presione Retroceso/Suprimir para eliminar la conexión"
+    },
+    "ndv": {
+      "input": "Entrada",
+      "output": "Salida",
+      "config": "Configuración",
+      "noInput": "No hay registros de entrada.",
+      "noOutput": "No hay registros reenviados.",
+      "prevStep": "Paso anterior · {name}",
+      "nextStep": "Paso siguiente · {name}",
+      "prevStepBtn": "Paso anterior",
+      "nextStepBtn": "Paso siguiente",
+      "collapseSteps": "Contraer pasos",
+      "expandSteps": "Expandir pasos",
+      "inputTag": "Entrada",
+      "openStep": "Abrir {name}",
+      "runToView": "Ejecute una prueba para ver estos datos.",
+      "noBranchItems": "No hay elementos en esta rama.",
+      "noUpstream": "No hay pasos anteriores.",
+      "noRunYet": "Aún no se ha ejecutado.",
+      "runLabel": "Ejecución",
+      "switchRun": "Cambiar ejecución",
+      "notInRun": "Este paso no está incluido en esta ejecución.",
+      "runTest": "Ejecutar prueba",
+      "noItems": "No hay elementos",
+      "itemsCount": "{count} elemento | {count} elementos",
+      "viewTable": "Tabla",
+      "viewJson": "JSON",
+      "itemN": "Elemento {n}",
+      "executeStep": "Ejecutar paso",
+      "sample": "Muestra",
+      "editStep": "Editar paso",
+      "testInputHint": "Entrada de prueba — edite y luego ejecute el paso.",
+      "noRunsList": "Aún no hay ejecuciones."
+    },
+    "runOverlay": {
+      "banner": "Mostrando datos de paso de una ejecución anterior ({run}). Puede editar libremente — esta ejecución nunca se modifica.",
+      "clear": "Borrar datos de ejecución",
+      "ghostNodes": "{count} paso de esta ejecución ya no existe en el flujo de trabajo, por lo que su estado no se muestra. | {count} pasos de esta ejecución ya no existen en el flujo de trabajo, por lo que sus estados no se muestran.",
+      "missingNode": "Ese paso ya no existe en este flujo de trabajo: se eliminó después de esta ejecución."
     },
     "unsaved": {
       "title": "Cambios sin guardar",
@@ -2781,7 +2830,20 @@
       "expand": "Expandir",
       "close": "Limpiar y cerrar resultados",
       "nodesTitle": "Pasos",
-      "empty": "Ejecuta una prueba para ver los resultados de los pasos aquí."
+      "empty": "Ejecuta una prueba para ver los resultados de los pasos aquí.",
+      "openNode": "Abrir nodo",
+      "viewConfig": "Ver configuración",
+      "hideConfig": "Ocultar configuración",
+      "noConfig": "Sin configuración",
+      "functionLabel": "Función",
+      "destinationLabel": "Destino",
+      "destinationUnsupported": "Tipo no compatible",
+      "destinationMissing": "Este destino ya no existe o no se puede leer.",
+      "headersLabel": "Encabezados",
+      "templateLabel": "Plantilla",
+      "outputFormatLabel": "Formato de salida",
+      "tlsVerifyLabel": "Verificación TLS",
+      "tlsDisabled": "Deshabilitada"
     }
   },
   "pipeline": {

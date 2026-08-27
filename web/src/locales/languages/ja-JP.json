@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "新しい宛先を作成",
       "select": "宛先",
-      "loadError": "宛先の取得中にエラーが発生しました。"
+      "loadError": "宛先の取得中にエラーが発生しました。",
+      "unsupportedType": "サポートされていないタイプ — ワークフローはカスタム宛先のみをサポートします"
     },
     "function": {
       "createNew": "新しい関数を作成",
       "createNewNoteWorkflow": "注：関数が作成され、その後、以前のフォームにリダイレクトされて、新しく作成された関数をワークフローに関連付けます。",
       "select": "関数を選択",
       "loadError": "関数の読み込みに失敗しました",
+      "saved": "関数が正常に保存されました",
+      "updated": "関数が正常に更新されました",
+      "saveError": "関数の保存に失敗しました",
       "flatten": "フラット化後",
       "guidelinesTitle": "関数実行ガイドライン：",
       "rbf": "RBF（フラット化前に実行）：",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "ワークフロー実行",
       "edit": "ワークフローを編集",
+      "debugInEditor": "エディタでデバッグ",
       "staleGraphWarning": "このワークフローはこの実行後に編集されました — 実行した{count}個のステップはもう存在しないため、ここではステータスが表示されません。 | このワークフローはこの実行後に編集されました — 実行した{count}個のステップはもう存在しないため、ここではステータスが表示されません。"
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "成功",
       "failed": "失敗",
       "open": "履歴",
+      "openFullView": "すべての実行ビューを開く",
       "loadError": "実行の読み込み中にエラーが発生しました",
       "loadRunError": "この実行の読み込み中にエラーが発生しました"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "トリガーが必要です",
     "addStepRequired": "トリガーの後に少なくとも1つのステップを追加してください",
     "connectAllNodes": "保存する前にすべてのノードを接続してください",
-    "finishStepsBeforePublish": "公開前にすべてのステップの設定を完了してください",
+    "finishStepsBeforePublish": "{count} ステップは公開前にセットアップが必要です — キャンバス上でハイライトされています。 | {count} ステップは公開前にセットアップが必要です — キャンバス上でハイライトされています。",
     "draft": "下書き",
     "saveDraft": "下書きとして保存",
     "publish": "公開",
@@ -2708,6 +2714,11 @@
       "linkError": "アラートをリンクできませんでした。"
     },
     "chooseTrigger": "トリガーを選択",
+    "start": {
+      "triggerHint": "ワークフローを開始するイベントを選択してください",
+      "chooseAction": "アクションを選択",
+      "actionHint": "トリガー後の動作を選択してください"
+    },
     "node": {
       "kindTrigger": "トリガー",
       "kindLogic": "ロジック",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "イベント固有フィールド",
       "incidentNoExtraFields": "このイベントは共通フィールド以外のフィールドを追加しません。",
       "conditionNoteTitle": "条件のガイドライン",
+      "functionFlattenTitle": "フラット化前と後",
       "conditionNoteEmpty": "空の値を確認するには、\"\" を使用します。例：",
       "conditionNoteNull": "null値を確認するには、null を使用します。例：",
       "conditionNoteCustom": "カスタム列を追加するには、名前を入力してEnterキーを押します。",
@@ -2755,19 +2767,56 @@
       "enable": "ステップを有効にする",
       "disabledBadge": "無効",
       "incompleteBadge": "後で設定",
-      "destinationSetUpLater": "後で設定",
-      "destinationSetUpLaterPrompt": "宛先がまだありませんか？ これをオンにして後で設定できます。下書きを保存して今すぐテストできます。",
-      "destinationSetUpLaterActive": "宛先は今のところスキップされます。名前とコメントは引き続き保存されます。公開する前に宛先が必要です。",
-      "functionSetUpLater": "後で設定",
-      "functionSetUpLaterPrompt": "まだ関数がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
-      "functionSetUpLaterActive": "今のところ関数はスキップされます — 名前とコメントは保存されます。公開前に関数が必要です。"
+      "unsavedFnTitle": "未保存の関数変更",
+      "unsavedFnMessage": "このステップにはライブラリに保存されていない関数コードがあります。保存するか、変更を破棄するか、編集を続けてください。",
+      "unsavedFnSave": "関数を保存",
+      "unsavedFnDiscard": "変更を破棄",
+      "unsavedFnKeep": "編集を続ける"
     },
     "commonFieldsAbove": "上記の共通フィールド",
     "canvas": {
       "undo": "元に戻す",
       "tidyUp": "整理",
-      "insertStep": "ステップを挿入",
-      "deleteEdge": "接続を削除"
+      "edgeDeleteHint": "Backspace/Delete キーを押すとエッジを削除できます"
+    },
+    "ndv": {
+      "input": "入力",
+      "output": "出力",
+      "config": "構成",
+      "noInput": "入力レコードがありません。",
+      "noOutput": "転送されたレコードがありません。",
+      "prevStep": "前のステップ · {name}",
+      "nextStep": "次のステップ · {name}",
+      "prevStepBtn": "前のステップ",
+      "nextStepBtn": "次のステップ",
+      "collapseSteps": "ステップを折りたたむ",
+      "expandSteps": "ステップを展開",
+      "inputTag": "入力",
+      "openStep": "{name} を開く",
+      "runToView": "このデータを表示するにはテストを実行してください。",
+      "noBranchItems": "このブランチにはアイテムがありません。",
+      "noUpstream": "上流のステップがありません。",
+      "noRunYet": "まだ実行されていません。",
+      "runLabel": "実行",
+      "switchRun": "実行を切り替え",
+      "notInRun": "このステップはこの実行に含まれていません。",
+      "runTest": "テストを実行",
+      "noItems": "アイテムがありません",
+      "itemsCount": "{count} アイテム | {count} アイテム",
+      "viewTable": "テーブル",
+      "viewJson": "JSON",
+      "itemN": "アイテム {n}",
+      "executeStep": "ステップを実行",
+      "sample": "サンプル",
+      "editStep": "ステップを編集",
+      "testInputHint": "テスト入力 — 編集してからステップを実行してください。",
+      "noRunsList": "実行はまだありません。"
+    },
+    "runOverlay": {
+      "banner": "過去の実行（{run}）のステップデータを表示しています。自由に編集できます — この実行が変更されることはありません。",
+      "clear": "実行データをクリア",
+      "ghostNodes": "この実行の {count} ステップはワークフロー内に存在しなくなったため、ステータスは表示されません。 | この実行の {count} ステップはワークフロー内に存在しなくなったため、ステータスは表示されません。",
+      "missingNode": "そのステップはこのワークフロー内に存在しなくなっています — この実行後に削除されました。"
     },
     "unsaved": {
       "title": "未保存の変更",
@@ -2781,7 +2830,20 @@
       "expand": "展開する",
       "close": "結果をクリアして閉じる",
       "nodesTitle": "ステップ",
-      "empty": "テストを実行すると、ここにステップ結果が表示されます。"
+      "empty": "テストを実行すると、ここにステップ結果が表示されます。",
+      "openNode": "ノードを開く",
+      "viewConfig": "設定を表示",
+      "hideConfig": "設定を非表示",
+      "noConfig": "設定なし",
+      "functionLabel": "関数",
+      "destinationLabel": "宛先",
+      "destinationUnsupported": "未対応のタイプ",
+      "destinationMissing": "この宛先は存在しないか、読み取ることができません。",
+      "headersLabel": "ヘッダー",
+      "templateLabel": "テンプレート",
+      "outputFormatLabel": "出力形式",
+      "tlsVerifyLabel": "TLS 検証",
+      "tlsDisabled": "無効"
     }
   },
   "pipeline": {
