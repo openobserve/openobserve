@@ -115,11 +115,8 @@ pub fn generate_histogram_interval(time_range: (i64, i64)) -> &'static str {
             return interval;
         }
     }
-    // Ranges narrower than one 10s bucket drop to 1s buckets: a bucket wider
-    // than the whole range makes the scan-start snap (histogram_bucket_start)
-    // pull in up to 10s of data from before the range, so bucket counts dwarf
-    // the range total (#13896). With 1s buckets the snap widens the scan by
-    // less than a second (zero for whole-second range starts).
+    // Ranges narrower than one 10s bucket drop to 1s buckets so the chart
+    // still gets multiple points instead of one bar wider than the range (#13896)
     "1 second"
 }
 
@@ -541,8 +538,7 @@ mod tests {
     #[test]
     fn test_generate_histogram_interval_narrow_range() {
         let second = 1_000_000_i64;
-        // a range narrower than the 10s floor drops to 1s buckets so the
-        // scan-start snap cannot widen the query past the range (#13896)
+        // a range narrower than the 10s floor drops to 1s buckets (#13896)
         assert_eq!(generate_histogram_interval((0, second)), "1 second");
         assert_eq!(
             generate_histogram_interval((0, 10 * second - 1)),

@@ -37,7 +37,10 @@ use hashbrown::HashMap;
 use o2_enterprise::enterprise::search::sampling::execution::generate_row_group_access_plan;
 
 use crate::{
-    datafusion::{storage, vortex::generate_vortex_access_plan},
+    datafusion::{
+        storage,
+        vortex::{generate_vortex_access_plan, generate_vortex_access_plan_from_ranges},
+    },
     index::IndexCondition,
 };
 
@@ -98,9 +101,15 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
                     file.extensions.insert(access_plan);
                 }
             }
-            // compact row ranges and row-group sampling are parquet only;
-            // vortex falls back to a full scan
-            FileSelection::RowRanges(_) | FileSelection::RowGroups(_) => {}
+            FileSelection::RowRanges(ranges) => {
+                if let Some(access_plan) =
+                    generate_vortex_access_plan_from_ranges(file, ranges.iter().cloned())
+                {
+                    file.extensions.insert(access_plan);
+                }
+            }
+            // Row-group sampling remains Parquet-only.
+            FileSelection::RowGroups(_) => {}
         },
     }
 }
@@ -315,7 +324,10 @@ pub fn apply_combined_filter(
 #[cfg(test)]
 mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
+    use config::meta::stream::FileKey;
     use datafusion::{common::Statistics, parquet::arrow::arrow_reader::RowSelector};
+    use vortex::scan::selection::Selection;
+    use vortex_datafusion::VortexAccessPlan;
 
     use super::*;
 
@@ -452,6 +464,35 @@ mod tests {
             RowSelection::from(vec![RowSelector::select(2), RowSelector::skip(2)]),
         );
         assert_eq!(plan, expected);
+    }
+
+    #[tokio::test]
+    async fn test_generate_access_plan_attaches_vortex_metrics_ranges() {
+        let trace_id = "test_vortex_metrics_ranges";
+        let file_key = "files/org/metrics/cpu/2026/01/01/00/indexed-v1-1.vortex";
+        let mut file = FileKey::from_file_name(file_key);
+        file.with_selection(FileSelection::RowRanges(Arc::new(vec![1..3, 5..8])), None);
+        storage::file_list::set(trace_id, "schema", "vortex", vec![file]).await;
+        let location = storage::file_list::get(&format!("{trace_id}/schema=schema/format=vortex"))
+            .unwrap()
+            .remove(0)
+            .location;
+        let mut partitioned_file = PartitionedFile::new(location.to_string(), 100);
+        let mut stats = Statistics::new_unknown(&Schema::empty());
+        stats.num_rows = Precision::Exact(8);
+        partitioned_file.statistics = Some(Arc::new(stats));
+
+        generate_access_plan(&mut partitioned_file);
+
+        let plan = partitioned_file
+            .extensions
+            .get::<VortexAccessPlan>()
+            .expect("Vortex row-range plan should be attached");
+        let Selection::IncludeRoaring(rows) = plan.selection().unwrap() else {
+            panic!("expected roaring row selection")
+        };
+        assert_eq!(rows.iter().collect::<Vec<_>>(), vec![1, 2, 5, 6, 7]);
+        storage::file_list::clear(trace_id);
     }
 
     fn make_exec() -> Arc<dyn ExecutionPlan> {

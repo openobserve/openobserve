@@ -37,7 +37,7 @@ pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u
 /// - Files completely within the query time range: no timestamp filter applied
 /// - Files partially overlapping with the query time range: timestamp filter applied
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tables_from_files<F>(
+pub async fn create_tables_from_files(
     files: Vec<FileKey>,
     session: config::meta::search::Session,
     query: Arc<QueryParams>,
@@ -46,11 +46,7 @@ pub async fn create_tables_from_files<F>(
     file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
-    on_error: F,
-) -> Result<Vec<Arc<dyn TableProvider>>>
-where
-    F: Fn() + Clone,
-{
+) -> Result<Vec<Arc<dyn TableProvider>>> {
     let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
     let schema_ref = Arc::new(
         schema_ref
@@ -68,7 +64,6 @@ where
         let file_stat_cache = file_stat_cache.clone();
         let index_condition = index_condition.clone();
         let fst_fields = fst_fields.clone();
-        let on_error = on_error.clone();
 
         async move {
             let mut builder = TableBuilder::new()
@@ -81,10 +76,7 @@ where
                 builder = builder.timestamp_filter(time_range);
             }
 
-            builder
-                .build(session, files, schema_ref)
-                .await
-                .inspect_err(|_| on_error())
+            builder.build(session, files, schema_ref).await
         }
     };
 

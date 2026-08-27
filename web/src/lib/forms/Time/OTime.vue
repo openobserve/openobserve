@@ -26,6 +26,7 @@ const props = withDefaults(defineProps<TimeProps>(), {
   readonly: false,
   clearable: false,
   withSeconds: false,
+  format24: false,
 });
 
 const emit = defineEmits<TimeEmits>();
@@ -80,6 +81,9 @@ const SVG_CX = 110;
 const SVG_CY = 110;
 const NUM_RADIUS = 82;
 const HAND_RADIUS = 68;
+// 24-hour face: 13–00 sit on a second ring inside the 1–12 ring.
+const NUM_RADIUS_INNER = 50;
+const HAND_RADIUS_INNER = 38;
 
 function calcPos(index: number, total: number, radius: number) {
   const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
@@ -94,6 +98,7 @@ interface ClockNum {
   label: I18nText;
   x: number;
   y: number;
+  inner?: boolean;
 }
 
 // Screen-reader label for a clock-face number ("7 hour", "05 minute"). One
@@ -109,12 +114,21 @@ const clockNumberKey = computed<I18nKey>(() =>
 
 const clockNumbers = computed((): ClockNum[] => {
   if (clockMode.value === "hour") {
-    return Array.from({ length: 12 }, (_, i) => {
+    const outer = Array.from({ length: 12 }, (_, i): ClockNum => {
       const h = i + 1;
       const index = h % 12;
       const pos = calcPos(index, 12, NUM_RADIUS);
       return { value: h, label: raw(String(h)), ...pos };
     });
+    if (!props.format24) return outer;
+    // Inner ring: 13..23 then 00 (midnight) at the 12-o'clock position.
+    const inner = Array.from({ length: 12 }, (_, i): ClockNum => {
+      const h = i === 11 ? 0 : i + 13;
+      const index = (i + 1) % 12;
+      const pos = calcPos(index, 12, NUM_RADIUS_INNER);
+      return { value: h, label: raw(String(h).padStart(2, "0")), ...pos, inner: true };
+    });
+    return [...outer, ...inner];
   }
   return Array.from({ length: 12 }, (_, i) => {
     const pos = calcPos(i, 12, NUM_RADIUS);
@@ -123,18 +137,18 @@ const clockNumbers = computed((): ClockNum[] => {
 });
 
 const handPos = computed(() => {
-  let index: number;
   if (clockMode.value === "hour") {
-    index = internalHour.value % 12;
-  } else {
-    const val = clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
-    index = Math.floor(val / 5) % 12;
+    const index = internalHour.value % 12;
+    const onInnerRing = props.format24 && (internalHour.value === 0 || internalHour.value >= 13);
+    return calcPos(index, 12, onInnerRing ? HAND_RADIUS_INNER : HAND_RADIUS);
   }
-  return calcPos(index, 12, HAND_RADIUS);
+  const val = clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
+  return calcPos(Math.floor(val / 5) % 12, 12, HAND_RADIUS);
 });
 
 function isClockNumSelected(num: ClockNum): boolean {
   if (clockMode.value === "hour") {
+    if (props.format24) return internalHour.value === num.value;
     return (internalHour.value % 12 || 12) === num.value;
   }
   const val = clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
@@ -146,9 +160,12 @@ function onClockClick(num: ClockNum) {
   if (props.disabled || props.readonly) return;
 
   if (clockMode.value === "hour") {
-    const h12 = num.value;
-    const h24 = isAM.value ? (h12 === 12 ? 0 : h12) : h12 === 12 ? 12 : h12 + 12;
-    internalHour.value = h24;
+    if (props.format24) {
+      internalHour.value = num.value;
+    } else {
+      const h12 = num.value;
+      internalHour.value = isAM.value ? (h12 === 12 ? 0 : h12) : h12 === 12 ? 12 : h12 + 12;
+    }
     clockMode.value = "minute";
     emitCurrentValue();
   } else if (clockMode.value === "minute") {
@@ -191,7 +208,11 @@ function emitCurrentValue() {
 }
 
 // ── Header display ─────────────────────────────────────────────
-const displayHour = computed(() => String(internalHour.value % 12 || 12).padStart(2, "0"));
+const displayHour = computed(() =>
+  props.format24
+    ? String(internalHour.value).padStart(2, "0")
+    : String(internalHour.value % 12 || 12).padStart(2, "0"),
+);
 const displayMinute = computed(() => String(internalMinute.value).padStart(2, "0"));
 const displaySecond = computed(() => String(internalSecond.value).padStart(2, "0"));
 
@@ -200,6 +221,36 @@ function handleClear(e: Event) {
   e.stopPropagation();
   emit("update:modelValue", "");
   emit("clear");
+}
+
+// ── 24-hour text input handler ──────────────────────────────
+// Parses `HH:MM` (seconds optional with `withSeconds`) on commit; anything
+// unparseable reverts the field to the last good value instead of emitting.
+function handleText24Change(e: Event) {
+  const el = e.target as HTMLInputElement;
+  const val = el.value.trim();
+  if (!val) {
+    emit("update:modelValue", "");
+    emit("change", "");
+    return;
+  }
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(val);
+  const h = m ? Number(m[1]) : NaN;
+  const min = m ? Number(m[2]) : NaN;
+  const s = m ? Number(m[3] ?? 0) : NaN;
+  if (!m || h > 23 || min > 59 || s > 59) {
+    el.value = props.modelValue ?? "";
+    return;
+  }
+  internalHour.value = h;
+  internalMinute.value = min;
+  internalSecond.value = s;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const str = props.withSeconds ? `${pad(h)}:${pad(min)}:${pad(s)}` : `${pad(h)}:${pad(min)}`;
+  // Normalise the visible text too ("7:5" → "07:05").
+  el.value = str;
+  emit("update:modelValue", str);
+  emit("change", str);
 }
 
 // ── Native time input handler ───────────────────────────────
@@ -280,7 +331,29 @@ const fieldClasses = computed(() => [
           <OIcon name="schedule" size="sm" />
         </PopoverTrigger>
 
+        <!-- 24h mode: a plain text field, because the native time input renders
+             in the OS locale's clock (often 12-hour AM/PM) with no override. -->
         <input
+          v-if="format24"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          :value="modelValue ?? ''"
+          :tabindex="inputTabindex"
+          :placeholder="placeholder ?? raw('HH:MM')"
+          :maxlength="withSeconds ? 8 : 5"
+          :disabled="disabled || undefined"
+          :readonly="readonly || undefined"
+          :class="[
+            'text-datepicker-text min-w-0 flex-1 bg-transparent ps-2 outline-none',
+            clearable ? 'pe-2' : 'pe-3',
+          ]"
+          @change="handleText24Change"
+          @focus="emit('focus', $event)"
+          @blur="emit('blur', $event)"
+        />
+        <input
+          v-else
           type="time"
           :value="modelValue ?? ''"
           :tabindex="inputTabindex"
@@ -380,8 +453,9 @@ const fieldClasses = computed(() => [
             </template>
           </div>
 
-          <!-- AM / PM horizontal pill -->
+          <!-- AM / PM horizontal pill (12-hour mode only) -->
           <div
+            v-if="!format24"
             class="rounded-default border-datepicker-border ms-3 flex shrink-0 overflow-hidden border"
           >
             <button
@@ -456,7 +530,7 @@ const fieldClasses = computed(() => [
               <circle
                 :cx="num.x"
                 :cy="num.y"
-                r="15"
+                :r="num.inner ? 13 : 15"
                 :class="
                   isClockNumSelected(num)
                     ? 'fill-datepicker-clock-selected-bg'
@@ -468,12 +542,14 @@ const fieldClasses = computed(() => [
                 :y="num.y"
                 text-anchor="middle"
                 dominant-baseline="central"
-                font-size="13"
+                :font-size="num.inner ? 11 : 13"
                 class="pointer-events-none select-none"
                 :class="
                   isClockNumSelected(num)
                     ? 'fill-datepicker-clock-selected-text'
-                    : 'fill-datepicker-day-text'
+                    : num.inner
+                      ? 'fill-datepicker-weekday-text'
+                      : 'fill-datepicker-day-text'
                 "
               >
                 {{ num.label }}

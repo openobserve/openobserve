@@ -1,3 +1,5 @@
+use infra::db::{get_orm_client_ro, get_orm_client_rw};
+
 use super::*;
 
 // ── Synthetics CRUD ──────────────────────────────────────────────────────────────
@@ -52,7 +54,7 @@ pub async fn create_synthetic(
     body = encrypt_synthetic_auth(org_id, body).await?;
     body.owner = Some(created_by.to_owned());
 
-    let conn = db()?;
+    let conn = get_orm_client_rw().await;
     let mut result = synthetics_checks::create(conn, org_id, body, false)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -109,7 +111,7 @@ pub async fn create_synthetic(
 }
 
 pub async fn get_synthetic(org_id: &str, id: &str) -> anyhow::Result<Option<Synthetic>> {
-    let conn = db()?;
+    let conn = get_orm_client_ro().await;
     let mut check = synthetics_checks::get(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -133,7 +135,7 @@ pub async fn update_synthetic(
     id: &str,
     mut body: Synthetic,
 ) -> anyhow::Result<Synthetic> {
-    let conn = db()?;
+    let conn = get_orm_client_rw().await;
 
     // Normalise locations exactly like create — a bare region stored on update
     // would never dispatch (region is derived from the "aws-" prefix).
@@ -241,7 +243,7 @@ pub async fn update_synthetic(
 }
 
 pub async fn delete_synthetic(org_id: &str, id: &str) -> anyhow::Result<bool> {
-    let conn = db()?;
+    let conn = get_orm_client_rw().await;
     // Drain any queued checks before deleting.
     synthetics_jobs::drain_check(conn, id)
         .await
@@ -271,7 +273,7 @@ pub async fn list_synthetics(
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> anyhow::Result<SyntheticListResponse> {
-    let conn = db()?;
+    let conn = get_orm_client_rw().await;
 
     // synthetics_checks.folder_id stores the KSUID PK (folders.id), not the slug
     // (folders.folder_id). Resolve any slug → PK before filtering. Falls back to the
@@ -351,7 +353,7 @@ pub async fn list_synthetics(
 /// (they expire via the reaper). Re-enabling resets next_run_at to 0 so the
 /// scheduler fires immediately on the next tick.
 pub async fn set_synthetic_enabled(org_id: &str, id: &str, enabled: bool) -> anyhow::Result<bool> {
-    let conn = db()?;
+    let conn = get_orm_client_rw().await;
     let changed = synthetics_checks::set_enabled(conn, org_id, id, enabled)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -394,7 +396,7 @@ pub async fn delete_synthetics_bulk(
     ids: &[String],
     _folder_id: Option<&str>,
 ) -> anyhow::Result<()> {
-    let conn = db()?;
+    let conn = get_orm_client_rw().await;
     let ofga = ofga_enabled();
     // Hoisted so the loop does not re-read the config per id.
     #[cfg(feature = "enterprise")]
@@ -432,7 +434,7 @@ pub async fn move_synthetics(
     ids: &[String],
     dst_folder_id: &str,
 ) -> anyhow::Result<()> {
-    let conn = db()?;
+    let conn = get_orm_client_rw().await;
 
     // Resolve slug → KSUID PK. Auto-create the default folder when necessary,
     // matching the behaviour of create_synthetic.
@@ -531,7 +533,7 @@ pub async fn move_synthetics(
 /// Triggers an immediate run by resetting `next_run_at` to 0. The scheduler
 /// picks it up on the next tick (within 5 seconds) and inserts jobs.
 pub async fn run_synthetic_now(org_id: &str, id: &str) -> anyhow::Result<()> {
-    let conn = db()?;
+    let conn = get_orm_client_rw().await;
     let check = synthetics_checks::get(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?

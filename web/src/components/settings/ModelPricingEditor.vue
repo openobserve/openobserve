@@ -38,73 +38,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
             >
               <div>
-                <div class="form-card-title text-compact font-semibold">
+                <OText variant="panel-title" class="text-compact font-semibold">
                   {{ t("modelPricing.modelDetails") }}
-                </div>
-                <div class="form-card-subtitle text-2xs mt-px opacity-60">
+                </OText>
+                <OText variant="meta" class="text-2xs mt-px block">
                   {{ t("modelPricing.modelDetailsDesc") }}
-                </div>
+                </OText>
               </div>
             </div>
-            <div class="form-card-body flex flex-row gap-4 px-4 pt-2.5 pb-2">
+            <div class="flex flex-row gap-4 px-4 pt-2.5 pb-2">
               <div class="flex-1">
-                <div
-                  class="field-label mb-1 flex h-5 items-center gap-1 text-xs font-semibold opacity-75"
+                <OFormInput
+                  name="name"
+                  :label="t('modelPricing.modelNameField')"
+                  :placeholder="t('modelPricing.modelNamePlaceholder', { example: raw('GPT-4o') })"
+                  data-test="model-pricing-name-input"
                 >
-                  {{ t("modelPricing.modelNameField") }}
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    class="ml-1"
-                    data-test="model-pricing-name-info-btn"
-                  >
-                    <OIcon name="info" size="xs" :class="'text-text-secondary'" />
+                  <template #tooltip>
                     <OTooltip
                       side="right"
                       max-width="18.75rem"
                       :content="t('modelPricing.modelNameTooltip')"
                     />
-                  </OButton>
-                </div>
-                <OFormInput
-                  name="name"
-                  :placeholder="
-                    t('modelPricing.modelNamePlaceholder', {
-                      example: raw('GPT-4o'),
-                    })
-                  "
-                  data-test="model-pricing-name-input"
-                />
+                  </template>
+                </OFormInput>
               </div>
-              <div class="flex flex-1 items-start gap-1">
+              <div class="flex flex-1 items-end gap-1">
                 <div class="flex-1">
-                  <div
-                    class="field-label mb-1 flex h-5 items-center gap-1 text-xs font-semibold opacity-75"
+                  <OFormInput
+                    name="match_pattern"
+                    :label="t('modelPricing.matchPatternField')"
+                    :placeholder="
+                      t('modelPricing.matchPatternPlaceholder', { example: raw('gpt-4.*') })
+                    "
+                    data-test="model-pricing-pattern-input"
                   >
-                    {{ t("modelPricing.matchPatternField") }}
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      class="ml-1"
-                      data-test="model-pricing-pattern-info-btn"
-                    >
-                      <OIcon name="info" size="xs" :class="'text-text-secondary'" />
+                    <template #tooltip>
                       <OTooltip
                         side="right"
                         max-width="18.75rem"
                         :content="t('modelPricing.matchPatternTooltip')"
                       />
-                    </OButton>
-                  </div>
-                  <OFormInput
-                    name="match_pattern"
-                    :placeholder="
-                      t('modelPricing.matchPatternPlaceholder', {
-                        example: raw('gpt-4.*'),
-                      })
-                    "
-                    data-test="model-pricing-pattern-input"
-                  />
+                    </template>
+                  </OFormInput>
                 </div>
                 <OButton
                   variant="ghost"
@@ -147,11 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="ex.name"
                 class="border-card-glass-border grid grid-cols-[11.25rem_1fr_auto] items-center gap-3 border-b px-3 py-2 text-xs last:border-b-0"
               >
-                <span class="examples-model-name font-medium">{{ ex.name }}</span>
-                <code
-                  class="text-2xs bg-surface-subtle rounded-default px-1.5 py-px font-mono break-all"
-                  >{{ ex.match_pattern }}</code
-                >
+                <OText variant="body-strong" class="text-xs">{{ ex.name }}</OText>
+                <!-- Presentation only. The copy button beside it keeps using
+                     @/utils/clipboard: OCode's own `copyable` is
+                     navigator.clipboard-only, which fails silently on HTTP and
+                     inside reka-ui's focus trap. -->
+                <OCode truncate>{{ ex.match_pattern }}</OCode>
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
@@ -183,16 +160,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
             >
               <div>
-                <div class="form-card-title text-compact font-semibold">
+                <OText variant="panel-title" class="text-compact font-semibold">
                   {{ t("modelPricing.pricingTiers") }}
-                </div>
-                <div class="form-card-subtitle text-2xs mt-px opacity-60">
+                </OText>
+                <OText variant="meta" class="text-2xs mt-px block">
                   {{ t("modelPricing.pricingTiersDesc") }}
-                </div>
+                </OText>
               </div>
             </div>
 
-            <div class="form-card-body flex flex-col gap-3 px-4 pt-2.5 pb-2">
+            <div class="flex flex-col gap-3 px-4 pt-2.5 pb-2">
               <div
                 v-for="(tier, idx) in formTiers"
                 :key="idx"
@@ -234,8 +211,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="idx > 0 && tier.condition"
                     class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
                   >
-                    <div class="sub-label text-2xs mb-2 font-semibold tracking-[0.06em] opacity-65">
-                      {{ t("modelPricing.applyTierWhen") }}
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                      <OText variant="section">
+                        {{ t("modelPricing.applyTierWhen") }}
+                      </OText>
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        type="button"
+                        :data-test="`model-pricing-tier-condition-remove-btn-${idx}`"
+                        @click="removeCondition(idx)"
+                      >
+                        <OIcon name="close" size="xs" />
+                        <OTooltip
+                          :side-offset="4"
+                          :content="t('modelPricing.removeUsageCondition')"
+                        />
+                      </OButton>
                     </div>
                     <div class="flex flex-nowrap items-end gap-2">
                       <div class="min-w-32.5 flex-1">
@@ -270,11 +262,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
+                  <!-- Recurring UTC time windows (non-default tiers only). Used by
+                       providers that bill peak / off-peak rates, e.g. DeepSeek. -->
+                  <div
+                    v-if="idx > 0 && tierWindows(tier).length"
+                    class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
+                  >
+                    <OText variant="section">
+                      {{ t("modelPricing.timeWindows") }}
+                    </OText>
+                    <div class="text-2xs mt-px mb-2 opacity-55">
+                      {{ t("modelPricing.timeWindowsDesc") }}
+                    </div>
+                    <!-- Key by INDEX to match the index-based field names — see the
+                         price-row comment below for why a stable-id key breaks binding. -->
+                    <div v-for="(win, winIdx) in tierWindows(tier)" :key="winIdx" class="py-0.5">
+                      <div class="flex flex-nowrap items-end gap-2">
+                        <div class="w-35 shrink-0">
+                          <OFormTime
+                            :name="`tiers[${idx}].utc_windows[${winIdx}].start`"
+                            :label="t('modelPricing.timeWindowFrom')"
+                            format24
+                            :data-test="`model-pricing-tier-window-start-${idx}-${winIdx}`"
+                          />
+                        </div>
+                        <div class="w-35 shrink-0">
+                          <OFormTime
+                            :name="`tiers[${idx}].utc_windows[${winIdx}].end`"
+                            :label="t('modelPricing.timeWindowTo')"
+                            format24
+                            :data-test="`model-pricing-tier-window-end-${idx}-${winIdx}`"
+                          />
+                        </div>
+                        <div class="flex h-8.5 items-center gap-2">
+                          <OButton
+                            variant="outline-destructive"
+                            size="icon"
+                            type="button"
+                            :data-test="`model-pricing-tier-window-remove-btn-${idx}-${winIdx}`"
+                            @click="removeWindow(idx, winIdx)"
+                          >
+                            <OIcon name="delete" size="sm" />
+                            <OTooltip
+                              :side-offset="4"
+                              :content="t('modelPricing.removeTimeWindow')"
+                            />
+                          </OButton>
+                          <span
+                            v-if="windowWraps(win)"
+                            class="text-2xs whitespace-nowrap opacity-55"
+                            :data-test="`model-pricing-tier-window-wrap-hint-${idx}-${winIdx}`"
+                          >
+                            {{ t("modelPricing.timeWindowWrapsHint") }}
+                          </span>
+                        </div>
+                      </div>
+                      <!-- The same window in the viewer's timezone -->
+                      <div
+                        v-if="windowLocalHint(win)"
+                        class="text-2xs mt-1 opacity-55"
+                        :data-test="`model-pricing-tier-window-local-hint-${idx}-${winIdx}`"
+                      >
+                        {{ t("modelPricing.localTimeHint", { range: windowLocalHint(win) }) }}
+                      </div>
+                    </div>
+                    <!-- Live 24h preview of the hours the tier covers -->
+                    <UtcHoursBar
+                      v-if="parsedTierWindows(tier).length"
+                      class="mt-3"
+                      :windows="parsedTierWindows(tier)"
+                      :data-test="`model-pricing-tier-window-bar-${idx}`"
+                    />
+                  </div>
+
+                  <!-- Add a restriction to a non-default tier -->
+                  <div v-if="idx > 0" class="flex flex-wrap items-center gap-2">
+                    <OButton
+                      v-if="!tier.condition"
+                      variant="outline"
+                      size="sm-action"
+                      type="button"
+                      :data-test="`model-pricing-tier-add-condition-btn-${idx}`"
+                      @click="addCondition(idx)"
+                    >
+                      {{ t("modelPricing.addUsageCondition") }}
+                    </OButton>
+                    <OButton
+                      variant="outline"
+                      size="sm-action"
+                      type="button"
+                      :data-test="`model-pricing-tier-add-window-btn-${idx}`"
+                      @click="addWindow(idx)"
+                    >
+                      {{ t("modelPricing.addTimeWindow") }}
+                    </OButton>
+                  </div>
+
                   <!-- Quick Setup -->
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="sub-label text-2xs font-semibold tracking-[0.06em] opacity-65">{{
-                      t("modelPricing.quickSetup")
-                    }}</span>
+                    <OText variant="section">{{ t("modelPricing.quickSetup") }}</OText>
                     <OButton
                       v-for="tpl in usageTemplates"
                       :key="tpl.name"
@@ -304,11 +390,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Price Table -->
                   <div>
-                    <div class="price-table-label text-2xs mb-2 font-semibold tracking-[0.03em]">
-                      {{ t("modelPricing.tokenPrices") }}
-                      <span class="price-table-label-sub font-normal tracking-normal opacity-55">
-                        {{ t("modelPricing.tokenPricesUnit") }}</span
-                      >
+                    <div class="mb-2">
+                      <OText variant="label">{{ t("modelPricing.tokenPrices") }}</OText>
+                      <OText variant="meta"> {{ t("modelPricing.tokenPricesUnit") }}</OText>
                     </div>
 
                     <div class="price-table overflow-hidden">
@@ -374,17 +458,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- Empty state -->
-                      <div
+                      <OEmptyState
                         v-if="!tier.prices.length"
-                        class="price-empty flex flex-col items-center gap-0.75 p-4"
-                      >
-                        <div class="price-empty-title text-xs font-medium">
-                          {{ t("modelPricing.noPricesDefined") }}
-                        </div>
-                        <div class="price-empty-sub text-2xs opacity-55">
-                          {{ t("modelPricing.noPricesDesc") }}
-                        </div>
-                      </div>
+                        size="inline"
+                        hide-action
+                        :title="t('modelPricing.noPricesDefined')"
+                        :description="t('modelPricing.noPricesDesc')"
+                      />
 
                       <!-- Add row (staging draft, form-owned) -->
                       <div
@@ -534,14 +614,21 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormTime from "@/lib/forms/Time/OFormTime.vue";
+import UtcHoursBar, { type UtcHoursWindow } from "@/components/settings/UtcHoursBar.vue";
+import OCode from "@/lib/core/Code/OCode.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeModelPricingSchema,
   type ModelPricingForm,
   type ModelPricingTier,
+  type ModelPricingTierWindow,
 } from "./ModelPricingEditor.schema";
 
 const { t } = useI18nTyped();
@@ -619,7 +706,12 @@ function createEmptyModel() {
 
 // API-shaped tier (per-token price map). Used to seed the working `model`.
 function newTier(name: string, condition: any = null) {
-  return { name, condition, prices: {} as Record<string, number> };
+  return {
+    name,
+    condition,
+    prices: {} as Record<string, number>,
+    utc_windows: [] as Array<{ start_minute: number; end_minute: number }>,
+  };
 }
 
 // ── map ↔ rows converters (the field-array unlock) ───────────────────────────
@@ -628,29 +720,99 @@ function newFormTier(name: string, condition: any = null) {
   return {
     name,
     condition,
+    utc_windows: [] as ModelPricingTierWindow[],
     prices: [] as Array<{ key: string; value: number }>,
     draftKey: "",
     draftValue: 0,
   };
 }
 
+// ── UTC time-window converters ───────────────────────────────────────────────
+// The API stores minutes past UTC midnight; OFormTime binds `HH:MM`. A window
+// whose start is later than its end wraps past midnight (e.g. 22:00 → 02:00).
+
+function minutesToHhmm(minutes: number): string {
+  // 1440 (24:00) is a valid API bound but not a valid <input type="time"> value;
+  // it means the same instant as 00:00, so normalise it.
+  const m = ((Math.round(Number(minutes) || 0) % 1440) + 1440) % 1440;
+  const hh = String(Math.floor(m / 60)).padStart(2, "0");
+  const mm = String(m % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+/** `HH:MM` → minutes past UTC midnight, or null when unparseable. */
+function hhmmToMinutes(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? "").trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const mins = Number(match[2]);
+  if (hours > 23 || mins > 59) return null;
+  return hours * 60 + mins;
+}
+
+/** A tier's windows, tolerant of form state seeded before the field existed. */
+function tierWindows(tier: any): ModelPricingTierWindow[] {
+  return (tier?.utc_windows ?? []) as ModelPricingTierWindow[];
+}
+
+/** True when a window crosses UTC midnight — surfaced as a hint next to the row. */
+function windowWraps(win: ModelPricingTierWindow): boolean {
+  const start = hhmmToMinutes(win.start);
+  const end = hhmmToMinutes(win.end);
+  return start !== null && end !== null && start > end;
+}
+
+/** One window rendered in the user's configured timezone, or "" when there is
+ *  nothing meaningful to show (unparseable bounds, or the timezone is UTC). */
+function windowLocalHint(win: ModelPricingTierWindow): string {
+  const start = hhmmToMinutes(win.start);
+  const end = hhmmToMinutes(win.end);
+  if (start === null || end === null) return "";
+  return formatUtcWindowsInTz([{ start_minute: start, end_minute: end }], store.state.timezone);
+}
+
+/** The tier's windows as minutes, keeping only rows the 24h preview can draw. */
+function parsedTierWindows(tier: any): UtcHoursWindow[] {
+  return tierWindows(tier)
+    .map((w) => ({
+      start_minute: hhmmToMinutes(w?.start),
+      end_minute: hhmmToMinutes(w?.end),
+    }))
+    .filter(
+      (w): w is UtcHoursWindow =>
+        w.start_minute !== null && w.end_minute !== null && w.start_minute !== w.end_minute,
+    );
+}
+
 // API model (per-token price MAP) → FORM value (per-million ROW array).
 function modelToForm(m: any): ModelPricingForm {
-  const tiers = (m?.tiers ?? []).map((tier: any, i: number) => ({
-    name: tier.name ?? "",
-    condition:
-      i === 0
-        ? null
-        : tier.condition
-          ? { ...tier.condition }
-          : { usage_key: "input", operator: "gt", value: 0 },
-    prices: Object.entries(tier.prices ?? {}).map(([k, v]) => ({
-      key: k,
-      value: toPerMillion(Number(v)),
-    })),
-    draftKey: "",
-    draftValue: 0,
-  }));
+  const tiers = (m?.tiers ?? []).map((tier: any, i: number) => {
+    const windows: ModelPricingTierWindow[] = (tier.utc_windows ?? []).map((w: any) => ({
+      start: minutesToHhmm(w?.start_minute),
+      end: minutesToHhmm(w?.end_minute),
+    }));
+    return {
+      name: tier.name ?? "",
+      // Tier 0 is the unconditional default. A later tier keeps its own condition;
+      // one restricted only by time windows keeps `null` rather than being handed a
+      // usage condition it never had.
+      condition:
+        i === 0
+          ? null
+          : tier.condition
+            ? { ...tier.condition }
+            : windows.length
+              ? null
+              : { usage_key: "input", operator: "gt", value: 0 },
+      utc_windows: i === 0 ? [] : windows,
+      prices: Object.entries(tier.prices ?? {}).map(([k, v]) => ({
+        key: k,
+        value: toPerMillion(Number(v)),
+      })),
+      draftKey: "",
+      draftValue: 0,
+    };
+  });
   return {
     name: m?.name ?? "",
     match_pattern: m?.match_pattern ?? "",
@@ -669,6 +831,20 @@ function formToModelTiers(tiers: any[]): any[] {
     }
     const dk = String(tier.draftKey ?? "").trim();
     if (dk) prices[dk] = fromPerMillion(Number(tier.draftValue) || 0);
+    // Drop unparseable rows and degenerate windows (start === end), which the API
+    // rejects as ambiguous — an always-active tier carries no window at all.
+    const utcWindows =
+      i === 0
+        ? []
+        : (tier.utc_windows ?? [])
+            .map((w: any) => ({
+              start_minute: hhmmToMinutes(w?.start),
+              end_minute: hhmmToMinutes(w?.end),
+            }))
+            .filter(
+              (w: any) =>
+                w.start_minute !== null && w.end_minute !== null && w.start_minute !== w.end_minute,
+            );
     return {
       name: tier.name,
       condition:
@@ -681,6 +857,7 @@ function formToModelTiers(tiers: any[]): any[] {
                 value: Number(tier.condition.value) || 0,
               }
             : null,
+      utc_windows: utcWindows,
       prices,
     };
   });
@@ -719,6 +896,9 @@ const operators = [
 function addTier() {
   setTiers([
     ...formTiers.value,
+    // Seeded with a usage condition (the long-standing default). It can be swapped
+    // for — or combined with — a UTC time window from the tier body.
+    // Untranslated on purpose: this is persisted verbatim as `tier.name`.
     newFormTier(raw("Conditional Tier"), {
       usage_key: "input",
       operator: "gt",
@@ -729,6 +909,37 @@ function addTier() {
 
 function removeTier(idx: number) {
   setTiers(formTiers.value.filter((_: any, i: number) => i !== idx));
+}
+
+function patchTier(idx: number, patch: (_tier: any) => any) {
+  setTiers(formTiers.value.map((tier: any, i: number) => (i === idx ? patch(tier) : tier)));
+}
+
+function addCondition(idx: number) {
+  patchTier(idx, (tier) => ({
+    ...tier,
+    condition: { usage_key: "input", operator: "gt", value: 200000 },
+  }));
+}
+
+function removeCondition(idx: number) {
+  patchTier(idx, (tier) => ({ ...tier, condition: null }));
+}
+
+// Seeded with DeepSeek's first peak window (01:00-04:00 UTC) — the common case
+// this exists for, and a concrete example of the HH:MM format.
+function addWindow(idx: number) {
+  patchTier(idx, (tier) => ({
+    ...tier,
+    utc_windows: [...(tier.utc_windows ?? []), { start: "01:00", end: "04:00" }],
+  }));
+}
+
+function removeWindow(tierIdx: number, winIdx: number) {
+  patchTier(tierIdx, (tier) => ({
+    ...tier,
+    utc_windows: (tier.utc_windows ?? []).filter((_: any, j: number) => j !== winIdx),
+  }));
 }
 
 function removePrice(tierIdx: number, entryIdx: number) {
@@ -881,6 +1092,16 @@ async function save(value?: ModelPricingForm) {
     }
   }
 
+  // A non-default tier with neither a usage condition nor a time window can never
+  // be selected — the unconditional tier 0 always wins first.
+  for (let i = 1; i < tiers.length; i++) {
+    const tier = tiers[i];
+    if (!tier.condition && !(tier.utc_windows ?? []).length) {
+      notifyWarn(t("modelPricing.tierNeedsRestriction", { name: tier.name || `#${i + 1}` }));
+      return;
+    }
+  }
+
   // Require at least one non-zero price in the default tier (committed + draft).
   const defaultTier = tiers[0];
   if (defaultTier) {
@@ -978,8 +1199,11 @@ onBeforeMount(async () => {
           delete model.value.source;
         }
         for (let i = 1; i < model.value.tiers.length; i++) {
-          if (!model.value.tiers[i].condition) {
-            model.value.tiers[i].condition = {
+          const tier = model.value.tiers[i];
+          // A tier restricted only by UTC time windows legitimately has no usage
+          // condition — leave it alone rather than fabricating one.
+          if (!tier.condition && !(tier.utc_windows ?? []).length) {
+            tier.condition = {
               usage_key: "input",
               operator: "gt",
               value: 0,

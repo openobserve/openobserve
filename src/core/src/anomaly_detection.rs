@@ -26,8 +26,8 @@ use config::{
 };
 use db::authz::{remove_ownership, set_ownership};
 use infra::{
-    db::ORM_CLIENT,
-    table::{anomaly_detection::config as anomaly_config_table, get_lock},
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::anomaly_detection::config as anomaly_config_table,
 };
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use search_service as search;
@@ -220,9 +220,7 @@ pub async fn list_configs(
     folder_name: Option<&str>,
     name_substring: Option<&str>,
 ) -> Result<Vec<serde_json::Value>> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let configs = anomaly_config_table::list_by_org(db, org_id)
         .await
@@ -336,9 +334,7 @@ pub async fn list_configs(
 
 /// Get a specific anomaly detection configuration
 pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_json::Value>> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
@@ -371,9 +367,7 @@ pub async fn create_config(
     let normalized_tags =
         config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)?;
 
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let anomaly_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
@@ -552,9 +546,7 @@ pub async fn update_config(
     anomaly_id: &str,
     req: UpdateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     // Fetch existing config — into_active_model() on a DB-fetched model sets the PK as
     // Unchanged, which is required for SeaORM to generate UPDATE … WHERE anomaly_id = ?
@@ -696,11 +688,7 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
     let updated = active_model.update(db).await?;
-    // released before the retrain/scheduler follow-ups below, which take this lock themselves
-    drop(_lock);
 
     // Evict any cached model for this config — training params may have changed,
     // so the next detection run should load a fresh model from S3.
@@ -851,9 +839,7 @@ pub async fn update_config(
 
 /// Delete an anomaly detection configuration
 pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     // Verify the config exists before deleting (returns 404 if missing).
     let existing = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
@@ -927,9 +913,7 @@ pub async fn clone_config(
     new_name: Option<String>,
     folder_id: Option<String>,
 ) -> Result<serde_json::Value> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let src = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
@@ -1060,9 +1044,7 @@ pub async fn clone_config(
 /// threshold changes are recomputed in place with no retrain.
 #[cfg(feature = "enterprise")]
 async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<()> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
@@ -1086,10 +1068,7 @@ async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<(
     active.status = Set(0i32);
     active.is_trained = Set(false);
     active.updated_at = Set(Utc::now().timestamp_micros());
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
     active.update(db).await?;
-    drop(_lock);
 
     // Nudge the training scheduler so the retrain fires promptly rather than on its next
     // periodic sweep.
@@ -1107,9 +1086,7 @@ async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<(
 /// which the user can then re-cancel if needed.  In practice the task will notice the
 /// status change and bail early on the next DB write.
 pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
@@ -1122,8 +1099,6 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     active.training_started_at = Set(None);
     active.last_error = Set(Some("Training cancelled by user.".to_string()));
     active.updated_at = Set(Utc::now().timestamp_micros());
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
     active.update(db).await?;
 
     log::info!("[anomaly_detection {anomaly_id}] training cancelled by user");
@@ -1133,9 +1108,7 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
 /// Train a model for a configuration
 pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
     // Verify the config exists and belongs to this org before delegating.
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
     anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
@@ -1158,9 +1131,7 @@ pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::V
 
 /// Run detection for a configuration
 pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
 
     // Fetch config
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
@@ -1365,13 +1336,7 @@ pub struct DetectionHistoryItem {
 /// scheduler's `watch_timeout()` job already resets any `Processing` rows whose
 /// `end_time` has passed, exactly as it does for alert triggers.
 pub async fn recover_detection_triggers_on_startup() {
-    let db = match ORM_CLIENT.get() {
-        Some(db) => db,
-        None => {
-            log::warn!("[anomaly_detection] DB not available for startup trigger recovery");
-            return;
-        }
-    };
+    let db = get_orm_client_ro().await;
 
     let configs = match anomaly_config_table::list_all_enabled(db).await {
         Ok(c) => c,

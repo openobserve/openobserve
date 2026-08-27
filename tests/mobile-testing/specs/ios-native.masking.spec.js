@@ -10,5 +10,6 @@ maskingSuite({
   pii: ['alex.morgan@example.com', '4242 4242 4242 4242'],
   flows: ['ios-native/masking.yaml'],
   device: cfg.IOS_SIM_UDID,
-  requireReplay: false, // iOS mobile replay is not always rendered in CI → skip-with-reason, don't false-fail
+  // NOTE: the NATIVE iOS SDK uses OpenObserve's correct /replay endpoint, so this uploads + renders and
+  // runs as a hard P0 (unlike RN iOS — see rn-ios.masking / openobserve#13942).
 });

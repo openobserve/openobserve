@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 71;
+pub const DB_SCHEMA_VERSION: u64 = 73;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2655,7 +2655,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor merges a closed hour into size-split `indexed-v1-` Parquet files with a `.midx` metrics index. Only affects newly written Parquet metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
     )]
     pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds

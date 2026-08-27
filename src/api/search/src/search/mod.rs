@@ -32,7 +32,7 @@ use config::{
             default_use_cache,
         },
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
-        sql::resolve_stream_names,
+        sql::{extract_where, resolve_stream_names},
         stream::StreamType,
     },
     utils::{base64, json, time::now_micros},
@@ -1972,11 +1972,15 @@ pub async fn result_schema(
         None
     };
 
+    // Single parse → both the full WHERE and the per-stream (join) WHERE.
+    let where_info = extract_where(&req.query.sql);
     Json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
         having: res_schema.having,
         timeseries_field: res_schema.timeseries,
+        where_clause: where_info.where_clause,
+        where_by_stream: where_info.where_by_stream,
         cross_links,
     })
     .into_response()

@@ -180,13 +180,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-match_pattern="{ row }">
             <div class="flex min-w-0 items-center gap-1">
-              <code
-                class="bg-surface-subtle border-card-glass-border rounded-default block max-w-full border px-1.5 py-0.5 text-xs text-inherit"
+              <OCode
+                truncate
                 :class="{
                   '[text-decoration-color:currentColor] opacity-50 [text-decoration:line-through]':
                     isChildRow(row),
                 }"
-                >{{ row.match_pattern }}</code
+                >{{ row.match_pattern }}</OCode
               >
               <OIcon
                 v-if="isChildRow(row)"
@@ -258,6 +258,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </tr>
                           </tbody>
                         </table>
+                      </div>
+                    </template>
+                  </OTooltip>
+                </OTag>
+                <OTag
+                  v-if="hasTimeBasedTiers(row)"
+                  type="countChip"
+                  value="neutral"
+                  clickable
+                  icon="schedule"
+                  data-test="model-pricing-time-based-chip"
+                  @click.stop="openPricingDialog(row)"
+                >
+                  {{ t("modelPricing.timeBasedChip") }}
+                  <OTooltip side="top" align="center">
+                    <template #content>
+                      <div class="min-w-60">
+                        <div class="text-compact mb-1 font-bold">{{ row.name }}</div>
+                        <div
+                          v-for="(tier, tIdx) in row.tiers ?? []"
+                          :key="tIdx"
+                          class="mb-2 last:mb-0"
+                        >
+                          <div class="text-2xs font-semibold">
+                            {{ tier.name || t("modelPricing.tierDefaultName") }}
+                          </div>
+                          <div
+                            v-if="tier.utc_windows?.length"
+                            class="text-2xs font-mono opacity-70"
+                          >
+                            {{ formatUtcWindows(tier.utc_windows) }}
+                          </div>
+                          <div v-if="tierWindowsLocal(tier)" class="text-2xs font-mono opacity-70">
+                            {{ t("modelPricing.localTimeHint", { range: tierWindowsLocal(tier) }) }}
+                          </div>
+                          <div
+                            v-if="!tier.condition && !tier.utc_windows?.length"
+                            class="text-2xs opacity-70"
+                          >
+                            {{ t("modelPricing.tierAlwaysActive") }}
+                          </div>
+                          <table class="mt-0.5 w-full border-collapse">
+                            <tbody>
+                              <tr
+                                v-for="[key, price] in sortedPriceEntries(tier.prices || {})"
+                                :key="key"
+                              >
+                                <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
+                                <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
+                                  {{ formatPerMillion(price) }}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </template>
                   </OTooltip>
@@ -407,60 +462,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex-1 overflow-y-auto">
         <div v-if="pricingDialogRow">
           <div class="mb-4">
-            <div class="text-text-secondary mb-1.5 text-xs font-semibold">
+            <OText variant="label" class="mb-1.5 block">
               {{ t("modelPricing.colPattern") }}
-            </div>
-            <code
-              class="bg-surface-subtle border-card-glass-border rounded-default text-compact block max-h-75 overflow-y-auto border px-1.5 px-2.5 py-0.5 py-1.5 text-xs break-all whitespace-pre-wrap text-inherit"
-              >{{ pricingDialogRow.match_pattern }}</code
-            >
+            </OText>
+            <!-- No `copyable`: OCode's copy is navigator.clipboard-only and fails
+                 silently on HTTP, unlike @/utils/clipboard's execCommand fallback. -->
+            <OCode block class="max-h-75 overflow-y-auto">{{
+              pricingDialogRow.match_pattern
+            }}</OCode>
           </div>
           <OSeparator class="mb-4" />
 
           <div>
-            <div
-              class="text-text-secondary pricing-section-label mt-2 mb-1.5 text-xs font-semibold"
-            >
+            <OText variant="label" class="mt-2 mb-1.5 block">
               {{ t("modelPricing.colPricing") }}
-            </div>
-            <div
-              v-if="sortedPriceEntries(getDefaultTier(pricingDialogRow)?.prices || {}).length"
-              class="border-card-glass-border rounded-default mt-2 overflow-hidden border"
-            >
-              <table class="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th
-                      class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-left font-semibold"
+            </OText>
+            <div v-if="drawerTiers.length" class="mt-2 flex flex-col gap-3">
+              <div
+                v-for="(tier, tIdx) in drawerTiers"
+                :key="tIdx"
+                class="border-card-glass-border rounded-default overflow-hidden border"
+                :data-test="`model-pricing-drawer-tier-${tIdx}`"
+              >
+                <!-- Tier header — only worth the space when there IS more than one tier -->
+                <div
+                  v-if="drawerTiers.length > 1"
+                  class="bg-surface-panel border-card-glass-border border-b px-3.5 py-2.5"
+                >
+                  <div class="text-compact font-semibold">
+                    {{ tier.name || t("modelPricing.tierDefaultName") }}
+                  </div>
+                  <div v-if="tier.condition" class="mt-0.5">
+                    <OCode
+                      >{{ tier.condition.usage_key }} {{ operatorSymbol(tier.condition.operator) }}
+                      {{ tier.condition.value }}</OCode
                     >
-                      {{ t("modelPricing.usageType") }}
-                    </th>
-                    <th
-                      class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-right font-semibold"
+                  </div>
+                  <div v-if="tier.utc_windows?.length" class="mt-2">
+                    <div class="text-2xs mb-1.5 opacity-55">
+                      {{ t("modelPricing.timeWindows") }}
+                      <span class="ml-1 font-mono">{{ formatUtcWindows(tier.utc_windows) }}</span>
+                    </div>
+                    <div
+                      v-if="tierWindowsLocal(tier)"
+                      class="text-2xs mb-1.5 opacity-55"
+                      data-test="model-pricing-drawer-tier-local-hint"
                     >
-                      {{ t("modelPricing.colPricing") }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="[key, price] in sortedPriceEntries(
-                      getDefaultTier(pricingDialogRow)?.prices || {},
-                    )"
-                    :key="key"
-                    class="last:[&>td]:border-b-0"
+                      {{ t("modelPricing.localTimeHint", { range: tierWindowsLocal(tier) }) }}
+                    </div>
+                    <UtcHoursBar :windows="tier.utc_windows" />
+                  </div>
+                  <div
+                    v-if="!tier.condition && !tier.utc_windows?.length"
+                    class="text-2xs mt-0.5 opacity-55"
                   >
-                    <td class="text-compact border-table-row-divider border-b px-3.5 py-2">
-                      {{ formatPriceKey(key) }}
-                    </td>
-                    <td
-                      class="text-compact border-table-row-divider border-b px-3.5 py-2 text-right font-semibold"
+                    {{ t("modelPricing.tierAlwaysActive") }}
+                  </div>
+                </div>
+                <table
+                  v-if="sortedPriceEntries(tier.prices || {}).length"
+                  class="w-full border-collapse"
+                >
+                  <thead>
+                    <tr>
+                      <th
+                        class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-left font-semibold"
+                      >
+                        {{ t("modelPricing.usageType") }}
+                      </th>
+                      <th
+                        class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-right font-semibold"
+                      >
+                        {{ t("modelPricing.colPricing") }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="[key, price] in sortedPriceEntries(tier.prices || {})"
+                      :key="key"
+                      class="last:[&>td]:border-b-0"
                     >
-                      {{ formatPerMillion(price) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                      <td class="text-compact border-table-row-divider border-b px-3.5 py-2">
+                        {{ formatPriceKey(key) }}
+                      </td>
+                      <td
+                        class="text-compact border-table-row-divider border-b px-3.5 py-2 text-right font-semibold"
+                      >
+                        {{ formatPerMillion(price) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="text-text-muted px-3.5 py-2 text-xs">&mdash;</div>
+              </div>
             </div>
             <span v-else class="text-text-muted">&mdash;</span>
           </div>
@@ -502,6 +597,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
+import OCode from "@/lib/core/Code/OCode.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import { operatorSymbol, formatUtcWindows, formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -705,9 +804,24 @@ function formatPerMillion(pricePerToken: number | undefined | null): string {
   return `$${perMillion.toFixed(2)}`;
 }
 
+// Mirrors the backend fallback rule: the default tier is the one restricted by
+// neither a usage condition nor a UTC time window (peak / off-peak pricing).
 function getDefaultTier(model: any) {
-  const fallback = model.tiers?.find((t: any) => !t.condition);
+  const fallback = model.tiers?.find((t: any) => !t.condition && !t.utc_windows?.length);
   return fallback || model.tiers?.[0];
+}
+
+/** True when any tier is restricted to UTC hours — i.e. peak / off-peak pricing. */
+function hasTimeBasedTiers(model: any): boolean {
+  return !!model.tiers?.some((t: any) => t.utc_windows?.length);
+}
+
+/** All of the drawer row's tiers, in stored order (default tier included). */
+const drawerTiers = computed<any[]>(() => pricingDialogRow.value?.tiers ?? []);
+
+/** A tier's windows in the user's timezone, or "" when that adds nothing (UTC). */
+function tierWindowsLocal(tier: any): string {
+  return formatUtcWindowsInTz(tier?.utc_windows ?? [], store.state.timezone);
 }
 
 const PRICE_KEY_ORDER = ["input", "output"];
