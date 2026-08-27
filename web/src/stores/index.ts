@@ -47,6 +47,15 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  // Which traces stream contains a given (canonical 32-char) trace id, learned
+  // by probing — see useCorrelatedTracesStream. knownStreams is the org-level
+  // fact ("streams that have ever contained a correlated trace") that keeps
+  // steady-state resolution at one point lookup regardless of stream count.
+  // Lives here so resetOrganizationData wipes it on org switch.
+  correlatedTracesStreams: {
+    byTraceId: {} as Record<string, string>,
+    knownStreams: [] as string[],
+  },
   quotaThresholdMsg: "",
   functions: [],
   actions: [],
@@ -202,6 +211,15 @@ export default createStore({
     },
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
+    },
+    setCorrelatedTracesStream(state, payload: { traceId: string; stream: string }) {
+      const cache = state.organizationData.correlatedTracesStreams;
+      // Bounded: past the cap, clear and restart. knownStreams survives, so a
+      // re-resolution of any dropped id is a single point lookup — LRU would
+      // be bookkeeping for ~100KB of strings.
+      if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
+      cache.byTraceId[payload.traceId] = payload.stream;
+      if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
     },
     setOrgTokens(state, payload) {
       state.organizationData.orgTokens = payload;

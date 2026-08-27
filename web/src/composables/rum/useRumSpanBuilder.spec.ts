@@ -345,6 +345,37 @@ describe("useRumSpanBuilder", () => {
   });
 
   // =========================================================================
+  // fetchRumEventsForTrace — padded/legacy trace-id variants
+  // =========================================================================
+
+  describe("fetchRumEventsForTrace — trace-id variants", () => {
+    it("should query both padded and legacy zero-stripped trace ids", async () => {
+      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      // 32-char canonical id as it arrives from the traces page; SDK 0.4.x
+      // stored the same id zero-stripped (31 chars) in _rumdata
+      await fetchRumEventsForTrace("01a034c1aabc72f78880daf6c9755cff", 1_000_000, 2_000_000);
+
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
+        .sql as string;
+      expect(sql).toContain("= '01a034c1aabc72f78880daf6c9755cff'");
+      expect(sql).toContain("= '1a034c1aabc72f78880daf6c9755cff'");
+    });
+
+    it("should keep exact matching for non-hex ids", async () => {
+      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
+        .sql as string;
+      expect(sql).toContain("= 'trace-abc'");
+    });
+  });
+
+  // =========================================================================
   // fetchRumEventsForTrace — successful full flow
   // =========================================================================
 

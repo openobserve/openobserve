@@ -32,6 +32,7 @@ import sys
 from translator import (
     SOURCE_LOCALE,
     build_locale,
+    build_module_glossary,
     build_state,
     collect_pending_leaves,
     find_duplicate_keys,
@@ -140,7 +141,11 @@ def main():
         pending = collect_pending_leaves(source, existing, state)
         print(f"\nTranslating: {locale} ({len(pending)} strings pending)")
 
-        translated = translate_pending(pending, locale) if pending else {}
+        translated = (
+            translate_pending(pending, locale, build_module_glossary(source, existing))
+            if pending
+            else {}
+        )
 
         target = build_locale(source, existing, state, translated, counters)
         locale_targets[locale] = target

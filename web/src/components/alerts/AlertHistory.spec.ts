@@ -210,6 +210,8 @@ describe("AlertHistory.vue", () => {
         expect.any(String),
         "",
         "",
+        // alertType — part of the list key, so it rides along on every call.
+        "",
       );
     });
 

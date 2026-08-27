@@ -1398,13 +1398,11 @@ export default defineComponent({
       }
     });
 
-    watch(
-      panelData,
-      () => {
-        emit("series-data-update", panelData.value);
-      },
-      { deep: true },
-    );
+    // panelData is a shallowRef replaced wholesale, so no deep watch needed —
+    // deep would traverse every data point of the chart options per update.
+    watch(panelData, () => {
+      emit("series-data-update", panelData.value);
+    });
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(

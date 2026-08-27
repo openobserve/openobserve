@@ -53,6 +53,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pageSizeOptions: () => [20, 50, 100, 250, 500],
   sorting: "client",
   selection: "none",
+  showSelectAll: true,
   expansion: "none",
   virtualScroll: false,
   virtualScrollItemSize: 48,
@@ -1213,6 +1214,7 @@ defineExpose({
             :table="table"
             :column-order="columnOrder"
             :selection-multiple="selection.isMultiple.value"
+            :show-select-all="showSelectAll"
             :is-all-selected="selection.isAllSelected()"
             :is-indeterminate="selection.isIndeterminate()"
             :expansion-enabled="expansion.isEnabled.value"
@@ -1270,6 +1272,7 @@ defineExpose({
             :clickable="isRowClickable"
             :selection-enabled="selection.isEnabled.value"
             :selection-multiple="selection.isMultiple.value"
+            :show-select-all="showSelectAll"
             :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
             :is-row-selectable="props.isRowSelectable"
             :expansion-enabled="expansion.isEnabled.value"

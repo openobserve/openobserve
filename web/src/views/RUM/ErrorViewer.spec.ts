@@ -316,14 +316,16 @@ describe("ErrorViewer.vue", () => {
     it("shows the trace correlation card when the error carries _oo_trace_id", async () => {
       await seedErrorDetails({
         error_id: "err-1",
-        _oo_trace_id: "trace-abc",
+        // Legacy zero-stripped id as SDK 0.4.x stored it (31 hex chars) — the
+        // card must receive the padded 32-char form the traces stream stores.
+        _oo_trace_id: "1a034c1aabc72f78880daf6c9755cff",
         session_id: "session-1",
         _timestamp: 1640995200000000,
       });
 
       const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
       expect(card.exists()).toBe(true);
-      expect(card.props("traceId")).toBe("trace-abc");
+      expect(card.props("traceId")).toBe("01a034c1aabc72f78880daf6c9755cff");
       expect(card.props("timestamp")).toBe(1640995200000000);
     });
 
@@ -333,13 +335,27 @@ describe("ErrorViewer.vue", () => {
         _timestamp: 1640995200000000,
         events: [
           { type: "action", action_type: "click" },
-          { type: "resource", resource_type: "xhr", _oo_trace_id: "trace-xhr" },
+          {
+            type: "resource",
+            resource_type: "xhr",
+            _oo_trace_id: "0badc0ffee0ddf00dd15ea5eba5eba11",
+          },
         ],
       });
 
       const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
       expect(card.exists()).toBe(true);
-      expect(card.props("traceId")).toBe("trace-xhr");
+      expect(card.props("traceId")).toBe("0badc0ffee0ddf00dd15ea5eba5eba11");
+    });
+
+    it("hides the card when the stored trace id is not plausible hex", async () => {
+      await seedErrorDetails({
+        error_id: "err-1",
+        _oo_trace_id: "not-a-trace-id",
+        _timestamp: 1640995200000000,
+      });
+
+      expect(wrapper.findComponent({ name: "TraceCorrelationCard" }).exists()).toBe(false);
     });
 
     it("hides the card when neither the error nor its events carry a trace id", async () => {
