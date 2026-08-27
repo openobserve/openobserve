@@ -618,6 +618,13 @@ pub enum ExtrapolationKind {
     Delta,
 }
 
+impl ExtrapolationKind {
+    /// Counter kinds correct for resets and extrapolate the counter zero point.
+    pub fn is_counter(self) -> bool {
+        matches!(self, Self::Rate | Self::Increase)
+    }
+}
+
 /// `extrapolated_rate` is a utility function for rate/increase/delta.
 ///
 /// Calculates the rate (allowing for counter resets if `kind` is Rate or
@@ -648,7 +655,7 @@ pub fn extrapolated_rate(
     let last = &samples.last().unwrap();
     let mut delta = last.value - first.value;
 
-    if matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase) {
+    if kind.is_counter() {
         // Handle counter resets.
         let mut prev_value = first.value;
         for sample in &samples[1..] {
@@ -674,7 +681,18 @@ pub struct CounterSeries<'a> {
 }
 
 impl<'a> CounterSeries<'a> {
+    /// True when the one-pass reset scan can amortize: multiple evaluation
+    /// windows that overlap (`step <= range`). Otherwise the legacy per-window
+    /// scan touches fewer samples.
+    pub fn amortizes(eval_points: usize, step: i64, range_micros: i64) -> bool {
+        eval_points > 1 && step <= range_micros
+    }
+
+    /// # Panics
+    ///
+    /// Panics if `kind` is not a counter kind.
     pub fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
+        assert!(kind.is_counter(), "CounterSeries requires a counter kind");
         let mut resets = Vec::new();
         for i in 1..samples.len() {
             if samples[i].value < samples[i - 1].value {
@@ -707,18 +725,13 @@ impl<'a> CounterSeries<'a> {
             return None;
         }
         let mut delta = window[window.len() - 1].value - window[0].value;
-        if matches!(
-            self.kind,
-            ExtrapolationKind::Rate | ExtrapolationKind::Increase
-        ) {
-            // Resets strictly inside the window, added in scan order.
-            let from = self.resets.partition_point(|&(index, _)| index <= start);
-            for &(index, correction) in &self.resets[from..] {
-                if index >= end {
-                    break;
-                }
-                delta += correction;
+        // Resets strictly inside the window, added in scan order.
+        let from = self.resets.partition_point(|&(index, _)| index <= start);
+        for &(index, correction) in &self.resets[from..] {
+            if index >= end {
+                break;
             }
+            delta += correction;
         }
         extrapolate_from_delta(window, delta, eval_ts, range, Duration::ZERO, self.kind)
     }
@@ -776,7 +789,7 @@ fn extrapolate_from_delta(
     assert!(last.timestamp <= end);
 
     let mut result = delta;
-    let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
+    let is_counter = kind.is_counter();
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
@@ -1160,6 +1173,24 @@ mod tests {
     }
 
     #[test]
+    fn test_counter_series_amortizes() {
+        const MINUTE: i64 = 60 * 1_000_000;
+        // Overlapping windows: 15s step inside a 5m range.
+        assert!(CounterSeries::amortizes(721, MINUTE / 4, 5 * MINUTE));
+        // Adjacent windows still reuse the boundary sample.
+        assert!(CounterSeries::amortizes(2, 5 * MINUTE, 5 * MINUTE));
+        // Disjoint windows (1h step, 5m range) or a single window cannot.
+        assert!(!CounterSeries::amortizes(168, 60 * MINUTE, 5 * MINUTE));
+        assert!(!CounterSeries::amortizes(1, MINUTE / 4, 5 * MINUTE));
+    }
+
+    #[test]
+    #[should_panic(expected = "counter kind")]
+    fn test_counter_series_rejects_non_counter_kind() {
+        CounterSeries::new(&[], ExtrapolationKind::Delta);
+    }
+
+    #[test]
     fn test_counter_series_window_boundaries() {
         const MICROS: i64 = 1_000_000;
         // A reset sits between samples 1 and 2. Windows that include it must
@@ -1172,11 +1203,7 @@ mod tests {
         ];
         let range = Duration::from_secs(60);
 
-        for kind in [
-            ExtrapolationKind::Rate,
-            ExtrapolationKind::Increase,
-            ExtrapolationKind::Delta,
-        ] {
+        for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
             let counter = CounterSeries::new(&samples, kind);
 
             // Full window: reset included.

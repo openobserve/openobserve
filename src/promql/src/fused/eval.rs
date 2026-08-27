@@ -78,10 +78,7 @@ pub(crate) fn fused_range_agg(
 
     let timestamps = eval_ctx.timestamps();
     let groups = group_series_by_labels(&matrix, param);
-    // A single-window query has no overlapping scans to amortize.
-    let counter_kind = func
-        .counter_extrapolation()
-        .filter(|_| timestamps.len() > 1);
+    let counter_kind = func.counter_extrapolation();
 
     let results = groups
         .par_iter()
@@ -100,8 +97,11 @@ pub(crate) fn fused_range_agg(
                     let range_micros = micros(range);
                     let mut start_index = 0;
                     let mut end_index = 0;
-                    let counter =
-                        counter_kind.map(|kind| CounterSeries::new(&metric.samples, kind));
+                    let counter = counter_kind
+                        .filter(|_| {
+                            CounterSeries::amortizes(timestamps.len(), eval_ctx.step, range_micros)
+                        })
+                        .map(|kind| CounterSeries::new(&metric.samples, kind));
 
                     for (slot, &eval_ts) in timestamps.iter().enumerate() {
                         let window_samples = advance_sample_window(
