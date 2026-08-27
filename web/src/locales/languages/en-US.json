@@ -13369,7 +13369,7 @@
     "attentionOpenPolicy": "Open escalation",
     "attentionOpenRouting": "Open routing",
     "attentionNoTransport": "No transport is configured — every page on this deployment reaches nobody",
-    "escalationTab": "Escalation",
+    "escalationTab": "Escalation Policies",
     "contactReadinessTitle": "Contact readiness",
     "contactReadinessHint": "would a page actually land?",
     "contactReachable": "Reachable",
