@@ -314,6 +314,7 @@ fn composite_input(
         tags: alert.tags,
         owner: alert.owner.or_else(|| Some(user_id.clone())),
         last_edited_by: Some(user_id),
+        pending_period_sec: alert.pending_period_sec
     }
 }
 

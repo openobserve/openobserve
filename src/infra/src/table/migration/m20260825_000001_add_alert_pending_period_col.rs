@@ -21,7 +21,9 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.alter_table(get_update_stmt()).await
+        manager.alter_table(get_update_stmt_alerts()).await?;
+        manager.alter_table(get_update_stmt_composites()).await?;
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -32,15 +34,36 @@ impl MigrationTrait for Migration {
                     .drop_column(Alerts::PendingPeriodSec)
                     .to_owned(),
             )
-            .await
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(AlertComposites::Table)
+                    .drop_column(AlertComposites::PendingPeriodSec)
+                    .to_owned(),
+            )
+            .await?;
+        Ok(())
     }
 }
 
-fn get_update_stmt() -> TableAlterStatement {
+fn get_update_stmt_alerts() -> TableAlterStatement {
     Table::alter()
         .table(Alerts::Table)
         .add_column_if_not_exists(
             ColumnDef::new(Alerts::PendingPeriodSec)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .to_owned()
+}
+
+fn get_update_stmt_composites() -> TableAlterStatement {
+    Table::alter()
+        .table(AlertComposites::Table)
+        .add_column_if_not_exists(
+            ColumnDef::new(AlertComposites::PendingPeriodSec)
                 .integer()
                 .not_null()
                 .default(0),
@@ -54,6 +77,12 @@ enum Alerts {
     PendingPeriodSec,
 }
 
+#[derive(DeriveIden)]
+enum AlertComposites {
+    Table,
+    PendingPeriodSec,
+}
+
 #[cfg(test)]
 mod tests {
     use collapse::*;
@@ -63,8 +92,12 @@ mod tests {
     #[test]
     fn postgres() {
         collapsed_eq!(
-            &get_update_stmt().to_string(PostgresQueryBuilder),
+            &get_update_stmt_alerts().to_string(PostgresQueryBuilder),
             r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "pending_period_sec" integer NOT NULL DEFAULT 0"#
+        );
+        collapsed_eq!(
+            &get_update_stmt_composites().to_string(PostgresQueryBuilder),
+            r#"ALTER TABLE "alert_composites" ADD COLUMN IF NOT EXISTS "pending_period_sec" integer NOT NULL DEFAULT 0"#
         );
     }
 
@@ -73,8 +106,12 @@ mod tests {
         // Note: SQLite doesn't support IF NOT EXISTS in ALTER TABLE ADD COLUMN,
         // so add_column_if_not_exists generates the same SQL as add_column
         collapsed_eq!(
-            &get_update_stmt().to_string(SqliteQueryBuilder),
+            &get_update_stmt_alerts().to_string(SqliteQueryBuilder),
             r#"ALTER TABLE "alerts" ADD COLUMN "pending_period_sec" integer NOT NULL DEFAULT 0"#
+        );
+        collapsed_eq!(
+            &get_update_stmt_composites().to_string(SqliteQueryBuilder),
+            r#"ALTER TABLE "alert_composites" ADD COLUMN "pending_period_sec" integer NOT NULL DEFAULT 0"#
         );
     }
 }

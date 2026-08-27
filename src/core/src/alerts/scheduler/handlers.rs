@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::TriggerCondition,
+        alerts::{TriggerCondition, level::DeliveryDecision},
         dashboards::reports::ReportFrequencyType,
         pipeline::components::NodeData,
         self_reporting::{
@@ -807,11 +807,37 @@ async fn handle_composite_alert_trigger(
     )?;
     let previous =
         infra::table::alert_states::get(&definition.definition.id, ROLLUP_GROUP_KEY).await?;
-    let outcome = if evaluated.result {
+
+    let base_outcome = if evaluated.result {
         RunOutcome::Firing
     } else {
         RunOutcome::Normal
     };
+
+    let outcome = if definition.definition.pending_period_sec > 0 {
+        match &previous {
+            // non existent state -> firing = pending
+            None if evaluated.result => RunOutcome::Pending,
+            // non-existent state -> normal = normal
+            None => RunOutcome::Normal,
+            Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
+                (None, _) | (Some(RunOutcome::Normal), _) if evaluated.result => {
+                    RunOutcome::Pending
+                }
+                (Some(RunOutcome::Pending), Some(last)) if evaluated.result => {
+                    if now - last < definition.definition.pending_period_sec * 1_000_000 {
+                        RunOutcome::Pending
+                    } else {
+                        base_outcome
+                    }
+                }
+                _ => base_outcome,
+            },
+        }
+    } else {
+        base_outcome
+    };
+
     let update = apply_outcome(
         &definition.definition.id,
         ROLLUP_GROUP_KEY,
@@ -859,15 +885,19 @@ async fn handle_composite_alert_trigger(
 
     let mut delivery_retry_at = None;
     if evaluated.result {
-        let delivery = config::meta::alerts::level::delivery_decision(
-            evaluated.level,
-            scheduled_data
-                .last_notified_level
-                .and_then(config::meta::alerts::level::AlertLevel::from_i32),
-            scheduled_data.delivery_silenced_until,
-            now,
-            Some(true),
-        );
+        let delivery = if matches!(outcome, RunOutcome::Pending) {
+            DeliveryDecision::SuppressedByPending
+        } else {
+            config::meta::alerts::level::delivery_decision(
+                evaluated.level,
+                scheduled_data
+                    .last_notified_level
+                    .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+                scheduled_data.delivery_silenced_until,
+                now,
+                Some(true),
+            )
+        };
         if delivery.should_deliver()
             && (!definition
                 .definition
