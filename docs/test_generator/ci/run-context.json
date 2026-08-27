@@ -1,0 +1,21 @@
+{
+  "feature_slug": "search-inspector",
+  "feature_title": "Search Inspector Permission Gating",
+  "area": "Logs",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "searchInspector.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/searchInspector.spec.js",
+  "playwright_group": "Logs-Features",
+  "source_files": [
+    "web/src/layouts/MainLayout.vue",
+    "src/api/management/src/request/status/mod.rs",
+    "src/api/search/src/search/search_inspector.rs",
+    "o2_openfga/src/meta/route_permissions.rs",
+    "o2_openfga/src/authorizer/authz.rs"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

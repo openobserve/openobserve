@@ -1,0 +1,12 @@
+src/api/common/src/extractors.rs
+src/api/management/src/request/status/mod.rs
+src/api/search/src/search/search_inspector.rs
+src/search/src/inspector.rs
+src/search_service/src/cache/mod.rs
+src/search_service/src/streaming/mod.rs
+web/src/layouts/MainLayout.vue
+o2_openfga/model/model.fga
+o2_openfga/model/model.json
+o2_openfga/src/authorizer/authz.rs
+o2_openfga/src/meta/mapping.rs
+o2_openfga/src/meta/route_permissions.rs

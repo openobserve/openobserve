@@ -103,6 +103,7 @@ const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
+import { SearchInspectorPage } from "./logsPages/searchInspectorPage.js";
 
 // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
 import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
@@ -230,6 +231,7 @@ class PageManager {
     // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
     this.logsQueryPage = new LogsQueryPage(page);
     this.unflattenedPage = new UnflattenedPage(page);
+    this.searchInspectorPage = new SearchInspectorPage(page);
 
     // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
     this.sdrPatternsPage = new SDRPatternsPage(page);
