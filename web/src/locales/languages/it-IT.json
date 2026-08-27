@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Crea nuova destinazione",
       "select": "Destinazione",
-      "loadError": "Errore durante il recupero delle destinazioni."
+      "loadError": "Errore durante il recupero delle destinazioni.",
+      "unsupportedType": "Tipo non supportato — Workflow supporta solo destinazioni personalizzate"
     },
     "function": {
       "createNew": "Crea nuova funzione",
       "createNewNoteWorkflow": "Nota: La funzione verrà creata, poi verrai reindirizzato al modulo precedente per associare la funzione appena creata al workflow.",
       "select": "Seleziona funzione",
       "loadError": "Caricamento funzioni fallito",
+      "saved": "Funzione salvata con successo",
+      "updated": "Funzione aggiornata con successo",
+      "saveError": "Salvataggio della funzione non riuscito",
       "flatten": "Dopo l'appiattimento",
       "guidelinesTitle": "Linee guida per l'esecuzione della funzione:",
       "rbf": "RBF (Esecuzione prima dell'appiattimento):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "Esecuzioni del flusso di lavoro",
       "edit": "Modifica flusso di lavoro",
+      "debugInEditor": "Debug nell'editor",
       "staleGraphWarning": "Questo workflow è stato modificato dopo questa esecuzione — il {count} step che ha eseguito non esiste più, quindi il suo stato non viene mostrato qui. | Questo workflow è stato modificato dopo questa esecuzione — i {count} step che ha eseguito non esistono più, quindi i loro stati non vengono mostrati qui."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Successo",
       "failed": "Fallito",
       "open": "Cronologia",
+      "openFullView": "Apri la visualizzazione completa delle esecuzioni",
       "loadError": "Errore durante il caricamento delle esecuzioni",
       "loadRunError": "Errore durante il caricamento di questa esecuzione"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "È richiesto un trigger",
     "addStepRequired": "Aggiungi almeno un passo dopo il trigger",
     "connectAllNodes": "Collega tutti i nodi prima di salvare",
-    "finishStepsBeforePublish": "Completa la configurazione di tutti i passaggi prima di pubblicare",
+    "finishStepsBeforePublish": "{count} passaggio richiede configurazione prima della pubblicazione — evidenziato sulla tela. | {count} passaggi richiedono configurazione prima della pubblicazione — evidenziati sulla tela.",
     "draft": "Bozza",
     "saveDraft": "Salva come bozza",
     "publish": "Pubblica",
@@ -2708,6 +2714,11 @@
       "linkError": "Impossibile collegare gli avvisi."
     },
     "chooseTrigger": "Scegli un trigger",
+    "start": {
+      "triggerHint": "Seleziona l'evento che avvia il tuo workflow",
+      "chooseAction": "Scegli un'azione",
+      "actionHint": "Seleziona cosa succede dopo il trigger"
+    },
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Campi specifici dell'evento",
       "incidentNoExtraFields": "Questo evento non aggiunge campi oltre a quelli comuni.",
       "conditionNoteTitle": "Linee guida per le condizioni",
+      "functionFlattenTitle": "Prima vs dopo l'appiattimento",
       "conditionNoteEmpty": "Per controllare un valore vuoto, usa \"\". Esempio:",
       "conditionNoteNull": "Per controllare un valore nullo, usa null. Esempio:",
       "conditionNoteCustom": "Per aggiungere una colonna personalizzata, digita il suo nome e premi Invio.",
@@ -2755,19 +2767,56 @@
       "enable": "Attiva passaggio",
       "disabledBadge": "Disattivato",
       "incompleteBadge": "Configura più tardi",
-      "destinationSetUpLater": "Configura più tardi",
-      "destinationSetUpLaterPrompt": "Non hai ancora una destinazione? Attiva questa opzione per configurarla in seguito — puoi salvare una bozza e testare ora.",
-      "destinationSetUpLaterActive": "La destinazione viene saltata per ora — nome e commento vengono comunque salvati. Ti servirà una destinazione prima di pubblicare.",
-      "functionSetUpLater": "Configura più tardi",
-      "functionSetUpLaterPrompt": "Non hai ancora una funzione? Attiva questa opzione per configurarla più tardi — puoi salvare una bozza e fare test subito.",
-      "functionSetUpLaterActive": "La funzione viene saltata per ora — nome e commento vengono comunque salvati. Ti servirà una funzione prima di pubblicare."
+      "unsavedFnTitle": "Modifiche alla funzione non salvate",
+      "unsavedFnMessage": "Questo passaggio contiene codice di funzione non salvato nella tua libreria. Salvalo, scarta le modifiche o continua a modificare.",
+      "unsavedFnSave": "Salva funzione",
+      "unsavedFnDiscard": "Scarta modifiche",
+      "unsavedFnKeep": "Continua a modificare"
     },
     "commonFieldsAbove": "campi comuni qui sopra",
     "canvas": {
       "undo": "Annulla",
       "tidyUp": "Riordina",
-      "insertStep": "Inserisci passaggio",
-      "deleteEdge": "Elimina connessione"
+      "edgeDeleteHint": "Premi Backspace/Canc per rimuovere il collegamento"
+    },
+    "ndv": {
+      "input": "Ingresso",
+      "output": "Uscita",
+      "config": "Configurazione",
+      "noInput": "Nessun record di ingresso.",
+      "noOutput": "Nessun record inoltrato.",
+      "prevStep": "Passaggio precedente · {name}",
+      "nextStep": "Passaggio successivo · {name}",
+      "prevStepBtn": "Passaggio precedente",
+      "nextStepBtn": "Passaggio successivo",
+      "collapseSteps": "Comprimi passaggi",
+      "expandSteps": "Espandi passaggi",
+      "inputTag": "Ingresso",
+      "openStep": "Apri {name}",
+      "runToView": "Esegui un test per visualizzare questi dati.",
+      "noBranchItems": "Nessun elemento in questo ramo.",
+      "noUpstream": "Nessun passaggio a monte.",
+      "noRunYet": "Nessuna esecuzione ancora.",
+      "runLabel": "Esegui",
+      "switchRun": "Cambia esecuzione",
+      "notInRun": "Questo passaggio non è incluso in questa esecuzione.",
+      "runTest": "Esegui test",
+      "noItems": "Nessun elemento",
+      "itemsCount": "{count} elemento | {count} elementi",
+      "viewTable": "Tabella",
+      "viewJson": "JSON",
+      "itemN": "Elemento {n}",
+      "executeStep": "Esegui passaggio",
+      "sample": "Campione",
+      "editStep": "Modifica passaggio",
+      "testInputHint": "Ingresso di test — modifica, quindi esegui il passaggio.",
+      "noRunsList": "Nessuna esecuzione ancora."
+    },
+    "runOverlay": {
+      "banner": "Stai visualizzando i dati del passaggio da un'esecuzione passata ({run}). Puoi modificare liberamente — questa esecuzione non viene mai modificata.",
+      "clear": "Cancella i dati dell'esecuzione",
+      "ghostNodes": "{count} passo di questa esecuzione non esiste più nel workflow, quindi il suo stato non viene mostrato. | {count} passi di questa esecuzione non esistono più nel workflow, quindi il loro stato non viene mostrato.",
+      "missingNode": "Quel passo non esiste più in questo workflow — è stato rimosso dopo questa esecuzione."
     },
     "unsaved": {
       "title": "Modifiche non salvate",
@@ -2781,7 +2830,20 @@
       "expand": "Espandi",
       "close": "Cancella e chiudi i risultati",
       "nodesTitle": "Passaggi",
-      "empty": "Esegui un test per vedere i risultati dei passaggi qui."
+      "empty": "Esegui un test per vedere i risultati dei passaggi qui.",
+      "openNode": "Apri nodo",
+      "viewConfig": "Visualizza configurazione",
+      "hideConfig": "Nascondi configurazione",
+      "noConfig": "Nessuna configurazione",
+      "functionLabel": "Funzione",
+      "destinationLabel": "Destinazione",
+      "destinationUnsupported": "Tipo non supportato",
+      "destinationMissing": "Questa destinazione non esiste più o non può essere letta.",
+      "headersLabel": "Intestazioni",
+      "templateLabel": "Template",
+      "outputFormatLabel": "Formato di output",
+      "tlsVerifyLabel": "Verifica TLS",
+      "tlsDisabled": "Disabilitato"
     }
   },
   "pipeline": {
