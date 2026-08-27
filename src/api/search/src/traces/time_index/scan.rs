@@ -255,7 +255,8 @@ impl BatchScanner {
     /// interrupted scan leaves keys Seen (partial find) or Unseen
     /// (indeterminate). Skipped keys yield None — another stream already
     /// answered for them.
-    pub(super) fn finish(self) -> Vec<Option<ScanOutcome>> {
+    pub(super) fn finish(mut self) -> Vec<Option<ScanOutcome>> {
+        self.settle();
         self.keys
             .into_iter()
             .map(|state| match state {
@@ -277,20 +278,66 @@ impl BatchScanner {
             .collect()
     }
 
-    /// The first island whose attached keys still need margin coverage gets a
-    /// growth window; islands whose needs are met complete their keys.
-    fn next_island_window(&mut self) -> Option<Pending> {
+    /// Advance every query-free transition — island completions, covered-span
+    /// jumps, end-of-scan verdicts — so the outcome reflects what the covered
+    /// region already proves. Without this, a deadline landing right after the
+    /// last ingest would report a fully-covered miss as timeout and a
+    /// margin-complete hit as partial.
+    fn settle(&mut self) {
+        self.complete_satisfied_islands();
+        if self.main_done {
+            return;
+        }
+        self.jump_covered_islands();
+        self.complete_main_keys();
+        if self.cursor <= self.bounds.scan_start {
+            self.finish_main();
+            self.complete_satisfied_islands();
+        }
+    }
+
+    /// The span an island must cover to complete its attached keys.
+    fn island_needs(&self, island: &Island) -> (i64, i64) {
+        let mut needed_left = island.left;
+        let mut needed_right = island.right;
+        for &key in &island.keys {
+            if let KeyState::Seen(range) = self.keys[key] {
+                let (left, right) = margin_span(range, self.margin, self.bounds);
+                needed_left = needed_left.min(left);
+                needed_right = needed_right.max(right);
+            }
+        }
+        (needed_left, needed_right)
+    }
+
+    /// Complete the keys of every island whose needs are already covered —
+    /// a pure state transition, no queries involved.
+    fn complete_satisfied_islands(&mut self) {
         for index in 0..self.islands.len() {
+            let (needed_left, needed_right) = self.island_needs(&self.islands[index]);
             let island = &self.islands[index];
-            let mut needed_left = island.left;
-            let mut needed_right = island.right;
-            for &key in &island.keys {
+            if needed_left < island.left || needed_right > island.right {
+                continue;
+            }
+            let keys = std::mem::take(&mut self.islands[index].keys);
+            for key in keys {
                 if let KeyState::Seen(range) = self.keys[key] {
-                    let (left, right) = margin_span(range, self.margin, self.bounds);
-                    needed_left = needed_left.min(left);
-                    needed_right = needed_right.max(right);
+                    self.keys[key] = KeyState::Complete {
+                        range,
+                        partial: false,
+                    };
                 }
             }
+        }
+    }
+
+    /// The first island whose attached keys still need margin coverage gets a
+    /// growth window.
+    fn next_island_window(&mut self) -> Option<Pending> {
+        self.complete_satisfied_islands();
+        for index in 0..self.islands.len() {
+            let (needed_left, needed_right) = self.island_needs(&self.islands[index]);
+            let island = &self.islands[index];
             if needed_left < island.left {
                 return Some(Pending::IslandGrow {
                     island: index,
@@ -305,21 +352,13 @@ impl BatchScanner {
                     right: needed_right,
                 });
             }
-            let keys = std::mem::take(&mut self.islands[index].keys);
-            for key in keys {
-                if let KeyState::Seen(range) = self.keys[key] {
-                    self.keys[key] = KeyState::Complete {
-                        range,
-                        partial: false,
-                    };
-                }
-            }
         }
         None
     }
 
-    fn next_main_window(&mut self) -> Option<Pending> {
-        // Jump over spans probes or island growth already covered.
+    /// Jump the cursor over spans probes or island growth already covered —
+    /// a pure state transition, no queries involved.
+    fn jump_covered_islands(&mut self) {
         loop {
             let mut jumped = false;
             for island in &self.islands {
@@ -332,6 +371,10 @@ impl BatchScanner {
                 break;
             }
         }
+    }
+
+    fn next_main_window(&mut self) -> Option<Pending> {
+        self.jump_covered_islands();
         if self.cursor <= self.bounds.scan_start {
             return None;
         }
@@ -655,6 +698,69 @@ mod tests {
     fn probe_spans_merge_and_clamp() {
         let merged = merge_and_clamp(vec![(5, 10), (8, 20), (30, 40), (-5, 2)], 0, 35);
         assert_eq!(merged, vec![(0, 2), (5, 20), (30, 35)]);
+    }
+
+    #[test]
+    fn deadline_after_full_coverage_still_proves_absence() {
+        let mut scanner = BatchScanner::new(
+            TimeIndexKind::Trace,
+            2,
+            bounds(0, W * 4),
+            None,
+            &[None, None],
+        );
+        let data = [(0usize, range(W * 2, W * 2 + 10))];
+        // Stop right after ingesting the window that reaches scan_start,
+        // without another next_window call — as the driver does on deadline.
+        while let Some((start, end)) = scanner.next_window() {
+            let rows = data
+                .iter()
+                .filter(|(_, r)| r.start_time <= end && r.end_time >= start)
+                .map(|&(k, r)| (k, r))
+                .collect();
+            scanner.ingest(rows);
+            if start <= 0 {
+                break;
+            }
+        }
+        let outcomes = scanner.finish();
+        assert_eq!(
+            outcomes[0],
+            Some(ScanOutcome::Found {
+                range: data[0].1,
+                partial: false,
+            })
+        );
+        assert_eq!(outcomes[1], Some(ScanOutcome::NotFound));
+    }
+
+    #[test]
+    fn deadline_after_island_completion_is_not_partial() {
+        let hint = W * 20;
+        let mut scanner = BatchScanner::new(
+            TimeIndexKind::Trace,
+            1,
+            bounds(0, W * 40),
+            Some(hint),
+            &[None],
+        );
+        let data = [(0usize, range(hint, hint))];
+        // Probe window only; the deadline lands before any further window.
+        let (start, end) = scanner.next_window().unwrap();
+        let rows = data
+            .iter()
+            .filter(|(_, r)| r.start_time <= end && r.end_time >= start)
+            .map(|&(k, r)| (k, r))
+            .collect();
+        scanner.ingest(rows);
+        let outcomes = scanner.finish();
+        assert_eq!(
+            outcomes[0],
+            Some(ScanOutcome::Found {
+                range: data[0].1,
+                partial: false,
+            })
+        );
     }
 
     #[test]
