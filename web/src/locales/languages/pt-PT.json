@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Criar novo destino",
       "select": "Destino",
-      "loadError": "Erro ao carregar destinos."
+      "loadError": "Erro ao carregar destinos.",
+      "unsupportedType": "Tipo não suportado — Fluxos de trabalho suportam apenas destinos personalizados"
     },
     "function": {
       "createNew": "Criar nova função",
       "createNewNoteWorkflow": "Nota: A função será criada e você será redirecionado ao formulário anterior para associar a função recém-criada ao fluxo de trabalho.",
       "select": "Selecionar função",
       "loadError": "Falha ao carregar funções",
+      "saved": "Função salva com sucesso",
+      "updated": "Função atualizada com sucesso",
+      "saveError": "Falha ao salvar função",
       "flatten": "Após achatamento",
       "guidelinesTitle": "Diretrizes de execução da função:",
       "rbf": "RBF (Executar antes do achatamento):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "Execuções do Fluxo de Trabalho",
       "edit": "Editar Fluxo de Trabalho",
+      "debugInEditor": "Depurar no editor",
       "staleGraphWarning": "Este workflow foi editado desde esta execução — {count} passo que ele executou não existe mais, portanto seu status não é mostrado aqui. | Este workflow foi editado desde esta execução — {count} passos que ele executou não existem mais, portanto seus status não são mostrados aqui."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Sucesso",
       "failed": "Falhou",
       "open": "Histórico",
+      "openFullView": "Abrir visão completa de execuções",
       "loadError": "Erro ao Carregar Execuções",
       "loadRunError": "Erro ao Carregar Esta Execução"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "Um Acionador é Obrigatório",
     "addStepRequired": "Adicione pelo Menos Uma Etapa Após o Acionador",
     "connectAllNodes": "Conecte Todos os Nós Antes de Salvar",
-    "finishStepsBeforePublish": "Conclua a configuração de todas as etapas antes de publicar",
+    "finishStepsBeforePublish": "{count} passo precisa de configuração antes de publicar — destacado no canvas. | {count} passos precisam de configuração antes de publicar — destacados no canvas.",
     "draft": "Rascunho",
     "saveDraft": "Salvar como rascunho",
     "publish": "Publicar",
@@ -2708,6 +2714,11 @@
       "linkError": "Não foi possível vincular os alertas."
     },
     "chooseTrigger": "Escolher um Gatilho",
+    "start": {
+      "triggerHint": "Selecione o evento que inicia seu fluxo de trabalho",
+      "chooseAction": "Escolha uma ação",
+      "actionHint": "Selecione o que acontece após o gatilho"
+    },
     "node": {
       "kindTrigger": "Gatilho",
       "kindLogic": "Lógica",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Campos Específicos do Evento",
       "incidentNoExtraFields": "Este evento não adiciona campos além dos comuns.",
       "conditionNoteTitle": "Diretrizes de Condição",
+      "functionFlattenTitle": "Antes vs Depois do Achatamento",
       "conditionNoteEmpty": "Para verificar um valor vazio, use \"\". Exemplo:",
       "conditionNoteNull": "Para verificar um valor nulo, use null. Exemplo:",
       "conditionNoteCustom": "Para adicionar uma coluna personalizada, digite seu nome e pressione Enter.",
@@ -2755,19 +2767,56 @@
       "enable": "Ativar etapa",
       "disabledBadge": "Desativado",
       "incompleteBadge": "Configurar depois",
-      "destinationSetUpLater": "Configurar depois",
-      "destinationSetUpLaterPrompt": "Ainda não tem um destino? Ative esta opção para configurá-lo depois — você pode salvar um rascunho e testar agora.",
-      "destinationSetUpLaterActive": "O destino é ignorado por enquanto — o nome e o comentário ainda são salvos. Você precisará de um destino antes de publicar.",
-      "functionSetUpLater": "Configurar depois",
-      "functionSetUpLaterPrompt": "Ainda não tem uma função? Ative esta opção para configurá-la depois — você pode salvar um rascunho e testar agora.",
-      "functionSetUpLaterActive": "A função é ignorada por enquanto — o nome e o comentário ainda são salvos. Você precisará de uma função antes de publicar."
+      "unsavedFnTitle": "Alterações não salvas na função",
+      "unsavedFnMessage": "Esta etapa tem código de função que não está salvo na sua biblioteca. Salve-o, descarte as alterações ou continue editando.",
+      "unsavedFnSave": "Salvar função",
+      "unsavedFnDiscard": "Descartar alterações",
+      "unsavedFnKeep": "Continuar editando"
     },
     "commonFieldsAbove": "campos comuns acima",
     "canvas": {
       "undo": "Desfazer",
       "tidyUp": "Organizar",
-      "insertStep": "Inserir etapa",
-      "deleteEdge": "Excluir conexão"
+      "edgeDeleteHint": "Pressione Backspace/Delete para remover a aresta"
+    },
+    "ndv": {
+      "input": "Entrada",
+      "output": "Saída",
+      "config": "Configuração",
+      "noInput": "Nenhum registro de entrada.",
+      "noOutput": "Nenhum registro encaminhado.",
+      "prevStep": "Etapa anterior · {name}",
+      "nextStep": "Próxima etapa · {name}",
+      "prevStepBtn": "Etapa anterior",
+      "nextStepBtn": "Próxima etapa",
+      "collapseSteps": "Recolher etapas",
+      "expandSteps": "Expandir etapas",
+      "inputTag": "Entrada",
+      "openStep": "Abrir {name}",
+      "runToView": "Execute um teste para visualizar estes dados.",
+      "noBranchItems": "Nenhum item neste ramo.",
+      "noUpstream": "Nenhuma etapa anterior.",
+      "noRunYet": "Nenhuma execução ainda.",
+      "runLabel": "Executar",
+      "switchRun": "Alternar execução",
+      "notInRun": "Esta etapa não está incluída nesta execução.",
+      "runTest": "Executar teste",
+      "noItems": "Nenhum item",
+      "itemsCount": "{count} Item | {count} Itens",
+      "viewTable": "Tabela",
+      "viewJson": "JSON",
+      "itemN": "Item {n}",
+      "executeStep": "Executar etapa",
+      "sample": "Amostra",
+      "editStep": "Editar etapa",
+      "testInputHint": "Entrada de teste — Edite e depois execute a etapa.",
+      "noRunsList": "Nenhuma execução ainda."
+    },
+    "runOverlay": {
+      "banner": "Mostrando dados da etapa de uma execução passada ({run}). Você pode editar livremente — esta execução nunca é alterada.",
+      "clear": "Limpar dados da execução",
+      "ghostNodes": "{count} passo desta execução não existe mais no fluxo de trabalho, portanto seu status não é exibido. | {count} passos desta execução não existem mais no fluxo de trabalho, portanto seus status não são exibidos.",
+      "missingNode": "Esse passo não existe mais neste fluxo de trabalho — ele foi removido após esta execução."
     },
     "unsaved": {
       "title": "Alterações não salvas",
@@ -2781,7 +2830,20 @@
       "expand": "Expandir",
       "close": "Limpar e Fechar Resultados",
       "nodesTitle": "Etapas",
-      "empty": "Execute um teste para ver os resultados das etapas aqui."
+      "empty": "Execute um teste para ver os resultados das etapas aqui.",
+      "openNode": "Abrir Nó",
+      "viewConfig": "Ver Configuração",
+      "hideConfig": "Ocultar Configuração",
+      "noConfig": "Sem Configuração",
+      "functionLabel": "Função",
+      "destinationLabel": "Destino",
+      "destinationUnsupported": "Tipo Não Suportado",
+      "destinationMissing": "Este destino não existe mais ou não pode ser lido.",
+      "headersLabel": "Cabeçalhos",
+      "templateLabel": "Modelo",
+      "outputFormatLabel": "Formato de Saída",
+      "tlsVerifyLabel": "Verificação TLS",
+      "tlsDisabled": "Desativado"
     }
   },
   "pipeline": {

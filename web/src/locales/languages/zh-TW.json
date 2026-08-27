@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "建立新目標",
       "select": "目標",
-      "loadError": "載入目標時發生錯誤。"
+      "loadError": "載入目標時發生錯誤。",
+      "unsupportedType": "不支援的類型 — 工作流程僅支援自訂目標"
     },
     "function": {
       "createNew": "建立新函式",
       "createNewNoteWorkflow": "注意：函式將會建立，然後您將被重新導向至先前的表單，以將新建立的函式與工作流程關聯。",
       "select": "選取函式",
       "loadError": "無法載入函式",
+      "saved": "函式已成功儲存",
+      "updated": "函式已成功更新",
+      "saveError": "儲存函式失敗",
       "flatten": "扁平化後",
       "guidelinesTitle": "函式執行指南：",
       "rbf": "RBF（扁平化前執行）：",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "工作流程執行記錄",
       "edit": "編輯工作流程",
+      "debugInEditor": "在編輯器中除錯",
       "staleGraphWarning": "此工作流程自本次執行後已遭編輯 — 其執行的 {count} 個步驟已不再存在，因此此處未顯示其狀態。 | 此工作流程自本次執行後已遭編輯 — 其執行的 {count} 個步驟已不再存在，因此此處未顯示其狀態。"
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "成功",
       "failed": "失敗",
       "open": "歷史",
+      "openFullView": "開啟完整執行檢視",
       "loadError": "載入執行記錄時發生錯誤",
       "loadRunError": "載入此次執行時發生錯誤"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "需要觸發器",
     "addStepRequired": "在觸發器之後至少新增一個步驟",
     "connectAllNodes": "儲存前連接所有節點",
-    "finishStepsBeforePublish": "完成所有步驟的設定後再發布",
+    "finishStepsBeforePublish": "{count} 個步驟需要在發布前設定 — 已在畫布上標示。 | {count} 個步驟需要在發布前設定 — 已在畫布上標示。",
     "draft": "草稿",
     "saveDraft": "儲存為草稿",
     "publish": "發布",
@@ -2708,6 +2714,11 @@
       "linkError": "無法連結警示。"
     },
     "chooseTrigger": "選擇觸發器",
+    "start": {
+      "triggerHint": "選擇啟動工作流程的事件",
+      "chooseAction": "選擇動作",
+      "actionHint": "選擇觸發後要進行的動作"
+    },
     "node": {
       "kindTrigger": "觸發器",
       "kindLogic": "邏輯",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "事件特定欄位",
       "incidentNoExtraFields": "此事件除了常見欄位外，不會新增任何欄位。",
       "conditionNoteTitle": "條件指南",
+      "functionFlattenTitle": "扁平化前後比較",
       "conditionNoteEmpty": "若要檢查空值，請使用 \"\"。範例：",
       "conditionNoteNull": "若要檢查 null 值，請使用 null。範例：",
       "conditionNoteCustom": "若要新增自訂欄位，請輸入其名稱並按 Enter。",
@@ -2755,19 +2767,56 @@
       "enable": "啟用步驟",
       "disabledBadge": "已停用",
       "incompleteBadge": "稍後設定",
-      "destinationSetUpLater": "稍後設定",
-      "destinationSetUpLaterPrompt": "還沒有目標嗎？開啟此選項以便稍後設定 — 您現在可以儲存草稿並進行測試。",
-      "destinationSetUpLaterActive": "目前會略過此目標 — 名稱與註解仍會儲存。發布前您需要設定目標。",
-      "functionSetUpLater": "稍後設定",
-      "functionSetUpLaterPrompt": "還沒有函數？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
-      "functionSetUpLaterActive": "函數目前會略過 — 名稱和備註仍會儲存。發布前您需要設定函數。"
+      "unsavedFnTitle": "未儲存的函式變更",
+      "unsavedFnMessage": "此步驟包含尚未儲存至您的函式庫的函式程式碼。您可以儲存、捨棄變更，或繼續編輯。",
+      "unsavedFnSave": "儲存函式",
+      "unsavedFnDiscard": "捨棄變更",
+      "unsavedFnKeep": "繼續編輯"
     },
     "commonFieldsAbove": "上方的通用欄位",
     "canvas": {
       "undo": "復原",
       "tidyUp": "整理",
-      "insertStep": "插入步驟",
-      "deleteEdge": "刪除連線"
+      "edgeDeleteHint": "按 Backspace/Delete 鍵以移除連線"
+    },
+    "ndv": {
+      "input": "輸入",
+      "output": "輸出",
+      "config": "組態",
+      "noInput": "沒有輸入記錄。",
+      "noOutput": "沒有轉發的記錄。",
+      "prevStep": "上一個步驟 · {name}",
+      "nextStep": "下一個步驟 · {name}",
+      "prevStepBtn": "上一個步驟",
+      "nextStepBtn": "下一個步驟",
+      "collapseSteps": "摺疊步驟",
+      "expandSteps": "展開步驟",
+      "inputTag": "輸入",
+      "openStep": "開啟 {name}",
+      "runToView": "執行測試以檢視此資料。",
+      "noBranchItems": "此分支上沒有項目。",
+      "noUpstream": "沒有上游步驟。",
+      "noRunYet": "尚未執行。",
+      "runLabel": "執行",
+      "switchRun": "切換執行",
+      "notInRun": "此步驟未包含在此次執行中。",
+      "runTest": "執行測試",
+      "noItems": "沒有項目",
+      "itemsCount": "{count} 個項目 | {count} 個項目",
+      "viewTable": "表格",
+      "viewJson": "JSON",
+      "itemN": "項目 {n}",
+      "executeStep": "執行步驟",
+      "sample": "樣本",
+      "editStep": "編輯步驟",
+      "testInputHint": "測試輸入 — 編輯後執行步驟。",
+      "noRunsList": "尚無執行記錄。"
+    },
+    "runOverlay": {
+      "banner": "顯示過去某次執行 ({run}) 的步驟資料。您可以自由編輯 — 此執行永遠不會被變更。",
+      "clear": "清除執行資料",
+      "ghostNodes": "此執行中的 {count} 個步驟已不存在於此工作流程，因此不顯示其狀態。 | 此執行中的 {count} 個步驟已不存在於此工作流程，因此不顯示其狀態。",
+      "missingNode": "該步驟已不存在於此工作流程 — 它在此執行後被移除。"
     },
     "unsaved": {
       "title": "未儲存的變更",
@@ -2781,7 +2830,20 @@
       "expand": "展开",
       "close": "清除并关闭结果",
       "nodesTitle": "步骤",
-      "empty": "运行测试以在此处查看步骤结果。"
+      "empty": "运行测试以在此处查看步骤结果。",
+      "openNode": "開啟節點",
+      "viewConfig": "檢視配置",
+      "hideConfig": "隱藏配置",
+      "noConfig": "無配置",
+      "functionLabel": "函式",
+      "destinationLabel": "目標",
+      "destinationUnsupported": "不支援的類型",
+      "destinationMissing": "此目標已不存在或無法讀取。",
+      "headersLabel": "標頭",
+      "templateLabel": "範本",
+      "outputFormatLabel": "輸出格式",
+      "tlsVerifyLabel": "TLS 驗證",
+      "tlsDisabled": "已停用"
     }
   },
   "pipeline": {

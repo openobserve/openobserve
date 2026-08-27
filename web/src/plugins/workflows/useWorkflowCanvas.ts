@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // the editor, canvas, nodes and node-forms all share one object.
 
 import { reactive } from "vue";
+import { isEqual } from "lodash-es";
 import { useVueFlow } from "@vue-flow/core";
 import { getUUID, getImageURL } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -203,7 +204,7 @@ const defaultObject = {
     show: false,
     source: "",
     handle: "out",
-    mode: "next" as "next" | "trigger" | "insert",
+    mode: "next" as "next" | "trigger" | "action" | "insert",
     // "insert" mode splices onto this edge (A→B becomes A→new→B on commit).
     edgeId: "",
     position: null as { x: number; y: number } | null,
@@ -232,13 +233,25 @@ const defaultObject = {
     // sentinel never lands here or on the API payload.
     fromNode: "",
     result: <any>null,
-    // Per-node Input/Output result drawer (opened by clicking a node's badge).
-    resultDrawer: { show: false, nodeId: "" },
   },
   currentSelectedWorkflow: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   workflowWithoutChange: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   nameError: false,
   nameErrorMessage: "",
+  // Node ids to FLASH a "needs setup" warning ring on — set by Publish validation
+  // when incomplete (dummy) nodes block publishing, so the user sees exactly which
+  // steps. Transient: the canvas frames them and clears this after a few seconds.
+  incompleteHighlight: <string[]>[],
+  // Runs list, fetched ONCE by the Runs page (WorkflowRunsPanel) and SHARED so the
+  // NDV's run switcher reuses it instead of re-hitting /history on every open. The
+  // user reaches the NDV from that list, so it's already loaded; a manual Refresh
+  // (with `fetchedAt` shown) re-pulls the same window when they want the latest.
+  runsHistory: {
+    list: <any[]>[],
+    fetchedAt: 0, // ms epoch of the last successful fetch; 0 = never
+    params: { start: 0, end: 0 }, // the time window the list was fetched for (µs)
+    loading: false,
+  },
 };
 
 const workflowObj = reactive(Object.assign({}, defaultObject));
@@ -323,9 +336,19 @@ export const isNodeDisabled = (node: any): boolean =>
 
 // Write meta on a node reference (staged or already on the canvas). Empty values
 // drop the key so an unnamed/uncommented node serializes clean.
+//
+// IDEMPOTENT: if the resolved value is unchanged, do nothing — no reassignment,
+// no dirty flag. This matters now that the node panel commits its config on CLOSE
+// (no Save button): opening a node and closing it re-runs the body's submit(),
+// which re-asserts the same `incomplete` value; without this guard that alone
+// would mark an untouched workflow dirty and trip the unsaved-changes guard.
 const setNodeMeta = (node: any, key: string, value: string) => {
   if (!node) return;
-  const meta = { ...(node.meta || {}) };
+  const current = node.meta || {};
+  const nextVal = value || undefined;
+  const curVal = current[key] || undefined;
+  if (curVal === nextVal) return;
+  const meta = { ...current };
   if (value) meta[key] = value;
   else delete meta[key];
   node.meta = meta;
@@ -486,9 +509,9 @@ export const flowOrderedNodeIds = (nodes: any[], edges: any[], startId?: string)
   return order;
 };
 
-// A step in the executed-steps TREE (results dock). Carries the render structure —
-// depth, direct-child count, and per-column "does this rail continue" flags — so
-// the panel draws the traces-waterfall connector lines without re-deriving them.
+// A step in the workflow TREE (the NDV's Steps rail). Carries the render structure —
+// depth, direct-child count, and per-column "does this rail continue" flags — so the
+// rail draws the traces-waterfall connector lines without re-deriving them.
 export interface StepTreeNode {
   id: string;
   depth: number;
@@ -569,6 +592,31 @@ const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
   return [...set];
 };
 
+// A v2 condition group the backend reads as "pass everything through": one rule
+// with an EMPTY column. The backend short-circuits an empty column to always-true
+// (Condition::evaluate: `if self.column.is_empty() { return true }`) BEFORE it ever
+// reads `operator`/`value`, so both are irrelevant — we send an empty value (not a
+// misleading literal like "true") so it matches an unconfigured rule and round-trips
+// cleanly if the draft is reopened. Used to give a never-configured (dummy) Condition
+// node a valid, non-filtering `NodeData` at send time; mirrors ConditionBuilder's
+// emptyGroup() shape.
+const passthroughConditionGroup = () => ({
+  filterType: "group",
+  logicalOperator: "AND",
+  groupId: getUUID(),
+  conditions: [
+    {
+      filterType: "condition",
+      column: "",
+      operator: "=",
+      value: "",
+      values: [],
+      logicalOperator: "AND",
+      id: getUUID(),
+    },
+  ],
+});
+
 // Serialize one in-memory VueFlow node down to the fields the backend `Node`
 // struct persists: id, io_type, position, data, and (when present) meta / style.
 // Everything else on the node is VueFlow runtime state (`type`, `dimensions`,
@@ -586,6 +634,21 @@ const serializeNode = (node: any) => {
   // in `data`; carry it in `meta` (strings survive serialization).
   if (nodeType === "workflow_trigger") {
     meta.trigger_kind = data.trigger_kind || DEFAULT_TRIGGER_KIND;
+  }
+
+  // Dummy / never-configured nodes carry only { label, node_type }, but each
+  // backend `NodeData` variant needs its own fields or deserialization fails.
+  // Fill a valid placeholder at SEND time only (the editor node stays flagged
+  // `incomplete`, so the "Set up later" badge and Publish block are unaffected):
+  //   - condition  → a pass-through v2 rule (see above); records flow untouched.
+  //   - destination → an empty destination name, the same shape a configured
+  //     node sends ({ destination_id, template_override }).
+  if (nodeType === "condition" && data.conditions == null) {
+    data.version = 2;
+    data.conditions = passthroughConditionGroup();
+  } else if (nodeType === "destination" && typeof data.destination_id !== "string") {
+    data.destination_id = "";
+    if (data.template_override === undefined) data.template_override = null;
   }
 
   const out: any = {
@@ -610,8 +673,14 @@ const serializeNode = (node: any) => {
 // graph so it can run WITHOUT saving). The `Workflow` struct has no serde
 // defaults, so every field must be present; org_id/id/created_by are
 // overridden/generated by the backend (the test endpoint assigns a throwaway id).
-export const serializeWorkflow = () => {
+//
+// `onlyNodeId` builds a SINGLE-NODE workflow (just that node, no edges) — used by
+// "Run Step" to execute one node in isolation (from_node = that node's id), so
+// nothing downstream runs and its output comes back on its own.
+export const serializeWorkflow = (opts?: { onlyNodeId?: string }) => {
   const wf = workflowObj.currentSelectedWorkflow;
+  const allNodes = wf.nodes || [];
+  const nodes = opts?.onlyNodeId ? allNodes.filter((n: any) => n.id === opts.onlyNodeId) : allNodes;
   return {
     id: wf.id || "",
     org_id: "",
@@ -621,87 +690,111 @@ export const serializeWorkflow = () => {
     created_at: wf.created_at || 0,
     updated_at: wf.updated_at || 0,
     created_by: "",
-    nodes: (wf.nodes || []).map(serializeNode),
-    edges: wf.edges || [],
+    nodes: nodes.map(serializeNode),
+    edges: opts?.onlyNodeId ? [] : wf.edges || [],
   };
 };
 
-// Run the workflow Test (from the Test dialog or a node's Replay button) and
+// Run the workflow Test (from the Test dialog or a node's Run Step button) and
 // store the result so each WorkflowNode paints its ✓ / ✗ / ⊘ badge. Shared so
 // both entry points behave identically. The whole in-memory graph is sent, so a
-// workflow can be tested whether or not it's been saved. The backend returns
-// errors only — the step drawer (error nodes only) derives its input/output from
-// `errors`, so there's no per-node node_io to carry.
+// workflow can be tested whether or not it's been saved. The backend returns a
+// per-node `inputs` map, a per-node `outputs` map, and `errors` — the step drawer
+// reads Input/Output straight from those maps.
+//
+// `singleNode` runs ONE node in isolation ("Run Step"): only that node is sent as
+// the workflow, with from_node = its id, so nothing upstream/downstream executes —
+// just this step, against the given input, and its output comes back on its own.
 export const executeTestRun = async (opts: {
   orgId: string;
   inputs: any[];
   fromNode?: string;
+  singleNode?: boolean;
 }): Promise<{ ok: boolean; error?: string }> => {
   const wf = workflowObj.currentSelectedWorkflow;
   try {
+    const single = opts.singleNode && opts.fromNode ? opts.fromNode : "";
     // Dry-run a DRAFT when the graph is a saved draft, has unsaved edits, or was
-    // never persisted — the backend then skips the strict published validation.
-    const draft = !!(wf.isDraft || workflowObj.dirtyFlag || !wf.id);
+    // never persisted — the backend then skips the strict published validation. A
+    // single-node run is inherently a partial graph (one node, no trigger/edges),
+    // so it's ALWAYS a draft, even when the parent workflow is published.
+    const draft = !!(single || wf.isDraft || workflowObj.dirtyFlag || !wf.id);
     const res = await workflowService.testWorkflow({
       org_identifier: opts.orgId,
-      workflow: serializeWorkflow(),
+      workflow: serializeWorkflow(single ? { onlyNodeId: single } : undefined),
       inputs: opts.inputs,
       from_node: opts.fromNode || undefined,
       draft,
     });
     const errors = res.data?.errors || {};
-    // Per-node INPUT map: node_id -> the records that node received. A node's
-    // OUTPUT is derived from this (see nodeTestOutputBranches): since the graph is
-    // a single-incoming tree, a child's input IS its parent's output on that edge.
+    // Per-node INPUT map: node_id -> the records that node received.
     const inputs = res.data?.inputs || {};
-    // Which nodes ran: from a replay, `fromNode` + everything downstream;
-    // otherwise everything reachable from the trigger. Nodes NOT reachable
-    // (unwired / disconnected) never executed, so they must not paint a ✓.
+    // Per-node OUTPUT map: node_id -> the records that node emitted. The backend
+    // now sends this directly (alongside `inputs`), so a node's Output is read
+    // straight from here (see nodeTestOutput) rather than derived from downstream
+    // inputs. Errors are still delivered the old way, via `errors`.
+    const outputs = res.data?.outputs || {};
+
+    if (single) {
+      // Single-node Run Step: REPLACE just this node's input/output/error in the
+      // CURRENT result, leaving every other node untouched — its fresh output
+      // overwrites whatever was shown for it (a loaded history run, a prior Test, or
+      // an earlier Run Step) while the rest of the view stays put. The spread keeps
+      // the surrounding context (mode/runId/ghostNodeIds, other nodes' data); only
+      // this node's slot is refreshed (its stale error cleared, then re-applied if
+      // it failed again) and it's marked as ran.
+      const base: any = workflowObj.testRun.result || {};
+      const mergedErrors = { ...(base.errors || {}) };
+      const mergedInputs = { ...(base.inputs || {}) };
+      const mergedOutputs = { ...(base.outputs || {}) };
+      // This node's slots are FULLY REPLACED by the fresh run: drop the old value
+      // first, then apply the response. Critical when the step emitted nothing — an
+      // empty/absent result must CLEAR the old output, not fall through to it
+      // (a plain `{ ...base, ...resp }` spread leaves the stale value when `resp`
+      // has no key for this node).
+      delete mergedErrors[single];
+      delete mergedInputs[single];
+      delete mergedOutputs[single];
+      Object.assign(mergedErrors, errors);
+      Object.assign(mergedInputs, inputs);
+      Object.assign(mergedOutputs, outputs);
+      const ranNodeIds = [...new Set([...(base.ranNodeIds || []), single])];
+      workflowObj.testRun.result = {
+        ...base,
+        errors: mergedErrors,
+        inputs: mergedInputs,
+        outputs: mergedOutputs,
+        ranNodeIds,
+        blockedNodeIds: downstreamOfErrorNodes(Object.keys(mergedErrors)),
+      };
+      return { ok: true };
+    }
+
+    // Full Test run — replaces the result entirely (a fresh, coherent run of the
+    // whole graph; stale single-node accumulations must not linger). Which nodes
+    // ran: a replay is `fromNode` + everything downstream; otherwise everything
+    // reachable from the trigger. Unreachable (unwired) nodes never ran → no ✓.
     const triggerId = (wf.nodes || []).find(
       (n: any) => n.data?.node_type === "workflow_trigger",
     )?.id;
     const startId = opts.fromNode || triggerId;
     const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
-    // Snapshot the executed-steps TREE at run time. The results dock now persists
-    // across graph edits, so a step later deleted or disabled must still
-    // render — with its frozen label/icon, struck-through. We freeze the tree shape
-    // (depth + connector guides) plus each step's display data/meta here; the panel
-    // resolves live label/status on top (reflecting a later rename) and falls back
-    // to this frozen data for a removed node. History runs don't set this — the
-    // panel rebuilds the tree from the live graph there. See WorkflowResultsPanel.
-    const stepById = new Map<string, any>((wf.nodes || []).map((n: any) => [n.id, n]));
-    const ranSteps = buildStepTree(wf.nodes || [], wf.edges || [], ranNodeIds).map((s) => {
-      const n = stepById.get(s.id);
-      return {
-        ...s,
-        data: n?.data ? { ...n.data } : undefined,
-        meta: n?.meta ? { ...n.meta } : undefined,
-      };
-    });
     workflowObj.testRun.result = {
       errors,
       inputs,
+      outputs,
       ranNodeIds,
-      ranSteps,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
     };
     return { ok: true };
   } catch (e: any) {
-    // A failed run must not leave the previous run's ✓/✗ badges on screen.
-    workflowObj.testRun.result = null;
+    // A failed FULL run must not leave the previous run's ✓/✗ badges on screen. A
+    // single-node run that throws (network/validation) keeps the accumulated
+    // results so other nodes' Run Step outputs aren't wiped by an unrelated failure.
+    if (!(opts.singleNode && opts.fromNode)) workflowObj.testRun.result = null;
     return { ok: false, error: e?.response?.data?.message };
   }
 };
-
-// A single downstream branch of a node's OUTPUT: the target it feeds and the
-// records that target received (== what this node emitted on that edge). `records`
-// is null when the target got nothing (filtered out / never reached).
-export interface NodeOutputBranch {
-  targetId: string;
-  nodeType: string;
-  detail: string;
-  records: any[] | null;
-}
 
 // The INPUT a node received on the last Test run — the raw records from the
 // backend `inputs` map (shape varies by node type; rendered as-is). Null when the
@@ -712,24 +805,45 @@ export const nodeTestInput = (nodeId: string): any[] | null => {
   return Array.isArray(v) ? v : null;
 };
 
-// A node's OUTPUT, per outgoing edge. The graph is a single-incoming tree, so
-// each child's input came ONLY from this node — child input == this node's output
-// on that branch. One entry per outgoing edge (so fan-out reads per-target); an
-// empty array means a terminal node (a destination/sink) with no derivable output.
-export const nodeTestOutputBranches = (nodeId: string): NodeOutputBranch[] => {
-  const wf = workflowObj.currentSelectedWorkflow;
-  const byId = new Map<string, any>((wf.nodes || []).map((n: any) => [n.id, n]));
-  return (wf.edges || [])
-    .filter((e: any) => e.source === nodeId)
-    .map((e: any) => {
-      const target = byId.get(e.target);
-      return {
-        targetId: e.target,
-        nodeType: target?.data?.node_type || "",
-        detail: nodeConfigDetail(target?.data, 40),
-        records: nodeTestInput(e.target),
-      };
+// The OUTPUT a node emitted on the last run — read straight from the backend
+// `outputs` map (node_id -> records). Null when the node isn't in the map (never
+// ran / emitted nothing) or there's no run. Replaces deriving output from
+// downstream inputs: the backend now reports each node's output directly.
+export const nodeTestOutput = (nodeId: string): any[] | null => {
+  const outputs = workflowObj.testRun.result?.outputs;
+  const v = outputs?.[nodeId];
+  return Array.isArray(v) ? v : null;
+};
+
+// Fetch the runs list into SHARED state (workflowObj.runsHistory), so the Runs page
+// and the NDV's run switcher read one source. Stores the window it fetched for
+// (`params`) and a `fetchedAt` stamp, so a later Refresh can re-pull the same
+// window. On error the previous list is kept (a failed refresh shouldn't blank the
+// switcher); the caller gets {ok,status} to surface load-error / permission UI.
+export const loadRunsHistory = async (opts: {
+  orgId: string;
+  workflowId: string;
+  start: number;
+  end: number;
+}): Promise<{ ok: boolean; status?: number }> => {
+  const rh = workflowObj.runsHistory;
+  rh.loading = true;
+  try {
+    const res = await workflowService.getWorkflowHistory({
+      org_identifier: opts.orgId,
+      id: opts.workflowId,
+      start_time: opts.start,
+      end_time: opts.end,
     });
+    rh.list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    rh.params = { start: opts.start, end: opts.end };
+    rh.fetchedAt = Date.now();
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, status: e?.response?.status };
+  } finally {
+    rh.loading = false;
+  }
 };
 
 // Load a PAST run (from the Executions history) into the same testRun.result the
@@ -771,24 +885,29 @@ export const loadWorkflowRun = async (opts: {
     }
 
     // Per-node INPUT for the whole run (all nodes) — the same shape/semantics as a
-    // Test run's `inputs`, so the drawer derives Output the same way. Older runs
-    // only carried error_node_map (errored node's input) — fall back to that.
+    // Test run's `inputs`. Older runs only carried error_node_map (errored node's
+    // input) — fall back to that.
     const inputs = payload.data?.input_map || payload.data?.error_node_map || {};
+    // Per-node OUTPUT for the whole run — the stored counterpart of a Test run's
+    // `outputs`, so the drawer reads a node's Output directly. Older runs predate
+    // the output map → empty, and Output shows "run to view".
+    const outputs = payload.data?.output_map || {};
 
     // GHOST NODES — the run references a node the workflow no longer has (it was
     // edited/deleted after the run). Its badge has nowhere to render, so an error
     // would silently vanish and the run would look cleaner than it was. Surface
     // them so the Runs view can say the graph no longer matches this run.
     const currentNodeIds = new Set((wf.nodes || []).map((n: any) => n.id));
-    const ghostNodeIds = [...new Set([...Object.keys(errors), ...Object.keys(inputs)])].filter(
-      (id) => !currentNodeIds.has(id),
-    );
+    const ghostNodeIds = [
+      ...new Set([...Object.keys(errors), ...Object.keys(inputs), ...Object.keys(outputs)]),
+    ].filter((id) => !currentNodeIds.has(id));
 
     workflowObj.testRun.result = {
       errors,
-      // Same per-node inputs map as a Test run — drives the ✓/grey/✗ badges and the
-      // drawer's Input + derived Output for every node.
+      // Same per-node inputs/outputs maps as a Test run — drives the ✓/grey/✗
+      // badges and the drawer's Input + Output for every node.
       inputs,
+      outputs,
       ranNodeIds: (wf.nodes || []).map((n: any) => n.id),
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
       mode: "history",
@@ -950,9 +1069,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     pushWorkflowHistory();
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
     wf.edges = wf.edges.filter((e: any) => e.source !== nodeId && e.target !== nodeId);
-    // The Test log PERSISTS: the deleted step stays listed in the dock,
-    // struck-through, from the run-time snapshot (result.ranSteps). Its canvas badge
-    // is gone with the node. Cleared only by a new run or the explicit Clear button.
+    // If the deleted node's NDV is open, close it.
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
       workflowObj.currentSelectedNodeData = null;
       workflowObj.dialog.show = false;
@@ -999,6 +1116,23 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       source: "",
       handle: "out",
       mode: "trigger",
+      edgeId: "",
+      position: screenToFlowCoordinate({ x: event.clientX, y: event.clientY }),
+      anchor: { x: event.clientX, y: event.clientY },
+    };
+  }
+
+  // The empty-canvas start scaffold's second slot: the same picker restricted to
+  // the addable (non-trigger) node types. Mirrors openTriggerPicker — the click
+  // point becomes the placed node's position (see addActionFromStart). `mode`
+  // "action" means "the workflow's FIRST step" (no parent yet), as distinct from
+  // "next" (extend a specific node).
+  function openActionPicker(event: MouseEvent) {
+    workflowObj.stepPicker = {
+      show: true,
+      source: "",
+      handle: "out",
+      mode: "action",
       edgeId: "",
       position: screenToFlowCoordinate({ x: event.clientX, y: event.clientY }),
       anchor: { x: event.clientX, y: event.clientY },
@@ -1115,30 +1249,23 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       type: meta.ioType,
       position,
       data: { label: id, node_type: nodeType },
+      meta: { incomplete: "true" },
     };
     // No auto-wire on drag-drop — the node is placed where dropped and stays
     // unconnected until the user draws an edge.
     workflowObj.pendingEdge = null;
+    workflowObj.pendingInsert = null;
     workflowObj.currentSelectedNodeID = id;
-    workflowObj.isEditNode = false;
     workflowObj.dialog.name = nodeType;
     workflowObj.dialog.expand = false;
-    workflowObj.dialog.show = true;
+    commitStagedNode();
+    closeNodeDrawer();
   }
 
-  // Hover-`+` add: STAGE a node below `sourceId` and open its config drawer. The
-  // node is NOT added to the canvas here — it's committed (added + auto-wired)
-  // only when the drawer is saved (commitNode), or discarded on cancel
-  // (cancelNodeDrawer). Pipeline pattern. `handle` is always "out" (the single
-  // output; the Condition is a filter, not a true/false branch).
   // Start node picked: ADD the workflow's first (trigger) node to the canvas and
-  // open its panel.
-  //
-  // Committed immediately rather than staged (the addNodeAfter / onDrop
-  // pattern): a staged node only lands via commitNode, which runs from the
-  // drawer's Save — and the trigger panel is a READ-ONLY payload reference with
-  // no footer and no Save (WorkflowNodeDrawer's `readonlyBody`). Staged, it
-  // could never be committed, so the node never appeared on the canvas.
+  // open its panel. Like every other add now, it lands on the canvas immediately
+  // (commitStagedNode is the shared path for the config nodes); the trigger is the
+  // one node with a READ-ONLY panel, so there's simply nothing to commit on close.
   //
   // `triggerKind` maps to the backend WorkflowTriggerKind; the node type stays
   // "workflow_trigger" for all kinds.
@@ -1153,9 +1280,10 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     // Placing the trigger is a real add — snapshot before, mark dirty after, so
     // it's undoable and the unsaved guard catches a just-started workflow.
     pushWorkflowHistory();
+    const wf = workflowObj.currentSelectedWorkflow;
     const id = getUUID();
-    workflowObj.currentSelectedWorkflow.nodes = [
-      ...workflowObj.currentSelectedWorkflow.nodes,
+    wf.nodes = [
+      ...wf.nodes,
       {
         id,
         type: meta.ioType,
@@ -1168,9 +1296,56 @@ export default function useWorkflowCanvas(t: TranslateFn) {
         },
       },
     ];
+    // Empty-canvas scaffold "Action first" path: if the user placed the action
+    // step BEFORE the trigger, the canvas holds exactly that one orphan step —
+    // auto-wire the new trigger into it so the two-node chain the scaffold implied
+    // is connected, instead of stranding an unlinked step. Guarded to the single
+    // orphan case so re-adding a trigger to a larger graph never wires blindly.
+    const others = wf.nodes.filter((n: any) => n.id !== id);
+    if (others.length === 1) {
+      const only = others[0];
+      const hasIncoming = (wf.edges || []).some((e: any) => e.target === only.id);
+      if (!hasIncoming && only.data?.node_type !== "workflow_trigger") {
+        wf.edges = [...(wf.edges || []), newEdge(id, only.id)];
+      }
+    }
     markWorkflowDirty();
     // Don't auto-open the trigger's (read-only) detail panel — placing the trigger
     // shouldn't interrupt the build flow. The user can click the node to open it.
+  }
+
+  // Empty-canvas scaffold "Action" slot picked: place the workflow's FIRST step.
+  // When a trigger already exists (the common flow — trigger picked first), append
+  // + auto-wire after the chain end, exactly like the palette add. When there's no
+  // trigger yet (the user clicked Action before Trigger), drop the step UNCONNECTED
+  // at the scaffold's action-slot position; adding the trigger afterwards auto-wires
+  // into it (see addTriggerNode). `position` is the click point the scaffold card
+  // sat at. Like every add, the node lands as an unconfigured DUMMY — its config
+  // panel opens only when the user clicks it, not on add.
+  function addActionFromStart(nodeType: string, position: { x: number; y: number } | null) {
+    if (hasTrigger()) {
+      const src = endNodeId();
+      if (src) addNodeAfter(src, "out", nodeType);
+      return;
+    }
+    const meta = nodeMeta(nodeType);
+    if (!meta) return;
+    const id = getUUID();
+    workflowObj.currentSelectedNodeData = {
+      id,
+      type: meta.ioType,
+      position: position ?? { x: 320, y: 240 },
+      data: { label: id, node_type: nodeType },
+      meta: { incomplete: "true" },
+    };
+    // Unconnected — no trigger to wire from yet; the trigger add links it later.
+    workflowObj.pendingEdge = null;
+    workflowObj.pendingInsert = null;
+    workflowObj.currentSelectedNodeID = id;
+    workflowObj.dialog.name = nodeType;
+    workflowObj.dialog.expand = false;
+    commitStagedNode();
+    closeNodeDrawer();
   }
 
   const NODE_W = 240;
@@ -1199,19 +1374,28 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       type: meta.ioType,
       position,
       data: { label: id, node_type: nodeType },
+      // A freshly-added config node is an unconfigured placeholder until the panel
+      // is closed with its payload; flag it so it shows the "Set up later" badge and
+      // Publish stays blocked.
+      meta: { incomplete: "true" },
     };
     workflowObj.pendingEdge = { source: sourceId, sourceHandle };
     workflowObj.pendingInsert = null;
     workflowObj.currentSelectedNodeID = id;
-    workflowObj.isEditNode = false;
     workflowObj.dialog.name = nodeType;
     workflowObj.dialog.expand = false;
-    workflowObj.dialog.show = true;
+    // Insert-immediately (no Save button): the node lands on the canvas + auto-wires
+    // now, and the panel does NOT open — adding several steps in a row shouldn't mean
+    // dismissing a dialog each time. It arrives flagged incomplete ("Set up later")
+    // and is configured by clicking it, which is what blocks Publish until it's done.
+    commitStagedNode();
+    closeNodeDrawer();
   }
 
-  // Insert-on-edge (T7): STAGE a node to be spliced onto edge A→B. On commit the
-  // old edge is removed and A→new + new→B are created (see commitNode). The node is
-  // positioned at the midpoint of A and B; B is nudged down so it doesn't overlap.
+  // Insert-on-edge (T7): splice a node onto edge A→B. commitStagedNode removes the
+  // old edge and creates A→new + new→B immediately. The node is positioned a row
+  // below A, aligned with B's column; B (and its subtree) is nudged down so it
+  // doesn't overlap.
   function addNodeOnEdge(edgeId: string, nodeType: string) {
     const wf = workflowObj.currentSelectedWorkflow;
     const edge = (wf.edges || []).find((e: any) => e.id === edgeId);
@@ -1223,8 +1407,8 @@ export default function useWorkflowCanvas(t: TranslateFn) {
 
     const id = getUUID();
     // Place the spliced node a full row below the source and aligned with the
-    // target's column (so new→target reads as a straight edge). commitNode then
-    // nudges the target + downstream down to keep a full row of breathing room
+    // target's column (so new→target reads as a straight edge). commitStagedNode
+    // then nudges the target + downstream down to keep a full row of breathing room
     // below the new node.
     const position = {
       x: tgt.position?.x ?? src.position?.x ?? 0,
@@ -1235,6 +1419,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       type: meta.ioType,
       position,
       data: { label: id, node_type: nodeType },
+      meta: { incomplete: "true" },
     };
     workflowObj.pendingEdge = null;
     workflowObj.pendingInsert = {
@@ -1244,26 +1429,24 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       sourceHandle: edge.sourceHandle,
     };
     workflowObj.currentSelectedNodeID = id;
-    workflowObj.isEditNode = false;
     workflowObj.dialog.name = nodeType;
     workflowObj.dialog.expand = false;
-    workflowObj.dialog.show = true;
+    commitStagedNode();
+    closeNodeDrawer();
   }
 
-  // Drawer Save: merge the form payload, then either update the existing node
-  // (edit) or commit the staged node + its auto-wired edge (add / insert).
-  function commitNode(payload: any = {}) {
+  // Insert the staged node (currentSelectedNodeData) onto the canvas immediately —
+  // the "insert-immediately" half of the Save-less node panel. Adds the node and
+  // its auto-wired edge (append via pendingEdge, or splice A→new→B via
+  // pendingInsert), leaves it in EDIT mode, and does NOT touch the dialog. The panel
+  // then opens on this now-real node; closing it commits the node's config
+  // (applyNodeConfig). One undo reverts the whole insert (edges included).
+  function commitStagedNode() {
     const wf = workflowObj.currentSelectedWorkflow;
     const node = workflowObj.currentSelectedNodeData;
     if (!node) return;
-    // Snapshot BEFORE the add/edit so one undo reverts the whole commit.
     pushWorkflowHistory();
-    node.data = { ...node.data, ...payload };
-
-    if (workflowObj.isEditNode) {
-      const idx = wf.nodes.findIndex((n: any) => n.id === node.id);
-      if (idx !== -1) wf.nodes[idx] = node;
-    } else if (workflowObj.pendingInsert) {
+    if (workflowObj.pendingInsert) {
       // Splice onto the edge: drop A→B, add A→new and new→B (T7).
       const ins = workflowObj.pendingInsert;
       wf.nodes = [...wf.nodes, node];
@@ -1297,20 +1480,39 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     }
     workflowObj.pendingEdge = null;
     workflowObj.pendingInsert = null;
-    workflowObj.isEditNode = false;
-    workflowObj.dialog.expand = false;
-    workflowObj.dialog.show = false;
-    // The Test log PERSISTS across edits — adding / inserting / editing
-    // a node keeps the dock and existing badges in place instead of a jarring
-    // close+reopen. A newly-added node simply has no badge (it wasn't in the run);
-    // an edited node keeps its last-run badge until re-tested. Cleared only by a new
-    // run or the explicit "Clear" button. See executeTestRun for the run snapshot.
+    // The node is now a real, committed node on the canvas — edit mode from here.
+    workflowObj.isEditNode = true;
     markWorkflowDirty();
   }
 
-  // Drawer Cancel: discard a staged (not-yet-added) node; leave existing nodes
-  // untouched.
-  function cancelNodeDrawer() {
+  // Merge the body's config payload into the already-committed node, in place,
+  // WITHOUT closing the panel. Change-gated — identical data writes nothing and does
+  // NOT mark dirty (e.g. open + close with no edit). Used both by the panel-close
+  // commit and by the NDV Replay (which commits, then re-runs, staying open).
+  function mergeNodeConfig(payload: any = {}) {
+    const wf = workflowObj.currentSelectedWorkflow;
+    const node = workflowObj.currentSelectedNodeData;
+    if (!node) return;
+    const merged = { ...node.data, ...payload };
+    if (isEqual(merged, node.data)) return;
+    pushWorkflowHistory();
+    node.data = merged;
+    const idx = wf.nodes.findIndex((n: any) => n.id === node.id);
+    if (idx !== -1) wf.nodes[idx] = node;
+    // The Test log PERSISTS across edits — editing a node keeps the dock and existing
+    // badges in place; the node keeps its last-run badge until re-tested.
+    markWorkflowDirty();
+  }
+
+  // Node panel CLOSE (there is no Save button): commit the config, then close.
+  function applyNodeConfig(payload: any = {}) {
+    mergeNodeConfig(payload);
+    closeNodeDrawer();
+  }
+
+  // Close the node panel without deleting anything (the node is already on the
+  // canvas — insert-immediately). Just clears the selection + dialog state.
+  function closeNodeDrawer() {
     workflowObj.pendingEdge = null;
     workflowObj.pendingInsert = null;
     workflowObj.currentSelectedNodeData = null;
@@ -1365,12 +1567,18 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     workflowObj.nameError = false;
     workflowObj.nameErrorMessage = "";
     workflowObj.deleteConfirm = { show: false, nodeId: "" };
+    workflowObj.incompleteHighlight = [];
+    workflowObj.runsHistory = {
+      list: [],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    };
     workflowObj.testRun = {
       show: false,
       input: "",
       fromNode: "",
       result: null,
-      resultDrawer: { show: false, nodeId: "" },
     };
   }
 
@@ -1387,9 +1595,11 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     // node ops
     openStepPicker,
     openTriggerPicker,
+    openActionPicker,
     openInsertPicker,
     closeStepPicker,
     addTriggerNode,
+    addActionFromStart,
     addNodeAfter,
     addNodeOnEdge,
     addNodeToEnd,
@@ -1397,8 +1607,9 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     onDragStart,
     onDragOver,
     onDrop,
-    commitNode,
-    cancelNodeDrawer,
+    applyNodeConfig,
+    mergeNodeConfig,
+    closeNodeDrawer,
     editNode,
     requestDeleteNode,
     cancelDeleteNode,

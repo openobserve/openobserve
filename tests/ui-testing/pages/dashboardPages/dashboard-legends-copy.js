@@ -240,8 +240,9 @@ export default class DashboardLegendsCopy {
       await cell.scrollIntoViewIfNeeded();
       await cell.hover({ force: true });
     }
-    // Wait for copy button to become visible (opacity transition from 0 to 1 on hover)
-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     await copyBtn.click({ force: true });
 
@@ -256,9 +257,15 @@ export default class DashboardLegendsCopy {
    */
   async isTableCellCopied(rowIndex, colIndex) {
     const cell = this.getTableCell(rowIndex, colIndex);
-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
-    // Hover to reveal the copy button, then check data-copied attribute
-    await cell.hover({ force: true });
+    const box = await cell.boundingBox();
+    if (box) {
+      await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await cell.hover({ force: true });
+    }
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     const copiedAttr = await copyBtn.getAttribute('data-copied');
     return copiedAttr === 'true';
@@ -295,8 +302,9 @@ export default class DashboardLegendsCopy {
       await cell.scrollIntoViewIfNeeded();
       await cell.hover({ force: true });
     }
-    // Wait briefly for opacity transition, then check visibility
-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
     try {
       await copyBtn.waitFor({ state: 'visible', timeout: 3000 });
       return true;
