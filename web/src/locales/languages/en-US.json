@@ -11033,7 +11033,7 @@
           "noRows": "No rows in this bucket",
           "bucketUncompared": "Not Compared",
           "tileCost": "Cost",
-          "tileLatency": "Latency (ms)",
+          "tileLatency": "Latency",
           "tileScoreDimensionsRegressed": "Score Dimensions Regressed",
           "tileWeakestScoreDimension": "Weakest Score Dimension",
           "ofScoreDimensions": "of {total} aggregate score dimensions",

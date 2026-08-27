@@ -289,21 +289,51 @@ function money(value: number) {
   return `$${format(value)}`;
 }
 
+/**
+ * The unit BOTH sides of a latency pair are rendered in.
+ *
+ * Chosen once from the larger side, never per value: `1.2 s → 800 ms` would put
+ * two scales inside one comparison and make the smaller number look bigger.
+ */
+const SECOND_MS = 1000;
+
+function latencyUnit(dimension: ExperimentComparisonDimension): "ms" | "s" {
+  const largest = Math.max(Math.abs(dimension.baseline ?? 0), Math.abs(dimension.candidate ?? 0));
+  return largest >= SECOND_MS ? "s" : "ms";
+}
+
+/**
+ * A mean latency to four decimal places ("10449.4821") is noise that costs the
+ * reader the magnitude, and three of them overflow the tile. Whole milliseconds
+ * below a second; seconds above it, where the digits that matter are the first
+ * two or three.
+ */
+function duration(value: number, unit: "ms" | "s") {
+  if (unit === "ms") return Math.round(value).toLocaleString();
+  const seconds = value / SECOND_MS;
+  return seconds.toFixed(seconds >= 10 ? 1 : 2);
+}
+
 function intrinsicTile(kind: "cost" | "latency", label: I18nText, dataTest: string): Tile {
   const icon = INTRINSIC_ICONS[kind];
   const dimension = props.comparison.dimensions.find((entry) => entry.kind === kind);
   if (!dimension) {
     return { key: kind, label, icon, primary: raw("—"), dataTest };
   }
+  const unit = latencyUnit(dimension);
   const show = (value: number | null) =>
-    value === null ? raw("—") : raw(kind === "cost" ? money(value) : format(value));
+    value === null ? raw("—") : raw(kind === "cost" ? money(value) : duration(value, unit));
   const showDelta = (value: number) =>
-    raw(kind === "cost" ? `${value > 0 ? "+" : "-"}${money(Math.abs(value))}` : signed(value));
+    raw(
+      kind === "cost"
+        ? `${value > 0 ? "+" : "-"}${money(Math.abs(value))}`
+        : `${value > 0 ? "+" : "-"}${duration(Math.abs(value), unit)}`,
+    );
   return {
     key: kind,
     label,
     icon,
-    unit: kind === "latency" ? raw("ms") : undefined,
+    unit: kind === "latency" ? raw(unit) : undefined,
     primary: show(dimension.baseline),
     secondary: show(dimension.candidate),
     delta:
