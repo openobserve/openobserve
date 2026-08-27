@@ -357,12 +357,14 @@ impl BatchScanner {
     }
 
     /// Jump the cursor over spans probes or island growth already covered —
-    /// a pure state transition, no queries involved.
+    /// a pure state transition, no queries involved. The strict left-edge
+    /// comparison makes every jump lower the cursor, so the loop terminates;
+    /// a cursor already at an island's left edge has nothing to gain.
     fn jump_covered_islands(&mut self) {
         loop {
             let mut jumped = false;
             for island in &self.islands {
-                if island.left <= self.cursor && self.cursor <= island.right {
+                if island.left < self.cursor && self.cursor <= island.right {
                     self.cursor = island.left;
                     jumped = true;
                 }
@@ -698,6 +700,29 @@ mod tests {
     fn probe_spans_merge_and_clamp() {
         let merged = merge_and_clamp(vec![(5, 10), (8, 20), (30, 40), (-5, 2)], 0, 35);
         assert_eq!(merged, vec![(0, 2), (5, 20), (30, 35)]);
+    }
+
+    #[test]
+    fn missed_hint_island_does_not_trap_the_main_scan() {
+        // A wrong hint leaves a keyless covered island; the main scan must
+        // jump over it (and not spin at its left edge) and still answer both
+        // keys from the region below.
+        let hint = W * 30;
+        let mut scanner = BatchScanner::new(
+            TimeIndexKind::Trace,
+            2,
+            bounds(0, W * 40),
+            Some(hint),
+            &[None, None],
+        );
+        let data = [(0usize, range(W * 5, W * 5 + 10))];
+        drive(&mut scanner, &data);
+        let outcomes = scanner.finish();
+        assert!(matches!(
+            outcomes[0],
+            Some(ScanOutcome::Found { partial: false, .. })
+        ));
+        assert_eq!(outcomes[1], Some(ScanOutcome::NotFound));
     }
 
     #[test]
