@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "创建新目标",
       "select": "目标",
-      "loadError": "获取目标时出错。"
+      "loadError": "获取目标时出错。",
+      "unsupportedType": "不支持的类型 — 工作流仅支持自定义目标"
     },
     "function": {
       "createNew": "创建新函数",
       "createNewNoteWorkflow": "注意：函数将被创建，然后您将被重定向到之前的表单，将新创建的函数与工作流关联。",
       "select": "选择函数",
       "loadError": "加载函数失败",
+      "saved": "函数保存成功",
+      "updated": "函数更新成功",
+      "saveError": "保存函数失败",
       "flatten": "展平后",
       "guidelinesTitle": "函数执行指南：",
       "rbf": "RBF（展平前运行）：",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "工作流运行",
       "edit": "编辑工作流",
+      "debugInEditor": "在编辑器中调试",
       "staleGraphWarning": "此工作流自本次运行后已被编辑 — {count} 个已执行的步骤不再存在，因此此处不显示其状态。 | 此工作流自本次运行后已被编辑 — {count} 个已执行的步骤不再存在，因此此处不显示其状态。"
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "成功",
       "failed": "失败",
       "open": "历史",
+      "openFullView": "打开完整运行视图",
       "loadError": "加载执行时出错",
       "loadRunError": "加载本次运行时出错"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "需要触发器",
     "addStepRequired": "在触发器后至少添加一个步骤",
     "connectAllNodes": "保存前连接所有节点",
-    "finishStepsBeforePublish": "完成所有步骤配置后再发布",
+    "finishStepsBeforePublish": "{count} 个步骤在发布前需要设置 — 已在画布上高亮显示。 | {count} 个步骤在发布前需要设置 — 已在画布上高亮显示。",
     "draft": "草稿",
     "saveDraft": "保存为草稿",
     "publish": "发布",
@@ -2708,6 +2714,11 @@
       "linkError": "无法链接告警。"
     },
     "chooseTrigger": "选择触发器",
+    "start": {
+      "triggerHint": "选择触发工作流的事件",
+      "chooseAction": "选择一个操作",
+      "actionHint": "选择触发后执行的操作"
+    },
     "node": {
       "kindTrigger": "触发器",
       "kindLogic": "逻辑",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "事件特定字段",
       "incidentNoExtraFields": "此事件除了公共字段外，不添加任何字段。",
       "conditionNoteTitle": "条件指南",
+      "functionFlattenTitle": "展平前后对比",
       "conditionNoteEmpty": "要检查空值，请使用 \"\"。例如：",
       "conditionNoteNull": "要检查空值，请使用 null。例如：",
       "conditionNoteCustom": "要添加自定义列，请键入其名称并按回车。",
@@ -2755,19 +2767,56 @@
       "enable": "启用步骤",
       "disabledBadge": "已禁用",
       "incompleteBadge": "稍后设置",
-      "destinationSetUpLater": "稍后设置",
-      "destinationSetUpLaterPrompt": "还没有目标？开启此项可稍后设置 — 现在即可保存草稿并测试。",
-      "destinationSetUpLaterActive": "目标暂时跳过 — 名称和备注仍会保存。发布前需要先提供目标。",
-      "functionSetUpLater": "稍后设置",
-      "functionSetUpLaterPrompt": "还没有函数？开启此项可稍后设置 — 现在即可保存草稿并测试。",
-      "functionSetUpLaterActive": "函数暂时跳过 — 名称和备注仍会保存。发布前需要先提供函数。"
+      "unsavedFnTitle": "未保存的函数更改",
+      "unsavedFnMessage": "此步骤包含未保存到函数库的函数代码。请保存、放弃更改或继续编辑。",
+      "unsavedFnSave": "保存函数",
+      "unsavedFnDiscard": "放弃更改",
+      "unsavedFnKeep": "继续编辑"
     },
     "commonFieldsAbove": "以上为公共字段",
     "canvas": {
       "undo": "撤销",
       "tidyUp": "整理",
-      "insertStep": "插入步骤",
-      "deleteEdge": "删除连接"
+      "edgeDeleteHint": "按 Backspace/Delete 键删除连线"
+    },
+    "ndv": {
+      "input": "输入",
+      "output": "输出",
+      "config": "配置",
+      "noInput": "没有输入记录。",
+      "noOutput": "没有转发的记录。",
+      "prevStep": "上一步 · {name}",
+      "nextStep": "下一步 · {name}",
+      "prevStepBtn": "上一步",
+      "nextStepBtn": "下一步",
+      "collapseSteps": "折叠步骤",
+      "expandSteps": "展开步骤",
+      "inputTag": "输入",
+      "openStep": "打开 {name}",
+      "runToView": "运行测试以查看此数据。",
+      "noBranchItems": "此分支上没有条目。",
+      "noUpstream": "没有上游步骤。",
+      "noRunYet": "尚未运行。",
+      "runLabel": "运行",
+      "switchRun": "切换运行",
+      "notInRun": "此步骤未包含在此次运行中。",
+      "runTest": "运行测试",
+      "noItems": "没有条目",
+      "itemsCount": "{count} 个条目 | {count} 个条目",
+      "viewTable": "表格",
+      "viewJson": "JSON",
+      "itemN": "条目 {n}",
+      "executeStep": "运行步骤",
+      "sample": "样本",
+      "editStep": "编辑步骤",
+      "testInputHint": "测试输入 — 编辑，然后运行步骤。",
+      "noRunsList": "尚无运行记录。"
+    },
+    "runOverlay": {
+      "banner": "正在显示来自历史运行（{run}）的步骤数据。您可以自由编辑 — 此运行不会被更改。",
+      "clear": "清除运行数据",
+      "ghostNodes": "{count} 个来自此运行的步骤已不再存在于工作流中，因此其状态不显示。 | {count} 个来自此运行的步骤已不再存在于工作流中，因此其状态不显示。",
+      "missingNode": "该步骤已不再存在于该工作流中 — 它已在此运行后被移除。"
     },
     "unsaved": {
       "title": "未保存的更改",
@@ -2781,7 +2830,20 @@
       "expand": "展开",
       "close": "清除并关闭结果",
       "nodesTitle": "步骤",
-      "empty": "运行测试以在此处查看步骤结果。"
+      "empty": "运行测试以在此处查看步骤结果。",
+      "openNode": "打开节点",
+      "viewConfig": "查看配置",
+      "hideConfig": "隐藏配置",
+      "noConfig": "无配置",
+      "functionLabel": "函数",
+      "destinationLabel": "目标",
+      "destinationUnsupported": "不支持的类型",
+      "destinationMissing": "该目标已不存在或无法读取。",
+      "headersLabel": "标头",
+      "templateLabel": "模板",
+      "outputFormatLabel": "输出格式",
+      "tlsVerifyLabel": "TLS 验证",
+      "tlsDisabled": "已禁用"
     }
   },
   "pipeline": {

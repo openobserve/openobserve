@@ -305,6 +305,8 @@ pub struct FunctionParams {
     pub after_flatten: bool,
     #[serde(default)]
     pub num_args: u8,
+    #[serde(default)]
+    pub raw_fn: Option<String>,
 }
 
 impl MemorySize for FunctionParams {
@@ -641,6 +643,7 @@ mod tests {
             after_flatten: false,
             // params: "row".to_string(),
             num_args: 0,
+            raw_fn: None,
         };
         let func_node = NodeData::Function(func);
         let payload = json::json!({
@@ -908,6 +911,7 @@ mod tests {
             name: "my_func".to_string(),
             after_flatten: false,
             num_args: 0,
+            raw_fn: None,
         });
         let node = Node::new(
             "func-1".to_string(),
@@ -1042,6 +1046,7 @@ mod tests {
             name: "my_fn".to_string(),
             after_flatten: false,
             num_args: 0,
+            raw_fn: None,
         });
         assert!(data.mem_size() > 0);
     }
@@ -1052,6 +1057,7 @@ mod tests {
             name: "fn".to_string(),
             after_flatten: true,
             num_args: 2,
+            raw_fn: None,
         };
         assert!(p.mem_size() > 0);
     }

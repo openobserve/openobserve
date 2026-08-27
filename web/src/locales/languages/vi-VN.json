@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Tạo đích mới",
       "select": "Đích",
-      "loadError": "Có lỗi khi lấy danh sách đích."
+      "loadError": "Có lỗi khi lấy danh sách đích.",
+      "unsupportedType": "Loại không được hỗ trợ — Quy trình làm việc chỉ hỗ trợ đích tùy chỉnh"
     },
     "function": {
       "createNew": "Tạo hàm mới",
       "createNewNoteWorkflow": "Lưu ý: Hàm sẽ được tạo, sau đó bạn sẽ được chuyển hướng đến biểu mẫu trước đó để liên kết hàm mới tạo với quy trình làm việc.",
       "select": "Chọn hàm",
       "loadError": "Tải hàm thất bại",
+      "saved": "Đã lưu hàm thành công",
+      "updated": "Đã cập nhật hàm thành công",
+      "saveError": "Không thể lưu hàm",
       "flatten": "Sau khi làm phẳng",
       "guidelinesTitle": "Hướng dẫn thực thi hàm:",
       "rbf": "RBF (Chạy trước khi làm phẳng):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "Lần chạy quy trình",
       "edit": "Sửa quy trình",
+      "debugInEditor": "Gỡ lỗi trong trình chỉnh sửa",
       "staleGraphWarning": "Workflow này đã được chỉnh sửa kể từ lần chạy này — {count} bước mà nó thực hiện không còn tồn tại, vì vậy trạng thái tương ứng không được hiển thị ở đây. | Workflow này đã được chỉnh sửa kể từ lần chạy này — {count} bước mà nó thực hiện không còn tồn tại, vì vậy trạng thái tương ứng không được hiển thị ở đây."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Thành công",
       "failed": "Thất bại",
       "open": "Lịch sử",
+      "openFullView": "Mở chế độ xem đầy đủ các lần chạy",
       "loadError": "Lỗi khi tải các lần thực thi",
       "loadRunError": "Lỗi khi tải lần chạy này"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "Cần có một bộ kích hoạt",
     "addStepRequired": "Thêm ít nhất một bước sau bộ kích hoạt",
     "connectAllNodes": "Kết nối tất cả các nút trước khi lưu",
-    "finishStepsBeforePublish": "Hoàn tất cấu hình tất cả các bước trước khi xuất bản",
+    "finishStepsBeforePublish": "{count} bước cần được thiết lập trước khi xuất bản — được đánh dấu trên canvas. | {count} bước cần được thiết lập trước khi xuất bản — được đánh dấu trên canvas.",
     "draft": "Bản nháp",
     "saveDraft": "Lưu thành bản nháp",
     "publish": "Xuất bản",
@@ -2708,6 +2714,11 @@
       "linkError": "Không thể liên kết cảnh báo."
     },
     "chooseTrigger": "Chọn một trình kích hoạt",
+    "start": {
+      "triggerHint": "Chọn sự kiện bắt đầu quy trình làm việc của bạn",
+      "chooseAction": "Chọn một hành động",
+      "actionHint": "Chọn điều gì xảy ra sau khi kích hoạt"
+    },
     "node": {
       "kindTrigger": "Trình kích hoạt",
       "kindLogic": "Logic",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Các trường cụ thể cho sự kiện",
       "incidentNoExtraFields": "Sự kiện này không thêm trường nào ngoài các trường chung.",
       "conditionNoteTitle": "Hướng dẫn điều kiện",
+      "functionFlattenTitle": "Trước và sau khi làm phẳng",
       "conditionNoteEmpty": "Để kiểm tra giá trị rỗng, sử dụng \"\". Ví dụ:",
       "conditionNoteNull": "Để kiểm tra giá trị null, sử dụng null. Ví dụ:",
       "conditionNoteCustom": "Để thêm cột tùy chỉnh, nhập tên của nó và nhấn Enter.",
@@ -2755,19 +2767,56 @@
       "enable": "Kích hoạt bước",
       "disabledBadge": "Đã tắt",
       "incompleteBadge": "Thiết lập sau",
-      "destinationSetUpLater": "Thiết lập sau",
-      "destinationSetUpLaterPrompt": "Chưa có đích? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
-      "destinationSetUpLaterActive": "Đích hiện đang được bỏ qua — tên và ghi chú vẫn được lưu. Bạn cần có một đích trước khi xuất bản.",
-      "functionSetUpLater": "Thiết lập sau",
-      "functionSetUpLaterPrompt": "Chưa có hàm? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
-      "functionSetUpLaterActive": "Hàm sẽ được bỏ qua trong lúc này — tên và nhận xét vẫn được lưu. Bạn cần một hàm trước khi xuất bản."
+      "unsavedFnTitle": "Thay đổi hàm chưa lưu",
+      "unsavedFnMessage": "Bước này có mã hàm chưa được lưu vào thư viện của bạn. Lưu nó, hủy thay đổi, hoặc tiếp tục chỉnh sửa.",
+      "unsavedFnSave": "Lưu hàm",
+      "unsavedFnDiscard": "Hủy thay đổi",
+      "unsavedFnKeep": "Tiếp tục chỉnh sửa"
     },
     "commonFieldsAbove": "các trường chung ở trên",
     "canvas": {
       "undo": "Hoàn tác",
       "tidyUp": "Dọn dẹp",
-      "insertStep": "Chèn bước",
-      "deleteEdge": "Xóa kết nối"
+      "edgeDeleteHint": "Nhấn Backspace/Delete để xóa đường nối"
+    },
+    "ndv": {
+      "input": "Đầu vào",
+      "output": "Đầu ra",
+      "config": "Cấu hình",
+      "noInput": "Không có bản ghi đầu vào.",
+      "noOutput": "Không có bản ghi nào được chuyển tiếp.",
+      "prevStep": "Bước trước · {name}",
+      "nextStep": "Bước tiếp theo · {name}",
+      "prevStepBtn": "Bước trước",
+      "nextStepBtn": "Bước tiếp theo",
+      "collapseSteps": "Thu gọn các bước",
+      "expandSteps": "Mở rộng các bước",
+      "inputTag": "Đầu vào",
+      "openStep": "Mở {name}",
+      "runToView": "Chạy thử để xem dữ liệu này.",
+      "noBranchItems": "Không có mục nào trên nhánh này.",
+      "noUpstream": "Không có bước thượng nguồn.",
+      "noRunYet": "Chưa có lần chạy nào.",
+      "runLabel": "Chạy",
+      "switchRun": "Chuyển lần chạy",
+      "notInRun": "Bước này không nằm trong lần chạy này.",
+      "runTest": "Chạy thử",
+      "noItems": "Không có mục nào",
+      "itemsCount": "{count} mục | {count} mục",
+      "viewTable": "Bảng",
+      "viewJson": "JSON",
+      "itemN": "Mục {n}",
+      "executeStep": "Chạy bước",
+      "sample": "Mẫu",
+      "editStep": "Chỉnh sửa bước",
+      "testInputHint": "Đầu vào thử nghiệm — Chỉnh sửa, sau đó chạy bước.",
+      "noRunsList": "Chưa có lần chạy nào."
+    },
+    "runOverlay": {
+      "banner": "Đang hiển thị dữ liệu bước từ lần chạy trước ({run}). Bạn có thể chỉnh sửa tự do — lần chạy này sẽ không bao giờ bị thay đổi.",
+      "clear": "Xóa dữ liệu lần chạy",
+      "ghostNodes": "{count} bước từ lần chạy này không còn tồn tại trong quy trình nữa, nên trạng thái tương ứng không được hiển thị. | {count} bước từ lần chạy này không còn tồn tại trong quy trình nữa, nên trạng thái tương ứng không được hiển thị.",
+      "missingNode": "Bước đó không còn tồn tại trong quy trình này — nó đã bị xóa sau lần chạy này."
     },
     "unsaved": {
       "title": "Các thay đổi chưa lưu",
@@ -2781,7 +2830,20 @@
       "expand": "Mở rộng",
       "close": "Xóa & Đóng Kết Quả",
       "nodesTitle": "Các bước",
-      "empty": "Chạy một bài kiểm tra để xem kết quả các bước tại đây."
+      "empty": "Chạy một bài kiểm tra để xem kết quả các bước tại đây.",
+      "openNode": "Mở Node",
+      "viewConfig": "Xem cấu hình",
+      "hideConfig": "Ẩn cấu hình",
+      "noConfig": "Không có cấu hình",
+      "functionLabel": "Hàm",
+      "destinationLabel": "Đích",
+      "destinationUnsupported": "Loại không được hỗ trợ",
+      "destinationMissing": "Đích này không còn tồn tại hoặc không thể đọc được.",
+      "headersLabel": "Header",
+      "templateLabel": "Mẫu",
+      "outputFormatLabel": "Định dạng đầu ra",
+      "tlsVerifyLabel": "Xác minh TLS",
+      "tlsDisabled": "Đã tắt"
     }
   },
   "pipeline": {

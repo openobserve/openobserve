@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "새 대상 만들기",
       "select": "대상",
-      "loadError": "대상을 불러오는 중 오류가 발생했습니다."
+      "loadError": "대상을 불러오는 중 오류가 발생했습니다.",
+      "unsupportedType": "지원되지 않는 유형 — 워크플로우는 사용자 지정 대상만 지원합니다"
     },
     "function": {
       "createNew": "새 함수 생성",
       "createNewNoteWorkflow": "참고: 함수가 생성된 후, 이전 양식으로 리디렉션되어 새로 생성된 함수를 워크플로우에 연결하게 됩니다.",
       "select": "함수 선택",
       "loadError": "함수 로드 실패",
+      "saved": "함수가 성공적으로 저장되었습니다",
+      "updated": "함수가 성공적으로 업데이트되었습니다",
+      "saveError": "함수를 저장하지 못했습니다",
       "flatten": "평탄화 후",
       "guidelinesTitle": "함수 실행 지침:",
       "rbf": "RBF (평탄화 전 실행):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "워크플로 실행",
       "edit": "워크플로 편집",
+      "debugInEditor": "편집기에서 디버그",
       "staleGraphWarning": "이 워크플로는 이 실행 이후 편집되었습니다 — 실행된 {count} 단계가 더 이상 존재하지 않으므로 상태가 여기에 표시되지 않습니다. | 이 워크플로는 이 실행 이후 편집되었습니다 — 실행된 {count} 단계가 더 이상 존재하지 않으므로 상태가 여기에 표시되지 않습니다."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "성공",
       "failed": "실패",
       "open": "기록",
+      "openFullView": "전체 실행 보기 열기",
       "loadError": "실행을 로드하는 중 오류 발생",
       "loadRunError": "이 실행을 로드하는 중 오류 발생"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "트리거가 필요합니다.",
     "addStepRequired": "트리거 뒤에 최소 하나의 단계를 추가하세요.",
     "connectAllNodes": "저장하기 전에 모든 노드를 연결하세요.",
-    "finishStepsBeforePublish": "게시하기 전에 모든 단계 구성을 완료하세요",
+    "finishStepsBeforePublish": "게시 전에 {count}개 단계의 설정이 필요합니다 — 캔버스에서 강조 표시됩니다. | 게시 전에 {count}개 단계의 설정이 필요합니다 — 캔버스에서 강조 표시됩니다.",
     "draft": "초안",
     "saveDraft": "초안으로 저장",
     "publish": "게시",
@@ -2708,6 +2714,11 @@
       "linkError": "알림을 연결할 수 없습니다."
     },
     "chooseTrigger": "트리거 선택",
+    "start": {
+      "triggerHint": "워크플로우를 시작하는 이벤트를 선택하세요",
+      "chooseAction": "액션 선택",
+      "actionHint": "트리거 후 수행할 작업을 선택하세요"
+    },
     "node": {
       "kindTrigger": "트리거",
       "kindLogic": "로직",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "이벤트별 필드",
       "incidentNoExtraFields": "이 이벤트는 공통 필드 외에 추가 필드가 없습니다.",
       "conditionNoteTitle": "조건 가이드라인",
+      "functionFlattenTitle": "평면화 전후",
       "conditionNoteEmpty": "빈 값을 확인하려면 \"\"를 사용하세요. 예:",
       "conditionNoteNull": "널 값을 확인하려면 null을 사용하세요. 예:",
       "conditionNoteCustom": "사용자 정의 열을 추가하려면 이름을 입력하고 Enter를 누르세요.",
@@ -2755,19 +2767,56 @@
       "enable": "단계 활성화",
       "disabledBadge": "비활성화됨",
       "incompleteBadge": "나중에 설정",
-      "destinationSetUpLater": "아직 대상이 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
-      "destinationSetUpLaterPrompt": "아직 대상이 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
-      "destinationSetUpLaterActive": "대상은 지금 건너뜁니다 — 이름과 설명은 계속 저장됩니다. 게시하려면 대상이 필요합니다.",
-      "functionSetUpLater": "아직 함수가 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
-      "functionSetUpLaterPrompt": "함수는 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 함수가 필요합니다.",
-      "functionSetUpLaterActive": "나중에 설정"
+      "unsavedFnTitle": "저장되지 않은 함수 변경 사항",
+      "unsavedFnMessage": "이 단계에는 라이브러리에 저장되지 않은 함수 코드가 있습니다. 저장하거나 변경 사항을 취소하거나 계속 편집할 수 있습니다.",
+      "unsavedFnSave": "함수 저장",
+      "unsavedFnDiscard": "변경 사항 취소",
+      "unsavedFnKeep": "계속 편집"
     },
     "commonFieldsAbove": "위의 공통 필드",
     "canvas": {
       "undo": "실행 취소",
       "tidyUp": "정리",
-      "insertStep": "단계 삽입",
-      "deleteEdge": "연결 삭제"
+      "edgeDeleteHint": "Backspace/Delete를 눌러 엣지를 제거하세요"
+    },
+    "ndv": {
+      "input": "입력",
+      "output": "출력",
+      "config": "구성",
+      "noInput": "입력 레코드가 없습니다.",
+      "noOutput": "전달된 레코드가 없습니다.",
+      "prevStep": "이전 단계 · {name}",
+      "nextStep": "다음 단계 · {name}",
+      "prevStepBtn": "이전 단계",
+      "nextStepBtn": "다음 단계",
+      "collapseSteps": "단계 접기",
+      "expandSteps": "단계 펼치기",
+      "inputTag": "입력",
+      "openStep": "{name} 열기",
+      "runToView": "이 데이터를 보려면 테스트를 실행하세요.",
+      "noBranchItems": "이 분기에 항목이 없습니다.",
+      "noUpstream": "상위 단계가 없습니다.",
+      "noRunYet": "아직 실행이 없습니다.",
+      "runLabel": "실행",
+      "switchRun": "실행 전환",
+      "notInRun": "이 단계는 이 실행에 포함되지 않습니다.",
+      "runTest": "테스트 실행",
+      "noItems": "항목 없음",
+      "itemsCount": "{count} 항목 | {count} 항목",
+      "viewTable": "테이블",
+      "viewJson": "JSON",
+      "itemN": "항목 {n}",
+      "executeStep": "단계 실행",
+      "sample": "샘플",
+      "editStep": "단계 편집",
+      "testInputHint": "테스트 입력 — 편집 후 단계를 실행하세요.",
+      "noRunsList": "아직 실행 기록이 없습니다."
+    },
+    "runOverlay": {
+      "banner": "과거 실행({run})의 단계 데이터를 표시합니다. 자유롭게 편집할 수 있습니다 — 이 실행은 변경되지 않습니다.",
+      "clear": "실행 데이터 지우기",
+      "ghostNodes": "이 실행의 {count} 단계는 더 이상 워크플로에 존재하지 않으므로 상태가 표시되지 않습니다. | 이 실행의 {count} 단계는 더 이상 워크플로에 존재하지 않으므로 상태가 표시되지 않습니다.",
+      "missingNode": "해당 단계는 이 워크플로에 더 이상 존재하지 않습니다. 이 실행 후에 제거되었습니다."
     },
     "unsaved": {
       "title": "저장되지 않은 변경 사항",
@@ -2781,7 +2830,20 @@
       "expand": "펼치기",
       "close": "결과 지우기 및 닫기",
       "nodesTitle": "단계",
-      "empty": "여기에서 테스트를 실행하여 단계 결과를 확인하세요."
+      "empty": "여기에서 테스트를 실행하여 단계 결과를 확인하세요.",
+      "openNode": "노드 열기",
+      "viewConfig": "구성 보기",
+      "hideConfig": "구성 숨기기",
+      "noConfig": "구성 없음",
+      "functionLabel": "함수",
+      "destinationLabel": "대상",
+      "destinationUnsupported": "지원되지 않는 유형",
+      "destinationMissing": "이 대상은 더 이상 존재하지 않거나 읽을 수 없습니다.",
+      "headersLabel": "헤더",
+      "templateLabel": "템플릿",
+      "outputFormatLabel": "출력 형식",
+      "tlsVerifyLabel": "TLS 검증",
+      "tlsDisabled": "비활성화"
     }
   },
   "pipeline": {

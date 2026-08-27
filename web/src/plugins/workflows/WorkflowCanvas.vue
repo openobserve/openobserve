@@ -41,8 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @edges-change="onEdgesChange"
     @node-drag-start="onNodeDragStart"
     @node-drag-stop="onNodeDragStop"
+    @node-mouse-enter="onNodeMouseEnter"
+    @node-mouse-leave="onNodeMouseLeave"
+    @edge-mouse-enter="onEdgeMouseEnter"
+    @edge-mouse-leave="onEdgeMouseLeave"
     @edge-click="onEdgeClick"
-    @pane-click="closeEdgeMenu"
     @connect="onConnect"
     @drop="onDrop"
     @dragover="onDragOver"
@@ -51,6 +54,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          library applies `pattern-color` as an SVG attribute, where var() would
          not resolve. -->
     <Background :size="2" :gap="22" />
+
+    <!-- Edge-delete hint — on edge click, a top-center banner reminds the user that
+         Backspace/Delete removes the edge (same affordance as the Pipelines canvas).
+         Inserting a step is done via the mid-edge `+`, so the edge has no menu. -->
+    <div
+      v-if="showEdgeHint && !readOnly"
+      data-test="workflow-edge-delete-hint"
+      class="bg-surface-base text-text-body border-border-default rounded-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
+    >
+      <OIcon name="info" class="mr-1" size="sm" />
+      {{ t("workflow.canvas.edgeDeleteHint") }}
+    </div>
 
     <!-- All three VueFlow templates render the same node; handle layout is
          derived from node_type inside WorkflowNode, so no io_type prop. -->
@@ -76,6 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="edgeProps.data"
         :marker-end="edgeProps.markerEnd"
         :style="edgeProps.style"
+        :insertable="!readOnly && isEdgeRevealed(edgeProps.id)"
+        @insert="onEdgeInsert(edgeProps.id, $event)"
+        @insert-enter="onInsertEnter(edgeProps.id)"
+        @insert-leave="onInsertLeave"
       />
     </template>
 
@@ -141,73 +160,138 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </Controls>
   </VueFlow>
 
-  <!-- Edge action menu — opens AT THE CLICK POINT on the clicked edge (no travel to
-       a top hint bar). Insert splices a step onto the edge (A→B becomes A→new→B,
-       rewired); Delete removes the connection (Backspace/Delete still works too).
-       Positioned via a CSS var (like the ghost start node's zoom) so no hardcoded
-       px. Never shown on the read-only Runs canvas. -->
+  <!-- Empty-canvas start scaffold — two DASHED placeholder cards (Trigger on top,
+       Action below, joined by a dashed connector), mirroring the reference
+       builder's start state so the trigger→action shape is legible before
+       anything is placed. Clicking Trigger opens the trigger-kind picker; clicking
+       Action opens the step picker for the addable (non-trigger) node types.
+
+       OVERLAYS, not Vue Flow nodes: real nodes would land in
+       `currentSelectedWorkflow.nodes` and show up in save, validation and the
+       dirty flag. Scaled by the LIVE viewport zoom (like a real node inside
+       `.vue-flow__viewport`, which carries the canvas transform) so the cards
+       track the canvas. Read-only Runs canvases show nothing. -->
   <div
-    v-if="edgeMenu.show && !readOnly"
-    ref="edgeMenuRef"
-    data-test="workflow-edge-menu"
-    class="bg-surface-base border-border-default rounded-default fixed top-[var(--edge-menu-y,0)] left-[var(--edge-menu-x,0)] z-1000 flex min-w-[10rem] flex-col overflow-hidden border py-1 text-sm shadow-lg dark:shadow-lg"
-    :style="{ '--edge-menu-x': edgeMenu.x + 'px', '--edge-menu-y': edgeMenu.y + 'px' }"
+    v-if="isEmptyCanvas && !readOnly"
+    data-test="workflow-flow-start-scaffold"
+    class="absolute top-24 left-1/2 z-10 flex origin-top -translate-x-1/2 scale-[var(--ghost-zoom,1)] flex-col items-center"
+    :style="{ '--ghost-zoom': viewport.zoom }"
   >
-    <OButton
-      variant="ghost"
-      size="sm"
-      class="w-full justify-start!"
-      data-test="workflows-edge-insert"
-      icon-left="add-circle-outline"
-      @click="onInsertStep"
-    >
-      {{ t("workflow.canvas.insertStep") }}
-    </OButton>
-    <OButton
-      variant="ghost-destructive"
-      size="sm"
-      class="w-full justify-start!"
-      data-test="workflows-edge-delete"
-      icon-left="delete"
-      @click="onDeleteEdge"
-    >
-      {{ t("workflow.canvas.deleteEdge") }}
-    </OButton>
+    <WorkflowStartCard
+      :tag="t('workflow.node.kindTrigger')"
+      :title="t('workflow.chooseTrigger')"
+      :hint="t('workflow.start.triggerHint')"
+      icon="notifications-active"
+      tint="bg-badge-blue-soft-bg text-badge-blue-soft-text"
+      data-test="workflow-flow-start-trigger"
+      @click="openTriggerPicker($event)"
+    />
+
+    <!-- Dashed connector + `+` between the two slots — same chip as every other
+         "add a step here" affordance; here it opens the Action picker. -->
+    <div class="flex flex-col items-center">
+      <span class="border-border-strong h-5 border-l-2"></span>
+      <FlowAddButton data-test="workflow-flow-start-add" @click="openActionPicker($event)" />
+      <span class="border-border-strong h-5 border-l-2"></span>
+    </div>
+
+    <WorkflowStartCard
+      :tag="t('workflow.node.kindAction')"
+      :title="t('workflow.start.chooseAction')"
+      :hint="t('workflow.start.actionHint')"
+      icon="bolt"
+      tint="bg-badge-success-soft-bg text-badge-success-soft-text"
+      data-test="workflow-flow-start-action"
+      @click="openActionPicker($event)"
+    />
   </div>
 
-  <!-- Empty-canvas start node (replaces the old "add a trigger" hint text). An
-       OVERLAY, not a Vue Flow node: a real node would land in
-       `currentSelectedWorkflow.nodes` and show up in save, validation and the
-       dirty flag. It borrows `vue-flow__node-input` so it is chrome-for-chrome
-       the same card a trigger renders as — picking one swaps the icon and
-       label, and the frame never moves. Read-only Runs canvases show nothing.
-
-       The wrapper carries `o2vf_node` because every shared node rule is scoped
-       under it, and on THIS canvas that class sits on the VueFlow element the
-       placeholder is a sibling of — without it the card gets no chrome at all
-       (the pipeline canvas has it on the container, so it inherits it there). -->
+  <!-- Persistent Action slot — once the Trigger is placed but no step follows it
+       yet, the Action ghost stays right below the real trigger node (so "picking
+       one keeps the other"). Anchored in FLOW space (viewport-transformed) to the
+       trigger's measured position + height, so it tracks pan/zoom and sits flush
+       under the node. Clicking it (or the connector `+`) opens the Action picker,
+       which appends + wires the first step after the trigger. -->
   <div
-    v-if="needsTrigger && !readOnly"
-    class="o2vf_node absolute top-32 left-1/2 z-10 -translate-x-1/2"
+    v-if="actionSlot && !readOnly"
+    data-test="workflow-flow-action-slot"
+    class="absolute top-[var(--wf-oy,0)] left-[var(--wf-ox,0)] z-10 flex origin-top -translate-x-1/2 scale-[var(--wf-oz,1)] flex-col items-center"
+    :style="{
+      '--wf-ox': actionSlot.left + 'px',
+      '--wf-oy': actionSlot.top + 'px',
+      '--wf-oz': actionSlot.zoom,
+    }"
   >
-    <!-- Scaled by the LIVE viewport zoom: real nodes are drawn inside
-         `.vue-flow__viewport`, which carries the canvas transform, so an
-         unscaled overlay renders larger than the node it stands in for.
-
-         `relative!` / `origin-top!` undo two things `.vue-flow__node` sets for
-         nodes VUE FLOW positions: `position:absolute` (which took this card out
-         of flow, collapsing the centring wrapper to zero width) and
-         `transform-origin:0 0` (which scaled it toward the top-left). -->
-    <div
-      data-test="workflow-flow-start-node"
-      class="vue-flow__node vue-flow__node-input relative! w-max origin-top! scale-[var(--ghost-zoom,1)] cursor-pointer! whitespace-nowrap"
-      :style="{ '--ghost-zoom': viewport.zoom }"
-      @click="openTriggerPicker($event)"
-    >
-      <FlowNodeCard icon="add" io-type="input" :has-input="false" :has-output="false">
-        <template #body>{{ t("workflow.chooseTrigger") }}</template>
-      </FlowNodeCard>
+    <div class="flex flex-col items-center">
+      <span class="border-border-strong h-5 border-l-2"></span>
+      <FlowAddButton data-test="workflow-flow-action-add" @click="openActionPicker($event)" />
+      <span class="border-border-strong h-5 border-l-2"></span>
     </div>
+    <WorkflowStartCard
+      :tag="t('workflow.node.kindAction')"
+      :title="t('workflow.start.chooseAction')"
+      :hint="t('workflow.start.actionHint')"
+      icon="bolt"
+      tint="bg-badge-success-soft-bg text-badge-success-soft-text"
+      data-test="workflow-flow-action-slot-card"
+      @click="openActionPicker($event)"
+    />
+  </div>
+
+  <!-- Append `+` — every step that can still chain onward gets a straight-down `+`
+       to add the next step / fan out a branch. A leaf's is persistent; a node whose
+       centre slot is already taken by a child reveals it on HOVER only. The `+`'s own
+       mouse events keep the reveal alive while the cursor is on it. Flow-anchored so
+       it tracks the node. -->
+  <div
+    v-for="pt in appendPoints"
+    :key="pt.id"
+    data-test="workflow-flow-append-add"
+    class="absolute top-[var(--wf-oy,0)] left-[var(--wf-ox,0)] z-20 flex origin-top -translate-x-1/2 scale-[var(--wf-oz,1)] flex-col items-center"
+    :style="{ '--wf-ox': pt.left + 'px', '--wf-oy': pt.top + 'px', '--wf-oz': pt.zoom }"
+    @mouseenter="onAppendEnter(pt.id)"
+    @mouseleave="onNodeMouseLeave"
+  >
+    <!-- Connector is ALWAYS drawn for a shown point — a leaf's straight stub, or a
+         branch's short side-nudged curve. Option C: the point only renders while its
+         node is hovered, so at rest there's nothing here. -->
+    <span v-if="!pt.svgW" class="border-border-strong h-5 border-l-2"></span>
+    <svg
+      v-else
+      :width="pt.svgW"
+      height="20"
+      :viewBox="`${-pt.svgW / 2} 0 ${pt.svgW} 20`"
+      aria-hidden="true"
+    >
+      <path
+        :d="`M ${pt.cx} 0 Q ${pt.cx} 13 0 20`"
+        fill="none"
+        stroke="var(--color-border-strong)"
+        stroke-width="2"
+      />
+    </svg>
+    <FlowAddButton @click="openStepPicker(pt.id, 'out', $event)" />
+  </div>
+
+  <!-- Trigger-missing fallback: no trigger but the canvas isn't empty (a step was
+       placed first, or the trigger was deleted mid-graph). The two-slot scaffold
+       is for the EMPTY canvas only; here we show a single dashed "Choose a Trigger"
+       card so the user can pick a kind (adding it auto-wires a lone orphan step). -->
+  <div
+    v-if="needsTrigger && !isEmptyCanvas && !readOnly"
+    data-test="workflow-flow-start-node"
+    class="absolute top-24 left-1/2 z-10 flex origin-top -translate-x-1/2 scale-[var(--ghost-zoom,1)] flex-col items-center"
+    :style="{ '--ghost-zoom': viewport.zoom }"
+  >
+    <WorkflowStartCard
+      :tag="t('workflow.node.kindTrigger')"
+      :title="t('workflow.chooseTrigger')"
+      :hint="t('workflow.start.triggerHint')"
+      icon="notifications-active"
+      tint="bg-badge-blue-soft-bg text-badge-blue-soft-text"
+      data-test="workflow-flow-start-trigger-fallback"
+      @click="openTriggerPicker($event)"
+    />
   </div>
 </template>
 
@@ -222,15 +306,17 @@ import { Background } from "@vue-flow/background";
 import { Controls, ControlButton } from "@vue-flow/controls";
 import { useI18nTyped } from "@/types/i18n";
 import WorkflowNode from "./WorkflowNode.vue";
+import WorkflowStartCard from "./WorkflowStartCard.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
-import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import FlowAddButton from "@/components/flow/FlowAddButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useWorkflowCanvas, {
   workflowHistory,
   pushWorkflowHistory,
   undoWorkflow,
   redoWorkflow,
   tidyWorkflowLayout,
+  nodeMeta,
 } from "./useWorkflowCanvas";
 
 import "@vue-flow/core/dist/style.css";
@@ -249,6 +335,8 @@ const {
   onDrop,
   onDragOver,
   openTriggerPicker,
+  openActionPicker,
+  openStepPicker,
   openInsertPicker,
 } = useWorkflowCanvas(t);
 
@@ -311,56 +399,20 @@ const vueFlowRef = ref<any>(null);
 // via WorkflowNode, the hover add/delete + click-to-edit. Run overlays stay.
 const readOnly = computed(() => workflowObj.readOnly);
 
-// Edges have no inline buttons; clicking one opens a small action menu AT THE
-// CLICK POINT with Insert + Delete (no travel to a top hint bar). `edge` is the
-// clicked edge; x/y are viewport coords for the fixed-positioned menu. Skipped on
-// the read-only Runs canvas, where edges can't be edited.
-const edgeMenuRef = ref<HTMLElement | null>(null);
-const edgeMenu = ref<{ show: boolean; x: number; y: number; edge: any }>({
-  show: false,
-  x: 0,
-  y: 0,
-  edge: null,
-});
-const onEdgeClick = (payload: any) => {
+// Edges have no menu — a step is inserted via the mid-edge `+` (onEdgeInsert) and a
+// connection is removed with Backspace/Delete on the selected edge. Clicking an edge
+// just flashes a top-center hint advertising that shortcut (same as the Pipelines
+// canvas). Skipped on the read-only Runs canvas, where edges can't be edited.
+const showEdgeHint = ref(false);
+let edgeHintTimeout: ReturnType<typeof setTimeout> | null = null;
+const onEdgeClick = () => {
   if (readOnly.value) return;
-  const edge = payload?.edge ?? payload ?? null;
-  if (!edge) return;
-  const evt = payload?.event as MouseEvent | undefined;
-  // Nudge a few px off the cursor so the menu doesn't open under the pointer.
-  edgeMenu.value = {
-    show: true,
-    x: (evt?.clientX ?? 0) + 4,
-    y: (evt?.clientY ?? 0) + 4,
-    edge,
-  };
-};
-const closeEdgeMenu = () => {
-  edgeMenu.value = { ...edgeMenu.value, show: false, edge: null };
-};
-
-// Insert a step onto the clicked edge (T7) — opens the step picker in "insert"
-// mode at the menu position; picking a type splices A→new→B (addNodeOnEdge).
-const onInsertStep = () => {
-  const edge = edgeMenu.value.edge;
-  if (!edge) return;
-  openInsertPicker(edge, { clientX: edgeMenu.value.x, clientY: edgeMenu.value.y } as MouseEvent);
-  closeEdgeMenu();
-};
-// Delete the clicked connection (single undo step).
-const onDeleteEdge = () => {
-  const edge = edgeMenu.value.edge;
-  if (!edge) return;
-  pushWorkflowHistory();
-  removeEdges([edge.id]);
-  closeEdgeMenu();
-};
-// Dismiss the menu on any click outside it (canvas pane-click already closes it;
-// this covers clicks on nodes / toolbar / elsewhere).
-const onDocMouseDown = (e: MouseEvent) => {
-  if (!edgeMenu.value.show) return;
-  if (edgeMenuRef.value && edgeMenuRef.value.contains(e.target as Node)) return;
-  closeEdgeMenu();
+  if (edgeHintTimeout) clearTimeout(edgeHintTimeout);
+  showEdgeHint.value = true;
+  edgeHintTimeout = setTimeout(() => {
+    showEdgeHint.value = false;
+    edgeHintTimeout = null;
+  }, 3500);
 };
 
 // Is the user typing in a field / code editor? Undo/redo + edge-delete must not
@@ -386,11 +438,6 @@ const isTextInputTarget = (target: EventTarget | null): boolean => {
 // Monaco editor is focused.
 const onKeydown = (event: KeyboardEvent) => {
   if (readOnly.value) return;
-  // Escape closes the edge menu regardless of focus.
-  if (event.key === "Escape" && edgeMenu.value.show) {
-    closeEdgeMenu();
-    return;
-  }
   if (isTextInputTarget(event.target)) return;
 
   const mod = event.metaKey || event.ctrlKey;
@@ -408,16 +455,14 @@ const onKeydown = (event: KeyboardEvent) => {
   // Snapshot BEFORE removal so the edge-delete is a single undo step.
   pushWorkflowHistory();
   removeEdges(selected.map((e) => e.id));
-  closeEdgeMenu();
 };
 
 onMounted(() => {
   window.addEventListener("keydown", onKeydown);
-  window.addEventListener("mousedown", onDocMouseDown);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
-  window.removeEventListener("mousedown", onDocMouseDown);
+  if (edgeHintTimeout) clearTimeout(edgeHintTimeout);
 });
 // The "Choose a Trigger" start node shows whenever the workflow has NO TRIGGER —
 // not only when the canvas is empty. A workflow needs exactly one trigger, and
@@ -432,19 +477,213 @@ const needsTrigger = computed(
     ),
 );
 
-// Center the trigger horizontally once nodes have measured dimensions — keep
-// its Y (near the top) so the steps flow down. Runs once per editor mount.
-// EXCEPTION: if a Test result is already present, the canvas has just remounted
-// into the reduced area above the results dock — frame ALL nodes instead so the
-// user still sees the whole graph.
+// A brand-new, untouched canvas — nothing placed yet. This is when the two-slot
+// Trigger + Action start scaffold shows; once ANY node exists we fall back to the
+// single "Choose a Trigger" card (only if the trigger is missing) and the flow-
+// anchored `+` add affordances below.
+const isEmptyCanvas = computed(
+  () => (workflowObj.currentSelectedWorkflow.nodes || []).length === 0,
+);
+
+// The trigger node (if placed) and how many NON-trigger steps exist — drive which
+// start affordances show.
+const triggerNode = computed<any>(() =>
+  (workflowObj.currentSelectedWorkflow.nodes || []).find(
+    (n: any) => n.data?.node_type === "workflow_trigger",
+  ),
+);
+const hasTrigger = computed(() => !!triggerNode.value);
+const stepCount = computed(
+  () =>
+    (workflowObj.currentSelectedWorkflow.nodes || []).filter(
+      (n: any) => n.data?.node_type !== "workflow_trigger",
+    ).length,
+);
+
+// Flow-coordinate → screen-pixel (relative to the canvas pane, whose origin the
+// viewport transform is measured from). Used to pin the flow-anchored overlays
+// (the persistent Action slot + the leaf-append `+`s) under their nodes so they
+// pan and zoom exactly like a real node. `left`/`top` land the node's BOTTOM-CENTRE
+// at the screen point; the overlay then grows downward from there.
+const screenBelow = (node: any) => {
+  const dims = findNode(node.id)?.dimensions;
+  const w = dims?.width ?? 240;
+  const h = dims?.height ?? 54;
+  const { x, y, zoom } = viewport.value;
+  return {
+    left: x + ((node.position?.x ?? 0) + w / 2) * zoom,
+    top: y + ((node.position?.y ?? 0) + h) * zoom,
+    zoom,
+  };
+};
+
+// Persistent Action slot: shown once the trigger is placed but no step follows it
+// yet, pinned flush under the trigger node (so choosing the trigger keeps the
+// Action ghost in view). Null otherwise.
+const actionSlot = computed(() => {
+  if (readOnly.value || !hasTrigger.value || stepCount.value !== 0) return null;
+  return screenBelow(triggerNode.value);
+});
+
+// Option C reveal state: the currently-hovered node and edge drive the append `+` and
+// the mid-edge insert `+`. A generous hide delay so the cursor can travel the connector
+// path onto the small `+` without it vanishing first (the `+`'s own mouseenter cancels
+// the timer anyway; this covers the gap in between).
+const HIDE_DELAY = 300;
+const hoveredNodeId = ref("");
+const hoveredEdgeId = ref("");
+let nodeHideTimer: ReturnType<typeof setTimeout> | null = null;
+let edgeHideTimer: ReturnType<typeof setTimeout> | null = null;
+const cancelNodeHide = () => {
+  if (nodeHideTimer) clearTimeout(nodeHideTimer);
+  nodeHideTimer = null;
+};
+const cancelEdgeHide = () => {
+  if (edgeHideTimer) clearTimeout(edgeHideTimer);
+  edgeHideTimer = null;
+};
+const onNodeMouseEnter = (e: any) => {
+  cancelNodeHide();
+  hoveredNodeId.value = e?.node?.id || "";
+};
+const onNodeMouseLeave = () => {
+  cancelNodeHide();
+  nodeHideTimer = setTimeout(() => (hoveredNodeId.value = ""), HIDE_DELAY);
+};
+// Hovering the EDGE line itself reveals that edge's insert `+`, so you can drop a step
+// between two nodes without travelling up to a node first.
+const onEdgeMouseEnter = (e: any) => {
+  cancelEdgeHide();
+  hoveredEdgeId.value = e?.edge?.id || "";
+};
+const onEdgeMouseLeave = () => {
+  cancelEdgeHide();
+  edgeHideTimer = setTimeout(() => (hoveredEdgeId.value = ""), HIDE_DELAY);
+};
+// Hovering an append `+` keeps its node the hovered one, so the `+` (and any edge
+// inserts on that node) stay up while the cursor is on the chip.
+const onAppendEnter = (id: string) => {
+  cancelNodeHide();
+  hoveredNodeId.value = id;
+};
+// Cursor moved onto a mid-edge `+`: keep it up regardless of whether it was revealed by
+// the edge line or an endpoint node (re-assert the edge as hovered, freeze both timers).
+const onInsertEnter = (edgeId: string) => {
+  cancelNodeHide();
+  cancelEdgeHide();
+  hoveredEdgeId.value = edgeId;
+};
+const onInsertLeave = () => {
+  onNodeMouseLeave();
+  onEdgeMouseLeave();
+};
+// Option C: a mid-edge insert `+` shows while the edge line is hovered OR while either
+// of its endpoint nodes is hovered — so it's reachable both ways, and the canvas is
+// otherwise quiet at rest.
+const isEdgeRevealed = (edgeId: string) => {
+  if (hoveredEdgeId.value === edgeId) return true;
+  const id = hoveredNodeId.value;
+  if (!id) return false;
+  const e = (workflowObj.currentSelectedWorkflow?.edges || []).find((x: any) => x.id === edgeId);
+  return !!e && (e.source === id || e.target === id);
+};
+
+// The append `+` for ONE node. A leaf (no children) shows a persistent STRAIGHT-DOWN
+// `+` — the "add next step" affordance. A node that ALREADY has children reveals its
+// `+` on HOVER only (`hoverOnly`, so the canvas isn't cluttered) and nudges it a
+// little to the side AWAY from the existing edge(s) — with a short connector — so it
+// reads as a separate branch handle rather than sitting on the edge. Clicking fans out.
+const appendPointFor = (node: any) => {
+  const base = screenBelow(node); // { left, top, zoom } — below centre
+  const wf = workflowObj.currentSelectedWorkflow;
+  const childIds = (wf.edges || [])
+    .filter((e: any) => e.source === node.id)
+    .map((e: any) => e.target);
+  if (!childIds.length) return { ...base, hoverOnly: false, cx: 0, svgW: 0 }; // leaf → stub
+
+  // Where do the existing children sit relative to the node centre?
+  const nodeW = findNode(node.id)?.dimensions?.width ?? 240;
+  const nodeCx = (node.position?.x ?? 0) + nodeW / 2;
+  const byId = new Map((wf.nodes || []).map((n: any) => [n.id, n]));
+  const TH = 40;
+  let hasLeft = false;
+  let hasRight = false;
+  for (const cid of childIds) {
+    const c: any = byId.get(cid);
+    if (!c) continue;
+    const cw = findNode(cid)?.dimensions?.width ?? 240;
+    const ccx = (c.position?.x ?? 0) + cw / 2;
+    if (ccx > nodeCx + TH) hasRight = true;
+    else if (ccx < nodeCx - TH) hasLeft = true;
+  }
+  // Both sides busy (a fanned-out node like the trigger) → the open space is the V-gap
+  // straight below centre, so drop the `+` there with a clean vertical stub (any side
+  // offset just lands it back on top of an existing branch edge). One side / a lone
+  // centred child → a small nudge to the free side, off the existing edge.
+  let sign: number;
+  let off: number;
+  if (hasLeft && hasRight) {
+    sign = 1;
+    off = 0; // centred in the V-gap — straight-down stub
+  } else {
+    sign = hasRight ? -1 : 1;
+    off = 40; // a little difference, not the old wide swing
+  }
+  return {
+    ...base,
+    hoverOnly: true,
+    left: base.left + off * base.zoom * sign,
+    cx: -off * sign, // node's LOCAL x relative to the `+` (connector start)
+    svgW: 2 * off,
+  };
+};
+
+// Append `+` points: one under EVERY step that can still chain onward (not a
+// terminal/output node), so a fan-out branch can be added from any node — but a
+// point whose slot is taken (`hoverOnly`) shows only while its node is hovered.
+// Excludes the trigger while the Action slot covers it, so there's never a bare `+`
+// and a labelled Action card on the same node.
+const appendPoints = computed(() => {
+  if (readOnly.value) return [];
+  const wf = workflowObj.currentSelectedWorkflow;
+  const nodes = wf.nodes || [];
+  return (
+    nodes
+      .filter((n: any) => {
+        if (nodeMeta(n.data?.node_type)?.ioType === "output") return false; // terminal
+        // The trigger's first step is offered via the labelled Action slot instead.
+        if (hasTrigger.value && stepCount.value === 0) return false;
+        return true;
+      })
+      .map((n: any) => ({ id: n.id, ...appendPointFor(n) }))
+      // Option C: nothing shows at rest — a node's append `+` appears only while that
+      // node (or its own `+`) is hovered. Leaves hover-gate too, so at rest the whole
+      // canvas is quiet.
+      .filter((pt: any) => pt.id === hoveredNodeId.value)
+  );
+});
+
+// Mid-edge `+` clicked → splice a step onto that edge (A→new→B). Reuses the same
+// insert picker the edge action-menu uses.
+const onEdgeInsert = (edgeId: string, event: MouseEvent) => {
+  const edge = (workflowObj.currentSelectedWorkflow.edges || []).find((e: any) => e.id === edgeId);
+  if (edge) openInsertPicker(edge, event);
+};
+
+// Frame the graph once nodes have measured dimensions. Runs once per editor mount.
+//  • Existing/loaded workflow (Edit, or History → Edit) or a run to inspect:
+//    fitView so the WHOLE graph is centered on screen (top-aligning a saved graph
+//    left it pushed off the top — the reported "not centering" bug).
+//  • Brand-new workflow (create): keep the trigger near the top and only center it
+//    horizontally, so the first steps flow DOWN from the top as you build.
 let centered = false;
 onNodesInitialized(() => {
   if (centered) return;
   const nodes = workflowObj.currentSelectedWorkflow.nodes;
   const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!trigger) return;
-  if (workflowObj.testRun.result) {
-    fitView({ padding: 0.2 });
+  if (workflowObj.isEditWorkflow || workflowObj.testRun.result) {
+    nextTick(() => fitView({ padding: 0.2 }));
     centered = true;
     return;
   }
@@ -460,15 +699,32 @@ onNodesInitialized(() => {
   centered = true;
 });
 
-// Whenever a run produces a result (the dock opens / re-runs), frame all nodes so
-// the reduced canvas still shows the whole graph. Guarded on !readOnly so the Runs
-// inspection canvas isn't reframed on every history load.
+// NOTE: a run result no longer reframes the canvas. That reframe existed for the old
+// results DOCK, which shrank the canvas when it opened; the NDV redesign removed the
+// dock, so running a Test / Run Step leaves the canvas size unchanged — auto-fitting
+// there just yanked the user's view (an unwanted zoom on every run). The view now stays
+// exactly where the user left it when a result arrives.
+
+// Publish validation flags incomplete (dummy) nodes → frame just those and thicken
+// their border in the node's own type colour (WorkflowNode adds `wf-needs-setup`).
+// Clear the flag after a few seconds so it's a transient nudge — the persistent
+// "Set up later" badge still marks them afterwards.
+let incompleteHighlightTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  () => !!workflowObj.testRun.result,
-  (has) => {
-    if (has && !readOnly.value) nextTick(() => fitView({ padding: 0.2 }));
+  () => workflowObj.incompleteHighlight,
+  (ids) => {
+    if (incompleteHighlightTimer) clearTimeout(incompleteHighlightTimer);
+    if (!ids.length) return;
+    nextTick(() => fitView({ nodes: ids, padding: 0.3, duration: 500 }));
+    incompleteHighlightTimer = setTimeout(() => {
+      workflowObj.incompleteHighlight = [];
+      incompleteHighlightTimer = null;
+    }, 4500);
   },
 );
+onBeforeUnmount(() => {
+  if (incompleteHighlightTimer) clearTimeout(incompleteHighlightTimer);
+});
 
 defineExpose({ vueFlowRef });
 </script>

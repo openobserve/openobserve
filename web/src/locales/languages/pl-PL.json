@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Utwórz nowe miejsce docelowe",
       "select": "Miejsce docelowe",
-      "loadError": "Błąd podczas pobierania miejsc docelowych."
+      "loadError": "Błąd podczas pobierania miejsc docelowych.",
+      "unsupportedType": "Nieobsługiwany typ — Przepływy pracy obsługują tylko niestandardowe miejsca docelowe"
     },
     "function": {
       "createNew": "Utwórz nową funkcję",
       "createNewNoteWorkflow": "Uwaga: Funkcja zostanie utworzona, a następnie zostaniesz przekierowany do poprzedniego formularza, aby powiązać nowo utworzoną funkcję z przepływem pracy.",
       "select": "Wybierz funkcję",
       "loadError": "Nie udało się załadować funkcji",
+      "saved": "Funkcja zapisana pomyślnie",
+      "updated": "Funkcja zaktualizowana pomyślnie",
+      "saveError": "Nie udało się zapisać funkcji",
       "flatten": "Po spłaszczeniu",
       "guidelinesTitle": "Wytyczne dotyczące wykonywania funkcji:",
       "rbf": "RBF (Uruchom przed spłaszczeniem):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "Uruchomienia przepływu pracy",
       "edit": "Edytuj przepływ pracy",
+      "debugInEditor": "Debuguj w edytorze",
       "staleGraphWarning": "Ten przepływ pracy został edytowany od czasu tego uruchomienia — {count} wykonany krok już nie istnieje, więc jego stan nie jest tutaj pokazany. | Ten przepływ pracy został edytowany od czasu tego uruchomienia — {count} wykonane kroki już nie istnieją, więc ich stan nie jest tutaj pokazany."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Sukces",
       "failed": "Niepowodzenie",
       "open": "Historia",
+      "openFullView": "Otwórz pełny widok uruchomień",
       "loadError": "Błąd podczas ładowania uruchomień",
       "loadRunError": "Błąd podczas ładowania tego uruchomienia"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "Wymagany jest wyzwalacz",
     "addStepRequired": "Dodaj co najmniej jeden krok po wyzwalaczu",
     "connectAllNodes": "Połącz wszystkie węzły przed zapisaniem",
-    "finishStepsBeforePublish": "Skonfiguruj wszystkie kroki przed publikacją",
+    "finishStepsBeforePublish": "{count} krok wymaga konfiguracji przed opublikowaniem — podświetlony na płótnie. | {count} kroków wymaga konfiguracji przed opublikowaniem — podświetlone na płótnie.",
     "draft": "Wersja robocza",
     "saveDraft": "Zapisz jako wersję roboczą",
     "publish": "Opublikuj",
@@ -2708,6 +2714,11 @@
       "linkError": "Nie udało się połączyć alertów."
     },
     "chooseTrigger": "Wybierz wyzwalacz",
+    "start": {
+      "triggerHint": "Wybierz zdarzenie, które uruchamia Twój przepływ pracy",
+      "chooseAction": "Wybierz akcję",
+      "actionHint": "Wybierz, co ma się wydarzyć po wyzwalaczu"
+    },
     "node": {
       "kindTrigger": "Wyzwalacz",
       "kindLogic": "Logika",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Pola specyficzne dla zdarzenia",
       "incidentNoExtraFields": "To zdarzenie nie dodaje żadnych pól poza standardowymi.",
       "conditionNoteTitle": "Wytyczne dotyczące warunków",
+      "functionFlattenTitle": "Przed vs Po spłaszczeniu",
       "conditionNoteEmpty": "Aby sprawdzić pustą wartość, użyj \"\". Przykład:",
       "conditionNoteNull": "Aby sprawdzić wartość null, użyj null. Przykład:",
       "conditionNoteCustom": "Aby dodać niestandardową kolumnę, wpisz jej nazwę i naciśnij Enter.",
@@ -2755,19 +2767,56 @@
       "enable": "Włącz krok",
       "disabledBadge": "Wyłączony",
       "incompleteBadge": "Skonfiguruj później",
-      "destinationSetUpLater": "Skonfiguruj później",
-      "destinationSetUpLaterPrompt": "Nie masz jeszcze miejsca docelowego? Włącz to, aby skonfigurować je później — możesz zapisać wersję roboczą i przetestować teraz.",
-      "destinationSetUpLaterActive": "Miejsce docelowe jest na razie pomijane — nazwa i komentarz nadal są zapisywane. Będziesz potrzebować miejsca docelowego przed opublikowaniem.",
-      "functionSetUpLater": "Skonfiguruj później",
-      "functionSetUpLaterPrompt": "Nie masz jeszcze funkcji? Włącz to, aby skonfigurować ją później — możesz zapisać wersję roboczą i przetestować teraz.",
-      "functionSetUpLaterActive": "Funkcja jest na razie pomijana — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować funkcji przed publikacją."
+      "unsavedFnTitle": "Niezapisane zmiany funkcji",
+      "unsavedFnMessage": "Ten krok zawiera kod funkcji, który nie jest zapisany w Twojej bibliotece. Zapisz go, odrzuć zmiany lub kontynuuj edycję.",
+      "unsavedFnSave": "Zapisz funkcję",
+      "unsavedFnDiscard": "Odrzuć zmiany",
+      "unsavedFnKeep": "Kontynuuj edycję"
     },
     "commonFieldsAbove": "Wspólne pola powyżej",
     "canvas": {
       "undo": "Cofnij",
       "tidyUp": "Uporządkuj",
-      "insertStep": "Wstaw krok",
-      "deleteEdge": "Usuń połączenie"
+      "edgeDeleteHint": "Naciśnij Backspace/Delete, aby usunąć krawędź"
+    },
+    "ndv": {
+      "input": "Wejście",
+      "output": "Wyjście",
+      "config": "Konfiguracja",
+      "noInput": "Brak rekordów wejściowych.",
+      "noOutput": "Brak przekazanych rekordów.",
+      "prevStep": "Poprzedni krok · {name}",
+      "nextStep": "Następny krok · {name}",
+      "prevStepBtn": "Poprzedni krok",
+      "nextStepBtn": "Następny krok",
+      "collapseSteps": "Zwiń kroki",
+      "expandSteps": "Rozwiń kroki",
+      "inputTag": "Wejście",
+      "openStep": "Otwórz {name}",
+      "runToView": "Uruchom test, aby zobaczyć te dane.",
+      "noBranchItems": "Brak elementów w tej gałęzi.",
+      "noUpstream": "Brak poprzedzających kroków.",
+      "noRunYet": "Brak uruchomienia.",
+      "runLabel": "Uruchom",
+      "switchRun": "Zmień uruchomienie",
+      "notInRun": "Ten krok nie jest uwzględniony w tym uruchomieniu.",
+      "runTest": "Uruchom test",
+      "noItems": "Brak elementów",
+      "itemsCount": "{count} element | {count} elementów",
+      "viewTable": "Tabela",
+      "viewJson": "JSON",
+      "itemN": "Element {n}",
+      "executeStep": "Uruchom krok",
+      "sample": "Próbka",
+      "editStep": "Edytuj krok",
+      "testInputHint": "Wejście testowe — edytuj, a następnie uruchom krok.",
+      "noRunsList": "Brak uruchomień."
+    },
+    "runOverlay": {
+      "banner": "Wyświetlanie danych kroku z poprzedniego uruchomienia ({run}). Możesz swobodnie edytować — to uruchomienie nigdy nie jest zmieniane.",
+      "clear": "Wyczyść dane uruchomienia",
+      "ghostNodes": "{count} krok z tego uruchomienia już nie istnieje w przepływie pracy, więc jego status nie jest wyświetlany. | {count} kroków z tego uruchomienia już nie istnieje w przepływie pracy, więc ich status nie jest wyświetlany.",
+      "missingNode": "Ten krok już nie istnieje w tym przepływie pracy — został usunięty po tym uruchomieniu."
     },
     "unsaved": {
       "title": "Niezapisane zmiany",
@@ -2781,7 +2830,20 @@
       "expand": "Rozwiń",
       "close": "Wyczyść i zamknij wyniki",
       "nodesTitle": "Kroki",
-      "empty": "Uruchom test, aby zobaczyć wyniki kroków tutaj."
+      "empty": "Uruchom test, aby zobaczyć wyniki kroków tutaj.",
+      "openNode": "Otwórz węzeł",
+      "viewConfig": "Zobacz konfigurację",
+      "hideConfig": "Ukryj konfigurację",
+      "noConfig": "Brak konfiguracji",
+      "functionLabel": "Funkcja",
+      "destinationLabel": "Miejsce docelowe",
+      "destinationUnsupported": "Nieobsługiwany typ",
+      "destinationMissing": "To miejsce docelowe już nie istnieje lub nie można go odczytać.",
+      "headersLabel": "Nagłówki",
+      "templateLabel": "Szablon",
+      "outputFormatLabel": "Format wyjściowy",
+      "tlsVerifyLabel": "Weryfikacja TLS",
+      "tlsDisabled": "Wyłączone"
     }
   },
   "pipeline": {
