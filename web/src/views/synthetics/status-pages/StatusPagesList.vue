@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
+import config from "@/aws-exports";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -305,19 +305,17 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const store = useStore();
 const search = ref("");
 
 /**
  * Notices ("Post update" / "View updates") and Custom domains are locked in
- * an OSS build, but available on both self-hosted enterprise and cloud —
- * cloud always compiles with the enterprise feature too (see the build_type
- * derivation fix), and the backend's own gate on these routes is a compile-time
- * `#[cfg(feature = "enterprise")]`, not a build_type check. `!== "opensource"`
- * matches the established convention for this split elsewhere (`router.ts`'s
- * alertSources/anomaly-detection routes, `AlertList.vue`).
+ * an OSS build, but available on both self-hosted enterprise and cloud — the
+ * backend's own gate on these routes is a compile-time
+ * `#[cfg(feature = "enterprise")]`, which cloud's Cargo feature graph already
+ * enables. Same `isCloud || isEnterprise` check that gates the Billing route
+ * itself (`router/index.ts`), rather than the runtime `build_type` signal.
  */
-const advancedEnabled = computed(() => store.state.zoConfig?.build_type !== "opensource");
+const advancedEnabled = computed(() => config.isCloud === "true" || config.isEnterprise === "true");
 
 const filteredPages = computed(() => {
   const q = search.value.trim().toLowerCase();

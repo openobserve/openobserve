@@ -359,6 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -418,8 +419,11 @@ const orgIdentifier = computed<string>(
 
 // Logo upload itself is available on any licensed build (cloud or self-hosted
 // enterprise) — same split as Notices/Custom Domains (see StatusPagesList's
-// `advancedEnabled`).
-const logoUploadEnabled = computed(() => store.state.zoConfig?.build_type !== "opensource");
+// `advancedEnabled`), using the same isCloud || isEnterprise check as the
+// Billing route (`router/index.ts`).
+const logoUploadEnabled = computed(
+  () => config.isCloud === "true" || config.isEnterprise === "true",
+);
 
 // Self-hosted enterprise only, never cloud: the org-wide logo (Settings →
 // General) is an on-prem-org concept, so defaulting/overriding a status
