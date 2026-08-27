@@ -187,9 +187,9 @@ const { t } = useI18nTyped();
 // only mode now); also used to write the AND/OR toggle below.
 const form = inject(FORM_CONTEXT_KEY, null);
 
-// Operator `value`s are the backend wire format (serde renames), so the null
-// checks use lowercase snake_case while showing a prose label.
-const triggerOperators = computed<SelectOptionInput[]>(() => [
+// Operator `value`s are the backend wire format (serde renames); labels stay
+// raw English like the rest of the list.
+const triggerOperators: SelectOptionInput[] = [
   "=",
   "!=",
   ">=",
@@ -198,11 +198,11 @@ const triggerOperators = computed<SelectOptionInput[]>(() => [
   "<",
   "Contains",
   "NotContains",
-  { label: t("dashboard.filterOperators.isNull"), value: "is_null" },
-  { label: t("dashboard.filterOperators.isNotNull"), value: "is_not_null" },
-  { label: t("dashboard.filterOperators.isEmpty"), value: "is_empty" },
-  { label: t("dashboard.filterOperators.isNotEmpty"), value: "is_not_empty" },
-]);
+  { label: raw("Is Null"), value: "is_null" },
+  { label: raw("Is Not Null"), value: "is_not_null" },
+  { label: raw("Is Empty"), value: "is_empty" },
+  { label: raw("Is Not Empty"), value: "is_not_empty" },
+];
 
 // Null checks take no value; drop a stale one so it can't leak into the payload.
 const onOperatorChange = (operator: unknown) => {
