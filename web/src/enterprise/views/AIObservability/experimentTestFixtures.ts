@@ -23,7 +23,7 @@ export function makeExperiment(overrides: Partial<LlmExperiment> = {}): LlmExper
     datasetId: "dataset-a",
     datasetName: "Dataset A",
     datasetVersion: 1,
-    task: { type: "remote", config: {} },
+    task: { type: "remote", taskRef: "summarizer@1" },
     scorers: [],
     trialCount: 1,
     status: "completed",

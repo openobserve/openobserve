@@ -30,6 +30,7 @@ mod eval_annotation_queues;
 mod eval_datasets;
 mod eval_experiments;
 mod eval_jobs;
+mod eval_playground_snapshots;
 mod eval_providers;
 mod eval_score_configs;
 mod eval_scorers;
@@ -59,10 +60,10 @@ mod user;
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
-    EvalDatasetsQueue, EvalExperimentsQueue, EvalJobsQueue, EvalProvidersQueue,
-    EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue, OrgUsersQueue,
-    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
-    SyntheticsQueue, TemplatesQueue,
+    EvalDatasetsQueue, EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue,
+    EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue,
+    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue,
+    SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(
@@ -149,6 +150,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let eval_experiments_queue = EvalExperimentsQueue {
         on_eval_experiment_msg: eval_experiments::process,
     };
+    let eval_playground_snapshots_queue = EvalPlaygroundSnapshotsQueue {
+        on_eval_playground_snapshot_msg: eval_playground_snapshots::process,
+    };
     let eval_scorers_queue = EvalScorersQueue {
         on_eval_scorer_msg: eval_scorers::process,
     };
@@ -195,6 +199,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(eval_annotation_queues_queue),
         Box::new(eval_datasets_queue),
         Box::new(eval_experiments_queue),
+        Box::new(eval_playground_snapshots_queue),
         Box::new(eval_scorers_queue),
         Box::new(eval_jobs_queue),
         Box::new(folders_queue),
