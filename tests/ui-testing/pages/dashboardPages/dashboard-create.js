@@ -363,6 +363,25 @@ export default class DashboardCreate {
 
     // Wait for Vue components to mount — use deterministic check on panel editor or back button
     await this.page.locator('[data-test="dashboard-back-btn"]').waitFor({ state: 'visible', timeout: 15000 });
+
+    // back-btn only proves the OPageLayout header mounted, and ViewDashboard renders
+    // that header immediately — before any dashboard data arrives. Everything callers
+    // actually reach for next lives in the CONTENT subtree: RenderDashboardCharts is
+    // `v-if="selectedDate"`, and loadDashboard() only sets selectedDate once the
+    // dashboard GET resolves. So returning here left every caller racing that load —
+    // the empty-state add-panel button and the variable selectors simply do not exist
+    // yet, and the wait expires on a page that looks perfectly fine in a screenshot.
+    // The date-time picker sits behind the same `v-if="selectedDate"`, so it is the
+    // signal that the content subtree is committed to render.
+    await this.waitForDashboardContentLoaded();
+  }
+
+  // Gate on the dashboard's data having loaded (see createDashboard for why the
+  // header alone is not enough). Safe to call on any ViewDashboard page.
+  async waitForDashboardContentLoaded(timeout = 30000) {
+    await this.page
+      .locator('[data-test="dashboard-global-date-time-picker"]')
+      .waitFor({ state: "visible", timeout });
   }
 
   //back to dashboard list
@@ -456,10 +475,13 @@ export default class DashboardCreate {
 
   //Add Panel to dashboard (when dashboard is empty)
   async addPanel() {
-    // The empty-state "add panel" button renders as soon as the dashboard has
-    // no panels — which is also true while the dashboard GET is still loading.
-    // Clicking it that early makes ViewDashboard.vue's addPanelData() read
-    // tabs[0] before tabs exist, which throws inside the handler so router.push
+    // Nothing below exists until the dashboard's data has loaded: the whole
+    // content subtree is `v-if="selectedDate"`, set by loadDashboard(). Gate on
+    // that first so the waits below fail on their own merits, not on arriving early.
+    await this.waitForDashboardContentLoaded();
+
+    // Clicking the empty-state button before tabs exist makes ViewDashboard.vue's
+    // addPanelData() read tabs[0] and throw inside the handler, so router.push
     // never runs: the click reports success and the URL never changes, burning
     // every retry below. The tab strip only renders once tabs have loaded, so
     // waiting for it gates the click on the data it depends on.

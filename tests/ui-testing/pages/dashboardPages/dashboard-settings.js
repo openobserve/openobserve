@@ -260,6 +260,20 @@ export default class DashboardSetting {
   //Variables Settings
   //Open Variables tab
 
+  // The variables tab click can be swallowed mid drawer-transition, leaving the
+  // General tab showing. Callers then wait out their full timeout on a control
+  // that was never going to render, so gate the tab switch on the variables panel
+  // actually appearing — either its list (add-variable button) or, if a variable
+  // form is already open, the form's name field.
+  async waitForVariablesPanel(timeout = 5000) {
+    await this.page
+      .locator(
+        '[data-test="dashboard-add-variable-btn"], [data-test="dashboard-variable-name-field"]'
+      )
+      .first()
+      .waitFor({ state: "visible", timeout });
+  }
+
   async openVariables() {
     // Check if the settings dialog is already open
     const generalTab = this.page.locator('[data-test="dashboard-settings-general-tab"]');
@@ -295,6 +309,7 @@ export default class DashboardSetting {
         await variablesTab.waitFor({ state: "visible", timeout: 10000 });
         await variablesTab.scrollIntoViewIfNeeded();
         await variablesTab.click();
+        await this.waitForVariablesPanel();
         return; // Success
       } catch (e) {
         testLogger.warn(`openVariables attempt ${attempt} failed: ${e.message}`);
@@ -326,6 +341,7 @@ export default class DashboardSetting {
         await variablesTab.waitFor({ state: "visible", timeout: 10000 });
         await variablesTab.scrollIntoViewIfNeeded();
         await variablesTab.click();
+        await this.waitForVariablesPanel();
         return; // Success
       } catch (e) {
         testLogger.warn(`goToVariablesTab attempt ${attempt} failed: ${e.message}`);
