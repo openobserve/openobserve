@@ -13,11 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
-
 use config::meta::promql::{
     NAME_LABEL,
-    value::{EvalContext, RangeValue, Value, build_reset_prefix, extrapolated_rate_with_prefix},
+    value::{CounterSeries, EvalContext, RangeValue, Value},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
@@ -99,7 +97,8 @@ pub(crate) fn fused_range_agg(
                     let range_micros = micros(range);
                     let mut start_index = 0;
                     let mut end_index = 0;
-                    let reset_prefix = counter_kind.map(|_| build_reset_prefix(&metric.samples));
+                    let counter =
+                        counter_kind.map(|kind| CounterSeries::new(&metric.samples, kind));
 
                     for (slot, &eval_ts) in timestamps.iter().enumerate() {
                         let window_samples = advance_sample_window(
@@ -112,18 +111,11 @@ pub(crate) fn fused_range_agg(
                         if window_samples.is_empty() {
                             continue;
                         }
-                        let value = match (&reset_prefix, counter_kind) {
-                            (Some(prefix), Some(kind)) => extrapolated_rate_with_prefix(
-                                &metric.samples,
-                                prefix,
-                                start_index,
-                                end_index,
-                                eval_ts,
-                                range,
-                                Duration::ZERO,
-                                kind,
-                            ),
-                            _ => func.exec(window_samples, eval_ts, &range),
+                        let value = match &counter {
+                            Some(counter) => {
+                                counter.extrapolate(start_index, end_index, eval_ts, range)
+                            }
+                            None => func.exec(window_samples, eval_ts, &range),
                         };
                         if let Some(value) = value {
                             acc.push(slot, value);

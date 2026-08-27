@@ -16,8 +16,7 @@
 use std::{collections::HashSet, sync::LazyLock as Lazy, time::Duration};
 
 use config::meta::promql::value::{
-    EvalContext, ExtrapolationKind, LabelsExt, RangeValue, Sample, Value, build_reset_prefix,
-    extrapolated_rate_with_prefix,
+    CounterSeries, EvalContext, ExtrapolationKind, LabelsExt, RangeValue, Sample, Value,
 };
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
@@ -290,9 +289,9 @@ where
             let mut result_samples = Vec::with_capacity(timestamps.len());
             let mut start_index = 0;
             let mut end_index = 0;
-            let reset_prefix = func
+            let counter = func
                 .counter_extrapolation()
-                .map(|_| build_reset_prefix(&metric.samples));
+                .map(|kind| CounterSeries::new(&metric.samples, kind));
 
             // For each eval timestamp, compute the function value
             for &eval_ts in &timestamps {
@@ -312,18 +311,9 @@ where
                     continue;
                 }
 
-                let value = match (&reset_prefix, func.counter_extrapolation()) {
-                    (Some(prefix), Some(kind)) => extrapolated_rate_with_prefix(
-                        &metric.samples,
-                        prefix,
-                        start_index,
-                        end_index,
-                        eval_ts,
-                        range,
-                        Duration::ZERO,
-                        kind,
-                    ),
-                    _ => func.exec(window_samples, eval_ts, &range),
+                let value = match &counter {
+                    Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
+                    None => func.exec(window_samples, eval_ts, &range),
                 };
                 if let Some(value) = value {
                     result_samples.push(Sample::new(eval_ts, value));
