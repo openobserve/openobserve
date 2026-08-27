@@ -38,6 +38,12 @@ test.describe("Search Inspector Permission Gating", () => {
     const identifier = await pm.createOrgPage.createOrg(orgName);
     testLogger.info(`Created org "${orgName}" (identifier: ${identifier})`);
 
+    // The org is created via API after the app bootstrapped its organization
+    // list, so the selector does not include it yet. Reload so MainLayout
+    // re-fetches the list (getDefaultOrganization on mount) before switching.
+    await page.reload();
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
     // Register the listener before the switch: MainLayout must re-fetch the
     // org-scoped full config for the newly selected organization.
     const configRequest = pm.searchInspectorPage.waitForConfigRequest(identifier);

@@ -1,5 +1,0 @@
-[
-  { "title": "should keep search_inspector_enabled in the full UI configuration", "action": "new", "verifies": "the org-scoped /api/{org}/config response still carries the search_inspector_enabled boolean the gating UI consumes" },
-  { "title": "should refetch the full UI configuration when switching organization", "action": "new", "verifies": "MainLayout re-fetches the org-scoped full config for the newly selected organization" },
-  { "title": "should hide the Search Inspect entry point for a user without the search_inspector grant — not wired: enterprise-gated v-if in SearchBar.vue:796 (config.isEnterprise == 'true' && search_inspector_enabled); OSS CI runs without enterprise so the grant path is unreachable", "action": "new", "verifies": "the Search Inspect entry point is absent from the search bar menu when the caller lacks the grant (enterprise-only, fixme)" }
-]
