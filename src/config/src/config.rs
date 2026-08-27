@@ -1621,6 +1621,13 @@ pub struct Common {
     // This will completely skip ssrf checks, not just localhost
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
+    /// Allow alert destinations to target private/RFC-1918 IP addresses
+    /// (10.x, 172.16-31.x, 192.168.x). Useful for self-hosted or homelab
+    /// setups where notification services run on the local network.
+    /// Loopback and cloud-metadata endpoints remain blocked unless
+    /// ZO_SSRF_ALLOW_LOOPBACK or ZO_SKIP_SSRF_CHECKS are also set.
+    #[env_config(name = "ZO_SSRF_ALLOW_PRIVATE_IP", default = false)]
+    pub ssrf_allow_private_ip: bool,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
