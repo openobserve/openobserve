@@ -1478,6 +1478,12 @@ pub struct Search {
     )]
     pub feature_metrics_pushdown_filter_enabled: bool,
     #[env_config(
+        name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
+        default = true,
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+    )]
+    pub feature_metrics_fused_agg_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
         help = "Enable dynamic pushdown filter"
