@@ -1442,10 +1442,8 @@
       "location": "Locatie",
       "pageUrl": "Pagina-URL",
       "noMessage": "Er is geen foutmelding vastgelegd.",
-      "copyLink": "Link kopiëren",
       "copyLinkHint": "Kopieer een permalink naar deze fout",
-      "copyEventId": "Gebeurtenis-ID kopiëren",
-      "linkCopied": "Link naar klembord gekopieerd"
+      "copyEventId": "Gebeurtenis-ID kopiëren"
     },
     "translatingStackTrace": "Stacktrace vertalen met source maps...",
     "translatingStackTraceHint": "Dit kan even duren",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "Lijst verversen",
       "orgManagementRefresh": "Lijst verversen",
       "rumErrorsRefresh": "Lijst verversen",
+      "rumErrorsCopyUrl": "Kopieer deel-URL voor foutopsporing",
       "rumSessionsRefresh": "Lijst verversen",
+      "rumSessionsCopyUrl": "Kopieer deel-URL voor sessie-herhaling",
       "sourceMapsRefresh": "Lijst verversen"
     }
   },

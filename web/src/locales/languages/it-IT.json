@@ -1442,10 +1442,8 @@
       "location": "Posizione",
       "pageUrl": "URL della pagina",
       "noMessage": "Nessun messaggio di errore è stato catturato.",
-      "copyLink": "Copia link",
       "copyLinkHint": "Copia un permalink a questo errore",
-      "copyEventId": "Copia ID evento",
-      "linkCopied": "Link copiato negli appunti"
+      "copyEventId": "Copia ID evento"
     },
     "translatingStackTrace": "Traduzione della traccia dello stack con source map...",
     "translatingStackTraceHint": "Potrebbe richiedere alcuni istanti",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "Aggiorna elenco",
       "orgManagementRefresh": "Aggiorna elenco",
       "rumErrorsRefresh": "Aggiorna elenco",
+      "rumErrorsCopyUrl": "Copia URL di condivisione del tracciamento errori",
       "rumSessionsRefresh": "Aggiorna elenco",
+      "rumSessionsCopyUrl": "Copia URL di condivisione della riproduzione della sessione",
       "sourceMapsRefresh": "Aggiorna elenco"
     }
   },

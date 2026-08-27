@@ -1442,10 +1442,8 @@
       "location": "位置",
       "pageUrl": "页面 URL",
       "noMessage": "未捕获到错误消息。",
-      "copyLink": "复制链接",
       "copyLinkHint": "复制此错误的永久链接",
-      "copyEventId": "复制事件 ID",
-      "linkCopied": "链接已复制到剪贴板"
+      "copyEventId": "复制事件 ID"
     },
     "translatingStackTrace": "正在使用源代码映射翻译堆栈跟踪...",
     "translatingStackTraceHint": "这可能需要一些时间",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "刷新清单",
       "orgManagementRefresh": "刷新清单",
       "rumErrorsRefresh": "刷新清单",
+      "rumErrorsCopyUrl": "复制错误追踪分享链接",
       "rumSessionsRefresh": "刷新清单",
+      "rumSessionsCopyUrl": "复制会话回放分享链接",
       "sourceMapsRefresh": "刷新清单"
     }
   },

@@ -1442,10 +1442,8 @@
       "location": "Location",
       "pageUrl": "Page URL",
       "noMessage": "No error message was captured.",
-      "copyLink": "Copy link",
       "copyLinkHint": "Copy a permalink to this error",
-      "copyEventId": "Copy event ID",
-      "linkCopied": "Link copied to clipboard"
+      "copyEventId": "Copy event ID"
     },
     "translatingStackTrace": "Translating stack trace with source maps...",
     "translatingStackTraceHint": "This may take a few moments",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "Refresh list",
       "orgManagementRefresh": "Refresh list",
       "rumErrorsRefresh": "Refresh list",
+      "rumErrorsCopyUrl": "Copy error tracking share URL",
       "rumSessionsRefresh": "Refresh list",
+      "rumSessionsCopyUrl": "Copy session replay share URL",
       "sourceMapsRefresh": "Refresh list"
     }
   },

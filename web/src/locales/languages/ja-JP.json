@@ -1442,10 +1442,8 @@
       "location": "場所",
       "pageUrl": "ページ URL",
       "noMessage": "エラー メッセージはキャプチャされませんでした。",
-      "copyLink": "リンクをコピー",
       "copyLinkHint": "このエラーへのパーマリンクをコピー",
-      "copyEventId": "イベント ID をコピー",
-      "linkCopied": "リンクがクリップボードにコピーされました"
+      "copyEventId": "イベント ID をコピー"
     },
     "translatingStackTrace": "ソースマップを使用してスタックトレースを変換中...",
     "translatingStackTraceHint": "これには少し時間がかかる場合があります",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "リストを更新",
       "orgManagementRefresh": "リストを更新",
       "rumErrorsRefresh": "リストを更新",
+      "rumErrorsCopyUrl": "エラートラッキング共有URLをコピー",
       "rumSessionsRefresh": "リストを更新",
+      "rumSessionsCopyUrl": "セッションリプレイ共有URLをコピー",
       "sourceMapsRefresh": "リストを更新"
     }
   },

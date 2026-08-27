@@ -1442,10 +1442,8 @@
       "location": "Lokalizacja",
       "pageUrl": "Adres URL strony",
       "noMessage": "Nie przechwycono komunikatu błędu.",
-      "copyLink": "Kopiuj link",
       "copyLinkHint": "Kopiuj bezpośredni link do tego błędu",
-      "copyEventId": "Kopiuj identyfikator zdarzenia",
-      "linkCopied": "Link skopiowano do schowka"
+      "copyEventId": "Kopiuj identyfikator zdarzenia"
     },
     "translatingStackTrace": "Tłumaczenie śladu stosu z mapami źródłowymi...",
     "translatingStackTraceHint": "To może zająć chwilę",
@@ -13864,7 +13862,9 @@
       "aiToolsetsRefresh": "Odśwież listę",
       "orgManagementRefresh": "Odśwież listę",
       "rumErrorsRefresh": "Odśwież listę",
+      "rumErrorsCopyUrl": "Kopiuj URL udostępniania śledzenia błędów",
       "rumSessionsRefresh": "Odśwież listę",
+      "rumSessionsCopyUrl": "Kopiuj URL udostępniania odtwarzania sesji",
       "sourceMapsRefresh": "Odśwież listę"
     }
   },
