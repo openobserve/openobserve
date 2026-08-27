@@ -46,6 +46,8 @@ mod llm_experiment_cleanup;
 #[cfg(feature = "enterprise")]
 mod llm_idempotency_purge;
 #[cfg(feature = "enterprise")]
+mod llm_playground_cleanup;
+#[cfg(feature = "enterprise")]
 mod llm_review_reconciliation;
 #[cfg(feature = "enterprise")]
 mod llm_secret_cleanup;
@@ -1232,6 +1234,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // sweep, which retries until the Experiment's own storage is gone.
     #[cfg(feature = "enterprise")]
     llm_experiment_cleanup::run();
+    #[cfg(feature = "enterprise")]
+    llm_playground_cleanup::run();
     // Signing-key rotation retains the outgoing key only until its bounded
     // grace period ends.
     #[cfg(feature = "enterprise")]

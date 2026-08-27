@@ -77,6 +77,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_synthetics_migration = false;
     let mut need_stream_names_migration = false;
     let mut need_annotation_queues_datasets_migration = false;
+    let mut need_llm_workbench_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -264,6 +265,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_37 = version_compare::Version::from("0.0.37").unwrap();
                 let v0_0_38 = version_compare::Version::from("0.0.38").unwrap();
                 let v0_0_39 = version_compare::Version::from("0.0.39").unwrap();
+                let v0_0_42 = version_compare::Version::from("0.0.42").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -355,6 +357,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         "[OFGA:Local] annotation queues and datasets permissions migration needed"
                     );
                     need_annotation_queues_datasets_migration = true;
+                }
+                if existing_model_version < v0_0_42 {
+                    log::info!("[OFGA:Local] LLM workbench permissions migration needed");
+                    need_llm_workbench_migration = true;
                 }
             }
 
@@ -489,6 +495,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         get_ownership_all_org_tuple(org_name, "score_configs", &mut tuples);
                         get_ownership_all_org_tuple(org_name, "scorers", &mut tuples);
                         get_ownership_all_org_tuple(org_name, "eval_jobs", &mut tuples);
+                    }
+                    if need_llm_workbench_migration {
+                        // The Playground is new at 0.0.41. The four beside it
+                        // shipped earlier without a migration branch, so orgs
+                        // that predate their release never received an
+                        // `_all_` tuple and custom roles could not be granted
+                        // those resources at all. Emitting them here is
+                        // idempotent for orgs that already have them.
+                        get_ownership_all_org_tuple(org_name, "playground", &mut tuples);
+                        get_ownership_all_org_tuple(org_name, "annotation_queues", &mut tuples);
+                        get_ownership_all_org_tuple(org_name, "datasets", &mut tuples);
+                        get_ownership_all_org_tuple(org_name, "experiments", &mut tuples);
+                        get_ownership_all_org_tuple(org_name, "remote_tasks", &mut tuples);
                     }
                     if need_billing_group_migration {
                         get_ownership_all_org_tuple(org_name, "billing_group", &mut tuples);

@@ -26,6 +26,7 @@ const mockGet = vi.fn();
 const mockListItems = vi.fn();
 const mockUpdateItem = vi.fn();
 const mockAddItem = vi.fn();
+const mockImportItems = vi.fn();
 const mockRemoveItem = vi.fn();
 const mockToast = vi.fn();
 const mockConfirm = vi.fn();
@@ -37,8 +38,10 @@ vi.mock("@/services/llm-datasets.service", () => ({
     listItems: (...args: any[]) => mockListItems(...args),
     updateItem: (...args: any[]) => mockUpdateItem(...args),
     addItem: (...args: any[]) => mockAddItem(...args),
+    importItems: (...args: any[]) => mockImportItems(...args),
     removeItem: (...args: any[]) => mockRemoveItem(...args),
   },
+  DATASET_IMPORT_MAX_FILE_SIZE: 10 * 1024 * 1024,
   DATASET_ITEMS_MAX_PAGE_SIZE: 100,
 }));
 
@@ -130,6 +133,7 @@ async function mountPage() {
         OForm: true,
         OFormTextarea: true,
         OFormTagInput: true,
+        OFile: true,
       },
     },
   });
@@ -144,6 +148,9 @@ beforeEach(() => {
     .mockResolvedValue({ items: [item()], total: 1, from: 0, size: 20, hasMore: false });
   mockUpdateItem.mockReset().mockResolvedValue(item({ version: 3 }));
   mockAddItem.mockReset().mockResolvedValue(item());
+  mockImportItems
+    .mockReset()
+    .mockResolvedValue({ filename: "goldens.csv", importedCount: 2, skippedCount: 1 });
   mockRemoveItem.mockReset().mockResolvedValue(undefined);
   mockToast.mockReset();
   mockConfirm.mockReset().mockResolvedValue(true);
@@ -203,6 +210,27 @@ describe("DatasetDetailPage item writes", () => {
       metadata: null,
       tags: [],
     });
+  });
+});
+
+describe("DatasetDetailPage CSV import", () => {
+  it("offers CSV upload from the item-tab header", async () => {
+    const wrapper = await mountPage();
+
+    expect(wrapper.find('[data-test="ai-dataset-detail-upload-csv"]').exists()).toBe(true);
+  });
+
+  it("imports the selected CSV and refreshes the dataset", async () => {
+    const wrapper = await mountPage();
+    const state = (wrapper.vm as any).$.setupState;
+    const file = new File(["input\nquestion"], "goldens.csv", { type: "text/csv" });
+
+    state.importFile = file;
+    await state.importCsv();
+    await flushPromises();
+
+    expect(mockImportItems).toHaveBeenCalledWith("test-org", "dataset-1", file);
+    expect(mockListItems).toHaveBeenCalledTimes(2);
   });
 });
 

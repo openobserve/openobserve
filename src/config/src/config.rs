@@ -55,7 +55,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // Bump on every new sea-orm migration: `init_db` returns early when the stored
 // version matches, so an un-bumped migration never runs on an existing
 // deployment. Fresh installs still get it, which hides the omission locally.
-pub const DB_SCHEMA_VERSION: u64 = 74;
+//
+// 74: create llm_playground_snapshots for Phase 3.1 shared Playground
+// snapshots.
+// 75: add steps_configured to synthetics_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 75;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

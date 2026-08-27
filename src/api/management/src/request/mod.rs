@@ -50,6 +50,8 @@ pub mod kv;
 pub mod license;
 pub mod model_pricing;
 pub mod organization;
+#[cfg(feature = "enterprise")]
+pub mod playground;
 #[cfg(feature = "profiling")]
 pub mod profiling;
 #[cfg(feature = "enterprise")]
