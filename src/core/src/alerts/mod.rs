@@ -1052,6 +1052,13 @@ impl ConditionExt for ConditionList {
 #[async_trait]
 impl ConditionExt for Condition {
     async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        // this is a special case introduced for draft workflows
+        // ideal in other places FE does not allow empty cols,
+        // but on BE we do not have specific restrictions, so when col is empty
+        // it is UB. Thus we use that for draft workflows and cond always evaluates to true
+        if self.column.is_empty() {
+            return true;
+        }
         match self.operator {
             Operator::IsNull => return row.get(&self.column).is_none_or(Value::is_null),
             Operator::IsNotNull => return row.get(&self.column).is_some_and(|v| !v.is_null()),
@@ -1312,6 +1319,13 @@ async fn evaluate_condition(
     condition_value: &Value,
     ignore_case: bool,
 ) -> bool {
+    // this is a special case introduced for draft workflows
+    // ideal in other places FE does not allow empty cols,
+    // but on BE we do not have specific restrictions, so when col is empty
+    // it is UB. Thus we use that for draft workflows and cond always evaluates to true
+    if column.is_empty() {
+        return true;
+    }
     match operator {
         Operator::IsNull => return row.get(column).is_none_or(Value::is_null),
         Operator::IsNotNull => return row.get(column).is_some_and(|v| !v.is_null()),

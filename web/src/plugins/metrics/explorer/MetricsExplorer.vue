@@ -1597,6 +1597,7 @@ export default defineComponent({
       refreshing.value = true;
       const manual = opts?.manual !== false;
       try {
+        if (manual) await grid.loadStreams(true);
         dateTimePickerRef.value?.refresh?.();
         // Keep the charts up: a refresh re-runs the same queries a few seconds
         // later, so blanking them to skeletons would just make them flicker.
@@ -1681,7 +1682,7 @@ export default defineComponent({
     onMounted(async () => {
       mountedAt = performance.now();
       syncTimeRange();
-      await grid.loadStreams();
+      await grid.loadStreams(true);
 
       track("metrics_explorer_opened", {
         metric_count: grid.cards.value.length,

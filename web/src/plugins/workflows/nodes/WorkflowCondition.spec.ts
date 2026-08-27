@@ -41,6 +41,7 @@ vi.mock("@/components/flow/forms/ConditionBuilder.vue", () => ({
       initialConditions: { default: null },
       normalizeOperators: { type: Boolean, default: false },
       normalizeColumnNames: { type: Boolean, default: false },
+      optional: { type: Boolean, default: false },
     },
     methods: {
       submit: (...args: any[]) => builderSubmit(...args),
@@ -67,7 +68,7 @@ function createWrapper() {
     global: {
       plugins: [i18n, store],
       stubs: {
-        OIcon: { name: "OIcon", props: ["name", "size"], template: "<i />" },
+        OIcon: { name: "OIcon", props: ["name", "size"], template: '<i :data-name="name" />' },
       },
     },
   });
@@ -163,28 +164,49 @@ describe("WorkflowCondition", () => {
       const note = wrapper.find('[data-test="workflow-condition-note"]');
       expect(note.exists()).toBe(true);
       // Only the custom-column bullet remains — the null/empty value hints are
-      // obsolete now that dedicated is_null/is_empty operators exist.
-      expect(note.findAll("i").length).toBe(1); // one OIcon per bullet
+      // obsolete now that dedicated is_null/is_empty operators exist. Count the
+      // BULLET icons specifically — the note also carries a dismiss button, so
+      // a blanket icon count breaks whenever its chrome changes.
+      expect(note.findAll('[data-name="info"]').length).toBe(1);
     });
   });
 
   describe("submit()", () => {
-    it("proxies the builder's payload", async () => {
-      const payload = { version: 2, conditions: { filterType: "group" } };
-      builderSubmit.mockResolvedValue(payload);
+    // The builder is `optional`, so it returns { version, conditions, complete }.
+    // The wrapper strips `complete` (it must not persist into node data) and sets
+    // the node's incomplete flag from it.
+    it("returns { version, conditions } (complete stripped) for a complete rule", async () => {
+      workflowObj.currentSelectedNodeData = { id: "c1", data: { node_type: "condition" } } as any;
+      const conditions = { filterType: "group" };
+      builderSubmit.mockResolvedValue({ version: 2, conditions, complete: true });
       const wrapper = createWrapper();
-      await expect((wrapper.vm as any).submit()).resolves.toEqual(payload);
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({ version: 2, conditions });
       expect(builderSubmit).toHaveBeenCalledTimes(1);
     });
 
-    it("resolves null when the builder rejects the rule (returns null)", async () => {
-      builderSubmit.mockResolvedValue(null);
+    it("clears meta.incomplete when the rule is complete", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "c1",
+        data: { node_type: "condition" },
+        meta: { incomplete: "true" },
+      } as any;
+      builderSubmit.mockResolvedValue({ version: 2, conditions: {}, complete: true });
       const wrapper = createWrapper();
-      await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+      await (wrapper.vm as any).submit();
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBeUndefined();
     });
 
-    it("normalizes an undefined builder result to null", async () => {
-      builderSubmit.mockResolvedValue(undefined);
+    it("flags meta.incomplete when the rule is incomplete (placeholder)", async () => {
+      workflowObj.currentSelectedNodeData = { id: "c1", data: { node_type: "condition" } } as any;
+      builderSubmit.mockResolvedValue({ version: 2, conditions: {}, complete: false });
+      const wrapper = createWrapper();
+      const payload = await (wrapper.vm as any).submit();
+      expect(payload).toEqual({ version: 2, conditions: {} });
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
+    });
+
+    it("resolves null when the builder returns null", async () => {
+      builderSubmit.mockResolvedValue(null);
       const wrapper = createWrapper();
       await expect((wrapper.vm as any).submit()).resolves.toBeNull();
     });
@@ -197,5 +219,10 @@ describe("WorkflowCondition", () => {
     expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("normalizeColumnNames")).toBe(
       true,
     );
+  });
+
+  it("renders the builder as optional (incomplete rule = placeholder)", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("optional")).toBe(true);
   });
 });
