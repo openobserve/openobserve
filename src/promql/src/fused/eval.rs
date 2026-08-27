@@ -15,7 +15,7 @@
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{EvalContext, RangeValue, Value},
+    value::{CounterSeries, EvalContext, RangeValue, Value},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
@@ -78,6 +78,7 @@ pub(crate) fn fused_range_agg(
 
     let timestamps = eval_ctx.timestamps();
     let groups = group_series_by_labels(&matrix, param);
+    let counter_kind = func.counter_extrapolation();
 
     let results = groups
         .par_iter()
@@ -96,6 +97,12 @@ pub(crate) fn fused_range_agg(
                     let range_micros = micros(range);
                     let mut start_index = 0;
                     let mut end_index = 0;
+                    let counter = CounterSeries::try_new(
+                        &metric.samples,
+                        counter_kind,
+                        eval_ctx,
+                        range_micros,
+                    );
 
                     for (slot, &eval_ts) in timestamps.iter().enumerate() {
                         let window_samples = advance_sample_window(
@@ -108,7 +115,13 @@ pub(crate) fn fused_range_agg(
                         if window_samples.is_empty() {
                             continue;
                         }
-                        if let Some(value) = func.exec(window_samples, eval_ts, &range) {
+                        let value = match &counter {
+                            Some(counter) => {
+                                counter.extrapolate(start_index, end_index, eval_ts, range)
+                            }
+                            None => func.exec(window_samples, eval_ts, &range),
+                        };
+                        if let Some(value) = value {
                             acc.push(slot, value);
                         }
                     }
@@ -245,11 +258,13 @@ mod tests {
                 "/one",
                 &zip([0.3, 80.1, 90.6, 170.2, 180.9, 260.5]),
             ),
+            // Contains a counter reset (25.1 -> 3.4) to exercise the
+            // reset-prefix path in both evaluators.
             make_series(
                 "requests_total",
                 "c",
                 "/two",
-                &zip([0.2, 20.4, 25.1, 45.8, 50.3, 70.9]),
+                &zip([0.2, 20.4, 25.1, 3.4, 50.3, 70.9]),
             ),
             // Samples only in the last window: earlier slots stay empty.
             make_series("other_total", "a", "/two", &[(130, 7.5), (170, 11.25)]),
