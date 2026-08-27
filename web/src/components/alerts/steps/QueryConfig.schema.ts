@@ -21,6 +21,8 @@
 
 import { z } from "zod";
 
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+
 /** i18n translator injected by the component: `(key, namedParams?) => string`.
  *  Every user-facing validation message resolves through this against the
  *  `alerts.validation.*` locale keys. */
@@ -83,7 +85,8 @@ export function isConditionGroupNode(item: unknown): boolean {
  *   • `column`   — truthy-required
  *   • `operator` — truthy-required
  *   • `value`    — required but ZERO-SAFE: fails ONLY on undefined/null/""
- *     (numeric 0 PASSES — never `.min(1)` on a number)
+ *     (numeric 0 PASSES — never `.min(1)` on a number). Unary operators
+ *     (is_null/is_empty, ...) take no value and are exempt.
  * Message is the caller-supplied `requiredMessage` (i18n
  * `alerts.validation.fieldRequired` → "Field is required!").
  *
@@ -125,7 +128,10 @@ export function refineConditionsTree(
         message: requiredMessage,
       });
     }
-    if (row.value === undefined || row.value === null || row.value === "") {
+    if (
+      (row.value === undefined || row.value === null || row.value === "") &&
+      !isUnaryOperator(row.operator)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: [...itemPath, "value"],
