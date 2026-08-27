@@ -419,8 +419,8 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
     })
 }
 
-/// Full UI configuration; org-scoped so auth applies, though the payload is
-/// instance-level.
+/// Full UI configuration; mostly instance-level, but `search_inspector_enabled`
+/// is computed per requesting user in the URL org.
 pub async fn zo_config(
     Path(org_id): Path<String>,
     user_email: Option<Headers<UserEmail>>,
@@ -642,7 +642,8 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
             org_id: org_id.to_string(),
             bypass_check: false,
             parent_id: "".to_string(),
-            use_all_org: false,
+            // module-level grants live on `search_inspector:_all_{org}`
+            use_all_org: true,
             use_self_context: false,
             use_self_parent: false,
         },
