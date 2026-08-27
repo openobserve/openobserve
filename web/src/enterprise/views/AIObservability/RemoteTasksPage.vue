@@ -33,13 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :scroll="false"
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="ai-remote-tasks-new-btn"
-        @click="openCreate"
-      >
+      <OButton variant="primary" size="sm" data-test="ai-remote-tasks-new-btn" @click="openCreate">
         {{ t("aiObservability.remoteTasks.newButton") }}
       </OButton>
     </template>

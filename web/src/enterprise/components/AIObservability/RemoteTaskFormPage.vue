@@ -230,15 +230,17 @@
               </div>
 
               <div class="flex flex-col gap-2">
-                <OFormTextarea
-                  name="requestTemplate"
-                  :label="t('aiObservability.remoteTasks.form.templateLabel')"
-                  :placeholder="raw(DEFAULT_REQUEST_TEMPLATE)"
-                  :help-text="t('aiObservability.remoteTasks.form.templateHelp')"
-                  size="sm"
-                  :rows="4"
-                  data-test="ai-remote-task-form-template-input"
-                />
+                <div ref="templateFieldRef">
+                  <OFormTextarea
+                    name="requestTemplate"
+                    :label="t('aiObservability.remoteTasks.form.templateLabel')"
+                    :placeholder="raw(DEFAULT_REQUEST_TEMPLATE)"
+                    :help-text="t('aiObservability.remoteTasks.form.templateHelp')"
+                    size="sm"
+                    :rows="4"
+                    data-test="ai-remote-task-form-template-input"
+                  />
+                </div>
                 <span class="text-text-secondary text-2xs">
                   {{ t("aiObservability.remoteTasks.form.templateVariables") }}
                 </span>
@@ -570,6 +572,7 @@ const headers = form.useStore(
 const nameValue = form.useStore((state: any) => String(state.values.name ?? ""));
 const endpointValue = form.useStore((state: any) => String(state.values.endpoint ?? ""));
 const templateValue = form.useStore((state: any) => String(state.values.requestTemplate ?? ""));
+const templateFieldRef = ref<HTMLElement | null>(null);
 
 // ── The test sample. It lives here rather than in the panel because the footer's
 // primary button runs the same test the panel's button does.
@@ -638,9 +641,37 @@ function removeHeader(index: number) {
 /** Appends to the template rather than inserting at the caret: OFormTextarea owns
  *  the element, and reaching into it for a selection range would be a second
  *  source of truth for the field's value. */
+/**
+ * Put a placeholder where the caret is.
+ *
+ * Two things this must NOT do. It must not fall back to
+ * `DEFAULT_REQUEST_TEMPLATE`: that string is the field's placeholder attribute
+ * — grey hint text, not a value — so treating it as the base materialised a
+ * whole template the author never typed and glued the token onto its end. And
+ * it must not append blindly: a body template is edited in the middle far more
+ * often than at the end.
+ */
 function appendPlaceholder(placeholder: string) {
-  const current = templateValue.value || DEFAULT_REQUEST_TEMPLATE;
-  form.setFieldValue("requestTemplate", `${current}${placeholderToken(placeholder)}`);
+  const token = placeholderToken(placeholder);
+  const element = templateInput();
+  const current = templateValue.value;
+  const start = element?.selectionStart ?? current.length;
+  const end = element?.selectionEnd ?? current.length;
+
+  form.setFieldValue("requestTemplate", current.slice(0, start) + token + current.slice(end));
+
+  const caret = start + token.length;
+  requestAnimationFrame(() => {
+    element?.focus();
+    element?.setSelectionRange(caret, caret);
+  });
+}
+
+/** Reached through a wrapper element we own: the field is a form-bound
+ *  component whose root is a fragment, so its `$el` is a text anchor rather
+ *  than something that can be queried. */
+function templateInput(): HTMLTextAreaElement | null {
+  return templateFieldRef.value?.querySelector("textarea") ?? null;
 }
 
 function goBack() {

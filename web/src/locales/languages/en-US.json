@@ -492,7 +492,7 @@
     "noRemoteTasks": {
       "title": "No remote tasks yet",
       "description": "A remote task is an HTTP service your experiments call to produce outputs. Register it once, prove the connection works, and every experiment can pin the exact version it ran against.",
-      "action": "Register Task",
+      "action": "New Task",
       "actionDesc": "Point OpenObserve at your endpoint and test the connection."
     }
   },
@@ -11299,7 +11299,7 @@
     "remoteTasks": {
       "listTitle": "Remote Tasks",
       "searchPlaceholder": "Search tasks",
-      "newButton": "Register Task",
+      "newButton": "New Task",
       "loadError": "Could not load remote tasks",
       "columns": {
         "name": "Name",

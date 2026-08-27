@@ -20,7 +20,7 @@
         <OButton
           variant="outline"
           size="xs"
-          icon-left="function"
+          icon-left="build"
           class="rounded-s-default! rounded-e-none!"
           :data-test="`ai-playground-tools-btn-${variant.id}`"
           @click="openTool(null)"
@@ -46,7 +46,7 @@
           <ODropdownItem
             v-for="(tool, index) in variant.tools"
             :key="index"
-            icon-left="function"
+            icon-left="build"
             :data-test="`ai-playground-tool-item-${index}`"
             @select="openTool(index)"
           >
