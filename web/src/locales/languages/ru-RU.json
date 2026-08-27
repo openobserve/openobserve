@@ -1442,10 +1442,8 @@
       "location": "Местоположение",
       "pageUrl": "URL страницы",
       "noMessage": "Сообщение об ошибке не было зафиксировано.",
-      "copyLink": "Копировать ссылку",
       "copyLinkHint": "Скопировать постоянную ссылку на эту ошибку",
-      "copyEventId": "Копировать идентификатор события",
-      "linkCopied": "Ссылка скопирована в буфер обмена"
+      "copyEventId": "Копировать идентификатор события"
     },
     "translatingStackTrace": "Перевод стек-трейса с исходными картами...",
     "translatingStackTraceHint": "Это может занять некоторое время",
@@ -2742,11 +2740,7 @@
       "incidentNoExtraFields": "Это событие не добавляет полей, кроме общих.",
       "conditionNoteTitle": "Рекомендации по условиям",
       "functionFlattenTitle": "До и после уплощения",
-      "conditionNoteEmpty": "Чтобы проверить пустое значение, используйте \"\". Пример:",
-      "conditionNoteNull": "Чтобы проверить значение null, используйте null. Пример:",
       "conditionNoteCustom": "Чтобы добавить пользовательский столбец, введите его имя и нажмите Enter.",
-      "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null",
       "functionBody": "Изменяйте полезную нагрузку с помощью функции",
       "functionBodySet": "Применяет {name}",
       "functionSelect": "Выберите функцию",
@@ -2954,9 +2948,6 @@
     "delayInfoLine2": "например, задержка в 10 минут означает, что конвейер будет запущен через 10 минут после запланированного времени.",
     "closeDrawer": "Закрыть панель",
     "conditionValueGuidelines": "Рекомендации по значению условия:",
-    "emptyValueGuideline": "Чтобы проверить пустое значение, используйте",
-    "exampleColon": ". Пример:",
-    "nullValueGuideline": "Чтобы проверить значение NULL, используйте",
     "customColumnGuideline": "Чтобы добавить пользовательский столбец, введите имя столбца и нажмите",
     "enterKey": "Enter",
     "conditionsNotMetWarning": "Если условия не выполнены, запись будет отброшена.",
@@ -13864,7 +13855,9 @@
       "aiToolsetsRefresh": "Обновить список",
       "orgManagementRefresh": "Обновить список",
       "rumErrorsRefresh": "Обновить список",
+      "rumErrorsCopyUrl": "Скопировать общий URL отслеживания ошибок",
       "rumSessionsRefresh": "Обновить список",
+      "rumSessionsCopyUrl": "Скопировать общий URL повтора сеанса",
       "sourceMapsRefresh": "Обновить список"
     }
   },

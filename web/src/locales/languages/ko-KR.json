@@ -1442,10 +1442,8 @@
       "location": "위치",
       "pageUrl": "페이지 URL",
       "noMessage": "오류 메시지가 캡처되지 않았습니다.",
-      "copyLink": "링크 복사",
       "copyLinkHint": "이 오류에 대한 고정 링크 복사",
-      "copyEventId": "이벤트 ID 복사",
-      "linkCopied": "링크가 클립보드에 복사되었습니다"
+      "copyEventId": "이벤트 ID 복사"
     },
     "translatingStackTrace": "소스 맵으로 스택 트레이스 변환 중...",
     "translatingStackTraceHint": "몇 분 정도 걸릴 수 있습니다",
@@ -2742,11 +2740,7 @@
       "incidentNoExtraFields": "이 이벤트는 공통 필드 외에 추가 필드가 없습니다.",
       "conditionNoteTitle": "조건 가이드라인",
       "functionFlattenTitle": "평면화 전후",
-      "conditionNoteEmpty": "빈 값을 확인하려면 \"\"를 사용하세요. 예:",
-      "conditionNoteNull": "널 값을 확인하려면 null을 사용하세요. 예:",
       "conditionNoteCustom": "사용자 정의 열을 추가하려면 이름을 입력하고 Enter를 누르세요.",
-      "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null",
       "functionBody": "함수로 페이로드 변형",
       "functionBodySet": "{name} 적용",
       "functionSelect": "함수 선택",
@@ -2954,9 +2948,6 @@
     "delayInfoLine2": "예: 10분 지연은 파이프라인이 예약된 시간보다 10분 후에 실행됨을 의미합니다.",
     "closeDrawer": "패널 닫기",
     "conditionValueGuidelines": "조건 값 지침:",
-    "emptyValueGuideline": "빈 값을 확인하려면 다음을 사용하세요.",
-    "exampleColon": ". 예:",
-    "nullValueGuideline": "Null 값을 확인하려면 다음을 사용하세요.",
     "customColumnGuideline": "사용자 지정 열을 추가하려면 열 이름을 입력하고 누르세요.",
     "enterKey": "Enter",
     "conditionsNotMetWarning": "조건이 충족되지 않으면 레코드가 삭제됩니다.",
@@ -13864,7 +13855,9 @@
       "aiToolsetsRefresh": "목록 새로 고침",
       "orgManagementRefresh": "목록 새로 고침",
       "rumErrorsRefresh": "목록 새로 고침",
+      "rumErrorsCopyUrl": "오류 추적 공유 URL 복사",
       "rumSessionsRefresh": "목록 새로 고침",
+      "rumSessionsCopyUrl": "세션 재생 공유 URL 복사",
       "sourceMapsRefresh": "목록 새로 고침"
     }
   },

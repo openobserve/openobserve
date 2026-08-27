@@ -64,10 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       normalize-column-names
       optional
     >
-      <!-- The examples below are CODE SAMPLES held in en-US.json: only the
-           illustrative column name ("severity") is meant to vary per locale —
-           the operators and literals (`!=`, `""`, `null`) are expression syntax
-           and must be copied verbatim, so translators should leave them alone. -->
       <template #guidelines>
         <!-- First-run hint; dismissed once, it stays gone (localStorage) and the
              recall icon above takes over. -->
@@ -125,14 +121,10 @@ import { triggerDef } from "@/plugins/workflows/triggers";
 const { t } = useI18nTyped();
 
 // The guidelines, as data — rendered in BOTH the inline first-run box and the
-// recall tooltip, so the copy lives in one place. `example` is a verbatim code
-// sample (see the template note); the custom-column tip has none.
+// recall tooltip, so the copy lives in one place. The null/empty value hints
+// are gone (dedicated is_null/is_empty operators replaced them); `example`
+// stays for future tips that carry a verbatim code sample.
 const tips: Array<{ note: I18nText; example?: I18nText }> = [
-  {
-    note: t("workflow.node.conditionNoteEmpty"),
-    example: t("workflow.node.conditionExampleEmpty"),
-  },
-  { note: t("workflow.node.conditionNoteNull"), example: t("workflow.node.conditionExampleNull") },
   { note: t("workflow.node.conditionNoteCustom") },
 ];
 

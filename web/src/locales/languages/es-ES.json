@@ -1442,10 +1442,8 @@
       "location": "Ubicación",
       "pageUrl": "URL de la página",
       "noMessage": "No se capturó ningún mensaje de error.",
-      "copyLink": "Copiar enlace",
       "copyLinkHint": "Copiar un enlace permanente a este error",
-      "copyEventId": "Copiar ID del evento",
-      "linkCopied": "Enlace copiado al portapapeles"
+      "copyEventId": "Copiar ID del evento"
     },
     "translatingStackTrace": "Traduciendo el stack trace con source maps...",
     "translatingStackTraceHint": "Esto puede tomar unos momentos",
@@ -2742,11 +2740,7 @@
       "incidentNoExtraFields": "Este evento no añade campos más allá de los comunes.",
       "conditionNoteTitle": "Directrices de condición",
       "functionFlattenTitle": "Antes vs Después del Aplanado",
-      "conditionNoteEmpty": "Para verificar un valor vacío, use \"\". Ejemplo:",
-      "conditionNoteNull": "Para verificar un valor nulo, use null. Ejemplo:",
       "conditionNoteCustom": "Para agregar una columna personalizada, escriba su nombre y presione Enter.",
-      "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null",
       "functionBody": "Reformatea el payload con una función",
       "functionBodySet": "Aplica {name}",
       "functionSelect": "Seleccionar función",
@@ -2954,9 +2948,6 @@
     "delayInfoLine2": "p. ej. un retraso de 10 minutos significa que el pipeline se ejecutará 10 minutos después de su hora programada.",
     "closeDrawer": "Cerrar panel",
     "conditionValueGuidelines": "Pautas del valor de condición:",
-    "emptyValueGuideline": "Para verificar un valor vacío, usa",
-    "exampleColon": ". Ejemplo:",
-    "nullValueGuideline": "Para verificar un valor nulo, usa",
     "customColumnGuideline": "Para agregar una columna personalizada, escribe el nombre de la columna y presiona",
     "enterKey": "Enter",
     "conditionsNotMetWarning": "Si no se cumplen las condiciones, el registro se descartará.",
@@ -13864,7 +13855,9 @@
       "aiToolsetsRefresh": "Actualizar lista",
       "orgManagementRefresh": "Actualizar lista",
       "rumErrorsRefresh": "Actualizar lista",
+      "rumErrorsCopyUrl": "Copiar URL para compartir el seguimiento de errores",
       "rumSessionsRefresh": "Actualizar lista",
+      "rumSessionsCopyUrl": "Copiar URL para compartir la repetición de sesión",
       "sourceMapsRefresh": "Actualizar lista"
     }
   },
