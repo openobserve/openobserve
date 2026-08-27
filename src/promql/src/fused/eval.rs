@@ -60,6 +60,14 @@ pub(crate) fn fused_range_agg(
         return Ok(Value::None);
     }
 
+    let start = std::time::Instant::now();
+    let trace_id = &eval_ctx.trace_id;
+    let input_series = matrix.len();
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) started with {input_series} series",
+        op.name()
+    );
+
     // Strip the metric name before grouping, as the range function would have;
     // visible to `sum by(__name__) (...)`.
     if !KEEP_METRIC_NAME_FUNC.contains(func_name) {
@@ -141,6 +149,12 @@ pub(crate) fn fused_range_agg(
 
     // Free the per-series allocations on the rayon pool; dropping them single-threaded is slow.
     matrix.into_par_iter().for_each(drop);
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) completed in {:?}, folded {input_series} series into {} series",
+        op.name(),
+        start.elapsed(),
+        results.len()
+    );
     if results.is_empty() {
         return Ok(Value::None);
     }
@@ -385,6 +399,69 @@ mod tests {
                     "chunked fused {}(sum_over_time) must be deterministic",
                     op.name(),
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn test_fused_chunked_float_values_stay_within_epsilon_of_generic() {
+        let eval_ctx = eval_ctx();
+        // In [chunk threshold, 65536) fused folds in chunks while generic is
+        // sequential; Kahan is non-associative, so fractional sums may drift
+        // in the last bits but never materially.
+        let series_count = 2 * FUSED_PARALLEL_CHUNK + 500;
+        let matrix = (0..series_count)
+            .map(|i| {
+                let base = (i % 97) as f64 * 0.1;
+                make_series(
+                    "requests_total",
+                    &format!("host-{i}"),
+                    "/one",
+                    &[10, 50, 70, 110, 130, 170]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(n, timestamp)| (timestamp, base + n as f64 * 0.7))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        for (op, generic_agg) in [
+            (FusedAggOp::Sum, aggregations::sum as GenericAgg),
+            (FusedAggOp::Avg, aggregations::avg as GenericAgg),
+        ] {
+            let generic_input = functions::rate(Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+            let expected = canonical_matrix(generic_agg(&None, generic_input, &eval_ctx).unwrap());
+            let func = functions::fusable_range_func("rate").unwrap();
+            let actual = canonical_matrix(
+                fused_range_agg(
+                    &None,
+                    Value::Matrix(matrix.clone()),
+                    func.as_ref(),
+                    op,
+                    &eval_ctx,
+                )
+                .unwrap(),
+            );
+
+            assert_eq!(expected.len(), actual.len());
+            for (expected, actual) in expected.iter().zip(&actual) {
+                assert_eq!(expected.0, actual.0);
+                assert_eq!(expected.1.len(), actual.1.len());
+                for (&(expected_ts, expected_bits), &(actual_ts, actual_bits)) in
+                    expected.1.iter().zip(&actual.1)
+                {
+                    assert_eq!(expected_ts, actual_ts);
+                    let expected_value = f64::from_bits(expected_bits);
+                    let actual_value = f64::from_bits(actual_bits);
+                    assert!(expected_value.is_finite() && actual_value.is_finite());
+                    let tolerance = expected_value.abs().max(actual_value.abs()) * 1e-12;
+                    assert!(
+                        (expected_value - actual_value).abs() <= tolerance,
+                        "fused {}(rate) diverged beyond epsilon: {expected_value} vs {actual_value}",
+                        op.name(),
+                    );
+                }
             }
         }
     }
