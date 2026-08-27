@@ -33,10 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :initial-conditions="savedConditions"
       normalize-column-names
     >
-      <!-- The examples below are CODE SAMPLES held in en-US.json: only the
-           illustrative column name ("severity") is meant to vary per locale —
-           the operators and literals (`!=`, `""`, `null`) are expression syntax
-           and must be copied verbatim, so translators should leave them alone. -->
       <template #guidelines>
         <div
           class="bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default mt-4 flex w-full flex-col gap-2 border p-3"
@@ -46,24 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("workflow.node.conditionNoteTitle") }}
           </div>
           <div class="flex flex-col gap-1 text-sm">
-            <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
-              <span>
-                {{ t("workflow.node.conditionNoteEmpty") }}
-                <span class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono">{{
-                  t("workflow.node.conditionExampleEmpty")
-                }}</span>
-              </span>
-            </div>
-            <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
-              <span>
-                {{ t("workflow.node.conditionNoteNull") }}
-                <span class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono">{{
-                  t("workflow.node.conditionExampleNull")
-                }}</span>
-              </span>
-            </div>
             <div class="flex items-start gap-2">
               <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
               <span>{{ t("workflow.node.conditionNoteCustom") }}</span>

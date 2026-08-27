@@ -162,10 +162,9 @@ describe("WorkflowCondition", () => {
       const wrapper = createWrapper();
       const note = wrapper.find('[data-test="workflow-condition-note"]');
       expect(note.exists()).toBe(true);
-      // the two example snippets the note calls out
-      expect(note.text()).toContain('severity != ""');
-      expect(note.text()).toContain("severity != null");
-      expect(note.findAll("i").length).toBe(3); // one OIcon per bullet
+      // Only the custom-column bullet remains — the null/empty value hints are
+      // obsolete now that dedicated is_null/is_empty operators exist.
+      expect(note.findAll("i").length).toBe(1); // one OIcon per bullet
     });
   });
 
