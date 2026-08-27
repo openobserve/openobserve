@@ -1,9 +1,0 @@
-tests/ui-testing/pages/dashboardPages/dashboard-cell-explorer.js
-tests/ui-testing/pages/dashboardPages/dashboard-legends-copy.js
-tests/ui-testing/playwright-tests/Dashboards/dashboard-legends-copy.spec.js
-tests/ui-testing/playwright-tests/Dashboards/dashboard-table-column-formatting.spec.js
-tests/ui-testing/playwright-tests/Dashboards/dashboard-table-copy-cell.spec.js
-web/src/components/dashboards/panels/TableRenderer.spec.ts
-web/src/components/dashboards/panels/TableRenderer.vue
-web/src/composables/useStreams.ts
-web/src/plugins/metrics/explorer/MetricsExplorer.vue

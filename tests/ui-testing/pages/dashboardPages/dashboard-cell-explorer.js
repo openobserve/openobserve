@@ -7,6 +7,7 @@
 // auto-runs a `field = value` query and syncs `cell_*` params into the URL.
 
 const { expect } = require("@playwright/test");
+const { getOrgIdentifier } = require("../../playwright-tests/utils/cloud-auth.js");
 
 export default class DashboardCellExplorerPage {
   constructor(page) {
@@ -160,7 +161,19 @@ export default class DashboardCellExplorerPage {
   }
 
   async runQuery() {
+    // Wait for the drawer's auto-run to settle (Run is disabled while loading) so the captured response is from this click.
+    await expect(this.runButton).toBeEnabled({ timeout: 30000 });
+
+    const orgId = getOrgIdentifier();
+    const searchResponsePromise = this.page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().includes(`/api/${orgId}/_search`),
+      { timeout: 30000 }
+    );
     await this.runButton.click();
+    const searchResponse = await searchResponsePromise;
+    expect(searchResponse.status()).toBe(200);
     await expect(this.resultsTable).toBeVisible({ timeout: 30000 });
   }
 

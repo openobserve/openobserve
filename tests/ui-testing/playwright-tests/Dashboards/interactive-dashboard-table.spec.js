@@ -172,7 +172,10 @@ test.describe("Interactive Dashboard Table — cell drilldown", { tag: ["@all", 
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Plain X-axis (drillable) + aggregated Y-axis (count(code), not drillable).
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+    // _timestamp auto-histograms into an aggregate (never drillable), so use a
+    // plain dimension field and drop the default histogram X first.
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "x");
     await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("code", "y");
     await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
@@ -203,7 +206,9 @@ test.describe("Interactive Dashboard Table — cell drilldown", { tag: ["@all", 
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+    // Plain X-axis + aggregated count(code): the aggregate is never drillable.
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "x");
     await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("code", "y");
     await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
