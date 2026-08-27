@@ -1,0 +1,28 @@
+{
+  "feature_slug": "saved-view-build-mode",
+  "feature_title": "Logs Saved View Build Mode Restore",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "savedViewBuildMode.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/savedViewBuildMode.spec.js",
+  "playwright_group": "Logs-Features",
+  "source_files": [
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/plugins/logs/BuildQueryPage.vue",
+    "web/src/composables/dashboard/useDashboardPanel.ts",
+    "web/src/utils/logs/constants.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All four changed paths (web/src/plugins/logs/SearchBar.vue, web/src/plugins/logs/BuildQueryPage.vue, web/src/composables/dashboard/useDashboardPanel.ts, web/src/utils/logs/constants.ts) live under web/src/ — the open-source frontend. None are under enterprise/, o2_enterprise/, src/enterprise/, or any enterprise-gated module, and no enterprise-only keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data) appear in the paths or symbols, so this is an OSS change.",
+    "skip": "Not skipping. There is no tests-added label, no skip request in trigger_comment.txt, and the diff is not docs/CI/comment-only — it changes real UI behavior in web/src, so it is user-facing.",
+    "e2e": "E2E is warranted: applying a saved view from the logs page now hands the saved builder chart (stream, fields, joins, chart type, config) to the build tab and repoints the URL's build_data, instead of re-deriving the builder from the logs query. This is a user-exercisable flow (open logs → configure build mode → save view → re-apply → verify the builder restores exactly).",
+    "area": "Area is Logs. The bulk of the changes are in web/src/plugins/logs/ (SearchBar.vue and BuildQueryPage.vue), and the sibling specs (logsQueryBuilder.spec.js, shareLink.spec.js) live in tests/ui-testing/playwright-tests/Logs/.",
+    "group": "playwright_group is Logs-Features: the closest existing matrix group whose run_files hold the build-mode/saved-config feature specs (logsQueryBuilder.spec.js, shareLink.spec.js) all mapping to actual_folder Logs.",
+    "existing_tests": "No E2E specs in the diff — only frontend source files (web/src/**/*.vue and *.ts) were changed; nothing under tests/ui-testing/playwright-tests/ is present, so there is no existing Playwright coverage to enhance."
+  }
+}

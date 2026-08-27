@@ -1,0 +1,4 @@
+web/src/composables/dashboard/useDashboardPanel.ts
+web/src/plugins/logs/BuildQueryPage.vue
+web/src/plugins/logs/SearchBar.vue
+web/src/utils/logs/constants.ts
