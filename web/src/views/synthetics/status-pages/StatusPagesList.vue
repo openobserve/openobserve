@@ -309,13 +309,15 @@ const store = useStore();
 const search = ref("");
 
 /**
- * Notices ("Post update" / "View updates") and Custom domains are Enterprise
- * sub-features of status pages — locked in an OSS build, same split as
- * Database Monitoring's per-tab enterprise gate (`DbmSectionTabs.vue`), but
- * keyed off `build_type` (already the established `/config` signal — see
- * `router.ts`, `AlertList.vue`) rather than a bespoke feature flag.
+ * Notices ("Post update" / "View updates") and Custom domains are locked in
+ * an OSS build, but available on both self-hosted enterprise and cloud —
+ * cloud always compiles with the enterprise feature too (see the build_type
+ * derivation fix), and the backend's own gate on these routes is a compile-time
+ * `#[cfg(feature = "enterprise")]`, not a build_type check. `!== "opensource"`
+ * matches the established convention for this split elsewhere (`router.ts`'s
+ * alertSources/anomaly-detection routes, `AlertList.vue`).
  */
-const advancedEnabled = computed(() => store.state.zoConfig?.build_type === "enterprise");
+const advancedEnabled = computed(() => store.state.zoConfig?.build_type !== "opensource");
 
 const filteredPages = computed(() => {
   const q = search.value.trim().toLowerCase();

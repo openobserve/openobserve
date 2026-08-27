@@ -417,8 +417,8 @@ const orgIdentifier = computed<string>(
 );
 
 // Logo upload itself is available on any licensed build (cloud or self-hosted
-// enterprise) — unlike Notices/Custom Domains (see StatusPagesList's
-// `advancedEnabled`), which stay enterprise-only.
+// enterprise) — same split as Notices/Custom Domains (see StatusPagesList's
+// `advancedEnabled`).
 const logoUploadEnabled = computed(() => store.state.zoConfig?.build_type !== "opensource");
 
 // Self-hosted enterprise only, never cloud: the org-wide logo (Settings →
