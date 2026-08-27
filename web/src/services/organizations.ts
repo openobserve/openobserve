@@ -78,6 +78,8 @@ const organizations = {
   extend_trial_period: (orgIdentifier: string, data: any) => {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
   },
+  // Legacy AI-only route, still served for callers outside this app. The app
+  // itself sets both pools through set_quota_usage_limit below.
   set_ai_usage_limit: (orgIdentifier: string, data: { org_id: string; credits_limit: number }) => {
     return http().put(`/api/${orgIdentifier}/ai/usage_limit`, data);
   },
