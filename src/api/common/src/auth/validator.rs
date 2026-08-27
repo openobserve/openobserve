@@ -242,6 +242,24 @@ async fn blocked_external(user: &config::meta::user::User) -> bool {
         )
 }
 
+/// Reads whose answer is instance-wide, so membership in the org named by the path is irrelevant.
+///
+/// `license` carries no org at all. `password_complexity` carries one but ignores it: the policy is
+/// the same for every organization, and the caller who most needs it is a user blocked for a forced
+/// password reset — who has to be told what password will satisfy the policy regardless of which
+/// org the console happens to be pointed at. Neither response contains org-scoped data, so nothing
+/// cross-tenant leaks by admitting a non-member.
+fn is_org_agnostic_read(path: &str) -> bool {
+    if path == "license" {
+        return true;
+    }
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    matches!(
+        segments.as_slice(),
+        [_org, "password_complexity"] | ["api", _org, "password_complexity"]
+    )
+}
+
 pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
@@ -437,7 +455,7 @@ pub async fn validate_credentials(
         // rest of api calls will get blocked anyways, but without this,
         // native users get stuck in logout loop if they go to any page calling license
         // api call
-        if path == "license"
+        if is_org_agnostic_read(path)
             && let Ok(v) = db::user::get_user_record(user_id).await
         {
             // we set the record manually with minimal permission,
@@ -1784,5 +1802,28 @@ mod tests {
             "default"
         };
         assert_eq!(org_id_normal, "default");
+    }
+
+    #[test]
+    fn org_agnostic_reads_cover_license_and_password_complexity() {
+        assert!(is_org_agnostic_read("license"));
+        // The path reaching here is relative and nest-stripped, but accept both shapes.
+        assert!(is_org_agnostic_read("acme/password_complexity"));
+        assert!(is_org_agnostic_read("api/acme/password_complexity"));
+        assert!(is_org_agnostic_read("_meta/password_complexity"));
+        // An org literally named "api" still resolves as an org.
+        assert!(is_org_agnostic_read("api/password_complexity"));
+    }
+
+    #[test]
+    fn org_agnostic_reads_do_not_widen_anything_else() {
+        // Authoring the policy keeps its org-membership requirement.
+        assert!(!is_org_agnostic_read("acme/settings/password_policy"));
+        assert!(!is_org_agnostic_read("_meta/settings/password_policy"));
+        // Neither do neighbouring or deeper paths.
+        assert!(!is_org_agnostic_read("acme/password_complexity/detail"));
+        assert!(!is_org_agnostic_read("acme/streams"));
+        assert!(!is_org_agnostic_read("password_complexity"));
+        assert!(!is_org_agnostic_read("license/keys"));
     }
 }
