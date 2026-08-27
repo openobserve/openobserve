@@ -823,6 +823,10 @@ mod tests {
             credits_used: 125,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            steps_used: 0,
+            #[cfg(feature = "cloud")]
+            steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -879,6 +883,10 @@ mod tests {
             credits_used: 0,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            steps_used: 0,
+            #[cfg(feature = "cloud")]
+            steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -900,6 +908,10 @@ mod tests {
             credits_used: 250,
             #[cfg(feature = "cloud")]
             credits_limit: 2_500,
+            #[cfg(feature = "cloud")]
+            steps_used: 0,
+            #[cfg(feature = "cloud")]
+            steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -987,6 +999,10 @@ mod tests {
             credits_used: 400,
             #[cfg(feature = "cloud")]
             credits_limit: 5_000,
+            #[cfg(feature = "cloud")]
+            steps_used: 0,
+            #[cfg(feature = "cloud")]
+            steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -1018,6 +1034,10 @@ mod tests {
             credits_used: 0,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            steps_used: 0,
+            #[cfg(feature = "cloud")]
+            steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
