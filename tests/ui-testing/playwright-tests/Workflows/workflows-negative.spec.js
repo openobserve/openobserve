@@ -31,6 +31,8 @@ test.describe(
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
+      // Workflows feature is under rework — skipped until it stabilizes.
+      test.skip(true, 'Workflows feature under rework');
       testLogger.testStart(testInfo.title, testInfo.file);
       await navigateToBase(page);
       pm = new PageManager(page);

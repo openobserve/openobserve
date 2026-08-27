@@ -127,7 +127,8 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: unit-tests
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # merge_group so an evicted cache self-heals from the next queue run, not only main pushes
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh

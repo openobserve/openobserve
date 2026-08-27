@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod scan;
+
 use std::{
     collections::HashSet,
     sync::atomic::{AtomicBool, Ordering},
@@ -30,7 +32,7 @@ use config::{
     meta::{
         search::{Query, Request, RequestEncoding, SearchEventType},
         stream::StreamType,
-        traces::session::{quote_identifier, quote_sql_string},
+        traces::session::{key_in_predicate, quote_identifier, quote_sql_string},
     },
     utils::{json, time::now_micros, util::get_trace_time_index_stream_name},
 };
@@ -44,8 +46,11 @@ use serde::Serialize;
 use tokio::time::Instant;
 use utoipa::ToSchema;
 
-use crate::common::{
-    meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
+use crate::{
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
+    traces::time_index::scan::{
+        BatchScanner, ScanBounds, ScanOutcome, margin_span, session_uuid_floor,
+    },
 };
 
 const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
@@ -183,7 +188,6 @@ struct TimerStats {
     locate_rounds: u64,
     expand_rounds: u64,
     timed_out: bool,
-    coverage_missing: bool,
 }
 
 /// Locate honors the scan bounds (tightened by a caller range); expand honors
@@ -194,10 +198,7 @@ struct TimerContext<'a> {
     kind: TimeIndexKind,
     key: &'a str,
     key_uuid_ts: Option<i64>,
-    scan_start: i64,
-    scan_end: i64,
-    hard_start: i64,
-    hard_end: i64,
+    bounds: ScanBounds,
     deadline: Instant,
 }
 
@@ -219,21 +220,29 @@ struct LookupRequest {
     bounds: Option<TraceTimeRange>,
 }
 
-/// `coverage_missing` reports that the lookup could not consult an index at
-/// all (feature disabled or index stream absent), so a miss is not proof.
-struct TimeIndexLookup {
-    result: Option<SessionTimeIndexResult>,
-    timed_out: bool,
-    coverage_missing: bool,
-}
-
-/// One (key, stream) fan-out result.
+/// One (key, stream) fan-out result. For a found key `timed_out` means the
+/// scan gave up while completing its margins (a partial range).
 struct LookupOutcome {
     key_index: usize,
     stream_index: usize,
     range: Option<TraceTimeRange>,
     timed_out: bool,
-    coverage_missing: bool,
+}
+
+/// Inputs for one stream's batch scan over all keys. The key-derived fields
+/// are built once per request and shared by every stream's scan.
+struct ScanParams<'a> {
+    org_id: &'a str,
+    stream_index: usize,
+    stream_name: &'a str,
+    kind: TimeIndexKind,
+    keys: &'a [String],
+    key_indexes: &'a HashMap<&'a str, usize>,
+    key_uuid_ts: &'a [Option<i64>],
+    hint_ts: Option<i64>,
+    bounds: Option<TraceTimeRange>,
+    deadline: Instant,
+    resolved: &'a [AtomicBool],
 }
 
 /// One window's worth of index rows: the merged overall range drives the
@@ -266,27 +275,18 @@ fn probe_range(candidate: i64, expand_window: i64, scan_start: i64, scan_end: i6
     }
 }
 
-async fn query_window(
-    context: &TimerContext<'_>,
+/// Runs one index-window search; None means the deadline expired first.
+async fn search_index_window(
+    org_id: &str,
+    sql: String,
     start_time: i64,
     end_time: i64,
-) -> Result<WindowResult> {
-    if start_time >= end_time {
-        return Ok(WindowResult::Miss);
-    }
-    let remaining = context.deadline.saturating_duration_since(Instant::now());
+    deadline: Instant,
+) -> Result<Option<Vec<json::Value>>> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
     if remaining.is_zero() {
-        return Ok(WindowResult::TimedOut);
+        return Ok(None);
     }
-
-    // Grouping by trace_id serves both kinds: a trace lookup returns its
-    // single row, a session lookup returns one row per member trace.
-    let sql = format!(
-        "SELECT trace_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE {} = {} GROUP BY trace_id",
-        quote_identifier(context.index_stream),
-        quote_identifier(context.kind.column()),
-        quote_sql_string(context.key),
-    );
     let request = Request {
         query: Query {
             sql,
@@ -323,7 +323,7 @@ async fn query_window(
     let internal_trace_id = config::ider::generate_trace_id();
     let search = SearchService::cache::search(
         &internal_trace_id,
-        context.org_id,
+        org_id,
         StreamType::Metadata,
         None,
         &request,
@@ -332,35 +332,102 @@ async fn query_window(
         None,
         false,
     );
-    let response = match tokio::time::timeout(remaining, search).await {
-        Ok(response) => {
-            response.map_err(|e| Error::Message(format!("query trace time index: {e}")))?
-        }
-        Err(_) => return Ok(WindowResult::TimedOut),
-    };
-    let mut range: Option<TraceTimeRange> = None;
-    let mut traces = Vec::with_capacity(response.hits.len());
-    for hit in &response.hits {
-        let Some(trace_id) = hit.get("trace_id").and_then(serde_json::Value::as_str) else {
-            continue;
-        };
-        let Some(min_ts) = hit.get("min_ts").map(json::get_int_value) else {
-            continue;
-        };
-        let Some(max_ts) = hit.get("max_ts").map(json::get_int_value) else {
-            continue;
-        };
-        let trace_range = TraceTimeRange {
+    match tokio::time::timeout(remaining, search).await {
+        Ok(response) => response
+            .map(|response| Some(response.hits))
+            .map_err(|e| Error::Message(format!("query trace time index: {e}"))),
+        Err(_) => Ok(None),
+    }
+}
+
+fn parse_hit_range(hit: &json::Value, key_column: &str) -> Option<(String, TraceTimeRange)> {
+    let key = hit.get(key_column).and_then(json::Value::as_str)?;
+    let min_ts = hit.get("min_ts").map(json::get_int_value)?;
+    let max_ts = hit.get("max_ts").map(json::get_int_value)?;
+    Some((
+        key.to_string(),
+        TraceTimeRange {
             start_time: min_ts,
             end_time: max_ts,
+        },
+    ))
+}
+
+async fn query_window(
+    context: &TimerContext<'_>,
+    start_time: i64,
+    end_time: i64,
+) -> Result<WindowResult> {
+    if start_time >= end_time {
+        return Ok(WindowResult::Miss);
+    }
+    // Grouping by trace_id serves both kinds: a trace lookup returns its
+    // single row, a session lookup returns one row per member trace.
+    let sql = format!(
+        "SELECT trace_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE {} = {} GROUP BY trace_id",
+        quote_identifier(context.index_stream),
+        quote_identifier(context.kind.column()),
+        quote_sql_string(context.key),
+    );
+    let Some(hits) =
+        search_index_window(context.org_id, sql, start_time, end_time, context.deadline).await?
+    else {
+        return Ok(WindowResult::TimedOut);
+    };
+    let mut range: Option<TraceTimeRange> = None;
+    let mut traces = Vec::with_capacity(hits.len());
+    for hit in &hits {
+        let Some((trace_id, trace_range)) = parse_hit_range(hit, "trace_id") else {
+            continue;
         };
         range = Some(range.map_or(trace_range, |r| r.merge(trace_range)));
-        traces.push((trace_id.to_string(), trace_range));
+        traces.push((trace_id, trace_range));
     }
     match range {
         Some(range) => Ok(WindowResult::Hit(WindowHit { range, traces })),
         None => Ok(WindowResult::Miss),
     }
+}
+
+/// One batch-scan window: all active keys in a single `IN` query, one row per
+/// key (sessions group by session_id — the batch path needs no per-trace map).
+/// None means the deadline expired first.
+async fn query_batch_window(
+    params: &ScanParams<'_>,
+    index_stream: &str,
+    active: &[usize],
+    start_time: i64,
+    end_time: i64,
+) -> Result<Option<Vec<(usize, TraceTimeRange)>>> {
+    if start_time >= end_time || active.is_empty() {
+        return Ok(Some(Vec::new()));
+    }
+    let column = params.kind.column();
+    let predicate = key_in_predicate(
+        column,
+        active.iter().map(|&index| params.keys[index].as_str()),
+    );
+    let sql = format!(
+        "SELECT {}, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE {predicate} GROUP BY {}",
+        quote_identifier(column),
+        quote_identifier(index_stream),
+        quote_identifier(column),
+    );
+    let Some(hits) =
+        search_index_window(params.org_id, sql, start_time, end_time, params.deadline).await?
+    else {
+        return Ok(None);
+    };
+    let mut rows = Vec::with_capacity(hits.len());
+    for hit in &hits {
+        let Some((key, range)) = parse_hit_range(hit, column) else {
+            continue;
+        };
+        if let Some(&index) = params.key_indexes.get(key.as_str()) {
+            rows.push((index, range));
+        }
+    }
+    Ok(Some(rows))
 }
 
 fn collect_traces(
@@ -397,8 +464,8 @@ async fn locate(
         let CoveredRange { start, end } = probe_range(
             candidate,
             expand_window,
-            context.scan_start,
-            context.scan_end,
+            context.bounds.scan_start,
+            context.bounds.scan_end,
         );
         stats.locate_rounds += 1;
         match query_window(context, start, end).await? {
@@ -414,12 +481,14 @@ async fn locate(
         }
     }
 
-    let mut cursor = context.scan_end;
+    let mut cursor = context.bounds.scan_end;
     for batch_size in locate_batch_sizes() {
-        if cursor <= context.scan_start {
+        if cursor <= context.bounds.scan_start {
             break;
         }
-        let start = cursor.saturating_sub(batch_size).max(context.scan_start);
+        let start = cursor
+            .saturating_sub(batch_size)
+            .max(context.bounds.scan_start);
         stats.locate_rounds += 1;
         match query_window(context, start, cursor).await? {
             WindowResult::Hit(hit) => {
@@ -446,10 +515,7 @@ async fn expand(
     let expand_window = context.kind.expand_window();
     // expand left
     loop {
-        let target = range
-            .start_time
-            .saturating_sub(expand_window)
-            .max(context.hard_start);
+        let (target, _) = margin_span(range, expand_window, context.bounds);
         if target >= covered.start {
             break;
         }
@@ -470,10 +536,7 @@ async fn expand(
 
     // expand right
     loop {
-        let target = range
-            .end_time
-            .saturating_add(expand_window)
-            .min(context.hard_end);
+        let (_, target) = margin_span(range, expand_window, context.bounds);
         if target <= covered.end {
             break;
         }
@@ -510,7 +573,7 @@ pub async fn query(
         deadline: default_deadline(),
     })
     .await
-    .map(|lookup| lookup.result.map(|result| result.range))
+    .map(|result| result.map(|result| result.range))
 }
 
 pub async fn query_session(
@@ -529,14 +592,13 @@ pub async fn query_session(
         deadline: default_deadline(),
     })
     .await
-    .map(|lookup| lookup.result)
 }
 
 fn default_deadline() -> Instant {
     Instant::now() + Duration::from_secs(get_config().limit.query_timeout)
 }
 
-async fn query_instrumented(params: &LookupParams<'_>) -> Result<TimeIndexLookup> {
+async fn query_instrumented(params: &LookupParams<'_>) -> Result<Option<SessionTimeIndexResult>> {
     let started = std::time::Instant::now();
     let mut stats = TimerStats::default();
     let result = query_inner(params, &mut stats).await;
@@ -576,53 +638,27 @@ async fn query_instrumented(params: &LookupParams<'_>) -> Result<TimeIndexLookup
         stats.expand_rounds,
         elapsed.as_millis(),
     );
-    result.map(|result| TimeIndexLookup {
-        result,
-        timed_out: stats.timed_out,
-        coverage_missing: stats.coverage_missing,
-    })
+    result
 }
 
 async fn query_inner(
     params: &LookupParams<'_>,
     stats: &mut TimerStats,
 ) -> Result<Option<SessionTimeIndexResult>> {
-    let cfg = get_config();
-    if !cfg.common.trace_time_index_enabled {
-        stats.coverage_missing = true;
-        return Ok(None);
-    }
-
     let kind = params.kind;
     let key_uuid_ts = config::ider::get_start_time_from_trace_id(params.key);
-    let mut hard_start = infra::db::trace_time_index::get_or_create_coverage_start()
-        .await
-        .map_err(|e| Error::Message(format!("read trace time index coverage marker: {e}")))?;
-    // A session's spans cannot causally precede its creation, so a UUID v7
-    // session id tightens the scan's left bound to the session's lifetime
-    // neighborhood; the expand-window margin absorbs clock skew.
-    if kind == TimeIndexKind::Session
-        && let Some(uuid_time) = key_uuid_ts
-    {
-        hard_start = hard_start.max(uuid_time.saturating_sub(kind.expand_window()));
-    }
-    let hard_end = now_micros().saturating_add(cfg.limit.ingest_allowed_in_future_micro);
-    let mut scan_start = hard_start;
-    let mut scan_end = hard_end;
-    if let Some(padded) = padded_bounds(kind, params.bounds) {
-        scan_start = scan_start.max(padded.start_time);
-        scan_end = scan_end.min(padded.end_time);
-    }
-    if scan_start >= scan_end {
-        // The caller bounds don't intersect index coverage: nothing was
-        // scanned, so this miss is not proof of absence.
-        stats.coverage_missing = true;
+    let floor = session_uuid_floor(kind, &[key_uuid_ts]);
+    let Some(bounds) = resolve_scan_bounds(
+        params.org_id,
+        params.stream_name,
+        kind,
+        params.bounds,
+        floor,
+    )
+    .await?
+    else {
         return Ok(None);
-    }
-    if !index_stream_exists(params.org_id, params.stream_name).await {
-        stats.coverage_missing = true;
-        return Ok(None);
-    }
+    };
     let index_stream = get_trace_time_index_stream_name(params.stream_name);
     let context = TimerContext {
         org_id: params.org_id,
@@ -630,10 +666,7 @@ async fn query_inner(
         kind,
         key: params.key,
         key_uuid_ts,
-        scan_start,
-        scan_end,
-        hard_start,
-        hard_end,
+        bounds,
         deadline: params.deadline,
     };
     let mut traces = HashMap::new();
@@ -644,10 +677,10 @@ async fn query_inner(
     Ok(Some(SessionTimeIndexResult { range, traces }))
 }
 
-/// Runs every (key, stream) lookup under one shared deadline, walking
-/// stream-major so a key resolved in an earlier stream is skipped in later
-/// ones (a trace or session id lives in exactly one stream). The bool reports
-/// whether any lookup ran without index coverage.
+/// Runs one batch scan per stream under one shared deadline. A trace or
+/// session id lives in exactly one stream, so a key seen by one stream's scan
+/// is skipped by the others. The bool reports whether any stream lacked index
+/// coverage.
 async fn run_lookups(
     org_id: &str,
     streams: &[String],
@@ -659,52 +692,224 @@ async fn run_lookups(
     let deadline = default_deadline();
     let resolved: Vec<AtomicBool> = (0..keys.len()).map(|_| AtomicBool::new(false)).collect();
     let resolved = &resolved;
-    let pairs = (0..streams.len())
-        .flat_map(|stream_index| (0..keys.len()).map(move |key_index| (key_index, stream_index)));
-    let outcomes = futures::stream::iter(pairs.map(|(key_index, stream_index)| async move {
-        if resolved[key_index].load(Ordering::Relaxed) {
-            return Ok::<_, Error>(None);
-        }
-        // Queued pairs must not keep draining work past the shared deadline.
-        if deadline.saturating_duration_since(Instant::now()).is_zero() {
-            return Ok(Some(LookupOutcome {
-                key_index,
-                stream_index,
-                range: None,
-                timed_out: true,
-                coverage_missing: false,
-            }));
-        }
-        let lookup = query_instrumented(&LookupParams {
+    let key_indexes: HashMap<&str, usize> = keys
+        .iter()
+        .enumerate()
+        .map(|(index, key)| (key.as_str(), index))
+        .collect();
+    let key_indexes = &key_indexes;
+    let key_uuid_ts: Vec<Option<i64>> = keys
+        .iter()
+        .map(|key| config::ider::get_start_time_from_trace_id(key))
+        .collect();
+    let key_uuid_ts = &key_uuid_ts;
+    let scans = futures::stream::iter((0..streams.len()).map(|stream_index| async move {
+        scan_stream(&ScanParams {
             org_id,
+            stream_index,
             stream_name: &streams[stream_index],
             kind,
-            key: &keys[key_index],
+            keys,
+            key_indexes,
+            key_uuid_ts,
             hint_ts,
             bounds,
             deadline,
+            resolved,
         })
-        .await?;
-        if lookup.result.is_some() {
-            resolved[key_index].store(true, Ordering::Relaxed);
-        }
-        Ok(Some(LookupOutcome {
-            key_index,
-            stream_index,
-            range: lookup.result.map(|result| result.range),
-            timed_out: lookup.timed_out,
-            coverage_missing: lookup.coverage_missing,
-        }))
+        .await
     }))
     .buffer_unordered(LOOKUP_CONCURRENCY)
-    .try_collect::<Vec<Option<LookupOutcome>>>()
+    .try_collect::<Vec<Option<Vec<LookupOutcome>>>>()
     .await?;
-    Ok(aggregate_outcomes(
-        streams,
-        kind,
-        keys,
-        outcomes.into_iter().flatten(),
+    let mut coverage_missing = false;
+    let mut outcomes = Vec::new();
+    for scan in scans {
+        match scan {
+            Some(scan) => outcomes.extend(scan),
+            None => coverage_missing = true,
+        }
+    }
+    Ok((
+        aggregate_outcomes(streams, kind, keys, outcomes),
+        coverage_missing,
     ))
+}
+
+/// Drives one stream's [`BatchScanner`]: asks it for windows, runs them, and
+/// feeds the rows back until the scan finishes or the deadline expires.
+/// None means the stream has no consultable coverage, so its misses are not
+/// proof.
+async fn scan_stream(params: &ScanParams<'_>) -> Result<Option<Vec<LookupOutcome>>> {
+    let result = scan_stream_inner(params).await;
+    if result.is_err() {
+        config::metrics::TRACE_TIME_INDEX_OPERATIONS
+            .with_label_values(&[params.org_id, params.kind.operation(), "error"])
+            .inc();
+    }
+    result
+}
+
+async fn scan_stream_inner(params: &ScanParams<'_>) -> Result<Option<Vec<LookupOutcome>>> {
+    let started = std::time::Instant::now();
+    let kind = params.kind;
+    let floor = session_uuid_floor(kind, params.key_uuid_ts);
+    let Some(bounds) = resolve_scan_bounds(
+        params.org_id,
+        params.stream_name,
+        kind,
+        params.bounds,
+        floor,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    let index_stream = get_trace_time_index_stream_name(params.stream_name);
+    let mut scanner = BatchScanner::new(
+        kind,
+        params.keys.len(),
+        bounds,
+        params.hint_ts,
+        params.key_uuid_ts,
+    );
+    let mut windows = 0u64;
+    loop {
+        if params
+            .deadline
+            .saturating_duration_since(Instant::now())
+            .is_zero()
+        {
+            break;
+        }
+        for (key, flag) in params.resolved.iter().enumerate() {
+            if flag.load(Ordering::Relaxed) {
+                scanner.skip_key(key);
+            }
+        }
+        let Some((start, end)) = scanner.next_window() else {
+            break;
+        };
+        windows += 1;
+        let active = scanner.active_keys();
+        let Some(rows) = query_batch_window(params, &index_stream, &active, start, end).await?
+        else {
+            break;
+        };
+        for key in scanner.ingest(rows) {
+            params.resolved[key].store(true, Ordering::Relaxed);
+        }
+    }
+    let outcomes = collect_scan_outcomes(params.stream_index, scanner.finish());
+    record_scan_metrics(params, windows, &outcomes, started.elapsed());
+    Ok(Some(outcomes))
+}
+
+/// The stream's scan bounds, shared by the per-key and batch paths, or None
+/// when there is no consultable coverage (feature disabled, caller bounds
+/// outside coverage, or no index stream). `hard_start_floor` carries the
+/// session-UUID causality bound.
+async fn resolve_scan_bounds(
+    org_id: &str,
+    stream_name: &str,
+    kind: TimeIndexKind,
+    bounds: Option<TraceTimeRange>,
+    hard_start_floor: Option<i64>,
+) -> Result<Option<ScanBounds>> {
+    let cfg = get_config();
+    if !cfg.common.trace_time_index_enabled {
+        return Ok(None);
+    }
+    let mut hard_start = infra::db::trace_time_index::get_or_create_coverage_start()
+        .await
+        .map_err(|e| Error::Message(format!("read trace time index coverage marker: {e}")))?;
+    if let Some(floor) = hard_start_floor {
+        hard_start = hard_start.max(floor);
+    }
+    let hard_end = now_micros().saturating_add(cfg.limit.ingest_allowed_in_future_micro);
+    let mut scan_start = hard_start;
+    let mut scan_end = hard_end;
+    if let Some(padded) = padded_bounds(kind, bounds) {
+        scan_start = scan_start.max(padded.start_time);
+        scan_end = scan_end.min(padded.end_time);
+    }
+    if scan_start >= scan_end {
+        return Ok(None);
+    }
+    if !index_stream_exists(org_id, stream_name).await {
+        return Ok(None);
+    }
+    Ok(Some(ScanBounds {
+        scan_start,
+        scan_end,
+        hard_start,
+        hard_end,
+    }))
+}
+
+fn collect_scan_outcomes(
+    stream_index: usize,
+    verdicts: Vec<Option<ScanOutcome>>,
+) -> Vec<LookupOutcome> {
+    verdicts
+        .into_iter()
+        .enumerate()
+        .filter_map(|(key_index, verdict)| {
+            let (range, timed_out) = match verdict? {
+                ScanOutcome::Found { range, partial } => (Some(range), partial),
+                ScanOutcome::NotFound => (None, false),
+                ScanOutcome::Timeout => (None, true),
+            };
+            Some(LookupOutcome {
+                key_index,
+                stream_index,
+                range,
+                timed_out,
+            })
+        })
+        .collect()
+}
+
+fn record_scan_metrics(
+    params: &ScanParams<'_>,
+    windows: u64,
+    outcomes: &[LookupOutcome],
+    elapsed: std::time::Duration,
+) {
+    let org_id = params.org_id;
+    let kind = params.kind;
+    // Same per-key accounting the per-key path emits: hit/miss verdicts, plus
+    // a timeout marker whenever the scan gave up on that key. Scan duration
+    // has no per-lookup status, so only the log line carries it.
+    let (mut hits, mut timeouts) = (0u64, 0u64);
+    for outcome in outcomes {
+        let status = if outcome.range.is_some() {
+            hits += 1;
+            "hit"
+        } else {
+            "miss"
+        };
+        config::metrics::TRACE_TIME_INDEX_OPERATIONS
+            .with_label_values(&[org_id, kind.operation(), status])
+            .inc();
+        if outcome.timed_out {
+            config::metrics::TRACE_TIME_INDEX_OPERATIONS
+                .with_label_values(&[org_id, kind.operation(), "timeout"])
+                .inc();
+            timeouts += 1;
+        }
+    }
+    config::metrics::TRACE_TIME_INDEX_QUERY_ROUNDS
+        .with_label_values(&[org_id, kind.label(), "batch_scan"])
+        .observe(windows as f64);
+    log::info!(
+        "[trace_time_index] batch scan org_id={org_id:?} stream={:?} kind={} keys={} windows={windows} hits={hits} misses={} timeouts={timeouts} took={} ms",
+        params.stream_name,
+        kind.label(),
+        params.keys.len(),
+        outcomes.len() as u64 - hits,
+        elapsed.as_millis(),
+    );
 }
 
 fn aggregate_outcomes(
@@ -712,12 +917,10 @@ fn aggregate_outcomes(
     kind: TimeIndexKind,
     keys: &[String],
     outcomes: impl IntoIterator<Item = LookupOutcome>,
-) -> (Vec<TimeRangeResult>, bool) {
+) -> Vec<TimeRangeResult> {
     let mut found: Vec<Vec<(usize, TraceTimeRange, bool)>> = vec![Vec::new(); keys.len()];
     let mut timed_out = vec![false; keys.len()];
-    let mut coverage_missing = false;
     for outcome in outcomes {
-        coverage_missing |= outcome.coverage_missing;
         match outcome.range {
             Some(range) => {
                 found[outcome.key_index].push((outcome.stream_index, range, outcome.timed_out))
@@ -748,7 +951,7 @@ fn aggregate_outcomes(
             }
         }
     }
-    (results, coverage_missing)
+    results
 }
 
 fn make_result(
@@ -1249,10 +1452,12 @@ mod tests {
             kind: TimeIndexKind::Trace,
             key: "trace",
             key_uuid_ts: None,
-            scan_start: 0,
-            scan_end: EXPAND_WINDOW * 20,
-            hard_start: 0,
-            hard_end: EXPAND_WINDOW * 20,
+            bounds: ScanBounds {
+                scan_start: 0,
+                scan_end: EXPAND_WINDOW * 20,
+                hard_start: 0,
+                hard_end: EXPAND_WINDOW * 20,
+            },
             deadline: Instant::now(),
         };
         let mut stats = TimerStats::default();
@@ -1363,26 +1568,24 @@ mod tests {
             start_time: 1,
             end_time: 2,
         };
-        let outcome = |key_index, stream_index, range, timed_out, coverage_missing| LookupOutcome {
+        let outcome = |key_index, stream_index, range, timed_out| LookupOutcome {
             key_index,
             stream_index,
             range,
             timed_out,
-            coverage_missing,
         };
         let outcomes = vec![
-            // k1 found in stream b (its stream-a pair was skipped)
-            outcome(0, 1, Some(range), false, false),
-            // k2 missed everywhere, one stream timed out and lacked coverage
-            outcome(1, 0, None, true, true),
-            outcome(1, 1, None, false, false),
+            // k1 found in stream b (skipped in stream a, so no outcome there)
+            outcome(0, 1, Some(range), false),
+            // k2 missed everywhere, one stream timed out
+            outcome(1, 0, None, true),
+            outcome(1, 1, None, false),
             // k3 missed everywhere without timeouts
-            outcome(2, 0, None, false, false),
-            // k4 found but expansion timed out: the range may be partial
-            outcome(3, 0, Some(range), true, false),
+            outcome(2, 0, None, false),
+            // k4 found but the scan gave up on its margins: partial
+            outcome(3, 0, Some(range), true),
         ];
-        let (results, coverage_missing) =
-            aggregate_outcomes(&streams, TimeIndexKind::Trace, &keys, outcomes);
+        let results = aggregate_outcomes(&streams, TimeIndexKind::Trace, &keys, outcomes);
         assert_eq!(results.len(), 4);
         assert_eq!(results[0].status, TimeRangeStatus::Found);
         assert_eq!(results[0].stream.as_deref(), Some("b"));
@@ -1394,7 +1597,6 @@ mod tests {
         assert_eq!(results[3].status, TimeRangeStatus::Found);
         assert!(results[3].partial);
         assert_eq!(results[3].range, Some(range));
-        assert!(coverage_missing);
     }
 
     #[test]

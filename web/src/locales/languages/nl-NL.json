@@ -847,13 +847,17 @@
     "destination": {
       "createNew": "Nieuwe bestemming maken",
       "select": "Bestemming",
-      "loadError": "Fout bij het ophalen van bestemmingen."
+      "loadError": "Fout bij het ophalen van bestemmingen.",
+      "unsupportedType": "Niet-ondersteund type — Workflows ondersteunen alleen aangepaste bestemmingen"
     },
     "function": {
       "createNew": "Nieuwe functie aanmaken",
       "createNewNoteWorkflow": "Opmerking: De functie wordt aangemaakt, waarna u wordt doorgestuurd naar het vorige formulier om de nieuw aangemaakte functie aan de workflow te koppelen.",
       "select": "Functie selecteren",
       "loadError": "Functies laden mislukt",
+      "saved": "Functie succesvol opgeslagen",
+      "updated": "Functie succesvol bijgewerkt",
+      "saveError": "Functie opslaan mislukt",
       "flatten": "Na afvlakking",
       "guidelinesTitle": "Richtlijnen voor functie-uitvoering:",
       "rbf": "RBF (Uitvoeren vóór afvlakking):",
@@ -2559,6 +2563,7 @@
     "runs": {
       "title": "Workflow-uitvoeringen",
       "edit": "Workflow bewerken",
+      "debugInEditor": "Debuggen in editor",
       "staleGraphWarning": "Deze workflow is bewerkt sinds deze run — {count} stap die werd uitgevoerd bestaat niet meer, dus de status wordt hier niet getoond. | Deze workflow is bewerkt sinds deze run — {count} stappen die werden uitgevoerd bestaan niet meer, dus hun status wordt hier niet getoond."
     },
     "history": {
@@ -2576,6 +2581,7 @@
       "success": "Succes",
       "failed": "Mislukt",
       "open": "Geschiedenis",
+      "openFullView": "Volledige runsweergave openen",
       "loadError": "Fout bij het laden van uitvoeringen",
       "loadRunError": "Fout bij het laden van deze uitvoering"
     },
@@ -2594,7 +2600,7 @@
     "triggerRequired": "Een trigger is vereist",
     "addStepRequired": "Voeg ten minste één stap toe na de trigger",
     "connectAllNodes": "Verbind alle knooppunten voordat u opslaat",
-    "finishStepsBeforePublish": "Voltooi alle stappen voordat u publiceert.",
+    "finishStepsBeforePublish": "{count} stap moet worden geconfigureerd voordat je publiceert — gemarkeerd op het canvas. | {count} stappen moeten worden geconfigureerd voordat je publiceert — gemarkeerd op het canvas.",
     "draft": "Concept",
     "saveDraft": "Opslaan als concept",
     "publish": "Publiceren",
@@ -2708,6 +2714,11 @@
       "linkError": "Kan meldingen niet koppelen."
     },
     "chooseTrigger": "Kies een trigger",
+    "start": {
+      "triggerHint": "Selecteer de gebeurtenis die je workflow start",
+      "chooseAction": "Kies een actie",
+      "actionHint": "Selecteer wat er na de trigger gebeurt"
+    },
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2730,6 +2741,7 @@
       "incidentSpecificTitle": "Gebeurtenisspecifieke velden",
       "incidentNoExtraFields": "Deze gebeurtenis voegt geen velden toe naast de algemene velden.",
       "conditionNoteTitle": "Richtlijnen voor voorwaarden",
+      "functionFlattenTitle": "Vóór vs. na afvlakken",
       "conditionNoteEmpty": "Om een lege waarde te controleren, gebruik \"\". Voorbeeld:",
       "conditionNoteNull": "Om een null-waarde te controleren, gebruik null. Voorbeeld:",
       "conditionNoteCustom": "Om een aangepaste kolom toe te voegen, typt u de naam en drukt u op Enter.",
@@ -2755,19 +2767,56 @@
       "enable": "Stap inschakelen",
       "disabledBadge": "Uitgeschakeld",
       "incompleteBadge": "Stel later in",
-      "destinationSetUpLater": "Stel later in",
-      "destinationSetUpLaterPrompt": "Heb je nog geen bestemming? Schakel dit in om deze later in te stellen — je kunt nu een concept opslaan en testen.",
-      "destinationSetUpLaterActive": "De bestemming wordt voorlopig overgeslagen — de naam en opmerking worden nog wel opgeslagen. Je hebt een bestemming nodig voordat je publiceert.",
-      "functionSetUpLater": "Stel later in",
-      "functionSetUpLaterPrompt": "Nog geen functie? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
-      "functionSetUpLaterActive": "De functie wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een functie nodig voordat u publiceert."
+      "unsavedFnTitle": "Niet-opgeslagen functiewijzigingen",
+      "unsavedFnMessage": "Deze stap bevat functiecode die niet in je bibliotheek is opgeslagen. Sla deze op, verwerp de wijzigingen of blijf bewerken.",
+      "unsavedFnSave": "Functie opslaan",
+      "unsavedFnDiscard": "Wijzigingen verwerpen",
+      "unsavedFnKeep": "Blijf bewerken"
     },
     "commonFieldsAbove": "algemene velden hierboven",
     "canvas": {
       "undo": "Ongedaan maken",
       "tidyUp": "Opruimen",
-      "insertStep": "Stap invoegen",
-      "deleteEdge": "Verbinding verwijderen"
+      "edgeDeleteHint": "Druk op Backspace/Delete om de verbinding te verwijderen"
+    },
+    "ndv": {
+      "input": "Invoer",
+      "output": "Uitvoer",
+      "config": "Configuratie",
+      "noInput": "Geen invoerrecords.",
+      "noOutput": "Geen records doorgestuurd.",
+      "prevStep": "Vorige stap · {name}",
+      "nextStep": "Volgende stap · {name}",
+      "prevStepBtn": "Vorige stap",
+      "nextStepBtn": "Volgende stap",
+      "collapseSteps": "Stappen invouwen",
+      "expandSteps": "Stappen uitvouwen",
+      "inputTag": "Invoer",
+      "openStep": "Open {name}",
+      "runToView": "Voer een test uit om deze gegevens te bekijken.",
+      "noBranchItems": "Geen items op deze vertakking.",
+      "noUpstream": "Geen upstream-stappen.",
+      "noRunYet": "Nog geen run.",
+      "runLabel": "Run",
+      "switchRun": "Wissel run",
+      "notInRun": "Deze stap is niet opgenomen in deze run.",
+      "runTest": "Test uitvoeren",
+      "noItems": "Geen items",
+      "itemsCount": "{count} item | {count} items",
+      "viewTable": "Tabel",
+      "viewJson": "JSON",
+      "itemN": "Item {n}",
+      "executeStep": "Stap uitvoeren",
+      "sample": "Voorbeeld",
+      "editStep": "Stap bewerken",
+      "testInputHint": "Testinvoer — bewerk en voer vervolgens de stap uit.",
+      "noRunsList": "Nog geen runs."
+    },
+    "runOverlay": {
+      "banner": "Toont stapgegevens van een eerdere run ({run}). Je kunt vrij bewerken — deze run wordt nooit gewijzigd.",
+      "clear": "Run-gegevens wissen",
+      "ghostNodes": "{count} stap van deze uitvoering bestaat niet meer in de workflow, dus de status wordt niet getoond. | {count} stappen van deze uitvoering bestaan niet meer in de workflow, dus hun status wordt niet getoond.",
+      "missingNode": "Die stap bestaat niet meer in deze workflow — deze is na deze uitvoering verwijderd."
     },
     "unsaved": {
       "title": "Niet-opgeslagen wijzigingen",
@@ -2781,7 +2830,20 @@
       "expand": "Uitklappen",
       "close": "Resultaten wissen en sluiten",
       "nodesTitle": "Stappen",
-      "empty": "Voer een test uit om hier de stapresultaten te zien."
+      "empty": "Voer een test uit om hier de stapresultaten te zien.",
+      "openNode": "Node openen",
+      "viewConfig": "Configuratie bekijken",
+      "hideConfig": "Configuratie verbergen",
+      "noConfig": "Geen configuratie",
+      "functionLabel": "Functie",
+      "destinationLabel": "Bestemming",
+      "destinationUnsupported": "Niet-ondersteund type",
+      "destinationMissing": "Deze bestemming bestaat niet meer of kan niet worden gelezen.",
+      "headersLabel": "Headers",
+      "templateLabel": "Template",
+      "outputFormatLabel": "Uitvoerformaat",
+      "tlsVerifyLabel": "TLS-verificatie",
+      "tlsDisabled": "Uitgeschakeld"
     }
   },
   "pipeline": {
