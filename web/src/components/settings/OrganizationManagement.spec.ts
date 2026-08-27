@@ -297,7 +297,8 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       expect(wrapper.vm.extendTrialPrompt).toBe(false);
-      expect(wrapper.vm.aiCreditsPrompt).toBe(false);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(false);
+      expect(wrapper.vm.usageLimitsTab).toBe("ai_credits");
       expect(wrapper.vm.extendedTrial).toBe(1);
       expect(Array.isArray(wrapper.vm.tabledata)).toBe(true);
       expect(wrapper.vm.resultTotal).toBe(0);
@@ -986,7 +987,7 @@ describe("OrganizationManagement.vue", () => {
 
       // Extend trial button should always be present
       expect(wrapper.find('[data-test="otg-management-extend-trial-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="org-management-set-ai-credits-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-set-usage-limits-btn"]').exists()).toBe(true);
       // Add contract button should show when billing_provider is "-"
       expect(wrapper.find('[data-test="org-management-add-contract-btn"]').exists()).toBe(true);
       // Storage enable button should show when org_storage_enabled is false
@@ -1165,10 +1166,33 @@ describe("OrganizationManagement.vue", () => {
     });
   });
 
-  describe("AI credit allowance dialog", () => {
+  describe("usage allowance dialog", () => {
+    it("offers one tab per quota pool, carrying the former buttons' selectors", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog({ name: "Acme", identifier: "acme" });
+      await nextTick();
+
+      // The two Actions-column buttons became tabs; the e2e selectors moved with
+      // them rather than being dropped.
+      expect(wrapper.find('[data-test="org-management-set-ai-credits-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-set-synthetics-steps-btn"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("defaults to the AI credits tab — the pre-existing behaviour of the icon", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog({ name: "Acme", identifier: "acme" });
+      await nextTick();
+
+      expect(wrapper.vm.usageLimitsTab).toBe("ai_credits");
+    });
+  });
+
+  describe("AI credit allowance tab", () => {
     it("opens with the selected organization's current credit limit", async () => {
       wrapper = createWrapper();
-      wrapper.vm.toggleAiCreditsDialog({
+      wrapper.vm.toggleUsageLimitsDialog({
         name: "Acme",
         identifier: "acme",
         credits_used: 125,
@@ -1176,7 +1200,7 @@ describe("OrganizationManagement.vue", () => {
       });
       await nextTick();
 
-      expect(wrapper.vm.aiCreditsPrompt).toBe(true);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(true);
       expect(wrapper.vm.aiCreditsFormDefaults).toEqual({ creditsLimit: 5000 });
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
@@ -1185,12 +1209,12 @@ describe("OrganizationManagement.vue", () => {
       expect(dialog?.attributes("data-primary-label")).toBe("Save Credits");
     });
 
-    it("sends the target org and updates the row from the response", async () => {
-      mockSetAiUsageLimit.mockResolvedValue({
-        data: { credits_used: 125, credits_limit: 7500 },
+    it("targets the ai_credits pool and updates the row from the response", async () => {
+      mockSetQuotaUsageLimit.mockResolvedValue({
+        data: { pool: "ai_credits", mode: "free", used: 125, limit: 7500, remaining: 7375 },
       });
       wrapper = createWrapper();
-      wrapper.vm.toggleAiCreditsDialog({
+      wrapper.vm.toggleUsageLimitsDialog({
         name: "Acme",
         identifier: "acme",
         credits_used: 125,
@@ -1199,13 +1223,16 @@ describe("OrganizationManagement.vue", () => {
 
       await wrapper.vm.submitAiCredits({ creditsLimit: "7500" } as any);
 
-      expect(mockSetAiUsageLimit).toHaveBeenCalledWith("default", {
+      // Both pools now go through the pool-parameterised route; the pool is an
+      // explicit argument, never implied by the URL.
+      expect(mockSetQuotaUsageLimit).toHaveBeenCalledWith("default", "ai_credits", {
         org_id: "acme",
-        credits_limit: 7500,
+        limit: 7500,
       });
-      expect(wrapper.vm.aiCreditsDataRow.credits_used).toBe(125);
-      expect(wrapper.vm.aiCreditsDataRow.credits_limit).toBe(7500);
-      expect(wrapper.vm.aiCreditsPrompt).toBe(false);
+      expect(mockSetAiUsageLimit).not.toHaveBeenCalled();
+      expect(wrapper.vm.usageLimitsRow.credits_used).toBe(125);
+      expect(wrapper.vm.usageLimitsRow.credits_limit).toBe(7500);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(false);
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "success",
         message: "AI credits updated successfully.",
@@ -1213,11 +1240,11 @@ describe("OrganizationManagement.vue", () => {
     });
 
     it("keeps the dialog open and reports an API error", async () => {
-      mockSetAiUsageLimit.mockRejectedValue({
+      mockSetQuotaUsageLimit.mockRejectedValue({
         response: { data: { message: "limit update failed" } },
       });
       wrapper = createWrapper();
-      wrapper.vm.toggleAiCreditsDialog({
+      wrapper.vm.toggleUsageLimitsDialog({
         name: "Acme",
         identifier: "acme",
         credits_used: 125,
@@ -1226,7 +1253,7 @@ describe("OrganizationManagement.vue", () => {
 
       await wrapper.vm.submitAiCredits({ creditsLimit: 7500 });
 
-      expect(wrapper.vm.aiCreditsPrompt).toBe(true);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(true);
       expect(wrapper.vm.loading).toBe(false);
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "error",
@@ -1236,18 +1263,22 @@ describe("OrganizationManagement.vue", () => {
     });
   });
 
-  describe("synthetics step allowance dialog", () => {
+  describe("synthetics step allowance tab", () => {
     it("opens with the selected organization's current step limit", async () => {
       wrapper = createWrapper();
-      wrapper.vm.toggleSyntheticsStepsDialog({
-        name: "Acme",
-        identifier: "acme",
-        steps_used: 400,
-        steps_limit: 10000,
-      });
+      wrapper.vm.toggleUsageLimitsDialog(
+        {
+          name: "Acme",
+          identifier: "acme",
+          steps_used: 400,
+          steps_limit: 10000,
+        },
+        "synthetics_steps",
+      );
       await nextTick();
 
-      expect(wrapper.vm.syntheticsStepsPrompt).toBe(true);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(true);
+      expect(wrapper.vm.usageLimitsTab).toBe("synthetics_steps");
       expect(wrapper.vm.syntheticsStepsFormDefaults).toEqual({ stepsLimit: 10000 });
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
@@ -1263,12 +1294,15 @@ describe("OrganizationManagement.vue", () => {
         data: { pool: "synthetics_steps", mode: "free", used: 400, limit: 25000, remaining: 24600 },
       });
       wrapper = createWrapper();
-      wrapper.vm.toggleSyntheticsStepsDialog({
-        name: "Acme",
-        identifier: "acme",
-        steps_used: 400,
-        steps_limit: 10000,
-      });
+      wrapper.vm.toggleUsageLimitsDialog(
+        {
+          name: "Acme",
+          identifier: "acme",
+          steps_used: 400,
+          steps_limit: 10000,
+        },
+        "synthetics_steps",
+      );
 
       await wrapper.vm.submitSyntheticsSteps({ stepsLimit: "25000" } as any);
 
@@ -1279,9 +1313,9 @@ describe("OrganizationManagement.vue", () => {
         limit: 25000,
       });
       // Neutral response field names — `credits_*` would be the wrong noun.
-      expect(wrapper.vm.syntheticsStepsDataRow.steps_used).toBe(400);
-      expect(wrapper.vm.syntheticsStepsDataRow.steps_limit).toBe(25000);
-      expect(wrapper.vm.syntheticsStepsPrompt).toBe(false);
+      expect(wrapper.vm.usageLimitsRow.steps_used).toBe(400);
+      expect(wrapper.vm.usageLimitsRow.steps_limit).toBe(25000);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(false);
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "success",
         message: "Synthetics steps updated successfully.",
@@ -1293,10 +1327,17 @@ describe("OrganizationManagement.vue", () => {
         data: { pool: "synthetics_steps", mode: "free", used: 0, limit: 25000, remaining: 25000 },
       });
       wrapper = createWrapper();
-      wrapper.vm.toggleSyntheticsStepsDialog({ name: "Acme", identifier: "acme" });
+      wrapper.vm.toggleUsageLimitsDialog({ name: "Acme", identifier: "acme" }, "synthetics_steps");
 
       await wrapper.vm.submitSyntheticsSteps({ stepsLimit: 25000 } as any);
 
+      // Now that both pools share one route, "wrong pool" means the wrong pool
+      // argument rather than the wrong endpoint.
+      expect(mockSetQuotaUsageLimit).not.toHaveBeenCalledWith(
+        "default",
+        "ai_credits",
+        expect.anything(),
+      );
       expect(mockSetAiUsageLimit).not.toHaveBeenCalled();
     });
 
@@ -1305,16 +1346,19 @@ describe("OrganizationManagement.vue", () => {
         response: { data: { message: "step limit update failed" } },
       });
       wrapper = createWrapper();
-      wrapper.vm.toggleSyntheticsStepsDialog({
-        name: "Acme",
-        identifier: "acme",
-        steps_used: 400,
-        steps_limit: 10000,
-      });
+      wrapper.vm.toggleUsageLimitsDialog(
+        {
+          name: "Acme",
+          identifier: "acme",
+          steps_used: 400,
+          steps_limit: 10000,
+        },
+        "synthetics_steps",
+      );
 
       await wrapper.vm.submitSyntheticsSteps({ stepsLimit: 25000 } as any);
 
-      expect(wrapper.vm.syntheticsStepsPrompt).toBe(true);
+      expect(wrapper.vm.usageLimitsPrompt).toBe(true);
       expect(wrapper.vm.loading).toBe(false);
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "error",

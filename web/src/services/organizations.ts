@@ -81,9 +81,8 @@ const organizations = {
   set_ai_usage_limit: (orgIdentifier: string, data: { org_id: string; credits_limit: number }) => {
     return http().put(`/api/${orgIdentifier}/ai/usage_limit`, data);
   },
-  // Pool-generic limit route. `limit` is the pool's new ceiling, not an
-  // increment — an org that has spent 40 of 50 and should get 20 more is sent
-  // 70. `pool` is a TrialQuotaPool key: "ai_credits" | "synthetics_steps".
+  // `limit` is the pool's new ceiling, not an increment. `pool` is a
+  // TrialQuotaPool key: "ai_credits" | "synthetics_steps".
   set_quota_usage_limit: (
     orgIdentifier: string,
     pool: string,

@@ -93,21 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="paid"
-                :aria-label="t('settings.organizationManagementPage.setAiCredits')"
-                data-test="org-management-set-ai-credits-btn"
-                @click.stop="toggleAiCreditsDialog(row)"
+                :aria-label="t('settings.organizationManagementPage.setUsageLimits')"
+                data-test="org-management-set-usage-limits-btn"
+                @click.stop="toggleUsageLimitsDialog(row)"
               >
-                <OTooltip :content="t('settings.organizationManagementPage.setAiCredits')" />
-              </OButton>
-              <OButton
-                variant="ghost"
-                size="icon-xs-circle"
-                icon-left="footprint"
-                :aria-label="t('settings.organizationManagementPage.setSyntheticsSteps')"
-                data-test="org-management-set-synthetics-steps-btn"
-                @click.stop="toggleSyntheticsStepsDialog(row)"
-              >
-                <OTooltip :content="t('settings.organizationManagementPage.setSyntheticsSteps')" />
+                <OTooltip :content="t('settings.organizationManagementPage.setUsageLimits')" />
               </OButton>
               <OButton
                 variant="ghost"
@@ -221,74 +211,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OForm>
     </ODialog>
 
-    <!-- AI Credit Allowance Dialog -->
+    <!-- Usage Allowance Dialog — one tab per quota pool, so a new pool becomes a
+         new tab rather than another glyph in the Actions column. -->
     <ODialog
-      data-test="organization-management-ai-credits-dialog"
-      v-model:open="aiCreditsPrompt"
+      data-test="organization-management-usage-limits-dialog"
+      v-model:open="usageLimitsPrompt"
       size="sm"
-      :title="t('settings.setAiCreditsFor', { name: aiCreditsDataRow?.name })"
-      :sub-title="t('settings.organizationManagementPage.setAiCreditsSubtitle')"
+      :title="usageLimitsTitle"
+      :sub-title="usageLimitsSubtitle"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-label="t('settings.organizationManagementPage.saveCredits')"
-      form-id="org-ai-credits-form"
-      @click:secondary="aiCreditsPrompt = false"
+      :primary-button-label="usageLimitsPrimaryLabel"
+      :form-id="usageLimitsFormId"
+      @click:secondary="usageLimitsPrompt = false"
     >
-      <OForm
-        id="org-ai-credits-form"
-        :schema="aiCreditsSchema"
-        :default-values="aiCreditsFormDefaults"
-        @submit="submitAiCredits"
-      >
-        <div class="flex flex-col gap-3">
-          <OFormInput
-            name="creditsLimit"
-            type="number"
-            data-test="ai-credits-limit-input"
-            :label="t('settings.organizationManagementPage.totalAiCredits')"
-            required
+      <div class="flex flex-col gap-3">
+        <OTabs v-model="usageLimitsTab" dense bordered data-test="org-management-usage-limits-tabs">
+          <OTab
+            name="ai_credits"
+            :label="t('settings.organizationManagementPage.aiCreditsTab')"
+            data-test="org-management-set-ai-credits-btn"
           />
-          <div class="text-text-secondary text-xs">
-            {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
-            {{ formatCredits(aiCreditsDataRow?.credits_used) }}
-            {{ t("settings.organizationManagementPage.credits") }}
-          </div>
-        </div>
-      </OForm>
-    </ODialog>
+          <OTab
+            name="synthetics_steps"
+            :label="t('settings.organizationManagementPage.syntheticsStepsTab')"
+            data-test="org-management-set-synthetics-steps-btn"
+          />
+        </OTabs>
 
-    <!-- Synthetics Step Allowance Dialog -->
-    <ODialog
-      data-test="organization-management-synthetics-steps-dialog"
-      v-model:open="syntheticsStepsPrompt"
-      size="sm"
-      :title="t('settings.setSyntheticsStepsFor', { name: syntheticsStepsDataRow?.name })"
-      :sub-title="t('settings.organizationManagementPage.setSyntheticsStepsSubtitle')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-label="t('settings.organizationManagementPage.saveSteps')"
-      form-id="org-synthetics-steps-form"
-      @click:secondary="syntheticsStepsPrompt = false"
-    >
-      <OForm
-        id="org-synthetics-steps-form"
-        :schema="syntheticsStepsSchema"
-        :default-values="syntheticsStepsFormDefaults"
-        @submit="submitSyntheticsSteps"
-      >
-        <div class="flex flex-col gap-3">
-          <OFormInput
-            name="stepsLimit"
-            type="number"
-            data-test="synthetics-steps-limit-input"
-            :label="t('settings.organizationManagementPage.totalSyntheticsSteps')"
-            required
-          />
-          <div class="text-text-secondary text-xs">
-            {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
-            {{ formatCredits(syntheticsStepsDataRow?.steps_used) }}
-            {{ t("settings.organizationManagementPage.steps") }}
+        <!-- One OForm per pool (own schema, own submit). v-if, so only the active
+             tab's form is mounted and the dialog's form-id has a single target. -->
+        <OForm
+          v-if="usageLimitsTab === 'ai_credits'"
+          id="org-ai-credits-form"
+          :schema="aiCreditsSchema"
+          :default-values="aiCreditsFormDefaults"
+          @submit="submitAiCredits"
+        >
+          <div class="flex flex-col gap-3">
+            <OFormInput
+              name="creditsLimit"
+              type="number"
+              data-test="ai-credits-limit-input"
+              :label="t('settings.organizationManagementPage.totalAiCredits')"
+              required
+            />
+            <div class="text-text-secondary text-xs">
+              {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
+              {{ formatCredits(usageLimitsRow?.credits_used) }}
+              {{ t("settings.organizationManagementPage.credits") }}
+            </div>
           </div>
-        </div>
-      </OForm>
+        </OForm>
+
+        <OForm
+          v-else
+          id="org-synthetics-steps-form"
+          :schema="syntheticsStepsSchema"
+          :default-values="syntheticsStepsFormDefaults"
+          @submit="submitSyntheticsSteps"
+        >
+          <div class="flex flex-col gap-3">
+            <OFormInput
+              name="stepsLimit"
+              type="number"
+              data-test="synthetics-steps-limit-input"
+              :label="t('settings.organizationManagementPage.totalSyntheticsSteps')"
+              required
+            />
+            <div class="text-text-secondary text-xs">
+              {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
+              {{ formatCredits(usageLimitsRow?.steps_used) }}
+              {{ t("settings.organizationManagementPage.steps") }}
+            </div>
+          </div>
+        </OForm>
+      </div>
     </ODialog>
 
     <!-- External Contract Dialog -->
@@ -349,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 import { ref, onMounted, watch, defineComponent, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -362,6 +359,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
@@ -384,6 +383,9 @@ import {
   type ExtendTrialForm,
 } from "./OrganizationManagement.schema";
 
+/** Backend TrialQuotaPool keys — also the usage-allowance dialog's tab names. */
+type QuotaPool = "ai_credits" | "synthetics_steps";
+
 export default defineComponent({
   name: "PageAlerts",
   components: {
@@ -396,6 +398,8 @@ export default defineComponent({
     OFormInput,
     OSearchInput,
     OTable,
+    OTab,
+    OTabs,
   },
   setup() {
     const store = useStore();
@@ -411,11 +415,14 @@ export default defineComponent({
     const resultTotal = ref(0);
     const filterQuery = ref("");
 
-    // AI credit allowance state
-    const aiCreditsPrompt = ref(false);
-    const aiCreditsDataRow = ref<any>({});
+    // Usage allowance state — one dialog for every quota pool, the active tab
+    // naming the pool. Tab names are the backend TrialQuotaPool keys.
+    const usageLimitsPrompt = ref(false);
+    const usageLimitsRow = ref<any>({});
+    const usageLimitsTab = ref<QuotaPool>("ai_credits");
+    const isAiCreditsTab = computed(() => usageLimitsTab.value === "ai_credits");
     const aiCreditsFormDefaults = computed(() =>
-      aiCreditsDefaults(aiCreditsDataRow.value?.credits_limit ?? 0),
+      aiCreditsDefaults(usageLimitsRow.value?.credits_limit ?? 0),
     );
 
     // Contract management state
@@ -431,15 +438,31 @@ export default defineComponent({
     const extendTrialSchema = makeExtendTrialSchema(t);
     const aiCreditsSchema = makeAiCreditsSchema(t);
 
-    // Synthetics step pool — a separate one-time allowance from the AI pool,
-    // in a different unit, so it gets its own dialog state rather than sharing
-    // the AI dialog's.
-    const syntheticsStepsPrompt = ref(false);
-    const syntheticsStepsDataRow = ref<any>({});
     const syntheticsStepsFormDefaults = computed(() =>
-      syntheticsStepsDefaults(syntheticsStepsDataRow.value?.steps_limit ?? 0),
+      syntheticsStepsDefaults(usageLimitsRow.value?.steps_limit ?? 0),
     );
     const syntheticsStepsSchema = makeSyntheticsStepsSchema(t);
+
+    // Title, subtitle, save label and submit target all follow the active tab,
+    // so each pool keeps the exact wording it had as a standalone dialog.
+    const usageLimitsTitle = computed(() =>
+      isAiCreditsTab.value
+        ? t("settings.setAiCreditsFor", { name: usageLimitsRow.value?.name })
+        : t("settings.setSyntheticsStepsFor", { name: usageLimitsRow.value?.name }),
+    );
+    const usageLimitsSubtitle = computed(() =>
+      isAiCreditsTab.value
+        ? t("settings.organizationManagementPage.setAiCreditsSubtitle")
+        : t("settings.organizationManagementPage.setSyntheticsStepsSubtitle"),
+    );
+    const usageLimitsPrimaryLabel = computed(() =>
+      isAiCreditsTab.value
+        ? t("settings.organizationManagementPage.saveCredits")
+        : t("settings.organizationManagementPage.saveSteps"),
+    );
+    const usageLimitsFormId = computed(() =>
+      isAiCreditsTab.value ? "org-ai-credits-form" : "org-synthetics-steps-form",
+    );
 
     // Extend-trial week count is bridged from the pill grid into the form below.
     // Dynamic defaults (project the current pill value) → a typed computed.
@@ -585,7 +608,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 240,
-        meta: { align: "center", actionCount: 5 },
+        meta: { align: "center", actionCount: 4 },
       },
     ];
 
@@ -671,81 +694,38 @@ export default defineComponent({
       extendTrialDataRow.value = row;
     };
 
-    const toggleAiCreditsDialog = (row: any) => {
-      aiCreditsDataRow.value = row;
-      aiCreditsPrompt.value = true;
+    const toggleUsageLimitsDialog = (row: any, pool: QuotaPool = "ai_credits") => {
+      usageLimitsRow.value = row;
+      usageLimitsTab.value = pool;
+      usageLimitsPrompt.value = true;
     };
 
-    const submitAiCredits = async (value: AiCreditsForm) => {
+    // The two pools differ only in which field the form carries, which row
+    // fields the response updates, and the copy. Everything else — the loading
+    // toast, the request, the close, the error path — is the same, so it lives
+    // here once.
+    const submitUsageLimit = async (
+      pool: QuotaPool,
+      limit: number,
+      apply: (used: number, granted: number) => void,
+      copy: { pending: I18nText; success: I18nText; failure: I18nText },
+    ) => {
       loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.settings.updatingAiCredits"),
-        timeout: 0,
-      });
-
-      try {
-        const response = await OrganizationServices.set_ai_usage_limit(
-          store.state.selectedOrganization.identifier,
-          {
-            org_id: aiCreditsDataRow.value.identifier,
-            credits_limit: Number(value.creditsLimit),
-          },
-        );
-        aiCreditsDataRow.value.credits_used = response.data.credits_used;
-        aiCreditsDataRow.value.credits_limit = response.data.credits_limit;
-        aiCreditsPrompt.value = false;
-        toast({
-          variant: "success",
-          message: t("toastMessages.settings.aiCreditsUpdatedSuccessfully"),
-        });
-      } catch (error: any) {
-        toast({
-          variant: "error",
-          message: error.response?.data?.message || t("settings.updateAiCreditsFailed"),
-          timeout: 5000,
-        });
-      } finally {
-        loading.value = false;
-        dismiss();
-      }
-    };
-
-    const toggleSyntheticsStepsDialog = (row: any) => {
-      syntheticsStepsDataRow.value = row;
-      syntheticsStepsPrompt.value = true;
-    };
-
-    const submitSyntheticsSteps = async (value: SyntheticsStepsForm) => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.settings.updatingSyntheticsSteps"),
-        timeout: 0,
-      });
+      const dismiss = toast({ variant: "loading", message: copy.pending, timeout: 0 });
 
       try {
         const response = await OrganizationServices.set_quota_usage_limit(
           store.state.selectedOrganization.identifier,
-          "synthetics_steps",
-          {
-            org_id: syntheticsStepsDataRow.value.identifier,
-            limit: Number(value.stepsLimit),
-          },
+          pool,
+          { org_id: usageLimitsRow.value.identifier, limit },
         );
-        // The pool-generic route answers in neutral field names — `credits_*`
-        // would be the wrong noun for a step count.
-        syntheticsStepsDataRow.value.steps_used = response.data.used;
-        syntheticsStepsDataRow.value.steps_limit = response.data.limit;
-        syntheticsStepsPrompt.value = false;
-        toast({
-          variant: "success",
-          message: t("toastMessages.settings.syntheticsStepsUpdatedSuccessfully"),
-        });
+        apply(response.data.used, response.data.limit);
+        usageLimitsPrompt.value = false;
+        toast({ variant: "success", message: copy.success });
       } catch (error: any) {
         toast({
           variant: "error",
-          message: error.response?.data?.message || t("settings.updateSyntheticsStepsFailed"),
+          message: error.response?.data?.message || copy.failure,
           timeout: 5000,
         });
       } finally {
@@ -753,6 +733,36 @@ export default defineComponent({
         dismiss();
       }
     };
+
+    const submitAiCredits = (value: AiCreditsForm) =>
+      submitUsageLimit(
+        "ai_credits",
+        Number(value.creditsLimit),
+        (used, granted) => {
+          usageLimitsRow.value.credits_used = used;
+          usageLimitsRow.value.credits_limit = granted;
+        },
+        {
+          pending: t("toastMessages.settings.updatingAiCredits"),
+          success: t("toastMessages.settings.aiCreditsUpdatedSuccessfully"),
+          failure: t("settings.updateAiCreditsFailed"),
+        },
+      );
+
+    const submitSyntheticsSteps = (value: SyntheticsStepsForm) =>
+      submitUsageLimit(
+        "synthetics_steps",
+        Number(value.stepsLimit),
+        (used, granted) => {
+          usageLimitsRow.value.steps_used = used;
+          usageLimitsRow.value.steps_limit = granted;
+        },
+        {
+          pending: t("toastMessages.settings.updatingSyntheticsSteps"),
+          success: t("toastMessages.settings.syntheticsStepsUpdatedSuccessfully"),
+          failure: t("settings.updateSyntheticsStepsFailed"),
+        },
+      );
 
     const getTimestampInMicroseconds = (weeks: number) =>
       (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
@@ -1008,17 +1018,19 @@ export default defineComponent({
       extendTrialPrompt,
       toggleExtendTrialDialog,
       extendTrialDataRow,
-      aiCreditsPrompt,
-      aiCreditsDataRow,
+      usageLimitsPrompt,
+      usageLimitsRow,
+      usageLimitsTab,
+      usageLimitsTitle,
+      usageLimitsSubtitle,
+      usageLimitsPrimaryLabel,
+      usageLimitsFormId,
+      toggleUsageLimitsDialog,
       aiCreditsFormDefaults,
       aiCreditsSchema,
-      toggleAiCreditsDialog,
       submitAiCredits,
-      syntheticsStepsPrompt,
-      syntheticsStepsDataRow,
       syntheticsStepsFormDefaults,
       syntheticsStepsSchema,
-      toggleSyntheticsStepsDialog,
       submitSyntheticsSteps,
       updateTrialPeriod,
       getData,

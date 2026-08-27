@@ -64,10 +64,8 @@ export const aiCreditsDefaults = (creditsLimit = 0): AiCreditsForm => ({
 });
 
 // ── Synthetics step allowance dialog ─────────────────────────────────────────
-// Same shape and same validation as the AI dialog — both set a lifetime pool
-// ceiling — but a separate schema and field name so the two dialogs cannot
-// share form state, and so the error copy can say "steps" rather than
-// "credits". The pools are separate allowances in different units.
+// Separate schema from the AI dialog so the two cannot share form state and the
+// error copy can say "steps".
 export const makeSyntheticsStepsSchema = (t: TranslateFn) =>
   z.object({
     stepsLimit: z.preprocess(

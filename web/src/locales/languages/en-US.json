@@ -8731,7 +8731,8 @@
       "genAiAgentMappingDesc": "Map GenAI spans to agent identifiers"
     },
     "organizationManagementPage": {
-      "setAiCredits": "Set AI Credits",
+      "setUsageLimits": "Set Usage Limits",
+      "aiCreditsTab": "AI Credits",
       "setAiCreditsSubtitle": "Set the organization's lifetime AI credit allowance.",
       "saveCredits": "Save Credits",
       "totalAiCredits": "Total AI Credits",
@@ -8739,7 +8740,7 @@
       "aiCreditsTotal": "AI Credits Total",
       "currentlyUsedLabel": "Currently used:",
       "credits": "credits",
-      "setSyntheticsSteps": "Set Synthetics Steps",
+      "syntheticsStepsTab": "Synthetics Steps",
       "setSyntheticsStepsSubtitle": "Set the organization's lifetime synthetics step allowance.",
       "saveSteps": "Save Steps",
       "totalSyntheticsSteps": "Total Synthetics Steps",
