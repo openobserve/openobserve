@@ -1621,6 +1621,30 @@ export class PipelinesPage {
         await this.page.waitForTimeout(300);
     }
 
+    async fillUnaryCondition(columnName, operator, index = 0) {
+        // Select the column (mirror fillCondition's column step) then the unary
+        // operator. Unary operators (is_null / is_not_null / is_empty /
+        // is_not_empty) render no value input, so never fill a value here.
+        const triggers = this.columnSelectTrigger;
+        const wrappers = this.columnSelect;
+        const trigCount = await triggers.count();
+        if (trigCount > 0) {
+            await triggers.nth(index).click();
+        } else {
+            await wrappers.nth(index).click();
+        }
+        await this.columnSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const searchCount = await this.columnSelectSearch.count();
+        if (searchCount > 0) {
+            await this.columnSelectSearch.first().fill(columnName);
+        }
+        await this.columnOptionByName(columnName).waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName(columnName).click();
+        await this.page.waitForTimeout(300);
+
+        await this.selectOperatorFromMenu(operator);
+    }
+
     async addNewCondition() {
         await this.addConditionButton.first().click();
         await this.page.waitForTimeout(500);
@@ -1915,6 +1939,36 @@ export class PipelinesPage {
         // The old `[role="alert"]` locator now matches Monaco's hidden a11y alert
         // (`class="monaco-alert" data-aria-hidden="true"`), so assert the real error.
         await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async verifyNoConditionError() {
+        // A successful save surfaces no inline schema error. Used to prove a
+        // unary condition (value-exempt) saved without the "fill all fields" error.
+        await expect(this.conditionRequiredToast).toHaveCount(0);
+    }
+
+    async verifyValueInputCount(expectedCount) {
+        // Count value inputs (v-if-removed for unary operators, present for binary).
+        await expect(this.valueInput).toHaveCount(expectedCount);
+    }
+
+    async verifyOperatorSelected(operator, index = 0) {
+        // The operator OSelect trigger exposes the selected wire value via
+        // `data-test-selected-value` (e.g. "is_null"), independent of the label.
+        await expect(this.operatorSelectTrigger.nth(index)).toHaveAttribute('data-test-selected-value', operator);
+    }
+
+    async verifyUnaryOperatorsOffered() {
+        // Open the operator menu and assert each unary option is offered by its
+        // snake_case `data-test-value` (the OSelect option value, not the label).
+        await this.operatorSelectTrigger.first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.operatorSelectTrigger.first().click();
+        for (const operator of ["is_null", "is_not_null", "is_empty", "is_not_empty"]) {
+            const option = this.page.locator(
+                `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
+            ).first();
+            await expect(option).toBeVisible();
+        }
     }
 
     async fillPartialCondition(columnName) {

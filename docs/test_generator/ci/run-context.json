@@ -1,0 +1,22 @@
+{
+  "feature_slug": "condition-null-empty-operators",
+  "feature_title": "Condition Null/Empty Operators (is_null / is_not_null / is_empty / is_not_empty)",
+  "area": "Pipelines",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "pipeline-conditions.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js",
+  "playwright_group": "Pipelines",
+  "source_files": [
+    "web/src/components/alerts/FilterCondition.vue",
+    "web/src/components/pipeline/NodeForm/Condition.vue",
+    "web/src/plugins/workflows/nodes/WorkflowCondition.vue",
+    "web/src/utils/alerts/conditionsFormatter.ts",
+    "web/src/utils/alerts/alertDataTransforms.ts",
+    "web/src/utils/alerts/alertValidation.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

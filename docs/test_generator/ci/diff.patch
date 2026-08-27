@@ -1,0 +1,2109 @@
+===== COMPLETE LIST OF CHANGED FILES (45 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+src/api/management/src/models/alerts/mod.rs
+src/api/pipelines/src/request/pipeline.rs
+src/config/src/meta/alerts/mod.rs
+src/core/src/alerts/mod.rs
+src/core/src/logs/mod.rs
+src/infra/src/table/alerts/intermediate.rs
+tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js
+web/src/components/alerts/FilterCondition.vue
+web/src/components/alerts/ImportAlert.vue
+web/src/components/alerts/steps/QueryConfig.schema.spec.ts
+web/src/components/alerts/steps/QueryConfig.schema.ts
+web/src/components/flow/forms/ConditionBuilder.spec.ts
+web/src/components/pipeline/ImportPipeline.vue
+web/src/components/pipeline/NodeForm/Condition.schema.ts
+web/src/components/pipeline/NodeForm/Condition.vue
+web/src/composables/useAlertForm.ts
+web/src/enterprise/components/onlineEvals/forms/JobFormPage.vue
+web/src/enterprise/components/onlineEvals/utils/jobFilter.spec.ts
+web/src/enterprise/components/onlineEvals/utils/jobFilter.ts
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/plugins/workflows/nodes/WorkflowCondition.spec.ts
+web/src/plugins/workflows/nodes/WorkflowCondition.vue
+web/src/utils/alerts/alertDataTransforms.spec.ts
+web/src/utils/alerts/alertDataTransforms.ts
+web/src/utils/alerts/alertValidation.ts
+web/src/utils/alerts/conditionsFormatter.spec.ts
+web/src/utils/alerts/conditionsFormatter.ts
+web/src/utils/conditionPreview.spec.ts
+web/src/utils/conditionPreview.ts
+o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/scheduler.rs
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index b697cf9e6c2..de8a07bf862 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -11183,7 +11183,6 @@
+     "editPipelineJson": "1f74d84a5ad4cbea",
+     "editorConditionTooltip": "a331fe355ae175a1",
+     "editorFunctionTooltip": "4ced4a80ca5617e7",
+-    "emptyValueGuideline": "281b8fee83e3386c",
+     "endpointMustStartSlash": "9a7e42c3da779afe",
+     "enrichmentTablesScheduledOnly": "024d16dea2c01fbc",
+     "enterKey": "dc8659db6d416dc3",
+@@ -11202,7 +11201,6 @@
+     "estimatedProcessingTime": "5d875c25b8bb67f0",
+     "evalTimeInSecs": "7d896415e0351d2b",
+     "evaluationTimeLabel": "b38589b1cc372531",
+-    "exampleColon": "9337f12965f2b987",
+     "executionDetailsTitle": "62652b0d3c9bc370",
+     "export": "3664895579f0a7e6",
+     "failedToLoadPipeline": "828763e773b2d445",
+@@ -11280,7 +11278,6 @@
+     "never": "6300ef800bb88429",
+     "noJobSelected": "ab46f41be179439d",
+     "noPipelinesFound": "ddbd91dc8e111e52",
+-    "nullValueGuideline": "5e856d8b5ba4b9c8",
+     "openNodes": "f08476bd8858cefb",
+     "orgRequiredOpenobserve": "84f99344d1bed1ea",
+     "organizationId": "39b561aeada69a60",
+@@ -16120,11 +16117,7 @@
+       "commentPlaceholder": "fbe74995bbaf2eee",
+       "condition": "39b36d38d6eb03c8",
+       "conditionDesc": "a331fe355ae175a1",
+-      "conditionExampleEmpty": "147d02888189ee10",
+-      "conditionExampleNull": "a9f53297107e7dcf",
+       "conditionNoteCustom": "419664fc5f694931",
+-      "conditionNoteEmpty": "1e2dd632d7cdac22",
+-      "conditionNoteNull": "64f9a3ff16c7fba5",
+       "conditionNoteTitle": "7d8586fae4d38d7c",
+       "configComingSoon": "e9c492ac803738cf",
+       "destinationBody": "20d22a18784e613d",
+diff --git a/src/api/management/src/models/alerts/mod.rs b/src/api/management/src/models/alerts/mod.rs
+index 41a250ea99a..286271da011 100644
+--- a/src/api/management/src/models/alerts/mod.rs
++++ b/src/api/management/src/models/alerts/mod.rs
+@@ -507,6 +507,10 @@ pub enum Operator {
+     LessThanEquals,
+     Contains,
+     NotContains,
++    IsNull,
++    IsNotNull,
++    IsEmpty,
++    IsNotEmpty,
+ }
+ 
+ #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
+@@ -703,6 +707,10 @@ impl From<meta_alerts::Operator> for Operator {
+             meta_alerts::Operator::LessThanEquals => Self::LessThanEquals,
+             meta_alerts::Operator::Contains => Self::Contains,
+             meta_alerts::Operator::NotContains => Self::NotContains,
++            meta_alerts::Operator::IsNull => Self::IsNull,
++            meta_alerts::Operator::IsNotNull => Self::IsNotNull,
++            meta_alerts::Operator::IsEmpty => Self::IsEmpty,
++            meta_alerts::Operator::IsNotEmpty => Self::IsNotEmpty,
+         }
+     }
+ }
+@@ -896,6 +904,10 @@ impl From<Operator> for meta_alerts::Operator {
+             Operator::LessThanEquals => Self::LessThanEquals,
+             Operator::Contains => Self::Contains,
+             Operator::NotContains => Self::NotContains,
++            Operator::IsNull => Self::IsNull,
++            Operator::IsNotNull => Self::IsNotNull,
++            Operator::IsEmpty => Self::IsEmpty,
++            Operator::IsNotEmpty => Self::IsNotEmpty,
+         }
+     }
+ }
+diff --git a/src/api/pipelines/src/request/pipeline.rs b/src/api/pipelines/src/request/pipeline.rs
+index 227ed017694..c291ff8b746 100644
+--- a/src/api/pipelines/src/request/pipeline.rs
++++ b/src/api/pipelines/src/request/pipeline.rs
+@@ -80,7 +80,7 @@ CONDITION FORMAT (version 2):
+ The conditions field is a group containing a flat array of items. Each item has a logicalOperator field (AND/OR) — this is the boolean connector BEFORE that item. The first item's logicalOperator is ignored but must be present (use AND). AND has higher precedence than OR. Use nested groups for explicit parentheses.
+ - Group: { "filterType": "group", "logicalOperator": "AND", "conditions": [...] }
+ - Condition: { "filterType": "condition", "column": "field", "operator": "<op>", "value": "val", "logicalOperator": "AND"|"OR" }
+-- Operators: =, !=, >, >=, <, <=, contains, not_contains
++- Operators: =, !=, >, >=, <, <=, contains, not_contains, is_null, is_not_null, is_empty, is_not_empty (null/empty checks ignore "value"; pass an empty string. is_empty matches null OR empty string)
+ 
+ EXAMPLE - status = "error" AND (level > 5 OR source = "nginx"):
+ { "node_type": "condition", "version": 2, "conditions": { "filterType": "group", "logicalOperator": "AND", "conditions": [{ "filterType": "condition", "column": "status", "operator": "=", "value": "error", "logicalOperator": "AND" }, { "filterType": "group", "logicalOperator": "AND", "conditions": [{ "filterType": "condition", "column": "level", "operator": ">", "value": "5", "logicalOperator": "OR" }, { "filterType": "condition", "column": "source", "operator": "=", "value": "nginx", "logicalOperator": "OR" }] }] } }
+diff --git a/src/config/src/meta/alerts/mod.rs b/src/config/src/meta/alerts/mod.rs
+index 4bfeb2685bf..c87728e2996 100644
+--- a/src/config/src/meta/alerts/mod.rs
++++ b/src/config/src/meta/alerts/mod.rs
+@@ -913,6 +913,18 @@ pub enum Operator {
+     #[serde(rename = "not_contains")]
+     #[serde(alias = "NotContains")]
+     NotContains,
++    #[serde(rename = "is_null")]
++    #[serde(alias = "IsNull")]
++    IsNull,
++    #[serde(rename = "is_not_null")]
++    #[serde(alias = "IsNotNull")]
++    IsNotNull,
++    #[serde(rename = "is_empty")]
++    #[serde(alias = "IsEmpty")]
++    IsEmpty,
++    #[serde(rename = "is_not_empty")]
++    #[serde(alias = "IsNotEmpty")]
++    IsNotEmpty,
+ }
+ 
+ impl std::fmt::Display for Operator {
+@@ -926,6 +938,10 @@ impl std::fmt::Display for Operator {
+             Operator::LessThanEquals => write!(f, "<="),
+             Operator::Contains => write!(f, "contains"),
+             Operator::NotContains => write!(f, "not contains"),
++            Operator::IsNull => write!(f, "is null"),
++            Operator::IsNotNull => write!(f, "is not null"),
++            Operator::IsEmpty => write!(f, "is empty"),
++            Operator::IsNotEmpty => write!(f, "is not empty"),
+         }
+     }
+ }
+diff --git a/src/core/src/alerts/mod.rs b/src/core/src/alerts/mod.rs
+index 7f5e57ed430..af4df61e4b7 100644
+--- a/src/core/src/alerts/mod.rs
++++ b/src/core/src/alerts/mod.rs
+@@ -1059,6 +1059,15 @@ impl ConditionExt for Condition {
+         if self.column.is_empty() {
+             return true;
+         }
++        match self.operator {
++            Operator::IsNull => return row.get(&self.column).is_none_or(Value::is_null),
++            Operator::IsNotNull => return row.get(&self.column).is_some_and(|v| !v.is_null()),
++            Operator::IsEmpty => return row.get(&self.column).is_none_or(is_empty_value),
++            Operator::IsNotEmpty => {
++                return row.get(&self.column).is_some_and(|v| !is_empty_value(v));
++            }
++            _ => {}
++        }
+         let val = match row.get(&self.column) {
+             Some(val) => val,
+             None => {
+@@ -1078,6 +1087,7 @@ impl ConditionExt for Condition {
+                     Operator::LessThanEquals => val <= con_val,
+                     Operator::Contains => val.contains(con_val),
+                     Operator::NotContains => !val.contains(con_val),
++                    _ => false,
+                 }
+             }
+             Value::Number(_) => {
+@@ -1296,6 +1306,11 @@ async fn evaluate_condition_items(
+     result
+ }
+ 
++/// Null, or an empty string; a missing column is handled by the callers.
++fn is_empty_value(v: &Value) -> bool {
++    v.is_null() || matches!(v, Value::String(s) if s.is_empty())
++}
++
+ /// Evaluates a single condition against a record
+ async fn evaluate_condition(
+     row: &Map<String, Value>,
+@@ -1311,6 +1326,13 @@ async fn evaluate_condition(
+     if column.is_empty() {
+         return true;
+     }
++    match operator {
++        Operator::IsNull => return row.get(column).is_none_or(Value::is_null),
++        Operator::IsNotNull => return row.get(column).is_some_and(|v| !v.is_null()),
++        Operator::IsEmpty => return row.get(column).is_none_or(is_empty_value),
++        Operator::IsNotEmpty => return row.get(column).is_some_and(|v| !is_empty_value(v)),
++        _ => {}
++    }
+     let val: &Value = match row.get(column) {
+         Some(val) => val,
+         None => {
+@@ -1336,6 +1358,7 @@ async fn evaluate_condition(
+                     Operator::LessThanEquals => val_lower <= con_val_lower,
+                     Operator::Contains => val_lower.contains(&con_val_lower),
+                     Operator::NotContains => !val_lower.contains(&con_val_lower),
++                    _ => false,
+                 }
+             } else {
+                 match operator {
+@@ -1347,6 +1370,7 @@ async fn evaluate_condition(
+                     Operator::LessThanEquals => val <= con_val,
+                     Operator::Contains => val.contains(con_val),
+                     Operator::NotContains => !val.contains(con_val),
++                    _ => false,
+                 }
+             }
+         }
+@@ -1603,8 +1627,33 @@ fn build_expr(
+     } else {
+         cond.column.as_str()
+     };
++    // Null/empty checks take no value. On non-string columns "empty" can only
++    // mean null, so the empty checks degrade to the null checks there.
++    let is_string_type = matches!(
++        field_type,
++        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
++    );
++    match cond.operator {
++        Operator::IsNull => return Ok(format!("\"{field_alias}\" IS NULL")),
++        Operator::IsNotNull => return Ok(format!("\"{field_alias}\" IS NOT NULL")),
++        Operator::IsEmpty => {
++            return Ok(if is_string_type {
++                format!("(\"{field_alias}\" IS NULL OR \"{field_alias}\" = '')")
++            } else {
++                format!("\"{field_alias}\" IS NULL")
++            });
++        }
++        Operator::IsNotEmpty => {
++            return Ok(if is_string_type {
++                format!("(\"{field_alias}\" IS NOT NULL AND \"{field_alias}\" != '')")
++            } else {
++                format!("\"{field_alias}\" IS NOT NULL")
++            });
++        }
++        _ => {}
++    }
+     let expr = match field_type {
+-        DataType::Utf8 | DataType::LargeUtf8 => {
++        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
+             let val = if cond.value.is_string() {
+                 cond.value.as_str().unwrap_or_default().to_string()
+             } else {
+@@ -1623,6 +1672,14 @@ fn build_expr(
+                 Operator::NotContains => {
+                     format!("\"{field_alias}\" NOT LIKE '%{val}%'")
+                 }
++                // Null checks returned above; keep the dead arm panic-free.
++                _ => {
++                    return Err(anyhow::anyhow!(
++                        "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
++                        cond.column,
++                        cond.operator
++                    ));
++                }
+             }
+         }
+         DataType::Int16 | DataType::Int32 | DataType::Int64 => {
+@@ -2504,6 +2561,103 @@ mod tests {
+         println!("✓ All deeply nested group tests with operator precedence passed!");
+     }
+ 
++    #[tokio::test]
++    async fn test_condition_evaluate_null_operators() {
++        use config::utils::json::json;
++
++        let is_null = make_cond("err", Operator::IsNull, Value::String(String::new()));
++        let is_not_null = make_cond("err", Operator::IsNotNull, Value::String(String::new()));
++
++        let missing = json!({"other": 1});
++        let null_val = json!({"err": null});
++        let present = json!({"err": "boom"});
++
++        assert!(is_null.evaluate(missing.as_object().unwrap()).await);
++        assert!(is_null.evaluate(null_val.as_object().unwrap()).await);
++        assert!(!is_null.evaluate(present.as_object().unwrap()).await);
++
++        assert!(!is_not_null.evaluate(missing.as_object().unwrap()).await);
++        assert!(!is_not_null.evaluate(null_val.as_object().unwrap()).await);
++        assert!(is_not_null.evaluate(present.as_object().unwrap()).await);
++    }
++
++    #[tokio::test]
++    async fn test_condition_evaluate_empty_operators() {
++        use config::utils::json::json;
++
++        let is_empty = make_cond("input", Operator::IsEmpty, Value::String(String::new()));
++        let is_not_empty = make_cond("input", Operator::IsNotEmpty, Value::String(String::new()));
++
++        let missing = json!({"other": 1});
++        let null_val = json!({"input": null});
++        let empty_str = json!({"input": ""});
++        let present = json!({"input": "hello"});
++        let number = json!({"input": 0});
++
++        assert!(is_empty.evaluate(missing.as_object().unwrap()).await);
++        assert!(is_empty.evaluate(null_val.as_object().unwrap()).await);
++        assert!(is_empty.evaluate(empty_str.as_object().unwrap()).await);
++        assert!(!is_empty.evaluate(present.as_object().unwrap()).await);
++        assert!(!is_empty.evaluate(number.as_object().unwrap()).await);
++
++        assert!(!is_not_empty.evaluate(missing.as_object().unwrap()).await);
++        assert!(!is_not_empty.evaluate(null_val.as_object().unwrap()).await);
++        assert!(!is_not_empty.evaluate(empty_str.as_object().unwrap()).await);
++        assert!(is_not_empty.evaluate(present.as_object().unwrap()).await);
++        assert!(is_not_empty.evaluate(number.as_object().unwrap()).await);
++    }
++
++    #[tokio::test]
++    async fn test_condition_group_empty_operators() {
++        use config::utils::json::json;
++
++        let schema = Schema::new(vec![Field::new("input", DataType::Utf8, true)]);
++        let group = ConditionGroup {
++            filter_type: "group".to_string(),
++            logical_operator: LogicalOperator::And,
++            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
++                column: "input".to_string(),
++                operator: Operator::IsEmpty,
++                value: Value::String(String::new()),
++                ignore_case: None,
++                logical_operator: LogicalOperator::And,
++            })],
++        };
++
++        assert_eq!(
++            group.to_sql(&schema).await.unwrap(),
++            "((\"input\" IS NULL OR \"input\" = ''))"
++        );
++        let empty_str = json!({"input": ""});
++        assert!(group.evaluate(empty_str.as_object().unwrap()).await);
++        let present = json!({"input": "x"});
++        assert!(!group.evaluate(present.as_object().unwrap()).await);
++    }
++
++    #[tokio::test]
++    async fn test_condition_group_null_operators() {
++        use config::utils::json::json;
++
++        let schema = Schema::new(vec![Field::new("err", DataType::Utf8, true)]);
++        let group = ConditionGroup {
++            filter_type: "group".to_string(),
++            logical_operator: LogicalOperator::And,
++            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
++                column: "err".to_string(),
++                operator: Operator::IsNull,
++                value: Value::String(String::new()),
++                ignore_case: None,
++                logical_operator: LogicalOperator::And,
++            })],
++        };
++
++        assert_eq!(group.to_sql(&schema).await.unwrap(), "(\"err\" IS NULL)");
++        let empty = json!({});
++        assert!(group.evaluate(empty.as_object().unwrap()).await);
++        let present = json!({"err": "x"});
++        assert!(!group.evaluate(present.as_object().unwrap()).await);
++    }
++
+     // ── build_expr sync unit tests ───────────────────────────────────────────
+ 
+     fn make_cond(column: &str, operator: Operator, value: Value) -> Condition {
+@@ -2590,6 +2744,73 @@ mod tests {
+         assert_eq!(expr, "\"msg\" NOT LIKE '%spam%'");
+     }
+ 
++    #[test]
++    fn test_build_expr_null_operators_any_type() {
++        let cond = make_cond("msg", Operator::IsNull, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
++        assert_eq!(expr, "\"msg\" IS NULL");
++
++        let cond = make_cond("code", Operator::IsNull, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
++        assert_eq!(expr, "\"code\" IS NULL");
++
++        let cond = make_cond("msg", Operator::IsNotNull, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
++        assert_eq!(expr, "\"msg\" IS NOT NULL");
++    }
++
++    #[test]
++    fn test_build_expr_utf8view_value_comparisons() {
++        let cond = make_cond(
++            "level",
++            Operator::EqualTo,
++            Value::String("error".to_string()),
++        );
++        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
++        assert_eq!(expr, "\"level\" = 'error'");
++
++        let cond = make_cond("msg", Operator::Contains, Value::String("oom".to_string()));
++        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
++        assert_eq!(expr, "str_match(\"msg\", 'oom')");
++
++        let cond = make_cond(
++            "msg",
++            Operator::NotContains,
++            Value::String("spam".to_string()),
++        );
++        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
++        assert_eq!(expr, "\"msg\" NOT LIKE '%spam%'");
++    }
++
++    #[test]
++    fn test_build_expr_empty_operators() {
++        let cond = make_cond("msg", Operator::IsEmpty, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
++        assert_eq!(expr, "(\"msg\" IS NULL OR \"msg\" = '')");
++
++        let cond = make_cond("msg", Operator::IsNotEmpty, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
++        assert_eq!(expr, "(\"msg\" IS NOT NULL AND \"msg\" != '')");
++
++        // Utf8View is a string type too — it must get the empty-string check.
++        let cond = make_cond("msg", Operator::IsEmpty, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
++        assert_eq!(expr, "(\"msg\" IS NULL OR \"msg\" = '')");
++
++        let cond = make_cond("msg", Operator::IsNotEmpty, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
++        assert_eq!(expr, "(\"msg\" IS NOT NULL AND \"msg\" != '')");
++
++        // Non-string columns can only be "empty" by being null.
++        let cond = make_cond("code", Operator::IsEmpty, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
++        assert_eq!(expr, "\"code\" IS NULL");
++
++        let cond = make_cond("code", Operator::IsNotEmpty, Value::String(String::new()));
++        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
++        assert_eq!(expr, "\"code\" IS NOT NULL");
++    }
++
+     #[test]
+     fn test_build_expr_int_greater_than() {
+         let cond = make_cond(
+diff --git a/src/core/src/logs/mod.rs b/src/core/src/logs/mod.rs
+index 6b1a7108474..c04de840b4c 100644
+--- a/src/core/src/logs/mod.rs
++++ b/src/core/src/logs/mod.rs
+@@ -97,7 +97,7 @@ pub fn cast_to_type(
+             continue;
+         }
+         match field.data_type() {
+-            DataType::Utf8 | DataType::LargeUtf8 => {
++            DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
+                 if val.is_string() {
+                     continue;
+                 }
+@@ -662,6 +662,15 @@ mod tests {
+         assert!(ret_val.is_ok());
+     }
+ 
++    #[test]
++    fn test_cast_to_type_utf8view_casts_to_string() {
++        let mut local_val = Map::new();
++        local_val.insert("test".to_string(), Value::from(42));
++        let delta = vec![Field::new("test", DataType::Utf8View, true)];
++        assert!(cast_to_type(&mut local_val, delta).is_ok());
++        assert_eq!(local_val.get("test"), Some(&Value::from("42")));
++    }
++
+     #[test]
+     fn test_parse_bulk_index_index_action() {
+         let v = json!({"index": {"_index": "my-stream", "_id": "doc1"}});
+diff --git a/src/infra/src/table/alerts/intermediate.rs b/src/infra/src/table/alerts/intermediate.rs
+index dafe5d9234b..4182e78f952 100644
+--- a/src/infra/src/table/alerts/intermediate.rs
++++ b/src/infra/src/table/alerts/intermediate.rs
+@@ -334,6 +334,14 @@ pub enum ConditionOperator {
+     Contains,
+     #[serde(rename = "not_contains")]
+     NotContains,
++    #[serde(rename = "is_null")]
++    IsNull,
++    #[serde(rename = "is_not_null")]
++    IsNotNull,
++    #[serde(rename = "is_empty")]
++    IsEmpty,
++    #[serde(rename = "is_not_empty")]
++    IsNotEmpty,
+ }
+ 
+ impl From<MetaOperator> for ConditionOperator {
+@@ -347,6 +355,10 @@ impl From<MetaOperator> for ConditionOperator {
+             MetaOperator::LessThanEquals => Self::LessThanEquals,
+             MetaOperator::Contains => Self::Contains,
+             MetaOperator::NotContains => Self::NotContains,
++            MetaOperator::IsNull => Self::IsNull,
++            MetaOperator::IsNotNull => Self::IsNotNull,
++            MetaOperator::IsEmpty => Self::IsEmpty,
++            MetaOperator::IsNotEmpty => Self::IsNotEmpty,
+         }
+     }
+ }
+@@ -362,6 +374,10 @@ impl From<ConditionOperator> for MetaOperator {
+             ConditionOperator::LessThanEquals => Self::LessThanEquals,
+             ConditionOperator::Contains => Self::Contains,
+             ConditionOperator::NotContains => Self::NotContains,
++            ConditionOperator::IsNull => Self::IsNull,
++            ConditionOperator::IsNotNull => Self::IsNotNull,
++            ConditionOperator::IsEmpty => Self::IsEmpty,
++            ConditionOperator::IsNotEmpty => Self::IsNotEmpty,
+         }
+     }
+ }
+diff --git a/tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js b/tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js
+index 137d61951d8..c5b79ac9290 100644
+--- a/tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js
++++ b/tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js
+@@ -227,11 +227,12 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
+   }, async ({ page }) => {
+     await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_validation${streamSuffix}`);
+ 
+-    // Test 1: Verify guidelines are displayed
++    // Test 1: Verify guidelines are displayed (the null/empty value hints are
++    // gone — dedicated is_null/is_empty operators replaced them)
+     await pageManager.pipelinesPage.verifyNoteContainer();
+     const noteInfo = pageManager.pipelinesPage.noteInfo;
+-    await expect(noteInfo).toContainText('""');
+-    await expect(noteInfo).toContainText('null');
++    await expect(noteInfo).toContainText("custom column");
++    await expect(noteInfo).toContainText("If conditions are not met");
+ 
+     // Test 2: Try to save without any valid conditions
+     await pageManager.pipelinesPage.tryToSaveWithoutValidConditions();
+diff --git a/web/src/components/alerts/FilterCondition.vue b/web/src/components/alerts/FilterCondition.vue
+index aa78c43ea84..868a86bba5e 100644
+--- a/web/src/components/alerts/FilterCondition.vue
++++ b/web/src/components/alerts/FilterCondition.vue
+@@ -71,11 +71,11 @@
+         ]"
+         :searchable="false"
+         data-test="alert-conditions-operator-select"
+-        @update:model-value="() => emits('input:update', 'conditions', condition)"
++        @update:model-value="onOperatorChange"
+       />
+       <OTooltip v-if="condition.operator" :content="condition.operator" />
+     </div>
+-    <div class="ml-0">
++    <div v-if="!isUnaryOperator(condition.operator)" class="ml-0">
+       <OFormInput
+         :name="`${namePrefix}.value`"
+         :placeholder="t('common.value')"
+@@ -160,8 +160,9 @@ import { ref, computed, watch, inject, type PropType } from "vue";
+ import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
+ import { useStore } from "vuex";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
++import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+ 
+-var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"]);
+ const emits = defineEmits(["input:update"]);
+ 
+ const filteredFields = ref<any[]>(props.streamFields as any[]);
+@@ -186,6 +187,31 @@ const { t } = useI18nTyped();
+ // only mode now); also used to write the AND/OR toggle below.
+ const form = inject(FORM_CONTEXT_KEY, null);
+ 
++// Operator `value`s are the backend wire format (serde renames); labels stay
++// raw English like the rest of the list.
++const triggerOperators: SelectOptionInput[] = [
++  "=",
++  "!=",
++  ">=",
++  "<=",
++  ">",
++  "<",
++  "Contains",
++  "NotContains",
++  { label: raw("Is Null"), value: "is_null" },
++  { label: raw("Is Not Null"), value: "is_not_null" },
++  { label: raw("Is Empty"), value: "is_empty" },
++  { label: raw("Is Not Empty"), value: "is_not_empty" },
++];
++
++// Null checks take no value; drop a stale one so it can't leak into the payload.
++const onOperatorChange = (operator: unknown) => {
++  if (isUnaryOperator(operator)) {
++    form?.setFieldValue(`${props.namePrefix}.value`, "");
++  }
++  emits("input:update", "conditions", props.condition);
++};
++
+ const computedLabel = computed(() => {
+   // First condition in any group should not show AND/OR operator;
+   // only subsequent conditions show the operator
+diff --git a/web/src/components/alerts/ImportAlert.vue b/web/src/components/alerts/ImportAlert.vue
+index a86c9297f9b..bea26573ed9 100644
+--- a/web/src/components/alerts/ImportAlert.vue
++++ b/web/src/components/alerts/ImportAlert.vue
+@@ -310,7 +310,9 @@ import {
+   convertV0ToV2,
+   convertV1ToV2,
+   convertV1BEToV2,
++  ensureUnaryConditionValues,
+ } from "@/utils/alerts/alertDataTransforms";
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+ 
+ export default defineComponent({
+   name: "ImportAlert",
+@@ -694,7 +696,11 @@ export default defineComponent({
+             return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
+           } else if (item.filterType === "condition") {
+             // V2 condition - validate required fields
+-            if (!item.column || !item.operator || item.value === undefined) {
++            if (
++              !item.column ||
++              !item.operator ||
++              (item.value === undefined && !isUnaryOperator(item.operator))
++            ) {
+               alertErrors.push(t("alerts.import.v2ConditionFieldsRequired", { index }));
+               return false;
+             }
+@@ -712,7 +718,8 @@ export default defineComponent({
+                 "NotContains",
+                 "contains",
+                 "not_contains",
+-              ].includes(item.operator)
++              ].includes(item.operator) &&
++              !isUnaryOperator(item.operator)
+             ) {
+               alertErrors.push(
+                 t("alerts.import.invalidOperator", { index, operator: item.operator }),
+@@ -726,7 +733,11 @@ export default defineComponent({
+ 
+         const validateV1Condition = (condition: any) => {
+           // Check if it's a simple condition (V0/V1 format)
+-          if (condition.column && condition.operator && condition.value !== undefined) {
++          if (
++            condition.column &&
++            condition.operator &&
++            (condition.value !== undefined || isUnaryOperator(condition.operator))
++          ) {
+             if (
+               input.query_condition.type === "custom" &&
+               ![
+@@ -740,7 +751,8 @@ export default defineComponent({
+                 "NotContains",
+                 "contains",
+                 "not_contains",
+-              ].includes(condition.operator)
++              ].includes(condition.operator) &&
++              !isUnaryOperator(condition.operator)
+             ) {
+               alertErrors.push(t("alerts.import.invalidQueryConditionOperator", { index }));
+             }
+@@ -774,7 +786,11 @@ export default defineComponent({
+         if (Array.isArray(conditionsToValidate)) {
+           // V0 format - flat array of conditions
+           conditionsToValidate.forEach((condition: any) => {
+-            if (!condition.column || !condition.operator || condition.value === undefined) {
++            if (
++              !condition.column ||
++              !condition.operator ||
++              (condition.value === undefined && !isUnaryOperator(condition.operator))
++            ) {
+               alertErrors.push(t("alerts.import.queryConditionFieldsRequired", { index }));
+             }
+           });
+@@ -984,7 +1000,7 @@ export default defineComponent({
+         // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
+         input.query_condition.conditions = {
+           version: 2,
+-          conditions: convertedConditions,
++          conditions: ensureUnaryConditionValues(convertedConditions),
+         };
+       }
+ 
+diff --git a/web/src/components/alerts/steps/QueryConfig.schema.spec.ts b/web/src/components/alerts/steps/QueryConfig.schema.spec.ts
+index 20d56fb25a2..e20da1365c0 100644
+--- a/web/src/components/alerts/steps/QueryConfig.schema.spec.ts
++++ b/web/src/components/alerts/steps/QueryConfig.schema.spec.ts
+@@ -99,6 +99,14 @@ describe("QueryConfig.schema — conditions tree", () => {
+       expect(conditionsTreeSchema.safeParse(group([leaf({ value: 0 })])).success).toBe(true);
+     });
+ 
++    it("unary operators need no value", () => {
++      for (const operator of ["is_null", "is_not_null", "is_empty", "is_not_empty"]) {
++        expect(conditionsTreeSchema.safeParse(group([leaf({ operator, value: "" })])).success).toBe(
++          true,
++        );
++      }
++    });
++
+     it('value fails ONLY on undefined / null / ""', () => {
+       for (const bad of ["", null, undefined]) {
+         const result = conditionsTreeSchema.safeParse(group([leaf({ value: bad })]));
+diff --git a/web/src/components/alerts/steps/QueryConfig.schema.ts b/web/src/components/alerts/steps/QueryConfig.schema.ts
+index cd4afe8f58c..38ae5d48af6 100644
+--- a/web/src/components/alerts/steps/QueryConfig.schema.ts
++++ b/web/src/components/alerts/steps/QueryConfig.schema.ts
+@@ -21,6 +21,8 @@
+ 
+ import { z } from "zod";
+ 
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
++
+ /** i18n translator injected by the component: `(key, namedParams?) => string`.
+  *  Every user-facing validation message resolves through this against the
+  *  `alerts.validation.*` locale keys. */
+@@ -83,7 +85,8 @@ export function isConditionGroupNode(item: unknown): boolean {
+  *   • `column`   — truthy-required
+  *   • `operator` — truthy-required
+  *   • `value`    — required but ZERO-SAFE: fails ONLY on undefined/null/""
+- *     (numeric 0 PASSES — never `.min(1)` on a number)
++ *     (numeric 0 PASSES — never `.min(1)` on a number). Unary operators
++ *     (is_null/is_empty, ...) take no value and are exempt.
+  * Message is the caller-supplied `requiredMessage` (i18n
+  * `alerts.validation.fieldRequired` → "Field is required!").
+  *
+@@ -125,7 +128,10 @@ export function refineConditionsTree(
+         message: requiredMessage,
+       });
+     }
+-    if (row.value === undefined || row.value === null || row.value === "") {
++    if (
++      (row.value === undefined || row.value === null || row.value === "") &&
++      !isUnaryOperator(row.operator)
++    ) {
+       ctx.addIssue({
+         code: z.ZodIssueCode.custom,
+         path: [...itemPath, "value"],
+diff --git a/web/src/components/flow/forms/ConditionBuilder.spec.ts b/web/src/components/flow/forms/ConditionBuilder.spec.ts
+index 5795c3b87e6..6823e2ef7af 100644
+--- a/web/src/components/flow/forms/ConditionBuilder.spec.ts
++++ b/web/src/components/flow/forms/ConditionBuilder.spec.ts
+@@ -80,14 +80,16 @@ describe("ConditionBuilder", () => {
+     expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
+   });
+ 
+-  it("leaves operators untouched when normalizeOperators is false", () => {
++  it("canonicalizes operator spelling on load even without normalizeOperators", () => {
++    // ensureIds maps backend spellings to the select's option values on every
++    // load path now, so the select never renders empty for a saved operator.
+     const saved = {
+       filterType: "group",
+       logicalOperator: "AND",
+       conditions: [{ filterType: "condition", column: "msg", operator: "contains", value: "x" }],
+     };
+     const wrapper = createWrapper({ initialConditions: saved });
+-    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("contains");
++    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
+   });
+ 
+   it("submit resolves { version, conditions } for a valid rule", async () => {
+diff --git a/web/src/components/pipeline/ImportPipeline.vue b/web/src/components/pipeline/ImportPipeline.vue
+index 00732778828..0dfbba59ec9 100644
+--- a/web/src/components/pipeline/ImportPipeline.vue
++++ b/web/src/components/pipeline/ImportPipeline.vue
+@@ -423,7 +423,9 @@ import {
+   convertV0ToV2,
+   convertV1ToV2,
+   convertV1BEToV2,
++  ensureUnaryConditionValues,
+ } from "@/utils/alerts/alertDataTransforms";
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+ 
+ export default defineComponent({
+   name: "ImportPipeline",
+@@ -1050,7 +1052,11 @@ export default defineComponent({
+                 }
+                 return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
+               } else if (item.filterType === "condition") {
+-                if (!item.column || !item.operator || item.value === undefined) {
++                if (
++                  !item.column ||
++                  !item.operator ||
++                  (item.value === undefined && !isUnaryOperator(item.operator))
++                ) {
+                   pipelineErrors.push({
+                     message: t("pipeline.importErrors.v2ConditionFields", { index, nodeIndex }),
+                     field: "condition_format",
+@@ -1063,7 +1069,11 @@ export default defineComponent({
+             };
+ 
+             const validateV1Condition = (condition: any): boolean => {
+-              if (condition.column && condition.operator && condition.value !== undefined) {
++              if (
++                condition.column &&
++                condition.operator &&
++                (condition.value !== undefined || isUnaryOperator(condition.operator))
++              ) {
+                 return true;
+               }
+               if (condition.and || condition.or) {
+@@ -1086,7 +1096,11 @@ export default defineComponent({
+             if (Array.isArray(conditionsToValidate)) {
+               // V0 format - flat array
+               const valid = conditionsToValidate.every((condition: any) => {
+-                return condition.column && condition.operator && condition.value !== undefined;
++                return (
++                  condition.column &&
++                  condition.operator &&
++                  (condition.value !== undefined || isUnaryOperator(condition.operator))
++                );
+               });
+               if (!valid) {
+                 pipelineErrors.push({
+@@ -1183,6 +1197,8 @@ export default defineComponent({
+               node.data.conditions = convertedConditions;
+             }
+ 
++            ensureUnaryConditionValues(node.data.conditions);
++
+             // Ensure version is set as integer (matching Condition.vue structure)
+             // Backend expects: node.data = { node_type: "condition", version: 2, conditions: {...} }
+             node.data.version = 2;
+diff --git a/web/src/components/pipeline/NodeForm/Condition.schema.ts b/web/src/components/pipeline/NodeForm/Condition.schema.ts
+index 70bb61714fd..87f80bc1dff 100644
+--- a/web/src/components/pipeline/NodeForm/Condition.schema.ts
++++ b/web/src/components/pipeline/NodeForm/Condition.schema.ts
+@@ -16,6 +16,8 @@
+ 
+ import { z } from "zod";
+ 
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
++
+ const isFilled = (v: any): boolean => v !== undefined && v !== null && String(v).trim() !== "";
+ 
+ // A V2 group node — its children live in `conditions` (or legacy V1 `items`).
+@@ -42,9 +44,12 @@ const collectLeafConditions = (group: any): any[] => {
+ // operator carries a default ("="), so it's ignored for the blank check.
+ const isBlankCondition = (c: any): boolean => !isFilled(c?.column) && !isFilled(c?.value);
+ 
+-// A leaf is usable only when all three fields are present.
++// A leaf is usable only when all three fields are present (null checks are
++// unary, so they need no value).
+ const isCompleteCondition = (c: any): boolean =>
+-  isFilled(c?.column) && isFilled(c?.operator) && isFilled(c?.value);
++  isFilled(c?.column) &&
++  isFilled(c?.operator) &&
++  (isFilled(c?.value) || isUnaryOperator(c?.operator));
+ 
+ export const makeConditionSchema = (t: (_key: string) => string) =>
+   z
+diff --git a/web/src/components/pipeline/NodeForm/Condition.vue b/web/src/components/pipeline/NodeForm/Condition.vue
+index ee44445b155..a7eb9cc519d 100644
+--- a/web/src/components/pipeline/NodeForm/Condition.vue
++++ b/web/src/components/pipeline/NodeForm/Condition.vue
+@@ -94,38 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                     class="text-banner-warning-text flex flex-col gap-1 text-sm"
+                     data-test="add-condition-note-info"
+                   >
+-                    <div class="flex items-start gap-2">
+-                      <OIcon
+-                        name="info"
+-                        size="sm"
+-                        class="text-status-warning-text mt-0.5 shrink-0"
+-                      />
+-                      <span>
+-                        {{ t("pipeline.emptyValueGuideline") }}
+-                        <span class="highlight text-text-link font-bold">{{ raw('""') }}</span
+-                        >{{ t("pipeline.exampleColon") }}
+-                        <span
+-                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
+-                          >{{ raw('app_name != ""') }}</span
+-                        >
+-                      </span>
+-                    </div>
+-                    <div class="flex items-start gap-2">
+-                      <OIcon
+-                        name="info"
+-                        size="sm"
+-                        class="text-status-warning-text mt-0.5 shrink-0"
+-                      />
+-                      <span>
+-                        {{ t("pipeline.nullValueGuideline") }}
+-                        <span class="highlight text-text-link font-bold">{{ raw("null") }}</span
+-                        >{{ t("pipeline.exampleColon") }}
+-                        <span
+-                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
+-                          >{{ raw("app_name != null") }}</span
+-                        >
+-                      </span>
+-                    </div>
+                     <div class="flex items-start gap-2">
+                       <OIcon
+                         name="info"
+diff --git a/web/src/composables/useAlertForm.ts b/web/src/composables/useAlertForm.ts
+index a3fd44bf1ab..095e7a6a89b 100644
+--- a/web/src/composables/useAlertForm.ts
++++ b/web/src/composables/useAlertForm.ts
+@@ -49,6 +49,7 @@ import {
+ } from "@/utils/zincutils";
+ import { convertDateToTimestamp } from "@/utils/date";
+ import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+ import {
+   validateInputs as validateInputsUtil,
+   validateSqlQuery as validateSqlQueryUtil,
+@@ -858,7 +859,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
+       return false;
+     }
+     if (conditions.filterType === "condition") {
+-      return !!(conditions.column && conditions.value !== undefined && conditions.value !== "");
++      return !!(
++        conditions.column &&
++        (isUnaryOperator(conditions.operator) ||
++          (conditions.value !== undefined && conditions.value !== ""))
++      );
+     }
+     if (conditions.filterType === "group" && Array.isArray(conditions.conditions)) {
+       return conditions.conditions.every((cond: any) => allConditionsValid(cond));
+diff --git a/web/src/enterprise/components/onlineEvals/forms/JobFormPage.vue b/web/src/enterprise/components/onlineEvals/forms/JobFormPage.vue
+index 9d1414a77e9..8b803f76acd 100644
+--- a/web/src/enterprise/components/onlineEvals/forms/JobFormPage.vue
++++ b/web/src/enterprise/components/onlineEvals/forms/JobFormPage.vue
+@@ -358,6 +358,8 @@ import {
+   normalizeJobFilterCondition,
+ } from "../utils/jobFilter";
+ import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
++import type { StreamFieldsMap } from "@/utils/alerts/alertQueryBuilder";
++import { DEFAULT_JOB_STREAM_FIELDS } from "../utils/defaultStreamFields";
+ import {
+   buildJobInputMappingPayload,
+   mappingUsesSystemProvidedSpans,
+@@ -437,6 +439,19 @@ const showActivateChoice = computed(
+   () => props.mode === "create" || (props.mode === "edit" && isDraft.value),
+ );
+ 
++// Field types for the SQL formatter: numeric columns must not be quoted and
++// their empty checks must degrade to null checks, or the query fails. Labels
++// are field names (raw identifiers), never prose.
++const filterFieldsMap = computed<StreamFieldsMap>(() => {
++  const fields = streamFields.value.length ? streamFields.value : DEFAULT_JOB_STREAM_FIELDS;
++  return Object.fromEntries(
++    fields.map((field) => [
++      field.value,
++      { label: raw(String(field.label)), value: field.value, type: field.type },
++    ]),
++  );
++});
++
+ // SQL WHERE body built from the filter builder — feeds the live "matched
+ // spans" count in the preview panel. Built from the CLEANED group (incomplete
+ // conditions stripped) so the SQL is always valid. Same formatter the form's
+@@ -447,6 +462,7 @@ const filterWhere = computed<string>(() => {
+       sqlMode: true,
+       addWherePrefix: false,
+       formatValues: true,
++      streamFieldsMap: filterFieldsMap.value,
+     });
+   } catch {
+     return "";
+diff --git a/web/src/enterprise/components/onlineEvals/utils/jobFilter.spec.ts b/web/src/enterprise/components/onlineEvals/utils/jobFilter.spec.ts
+index b66b8f779dc..691675e4b69 100644
+--- a/web/src/enterprise/components/onlineEvals/utils/jobFilter.spec.ts
++++ b/web/src/enterprise/components/onlineEvals/utils/jobFilter.spec.ts
+@@ -141,6 +141,20 @@ describe("cleanFilterGroup", () => {
+     expect((cleaned.conditions[0] as any).column).toBe("b");
+   });
+ 
++  it("keeps null/empty-check conditions that have no value", () => {
++    const cleaned = cleanFilterGroup({
++      filterType: "group",
++      logicalOperator: "AND",
++      conditions: [
++        { filterType: "condition", column: "err", operator: "is_null", value: "" },
++        { filterType: "condition", column: "host", operator: "is_not_null" },
++        { filterType: "condition", column: "gen_ai_input", operator: "is_empty" },
++      ],
++    });
++    expect(cleaned.conditions).toHaveLength(3);
++    expect((cleaned.conditions[1] as any).value).toBe("");
++  });
++
+   it("recursively cleans nested groups and drops them when empty", () => {
+     const cleaned = cleanFilterGroup({
+       filterType: "group",
+diff --git a/web/src/enterprise/components/onlineEvals/utils/jobFilter.ts b/web/src/enterprise/components/onlineEvals/utils/jobFilter.ts
+index a52b5ef68df..799af1df8d9 100644
+--- a/web/src/enterprise/components/onlineEvals/utils/jobFilter.ts
++++ b/web/src/enterprise/components/onlineEvals/utils/jobFilter.ts
+@@ -6,6 +6,7 @@ import {
+   ensureIds,
+   type V2Group,
+ } from "@/utils/alerts/alertDataTransforms";
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+ 
+ export function createEmptyJobFilterGroup(): V2Group {
+   return ensureIds(convertV0ToV2([])) as V2Group;
+@@ -53,6 +54,10 @@ export function normalizeJobFilterCondition(value: any): V2Group {
+   return ensureIds(convertV1BEToV2(conditionValue)) as V2Group;
+ }
+ 
++const conditionHasValue = (item: any): boolean =>
++  isUnaryOperator(item?.operator) ||
++  (item?.value !== undefined && item?.value !== null && item?.value !== "");
++
+ export function cleanFilterGroup(group: any): V2Group {
+   const logicalOperator = group?.logicalOperator === "OR" ? "OR" : "AND";
+   const conditions = (group?.conditions || [])
+@@ -67,15 +72,14 @@ export function cleanFilterGroup(group: any): V2Group {
+           : null;
+       }
+ 
+-      const hasValue = item?.value !== undefined && item?.value !== null && item?.value !== "";
+-      if (item?.filterType !== "condition" || !item.column || !item.operator || !hasValue)
+-        return null;
++      if (item?.filterType !== "condition" || !item.column || !item.operator) return null;
++      if (!conditionHasValue(item)) return null;
+ 
+       return {
+         filterType: "condition",
+         column: item.column,
+         operator: item.operator,
+-        value: item.value,
++        value: item.value ?? "",
+         values: item.values || [],
+         logicalOperator: item.logicalOperator === "OR" ? "OR" : "AND",
+       };
+@@ -101,8 +105,7 @@ export function isJobFilterComplete(group: any): boolean {
+       if (!isJobFilterComplete(item)) return false;
+     } else if (item?.filterType === "condition") {
+       const hasValue =
+-        (item.value !== undefined && item.value !== null && item.value !== "") ||
+-        (Array.isArray(item.values) && item.values.length > 0);
++        conditionHasValue(item) || (Array.isArray(item.values) && item.values.length > 0);
+       if (!item.column || !item.operator || !hasValue) return false;
+     }
+   }
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 04ecdfdb630..c9b81f8da81 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Dieses Ereignis fügt keine Felder über die üblichen hinaus hinzu.",
+       "conditionNoteTitle": "Richtlinien für Bedingungen",
+       "functionFlattenTitle": "Vor vs. nach dem Abflachen",
+-      "conditionNoteEmpty": "Um einen leeren Wert zu prüfen, verwenden Sie \"\". Beispiel:",
+-      "conditionNoteNull": "Um einen Null-Wert zu prüfen, verwenden Sie null. Beispiel:",
+       "conditionNoteCustom": "Um eine benutzerdefinierte Spalte hinzuzufügen, geben Sie ihren Namen ein und drücken Sie die Eingabetaste.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Payload mit einer Funktion umformen",
+       "functionBodySet": "Wendet {name} an",
+       "functionSelect": "Funktion auswählen",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "z. B. eine Verzögerung von 10 Minuten bedeutet, dass die Pipeline 10 Minuten nach ihrer geplanten Zeit ausgeführt wird.",
+     "closeDrawer": "Drawer schließen",
+     "conditionValueGuidelines": "Richtlinien für Bedingungswerte:",
+-    "emptyValueGuideline": "Um auf einen leeren Wert zu prüfen, verwenden Sie",
+-    "exampleColon": ". Beispiel:",
+-    "nullValueGuideline": "Um auf einen Null-Wert zu prüfen, verwenden Sie",
+     "customColumnGuideline": "Um eine benutzerdefinierte Spalte hinzuzufügen, geben Sie den Spaltennamen ein und drücken Sie",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "Wenn die Bedingungen nicht erfüllt sind, wird der Datensatz verworfen.",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 6a3201573c2..fd8b7e822db 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "This event adds no fields beyond the common ones.",
+       "conditionNoteTitle": "Condition Guidelines",
+       "functionFlattenTitle": "Before vs After Flattening",
+-      "conditionNoteEmpty": "To Check For An Empty Value, Use \"\". Example:",
+-      "conditionNoteNull": "To Check For A Null Value, Use null. Example:",
+       "conditionNoteCustom": "To Add A Custom Column, Type Its Name And Press Enter.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Reshape The Payload With A Function",
+       "functionBodySet": "Applies {name}",
+       "functionSelect": "Select Function",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "e.g. 10 minutes delay means that the pipeline will run 10 minutes after its scheduled time.",
+     "closeDrawer": "Close drawer",
+     "conditionValueGuidelines": "Condition value Guidelines:",
+-    "emptyValueGuideline": "To check for an empty value, use",
+-    "exampleColon": ". Example:",
+-    "nullValueGuideline": "To check for an Null value, use",
+     "customColumnGuideline": "To add a custom column, type column name and press",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "If conditions are not met, the record will be dropped.",
+@@ -4132,8 +4125,8 @@
+       "dbmConfigureMssqlDesc": "Writes `dbm-config.yaml` — set the database to connect to below. SQL Server gets deadlocks, blocked queries, activity samples, top queries and execution plans here. The sqlserver receiver reads across the whole instance, so activity and top queries are not limited to the database you name above.",
+       "dbmRunMssqlDesc": "Runs both configs together. Use the same login and password you created in step 1.",
+       "dbmVerifyBlockingDesc": "Open **Infra → Databases → Blocked queries**. Sessions waiting on a lock appear as soon as one is sampled — an empty tab there tells you whether nothing is blocked or nothing is being collected.",
+-      "dbmVerifyFullNoSampleTextDesc": "Open **Infra \u2192 Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and top queries carry their plans on a query's detail page. MariaDB does not expose the sampled statement text, so an activity row names the session without its SQL. Table health fills after the first 60-second snapshot.",
+-      "dbmVerifyFullPlainPlansDesc": "Open **Infra \u2192 Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and execution plans appear on a query's detail page. Table health fills after the first 60-second snapshot.",
++      "dbmVerifyFullNoSampleTextDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and top queries carry their plans on a query's detail page. MariaDB does not expose the sampled statement text, so an activity row names the session without its SQL. Table health fills after the first 60-second snapshot.",
++      "dbmVerifyFullPlainPlansDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and execution plans appear on a query's detail page. Table health fills after the first 60-second snapshot.",
+       "dbmVerifyFullSlowTableHealthDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and estimated plans appear on a query's detail page. Table health takes up to five minutes — reading table sizes gets slower as your schema grows, so it runs less often than the rest.",
+       "dbmVerifyTableHealthDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one — an empty tab there tells you whether nothing happened or nothing is being collected. Table health fills after the first 60-second snapshot."
+     },
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index b3c39b5dc34..b1c0cea5ea4 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Este evento no añade campos más allá de los comunes.",
+       "conditionNoteTitle": "Directrices de condición",
+       "functionFlattenTitle": "Antes vs Después del Aplanado",
+-      "conditionNoteEmpty": "Para verificar un valor vacío, use \"\". Ejemplo:",
+-      "conditionNoteNull": "Para verificar un valor nulo, use null. Ejemplo:",
+       "conditionNoteCustom": "Para agregar una columna personalizada, escriba su nombre y presione Enter.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Reformatea el payload con una función",
+       "functionBodySet": "Aplica {name}",
+       "functionSelect": "Seleccionar función",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "p. ej. un retraso de 10 minutos significa que el pipeline se ejecutará 10 minutos después de su hora programada.",
+     "closeDrawer": "Cerrar panel",
+     "conditionValueGuidelines": "Pautas del valor de condición:",
+-    "emptyValueGuideline": "Para verificar un valor vacío, usa",
+-    "exampleColon": ". Ejemplo:",
+-    "nullValueGuideline": "Para verificar un valor nulo, usa",
+     "customColumnGuideline": "Para agregar una columna personalizada, escribe el nombre de la columna y presiona",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "Si no se cumplen las condiciones, el registro se descartará.",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 79e55c076b7..6c913c690ee 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Cet événement n'ajoute aucun champ au-delà des champs courants.",
+       "conditionNoteTitle": "Directives de condition",
+       "functionFlattenTitle": "Avant vs Après aplatissement",
+-      "conditionNoteEmpty": "Pour vérifier une valeur vide, utilisez \"\". Exemple :",
+-      "conditionNoteNull": "Pour vérifier une valeur nulle, utilisez null. Exemple :",
+       "conditionNoteCustom": "Pour ajouter une colonne personnalisée, tapez son nom et appuyez sur Entrée.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Reformez la charge utile avec une fonction",
+       "functionBodySet": "Applique {name}",
+       "functionSelect": "Sélectionner une fonction",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "p. ex. un délai de 10 minutes signifie que le pipeline s'exécutera 10 minutes après son heure planifiée.",
+     "closeDrawer": "Fermer le panneau",
+     "conditionValueGuidelines": "Directives pour la valeur de condition :",
+-    "emptyValueGuideline": "Pour vérifier une valeur vide, utilisez",
+-    "exampleColon": ". Exemple :",
+-    "nullValueGuideline": "Pour vérifier une valeur nulle, utilisez",
+     "customColumnGuideline": "Pour ajouter une colonne personnalisée, saisissez le nom de la colonne et appuyez sur",
+     "enterKey": "Entrée",
+     "conditionsNotMetWarning": "Si les conditions ne sont pas remplies, l'enregistrement sera supprimé.",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index edee1f4ca19..f98f4f3756c 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Questo evento non aggiunge campi oltre a quelli comuni.",
+       "conditionNoteTitle": "Linee guida per le condizioni",
+       "functionFlattenTitle": "Prima vs dopo l'appiattimento",
+-      "conditionNoteEmpty": "Per controllare un valore vuoto, usa \"\". Esempio:",
+-      "conditionNoteNull": "Per controllare un valore nullo, usa null. Esempio:",
+       "conditionNoteCustom": "Per aggiungere una colonna personalizzata, digita il suo nome e premi Invio.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Rimodella il payload con una funzione",
+       "functionBodySet": "Applica {name}",
+       "functionSelect": "Seleziona funzione",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "ad es. un ritardo di 10 minuti significa che la pipeline verrà eseguita 10 minuti dopo l'orario pianificato.",
+     "closeDrawer": "Chiudi il pannello",
+     "conditionValueGuidelines": "Linee guida per il valore della condizione:",
+-    "emptyValueGuideline": "Per verificare un valore vuoto, usa",
+-    "exampleColon": ". Esempio:",
+-    "nullValueGuideline": "Per verificare un valore Null, usa",
+     "customColumnGuideline": "Per aggiungere una colonna personalizzata, digita il nome della colonna e premi",
+     "enterKey": "Invio",
+     "conditionsNotMetWarning": "Se le condizioni non sono soddisfatte, il record verrà scartato.",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 1de316f06fe..b8e3549ca08 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "このイベントは共通フィールド以外のフィールドを追加しません。",
+       "conditionNoteTitle": "条件のガイドライン",
+       "functionFlattenTitle": "フラット化前と後",
+-      "conditionNoteEmpty": "空の値を確認するには、\"\" を使用します。例：",
+-      "conditionNoteNull": "null値を確認するには、null を使用します。例：",
+       "conditionNoteCustom": "カスタム列を追加するには、名前を入力してEnterキーを押します。",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "関数でペイロードを再形成する",
+       "functionBodySet": "{name} を適用",
+       "functionSelect": "関数を選択",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "例: 10分の遅延は、パイプラインがスケジュールされた時刻の10分後に実行されることを意味します。",
+     "closeDrawer": "ドロワーを閉じる",
+     "conditionValueGuidelines": "条件値のガイドライン:",
+-    "emptyValueGuideline": "空の値を確認するには、次を使用します:",
+-    "exampleColon": ". 例:",
+-    "nullValueGuideline": "Null値を確認するには、次を使用します:",
+     "customColumnGuideline": "カスタム列を追加するには、列名を入力して",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "条件が満たされない場合、レコードは破棄されます。",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index d43150c91ec..3755c8e3eab 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "이 이벤트는 공통 필드 외에 추가 필드가 없습니다.",
+       "conditionNoteTitle": "조건 가이드라인",
+       "functionFlattenTitle": "평면화 전후",
+-      "conditionNoteEmpty": "빈 값을 확인하려면 \"\"를 사용하세요. 예:",
+-      "conditionNoteNull": "널 값을 확인하려면 null을 사용하세요. 예:",
+       "conditionNoteCustom": "사용자 정의 열을 추가하려면 이름을 입력하고 Enter를 누르세요.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "함수로 페이로드 변형",
+       "functionBodySet": "{name} 적용",
+       "functionSelect": "함수 선택",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "예: 10분 지연은 파이프라인이 예약된 시간보다 10분 후에 실행됨을 의미합니다.",
+     "closeDrawer": "패널 닫기",
+     "conditionValueGuidelines": "조건 값 지침:",
+-    "emptyValueGuideline": "빈 값을 확인하려면 다음을 사용하세요.",
+-    "exampleColon": ". 예:",
+-    "nullValueGuideline": "Null 값을 확인하려면 다음을 사용하세요.",
+     "customColumnGuideline": "사용자 지정 열을 추가하려면 열 이름을 입력하고 누르세요.",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "조건이 충족되지 않으면 레코드가 삭제됩니다.",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index eeded3124d1..cd204b4c229 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Deze gebeurtenis voegt geen velden toe naast de algemene velden.",
+       "conditionNoteTitle": "Richtlijnen voor voorwaarden",
+       "functionFlattenTitle": "Vóór vs. na afvlakken",
+-      "conditionNoteEmpty": "Om een lege waarde te controleren, gebruik \"\". Voorbeeld:",
+-      "conditionNoteNull": "Om een null-waarde te controleren, gebruik null. Voorbeeld:",
+       "conditionNoteCustom": "Om een aangepaste kolom toe te voegen, typt u de naam en drukt u op Enter.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Vorm de payload om met een functie",
+       "functionBodySet": "Past {name} toe",
+       "functionSelect": "Selecteer functie",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "bijv. een vertraging van 10 minuten betekent dat de pipeline 10 minuten na de geplande tijd wordt uitgevoerd.",
+     "closeDrawer": "Sluit lade",
+     "conditionValueGuidelines": "Richtlijnen voor voorwaardes:",
+-    "emptyValueGuideline": "Om een lege waarde te controleren, gebruik",
+-    "exampleColon": ". Voorbeeld:",
+-    "nullValueGuideline": "Om een Null-waarde te controleren, gebruik",
+     "customColumnGuideline": "Om een aangepaste kolom toe te voegen, typt u de kolomnaam en druk op",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "Als niet aan de voorwaarden wordt voldaan, wordt het record verwijderd.",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 62924344def..d6320b2656d 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "To zdarzenie nie dodaje żadnych pól poza standardowymi.",
+       "conditionNoteTitle": "Wytyczne dotyczące warunków",
+       "functionFlattenTitle": "Przed vs Po spłaszczeniu",
+-      "conditionNoteEmpty": "Aby sprawdzić pustą wartość, użyj \"\". Przykład:",
+-      "conditionNoteNull": "Aby sprawdzić wartość null, użyj null. Przykład:",
+       "conditionNoteCustom": "Aby dodać niestandardową kolumnę, wpisz jej nazwę i naciśnij Enter.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Przekształć dane wejściowe za pomocą funkcji",
+       "functionBodySet": "Stosuje {name}",
+       "functionSelect": "Wybierz funkcję",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "np. 10 minut opóźnienia oznacza, że potok uruchomi się 10 minut po zaplanowanym czasie.",
+     "closeDrawer": "Zamknij panel",
+     "conditionValueGuidelines": "Wytyczne dotyczące wartości warunku:",
+-    "emptyValueGuideline": "Aby sprawdzić pustą wartość, użyj",
+-    "exampleColon": ". Przykład:",
+-    "nullValueGuideline": "Aby sprawdzić wartość Null, użyj",
+     "customColumnGuideline": "Aby dodać kolumnę niestandardową, wpisz nazwę kolumny i naciśnij",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "Jeśli warunki nie zostaną spełnione, rekord zostanie odrzucony.",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 5663eaf62f7..db59c0fa22e 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Este evento não adiciona campos além dos comuns.",
+       "conditionNoteTitle": "Diretrizes de Condição",
+       "functionFlattenTitle": "Antes vs Depois do Achatamento",
+-      "conditionNoteEmpty": "Para verificar um valor vazio, use \"\". Exemplo:",
+-      "conditionNoteNull": "Para verificar um valor nulo, use null. Exemplo:",
+       "conditionNoteCustom": "Para adicionar uma coluna personalizada, digite seu nome e pressione Enter.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Reformate o payload com uma função",
+       "functionBodySet": "Aplica {name}",
+       "functionSelect": "Selecionar função",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "ex.: um atraso de 10 minutos significa que o pipeline será executado 10 minutos após o horário programado.",
+     "closeDrawer": "Fechar gaveta",
+     "conditionValueGuidelines": "Diretrizes de valor de condição:",
+-    "emptyValueGuideline": "Para verificar um valor vazio, use",
+-    "exampleColon": ". Exemplo:",
+-    "nullValueGuideline": "Para verificar um valor nulo, use",
+     "customColumnGuideline": "Para adicionar uma coluna personalizada, digite o nome da coluna e pressione",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "Se as condições não forem atendidas, o registro será descartado.",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 55db1992817..44197caf30b 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Это событие не добавляет полей, кроме общих.",
+       "conditionNoteTitle": "Рекомендации по условиям",
+       "functionFlattenTitle": "До и после уплощения",
+-      "conditionNoteEmpty": "Чтобы проверить пустое значение, используйте \"\". Пример:",
+-      "conditionNoteNull": "Чтобы проверить значение null, используйте null. Пример:",
+       "conditionNoteCustom": "Чтобы добавить пользовательский столбец, введите его имя и нажмите Enter.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Изменяйте полезную нагрузку с помощью функции",
+       "functionBodySet": "Применяет {name}",
+       "functionSelect": "Выберите функцию",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "например, задержка в 10 минут означает, что конвейер будет запущен через 10 минут после запланированного времени.",
+     "closeDrawer": "Закрыть панель",
+     "conditionValueGuidelines": "Рекомендации по значению условия:",
+-    "emptyValueGuideline": "Чтобы проверить пустое значение, используйте",
+-    "exampleColon": ". Пример:",
+-    "nullValueGuideline": "Чтобы проверить значение NULL, используйте",
+     "customColumnGuideline": "Чтобы добавить пользовательский столбец, введите имя столбца и нажмите",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "Если условия не выполнены, запись будет отброшена.",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index 676fa8b91fc..773e30aca69 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Bu olay, ortak alanların dışında herhangi bir alan eklemez.",
+       "conditionNoteTitle": "Koşul Yönergeleri",
+       "functionFlattenTitle": "Düzleştirme Öncesi ve Sonrası",
+-      "conditionNoteEmpty": "Boş Bir Değer Kontrol Etmek İçin \"\" Kullanın. Örnek:",
+-      "conditionNoteNull": "Null Bir Değer Kontrol Etmek İçin null Kullanın. Örnek:",
+       "conditionNoteCustom": "Özel Bir Sütun Eklemek İçin Adını Yazın ve Enter'a Basın.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Bir Fonksiyonla Yükü Yeniden Şekillendirin",
+       "functionBodySet": "Uygular {name}",
+       "functionSelect": "Fonksiyon Seç",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "ör. 10 dakikalık gecikme, pipeline'ın planlanan zamanından 10 dakika sonra çalışacağı anlamına gelir.",
+     "closeDrawer": "Paneli kapat",
+     "conditionValueGuidelines": "Koşul değeri yönergeleri:",
+-    "emptyValueGuideline": "Boş bir değeri kontrol etmek için kullanın",
+-    "exampleColon": ". Örnek:",
+-    "nullValueGuideline": "Null bir değeri kontrol etmek için kullanın",
+     "customColumnGuideline": "Özel bir sütun eklemek için sütun adını yazın ve basın",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "Koşullar karşılanmazsa kayıt atılır.",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index b196adf9e91..b17ebad2838 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "Sự kiện này không thêm trường nào ngoài các trường chung.",
+       "conditionNoteTitle": "Hướng dẫn điều kiện",
+       "functionFlattenTitle": "Trước và sau khi làm phẳng",
+-      "conditionNoteEmpty": "Để kiểm tra giá trị rỗng, sử dụng \"\". Ví dụ:",
+-      "conditionNoteNull": "Để kiểm tra giá trị null, sử dụng null. Ví dụ:",
+       "conditionNoteCustom": "Để thêm cột tùy chỉnh, nhập tên của nó và nhấn Enter.",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "Định dạng lại payload bằng hàm",
+       "functionBodySet": "Áp dụng {name}",
+       "functionSelect": "Chọn hàm",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "Ví dụ: độ trễ 10 phút nghĩa là pipeline sẽ chạy sau 10 phút so với thời gian đã lên lịch.",
+     "closeDrawer": "Đóng ngăn kéo",
+     "conditionValueGuidelines": "Hướng dẫn giá trị điều kiện:",
+-    "emptyValueGuideline": "Để kiểm tra giá trị rỗng, sử dụng",
+-    "exampleColon": ". Ví dụ:",
+-    "nullValueGuideline": "Để kiểm tra giá trị Null, sử dụng",
+     "customColumnGuideline": "Để thêm cột tùy chỉnh, nhập tên cột và nhấn",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "Nếu không đáp ứng điều kiện, bản ghi sẽ bị loại bỏ.",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index e4b5d5dfc9c..3e9be102fe9 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "此事件除了公共字段外，不添加任何字段。",
+       "conditionNoteTitle": "条件指南",
+       "functionFlattenTitle": "展平前后对比",
+-      "conditionNoteEmpty": "要检查空值，请使用 \"\"。例如：",
+-      "conditionNoteNull": "要检查空值，请使用 null。例如：",
+       "conditionNoteCustom": "要添加自定义列，请键入其名称并按回车。",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "使用函数重塑负载",
+       "functionBodySet": "应用 {name}",
+       "functionSelect": "选择函数",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "例如，延迟 10 分钟意味着流水线将在计划时间后 10 分钟运行。",
+     "closeDrawer": "关闭抽屉",
+     "conditionValueGuidelines": "条件值指南：",
+-    "emptyValueGuideline": "要检查空值，请使用",
+-    "exampleColon": "。例如：",
+-    "nullValueGuideline": "要检查 Null 值，请使用",
+     "customColumnGuideline": "要添加自定义列，请键入列名并按",
+     "enterKey": "回车",
+     "conditionsNotMetWarning": "如果条件不满足，该记录将被丢弃。",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index b9ae3cc64cd..7d18b354eba 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -2742,11 +2742,7 @@
+       "incidentNoExtraFields": "此事件除了常見欄位外，不會新增任何欄位。",
+       "conditionNoteTitle": "條件指南",
+       "functionFlattenTitle": "扁平化前後比較",
+-      "conditionNoteEmpty": "若要檢查空值，請使用 \"\"。範例：",
+-      "conditionNoteNull": "若要檢查 null 值，請使用 null。範例：",
+       "conditionNoteCustom": "若要新增自訂欄位，請輸入其名稱並按 Enter。",
+-      "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null",
+       "functionBody": "使用函數重塑 Payload",
+       "functionBodySet": "套用 {name}",
+       "functionSelect": "選擇函數",
+@@ -2954,9 +2950,6 @@
+     "delayInfoLine2": "例如：延遲 10 分鐘表示管線將在排定時間後 10 分鐘執行。",
+     "closeDrawer": "關閉抽屜",
+     "conditionValueGuidelines": "條件值指南：",
+-    "emptyValueGuideline": "若要檢查空值，請使用",
+-    "exampleColon": ". 範例：",
+-    "nullValueGuideline": "若要檢查 Null 值，請使用",
+     "customColumnGuideline": "若要新增自訂欄位，請輸入欄位名稱並按下",
+     "enterKey": "Enter",
+     "conditionsNotMetWarning": "如果未滿足條件，記錄將被丟棄。",
+diff --git a/web/src/plugins/workflows/nodes/WorkflowCondition.spec.ts b/web/src/plugins/workflows/nodes/WorkflowCondition.spec.ts
+index 6b9b1f8ca4d..8f711707490 100644
+--- a/web/src/plugins/workflows/nodes/WorkflowCondition.spec.ts
++++ b/web/src/plugins/workflows/nodes/WorkflowCondition.spec.ts
+@@ -163,12 +163,11 @@ describe("WorkflowCondition", () => {
+       const wrapper = createWrapper();
+       const note = wrapper.find('[data-test="workflow-condition-note"]');
+       expect(note.exists()).toBe(true);
+-      // the two example snippets the note calls out
+-      expect(note.text()).toContain('severity != ""');
+-      expect(note.text()).toContain("severity != null");
+-      // Count the BULLET icons specifically — the note also carries a dismiss
+-      // button, so a blanket icon count breaks whenever its chrome changes.
+-      expect(note.findAll('[data-name="info"]').length).toBe(3);
++      // Only the custom-column bullet remains — the null/empty value hints are
++      // obsolete now that dedicated is_null/is_empty operators exist. Count the
++      // BULLET icons specifically — the note also carries a dismiss button, so
++      // a blanket icon count breaks whenever its chrome changes.
++      expect(note.findAll('[data-name="info"]').length).toBe(1);
+     });
+   });
+ 
+diff --git a/web/src/plugins/workflows/nodes/WorkflowCondition.vue b/web/src/plugins/workflows/nodes/WorkflowCondition.vue
+index e6a95c73ba4..3ed0199c34c 100644
+--- a/web/src/plugins/workflows/nodes/WorkflowCondition.vue
++++ b/web/src/plugins/workflows/nodes/WorkflowCondition.vue
+@@ -64,10 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       normalize-column-names
+       optional
+     >
+-      <!-- The examples below are CODE SAMPLES held in en-US.json: only the
+-           illustrative column name ("severity") is meant to vary per locale —
+-           the operators and literals (`!=`, `""`, `null`) are expression syntax
+-           and must be copied verbatim, so translators should leave them alone. -->
+       <template #guidelines>
+         <!-- First-run hint; dismissed once, it stays gone (localStorage) and the
+              recall icon above takes over. -->
+@@ -125,14 +121,10 @@ import { triggerDef } from "@/plugins/workflows/triggers";
+ const { t } = useI18nTyped();
+ 
+ // The guidelines, as data — rendered in BOTH the inline first-run box and the
+-// recall tooltip, so the copy lives in one place. `example` is a verbatim code
+-// sample (see the template note); the custom-column tip has none.
++// recall tooltip, so the copy lives in one place. The null/empty value hints
++// are gone (dedicated is_null/is_empty operators replaced them); `example`
++// stays for future tips that carry a verbatim code sample.
+ const tips: Array<{ note: I18nText; example?: I18nText }> = [
+-  {
+-    note: t("workflow.node.conditionNoteEmpty"),
+-    example: t("workflow.node.conditionExampleEmpty"),
+-  },
+-  { note: t("workflow.node.conditionNoteNull"), example: t("workflow.node.conditionExampleNull") },
+   { note: t("workflow.node.conditionNoteCustom") },
+ ];
+ 
+diff --git a/web/src/utils/alerts/alertDataTransforms.spec.ts b/web/src/utils/alerts/alertDataTransforms.spec.ts
+index a06862d130a..140eb0558de 100644
+--- a/web/src/utils/alerts/alertDataTransforms.spec.ts
++++ b/web/src/utils/alerts/alertDataTransforms.spec.ts
+@@ -9,6 +9,7 @@ import {
+   convertV1ToV2,
+   convertV1BEToV2,
+   ensureIds,
++  ensureUnaryConditionValues,
+   TransformContext,
+ } from "./alertDataTransforms";
+ 
+@@ -2860,3 +2861,51 @@ describe("alertDataTransforms - V2 Structure Tests", () => {
+     });
+   });
+ });
++
++describe("ensureIds operator spelling", () => {
++  it("maps backend lowercase operators to the select's option values", () => {
++    const tree: any = {
++      filterType: "group",
++      logicalOperator: "AND",
++      conditions: [
++        { filterType: "condition", column: "a", operator: "contains", value: "x" },
++        { filterType: "condition", column: "b", operator: "not_contains", value: "y" },
++        { filterType: "condition", column: "c", operator: "IsNull", value: "" },
++        { filterType: "condition", column: "d", operator: "is_empty", value: "" },
++        { filterType: "condition", column: "e", operator: "=", value: "z" },
++      ],
++    };
++    ensureIds(tree);
++    expect(tree.conditions.map((c: any) => c.operator)).toEqual([
++      "Contains",
++      "NotContains",
++      "is_null",
++      "is_empty",
++      "=",
++    ]);
++  });
++});
++
++describe("ensureUnaryConditionValues", () => {
++  it("backfills value only on unary leaves that omit it, recursively", () => {
++    const tree: any = {
++      filterType: "group",
++      logicalOperator: "AND",
++      conditions: [
++        { filterType: "condition", column: "a", operator: "is_null" },
++        { filterType: "condition", column: "b", operator: "=", value: "x" },
++        { filterType: "condition", column: "c", operator: "=" },
++        {
++          filterType: "group",
++          logicalOperator: "OR",
++          conditions: [{ filterType: "condition", column: "d", operator: "is_empty" }],
++        },
++      ],
++    };
++    ensureUnaryConditionValues(tree);
++    expect(tree.conditions[0].value).toBe("");
++    expect(tree.conditions[1].value).toBe("x");
++    expect(tree.conditions[2].value).toBeUndefined();
++    expect(tree.conditions[3].conditions[0].value).toBe("");
++  });
++});
+diff --git a/web/src/utils/alerts/alertDataTransforms.ts b/web/src/utils/alerts/alertDataTransforms.ts
+index 16796a2e80b..ce82247ee62 100644
+--- a/web/src/utils/alerts/alertDataTransforms.ts
++++ b/web/src/utils/alerts/alertDataTransforms.ts
+@@ -7,6 +7,7 @@
+  */
+ 
+ import { getUUID } from "@/utils/zincutils";
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+ 
+ export interface TransformContext {
+   formData: any;
+@@ -52,6 +53,19 @@ export interface V1Group {
+  * Ensures all groups have groupId and all conditions have id
+  * This is needed because data from backend might not have these fields
+  */
++// The backend serializes operators in canonical lowercase ("contains",
++// "is_null", ...) while the operator select's option values use the FE
++// spellings — a loaded tree must be mapped back or the select renders empty.
++const OPERATOR_DISPLAY_MAP: Record<string, string> = {
++  contains: "Contains",
++  not_contains: "NotContains",
++  notcontains: "NotContains",
++  isnull: "is_null",
++  isnotnull: "is_not_null",
++  isempty: "is_empty",
++  isnotempty: "is_not_empty",
++};
++
+ export const ensureIds = (group: any): any => {
+   if (!group) return group;
+ 
+@@ -71,6 +85,10 @@ export const ensureIds = (group: any): any => {
+         if (!item.id) {
+           item.id = getUUID();
+         }
++        const opKey = String(item.operator ?? "").toLowerCase();
++        if (Object.hasOwn(OPERATOR_DISPLAY_MAP, opKey)) {
++          item.operator = OPERATOR_DISPLAY_MAP[opKey];
++        }
+         return item;
+       }
+     });
+@@ -188,6 +206,23 @@ export const removeConditionGroup = (
+   }
+ };
+ 
++/**
++ * Backfill `value: ""` on unary-operator leaves (imported JSON may omit it,
++ * but the backend's `Condition.value` field is required). Mutates in place.
++ */
++export const ensureUnaryConditionValues = (node: any): any => {
++  if (!node || typeof node !== "object") return node;
++  if (Array.isArray(node)) {
++    node.forEach(ensureUnaryConditionValues);
++    return node;
++  }
++  if (node.value === undefined && isUnaryOperator(node.operator)) {
++    node.value = "";
++  }
++  if (Array.isArray(node.conditions)) node.conditions.forEach(ensureUnaryConditionValues);
++  return node;
++};
++
+ export const transformFEToBE = (node: any): any => {
+   if (!node || !node.items || !Array.isArray(node.items)) return {};
+ 
+@@ -204,7 +239,8 @@ export const transformFEToBE = (node: any): any => {
+     return {
+       column: item.column,
+       operator: item.operator,
+-      value: item.value,
++      // The backend requires `value` even for unary operators.
++      value: item.value === undefined && isUnaryOperator(item.operator) ? "" : item.value,
+       ignore_case: !!item.ignore_case,
+     };
+   });
+diff --git a/web/src/utils/alerts/alertValidation.ts b/web/src/utils/alerts/alertValidation.ts
+index 75be4a05f1e..e2c8abce25f 100644
+--- a/web/src/utils/alerts/alertValidation.ts
++++ b/web/src/utils/alerts/alertValidation.ts
+@@ -8,6 +8,7 @@ import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
+ import CronExpressionParser from "cron-parser";
+ import { b64EncodeUnicode } from "@/utils/zincutils";
+ import { toast } from "@/lib/feedback/Toast/useToast";
++import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+ import type { I18nText } from "@/types/i18n";
+ 
+ /**
+@@ -167,14 +168,18 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
+             } else {
+               // Validate each condition item
+               alert.query_condition.conditions.items.forEach((item, index) => {
+-                if (!item.column || !item.operator || item.value === undefined) {
++                if (
++                  !item.column ||
++                  !item.operator ||
++                  (item.value === undefined && !isUnaryOperator(item.operator))
++                ) {
+                   result.errors.push(
+                     t("alerts.validation.conditionItemIncomplete", { index: index + 1 }),
+                   );
+                 }
+ 
+                 const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
+-                if (!validOperators.includes(item.operator)) {
++                if (!validOperators.includes(item.operator) && !isUnaryOperator(item.operator)) {
+                   result.errors.push(
+                     t("alerts.validation.invalidOperatorInConditionItem", {
+                       operator: item.operator,
+@@ -193,14 +198,21 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
+               result.errors.push(t("alerts.validation.conditionsOrAndArray"));
+             } else {
+               conditions.forEach((condition, index) => {
+-                if (!condition.column || !condition.operator || condition.value === undefined) {
++                if (
++                  !condition.column ||
++                  !condition.operator ||
++                  (condition.value === undefined && !isUnaryOperator(condition.operator))
++                ) {
+                   result.errors.push(
+                     t("alerts.validation.conditionIncomplete", { index: index + 1 }),
+                   );
+                 }
+ 
+                 const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
+-                if (!validOperators.includes(condition.operator)) {
++                if (
++                  !validOperators.includes(condition.operator) &&
++                  !isUnaryOperator(condition.operator)
++                ) {
+                   result.errors.push(
+                     t("alerts.validation.invalidOperatorInCondition", {
+                       operator: condition.operator,
+diff --git a/web/src/utils/alerts/conditionsFormatter.spec.ts b/web/src/utils/alerts/conditionsFormatter.spec.ts
+index 4fb57159395..1e47947a783 100644
+--- a/web/src/utils/alerts/conditionsFormatter.spec.ts
++++ b/web/src/utils/alerts/conditionsFormatter.spec.ts
+@@ -1,5 +1,5 @@
+ import { describe, it, expect } from "vitest";
+-import { buildConditionsString } from "./conditionsFormatter";
++import { buildConditionsString, isUnaryOperator } from "./conditionsFormatter";
+ import type { StreamFieldsMap } from "./alertQueryBuilder";
+ 
+ describe("conditionsFormatter", () => {
+@@ -9,6 +9,26 @@ describe("conditionsFormatter", () => {
+     city: { label: "city", value: "city", type: "String" },
+   };
+ 
++  describe("isUnaryOperator", () => {
++    it("matches the canonical spellings and the serde aliases", () => {
++      expect(isUnaryOperator("is_null")).toBe(true);
++      expect(isUnaryOperator("is_not_null")).toBe(true);
++      expect(isUnaryOperator("is_empty")).toBe(true);
++      expect(isUnaryOperator("is_not_empty")).toBe(true);
++      expect(isUnaryOperator("IsNull")).toBe(true);
++      expect(isUnaryOperator("IsNotEmpty")).toBe(true);
++      expect(isUnaryOperator("=")).toBe(false);
++      expect(isUnaryOperator("Contains")).toBe(false);
++      expect(isUnaryOperator(undefined)).toBe(false);
++    });
++
++    it("does not match inherited object properties", () => {
++      expect(isUnaryOperator("constructor")).toBe(false);
++      expect(isUnaryOperator("__proto__")).toBe(false);
++      expect(isUnaryOperator("toString")).toBe(false);
++    });
++  });
++
+   describe("buildConditionsString", () => {
+     it("generates display format (lowercase operators, no WHERE)", () => {
+       const group = {
+@@ -303,6 +323,99 @@ describe("conditionsFormatter", () => {
+       expect(result).toBe("WHERE name NOT LIKE '%test%'");
+     });
+ 
++    it("handles null-check operators without a value", () => {
++      const group = {
++        filterType: "group",
++        logicalOperator: "AND",
++        conditions: [
++          {
++            filterType: "condition",
++            column: "name",
++            operator: "is_null",
++            value: "",
++            logicalOperator: "AND",
++          },
++          {
++            filterType: "condition",
++            column: "city",
++            operator: "is_not_null",
++            logicalOperator: "AND",
++          },
++        ],
++      };
++
++      expect(
++        buildConditionsString(group, {
++          sqlMode: true,
++          addWherePrefix: true,
++          formatValues: true,
++          streamFieldsMap,
++        }),
++      ).toBe("WHERE name IS NULL AND city IS NOT NULL");
++
++      expect(buildConditionsString(group, { sqlMode: false })).toBe(
++        "name is null and city is not null",
++      );
++    });
++
++    it("handles empty-check operators, degrading to null checks on numeric columns", () => {
++      const group = {
++        filterType: "group",
++        logicalOperator: "AND",
++        conditions: [
++          {
++            filterType: "condition",
++            column: "name",
++            operator: "is_empty",
++            value: "",
++            logicalOperator: "AND",
++          },
++          {
++            filterType: "condition",
++            column: "age",
++            operator: "is_not_empty",
++            logicalOperator: "AND",
++          },
++        ],
++      };
++
++      expect(
++        buildConditionsString(group, {
++          sqlMode: true,
++          addWherePrefix: true,
++          formatValues: true,
++          streamFieldsMap,
++        }),
++      ).toBe("WHERE (name IS NULL OR name = '') AND age IS NOT NULL");
++
++      expect(buildConditionsString(group, { sqlMode: false })).toBe(
++        "name is empty and age is not empty",
++      );
++    });
++
++    it("treats every known string type as string for empty checks", () => {
++      const typedMap: StreamFieldsMap = {
++        v: { label: "v", value: "v", type: "Utf8View" },
++        n: { label: "n", value: "n", type: "Int32" },
++      };
++      const group = {
++        filterType: "group",
++        logicalOperator: "AND",
++        conditions: [
++          { filterType: "condition", column: "v", operator: "is_empty", logicalOperator: "AND" },
++          { filterType: "condition", column: "n", operator: "is_empty", logicalOperator: "AND" },
++        ],
++      };
++
++      expect(
++        buildConditionsString(group, {
++          sqlMode: true,
++          formatValues: true,
++          streamFieldsMap: typedMap,
++        }),
++      ).toBe("(v IS NULL OR v = '') AND n IS NULL");
++    });
++
+     it("handles mixed OR and AND operators", () => {
+       const group = {
+         filterType: "group",
+diff --git a/web/src/utils/alerts/conditionsFormatter.ts b/web/src/utils/alerts/conditionsFormatter.ts
+index 6a906a8dee2..a689a1d261a 100644
+--- a/web/src/utils/alerts/conditionsFormatter.ts
++++ b/web/src/utils/alerts/conditionsFormatter.ts
+@@ -37,6 +37,38 @@ export interface FormatOptions {
+   streamFieldsMap?: StreamFieldsMap;
+ }
+ 
++// Keys tolerate the backend's serde aliases ("IsNull", ...) alongside the
++// canonical lowercase spellings; values are the display text.
++const UNARY_OPERATOR_TEXT: Record<string, string> = {
++  is_null: "is null",
++  isnull: "is null",
++  is_not_null: "is not null",
++  isnotnull: "is not null",
++  is_empty: "is empty",
++  isempty: "is empty",
++  is_not_empty: "is not empty",
++  isnotempty: "is not empty",
++};
++
++// "Empty" only differs from "null" on string columns; on any other KNOWN type
++// the empty checks degrade to the null checks (matching the backend's
++// build_expr, where `col = ''` on e.g. an Int64 column fails coercion). An
++// unknown type keeps the string form — the common case for custom columns.
++const STRING_TYPES = ["String", "Utf8", "LargeUtf8", "Utf8View"];
++
++/**
++ * Unary null/empty-check operators: they take no value, so completeness
++ * checks and formatters must not require one.
++ */
++export function isUnaryOperator(operator: unknown): boolean {
++  return typeof operator === "string" && Object.hasOwn(UNARY_OPERATOR_TEXT, operator.toLowerCase());
++}
++
++/** Display text for a unary operator ("is null", "is empty", ...). */
++export function unaryOperatorText(operator: unknown): string {
++  return isUnaryOperator(operator) ? UNARY_OPERATOR_TEXT[(operator as string).toLowerCase()] : "";
++}
++
+ /**
+  * Check if an item is a group (has conditions array and filterType)
+  *
+@@ -103,7 +135,24 @@ function getFormattedCondition(
+   operator: string,
+   value: string,
+   sqlMode: boolean = false,
++  columnType?: string,
+ ): string {
++  if (isUnaryOperator(operator)) {
++    const text = unaryOperatorText(operator);
++    if (!sqlMode) return `${column} ${text}`;
++    const nonString = columnType !== undefined && !STRING_TYPES.includes(columnType);
++    switch (text) {
++      case "is null":
++        return `${column} IS NULL`;
++      case "is not null":
++        return `${column} IS NOT NULL`;
++      case "is empty":
++        return nonString ? `${column} IS NULL` : `(${column} IS NULL OR ${column} = '')`;
++      default:
++        return nonString ? `${column} IS NOT NULL` : `(${column} IS NOT NULL AND ${column} != '')`;
++    }
++  }
++
+   let condition = "";
+   const op = operator.toLowerCase();
+ 
+@@ -186,7 +235,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}):
+           item.filterType === "condition" &&
+           item.column &&
+           item.operator &&
+-          item.value !== undefined
++          (item.value !== undefined || isUnaryOperator(item.operator))
+         ) {
+           // Step 1: Format the value (add quotes if needed, based on type)
+           const formattedValue = formatValues
+@@ -196,7 +245,13 @@ export function buildConditionsString(group: any, options: FormatOptions = {}):
+               : "''";
+ 
+           // Step 2: Build the condition string (column operator value)
+-          conditionStr = getFormattedCondition(item.column, item.operator, formattedValue, sqlMode);
++          conditionStr = getFormattedCondition(
++            item.column,
++            item.operator,
++            formattedValue,
++            sqlMode,
++            streamFieldsMap?.[item.column]?.type,
++          );
+         }
+ 
+         // Step 3: Add logical operator prefix (except for first item at index 0)
+@@ -224,7 +279,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}):
+       node.filterType === "condition" &&
+       node.column &&
+       node.operator &&
+-      node.value !== undefined
++      (node.value !== undefined || isUnaryOperator(node.operator))
+     ) {
+       const formattedValue = formatValues
+         ? formatValue(node.column, node.operator, node.value, streamFieldsMap)
+@@ -232,7 +287,13 @@ export function buildConditionsString(group: any, options: FormatOptions = {}):
+           ? `'${node.value}'`
+           : "''";
+ 
+-      return getFormattedCondition(node.column, node.operator, formattedValue, sqlMode);
++      return getFormattedCondition(
++        node.column,
++        node.operator,
++        formattedValue,
++        sqlMode,
++        streamFieldsMap?.[node.column]?.type,
++      );
+     }
+ 
+     return "";
+diff --git a/web/src/utils/conditionPreview.spec.ts b/web/src/utils/conditionPreview.spec.ts
+index aa421f62c70..b618ce2187e 100644
+--- a/web/src/utils/conditionPreview.spec.ts
++++ b/web/src/utils/conditionPreview.spec.ts
+@@ -80,6 +80,19 @@ describe("buildConditionPreview", () => {
+       expect(buildConditionPreview(node)).toBe("status = '500' and host != 'web-01'");
+     });
+ 
++    it("renders null-check operators without a value", () => {
++      const node = group([cond("err", "is_null", ""), cond("host", "is_not_null", "", "AND")]);
++      expect(buildConditionPreview(node)).toBe("err is null and host is not null");
++    });
++
++    it("renders empty-check operators without a value", () => {
++      const node = group([
++        cond("gen_ai_input", "is_empty", ""),
++        cond("host", "is_not_empty", "", "AND"),
++      ]);
++      expect(buildConditionPreview(node)).toBe("gen_ai_input is empty and host is not empty");
++    });
++
+     it("lowercases an OR logicalOperator", () => {
+       const node = group([cond("a", "=", "1"), cond("b", "=", "2", "OR")]);
+       expect(buildConditionPreview(node)).toBe("a = '1' or b = '2'");
+diff --git a/web/src/utils/conditionPreview.ts b/web/src/utils/conditionPreview.ts
+index d1db98a0a1a..f0cf28e0bd0 100644
+--- a/web/src/utils/conditionPreview.ts
++++ b/web/src/utils/conditionPreview.ts
+@@ -17,6 +17,20 @@
+ // workflow condition nodes (canvas card + Run-From labels) so they never drift.
+ // Handles the V2 group format ({filterType:"group", conditions:[...]}), the V1
+ // backend formats (and/or/not, items), a single condition, and the V0 array.
++
++import { isUnaryOperator, unaryOperatorText } from "@/utils/alerts/conditionsFormatter";
++
++const leafPreview = (item: any): string => {
++  const column = item.column || "field";
++  const operator = item.operator || "=";
++  if (isUnaryOperator(operator)) {
++    return `${column} ${unaryOperatorText(operator)}`;
++  }
++  const value =
++    item.value !== undefined && item.value !== null && item.value !== "" ? `'${item.value}'` : "''";
++  return `${column} ${operator} ${value}`;
++};
++
+ export const buildConditionPreview = (node: any): string => {
+   if (!node) return "";
+ 
+@@ -32,13 +46,7 @@ export const buildConditionPreview = (node: any): string => {
+         const nestedPreview = buildConditionPreview(item);
+         if (nestedPreview) conditionStr = `(${nestedPreview})`;
+       } else if (item.filterType === "condition") {
+-        const column = item.column || "field";
+-        const operator = item.operator || "=";
+-        const value =
+-          item.value !== undefined && item.value !== null && item.value !== ""
+-            ? `'${item.value}'`
+-            : "''";
+-        conditionStr = `${column} ${operator} ${value}`;
++        conditionStr = leafPreview(item);
+       }
+ 
+       if (index > 0 && item.logicalOperator) {
+@@ -90,26 +98,14 @@ export const buildConditionPreview = (node: any): string => {
+ 
+   // Single condition
+   if (node.column && node.operator) {
+-    const column = node.column || "field";
+-    const operator = node.operator || "=";
+-    const value =
+-      node.value !== undefined && node.value !== null && node.value !== ""
+-        ? `'${node.value}'`
+-        : "''";
+-    return `${column} ${operator} ${value}`;
++    return leafPreview(node);
+   }
+ 
+   // V0 Format: Array
+   if (Array.isArray(node)) {
+     return node
+       .filter((c: any) => c.column && c.operator)
+-      .map((c: any) => {
+-        const column = c.column || "field";
+-        const operator = c.operator || "=";
+-        const value =
+-          c.value !== undefined && c.value !== null && c.value !== "" ? `'${c.value}'` : "''";
+-        return `${column} ${operator} ${value}`;
+-      })
++      .map(leafPreview)
+       .join(" and ");
+   }
+ 
+
+
+===== LINKED / SISTER PR: openobserve/o2-enterprise #2500 (combined for full feature context) =====
+
+diff --git a/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/scheduler.rs b/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/scheduler.rs
+index 21114eac8..34cd814b5 100644
+--- a/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/scheduler.rs
++++ b/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/scheduler.rs
+@@ -1377,6 +1377,11 @@ fn evaluate_legacy_condition(condition: &Condition, row: &Map<String, Value>) ->
+     )
+ }
+ 
++/// Null, or an empty string; a missing column is handled by the caller.
++fn is_empty_value(v: &Value) -> bool {
++    v.is_null() || matches!(v, Value::String(s) if s.is_empty())
++}
++
+ fn evaluate_value_condition(
+     row: &Map<String, Value>,
+     column: &str,
+@@ -1386,6 +1391,13 @@ fn evaluate_value_condition(
+     trim_string_quotes: bool,
+     match_null_string: bool,
+ ) -> bool {
++    match operator {
++        Operator::IsNull => return row.get(column).is_none_or(Value::is_null),
++        Operator::IsNotNull => return row.get(column).is_some_and(|v| !v.is_null()),
++        Operator::IsEmpty => return row.get(column).is_none_or(is_empty_value),
++        Operator::IsNotEmpty => return row.get(column).is_some_and(|v| !is_empty_value(v)),
++        _ => {}
++    }
+     let Some(value) = row.get(column) else {
+         return false;
+     };
+@@ -1410,6 +1422,7 @@ fn evaluate_value_condition(
+                     Operator::LessThanEquals => value <= condition_value,
+                     Operator::Contains => value.contains(&condition_value),
+                     Operator::NotContains => !value.contains(&condition_value),
++                    _ => false,
+                 }
+             } else {
+                 match operator {
+@@ -1421,6 +1434,7 @@ fn evaluate_value_condition(
+                     Operator::LessThanEquals => value.as_str() <= condition_value,
+                     Operator::Contains => value.contains(condition_value),
+                     Operator::NotContains => !value.contains(condition_value),
++                    _ => false,
+                 }
+             }
+         }
