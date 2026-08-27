@@ -105,6 +105,19 @@ describe("ShareButton", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  it("exposes handleShareClick, which keyboard shortcuts invoke through a template ref", () => {
+    const wrapper = mount(ShareButton, {
+      props: {
+        url: "https://example.com/logs?query=test",
+      },
+      global: {
+        plugins: [store, i18n],
+      },
+    });
+
+    expect(typeof wrapper.vm.handleShareClick).toBe("function");
+  });
+
   it("should disable button when no URL is provided", () => {
     const wrapper = mount(ShareButton, {
       props: {

@@ -16,9 +16,8 @@
 import { computed, type ComputedRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-// Every RUM page already pushes its full state (time range, query, filters, ids)
-// into the router query, so the live location IS the shareable link — no page
-// needs to rebuild its params a second time and risk drifting from the real one.
+// Every RUM page already pushes its full state into the router query, so the live
+// location is the shareable link and no page rebuilds its params a second time.
 export function useRumShareUrl(): { shareUrl: ComputedRef<string> } {
   const route = useRoute();
   const router = useRouter();
