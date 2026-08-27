@@ -837,6 +837,29 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
+        // Avoid materializing one range-function output sample per source
+        // series and evaluation timestamp when the parent aggregation folds
+        // those values immediately (VictoriaMetrics-style incremental
+        // aggregation). Kept as a narrow AST match so the generic evaluator
+        // remains the correctness fallback for every other expression shape.
+        if let Some(agg_op) = aggregations::FusedAggOp::from_token(op.id())
+            && let PromExpr::Call(Call { func, args }) = expr
+            && args.len() == 1
+            && let Some(range_func) = functions::fusable_range_func(func.name)
+        {
+            let range_arg = args
+                .last()
+                .expect("promql-parser validated the function argument");
+            let range_input = self.exec_expr(&range_arg).await?;
+            return aggregations::fused_range_agg(
+                modifier,
+                range_input,
+                range_func.as_ref(),
+                agg_op,
+                &self.eval_ctx,
+            );
+        }
+
         let input = self.exec_expr(expr).await?;
 
         let eval_ctx = self.eval_ctx.clone();

@@ -184,7 +184,7 @@ pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
 ///     }
 /// }
 /// ```
-pub trait RangeFunc: Sync {
+pub trait RangeFunc: Send + Sync {
     /// Returns the name of the range function (e.g., "rate", "avg_over_time", "increase").
     fn name(&self) -> &'static str;
 
@@ -208,6 +208,35 @@ pub trait RangeFunc: Sync {
     /// * `None` - If the function cannot produce a value (e.g., insufficient samples, invalid data,
     ///   or the result should be omitted)
     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64>;
+}
+
+/// Constructs the range function for fused aggregate evaluation, or `None` if
+/// the function is not eligible.
+///
+/// Only single-argument range functions whose engine path is exactly
+/// [`eval_range`] qualify: the fused path reproduces that evaluation, so
+/// functions with extra parameters (`quantile_over_time`, `predict_linear`,
+/// `holt_winters`) or special semantics (`absent_over_time`) stay generic.
+pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
+    Some(match name {
+        "avg_over_time" => Box::new(avg_over_time::AvgOverTimeFunc::new()),
+        "changes" => Box::new(changes::ChangesFunc::new()),
+        "count_over_time" => Box::new(count_over_time::CountOverTimeFunc::new()),
+        "delta" => Box::new(delta::DeltaFunc::new()),
+        "deriv" => Box::new(deriv::DerivFunc::new()),
+        "idelta" => Box::new(idelta::IdeltaFunc::new()),
+        "increase" => Box::new(increase::IncreaseFunc::new()),
+        "irate" => Box::new(irate::IrateFunc::new()),
+        "last_over_time" => Box::new(last_over_time::LastOverTimeFunc::new()),
+        "max_over_time" => Box::new(max_over_time::MaxOverTimeFunc::new()),
+        "min_over_time" => Box::new(min_over_time::MinOverTimeFunc::new()),
+        "rate" => Box::new(rate::RateFunc::new()),
+        "resets" => Box::new(resets::ResetsFunc::new()),
+        "stddev_over_time" => Box::new(stddev_over_time::StddevOverTimeFunc::new()),
+        "stdvar_over_time" => Box::new(stdvar_over_time::StdvarOverTimeFunc::new()),
+        "sum_over_time" => Box::new(sum_over_time::SumOverTimeFunc::new()),
+        _ => return None,
+    })
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
@@ -305,7 +334,7 @@ where
 /// evaluation windows. This preserves the inclusive `[window_start,
 /// window_end]` bounds previously implemented with two `partition_point`
 /// calls per window.
-fn advance_sample_window<'a>(
+pub(crate) fn advance_sample_window<'a>(
     samples: &'a [Sample],
     window_start: i64,
     window_end: i64,
