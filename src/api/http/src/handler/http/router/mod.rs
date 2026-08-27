@@ -72,6 +72,7 @@ use crate::{
             RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
             validator_rum,
         },
+        password_policy,
         router::middlewares::blocked_orgs_middleware,
     },
 };
@@ -107,6 +108,11 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampled"),
             X_O2_ASSISTANT_SESSION_ID,
         ])
+        // Response headers are invisible to a cross-origin caller unless listed here, and the
+        // rotation countdown is only useful if the console can read it.
+        .expose_headers([header::HeaderName::from_static(
+            password_policy::ROTATION_WARNING_HEADER,
+        )])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin
@@ -274,15 +280,17 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
             // Policy enforcement sits after authentication, not before it: a flagged user is
             // still who they say they are, they just may not reach resources until they set a
             // compliant password.
-            if let Some(blocked) = crate::handler::http::password_policy::check_request(
+            let rotation_warning = match password_policy::check_request(
                 &result.user_email,
                 &req_data.uri,
                 &req_data.method,
             )
             .await
             {
-                return blocked;
-            }
+                password_policy::RequestOutcome::Proceed => None,
+                password_policy::RequestOutcome::Warn { days_remaining } => Some(days_remaining),
+                password_policy::RequestOutcome::Block(blocked) => return *blocked,
+            };
 
             // Handle Prometheus POST hack - add content-type if missing
             if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
@@ -292,7 +300,13 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                 );
             }
 
-            next.run(Request::from_parts(parts, body)).await
+            let mut response = next.run(Request::from_parts(parts, body)).await;
+            // The rotation deadline is advisory until it passes, so it rides on whatever response
+            // the request produced rather than interrupting it.
+            if let Some(days_remaining) = rotation_warning {
+                password_policy::attach_rotation_warning(&mut response, days_remaining);
+            }
+            response
         }
         Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     }

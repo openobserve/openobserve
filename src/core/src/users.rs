@@ -471,6 +471,10 @@ pub async fn update_user(
                     return Ok(MetaHttpResponse::bad_request("No changes to update"));
                 }
 
+                // `password_changed` also clears whatever the user was flagged for and restarts
+                // their rotation clock, in the same statement as the new hash: the password has
+                // just been validated against the current policy, so there is nothing left to hold
+                // them to.
                 if is_updated
                     && db::user::update(
                         email,
@@ -478,18 +482,12 @@ pub async fn update_user(
                         &new_user.last_name,
                         &new_user.password,
                         new_user.password_ext,
+                        password_changed,
                     )
                     .await
                     .is_err()
                 {
                     return Ok(MetaHttpResponse::internal_error("Failed to update user"));
-                }
-
-                // The new password satisfies the current policy, so whatever the user was flagged
-                // for is now resolved. A failure here would leave them blocked despite having
-                // complied, so it is logged rather than reported as a failed update.
-                if password_changed && let Err(e) = db::user::record_password_change(email).await {
-                    log::error!("Failed to clear the password reset flag for {email}: {e}");
                 }
 
                 // Update the organization membership
@@ -1853,6 +1851,64 @@ mod tests {
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), 404);
+    }
+
+    /// A password change must land the new hash and the columns describing it together: the flag
+    /// that blocks the user and the rotation clock that expires them.
+    #[tokio::test]
+    async fn test_password_change_clears_the_flag_and_restarts_the_rotation_clock() {
+        set_up().await;
+
+        let email = "rotating@zo.dev";
+        let resp = post_user(
+            "dummy",
+            UserRequest {
+                email: email.to_string(),
+                password: "Pass#1234".to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: UserRole::Admin,
+                    custom_role: None,
+                },
+                first_name: "rot".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+
+        infra_table::users::flag_all_for_password_reset("policy_tightened")
+            .await
+            .unwrap();
+        let before = infra_table::users::get(email).await.unwrap();
+        assert!(before.must_reset_password);
+
+        let resp = update_user(
+            "dummy",
+            email,
+            UserUpdateMode::SelfUpdate,
+            email,
+            UpdateUser {
+                token: None,
+                first_name: None,
+                last_name: None,
+                old_password: Some("Pass#1234".to_string()),
+                new_password: Some("Newpass#1234".to_string()),
+                role: None,
+                change_password: true,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        let after = infra_table::users::get(email).await.unwrap();
+        assert!(!after.must_reset_password);
+        assert!(after.password_reset_reason.is_none());
+        assert!(after.flagged_at.is_none());
+        assert!(after.password_updated_at > before.password_updated_at);
     }
 
     #[tokio::test]

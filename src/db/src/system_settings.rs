@@ -166,6 +166,24 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
     Ok(result)
 }
 
+/// Put a setting into this node's cache without writing it to the database.
+///
+/// For a setting whose absence has a defined meaning: caching that meaning stops every subsequent
+/// [`get`] falling through to a database read that can only return nothing. A real row, written
+/// here or on any other node, replaces it through [`set`] or [`watch`].
+pub(crate) async fn set_only_cached(setting: &SystemSetting) {
+    let cache_k = cache_key(
+        &setting.scope,
+        setting.org_id.as_deref(),
+        setting.user_id.as_deref(),
+        &setting.setting_key,
+    );
+    SYSTEM_SETTINGS
+        .write()
+        .await
+        .insert(cache_k, setting.clone());
+}
+
 /// Delete a setting
 pub async fn delete(
     scope: &SettingScope,

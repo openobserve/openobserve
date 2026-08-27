@@ -215,26 +215,17 @@ pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Clear a user's forced-reset flag and restart their rotation clock, then refresh the caches.
+/// Update a user, then refresh the local cache and the rest of the cluster.
 ///
-/// Separate from [`update`] and called after it: the flag lives on columns `update` does not touch,
-/// and this emits its own event so a node cannot serve a stale `must_reset_password` and keep
-/// blocking a user who has already complied.
-pub async fn record_password_change(user_email: &str) -> Result<(), anyhow::Error> {
-    let key = format!("{USER_RECORD_KEY}{user_email}");
-    users::record_password_change(user_email)
-        .await
-        .map_err(|e| anyhow::anyhow!("Error recording password change: {e}"))?;
-    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
-    Ok(())
-}
-
+/// `password_changed` carries through to the row write — see [`users::update`] — and on to the
+/// other clusters, so a password set here does not read as expired everywhere else.
 pub async fn update(
     user_email: &str,
     first_name: &str,
     last_name: &str,
     password: &str,
     password_ext: Option<String>,
+    password_changed: bool,
 ) -> Result<(), anyhow::Error> {
     let key = format!("{USER_RECORD_KEY}{user_email}");
     users::update(
@@ -243,6 +234,7 @@ pub async fn update(
         last_name,
         password,
         password_ext.clone(),
+        password_changed,
     )
     .await
     .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
@@ -255,6 +247,7 @@ pub async fn update(
         last_name: last_name.to_string(),
         password: password.to_string(),
         password_ext,
+        password_changed,
     })
     .await?;
     Ok(())

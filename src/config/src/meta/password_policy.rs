@@ -19,6 +19,7 @@
 //! There is no environment-variable path: an instance that has never been configured enforces
 //! [`PasswordPolicy::default`], which is the pre-feature behaviour.
 
+use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -42,12 +43,28 @@ pub enum EnforcementMode {
     RestrictWrites,
 }
 
-/// Why a user was flagged for a forced password reset.
+/// Why a user must set a new password.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PasswordResetReason {
     /// The complexity policy was tightened under the user's existing password.
     PolicyTightened,
+    /// The password is older than `rotation_days`. Never stored: rotation is recomputed from
+    /// `password_updated_at` on every request, so a stored flag could only go stale.
+    RotationExpired,
+}
+
+/// Where a password sits relative to the rotation deadline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RotationStatus {
+    /// Rotation is off, the password has no recorded age, or the deadline is not close yet.
+    Current,
+    /// Inside the warning window. `days_remaining` is rounded up, so the final day reads as 1
+    /// rather than 0 and the message never says the password expires today when it does not.
+    Warning {
+        days_remaining: i64,
+    },
+    Expired,
 }
 
 /// Failed-login lockout knobs.
@@ -166,6 +183,7 @@ impl PasswordResetReason {
     pub fn as_str(&self) -> &'static str {
         match self {
             PasswordResetReason::PolicyTightened => "policy_tightened",
+            PasswordResetReason::RotationExpired => "rotation_expired",
         }
     }
 }
@@ -182,6 +200,7 @@ impl std::str::FromStr for PasswordResetReason {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "policy_tightened" => Ok(PasswordResetReason::PolicyTightened),
+            "rotation_expired" => Ok(PasswordResetReason::RotationExpired),
             _ => Err(format!("Invalid password reset reason: {s}")),
         }
     }
@@ -259,6 +278,57 @@ impl PasswordPolicy {
             || (self.require_lowercase && !previous.require_lowercase)
             || (self.require_digit && !previous.require_digit)
             || (self.require_special && !previous.require_special)
+    }
+
+    /// Where a password last set at `password_updated_at` sits relative to the rotation deadline,
+    /// as of `now`.
+    ///
+    /// A `None` timestamp reads as never-expired rather than as the epoch. It should not survive
+    /// the column backfill, but if one ever appears the alternative failure mode is expiring every
+    /// password on the instance at once.
+    ///
+    /// Rotation is recomputed here on every check, so lowering `rotation_days` takes effect on the
+    /// next request with no sweep and nothing stored.
+    pub fn rotation_status(
+        &self,
+        password_updated_at: Option<DateTime<Utc>>,
+        now: DateTime<Utc>,
+    ) -> RotationStatus {
+        if self.rotation_days == 0 {
+            return RotationStatus::Current;
+        }
+        let Some(updated_at) = password_updated_at else {
+            return RotationStatus::Current;
+        };
+
+        // A deadline that falls outside the representable range is one no password can ever reach,
+        // so it reads as no deadline at all rather than as one that has already passed.
+        let Some(expires_at) = TimeDelta::try_days(i64::from(self.rotation_days))
+            .and_then(|lifetime| updated_at.checked_add_signed(lifetime))
+        else {
+            return RotationStatus::Current;
+        };
+
+        let remaining = expires_at - now;
+        if remaining <= TimeDelta::zero() {
+            return RotationStatus::Expired;
+        }
+        if self.rotation_warning_days == 0 {
+            return RotationStatus::Current;
+        }
+
+        // Any part of a day still counts as a day, so the final day reads as 1 rather than 0.
+        let whole_days = remaining.num_days();
+        let days_remaining = if remaining > TimeDelta::days(whole_days) {
+            whole_days + 1
+        } else {
+            whole_days
+        };
+        if days_remaining <= i64::from(self.rotation_warning_days) {
+            RotationStatus::Warning { days_remaining }
+        } else {
+            RotationStatus::Current
+        }
     }
 
     /// Failed attempts tolerated before the lockout at `level` (0 = no lockout yet) triggers.
@@ -351,10 +421,18 @@ mod tests {
             "policy_tightened".parse::<PasswordResetReason>().unwrap(),
             PasswordResetReason::PolicyTightened
         );
+        assert_eq!(
+            "rotation_expired".parse::<PasswordResetReason>().unwrap(),
+            PasswordResetReason::RotationExpired
+        );
         assert!("other".parse::<PasswordResetReason>().is_err());
         assert_eq!(
             PasswordResetReason::PolicyTightened.as_str(),
             "policy_tightened"
+        );
+        assert_eq!(
+            PasswordResetReason::RotationExpired.as_str(),
+            "rotation_expired"
         );
     }
 
@@ -441,6 +519,103 @@ mod tests {
         p.lockout.bucket_size = 2;
         assert_eq!(p.lockout_bucket(0), 5);
         assert_eq!(p.lockout_bucket(1), 2);
+    }
+
+    fn rotating(days: u32, warning_days: u32) -> PasswordPolicy {
+        let mut p = base();
+        p.rotation_days = days;
+        p.rotation_warning_days = warning_days;
+        p
+    }
+
+    fn now() -> DateTime<Utc> {
+        DateTime::from_timestamp(1_700_000_000, 0).unwrap()
+    }
+
+    fn days_ago(n: i64) -> Option<DateTime<Utc>> {
+        Some(now() - TimeDelta::days(n))
+    }
+
+    #[test]
+    fn test_rotation_off_never_expires() {
+        let p = base();
+        assert_eq!(p.rotation_days, 0);
+        assert_eq!(
+            p.rotation_status(days_ago(10_000), now()),
+            RotationStatus::Current
+        );
+    }
+
+    #[test]
+    fn test_rotation_expires_at_the_threshold_not_after() {
+        let p = rotating(90, 7);
+        // Exactly at the deadline counts as expired: the password has had its full 90 days.
+        assert_eq!(
+            p.rotation_status(days_ago(90), now()),
+            RotationStatus::Expired
+        );
+        assert_eq!(
+            p.rotation_status(days_ago(90).map(|t| t + TimeDelta::microseconds(1)), now()),
+            RotationStatus::Warning { days_remaining: 1 }
+        );
+        assert_eq!(
+            p.rotation_status(days_ago(91), now()),
+            RotationStatus::Expired
+        );
+    }
+
+    #[test]
+    fn test_rotation_warning_window_edges() {
+        let p = rotating(90, 7);
+        assert_eq!(
+            p.rotation_status(days_ago(83), now()),
+            RotationStatus::Warning { days_remaining: 7 }
+        );
+        // One day earlier is outside the window and must stay silent.
+        assert_eq!(
+            p.rotation_status(days_ago(82), now()),
+            RotationStatus::Current
+        );
+    }
+
+    #[test]
+    fn test_rotation_days_remaining_rounds_up() {
+        let p = rotating(90, 7);
+        // 6.5 days left reads as 7, never as 6.
+        assert_eq!(
+            p.rotation_status(days_ago(83).map(|t| t - TimeDelta::hours(12)), now()),
+            RotationStatus::Warning { days_remaining: 7 }
+        );
+    }
+
+    #[test]
+    fn test_rotation_warning_disabled_still_expires() {
+        let p = rotating(90, 0);
+        assert_eq!(
+            p.rotation_status(days_ago(89), now()),
+            RotationStatus::Current
+        );
+        assert_eq!(
+            p.rotation_status(days_ago(90), now()),
+            RotationStatus::Expired
+        );
+    }
+
+    #[test]
+    fn test_rotation_treats_missing_timestamp_as_current() {
+        // The alternative reading — None as the epoch — expires every user at once.
+        assert_eq!(
+            rotating(1, 0).rotation_status(None, now()),
+            RotationStatus::Current
+        );
+    }
+
+    #[test]
+    fn test_rotation_deadline_beyond_the_calendar_never_arrives() {
+        assert_eq!(
+            rotating(u32::MAX, 7).rotation_status(Some(now()), now()),
+            RotationStatus::Current
+        );
     }
 
     #[test]

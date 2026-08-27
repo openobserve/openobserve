@@ -92,6 +92,10 @@ pub struct UserUpdate {
     pub last_name: String,
     pub password: String,
     pub password_ext: Option<String>,
+    /// Whether `password` is a new password rather than an unchanged one carried along with an
+    /// edit to something else. Defaulted so a message from an older build still deserializes.
+    #[serde(default)]
+    pub password_changed: bool,
 }
 
 impl From<&DBUser> for UserRecord {
@@ -191,55 +195,46 @@ pub async fn add(user: UserRecord) -> Result<(), errors::Error> {
     }
 }
 
+/// Update a user's profile fields.
+///
+/// `password_changed` says whether `password` is a genuinely new password. When it is, the columns
+/// that describe the password — the forced-reset flag and the rotation clock — are rewritten in the
+/// same statement, so a user can never hold a compliant password while still flagged for one. It
+/// must stay false for edits that merely carry the existing hash along, such as the `password_ext`
+/// backfill at login; restarting the rotation clock there would make expiry unreachable.
 pub async fn update(
     email: &str,
     first_name: &str,
     last_name: &str,
     password: &str,
     password_ext: Option<String>,
+    password_changed: bool,
 ) -> Result<u64, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    let result = Entity::update_many()
+    let now = chrono::Utc::now().timestamp_micros();
+    let mut stmt = Entity::update_many()
         .col_expr(Column::FirstName, Expr::value(first_name))
         .col_expr(Column::LastName, Expr::value(last_name))
         .col_expr(Column::Password, Expr::value(password))
         .col_expr(Column::PasswordExt, Expr::value(password_ext))
-        .col_expr(
-            Column::UpdatedAt,
-            Expr::value(chrono::Utc::now().timestamp_micros()),
-        )
-        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .col_expr(Column::UpdatedAt, Expr::value(now));
 
-    Ok(result.rows_affected)
-}
+    if password_changed {
+        stmt = stmt
+            .col_expr(Column::MustResetPassword, Expr::value(false))
+            .col_expr(
+                Column::PasswordResetReason,
+                Expr::value(Option::<String>::None),
+            )
+            .col_expr(Column::FlaggedAt, Expr::value(Option::<i64>::None))
+            .col_expr(Column::PasswordUpdatedAt, Expr::value(now));
+    }
 
-/// Clear the forced-reset flag and restart the rotation clock.
-///
-/// Called only after a new password has passed validation against the current policy — clearing on
-/// any other path would let a user escape a tightened policy by changing nothing.
-pub async fn record_password_change(email: &str) -> Result<u64, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let result = Entity::update_many()
-        .col_expr(Column::MustResetPassword, Expr::value(false))
-        .col_expr(
-            Column::PasswordResetReason,
-            Expr::value(Option::<String>::None),
-        )
-        .col_expr(Column::FlaggedAt, Expr::value(Option::<i64>::None))
-        .col_expr(
-            Column::PasswordUpdatedAt,
-            Expr::value(chrono::Utc::now().timestamp_micros()),
-        )
+    let result = stmt
         .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await

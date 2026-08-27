@@ -857,12 +857,15 @@ async fn validate_user_from_db(
                 if user.password_ext.is_none() {
                     let password_ext = get_hash(user_password, password_ext_salt);
                     user.password_ext = Some(password_ext);
+                    // Backfilling the derived hash is not a password change: bumping the rotation
+                    // clock here would restart it on every login and expiry would never arrive.
                     let _ = db::user::update(
                         &user.email,
                         &user.first_name,
                         &user.last_name,
                         &user.password,
                         user.password_ext.clone(),
+                        false,
                     )
                     .await;
                 }

@@ -30,7 +30,10 @@ use infra::table::users;
 
 const POLICY_LOCK_KEY: &str = "/password_policy/write";
 
-/// The policy every enforcement point should read. Served from the system-settings cache.
+/// The policy every enforcement point should read, served from the system-settings cache.
+///
+/// The rotation check consults it on every authenticated request, so the read has to stay off the
+/// database — see [`read_stored_policy`] for how an instance with no row does that.
 pub async fn get_effective_policy() -> PasswordPolicy {
     match read_stored_policy().await {
         Ok(Some(policy)) => policy,
@@ -85,6 +88,13 @@ async fn set_locked(policy: &PasswordPolicy) -> Result<u64, anyhow::Error> {
     Ok(flagged)
 }
 
+/// Read the row, caching the default in its place when there is none.
+///
+/// The settings cache only ever holds rows that exist, so without the seed every read on an
+/// unconfigured instance falls through to a database lookup that can only return nothing — once per
+/// request, forever, since no row is a permanent valid state. The cached default says exactly what
+/// an absent row means, so callers need not tell the two apart, and a real row written on any node
+/// replaces it through `set` or the settings watcher.
 async fn read_stored_policy() -> Result<Option<PasswordPolicy>, anyhow::Error> {
     let Some(setting) = crate::system_settings::get(
         &SettingScope::Org,
@@ -94,6 +104,7 @@ async fn read_stored_policy() -> Result<Option<PasswordPolicy>, anyhow::Error> {
     )
     .await?
     else {
+        crate::system_settings::set_only_cached(&policy_setting(&PasswordPolicy::default())?).await;
         return Ok(None);
     };
 
@@ -101,14 +112,16 @@ async fn read_stored_policy() -> Result<Option<PasswordPolicy>, anyhow::Error> {
 }
 
 async fn write_policy(policy: &PasswordPolicy) -> Result<(), anyhow::Error> {
-    let setting = SystemSetting::new_org(
+    crate::system_settings::set(&policy_setting(policy)?).await?;
+    Ok(())
+}
+
+fn policy_setting(policy: &PasswordPolicy) -> Result<SystemSetting, anyhow::Error> {
+    Ok(SystemSetting::new_org(
         META_ORG_ID,
         keys::PASSWORD_POLICY,
         serde_json::to_value(policy)?,
     )
     .with_category(SettingCategory::Security)
-    .with_description("Instance-wide authentication policy for native users");
-
-    crate::system_settings::set(&setting).await?;
-    Ok(())
+    .with_description("Instance-wide authentication policy for native users"))
 }

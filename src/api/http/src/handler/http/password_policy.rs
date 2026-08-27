@@ -18,14 +18,21 @@
 //! Enforcement deliberately sits here rather than at the login endpoint: blocking authentication
 //! itself would lock every user out at once the moment a policy tightened, with no way back in.
 //! A flagged user can still log in, and is refused resources until they set a compliant password.
+//!
+//! Two things are enforced here. A stored `must_reset_password` flag, set by the complexity sweep
+//! when the policy tightened; and password rotation, which stores nothing and is recomputed from
+//! `password_updated_at` on every request, so a change to `rotation_days` takes effect at once.
 
 use axum::{
     body::Body,
     http::{Method, StatusCode, Uri, header},
     response::Response,
 };
+use chrono::{DateTime, Utc};
 use common::infra::config::USERS;
-use config::meta::password_policy::EnforcementMode;
+use config::meta::password_policy::{
+    EnforcementMode, PasswordPolicy, PasswordResetReason, RotationStatus,
+};
 use infra::table::users::UserRecord;
 
 /// A distinct code so the console can route to a reset screen. A generic 401/403 would be
@@ -33,22 +40,43 @@ use infra::table::users::UserRecord;
 /// clear the flag and so would loop.
 const RESET_REQUIRED_CODE: &str = "password_reset_required";
 
+/// Days left before the password expires. Advisory: it rides along with the response the caller
+/// actually asked for, so a warning can never break a working client that ignores it.
+pub const ROTATION_WARNING_HEADER: &str = "x-password-rotation-warning";
+
 /// What the policy says about a request.
 #[derive(Debug, PartialEq, Eq)]
 pub enum PolicyDecision {
     Allow,
-    Block { reason: String },
+    /// Inside the rotation warning window: the request proceeds and carries a countdown.
+    Warn {
+        days_remaining: i64,
+    },
+    Block {
+        reason: String,
+    },
+}
+
+/// The middleware's view of [`PolicyDecision`], with the block already rendered.
+pub enum RequestOutcome {
+    Proceed,
+    Warn {
+        days_remaining: i64,
+    },
+    /// Boxed: a `Response` dwarfs the other variants, and this one is the rare case.
+    Block(Box<Response>),
 }
 
 /// Decide whether a request may proceed.
 ///
 /// Split from the middleware so it is testable without axum's `Next` machinery; the middleware
-/// below is only the glue that turns [`PolicyDecision::Block`] into a response.
+/// below is only the glue that turns [`PolicyDecision`] into a response.
 pub fn decide(
     user: &UserRecord,
     uri: &Uri,
     method: &Method,
-    enforcement_mode: EnforcementMode,
+    policy: &PasswordPolicy,
+    now: DateTime<Utc>,
 ) -> PolicyDecision {
     // Root is never blocked by any policy (design §4, principle 5). It is the only account that can
     // repair a misconfigured policy or clear another user's flag, and the only one whose lockout
@@ -58,9 +86,26 @@ pub fn decide(
         return PolicyDecision::Allow;
     }
 
-    if !user.must_reset_password {
-        return PolicyDecision::Allow;
-    }
+    // The stored flag wins over rotation: it is the more specific reason, and both lead to the same
+    // remediation anyway.
+    let reason = if user.must_reset_password {
+        user.password_reset_reason
+            .clone()
+            .unwrap_or_else(|| PasswordResetReason::PolicyTightened.as_str().to_string())
+    } else {
+        // An unrepresentable stored timestamp lands on the same never-expired reading as no
+        // timestamp at all.
+        let set_at = user
+            .password_updated_at
+            .and_then(DateTime::from_timestamp_micros);
+        match policy.rotation_status(set_at, now) {
+            RotationStatus::Current => return PolicyDecision::Allow,
+            RotationStatus::Warning { days_remaining } => {
+                return PolicyDecision::Warn { days_remaining };
+            }
+            RotationStatus::Expired => PasswordResetReason::RotationExpired.as_str().to_string(),
+        }
+    };
 
     // Checked before the block so the user has a route out. Without this the flag is a trap: every
     // request refused, including the one that would clear it.
@@ -68,16 +113,11 @@ pub fn decide(
         return PolicyDecision::Allow;
     }
 
-    if enforcement_mode == EnforcementMode::RestrictWrites && is_read_only(method) {
+    if policy.enforcement_mode == EnforcementMode::RestrictWrites && is_read_only(method) {
         return PolicyDecision::Allow;
     }
 
-    PolicyDecision::Block {
-        reason: user
-            .password_reset_reason
-            .clone()
-            .unwrap_or_else(|| "policy_tightened".to_string()),
-    }
+    PolicyDecision::Block { reason }
 }
 
 /// Routes a blocked user must still reach: the complexity requirements they are being held to, and
@@ -137,22 +177,40 @@ fn is_read_only(method: &Method) -> bool {
     matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
 }
 
-/// Look the user up and apply the policy. `None` means the request may proceed.
-pub async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Option<Response> {
+/// Look the user up and apply the policy.
+pub async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> RequestOutcome {
     // Served from the cluster-consistent users cache, so this costs no database round trip on the
     // authenticated hot path.
-    let user = USERS.get(&user_email.to_lowercase())?;
+    let Some(user) = USERS.get(&user_email.to_lowercase()) else {
+        // Authentication succeeded against something this cache does not hold — a token or an
+        // enterprise identity. Nothing here applies to it.
+        return RequestOutcome::Proceed;
+    };
 
-    // Nothing else in the policy is consulted unless the user is actually flagged, so the settings
-    // read is skipped entirely for the overwhelmingly common case.
-    if user.is_root || !user.must_reset_password {
-        return None;
+    if user.is_root {
+        return RequestOutcome::Proceed;
     }
 
     let policy = db::password_policy::get_effective_policy().await;
-    match decide(&user, uri, method, policy.enforcement_mode) {
-        PolicyDecision::Allow => None,
-        PolicyDecision::Block { reason } => Some(blocked_response(&reason)),
+    match decide(&user, uri, method, &policy, Utc::now()) {
+        PolicyDecision::Allow => RequestOutcome::Proceed,
+        PolicyDecision::Warn { days_remaining } => RequestOutcome::Warn { days_remaining },
+        PolicyDecision::Block { reason } => {
+            RequestOutcome::Block(Box::new(blocked_response(&reason)))
+        }
+    }
+}
+
+/// Attach the rotation countdown to a response that has already been produced.
+///
+/// A warning must not change what the caller asked for, so an unrepresentable value is dropped
+/// rather than turned into an error.
+pub fn attach_rotation_warning(response: &mut Response, days_remaining: i64) {
+    if let Ok(value) = header::HeaderValue::from_str(&days_remaining.to_string()) {
+        response.headers_mut().insert(
+            header::HeaderName::from_static(ROTATION_WARNING_HEADER),
+            value,
+        );
     }
 }
 
@@ -185,6 +243,7 @@ impl InfallibleResponse for StatusCode {
 
 #[cfg(test)]
 mod tests {
+    use chrono::TimeDelta;
     use config::meta::user::UserType;
 
     use super::*;
@@ -212,8 +271,33 @@ mod tests {
         path.parse().unwrap()
     }
 
+    /// Rotation off, hard block — the default policy, under which only the stored flag matters.
     fn decide_hard(u: &UserRecord, path: &str, m: Method) -> PolicyDecision {
-        decide(u, &uri(path), &m, EnforcementMode::HardBlock)
+        decide(u, &uri(path), &m, &PasswordPolicy::default(), now())
+    }
+
+    fn rotating(days: u32, warning_days: u32) -> PasswordPolicy {
+        PasswordPolicy {
+            rotation_days: days,
+            rotation_warning_days: warning_days,
+            ..PasswordPolicy::default()
+        }
+    }
+
+    fn now() -> DateTime<Utc> {
+        DateTime::from_timestamp(1_700_000_000, 0).unwrap()
+    }
+
+    /// A compliant user whose password was set `n` days ago, so rotation is the only thing that
+    /// can act on them.
+    fn unflagged(email: &str, password_age_days: i64) -> UserRecord {
+        let mut u = user(email);
+        u.must_reset_password = false;
+        u.password_reset_reason = None;
+        u.flagged_at = None;
+        u.password_updated_at =
+            Some((now() - TimeDelta::days(password_age_days)).timestamp_micros());
+        u
     }
 
     #[test]
@@ -334,9 +418,13 @@ mod tests {
     fn restrict_writes_allows_reads_and_refuses_writes() {
         let u = user("a@b.com");
         let path = "/api/default/streams";
+        let policy = PasswordPolicy {
+            enforcement_mode: EnforcementMode::RestrictWrites,
+            ..PasswordPolicy::default()
+        };
         for m in [Method::GET, Method::HEAD, Method::OPTIONS] {
             assert_eq!(
-                decide(&u, &uri(path), &m, EnforcementMode::RestrictWrites),
+                decide(&u, &uri(path), &m, &policy, now()),
                 PolicyDecision::Allow,
                 "{m} should read"
             );
@@ -344,12 +432,174 @@ mod tests {
         for m in [Method::POST, Method::PUT, Method::DELETE] {
             assert!(
                 matches!(
-                    decide(&u, &uri(path), &m, EnforcementMode::RestrictWrites),
+                    decide(&u, &uri(path), &m, &policy, now()),
                     PolicyDecision::Block { .. }
                 ),
                 "{m} should be refused"
             );
         }
+    }
+
+    #[test]
+    fn expired_password_is_blocked_with_its_own_reason() {
+        let u = unflagged("a@b.com", 91);
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/default/streams"),
+                &Method::GET,
+                &rotating(90, 7),
+                now()
+            ),
+            PolicyDecision::Block {
+                reason: "rotation_expired".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn expiry_lands_exactly_on_the_threshold() {
+        let mut u = unflagged("a@b.com", 90);
+        let policy = rotating(90, 7);
+        assert!(matches!(
+            decide(&u, &uri("/default/streams"), &Method::GET, &policy, now()),
+            PolicyDecision::Block { .. }
+        ));
+
+        u.password_updated_at = u.password_updated_at.map(|t| t + 1);
+        assert!(matches!(
+            decide(&u, &uri("/default/streams"), &Method::GET, &policy, now()),
+            PolicyDecision::Warn { .. }
+        ));
+    }
+
+    #[test]
+    fn expired_user_can_still_reach_the_remediation_routes() {
+        // The whole point of blocking at access time rather than at login: the way out stays open.
+        let u = unflagged("a@b.com", 91);
+        let policy = rotating(90, 7);
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/default/users/a@b.com"),
+                &Method::PUT,
+                &policy,
+                now()
+            ),
+            PolicyDecision::Allow
+        );
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/default/password_complexity"),
+                &Method::GET,
+                &policy,
+                now()
+            ),
+            PolicyDecision::Allow
+        );
+    }
+
+    #[test]
+    fn warning_window_warns_rather_than_blocks() {
+        let u = unflagged("a@b.com", 85);
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/default/streams"),
+                &Method::POST,
+                &rotating(90, 7),
+                now()
+            ),
+            PolicyDecision::Warn { days_remaining: 5 }
+        );
+    }
+
+    #[test]
+    fn root_is_exempt_from_rotation() {
+        let mut u = unflagged("root@b.com", 10_000);
+        u.is_root = true;
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/default/streams"),
+                &Method::POST,
+                &rotating(90, 7),
+                now()
+            ),
+            PolicyDecision::Allow
+        );
+    }
+
+    #[test]
+    fn a_password_with_no_recorded_age_is_never_expired() {
+        // Should not survive the backfill, but reading None as the epoch would expire the whole
+        // instance at once.
+        let mut u = unflagged("a@b.com", 0);
+        u.password_updated_at = None;
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/default/streams"),
+                &Method::POST,
+                &rotating(1, 0),
+                now()
+            ),
+            PolicyDecision::Allow
+        );
+    }
+
+    #[test]
+    fn rotation_off_ignores_an_ancient_password() {
+        let u = unflagged("a@b.com", 10_000);
+        assert_eq!(
+            decide_hard(&u, "/default/streams", Method::POST),
+            PolicyDecision::Allow
+        );
+    }
+
+    #[test]
+    fn the_stored_flag_outranks_rotation() {
+        // Both apply; the reason reported is the one that was actually recorded.
+        let mut u = user("a@b.com");
+        u.password_updated_at = Some((now() - TimeDelta::days(91)).timestamp_micros());
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/default/streams"),
+                &Method::GET,
+                &rotating(90, 7),
+                now()
+            ),
+            PolicyDecision::Block {
+                reason: "policy_tightened".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn restrict_writes_applies_to_rotation_too() {
+        let u = unflagged("a@b.com", 91);
+        let policy = PasswordPolicy {
+            rotation_days: 90,
+            enforcement_mode: EnforcementMode::RestrictWrites,
+            ..PasswordPolicy::default()
+        };
+        assert_eq!(
+            decide(&u, &uri("/default/streams"), &Method::GET, &policy, now()),
+            PolicyDecision::Allow
+        );
+        assert!(matches!(
+            decide(&u, &uri("/default/streams"), &Method::POST, &policy, now()),
+            PolicyDecision::Block { .. }
+        ));
+    }
+
+    #[test]
+    fn the_warning_header_carries_the_countdown() {
+        let mut response = Response::new(Body::empty());
+        attach_rotation_warning(&mut response, 3);
+        assert_eq!(response.headers()[ROTATION_WARNING_HEADER], "3");
     }
 
     /// The unit tests above feed `decide` a path string directly, so they cannot catch the case
