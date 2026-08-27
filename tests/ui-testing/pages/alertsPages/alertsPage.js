@@ -2007,14 +2007,15 @@ export class AlertsPage {
     }
 
     /**
-     * Assert the four OSS alert-type tabs render and the enterprise-only Anomaly tab is absent.
+     * Assert the four OSS alert-type tabs render. The anomalyDetection tab is
+     * edition-gated (enterprise/cloud only) and asserted separately by the
+     * anomaly spec, so it is not part of the OSS migration surface.
      */
     async expectAlertListTabsRender() {
         await expect(this.page.locator(this.locators.alertListTabAll)).toBeVisible();
         await expect(this.page.locator(this.locators.alertListTabScheduled)).toBeVisible();
         await expect(this.page.locator(this.locators.alertListTabRealtime)).toBeVisible();
         await expect(this.page.locator(this.locators.alertListTabComposite)).toBeVisible();
-        await expect(this.page.locator(this.locators.alertListTabAnomalyDetection)).toHaveCount(0);
     }
 
     /**

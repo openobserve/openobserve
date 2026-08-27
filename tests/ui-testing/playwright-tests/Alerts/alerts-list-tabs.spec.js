@@ -57,7 +57,7 @@ test.describe('Alerts list tab control', () => {
     await deleteAlerts(page, [...createdIds].reverse());
   });
 
-  test('should render the four OSS alert-type tabs and hide the enterprise-only Anomaly tab', {
+  test('should render the four OSS alert-type tabs', {
     tag: ['@alerts-ui-refactor', '@alerts', '@all', '@P0'],
   }, async () => {
     testLogger.info('Verifying the migrated OToggleGroup tab control renders the four OSS tabs');
@@ -168,19 +168,19 @@ test.describe('Alerts list tab control', () => {
 
     testLogger.info('Navigating each sibling section and asserting the route + shared header');
     await pm.alertsPage.clickSectionTab('alertDestinations');
-    await pm.alertsPage.expectCurrentUrlContains('/web/alert-destinations/');
+    await pm.alertsPage.expectCurrentUrlContains('/web/alert-destinations');
     await pm.alertsPage.expectHeaderSubtitleVisible();
 
     await pm.alertsPage.clickSectionTab('alertTemplates');
-    await pm.alertsPage.expectCurrentUrlContains('/web/alert-templates/');
+    await pm.alertsPage.expectCurrentUrlContains('/web/alert-templates');
     await pm.alertsPage.expectHeaderSubtitleVisible();
 
     await pm.alertsPage.clickSectionTab('alertLibrary');
-    await pm.alertsPage.expectCurrentUrlContains('/web/alert-library/');
+    await pm.alertsPage.expectCurrentUrlContains('/web/alert-library');
     await pm.alertsPage.expectHeaderSubtitleVisible();
 
     await pm.alertsPage.clickSectionTab('alertList');
-    await pm.alertsPage.expectCurrentUrlContains('/web/alerts/');
+    await pm.alertsPage.expectCurrentUrlContains('/web/alerts');
     await pm.alertsPage.expectHeaderSubtitleVisible();
 
     testLogger.info('Test completed');
