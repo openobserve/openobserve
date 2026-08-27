@@ -59,23 +59,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              divide the engine's own total by a traced subtotal, a ratio of two
              different populations that routinely exceeds 100%. So it is
              withheld, and the qualifier takes its place. -->
-        <span v-if="showsShare" class="text-text-label text-3xs font-mono tabular-nums">
+        <span v-if="showsShare" class="text-text-secondary text-3xs font-mono tabular-nums">
           {{ formatPercent(share, 0) }}
         </span>
       </span>
-      <!-- What this duration IS, when it came from the database: execution
-           time on Postgres, WAIT time on MySQL/MariaDB. The column heading is
-           the generic "Database time" and this list mixes engines, so the
-           distinction can only be stated per row. -->
-      <span
-        v-if="qualifier"
-        class="text-text-label text-3xs"
-        :title="qualifierTitle"
-        data-test="dbm-overlap-qualifier"
-      >
-        {{ qualifier }}
+      <span v-if="showsShare || qualifier" class="flex items-center gap-1.5">
+        <OProgressBar
+          v-if="showsShare"
+          :value="share"
+          :variant="barVariant"
+          size="xs"
+          class="w-14"
+        />
+        <span
+          v-if="qualifier"
+          class="text-text-secondary text-3xs"
+          data-test="dbm-overlap-qualifier"
+        >
+          <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
+          {{ qualifier }}
+        </span>
       </span>
-      <OProgressBar v-if="showsShare" :value="share" :variant="barVariant" size="xs" class="w-18" />
     </div>
   </div>
 </template>
@@ -85,6 +89,7 @@ import { computed } from "vue";
 
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SparklinePoint, SparklineTone } from "@/lib/data/Sparkline/OSparkline.types";
 import { useI18nTyped } from "@/types/i18n";
 import { formatNs, formatPercent } from "@/utils/dbm/format";
@@ -142,11 +147,9 @@ const qualifier = computed(() =>
 const qualifierTitle = computed(() =>
   props.qualifierKey === null
     ? undefined
-    : String(
-        t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
-          engine: props.engine ?? "",
-        }),
-      ),
+    : t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
+        engine: props.engine ?? "",
+      }),
 );
 
 /** A single query owning this much of a database's time is worth noticing. */

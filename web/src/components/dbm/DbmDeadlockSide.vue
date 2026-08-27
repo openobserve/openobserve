@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="isVictim ? 'bg-status-error-bg' : 'bg-status-success-bg'"
     :data-test="dataTest"
   >
-    <div class="text-2xs flex items-center gap-1.5 font-bold tracking-wide uppercase">
+    <div class="text-2xs flex items-center gap-1.5 font-bold">
       <OIcon
         :name="isVictim ? 'error-outline' : 'check-circle'"
         class="size-3.5 shrink-0"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ raw(participant.query) }}
     </code>
-    <span v-else class="text-text-label text-2xs italic">
+    <span v-else class="text-text-secondary text-2xs italic">
       {{ t("dbm.deadlocks.detail.noQueryCaptured") }}
     </span>
 

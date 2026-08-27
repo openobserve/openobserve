@@ -39,20 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-center gap-1.5">
         <OTag
           type="severity"
-          size="xs"
           :value="severityValue"
           :label="severityText"
           data-test="alert-library-drawer-severity"
         />
         <OTag
           variant="default-soft"
-          size="xs"
-          :label="queryTypeLabel"
+          :label="queryTypeLabelText"
           data-test="alert-library-drawer-query-type"
         />
         <OTag
           :variant="availability.variant"
-          size="xs"
           :icon="availability.icon"
           :label="availability.label"
           data-test="alert-library-drawer-availability"
@@ -60,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <section>
-        <h3 class="text-text-secondary text-2xs pb-1 font-semibold uppercase">
+        <h3 class="text-text-secondary pb-1 text-xs font-semibold">
           {{ t("alert_library.drawer.detects") }}
         </h3>
         <p class="text-text-body text-sm" data-test="alert-library-drawer-description">
@@ -100,9 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-else-if="file">
         <section>
-          <h3
-            class="text-text-secondary text-2xs flex items-center gap-1.5 pb-2 font-semibold uppercase"
-          >
+          <h3 class="text-text-secondary flex items-center gap-1.5 pb-2 text-xs font-semibold">
             <OIcon name="code" size="xs" />
             <span>{{ t("alert_library.drawer.query") }}</span>
           </h3>
@@ -130,9 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
 
         <section data-test="alert-library-drawer-preview">
-          <h3
-            class="text-text-secondary text-2xs flex items-center gap-1.5 pb-2 font-semibold uppercase"
-          >
+          <h3 class="text-text-secondary flex items-center gap-1.5 pb-2 text-xs font-semibold">
             <OIcon name="query-stats" size="xs" />
             <span>{{ t("alerts.preview") }}</span>
             <template v-if="evaluation">
@@ -219,7 +212,13 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
 
-import { categoryLabel, packLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
+import {
+  categoryLabel,
+  packLabel,
+  queryTypeLabel,
+  severityBadgeValue,
+  severityLabel,
+} from "./libraryFacets";
 import { readTunables, applyTunables } from "./libraryTunables";
 
 const props = defineProps<{
@@ -311,7 +310,7 @@ const drawerSubtitle = computed(() => {
 const severityValue = computed(() => severityBadgeValue(props.entry?.severity ?? ""));
 const severityText = computed(() => severityLabel(t, props.entry?.severity ?? ""));
 // A query language, not prose — one correct form worldwide.
-const queryTypeLabel = computed(() => raw(String(props.entry?.query_type ?? "").toUpperCase()));
+const queryTypeLabelText = computed(() => queryTypeLabel(props.entry?.query_type));
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

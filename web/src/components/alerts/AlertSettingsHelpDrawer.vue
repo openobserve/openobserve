@@ -459,10 +459,9 @@ defineExpose({ applyTemplate, previewTemplate });
             <div
               class="rounded-surface border-border-default border-l-warning-500 flex flex-col gap-1.5 border border-l-2 p-3"
             >
-              <span
-                class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase"
-                >{{ t("alerts.alertSettings.helpWhyWithoutLabel") }}</span
-              >
+              <span class="text-text-secondary text-2xs font-semibold">{{
+                t("alerts.alertSettings.helpWhyWithoutLabel")
+              }}</span>
               <p class="text-text-secondary text-compact m-0 leading-[1.45]">
                 {{ t("alerts.alertSettings.helpWhyWithoutDesc") }}
               </p>
@@ -474,10 +473,9 @@ defineExpose({ applyTemplate, previewTemplate });
             <div
               class="rounded-surface border-border-default border-l-primary-500 flex flex-col gap-1.5 border border-l-2 p-3"
             >
-              <span
-                class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase"
-                >{{ t("alerts.alertSettings.helpWhyWithLabel") }}</span
-              >
+              <span class="text-text-secondary text-2xs font-semibold">{{
+                t("alerts.alertSettings.helpWhyWithLabel")
+              }}</span>
               <p class="text-text-secondary text-compact m-0 leading-[1.45]">
                 {{ t("alerts.alertSettings.helpWhyWithDesc") }}
               </p>
@@ -503,10 +501,9 @@ defineExpose({ applyTemplate, previewTemplate });
             data-test="help-preview-box"
             class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             >{{ SAMPLE.variablesCode }}</pre>
-          <span
-            class="text-text-secondary text-2xs mx-0 mt-2.5 mb-1 block font-semibold tracking-[0.03em] uppercase"
-            >{{ t("alerts.alertSettings.helpExampleResultLabel") }}</span
-          >
+          <span class="text-text-secondary text-2xs mx-0 mt-2.5 mb-1 block font-semibold">{{
+            t("alerts.alertSettings.helpExampleResultLabel")
+          }}</span>
           <pre
             data-test="help-preview-box"
             class="rounded-surface border-border-default bg-surface-subtle text-text-body border-l-primary-500 m-0 border border-l-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
@@ -610,24 +607,23 @@ defineExpose({ applyTemplate, previewTemplate });
             {{ t("alerts.alertSettings.helpRowTemplateExampleCaption") }}
           </p>
           <div class="flex flex-col gap-1.5">
-            <span class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase">{{
+            <span class="text-text-secondary text-2xs font-semibold">{{
               t("alerts.alertSettings.helpRowTemplateExampleRowLabel")
             }}</span>
             <pre
               data-test="help-preview-box"
               class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
               >{{ SAMPLE.rowTemplateRow }}</pre>
-            <span class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase">{{
+            <span class="text-text-secondary text-2xs font-semibold">{{
               t("alerts.alertSettings.helpRowTemplateExampleMainLabel")
             }}</span>
             <pre
               data-test="help-preview-box"
               class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
               >{{ SAMPLE.rowTemplateMain }}</pre>
-            <span
-              class="text-text-secondary text-2xs mx-0 mt-2.5 mb-1 block font-semibold tracking-[0.03em] uppercase"
-              >{{ t("alerts.alertSettings.helpExampleResultLabel") }}</span
-            >
+            <span class="text-text-secondary text-2xs mx-0 mt-2.5 mb-1 block font-semibold">{{
+              t("alerts.alertSettings.helpExampleResultLabel")
+            }}</span>
             <pre
               data-test="help-preview-box"
               class="rounded-surface border-border-default bg-surface-subtle text-text-body border-l-primary-500 m-0 border border-l-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
