@@ -123,43 +123,12 @@
         </span>
         <span
           v-else-if="score.reasoning"
-          class="text-text-secondary text-2xs min-w-0 flex-1 line-clamp-2"
+          class="text-text-secondary text-2xs line-clamp-2 min-w-0 flex-1"
           :title="score.reasoning"
         >
           {{ raw(score.reasoning) }}
         </span>
       </div>
-    </div>
-
-    <div v-if="showActions && cell?.status === 'done'" class="flex flex-wrap gap-1.5">
-      <OButton
-        variant="outline"
-        size="xs"
-        icon-left="content-copy"
-        data-test="ai-playground-output-copy"
-        @click="emit('copy')"
-      >
-        {{ t("aiObservability.playground.copyOutput") }}
-      </OButton>
-      <OButton
-        v-if="!cell.toolCall"
-        variant="outline"
-        size="xs"
-        icon-left="add"
-        :title="t('aiObservability.playground.addToMessagesTooltip')"
-        data-test="ai-playground-output-add-to-messages"
-        @click="emit('add-to-messages')"
-      >
-        {{ t("aiObservability.playground.addToMessages") }}
-      </OButton>
-      <OButton
-        variant="outline"
-        size="xs"
-        data-test="ai-playground-output-create-experiment"
-        @click="emit('create-experiment')"
-      >
-        {{ t("aiObservability.playground.createExperiment") }}
-      </OButton>
     </div>
   </div>
 </template>
@@ -179,23 +148,18 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 const props = withDefaults(
   defineProps<{
     cell: PlaygroundCell | undefined;
-    /** Table-cell rendering: clamped text, terser empty copy, no action row. */
+    /** Table-cell rendering: clamped text, terser empty copy. */
     compact?: boolean;
-    showActions?: boolean;
     dataTest?: string;
   }>(),
   {
     compact: false,
-    showActions: false,
     dataTest: "ai-playground-output",
   },
 );
 
 const emit = defineEmits<{
   retry: [];
-  copy: [];
-  "add-to-messages": [];
-  "create-experiment": [];
 }>();
 
 const { t } = useI18nTyped();

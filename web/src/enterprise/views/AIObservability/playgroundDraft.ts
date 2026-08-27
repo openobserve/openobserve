@@ -130,11 +130,37 @@ export type PlaygroundResults = Record<string, Record<string, PlaygroundCell>>;
 
 let idCounter = 0;
 
-/** Draft-local id. Never persisted, so a monotonic counter is enough and keeps
- *  the helpers deterministic under test. */
+/** Draft-local id: a counter, so the helpers stay deterministic under test.
+ *  Anything that adopts a draft from outside this page load must call
+ *  [`adoptIds`] first — see there for why. */
 export function playgroundId(prefix: string): string {
   idCounter += 1;
   return `${prefix}-${idCounter}`;
+}
+
+/**
+ * Take ownership of the ids in a draft that came from outside this page load —
+ * a restored session, a recent draft, a shared snapshot.
+ *
+ * The counter restarts at zero on every load, while those ids were spent by an
+ * earlier one. Skip this and the next message or variant is handed an id the
+ * bench already holds, after which every lookup by id — update, remove, the
+ * results a cell is keyed by, Vue's own `:key` — resolves to whichever of the
+ * two comes first. A model change lands on the wrong column and one ✕ deletes
+ * both.
+ */
+export function adoptIds(draft: PlaygroundDraft): void {
+  for (const variant of draft.variants) {
+    claimId(variant.id);
+    for (const message of variant.messages) claimId(message.id);
+  }
+}
+
+/** Ids not shaped `prefix-N` are left alone: they cannot collide with one this
+ *  counter produces. */
+function claimId(id: string): void {
+  const spent = Number(id.slice(id.lastIndexOf("-") + 1));
+  if (Number.isInteger(spent) && spent > idCounter) idCounter = spent;
 }
 
 // ── template variables ────────────────────────────────────────────
@@ -298,6 +324,42 @@ export function renderedMessages(
 }
 
 /**
+ * Retype one message.
+ *
+ * `toolName` is dropped on the way out of `tool`: it labels which tool a
+ * response answers, so on any other role it is invisible state that would come
+ * back the moment the row was switched to `tool` again.
+ */
+export function withRole(message: PlaygroundMessage, role: PlaygroundRole): PlaygroundMessage {
+  if (role === "tool") return { ...message, role };
+  const { toolName: _dropped, ...rest } = message;
+  return { ...rest, role };
+}
+
+/**
+ * Move one message, keeping an opening `system` message pinned to the front.
+ *
+ * Order IS the wire format — the run sends these messages in array order — and
+ * every provider reads a system message as the frame around the conversation
+ * rather than a turn inside it. So the system row neither moves nor gets
+ * displaced, and an out-of-range target clamps instead of throwing.
+ */
+export function moveMessage(
+  messages: PlaygroundMessage[],
+  from: number,
+  to: number,
+): PlaygroundMessage[] {
+  if (from < 0 || from >= messages.length) return messages;
+  const pinned = messages[0]?.role === "system" ? 1 : 0;
+  if (from < pinned) return messages;
+  const target = Math.max(pinned, Math.min(to, messages.length - 1));
+  if (target === from) return messages;
+  const next = [...messages];
+  next.splice(target, 0, ...next.splice(from, 1));
+  return next;
+}
+
+/**
  * The role a new message should take.
  *
  * A conversation alternates, so the next turn is the opposite of the last real
@@ -397,7 +459,7 @@ export function snapshotPayload(
 
 /** Only outcomes travel. A cell caught mid-stream would restore as a run that
  *  is forever in flight, and an idle one carries nothing to show. */
-function settledResults(results: PlaygroundResults): PlaygroundResults {
+export function settledResults(results: PlaygroundResults): PlaygroundResults {
   const settled: PlaygroundResults = {};
   for (const [variantId, byRow] of Object.entries(results)) {
     for (const [rowKey, cell] of Object.entries(byRow)) {

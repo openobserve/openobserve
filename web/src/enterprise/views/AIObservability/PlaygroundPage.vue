@@ -281,12 +281,14 @@ import {
   PlaygroundRunError,
   runPlayground,
   scorePlayground,
+  type PlaygroundScoreRequest,
 } from "@/services/llm-playground.service";
 import llmPlaygroundSnapshotsService from "@/services/llm-playground-snapshots.service";
 import {
   MAX_VARIANTS,
   SINGLE_ROW_KEY,
   type PlaygroundSample,
+  adoptIds,
   cellAt,
   cloneVariant,
   draftFromSnapshot,
@@ -296,6 +298,7 @@ import {
   playgroundId,
   renderedMessages,
   renderTemplate,
+  settledResults,
   snapshotPayload,
   starterDraft,
   variantLabel,
@@ -395,9 +398,18 @@ async function resetPlayground() {
   });
   if (!ok) return;
   stopAll();
-  const provider = providers.value[0];
-  Object.assign(draft, starterDraft(provider?.id ?? "", ""));
+  // Seeded exactly as a first load seeds it — the org default and ITS default
+  // model. Taking the first provider and no model left the header select
+  // holding a value no option matched, which renders as the raw key.
+  Object.assign(draft, starterDraft());
+  seedDefaultProvider();
   for (const key of Object.keys(results)) delete results[key];
+  // A new working session: the old one stays in Recent Drafts, but Reset is the
+  // one action that means "not this any more".
+  draftSessionId.value = playgroundId("draft");
+  parentSnapshotId.value = null;
+  sharedSnapshot.value = null;
+  clearSession();
 }
 
 function isVariantRunning(variantId: string) {
@@ -411,6 +423,9 @@ function cellFor(variantId: string, rowKey: string): PlaygroundCell | undefined 
 // ── loading ───────────────────────────────────────────────────────
 
 onMounted(async () => {
+  // First, and synchronously: the bench is the work, and it must be on screen
+  // before anything that can fail or take a round trip.
+  restoreSession();
   await Promise.all([loadProviders(), loadDatasets(), loadScorers()]);
   applyEntryParams();
   loadRecentDrafts();
@@ -422,6 +437,9 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
+  // Flush before the abort: leaving the page mid-edit must not cost the edit,
+  // and the debounce may not have fired yet.
+  saveSession();
   stopAll();
 });
 
@@ -633,22 +651,24 @@ async function scoreVariant(variant: PlaygroundVariant) {
   if (!cell || cell.status !== "done" || !cell.text.trim()) return;
   if (!draft.scorerIds.length) return;
 
-  const key = scoreKey(cell.text, draft.scorerIds);
+  const request = {
+    scorerIds: [...draft.scorerIds].sort(),
+    input: scoreInput(variant),
+    output: cell.text,
+    expectedOutput: draft.expectedSingle ?? undefined,
+    metadata: {
+      model: variant.model,
+      providerId: variant.providerId,
+      temperature: Number(variant.temperature) || 0,
+    },
+  };
+
+  const key = scoreKey(request);
   if (cell.scoredKey === key) return;
 
   setCell(variant.id, SINGLE_ROW_KEY, { scoring: true });
   try {
-    const scores = await scorePlayground(orgId.value, {
-      scorerIds: [...draft.scorerIds],
-      input: scoreInput(variant),
-      output: cell.text,
-      expectedOutput: draft.expectedSingle ?? undefined,
-      metadata: {
-        model: variant.model,
-        providerId: variant.providerId,
-        temperature: Number(variant.temperature) || 0,
-      },
-    });
+    const scores = await scorePlayground(orgId.value, request);
     setCell(variant.id, SINGLE_ROW_KEY, { scores, scoredKey: key, scoring: false });
   } catch {
     setCell(variant.id, SINGLE_ROW_KEY, { scoring: false });
@@ -665,10 +685,17 @@ function scoreInput(variant: PlaygroundVariant): string {
   return asked ? renderTemplate(asked.content, draft.vars) : "";
 }
 
-/** Identifies a verdict set: the answer it judged and the scorers that judged
- *  it. Either changing is what makes the old verdicts stale. */
-function scoreKey(text: string, scorerIds: string[]): string {
-  return `${[...scorerIds].sort().join(",")}::${text}`;
+/**
+ * Identifies a verdict set by everything the judge was given.
+ *
+ * The whole request, not just the answer: adding an expected output changes
+ * what a reference-based scorer can do — often from "skipped" to a real verdict
+ * — while the output it judges stays byte-identical. Keying on the answer alone
+ * made that edit invisible, so Score did nothing until a re-run happened to
+ * change the text.
+ */
+function scoreKey(request: PlaygroundScoreRequest): string {
+  return JSON.stringify(request);
 }
 
 // ── draft mutations ───────────────────────────────────────────────
@@ -843,6 +870,7 @@ async function openSharedSnapshot(snapshotId: string) {
     if (!restored) throw new Error("snapshot carries no bench");
     stopAll();
     Object.assign(draft, restored.draft);
+    adoptIds(draft);
     for (const key of Object.keys(results)) delete results[key];
     Object.assign(results, restored.results);
     // A new session id, so opening a link never overwrites the recent draft the
@@ -986,15 +1014,83 @@ function draftContext(current: PlaygroundDraft): string {
   return text.length > 40 ? `${text.slice(0, 40)}\u2026` : text;
 }
 
+// ── the live session (this browser only) ──────────────────────────
+
+/**
+ * The bench survives leaving the page.
+ *
+ * The route is `keepAlive: false`, so navigating to Logs and back unmounts this
+ * component and takes the draft with it. That is only correct for a page you
+ * can re-derive from its address; the Playground is unsaved work, and Reset —
+ * which asks first — is the one thing that is allowed to clear it.
+ */
+interface StoredSession {
+  id: string;
+  draft: PlaygroundDraft;
+  results: PlaygroundResults;
+}
+
+const sessionKey = computed(() => `o2-playground-session:${orgId.value}`);
+
+function restoreSession() {
+  try {
+    const stored = localStorage.getItem(sessionKey.value);
+    if (!stored) return;
+    const session = JSON.parse(stored) as StoredSession;
+    if (!session?.draft?.variants?.length) return;
+    Object.assign(draft, session.draft);
+    adoptIds(draft);
+    Object.assign(results, session.results ?? {});
+    // Same id, so picking the session back up updates its Recent Drafts entry
+    // in place rather than forking a near-duplicate beside it.
+    if (session.id) draftSessionId.value = session.id;
+  } catch {
+    // Corrupt or unavailable storage costs the restore, never the page.
+  }
+}
+
+function saveSession() {
+  try {
+    const session: StoredSession = {
+      id: draftSessionId.value,
+      draft: JSON.parse(JSON.stringify(draft)) as PlaygroundDraft,
+      // Outcomes only: a cell caught mid-stream would come back as a run that
+      // never finishes.
+      results: settledResults(results),
+    };
+    localStorage.setItem(sessionKey.value, JSON.stringify(session));
+  } catch {
+    // A full or disabled localStorage costs the convenience, never the session.
+  }
+}
+
+function clearSession() {
+  try {
+    localStorage.removeItem(sessionKey.value);
+  } catch {
+    // Nothing to do — the next save overwrites it anyway.
+  }
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 watch(
   () => JSON.stringify(draft),
   () => {
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(persistDraft, 1500);
+    saveTimer = setTimeout(() => {
+      saveSession();
+      persistDraft();
+    }, 1500);
   },
 );
+
+/** Outputs are not part of the draft, so the debounce above never sees one
+ *  arrive. Saving when the last run settles is what carries them across a
+ *  navigation. */
+watch(running, (isRunning, wasRunning) => {
+  if (wasRunning && !isRunning) saveSession();
+});
 
 function persistDraft() {
   const summary = draftSummary(draft);
@@ -1023,6 +1119,7 @@ function restoreDraft(entry: RecentDraftEntry) {
   // rather than cloning it into a second entry.
   draftSessionId.value = entry.id;
   Object.assign(draft, JSON.parse(JSON.stringify(entry.draft)) as PlaygroundDraft);
+  adoptIds(draft);
   for (const key of Object.keys(results)) delete results[key];
   toast({ variant: "info", message: t("aiObservability.playground.draftRestored") });
 }

@@ -92,6 +92,8 @@
       @add="onMessageAdd"
       @focus="onMessageFocus"
       @set-tool="onMessageToolChange"
+      @set-role="onMessageRoleChange"
+      @move="onMessageMove"
     />
 
     <PlaygroundToolsDialog
@@ -121,7 +123,9 @@ import PlaygroundToolsDialog from "./PlaygroundToolsDialog.vue";
 import PlaygroundVariablesMenu from "./PlaygroundVariablesMenu.vue";
 import {
   insertTokenAt,
+  moveMessage,
   playgroundId,
+  withRole,
   type PlaygroundRole,
   type PlaygroundVariant,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
@@ -166,6 +170,18 @@ function onMessageToolChange(messageId: string, toolName: string) {
       message.id === messageId ? { ...message, toolName } : message,
     ),
   });
+}
+
+function onMessageRoleChange(messageId: string, role: PlaygroundRole) {
+  patch({
+    messages: props.variant.messages.map((message) =>
+      message.id === messageId ? withRole(message, role) : message,
+    ),
+  });
+}
+
+function onMessageMove(from: number, to: number) {
+  patch({ messages: moveMessage(props.variant.messages, from, to) });
 }
 
 function onMessageUpdate(messageId: string, content: string) {

@@ -58,22 +58,51 @@
 
       <template #after>
         <div class="flex h-full min-h-0 flex-col gap-2 px-2.5 py-2.5">
-          <span
-            class="o-input-label text-compact text-input-label-text shrink-0 leading-tight font-medium"
-          >
-            {{ t("aiObservability.playground.output") }}
-          </span>
+          <!-- The actions ride on the label row rather than under the answer:
+               below the text they sat wherever the answer happened to end, and
+               a long one pushed them out of sight entirely. -->
+          <div class="flex shrink-0 items-center gap-1.5">
+            <span
+              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+            >
+              {{ t("aiObservability.playground.output") }}
+            </span>
+            <div class="grow" />
+            <template v-if="cell?.status === 'done'">
+              <OButton
+                variant="ghost-muted"
+                size="icon-xs"
+                icon-left="content-copy"
+                :title="t('aiObservability.playground.copyOutput')"
+                :data-test="`ai-playground-output-copy-${label}`"
+                @click="emit('copy')"
+              />
+              <OButton
+                v-if="!cell.toolCall"
+                variant="ghost-muted"
+                size="icon-xs"
+                icon-left="chat"
+                :title="t('aiObservability.playground.addToMessagesTooltip')"
+                :data-test="`ai-playground-output-add-to-messages-${label}`"
+                @click="emit('add-to-messages')"
+              />
+              <OButton
+                variant="ghost-muted"
+                size="icon-xs"
+                icon-left="science"
+                :title="t('aiObservability.playground.createExperiment')"
+                :data-test="`ai-playground-output-create-experiment-${label}`"
+                @click="emit('create-experiment')"
+              />
+            </template>
+          </div>
           <div
             class="border-border-default rounded-default bg-surface-subtle min-h-24 min-w-0 flex-1 overflow-y-auto px-2.5 py-2"
           >
             <PlaygroundOutputCell
               :cell="cell"
-              show-actions
               :data-test="`ai-playground-output-${label}`"
               @retry="emit('run')"
-              @copy="emit('copy')"
-              @add-to-messages="emit('add-to-messages')"
-              @create-experiment="emit('create-experiment')"
             />
           </div>
         </div>

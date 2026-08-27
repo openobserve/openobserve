@@ -147,8 +147,13 @@ const { t } = useI18nTyped();
 
 const maxVariants = MAX_VARIANTS;
 
+/** Both halves or nothing: a key with an empty model matches no option, and an
+ *  unmatched value is rendered by the select as the raw key — which reads as an
+ *  id where a model name belongs. Empty shows the placeholder instead. */
 const selectedKey = computed(() =>
-  props.variant.providerId ? keyFor(props.variant.providerId, props.variant.model) : "",
+  props.variant.providerId && props.variant.model
+    ? keyFor(props.variant.providerId, props.variant.model)
+    : "",
 );
 
 const modelOptions = computed<SelectOption[]>(() => {
