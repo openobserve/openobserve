@@ -33,10 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.header')"
       icon="shield-alert-outline"
       title-data-test="alert-library-title"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
-      <!-- Section-level title, identical on all four alerting pages, so the
-           peer tabs anchor at the same x — see AlertList.vue for the rationale.
-           Subtitle-free for the same reason. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
@@ -167,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <section v-for="group in groupedEntries" :key="group.id" class="pt-3">
                   <h2
-                    class="text-text-secondary text-2xs flex items-center gap-2 pb-2 font-semibold uppercase"
+                    class="text-text-secondary flex items-center gap-2 pb-2 text-xs font-semibold"
                     :data-test="`alert-library-group-${group.id}`"
                   >
                     <span v-if="group.packLabel" class="opacity-70"

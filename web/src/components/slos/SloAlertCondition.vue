@@ -204,7 +204,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -213,6 +213,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import sloService from "@/services/slos";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { Slo } from "@/ts/interfaces/slo";
 import { formatTimeToExhaust, formatWindow } from "@/composables/useSloFormat";
 
@@ -236,9 +237,9 @@ const selectedSlo = computed(
   () => props.slo ?? slos.value.find((s) => s.id === model.value.slo_id) ?? null,
 );
 
-const kindOptions = computed(() => [
+const kindOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
   { value: "burn_rate", label: t("slos.alert.kind.burnRate"), icon: "local-fire-department" },
-  { value: "error_budget", label: t("slos.alert.kind.errorBudget"), icon: "data_usage" },
+  { value: "error_budget", label: t("slos.alert.kind.errorBudget"), icon: "data-usage" },
 ]);
 
 const operatorOptions = [

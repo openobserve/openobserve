@@ -595,6 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
+                        @select-span-event="onSelectSpanEvent"
                         @hover-span="onHoverSpan"
                         @unhover-span="onUnhoverSpan"
                         @update-current-index="handleIndexUpdate"
@@ -622,6 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
@@ -633,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -685,6 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
@@ -696,7 +699,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -764,6 +767,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
@@ -775,7 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -2087,15 +2091,64 @@ export default defineComponent({
     const hoveredSpanId = ref("");
     const effectiveSpanId = computed(() => hoveredSpanId.value || selectedSpanId.value);
 
+    /**
+     * A sidebar tab requested explicitly by an interaction, as opposed to the
+     * default the watcher below picks. Keyed to the span it was requested for
+     * and drained on every watcher fire, so a request that is never consumed
+     * (e.g. re-clicking a marker on the already-selected span, which does not
+     * change `selectedSpanId` and so never reaches this watcher) cannot
+     * outlive the selection it belonged to and hijack a later, unrelated one.
+     *
+     * The watcher runs on the flush after `selectedSpanId` changes, i.e. after
+     * the handler that changed it has returned — so a handler cannot simply
+     * assign `sidebarActiveTab` and expect it to survive. Recording the intent
+     * here removes the ordering question entirely: whichever runs first, the
+     * explicit tab wins and the default is skipped.
+     */
+    const pendingSidebarTab = ref<{ spanId: string; tab: string } | null>(null);
+
+    /**
+     * The span whose Events tab was opened by a marker click.
+     *
+     * A marker-driven Events view belongs to one span — navigating to another
+     * span should fall back to that span's default tab. A manually chosen tab
+     * is different: like every other tab, it persists across span navigation.
+     * Comparing `sidebarActiveTab` to "events" cannot tell the two apart,
+     * because the Events tab is always present and always selectable by hand.
+     */
+    const markerEventsSpanId = ref<string | null>(null);
+
     // Set the default sidebar tab on the first span selection,
     // and re-evaluate when the current tab no longer exists for the new span
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
-      if (newSpanId && spanMap.value[newSpanId]) {
-        const canPreview = hasTracePreview(spanMap.value[newSpanId]);
-        if (!oldSpanId || (sidebarActiveTab.value === "preview" && !canPreview)) {
-          sidebarActiveTab.value = canPreview ? "preview" : "attributes";
-        }
+      // Drain first, always: a request that was never consumed must not
+      // survive to hijack the next selection.
+      const pending = pendingSidebarTab.value;
+      pendingSidebarTab.value = null;
+
+      // A marker-driven Events view is scoped to its own span. Once the
+      // selection moves elsewhere it no longer applies, so retire it and let
+      // the default apply — but only for a view a marker opened, never for a
+      // tab the user chose by hand.
+      const leavingMarkerEvents =
+        markerEventsSpanId.value !== null && markerEventsSpanId.value !== newSpanId;
+      if (leavingMarkerEvents) markerEventsSpanId.value = null;
+
+      if (!newSpanId || !spanMap.value[newSpanId]) return;
+
+      if (pending && pending.spanId === newSpanId) {
+        sidebarActiveTab.value = pending.tab;
+        return;
+      }
+
+      const canPreview = hasTracePreview(spanMap.value[newSpanId]);
+      if (
+        !oldSpanId ||
+        leavingMarkerEvents ||
+        (sidebarActiveTab.value === "preview" && !canPreview)
+      ) {
+        sidebarActiveTab.value = canPreview ? "preview" : "attributes";
       }
     });
 
@@ -2775,6 +2828,38 @@ export default defineComponent({
       });
     };
 
+    const focusedEventIndex = ref<number | null>(null);
+
+    /**
+     * A waterfall marker click. Selecting the span hides the timeline the
+     * marker lived on, so route the event's index into the sidebar and open the
+     * Events tab, which carries its own span-scoped mini-timeline.
+     */
+    const onSelectSpanEvent = (payload: { spanId: string; eventIndex: number }) => {
+      // Record the tab before the selection, so the watcher this triggers sees
+      // the request rather than overwriting it with the default.
+      pendingSidebarTab.value = { spanId: payload.spanId, tab: "events" };
+      markerEventsSpanId.value = payload.spanId;
+      updateSelectedSpan(payload.spanId);
+      sidebarActiveTab.value = "events";
+      // Re-assign through null so clicking the same marker twice re-triggers
+      // the sidebar's watcher.
+      focusedEventIndex.value = null;
+      nextTick(() => {
+        focusedEventIndex.value = payload.eventIndex;
+      });
+    };
+
+    /**
+     * An explicit tab choice from the sidebar. Clears marker provenance: once
+     * the user has picked a tab themselves, it persists across span
+     * navigation like any other.
+     */
+    const onSidebarTabChange = (tab: string) => {
+      sidebarActiveTab.value = tab;
+      markerEventsSpanId.value = null;
+    };
+
     const updateSelectedSpan = (spanId: string, swichToWaterfall: boolean = false) => {
       hoveredSpanId.value = ""; // clear any hover state on click
       showTraceDetails.value = false;
@@ -2914,6 +2999,8 @@ export default defineComponent({
       traceTabs,
       onTabReorder,
       sidebarActiveTab,
+      pendingSidebarTab,
+      markerEventsSpanId,
       traceTree,
       collapseMapping,
       traceRootSpan,
@@ -2968,6 +3055,9 @@ export default defineComponent({
       showTraceDetails,
       traceDetails,
       updateSelectedSpan,
+      onSelectSpanEvent,
+      onSidebarTabChange,
+      focusedEventIndex,
       routeToTracesList,
       handleExpandToFullView,
       openTraceLink,

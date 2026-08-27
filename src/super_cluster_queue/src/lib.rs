@@ -28,6 +28,7 @@ mod domain_management;
 mod enrichment_table;
 mod eval_annotation_queues;
 mod eval_datasets;
+mod eval_experiments;
 mod eval_jobs;
 mod eval_providers;
 mod eval_score_configs;
@@ -58,9 +59,10 @@ mod user;
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
-    EvalDatasetsQueue, EvalJobsQueue, EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue,
-    FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
-    SearchJobsQueue, SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
+    EvalDatasetsQueue, EvalExperimentsQueue, EvalJobsQueue, EvalProvidersQueue,
+    EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue, OrgUsersQueue,
+    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
+    SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(
@@ -144,6 +146,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let eval_datasets_queue = EvalDatasetsQueue {
         on_eval_dataset_msg: eval_datasets::process,
     };
+    let eval_experiments_queue = EvalExperimentsQueue {
+        on_eval_experiment_msg: eval_experiments::process,
+    };
     let eval_scorers_queue = EvalScorersQueue {
         on_eval_scorer_msg: eval_scorers::process,
     };
@@ -189,6 +194,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(eval_score_configs_queue),
         Box::new(eval_annotation_queues_queue),
         Box::new(eval_datasets_queue),
+        Box::new(eval_experiments_queue),
         Box::new(eval_scorers_queue),
         Box::new(eval_jobs_queue),
         Box::new(folders_queue),

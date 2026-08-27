@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 71;
+pub const DB_SCHEMA_VERSION: u64 = 73;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1477,6 +1477,12 @@ pub struct Search {
         help = "Enable pushdown filter for metrics queries"
     )]
     pub feature_metrics_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
+        default = true,
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+    )]
+    pub feature_metrics_fused_agg_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,

@@ -164,7 +164,7 @@ describe("Rule B — the database server is the source of truth on overlap", () 
   it("sources the two overlap tiles through the shared resolver", () => {
     expect(detail).toContain("resolveDatabaseTime");
     expect(detail).toContain("resolveCalls");
-    const stats = detail.split("const headlineStats = computed(")[1]?.split("\n});")[0] ?? "";
+    const stats = detail.split("const headlineStats = computed")[1]?.split("\n});")[0] ?? "";
     expect(stats).toContain("databaseTime.value.value");
     expect(stats).toContain("callCount.value.value");
   });
@@ -176,7 +176,7 @@ describe("Rule B — the database server is the source of truth on overlap", () 
    * The qualifier must reach the tile.
    */
   it("keeps the engine qualifier on every server-sourced tile", () => {
-    const stats = detail.split("const headlineStats = computed(")[1]?.split("\n});")[0] ?? "";
+    const stats = detail.split("const headlineStats = computed")[1]?.split("\n});")[0] ?? "";
     expect(stats).toContain("overlapDetail");
     expect(stats).toContain("dbm.detail.overlap.");
     expect(stats).toContain("engine: engineName");
@@ -189,7 +189,7 @@ describe("Rule B — the database server is the source of truth on overlap", () 
    * total by a traced subtotal.
    */
   it("only lets the client-scope captions qualify a client-sourced value", () => {
-    const stats = detail.split("const headlineStats = computed(")[1]?.split("\n});")[0] ?? "";
+    const stats = detail.split("const headlineStats = computed")[1]?.split("\n});")[0] ?? "";
     expect(stats).toContain('databaseTime.value.source === "client"');
     expect(stats).toContain('callCount.value.source === "client"');
   });
@@ -226,7 +226,7 @@ describe("absent measurements never render as zero", () => {
    * executions.
    */
   it("does not coerce absent calls or errors to zero", () => {
-    const stats = detail.split("const headlineStats = computed(")[1]?.split("\n});")[0] ?? "";
+    const stats = detail.split("const headlineStats = computed")[1]?.split("\n});")[0] ?? "";
     expect(stats, "headlineStats must exist").not.toBe("");
     expect(stats).toContain("const calls = current?.calls;");
     expect(stats).toContain("const errors = current?.errors;");
@@ -240,7 +240,7 @@ describe("absent measurements never render as zero", () => {
    * absent count cannot print as "none".
    */
   it("keeps the rate arithmetic separate from what is displayed", () => {
-    const stats = detail.split("const headlineStats = computed(")[1]?.split("\n});")[0] ?? "";
+    const stats = detail.split("const headlineStats = computed")[1]?.split("\n});")[0] ?? "";
     expect(stats).toContain("callsForRate");
     expect(stats).toContain("errorsForRate");
     expect(stats).toContain("errors === undefined");
@@ -253,7 +253,7 @@ describe("absent measurements never render as zero", () => {
    * query the trace vantage never saw.
    */
   it("suppresses the caption when the value it describes is absent", () => {
-    const stats = detail.split("const headlineStats = computed(")[1]?.split("\n});")[0] ?? "";
+    const stats = detail.split("const headlineStats = computed")[1]?.split("\n});")[0] ?? "";
     expect(stats).toContain("const captionFor =");
     // Every tile whose caption makes a claim routes through the guard.
     for (const value of [

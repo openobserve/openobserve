@@ -51,9 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         value="neutral"
         :data-test="`used-by-${key}-${b.kind}`"
       >
+        <OTooltip side="top" :content="b.label" />
         <OIcon :name="depKindIcon(b.kind)" size="xs" class="mr-0.5" :class="kindColor(b.kind)" />
         {{ b.count }}
-        <OTooltip side="top" :content="b.label" />
       </OTag>
     </template>
   </OButton>

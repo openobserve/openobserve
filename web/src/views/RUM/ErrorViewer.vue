@@ -95,7 +95,7 @@ import useErrorTracking from "@/composables/useErrorTracking";
 import useErrorDetail from "@/composables/rum/useErrorDetail";
 import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
-import { rumField } from "@/utils/rum/fields";
+import { rumField, normalizeTraceId } from "@/utils/rum/fields";
 import { buildBreadcrumbsSql, type ErrorDetailContext } from "@/utils/rum/errorDetailQueries";
 import { useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -148,15 +148,17 @@ const getTimestamp = computed(() => {
 });
 
 // Trace id linking this error to a backend trace: on the error itself, or
-// on the nearest xhr/fetch event captured around the failure.
+// on the nearest xhr/fetch event captured around the failure. Canonicalized
+// to the padded 32-char form the traces stream stores — SDK 0.4.x wrote the
+// id zero-stripped on RUM events.
 const errorTraceId = computed(() => {
   if (rumField(errorDetails.value, "trace_id")) {
-    return rumField<string>(errorDetails.value, "trace_id");
+    return normalizeTraceId(rumField<string>(errorDetails.value, "trace_id"));
   }
   const xhrWithTrace = (errorDetails.value?.events || []).find(
     (event: any) => event.type === "resource" && rumField(event, "trace_id"),
   );
-  return rumField<string>(xhrWithTrace, "trace_id") || "";
+  return normalizeTraceId(rumField<string>(xhrWithTrace, "trace_id"));
 });
 
 /**
