@@ -1,0 +1,353 @@
+===== COMPLETE LIST OF CHANGED FILES (9 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/pages/dashboardPages/dashboard-cell-explorer.js
+tests/ui-testing/pages/dashboardPages/dashboard-legends-copy.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-legends-copy.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-table-column-formatting.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-table-copy-cell.spec.js
+web/src/components/dashboards/panels/TableRenderer.spec.ts
+web/src/components/dashboards/panels/TableRenderer.vue
+web/src/composables/useStreams.ts
+web/src/plugins/metrics/explorer/MetricsExplorer.vue
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-cell-explorer.js b/tests/ui-testing/pages/dashboardPages/dashboard-cell-explorer.js
+index 64211c966a4..cd4f80639d3 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-cell-explorer.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-cell-explorer.js
+@@ -15,8 +15,10 @@ export default class DashboardCellExplorerPage {
+     // Interactive table (TableRenderer)
+     this.tablePanel = page.locator('[data-test="dashboard-panel-table"]').first();
+     this.firstRow = this.tablePanel.locator('[data-test^="o2-table-row-"]').first();
+-    // The per-cell drilldown search icon — dynamic id, matched by prefix.
+-    this.drilldownButtons = this.tablePanel.locator(
++    this.firstRowCells = this.firstRow.locator(
++      '[data-test^="o2-table-cell-"]:not([data-test^="o2-table-cell-copy-"]):not([data-test^="o2-table-cell-hover-actions-"])'
++    );
++    this.drilldownButtons = page.locator(
+       '[data-test^="dashboard-table-cell-drilldown-"]'
+     );
+ 
+@@ -51,23 +53,37 @@ export default class DashboardCellExplorerPage {
+     await this.firstRow.waitFor({ state: "visible", timeout: 30000 });
+   }
+ 
++  async revealFirstDrilldownButton() {
++    const count = await this.firstRowCells.count();
++    for (let i = 0; i < count; i++) {
++      const box = await this.firstRowCells.nth(i).boundingBox();
++      if (!box) continue;
++      await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
++      const button = this.drilldownButtons.first();
++      try {
++        await button.waitFor({ state: "visible", timeout: 1500 });
++        return button;
++      } catch {
++        continue;
++      }
++    }
++    return null;
++  }
++
+   /** True when at least one drillable cell (search icon) exists in the table. */
+   async hasDrillableCell() {
+-    return (await this.drilldownButtons.count()) > 0;
++    return (await this.revealFirstDrilldownButton()) !== null;
+   }
+ 
+   async expectDrillableCellVisible() {
+-    await expect(this.drilldownButtons.first()).toBeAttached({ timeout: 15000 });
++    const button = await this.revealFirstDrilldownButton();
++    expect(button, "expected a drillable cell with a search icon").not.toBeNull();
++    await expect(button).toBeVisible({ timeout: 15000 });
+   }
+ 
+-  /**
+-   * Hover the first data row so the (opacity-0) cell icons reveal, then click
+-   * the first drilldown search icon to open the cell-explorer drawer.
+-   */
+   async openDrawerFromFirstDrillableCell() {
+-    await this.firstRow.hover();
+-    const button = this.drilldownButtons.first();
+-    await button.waitFor({ state: "attached", timeout: 15000 });
++    const button = await this.revealFirstDrilldownButton();
++    expect(button, "expected a drillable cell with a search icon").not.toBeNull();
+     await button.click();
+     await this.expectDrawerOpen();
+   }
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-legends-copy.js b/tests/ui-testing/pages/dashboardPages/dashboard-legends-copy.js
+index 4b3236e2f95..09512d3a30e 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-legends-copy.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-legends-copy.js
+@@ -240,8 +240,9 @@ export default class DashboardLegendsCopy {
+       await cell.scrollIntoViewIfNeeded();
+       await cell.hover({ force: true });
+     }
+-    // Wait for copy button to become visible (opacity transition from 0 to 1 on hover)
+-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
++    const copyBtn = this.page
++      .locator('[data-test^="dashboard-table-cell-copy-"]')
++      .first();
+     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
+     await copyBtn.click({ force: true });
+ 
+@@ -256,9 +257,15 @@ export default class DashboardLegendsCopy {
+    */
+   async isTableCellCopied(rowIndex, colIndex) {
+     const cell = this.getTableCell(rowIndex, colIndex);
+-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
+-    // Hover to reveal the copy button, then check data-copied attribute
+-    await cell.hover({ force: true });
++    const box = await cell.boundingBox();
++    if (box) {
++      await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
++    } else {
++      await cell.hover({ force: true });
++    }
++    const copyBtn = this.page
++      .locator('[data-test^="dashboard-table-cell-copy-"]')
++      .first();
+     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
+     const copiedAttr = await copyBtn.getAttribute('data-copied');
+     return copiedAttr === 'true';
+@@ -295,8 +302,9 @@ export default class DashboardLegendsCopy {
+       await cell.scrollIntoViewIfNeeded();
+       await cell.hover({ force: true });
+     }
+-    // Wait briefly for opacity transition, then check visibility
+-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
++    const copyBtn = this.page
++      .locator('[data-test^="dashboard-table-cell-copy-"]')
++      .first();
+     try {
+       await copyBtn.waitFor({ state: 'visible', timeout: 3000 });
+       return true;
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-legends-copy.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-legends-copy.spec.js
+index 8aa8de5431c..680a63c45a8 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-legends-copy.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-legends-copy.spec.js
+@@ -508,7 +508,7 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
+         if (box) {
+           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+         }
+-        const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
++        const copyBtn = page.locator('[data-test^="dashboard-table-cell-copy-"]').first();
+         await copyBtn.waitFor({ state: 'visible', timeout: 2000 });
+         const copiedAttr = await copyBtn.getAttribute('data-copied');
+         expect(copiedAttr).not.toBe('true');
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-table-column-formatting.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-table-column-formatting.spec.js
+index 29f44383cee..814c3d5fe4b 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-table-column-formatting.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-table-column-formatting.spec.js
+@@ -264,9 +264,9 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
+ 
+     const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
+     await firstRow.waitFor({ state: "visible", timeout: 15000 });
+-    const wrapperDiv = firstRow.locator("td").last().locator("div").first();
+-    await expect(wrapperDiv).toHaveClass(/justify-center/);
+-    testLogger.info("Table cell wrapper reflects Center alignment class");
++    const cell = firstRow.locator("td").last();
++    await expect(cell).toHaveClass(/text-center/);
++    testLogger.info("Table cell reflects Center alignment class");
+ 
+     // This environment's backend build doesn't yet accept the alignment
+     // override_config variant on save (version-skew, not a product bug) — the
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-table-copy-cell.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-table-copy-cell.spec.js
+index b3cfba4e048..7f43b93446b 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-table-copy-cell.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-table-copy-cell.spec.js
+@@ -117,7 +117,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
+       await firstCell.hover();
+ 
+       // Click the copy button inside the cell
+-      const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
++      const copyBtn = page.locator("[data-test^='dashboard-table-cell-copy-']").first();
+       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
+       await copyBtn.click({ force: true });
+ 
+@@ -169,7 +169,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
+       const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
+       const firstCell = firstRow.locator("td").first();
+       await firstCell.hover();
+-      const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
++      const copyBtn = page.locator("[data-test^='dashboard-table-cell-copy-']").first();
+       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
+       await copyBtn.click({ force: true });
+ 
+@@ -219,7 +219,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
+       const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
+       const secondCell = firstRow.locator("td").nth(1);
+       await secondCell.hover();
+-      const copyBtn = secondCell.locator("[data-test^='o2-table-cell-copy-']").first();
++      const copyBtn = page.locator("[data-test^='dashboard-table-cell-copy-']").first();
+       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
+       await copyBtn.click({ force: true });
+ 
+@@ -305,7 +305,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
+       const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
+       const firstCell = firstRow.locator("td").first();
+       await firstCell.hover();
+-      const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
++      const copyBtn = page.locator("[data-test^='dashboard-table-cell-copy-']").first();
+       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
+       await copyBtn.click({ force: true });
+ 
+@@ -352,7 +352,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
+       const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
+       const firstCell = firstRow.locator("td").first();
+       await firstCell.hover();
+-      const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
++      const copyBtn = page.locator("[data-test^='dashboard-table-cell-copy-']").first();
+       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
+       await copyBtn.click({ force: true });
+ 
+diff --git a/web/src/components/dashboards/panels/TableRenderer.spec.ts b/web/src/components/dashboards/panels/TableRenderer.spec.ts
+index f346f262855..644d16276fe 100644
+--- a/web/src/components/dashboards/panels/TableRenderer.spec.ts
++++ b/web/src/components/dashboards/panels/TableRenderer.spec.ts
+@@ -355,10 +355,10 @@ describe("TableRenderer", () => {
+       expect(table.props("enableColumnReorder")).toBe(false);
+     });
+ 
+-    it("should set enableCellCopy=true on TenstackTable", () => {
++    it("should set enableCellCopy=false — copy moved to the floating hover-action toolbar", () => {
+       wrapper = createWrapper();
+       const table = wrapper.findComponent({ name: "OTable" });
+-      expect(table.props("enableCellCopy")).toBe(true);
++      expect(table.props("enableCellCopy")).toBe(false);
+     });
+   });
+ 
+diff --git a/web/src/components/dashboards/panels/TableRenderer.vue b/web/src/components/dashboards/panels/TableRenderer.vue
+index 269c83e7715..a8eb3ad61f3 100644
+--- a/web/src/components/dashboards/panels/TableRenderer.vue
++++ b/web/src/components/dashboards/panels/TableRenderer.vue
+@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       :enable-column-format="enableColumnFormat"
+       @format-column="onFormatColumn"
+       :enable-column-reorder="false"
+-      :enable-cell-copy="true"
++      :enable-cell-copy="false"
+       :class="{ 'wrap-enabled': wrapCells }"
+       data-test="dashboard-panel-table"
+       @row-click="
+@@ -83,20 +83,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         <span v-else>{{ formatCellValue(value, column, row) }}</span>
+       </template>
+ 
+-      <!-- Explore-in-Logs hover action, drillable columns only -->
+-      <template
+-        v-if="drilldownColumns.length || drilldownAllColumns"
+-        #copy-actions="{ columnId, row, value }"
+-      >
++      <template #cell-hover-actions="{ row, column, value }">
++        <OButton
++          v-if="isCopyableCellValue(value)"
++          variant="ghost"
++          size="icon-xs-circle"
++          :data-test="`dashboard-table-cell-copy-${column.id}`"
++          :data-copied="copiedCellKey === cellKey(column, row) ? 'true' : undefined"
++          @click.stop="copyCellValue(value, column, row)"
++        >
++          <OIcon
++            :name="copiedCellKey === cellKey(column, row) ? 'check' : 'content-copy'"
++            size="xs"
++          />
++          <OTooltip :content="t('common.copy')" />
++        </OButton>
+         <OButton
+-          v-if="isCellDrillable(columnId)"
++          v-if="isCellDrillable(column.id)"
+           variant="ghost"
+-          size="icon-xs-sq"
+-          :data-test="`dashboard-table-cell-drilldown-${columnId}`"
+-          class="ml-1 h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
+-          @click.stop="onCellDrilldown({ columnId, row, value })"
++          size="icon-xs-circle"
++          :data-test="`dashboard-table-cell-drilldown-${column.id}`"
++          @click.stop="onCellDrilldown({ columnId: column.id, row, value })"
+         >
+-          <OIcon name="search" size="sm" />
++          <OIcon name="search" size="xs" />
+           <OTooltip :content="t('dashboard.tableCellDrilldownTooltip')" />
+         </OButton>
+       </template>
+@@ -160,6 +169,7 @@ import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
+ import { getColorForTable } from "@/utils/dashboard/colorPalette";
+ import { isColorDark } from "@/utils/dashboard/chartColorUtils";
+ import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboard/tableConfigUtils";
++import { copyToClipboard } from "@/utils/clipboard";
+ import { useStore } from "vuex";
+ 
+ export default defineComponent({
+@@ -389,6 +399,24 @@ export default defineComponent({
+       emit("explore-cell", params, sortedRows.value.indexOf(params.row));
+     };
+ 
++    const isCopyableCellValue = (value: any) =>
++      value !== null && value !== undefined && String(value).trim() !== "";
++
++    const copiedCellKey = ref<string | null>(null);
++    let copiedTimer: ReturnType<typeof setTimeout> | null = null;
++    const cellKey = (column: any, row: any) => `${column?.id}#${sortedRows.value.indexOf(row)}`;
++
++    const copyCellValue = async (value: any, column: any, row: any) => {
++      const text = String(formatCellValue(value, column, row) ?? "");
++      const ok = await copyToClipboard(text, t, { silent: true });
++      if (!ok) return;
++      copiedCellKey.value = cellKey(column, row);
++      if (copiedTimer) clearTimeout(copiedTimer);
++      copiedTimer = setTimeout(() => {
++        copiedCellKey.value = null;
++      }, 2000);
++    };
++
+     const cellStyleFn = computed(
+       () =>
+         (params: { columnId: string; row: any; value: any }): Record<string, any> => {
+@@ -588,6 +616,10 @@ export default defineComponent({
+       onFormatColumn,
+       onCellDrilldown,
+       isCellDrillable,
++      isCopyableCellValue,
++      copyCellValue,
++      copiedCellKey,
++      cellKey,
+       getTableCsvString,
+       downloadTableAsCSV,
+       downloadTableAsJSON,
+diff --git a/web/src/composables/useStreams.ts b/web/src/composables/useStreams.ts
+index 0ed273c9cac..2769ef916de 100644
+--- a/web/src/composables/useStreams.ts
++++ b/web/src/composables/useStreams.ts
+@@ -134,7 +134,7 @@ const useStreams = (t: TranslateFn) => {
+               );
+               getStreamsPromise.value
+                 .then((res: any) => {
+-                  setStreams(streamName, res.data.list);
++                  setStreams(streamName, res.data.list, force);
+                   const streamData = {
+                     name: streamName,
+                     list: res.data.list,
+diff --git a/web/src/plugins/metrics/explorer/MetricsExplorer.vue b/web/src/plugins/metrics/explorer/MetricsExplorer.vue
+index a3a94653f3a..adfc4e4ef9c 100644
+--- a/web/src/plugins/metrics/explorer/MetricsExplorer.vue
++++ b/web/src/plugins/metrics/explorer/MetricsExplorer.vue
+@@ -1597,6 +1597,7 @@ export default defineComponent({
+       refreshing.value = true;
+       const manual = opts?.manual !== false;
+       try {
++        if (manual) await grid.loadStreams(true);
+         dateTimePickerRef.value?.refresh?.();
+         // Keep the charts up: a refresh re-runs the same queries a few seconds
+         // later, so blanking them to skeletons would just make them flicker.
+@@ -1681,7 +1682,7 @@ export default defineComponent({
+     onMounted(async () => {
+       mountedAt = performance.now();
+       syncTimeRange();
+-      await grid.loadStreams();
++      await grid.loadStreams(true);
+ 
+       track("metrics_explorer_opened", {
+         metric_count: grid.cards.value.length,

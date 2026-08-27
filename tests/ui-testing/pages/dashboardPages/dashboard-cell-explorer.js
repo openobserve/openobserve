@@ -21,6 +21,9 @@ export default class DashboardCellExplorerPage {
     this.drilldownButtons = page.locator(
       '[data-test^="dashboard-table-cell-drilldown-"]'
     );
+    this.copyButtons = page.locator(
+      '[data-test^="dashboard-table-cell-copy-"]'
+    );
 
     // Cell-explorer drawer (PanelSchemaRenderer -> ODrawer)
     this.cellDrawer = page.locator('[data-test="dashboard-cell-explorer-drawer"]');
@@ -68,6 +71,55 @@ export default class DashboardCellExplorerPage {
       }
     }
     return null;
+  }
+
+  /**
+   * Hover the cell at `cellIndex` in the first data row and report whether the
+   * hover toolbar rendered a copy button and/or a drilldown button. Copy appears
+   * on every non-empty cell; drilldown only on plain (non-aggregated) columns,
+   * so callers can assert either presence or absence per column.
+   */
+  async revealActionsForCell(cellIndex) {
+    const cell = this.firstRowCells.nth(cellIndex);
+    const box = await cell.boundingBox();
+    if (!box) {
+      return { hasCopy: false, hasDrilldown: false };
+    }
+    await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+    const hasCopy = await this.copyButtons
+      .first()
+      .waitFor({ state: "visible", timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+
+    const hasDrilldown = await this.drilldownButtons
+      .first()
+      .waitFor({ state: "visible", timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+
+    return { hasCopy, hasDrilldown };
+  }
+
+  /** Assert a drillable (plain) cell shows both copy and drilldown buttons. */
+  async expectCopyAndDrilldownOnCell(cellIndex) {
+    const { hasCopy, hasDrilldown } = await this.revealActionsForCell(cellIndex);
+    expect(hasCopy, `expected a copy button on cell ${cellIndex}`).toBe(true);
+    expect(
+      hasDrilldown,
+      `expected a drilldown button on cell ${cellIndex}`
+    ).toBe(true);
+  }
+
+  /** Assert an aggregated cell shows the copy button but no drilldown button. */
+  async expectCopyOnlyOnCell(cellIndex) {
+    const { hasCopy, hasDrilldown } = await this.revealActionsForCell(cellIndex);
+    expect(hasCopy, `expected a copy button on cell ${cellIndex}`).toBe(true);
+    expect(
+      hasDrilldown,
+      `expected no drilldown button on aggregated cell ${cellIndex}`
+    ).toBe(false);
   }
 
   /** True when at least one drillable cell (search icon) exists in the table. */

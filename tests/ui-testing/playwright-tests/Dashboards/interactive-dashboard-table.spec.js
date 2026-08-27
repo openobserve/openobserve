@@ -13,11 +13,12 @@ const {
 } = require("../utils/enhanced-baseFixtures.js");
 import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
-import { cleanupTestDashboard } from "./utils/dashCreation.js";
+import { cleanupTestDashboard, setupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
   setupTablePanelWithDimension,
 } from "./utils/configPanelHelpers.js";
+import { waitForStreamComplete } from "../utils/streaming-helpers.js";
 const testLogger = require("../utils/test-logger.js");
 
 test.describe.configure({ mode: "parallel" });
@@ -151,6 +152,71 @@ test.describe("Interactive Dashboard Table — cell drilldown", { tag: ["@all", 
     await pm.dashboardCellExplorer.expectNoCellParamsInUrl();
     testLogger.info("cell_* params cleaned up on drawer close");
 
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  // ── Unified hover-toolbar gating (copy-always vs drilldown-only-on-plain) ──
+
+  test("drillable cell shows both copy and drilldown in the same hover toolbar", {
+    tag: ["@dashboard-table-cell-copy-actions", "@all", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName("Drillable Cell Copy And Drilldown");
+
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+
+    // Plain X-axis (drillable) + aggregated Y-axis (count(code), not drillable).
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
+    await pm.chartTypeSelector.searchAndAddField("code", "y");
+    await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
+
+    const streamPromise = waitForStreamComplete(page);
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await streamPromise;
+    await pm.chartTypeSelector.waitForTableDataLoad();
+
+    await pm.dashboardCellExplorer.expectCopyAndDrilldownOnCell(0);
+    testLogger.info("Drillable cell shows both copy and drilldown in the hover toolbar");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("aggregated column shows only the copy button with no drilldown icon", {
+    tag: ["@dashboard-table-cell-copy-actions", "@all", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName("Aggregated Column Copy Only");
+
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
+    await pm.chartTypeSelector.searchAndAddField("code", "y");
+    await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
+
+    const streamPromise = waitForStreamComplete(page);
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await streamPromise;
+    await pm.chartTypeSelector.waitForTableDataLoad();
+
+    await pm.dashboardCellExplorer.expectCopyOnlyOnCell(1);
+    testLogger.info("Aggregated column shows copy button with no drilldown icon");
+
+    await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 });
