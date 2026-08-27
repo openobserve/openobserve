@@ -420,12 +420,14 @@ impl EvalContext {
         self.start == self.end
     }
 
-    /// More than one evaluation window, and consecutive windows overlap.
+    /// More than one evaluation window, overlapping by a positive duration.
+    /// Reset detection compares adjacent sample pairs, and a pair repeats
+    /// across windows only when two windows share at least two samples.
     pub fn windows_overlap(&self, range_micros: i64) -> bool {
         !self.is_instant()
             && self.step > 0
             && self.end - self.start >= self.step
-            && self.step <= range_micros
+            && self.step < range_micros
     }
 
     /// Get all evaluation timestamps
@@ -1194,8 +1196,8 @@ mod tests {
         let ctx = |end, step| EvalContext::new(MINUTE, MINUTE + end, step, "test".into());
         // Overlapping windows: 15s step inside a 5m range.
         assert!(ctx(180 * MINUTE, MINUTE / 4).windows_overlap(5 * MINUTE));
-        // Adjacent windows still reuse the boundary sample.
-        assert!(ctx(5 * MINUTE, 5 * MINUTE).windows_overlap(5 * MINUTE));
+        // Adjacent windows share at most one sample, so no pair repeats.
+        assert!(!ctx(5 * MINUTE, 5 * MINUTE).windows_overlap(5 * MINUTE));
         // Disjoint windows (1h step, 5m range) or a single window cannot.
         assert!(!ctx(7 * 24 * 60 * MINUTE, 60 * MINUTE).windows_overlap(5 * MINUTE));
         assert!(!ctx(0, MINUTE / 4).windows_overlap(5 * MINUTE));
