@@ -657,6 +657,16 @@ pub enum UsageEvent {
     /// Browser run duration in milliseconds — the v2 duration hedge. `size`
     /// carries `browser_ms`. Reported, never billed.
     _SyntheticsBrowserMs,
+    /// Also the landing place for an `event` string this binary does not know.
+    ///
+    /// A node reads `_meta."usage"` rows written by every other node, including
+    /// newer ones. Without this, a variant added in a later release makes
+    /// `UsageResult` fail to deserialize, and the metering loop's
+    /// `collect::<Result<_, _>>` turns that one row into a `return Err` that
+    /// abandons the cycle for EVERY org, not just the one that wrote it.
+    /// `Other` is not billable, so an unknown event is skipped rather than
+    /// charged.
+    #[serde(other)]
     Other,
 }
 
@@ -2562,13 +2572,10 @@ mod tests {
         );
     }
 
-    /// KNOWN, UNMITIGATED HAZARD (SPEC §11 F2) — this test asserts it, not fixes
-    /// it.
+    /// SPEC §11 F2, now mitigated — this test is the regression guard.
     ///
-    /// `UsageEvent` has no `#[serde(other)]`, so an `event` string a binary has
-    /// no variant for is a hard deserialization error. The metering loop
-    /// (o2-enterprise `metering/common.rs::handle_metering_event`) does exactly
-    /// this with each org's SQL rows:
+    /// A node reads `_meta."usage"` rows written by every other node, newer ones
+    /// included. The metering loop decodes each org's rows with a strict collect:
     ///
     /// ```text
     /// let usages = usage_data.into_iter()
@@ -2577,14 +2584,13 @@ mod tests {
     /// // on Err: return Err(..) — out of handle_metering_event entirely
     /// ```
     ///
-    /// That `return` exits the whole function, so ONE unknown row silently
-    /// aborts the entire metering cycle for every remaining org. A rolling
-    /// upgrade produces exactly that: an un-upgraded scheduler reading rows an
-    /// upgraded node wrote. F2's mitigation is deploy ordering / flag discipline
-    /// (SPEC §12 item 3), not a code change here. If this test starts failing,
-    /// the decode became lenient and the hazard is gone — delete it.
+    /// That `return` leaves the whole function, so before `#[serde(other)]` ONE
+    /// row naming a variant this binary lacked aborted the metering cycle for
+    /// every remaining org — which a rolling upgrade produces by construction.
+    /// The unknown event now decodes as `Other`, which is not billable, so it is
+    /// skipped rather than charged.
     #[test]
-    fn test_unknown_usage_event_aborts_metering_collect_documents_f2_hazard() {
+    fn test_unknown_usage_event_decodes_as_other_and_does_not_poison_the_batch() {
         /// Mirror of o2-enterprise `metering::common::UsageResult`.
         #[derive(Debug, Deserialize)]
         #[allow(dead_code)]
@@ -2596,43 +2602,29 @@ mod tests {
 
         const UNKNOWN_TO_THIS_BUILD: &str = "SyntheticsFutureEventFromANewerNode";
 
-        let rows = || {
-            vec![
-                serde_json::json!({"org_id": "org_a", "event": "Ingestion", "value": 10.0}),
-                serde_json::json!({"org_id": "org_a", "event": "SyntheticsSteps", "value": 84.0}),
-                serde_json::json!({"org_id": "org_b", "event": UNKNOWN_TO_THIS_BUILD, "value": 7.0}),
-                serde_json::json!({"org_id": "org_c", "event": "Pipeline", "value": 3.0}),
-            ]
-        };
-
-        // Precondition: an unknown event string is a hard error, not a skip.
-        assert!(
-            serde_json::from_value::<UsageResult>(
-                serde_json::json!({"org_id": "org_b", "event": UNKNOWN_TO_THIS_BUILD, "value": 7.0})
-            )
-            .is_err(),
-            "UsageEvent has no #[serde(other)] — an unknown event string must fail to decode"
+        let decoded: UsageResult = serde_json::from_value(
+            serde_json::json!({"org_id": "org_b", "event": UNKNOWN_TO_THIS_BUILD, "value": 7.0}),
+        )
+        .expect("an unknown event string must decode, not error");
+        assert_eq!(
+            decoded.event,
+            UsageEvent::Other,
+            "unknown events must land on the non-billable Other"
         );
 
-        // The metering loop's exact collect: the whole batch is poisoned.
-        let collected = rows()
+        // The metering loop's exact collect: the batch survives intact.
+        let rows = vec![
+            serde_json::json!({"org_id": "org_a", "event": "Ingestion", "value": 10.0}),
+            serde_json::json!({"org_id": "org_a", "event": "SyntheticsSteps", "value": 84.0}),
+            serde_json::json!({"org_id": "org_b", "event": UNKNOWN_TO_THIS_BUILD, "value": 7.0}),
+            serde_json::json!({"org_id": "org_c", "event": "Pipeline", "value": 3.0}),
+        ];
+        let collected = rows
             .into_iter()
             .map(serde_json::from_value::<UsageResult>)
-            .collect::<Result<Vec<_>, _>>();
-        assert!(
-            collected.is_err(),
-            "F2 is UNMITIGATED: if this now succeeds, the deserialization contract \
-             changed and this hazard test should be deleted"
-        );
-
-        let decodable = rows()
-            .into_iter()
-            .filter_map(|row| serde_json::from_value::<UsageResult>(row).ok())
-            .count();
-        assert_eq!(
-            decodable, 3,
-            "3 of 4 rows are decodable — the strict collect throws all of them away"
-        );
+            .collect::<Result<Vec<_>, _>>()
+            .expect("one unknown row must not abort the cycle for every other org");
+        assert_eq!(collected.len(), 4);
     }
 }
 
