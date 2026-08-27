@@ -659,6 +659,14 @@ export interface BrowserCheck {
     password: string;
   };
   variables?: { id?: string; name: string; value: string; secure?: boolean; example?: string }[];
+  /**
+   * Environment ids this check runs against. Empty means one unscoped run.
+   *
+   * Carried but not yet edited here - the editor lands in a later phase. It is
+   * round-tripped so a check pinned to an environment through the API does not
+   * lose that pin the first time someone saves it from this form.
+   */
+  environments?: string[];
   secrets?: { id?: string; name: string; value: string }[];
   headers?: { id?: string; key: string; value: string }[];
   cookies?: { id?: string; name: string; value: string; domain: string }[];

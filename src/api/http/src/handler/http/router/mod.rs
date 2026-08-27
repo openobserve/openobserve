@@ -1443,6 +1443,17 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
             .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
             .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
+            // Shared variables and environments. Registered before the generic
+            // "{id}" entry to match the order the OpenFGA route table needs —
+            // there, a "{placeholder}" matches a literal segment and the first
+            // structural match wins, so "variables" would authorize against a
+            // per-check object instead of its own resource.
+            .route("/{org_id}/synthetics/variables", get(synthetics::list_synthetics_variables).post(synthetics::create_synthetics_variable))
+            .route("/{org_id}/synthetics/variables/{id}", put(synthetics::update_synthetics_variable).delete(synthetics::delete_synthetics_variable))
+            .route("/{org_id}/synthetics/environments", get(synthetics::list_synthetics_environments).post(synthetics::create_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/{env}", put(synthetics::update_synthetics_environment).delete(synthetics::delete_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/{env}/variables", get(synthetics::list_synthetics_environment_variables).post(synthetics::create_synthetics_environment_variable))
+            .route("/{org_id}/synthetics/environments/{env}/variables/{id}", put(synthetics::update_synthetics_environment_variable).delete(synthetics::delete_synthetics_environment_variable))
             .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
             .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
             .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))

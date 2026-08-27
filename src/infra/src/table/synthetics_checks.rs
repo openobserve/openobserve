@@ -153,6 +153,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             alert_if_fails: settings.alert_if_fails,
             collect_rum_data: settings.collect_rum_data,
             session_replay: settings.session_replay,
+            environments: settings.environments,
             auth,
             cookies,
             variables,
@@ -324,6 +325,34 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
         }
     }
     Ok(out)
+}
+
+/// How many checks in an org are pinned to each environment, keyed by
+/// environment id.
+///
+/// One pass over the org's settings blobs rather than one query per
+/// environment: the environments list needs every count at once, and JSON
+/// containment syntax differs across Postgres and SQLite. Same reasoning as
+/// `count_referencing_location`.
+pub async fn count_by_environment<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<std::collections::HashMap<String, u64>, errors::Error> {
+    let rows: Vec<serde_json::Value> = Entity::find()
+        .select_only()
+        .column(Column::Settings)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    let mut counts = std::collections::HashMap::new();
+    for settings in rows {
+        let parsed: SyntheticSettings = serde_json::from_value(settings).unwrap_or_default();
+        for env in parsed.environments {
+            *counts.entry(env).or_insert(0) += 1;
+        }
+    }
+    Ok(counts)
 }
 
 /// Picks the primary key for a new row. Split out of [`create`] so the
@@ -949,6 +978,7 @@ fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> 
         collect_rum_data: check.collect_rum_data,
         session_replay: check.session_replay,
         start: check.start,
+        environments: check.environments.clone(),
     })?)
 }
 

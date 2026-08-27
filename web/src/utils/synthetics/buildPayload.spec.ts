@@ -14,8 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
-import { buildCreateBrowserTestPayload } from "./buildPayload";
+import type { BrowserCheck, BrowserStep, ProtocolCheck } from "@/types/synthetics";
+import {
+  buildCreateBrowserTestPayload,
+  buildCreateProtocolCheckPayload,
+  mapResponseToBrowserCheck,
+} from "./buildPayload";
 
 function journey(): BrowserStep[] {
   return [
@@ -80,5 +84,37 @@ describe("buildCreateBrowserTestPayload", () => {
     });
 
     expect(() => buildCreateBrowserTestPayload(withRetired)).toThrow(/cannot be stored/);
+  });
+});
+
+describe("environments round-trip", () => {
+  // The editor does not set environments yet, so a check pinned to one through
+  // the API is only ever loaded and saved back. If either direction drops the
+  // field, that save silently unpins the check.
+  it("carries environments through the browser payload", () => {
+    const payload = buildCreateBrowserTestPayload(check({ environments: ["env-1"] }));
+
+    expect(payload.environments).toEqual(["env-1"]);
+  });
+
+  it("carries environments through the protocol payload", () => {
+    const protocolCheck = {
+      ...check({ environments: ["env-1"] }),
+      checkType: "tcp",
+      tcp: { port: 443, timeout_ms: 10000, response_contains: "" },
+    } as unknown as ProtocolCheck;
+
+    expect(buildCreateProtocolCheckPayload(protocolCheck).environments).toEqual(["env-1"]);
+  });
+
+  it("reads environments back off the wire", () => {
+    const mapped = mapResponseToBrowserCheck({
+      name: "Cloud login",
+      target: "https://app.test",
+      environments: ["env-1"],
+      config: { steps: [] },
+    });
+
+    expect(mapped.environments).toEqual(["env-1"]);
   });
 });

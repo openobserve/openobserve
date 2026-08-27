@@ -32,10 +32,19 @@ use config::meta::{
         ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticListItem, SyntheticListResponse,
         for_each_string_at_path, take_strings_at_path,
     },
+    synthetics_variables::{
+        SyntheticsEnvironmentRequest, SyntheticsEnvironmentView, SyntheticsVariableKind,
+        SyntheticsVariableRequest, SyntheticsVariableView, normalize_variable_name,
+        validate_environment_request, validate_variable_request,
+    },
 };
+// Re-exported so handlers can name what `get_environment` returns without
+// depending on the infra crate's module layout.
+pub use infra::table::synthetics_environments::SyntheticsEnvironmentRecord;
 use infra::table::{
-    cipher, folders, synthetics_agents, synthetics_checks, synthetics_jobs, synthetics_locations,
-    synthetics_runs,
+    cipher, folders, synthetics_agents, synthetics_checks, synthetics_environments,
+    synthetics_jobs, synthetics_locations, synthetics_runs, synthetics_variables,
+    synthetics_variables::SyntheticsVariableRecord,
 };
 // ── OpenFGA ───────────────────────────────────────────────────────────────────
 //
@@ -84,12 +93,14 @@ pub mod crypto;
 pub mod locations;
 pub mod runs;
 pub mod tokens;
+pub mod variables;
 
 pub use checks::*;
 pub use crypto::*;
 pub use locations::*;
 pub use runs::*;
 pub use tokens::*;
+pub use variables::*;
 
 // ── DB helper ─────────────────────────────────────────────────────────────────
 
@@ -166,6 +177,7 @@ mod tests {
             include_str!("locations.rs"),
             include_str!("runs.rs"),
             include_str!("tokens.rs"),
+            include_str!("variables.rs"),
         ]
         .map(squeezed)
         .join("");

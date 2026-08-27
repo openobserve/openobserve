@@ -562,7 +562,9 @@ use std::collections::HashMap;
 
 use config::meta::{
     self_reporting::usage::UsageData,
-    synthetics::{Synthetic, SyntheticAuth, for_each_string_at_path},
+    synthetics::{
+        MAX_VARIABLES, Synthetic, SyntheticAuth, SyntheticVariable, for_each_string_at_path,
+    },
 };
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -1311,29 +1313,35 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
             Ok::<(), ()>(())
         });
     }
-    let needs_dek = synthetic.auth.is_some()
-        || !synthetic.variables.is_empty()
-        || !synthetic.cookies.is_empty()
-        || has_encrypted_config;
+    // The environment this job runs against, or None for an unscoped run. Read
+    // from the check because `environments` is capped at one until fan-out — the
+    // job row carries no environment of its own yet.
+    let env_id = synthetic.environments.first().cloned();
+    // Widened past the check's own fields: a check whose variables all live in
+    // the shared tier has an empty `variables` vec, and computing `needs_dek`
+    // without this skipped the whole decrypt block, so it resolved nothing at
+    // all and the probe typed empty strings into every field.
+    let has_shared_variables = crate::service::org_has_shared_variables(&check.org_id).await;
     let mut env_inject = HashMap::new();
 
-    if needs_dek {
+    if needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
         let dek = crate::service::synthetics_dek(&check.org_id).await?;
 
         if let Some(ref auth) = synthetic.auth {
             env_inject.extend(build_env_map(auth, &dek)?);
         }
 
-        // Inject decrypted variable values so the probe can substitute {{ VAR }}.
-        // All values are AESenc: at rest regardless of the secure flag.
-        for var in &synthetic.variables {
-            let value = if var.value.starts_with("AESenc:") {
-                crate::service::decrypt_secret(&dek, &var.value)?
-            } else {
-                var.value.clone()
-            };
-            env_inject.insert(var.name.clone(), value);
-        }
+        let shared = if has_shared_variables {
+            crate::service::resolve_shared_variables(&check.org_id, env_id.as_deref(), &dek).await?
+        } else {
+            Vec::new()
+        };
+        env_inject.extend(merge_variable_tiers(
+            shared,
+            &synthetic.variables,
+            &dek,
+            &check.synthetics_id,
+        )?);
 
         // Decrypt top-level cookies and serialize as _AUTH_COOKIES JSON for the probe.
         // Probe calls context.addCookies(JSON.parse(envVars._AUTH_COOKIES)) regardless of auth
@@ -1480,6 +1488,59 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
 }
 
 /// AES-decrypt credentials from `auth` and return as env var map.
+/// Whether resolving this check needs the org DEK at all.
+///
+/// The shared tier is the fourth input and the one that used to be missing:
+/// this read only the check's own fields, so a check whose variables all live in
+/// the shared tier computed `false`, skipped the entire decrypt block, and
+/// resolved nothing — the probe then typed empty strings into every field the
+/// journey filled. Failing silently is what made it worth extracting.
+fn needs_dek(
+    synthetic: &Synthetic,
+    has_encrypted_config: bool,
+    has_shared_variables: bool,
+) -> bool {
+    synthetic.auth.is_some()
+        || !synthetic.variables.is_empty()
+        || !synthetic.cookies.is_empty()
+        || has_encrypted_config
+        || has_shared_variables
+}
+
+/// The two variable tiers merged into what the probe receives.
+///
+/// Narrowest last: the shared tier goes in first so a name the check also
+/// defines overwrites it. Merging is per name rather than per set, so a check
+/// that overrides `BASE_URL` still inherits every other shared variable.
+///
+/// The cap is enforced here because here is the only place the resolved set
+/// exists — neither tier alone knows what the other contributes to this check.
+fn merge_variable_tiers(
+    shared: Vec<(String, String)>,
+    check_variables: &[SyntheticVariable],
+    dek: &[u8],
+    synthetics_id: &str,
+) -> anyhow::Result<HashMap<String, String>> {
+    let mut merged: HashMap<String, String> = shared.into_iter().collect();
+    // All values are AESenc: at rest regardless of the `secure` flag, which is a
+    // display hint and has never had a storage effect.
+    for var in check_variables {
+        let value = if var.value.starts_with("AESenc:") {
+            crate::service::decrypt_secret(dek, &var.value)?
+        } else {
+            var.value.clone()
+        };
+        merged.insert(var.name.clone(), value);
+    }
+    if merged.len() > MAX_VARIABLES {
+        anyhow::bail!(
+            "check {synthetics_id} resolves {} variables, more than the {MAX_VARIABLES} allowed",
+            merged.len()
+        );
+    }
+    Ok(merged)
+}
+
 fn build_env_map(auth: &SyntheticAuth, dek: &[u8]) -> anyhow::Result<HashMap<String, String>> {
     let mut map = HashMap::new();
     match auth {
@@ -1949,7 +2010,10 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::synthetics::{SyntheticCookie, SyntheticVariable};
+
     use super::*;
+    use crate::service::encrypt_secret;
 
     /// The minimum an ack has ever had to carry. Everything else on
     /// `AckRequest` is `#[serde(default)]`, which is what makes rollback safe.
@@ -3412,5 +3476,100 @@ mod tests {
                 metadata: "{}".to_string(),
             }
         }
+    }
+
+    fn dek() -> Vec<u8> {
+        vec![7u8; 64]
+    }
+
+    fn variable(name: &str, value: &str) -> SyntheticVariable {
+        SyntheticVariable {
+            name: name.to_string(),
+            value: encrypt_secret(&dek(), value).unwrap(),
+            secure: false,
+            example: String::new(),
+        }
+    }
+
+    #[test]
+    fn a_check_with_only_shared_variables_still_needs_the_dek() {
+        // The regression this whole extraction exists for. Before the shared
+        // tier was an input, this check computed `false` and resolved nothing.
+        let synthetic = Synthetic::default();
+        assert!(!needs_dek(&synthetic, false, false));
+        assert!(needs_dek(&synthetic, false, true));
+    }
+
+    #[test]
+    fn the_original_four_inputs_still_decide_on_their_own() {
+        let with_variables = Synthetic {
+            variables: vec![variable("A", "1")],
+            ..Default::default()
+        };
+        assert!(needs_dek(&with_variables, false, false));
+
+        let with_cookies = Synthetic {
+            cookies: vec![SyntheticCookie::default()],
+            ..Default::default()
+        };
+        assert!(needs_dek(&with_cookies, false, false));
+
+        assert!(needs_dek(&Synthetic::default(), true, false));
+    }
+
+    #[test]
+    fn a_check_tier_name_overrides_a_shared_one_and_the_rest_inherit() {
+        let shared = vec![
+            ("BASE_URL".to_string(), "https://shared".to_string()),
+            ("API_TOKEN".to_string(), "shared-token".to_string()),
+        ];
+        let merged = merge_variable_tiers(
+            shared,
+            &[variable("BASE_URL", "https://check")],
+            &dek(),
+            "check-1",
+        )
+        .unwrap();
+
+        assert_eq!(merged.get("BASE_URL").unwrap(), "https://check");
+        assert_eq!(merged.get("API_TOKEN").unwrap(), "shared-token");
+    }
+
+    #[test]
+    fn the_shared_tier_resolves_on_its_own_when_the_check_has_none() {
+        let shared = vec![("PASSWORD".to_string(), "hunter2".to_string())];
+        let merged = merge_variable_tiers(shared, &[], &dek(), "check-1").unwrap();
+
+        // Asserting the value is present, not merely that the call succeeded —
+        // the failure this guards against returned Ok with an empty map.
+        assert_eq!(merged.get("PASSWORD").unwrap(), "hunter2");
+    }
+
+    #[test]
+    fn the_cap_counts_the_resolved_set_not_either_tier() {
+        let shared: Vec<(String, String)> = (0..MAX_VARIABLES)
+            .map(|i| (format!("SHARED_{i}"), "x".to_string()))
+            .collect();
+        assert!(merge_variable_tiers(shared.clone(), &[], &dek(), "check-1").is_ok());
+        // One inline variable that does not collide pushes the merged set over.
+        assert!(
+            merge_variable_tiers(shared, &[variable("EXTRA", "1")], &dek(), "check-1").is_err()
+        );
+    }
+
+    #[test]
+    fn an_overriding_name_does_not_count_twice_toward_the_cap() {
+        let shared: Vec<(String, String)> = (0..MAX_VARIABLES)
+            .map(|i| (format!("SHARED_{i}"), "x".to_string()))
+            .collect();
+        let merged = merge_variable_tiers(
+            shared,
+            &[variable("SHARED_0", "override")],
+            &dek(),
+            "check-1",
+        )
+        .unwrap();
+        assert_eq!(merged.len(), MAX_VARIABLES);
+        assert_eq!(merged.get("SHARED_0").unwrap(), "override");
     }
 }

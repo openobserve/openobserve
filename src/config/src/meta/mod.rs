@@ -49,6 +49,7 @@ pub mod sql;
 pub mod status_pages;
 pub mod stream;
 pub mod synthetics;
+pub mod synthetics_variables;
 pub mod system_settings;
 pub mod timed_annotations;
 pub mod traces;

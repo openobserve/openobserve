@@ -22,6 +22,7 @@ import {
   journeyToWireSteps,
   mapWireStep,
   mapWireSteps,
+  substituteVariables,
 } from "./mapRecordedStep";
 
 describe("mapRecordedStep", () => {
@@ -524,5 +525,42 @@ describe("stored journeys with mid-journey navigates", () => {
       "https://app.test/",
       "https://app.test/home",
     ]);
+  });
+});
+
+describe("substituteVariables", () => {
+  const step = (over: Partial<WireStep>): WireStep => ({ action: "fill", ...over }) as WireStep;
+
+  it("substitutes a bound placeholder in every string field", () => {
+    const out = substituteVariables(
+      step({ value: "{{USER}}", url: "https://app.test/{{PATH}}", key: "{{KEY}}" }),
+      { USER: "alice", PATH: "home", KEY: "Enter" },
+    );
+
+    expect(out.value).toBe("alice");
+    expect(out.url).toBe("https://app.test/home");
+    expect(out.key).toBe("Enter");
+  });
+
+  it("leaves an unbound placeholder verbatim", () => {
+    // `{{...}}` is not necessarily a variable reference - a check may legitimately
+    // type those characters, and nothing here can tell that from a typo. The
+    // probe's substituteSecretsV2 makes the same choice.
+    const out = substituteVariables(step({ value: "{{TYPO}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("{{TYPO}}");
+  });
+
+  it("substitutes a bound name alongside an unbound one in the same string", () => {
+    const out = substituteVariables(step({ value: "{{USER}}/{{TYPO}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("alice/{{TYPO}}");
+  });
+
+  it("still substitutes a bound name whose value is empty", () => {
+    // Distinct from unbound: the author set it, the value is just blank.
+    const out = substituteVariables(step({ value: "{{BLANK}}" }), { BLANK: "" });
+
+    expect(out.value).toBe("");
   });
 });

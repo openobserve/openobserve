@@ -164,6 +164,14 @@ pub struct Synthetic {
     /// Key-value variables injected into the probe environment.
     #[serde(default)]
     pub variables: Vec<SyntheticVariable>,
+    /// Environments this check runs against, by id.
+    ///
+    /// Empty means one unscoped run, which is every check that existed before
+    /// shared variables — so there is nothing to migrate. Capped at one entry
+    /// until fan-out lands; more than one would multiply job volume today with
+    /// no way to tell the resulting runs apart.
+    #[serde(default)]
+    pub environments: Vec<String>,
     /// Unix epoch microseconds — when to first run the check ("schedule later").
     /// When set, the scheduler uses this as the initial next_run_at instead of firing immediately.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -520,6 +528,8 @@ pub struct SyntheticSettings {
     pub session_replay: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub environments: Vec<String>,
 }
 
 fn default_wait_before_retry_secs_i32() -> i32 {
@@ -1345,7 +1355,10 @@ pub const DEFAULT_TEST_ID_ATTR: &str = "data-test";
 const MAX_TEST_ID_ATTR_LEN: usize = 64;
 const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
-const MAX_VARIABLES: usize = 50;
+/// Variables one check may end up with. Applies to the **resolved** set — the
+/// shared tier merged with the check's own — because that is what the probe
+/// receives and what an author has to reason about.
+pub const MAX_VARIABLES: usize = 50;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
 /// Minimum schedule interval (seconds) for protocol checks (http/tcp/tls/ssh).
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
@@ -1633,6 +1646,22 @@ impl Synthetic {
             }
             if !seen_vars.insert(v.name.as_str()) {
                 return Err(format!("variables: duplicate name '{}'", v.name));
+            }
+        }
+
+        // ── environments ───────────────────────────────────────────────────
+        // One entry until fan-out: runs, alerts and results are per check, so a
+        // second environment would put two environments' runs in one table with
+        // nothing distinguishing them.
+        if self.environments.len() > 1 {
+            return Err(format!(
+                "environments: at most one environment per check ({} given)",
+                self.environments.len()
+            ));
+        }
+        for env in &self.environments {
+            if env.trim().is_empty() {
+                return Err("environments: empty environment id not allowed".to_string());
             }
         }
 
@@ -2691,6 +2720,46 @@ mod tests {
             config: serde_json::json!({ "port": 5432, "timeout_ms": 10000 }),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn a_check_may_name_at_most_one_environment() {
+        let (locs, brs, devs) = allowed();
+
+        // No environment is the shape every check that pre-dates shared
+        // variables has, so it must stay valid with nothing to migrate.
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec![];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string()];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        // Two would put two environments' runs in one results table with
+        // nothing distinguishing them, since runs and alerts are per check.
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string(), "env-2".to_string()];
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("environments:"), "{err}");
+    }
+
+    #[test]
+    fn environments_survive_the_settings_round_trip() {
+        // `environments` rides in the settings JSON blob rather than a column of
+        // its own, which is what makes this a migration-free change. A row
+        // written before the field existed must still deserialize.
+        let legacy: SyntheticSettings =
+            serde_json::from_value(serde_json::json!({ "retries": 2 })).unwrap();
+        assert!(legacy.environments.is_empty());
+
+        let packed = serde_json::to_value(SyntheticSettings {
+            environments: vec!["env-1".to_string()],
+            ..Default::default()
+        })
+        .unwrap();
+        let round_tripped: SyntheticSettings = serde_json::from_value(packed).unwrap();
+        assert_eq!(round_tripped.environments, vec!["env-1".to_string()]);
     }
 
     #[test]

@@ -21,6 +21,7 @@ const KIND_CHECK: &str = "check";
 const KIND_LOCATION: &str = "location";
 const KIND_TOKEN: &str = "token";
 const KIND_AGENT: &str = "agent";
+const KIND_VARIABLE: &str = "variable";
 
 /// A check definition was created or updated.
 pub async fn emit_check_put(org_id: &str, synthetics_id: &str) -> Result<(), Error> {
@@ -43,6 +44,18 @@ pub async fn emit_locations_changed() -> Result<(), Error> {
 /// is the fleet-wide revocation window.
 pub async fn emit_tokens_changed(org_id: &str) -> Result<(), Error> {
     emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_TOKEN}/{org_id}")).await
+}
+
+/// An org's shared variables changed — created, edited, deleted, or removed
+/// alongside their environment.
+///
+/// Delivery latency is how long a rotated credential keeps resolving to its old
+/// value on other nodes, bounded by the cache TTL either way.
+pub async fn emit_variables_changed(org_id: &str) -> Result<(), Error> {
+    emit_put(&format!(
+        "{SYNTHETICS_WATCHER_PREFIX}{KIND_VARIABLE}/{org_id}"
+    ))
+    .await
 }
 
 /// An agent re-registered, so its capabilities may have changed.
@@ -112,6 +125,10 @@ async fn apply(key: &str) {
         },
         Some(KIND_LOCATION) => crate::table::synthetics_locations::invalidate_cache().await,
         Some(KIND_TOKEN) => crate::table::synthetics_probe_tokens::invalidate_cache(),
+        Some(KIND_VARIABLE) => match parts.get(2) {
+            Some(org) => crate::table::synthetics_variables::invalidate_cache(org),
+            None => log::error!("watch_synthetics: malformed variable key {key}"),
+        },
         Some(KIND_AGENT) => match parts.get(2) {
             Some(agent_id) => crate::table::synthetics_agents::invalidate_cache(agent_id),
             None => log::error!("watch_synthetics: malformed agent key {key}"),
@@ -141,6 +158,7 @@ mod tests {
             format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_LOCATION}/all"),
             format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_TOKEN}/o"),
             format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_AGENT}/a"),
+            format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_VARIABLE}/o"),
         ] {
             assert!(k.starts_with(SYNTHETICS_WATCHER_PREFIX), "{k}");
         }

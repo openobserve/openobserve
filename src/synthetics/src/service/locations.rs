@@ -673,7 +673,10 @@ pub(crate) async fn validate_against_capabilities(
         &allowed_devices,
         is_create,
     )
-    .map_err(|e| anyhow::anyhow!("validation: {e}"))
+    .map_err(|e| anyhow::anyhow!("validation: {e}"))?;
+    // Environments are a registry lookup like locations, so they are checked
+    // here rather than in `validate`, which has no database.
+    super::variables::validate_environments(org_id, &body.environments).await
 }
 
 /// The org token and install command a private location hands back, or
