@@ -145,25 +145,22 @@ describe("RemoteTasksPage", () => {
     expect(wrapper.text()).not.toContain("v0");
   });
 
-  // A task holding a write-only secret cannot be re-sent, so Edit has to be
-  // shut off rather than fail on submit.
-  it("disables Edit for a task the platform cannot round-trip", async () => {
+  it("allows editing a task that uses a write-only signing secret", async () => {
     list.mockResolvedValue([
-      task({ entityId: "open" }),
-      task({ entityId: "locked", auth: { type: "bearer", usesSecret: true } }),
+      task({
+        entityId: "signed",
+        signing: { enabled: true, usesSecret: true },
+      }),
     ]);
     const wrapper = mountPage();
     await flushPromises();
 
     expect(
-      wrapper.get('[data-test="ai-remote-tasks-edit-open"]').attributes("disabled"),
+      wrapper.get('[data-test="ai-remote-tasks-edit-signed"]').attributes("disabled"),
     ).toBeUndefined();
-    expect(
-      wrapper.get('[data-test="ai-remote-tasks-edit-locked"]').attributes("disabled"),
-    ).toBeDefined();
 
-    await wrapper.get('[data-test="ai-remote-tasks-edit-locked"]').trigger("click");
-    expect(push).not.toHaveBeenCalled();
+    await wrapper.get('[data-test="ai-remote-tasks-edit-signed"]').trigger("click");
+    expect(push).toHaveBeenCalled();
   });
 
   // The list endpoint carries no reference count, so it is derived from the

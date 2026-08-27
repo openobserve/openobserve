@@ -22,7 +22,9 @@ import type {
   CreateRemoteTaskHeaderPayload,
   CreateRemoteTaskPayload,
   CreateRemoteTaskSigningPayload,
+  RemoteTaskHeaderPayload,
   RemoteTaskHttpMethod,
+  RemoteTaskPayload,
 } from "@/services/remote-tasks.service";
 
 export const REMOTE_TASK_AUTH_TYPES = ["none", "bearer", "basic", "api_key_header"] as const;
@@ -40,7 +42,7 @@ const boundedNumber = (min: number, max: number, message: string) =>
 
 export const makeRemoteTaskSchema = (
   t: (_key: string) => string,
-  options: { requireHttps: boolean },
+  options: { requireHttps: boolean; preserveSecrets?: boolean },
 ) =>
   z
     .object({
@@ -54,7 +56,13 @@ export const makeRemoteTaskSchema = (
       password: z.string().optional().default(""),
       authHeaderName: z.string().optional().default(""),
       headers: z
-        .array(z.object({ key: z.string().default(""), value: z.string().default("") }))
+        .array(
+          z.object({
+            key: z.string().default(""),
+            value: z.string().default(""),
+            usesSecret: z.boolean().optional(),
+          }),
+        )
         .default([]),
       requestTemplate: z.string().optional().default(""),
       responseSchema: filled(
@@ -104,14 +112,14 @@ export const makeRemoteTaskSchema = (
         }
       };
 
-      if (values.authType === "bearer") {
+      if (!options.preserveSecrets && values.authType === "bearer") {
         requireFilled(
           values.token,
           "token",
           t("aiObservability.remoteTasks.form.validation.tokenRequired"),
         );
       }
-      if (values.authType === "basic") {
+      if (!options.preserveSecrets && values.authType === "basic") {
         requireFilled(
           values.username,
           "username",
@@ -123,7 +131,7 @@ export const makeRemoteTaskSchema = (
           t("aiObservability.remoteTasks.form.validation.passwordRequired"),
         );
       }
-      if (values.authType === "api_key_header") {
+      if (!options.preserveSecrets && values.authType === "api_key_header") {
         requireFilled(
           values.authHeaderName,
           "authHeaderName",
@@ -156,7 +164,7 @@ export const makeRemoteTaskSchema = (
             message: t("aiObservability.remoteTasks.form.validation.headerReserved"),
           });
         }
-        if (!value) {
+        if (!value && !(options.preserveSecrets && header.usesSecret)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["headers", index, "value"],
@@ -169,7 +177,7 @@ export const makeRemoteTaskSchema = (
       // means the generator failed rather than that the operator skipped a
       // field. Registering unsigned-but-marked-signed would be worse than
       // refusing.
-      if (values.signingEnabled && !values.signingKey.trim()) {
+      if (!options.preserveSecrets && values.signingEnabled && !values.signingKey.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["signingKey"],
@@ -234,8 +242,18 @@ function signingPayload(values: RemoteTaskFormValues): CreateRemoteTaskSigningPa
 
 function headerPayloads(values: RemoteTaskFormValues): CreateRemoteTaskHeaderPayload[] {
   return values.headers
-    .filter((header) => header.key.trim() && header.value.trim())
+    .filter((header) => !header.usesSecret && header.key.trim() && header.value.trim())
     .map((header) => ({ key: header.key.trim(), value: header.value.trim() }));
+}
+
+function draftHeaderPayloads(values: RemoteTaskFormValues): RemoteTaskHeaderPayload[] {
+  return values.headers
+    .filter((header) => header.key.trim() && (header.usesSecret || header.value.trim()))
+    .map((header) =>
+      header.usesSecret
+        ? { key: header.key.trim() }
+        : { key: header.key.trim(), value: header.value.trim() },
+    );
 }
 
 /** Explicit keys, never a spread: the form carries discriminator fields the API
@@ -260,45 +278,46 @@ export function toCreatePayload(values: RemoteTaskFormValues): CreateRemoteTaskP
   };
 }
 
-/**
- * The draft-save payload. It carries no secret material at all — secrets are
- * owned by the dedicated auth/header/signing routes — which is why edit is only
- * offered for a task that holds none (see `canEditRemoteTask`).
- */
-export function toDraftPayload(values: RemoteTaskFormValues, fromVersion?: number) {
+/** The server carries its own write-only references into this edited draft. */
+export function toDraftPayload(
+  values: RemoteTaskFormValues,
+  fromVersion?: number,
+): RemoteTaskPayload {
   const template = values.requestTemplate.trim();
-  const headers = headerPayloads(values);
+  const headers = draftHeaderPayloads(values);
   return {
     name: values.name.trim(),
     description: values.description.trim() || null,
     endpoint: values.endpoint.trim(),
     httpMethod: values.httpMethod as RemoteTaskHttpMethod,
-    auth: { type: "none" as const },
     ...(headers.length ? { customHeaders: headers } : {}),
     requestTemplate: template || null,
     responseSchema: values.responseSchema.trim(),
     timeoutMs: Number(values.timeoutSeconds) * 1000,
     maxAttempts: Number(values.maxAttempts),
     maxConcurrency: Number(values.maxConcurrency),
-    signing: { enabled: false },
     ...(fromVersion !== undefined ? { fromVersion } : {}),
   };
 }
 
-/** Prefill for the edit form. Only reached for a task carrying no secrets, so
- *  every credential field stays blank by construction. */
+/** Prefill the visible credential shape while keeping all material blank. */
 export function remoteTaskToFormValues(task: {
   name: string;
   description?: string | null;
   endpoint: string;
   httpMethod: string;
-  customHeaders: { key: string; value?: string }[];
+  auth: { type: string; headerName?: string };
+  customHeaders: { key: string; value?: string; usesSecret?: boolean }[];
   requestTemplate?: string | null;
   responseSchema: string;
   timeoutMs: number;
   maxAttempts: number;
   maxConcurrency: number;
+  signing: { enabled: boolean };
 }): RemoteTaskFormValues {
+  const authType = (REMOTE_TASK_AUTH_TYPES as readonly string[]).includes(task.auth.type)
+    ? (task.auth.type as RemoteTaskFormValues["authType"])
+    : "none";
   return {
     ...remoteTaskFormDefaults(),
     name: task.name,
@@ -306,15 +325,19 @@ export function remoteTaskToFormValues(task: {
     httpMethod: (REMOTE_TASK_METHODS as readonly string[]).includes(task.httpMethod)
       ? (task.httpMethod as RemoteTaskHttpMethod)
       : "POST",
+    authType,
+    authHeaderName: task.auth.headerName ?? "",
     endpoint: task.endpoint,
     headers: task.customHeaders.map((header) => ({
       key: header.key,
       value: header.value ?? "",
+      usesSecret: header.usesSecret ?? false,
     })),
     requestTemplate: task.requestTemplate ?? "",
     responseSchema: task.responseSchema,
     timeoutSeconds: String(Math.round(task.timeoutMs / 1000)),
     maxAttempts: String(task.maxAttempts),
     maxConcurrency: String(task.maxConcurrency),
+    signingEnabled: task.signing.enabled,
   };
 }

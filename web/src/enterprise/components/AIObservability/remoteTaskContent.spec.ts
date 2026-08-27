@@ -86,14 +86,12 @@ describe("canEditRemoteTask", () => {
     expect(canEditRemoteTask(task())).toBe(true);
   });
 
-  // Every one of these holds a write-only secret reference the client is never
-  // given, so re-sending the spec would drop or invalidate it.
   it.each([
     ["auth", { auth: { type: "bearer" as const, usesSecret: true } }],
     ["signing", { signing: { enabled: true, usesSecret: true } }],
     ["a header", { customHeaders: [{ key: "x-api-key", usesSecret: true }] }],
-  ])("refuses a task whose %s holds a secret", (_label, overrides) => {
-    expect(canEditRemoteTask(task(overrides as Partial<RemoteTask>))).toBe(false);
+  ])("allows a task whose %s holds a server-managed secret", (_label, overrides) => {
+    expect(canEditRemoteTask(task(overrides as Partial<RemoteTask>))).toBe(true);
   });
 
   it("refuses a retired head", () => {

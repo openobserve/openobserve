@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :content="
                   canEdit(row)
                     ? t('aiObservability.remoteTasks.edit')
-                    : t('aiObservability.remoteTasks.editSecretLocked')
+                    : t('aiObservability.remoteTasks.statusHint.retired')
                 "
               />
             </OButton>

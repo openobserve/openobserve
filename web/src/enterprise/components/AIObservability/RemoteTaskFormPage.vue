@@ -127,7 +127,8 @@
                 :label="t('aiObservability.remoteTasks.form.headerNameLabel')"
                 :placeholder="t('aiObservability.remoteTasks.form.headerNamePlaceholder')"
                 size="sm"
-                required
+                :disabled="mode === 'edit'"
+                :required="mode === 'create'"
                 data-test="ai-remote-task-form-auth-header-input"
               />
 
@@ -139,7 +140,8 @@
                 :label="t('aiObservability.remoteTasks.form.tokenLabel')"
                 :placeholder="t('aiObservability.remoteTasks.form.tokenPlaceholder')"
                 size="sm"
-                required
+                :disabled="mode === 'edit'"
+                :required="mode === 'create'"
                 data-test="ai-remote-task-form-token-input"
               />
 
@@ -151,7 +153,8 @@
                     name="username"
                     :label="t('aiObservability.remoteTasks.form.usernameLabel')"
                     size="sm"
-                    required
+                    :disabled="mode === 'edit'"
+                    :required="mode === 'create'"
                     data-test="ai-remote-task-form-username-input"
                   />
                 </div>
@@ -162,7 +165,8 @@
                     revealable
                     :label="t('aiObservability.remoteTasks.form.passwordLabel')"
                     size="sm"
-                    required
+                    :disabled="mode === 'edit'"
+                    :required="mode === 'create'"
                     data-test="ai-remote-task-form-password-input"
                   />
                 </div>
@@ -191,20 +195,26 @@
                 <!-- Index key, never a stable id: OForm resolves a field name once
                      at creation, so reordering on delete would leave each surviving
                      input bound to its old index. -->
-                <div v-for="(_, index) in headers" :key="index" class="flex items-start gap-2">
+                <div v-for="(header, index) in headers" :key="index" class="flex items-start gap-2">
                   <div class="min-w-0 flex-1">
                     <OFormInput
                       :name="`headers[${index}].key`"
                       :placeholder="t('aiObservability.remoteTasks.form.headerKeyPlaceholder')"
                       size="sm"
+                      :disabled="Boolean(header.usesSecret)"
                       :data-test="`ai-remote-task-form-header-key-${index}`"
                     />
                   </div>
                   <div class="min-w-0 flex-1">
                     <OFormInput
                       :name="`headers[${index}].value`"
-                      :placeholder="t('aiObservability.remoteTasks.form.headerValuePlaceholder')"
+                      :placeholder="
+                        header.usesSecret
+                          ? raw('••••••••')
+                          : t('aiObservability.remoteTasks.form.headerValuePlaceholder')
+                      "
                       size="sm"
+                      :disabled="Boolean(header.usesSecret)"
                       :data-test="`ai-remote-task-form-header-value-${index}`"
                     />
                   </div>
@@ -213,6 +223,7 @@
                     size="icon-sm"
                     icon-left="delete"
                     :aria-label="t('aiObservability.remoteTasks.form.removeHeader')"
+                    :disabled="Boolean(header.usesSecret)"
                     :data-test="`ai-remote-task-form-header-remove-${index}`"
                     @click="removeHeader(index)"
                   />
@@ -343,7 +354,7 @@
                 :disabled="mode === 'edit'"
                 data-test="ai-remote-task-form-signing-toggle"
               />
-              <template v-if="signingEnabled">
+              <template v-if="signingEnabled && mode === 'create'">
                 <!-- The key is shown BEFORE the register button, not after:
                      the test connection is signed with it, so it has to be in
                      the operator's own service before that call goes out. -->
@@ -545,7 +556,10 @@ const endpointHelp = computed<I18nText>(() =>
 );
 
 // Built once, not computed: useOForm hands the schema straight to TanStack.
-const schema = makeRemoteTaskSchema(t as unknown as (_key: string) => string, { requireHttps });
+const schema = makeRemoteTaskSchema(t as unknown as (_key: string) => string, {
+  requireHttps,
+  preserveSecrets: mode.value === "edit",
+});
 
 const form = useOForm<RemoteTaskFormValues>({
   defaultValues: remoteTaskFormDefaults(),
@@ -567,7 +581,7 @@ function onSubmit(values: RemoteTaskFormValues) {
 const authType = form.useStore((state: any) => state.values.authType as string);
 const signingEnabled = form.useStore((state: any) => state.values.signingEnabled as boolean);
 const headers = form.useStore(
-  (state: any) => state.values.headers as { key: string; value: string }[],
+  (state: any) => state.values.headers as { key: string; value: string; usesSecret?: boolean }[],
 );
 const nameValue = form.useStore((state: any) => String(state.values.name ?? ""));
 const endpointValue = form.useStore((state: any) => String(state.values.endpoint ?? ""));
@@ -591,6 +605,7 @@ const headerShape = raw(SIGNATURE_HEADER_SHAPE);
 // A key exists from the instant signing is switched on, so the operator can put
 // it in their own service before the (signed) test connection runs.
 watch(signingEnabled, (enabled) => {
+  if (mode.value === "edit") return;
   if (enabled && !signingKey.value) form.setFieldValue("signingKey", generateSigningKey());
   if (!enabled) {
     form.setFieldValue("signingKey", "");
@@ -628,7 +643,10 @@ const submitLabel = computed<I18nText>(() => {
 });
 
 function addHeader() {
-  form.setFieldValue("headers", [...(headers.value ?? []), { key: "", value: "" }]);
+  form.setFieldValue("headers", [
+    ...(headers.value ?? []),
+    { key: "", value: "", usesSecret: false },
+  ]);
 }
 
 function removeHeader(index: number) {
@@ -733,7 +751,7 @@ async function publish(values: RemoteTaskFormValues) {
     }
 
     const result = await remoteTasksService.testConnection(orgId.value, entityId, currentSample());
-    testReport.value = result.report;
+    testReport.value = result.report ?? null;
 
     if (!result.published) {
       testState.value = "failed";
@@ -813,7 +831,7 @@ async function loadForEdit() {
   try {
     const task: RemoteTask = await remoteTasksService.get(orgId.value, routeEntityId.value);
     if (!canEditRemoteTask(task)) {
-      toast({ variant: "error", message: t("aiObservability.remoteTasks.editSecretLocked") });
+      toast({ variant: "error", message: t("aiObservability.remoteTasks.statusHint.retired") });
       goBack();
       return;
     }

@@ -26,19 +26,9 @@ export function remoteTaskVersionLabel(task: RemoteTask): I18nText | null {
   return task.isDraft ? null : raw(`v${task.version}`);
 }
 
-/**
- * Whether the platform can round-trip this task's draft.
- *
- * `PUT /tasks/{id}` re-sends the whole spec, and the server resolves each secret
- * reference by its exact string — but a reference is write-only and never
- * reaches the client. So a task holding any secret cannot be edited until the
- * server can carry its own references over.
- */
+/** Retired heads are immutable; active heads can always create an edit draft. */
 export function canEditRemoteTask(task: RemoteTask): boolean {
-  if (!task.isActive) return false;
-  if (task.auth.usesSecret) return false;
-  if (task.signing.enabled) return false;
-  return !task.customHeaders.some((header) => header.usesSecret);
+  return task.isActive;
 }
 
 /** The whole placeholder vocabulary a body template may name. Anything else is

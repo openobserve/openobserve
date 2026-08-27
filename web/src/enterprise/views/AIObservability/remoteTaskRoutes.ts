@@ -22,8 +22,7 @@ export function aiRemoteTaskCreateRoute(orgIdentifier: string): RouteLocationRaw
   return { name: "aiRemoteTaskCreate", query: { org_identifier: orgIdentifier } };
 }
 
-/** The edit form. Only reachable for a task the platform can round-trip — see
- *  `canEditRemoteTask`. */
+/** The edit form for an active Remote Task head. */
 export function aiRemoteTaskEditRoute(orgIdentifier: string, entityId: string): RouteLocationRaw {
   return {
     name: "aiRemoteTaskEdit",

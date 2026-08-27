@@ -52,7 +52,7 @@
         <OTooltip
           v-if="!canEdit"
           side="bottom"
-          :content="t('aiObservability.remoteTasks.editSecretLocked')"
+          :content="t('aiObservability.remoteTasks.statusHint.retired')"
         />
       </OButton>
       <OButton

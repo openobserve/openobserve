@@ -11109,6 +11109,17 @@
           "experiments": "Experiments"
         },
         "searchPlaceholder": "Search Items...",
+        "csvImport": {
+          "button": "Upload CSV",
+          "title": "Upload Dataset Items",
+          "description": "Import dataset items from a CSV file.",
+          "fileLabel": "CSV file",
+          "placeholder": "Choose a CSV file",
+          "help": "Required column: input. Optional columns: expected_output and tags (pipe-delimited or JSON array). Maximum size: 10 MiB.",
+          "success": "Imported {imported} items from {filename}; skipped {skipped} rows",
+          "error": "Failed to import CSV",
+          "sizeError": "CSV file must be 10 MiB or smaller"
+        },
         "columns": {
           "input": "Input (Purified)",
           "expectedOutput": "Expected Output",
@@ -11333,7 +11344,6 @@
       "signingOn": "HMAC",
       "referencedBy": "{count} experiment | {count} experiments",
       "edit": "Edit",
-      "editSecretLocked": "A task with a stored credential cannot be edited yet: the platform never returns the secret reference, so the draft cannot be sent back.",
       "delete": {
         "title": "Delete Remote Task",
         "message": "Delete “{name}”? Its published versions stay for history but stop being referenceable, so any experiment pinned to one will fail to start.",

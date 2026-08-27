@@ -13,6 +13,10 @@ import {
 const t = (key: string) => key;
 const schema = makeRemoteTaskSchema(t, { requireHttps: true });
 const selfHostedSchema = makeRemoteTaskSchema(t, { requireHttps: false });
+const editSchema = makeRemoteTaskSchema(t, {
+  requireHttps: true,
+  preserveSecrets: true,
+});
 
 function values(overrides: Partial<RemoteTaskFormValues> = {}): RemoteTaskFormValues {
   return {
@@ -186,14 +190,22 @@ describe("toCreatePayload", () => {
 });
 
 describe("toDraftPayload", () => {
-  // A draft save carries no material at all — secrets belong to the dedicated
-  // auth/header/signing routes — which is why edit is offered only for a task
-  // that holds none.
-  it("carries no secret material and no signing", () => {
-    const payload = toDraftPayload(values({ authType: "bearer", token: "abc" }), 3);
-    expect(payload.auth).toEqual({ type: "none" });
-    expect(payload.signing).toEqual({ enabled: false });
+  it("leaves credential references for the server to carry forward", () => {
+    const payload = toDraftPayload(
+      values({
+        authType: "bearer",
+        token: "abc",
+        signingEnabled: true,
+        signingKey: "signing-key",
+        headers: [{ key: "x-api-key", value: "", usesSecret: true }],
+      }),
+      3,
+    );
+    expect(payload.auth).toBeUndefined();
+    expect(payload.signing).toBeUndefined();
+    expect(payload.customHeaders).toEqual([{ key: "x-api-key" }]);
     expect(JSON.stringify(payload)).not.toContain("abc");
+    expect(JSON.stringify(payload)).not.toContain("signing-key");
     expect(payload.fromVersion).toBe(3);
   });
 
@@ -209,21 +221,23 @@ describe("remoteTaskToFormValues", () => {
       description: "does things",
       endpoint: "https://tasks.example.com/run",
       httpMethod: "PATCH",
-      customHeaders: [{ key: "x-team", value: "search" }],
+      auth: { type: "bearer" },
+      customHeaders: [{ key: "x-team", value: "search", usesSecret: false }],
       requestTemplate: null,
       responseSchema: "$.answer",
       timeoutMs: 90_000,
       maxAttempts: 2,
       maxConcurrency: 8,
+      signing: { enabled: true },
     });
     expect(form.httpMethod).toBe("PATCH");
     expect(form.timeoutSeconds).toBe("90");
     expect(form.maxConcurrency).toBe("8");
-    expect(form.headers).toEqual([{ key: "x-team", value: "search" }]);
+    expect(form.headers).toEqual([{ key: "x-team", value: "search", usesSecret: false }]);
     expect(form.responseSchema).toBe("$.answer");
-    // Credentials are never returned, so they stay blank by construction.
     expect(form.token).toBe("");
-    expect(form.authType).toBe("none");
+    expect(form.authType).toBe("bearer");
+    expect(form.signingEnabled).toBe(true);
   });
 
   it("falls back to POST for a method the form cannot offer", () => {
@@ -231,12 +245,27 @@ describe("remoteTaskToFormValues", () => {
       name: "x",
       endpoint: "https://x.example.com",
       httpMethod: "DELETE",
+      auth: { type: "none" },
       customHeaders: [],
       responseSchema: "$.output",
       timeoutMs: 1000,
       maxAttempts: 1,
       maxConcurrency: 1,
+      signing: { enabled: false },
     });
     expect(form.httpMethod).toBe("POST");
   });
+});
+
+it("validates an edit with stored credentials but no returned material", () => {
+  const result = editSchema.safeParse(
+    values({
+      authType: "bearer",
+      token: "",
+      signingEnabled: true,
+      signingKey: "",
+      headers: [{ key: "x-api-key", value: "", usesSecret: true }],
+    }),
+  );
+  expect(result.success).toBe(true);
 });

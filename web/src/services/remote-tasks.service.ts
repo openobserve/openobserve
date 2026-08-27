@@ -122,6 +122,7 @@ export interface RemoteTaskPayload {
   maxAttempts?: number;
   maxConcurrency?: number;
   signing?: RemoteTaskSigningPayload;
+  /** Omitted credential fields retain their server-owned Secret references. */
   /** The published version an edit started from. Ignored when a draft exists. */
   fromVersion?: number;
 }
@@ -235,7 +236,8 @@ export interface RemoteTaskPublishResult {
   versionBumped: boolean;
   error?: string;
   task: RemoteTask;
-  report: RemoteTaskVerificationReport;
+  /** Null when a description-only update correctly skipped the connection test. */
+  report: RemoteTaskVerificationReport | null;
 }
 
 export interface RemoteTaskTestRunSample {

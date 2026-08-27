@@ -308,31 +308,52 @@ describe("RemoteTaskFormPage — editing", () => {
     expect((wrapper.vm as any).draftFromVersion).toBe(3);
   });
 
-  // Opening the edit route directly for a secret-bearing task must not present a
-  // form whose submit could only ever strip the credential.
-  it("refuses to edit a task holding a secret", async () => {
+  it("edits a signed task without exposing or replacing its secret", async () => {
     route.params = { id: "head-1" };
     get.mockResolvedValue({
       entityId: "head-1",
       name: "summarizer",
       endpoint: "https://tasks.example.com/run",
       httpMethod: "POST",
-      auth: { type: "bearer", usesSecret: true },
+      auth: { type: "none", usesSecret: false },
       customHeaders: [],
       responseSchema: "$.output",
       timeoutMs: 60_000,
       maxAttempts: 3,
       maxConcurrency: 4,
-      signing: { enabled: false, usesSecret: false },
+      signing: { enabled: true, usesSecret: true, keyId: "k1" },
       isDraft: false,
       version: 1,
       isActive: true,
       verificationStatus: "verified",
     });
-    mountForm();
+    saveDraft.mockResolvedValue({});
+    testConnection.mockResolvedValue({
+      published: true,
+      versionBumped: true,
+      task: { version: 2 },
+      report,
+    });
+    const wrapper = mountForm();
     await flushPromises();
 
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "aiRemoteTasks" }));
+    expect((wrapper.vm as any).form.state.values.signingEnabled).toBe(true);
+    expect((wrapper.vm as any).form.state.values.signingKey).toBe("");
+
+    (wrapper.vm as any).form.setFieldValue("endpoint", "https://tasks.example.com/v2/run");
+    await submit(wrapper);
+
+    expect(saveDraft).toHaveBeenCalledWith(
+      "acme",
+      "head-1",
+      expect.objectContaining({
+        endpoint: "https://tasks.example.com/v2/run",
+        fromVersion: 1,
+      }),
+    );
+    const payload = saveDraft.mock.calls[0][2];
+    expect(payload).not.toHaveProperty("auth");
+    expect(payload).not.toHaveProperty("signing");
+    expect(testConnection).toHaveBeenCalledWith("acme", "head-1", expect.any(Object));
   });
 });
