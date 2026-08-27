@@ -1442,10 +1442,8 @@
       "location": "Localisation",
       "pageUrl": "URL de la page",
       "noMessage": "Aucun message d'erreur n'a été capturé.",
-      "copyLink": "Copier le lien",
       "copyLinkHint": "Copier un lien permanent vers cette erreur",
-      "copyEventId": "Copier l'ID de l'événement",
-      "linkCopied": "Lien copié dans le presse-papiers"
+      "copyEventId": "Copier l'ID de l'événement"
     },
     "translatingStackTrace": "Traduction de la trace de pile avec les source maps...",
     "translatingStackTraceHint": "Cela peut prendre quelques instants",
@@ -2742,11 +2740,7 @@
       "incidentNoExtraFields": "Cet événement n'ajoute aucun champ au-delà des champs courants.",
       "conditionNoteTitle": "Directives de condition",
       "functionFlattenTitle": "Avant vs Après aplatissement",
-      "conditionNoteEmpty": "Pour vérifier une valeur vide, utilisez \"\". Exemple :",
-      "conditionNoteNull": "Pour vérifier une valeur nulle, utilisez null. Exemple :",
       "conditionNoteCustom": "Pour ajouter une colonne personnalisée, tapez son nom et appuyez sur Entrée.",
-      "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null",
       "functionBody": "Reformez la charge utile avec une fonction",
       "functionBodySet": "Applique {name}",
       "functionSelect": "Sélectionner une fonction",
@@ -2954,9 +2948,6 @@
     "delayInfoLine2": "p. ex. un délai de 10 minutes signifie que le pipeline s'exécutera 10 minutes après son heure planifiée.",
     "closeDrawer": "Fermer le panneau",
     "conditionValueGuidelines": "Directives pour la valeur de condition :",
-    "emptyValueGuideline": "Pour vérifier une valeur vide, utilisez",
-    "exampleColon": ". Exemple :",
-    "nullValueGuideline": "Pour vérifier une valeur nulle, utilisez",
     "customColumnGuideline": "Pour ajouter une colonne personnalisée, saisissez le nom de la colonne et appuyez sur",
     "enterKey": "Entrée",
     "conditionsNotMetWarning": "Si les conditions ne sont pas remplies, l'enregistrement sera supprimé.",
@@ -13864,7 +13855,9 @@
       "aiToolsetsRefresh": "Actualiser la liste",
       "orgManagementRefresh": "Actualiser la liste",
       "rumErrorsRefresh": "Actualiser la liste",
+      "rumErrorsCopyUrl": "Copier l'URL de partage du suivi des erreurs",
       "rumSessionsRefresh": "Actualiser la liste",
+      "rumSessionsCopyUrl": "Copier l'URL de partage de session replay",
       "sourceMapsRefresh": "Actualiser la liste"
     }
   },

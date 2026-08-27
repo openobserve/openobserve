@@ -163,12 +163,11 @@ describe("WorkflowCondition", () => {
       const wrapper = createWrapper();
       const note = wrapper.find('[data-test="workflow-condition-note"]');
       expect(note.exists()).toBe(true);
-      // the two example snippets the note calls out
-      expect(note.text()).toContain('severity != ""');
-      expect(note.text()).toContain("severity != null");
-      // Count the BULLET icons specifically — the note also carries a dismiss
-      // button, so a blanket icon count breaks whenever its chrome changes.
-      expect(note.findAll('[data-name="info"]').length).toBe(3);
+      // Only the custom-column bullet remains — the null/empty value hints are
+      // obsolete now that dedicated is_null/is_empty operators exist. Count the
+      // BULLET icons specifically — the note also carries a dismiss button, so
+      // a blanket icon count breaks whenever its chrome changes.
+      expect(note.findAll('[data-name="info"]').length).toBe(1);
     });
   });
 
