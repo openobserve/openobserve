@@ -27,20 +27,16 @@ EOF
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
     cargo nextest --version >/dev/null || cargo install cargo-nextest
-    # share one instrumented build between init-db and nextest instead of building the workspace twice
-    source <(cargo llvm-cov show-env --export-prefix --no-cfg-coverage --no-cfg-coverage-nightly)
-    # show-env mode skips llvm-cov's auto-clean; stale profraw or uninstrumented artifacts would corrupt coverage
-    cargo llvm-cov clean --workspace
-    # profile output goes outside the scanned tree so the init-db run stays out of coverage
-    LLVM_PROFILE_FILE="$(mktemp -d)/init-db-%p.profraw" cargo run -- init-db
-    # nested `cargo llvm-cov nextest` under show-env would clean and rebuild the artifacts shared above
-    cargo nextest run \
+    cargo run -- init-db
+    cargo llvm-cov nextest \
         --workspace \
+        --verbose \
+        --no-cfg-coverage \
+        --no-cfg-coverage-nightly \
+        --ignore-filename-regex 'job|.*generated.*' \
         --test-threads=1 \
         --no-fail-fast \
-        --retries 1
-    cargo llvm-cov report \
-        --ignore-filename-regex 'job|.*generated.*' \
+        --retries 1 \
         "$@"
 }
 
