@@ -111,7 +111,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
-import { useRumShareUrl } from "@/composables/rum/useRumShareUrl";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -131,8 +130,7 @@ export default defineComponent({
     const activePerformanceTab = ref("overview");
     const activePerformanceComponent = ref(null);
     const { performanceState } = usePerformance();
-    useRum();
-    const { shareUrl } = useRumShareUrl();
+    const { shareUrl } = useRum();
 
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);

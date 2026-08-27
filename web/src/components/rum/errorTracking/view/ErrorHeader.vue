@@ -127,7 +127,7 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
-import { useRumShareUrl } from "@/composables/rum/useRumShareUrl";
+import useRum from "@/composables/rum/useRum";
 
 const props = defineProps<{
   error: Record<string, any>;
@@ -135,7 +135,7 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const router = useRouter();
-const { shareUrl } = useRumShareUrl();
+const { shareUrl } = useRum();
 
 // "handled" is the only safe state — treat missing/other values as unhandled.
 const isUnhandled = computed(() => props.error.error_handling !== "handled");

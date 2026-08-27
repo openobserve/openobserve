@@ -149,7 +149,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
-import { useRumShareUrl } from "@/composables/rum/useRumShareUrl";
+import useRum from "@/composables/rum/useRum";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
@@ -174,7 +174,7 @@ const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
 const { t } = useI18nTyped();
-const { shareUrl } = useRumShareUrl();
+const { shareUrl } = useRum();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);

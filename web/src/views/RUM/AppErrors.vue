@@ -285,7 +285,7 @@ import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtil
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
-import { useRumShareUrl } from "@/composables/rum/useRumShareUrl";
+import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -589,7 +589,7 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
-const { shareUrl } = useRumShareUrl();
+const { shareUrl } = useRum();
 const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
 
 onBeforeMount(() => {

@@ -24,11 +24,14 @@ vi.mock("@/composables/rum/usePerformance", () => ({
   }),
 }));
 
-vi.mock("@/composables/rum/useRum", () => ({
-  default: () => ({
-    rumState: mockRumState,
-  }),
-}));
+// Only rumState is faked — the rest of useRum (shareUrl) stays real so the share
+// link is exercised rather than mocked.
+vi.mock("@/composables/rum/useRum", async (importOriginal) => {
+  const actual = await importOriginal<{ default: () => Record<string, unknown> }>();
+  return {
+    default: () => ({ ...actual.default(), rumState: mockRumState }),
+  };
+});
 
 // Mock utility functions
 vi.mock("@/utils/commons.ts", () => ({
