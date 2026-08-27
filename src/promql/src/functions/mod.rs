@@ -289,10 +289,12 @@ where
             let mut result_samples = Vec::with_capacity(timestamps.len());
             let mut start_index = 0;
             let mut end_index = 0;
-            let counter = func
-                .counter_extrapolation()
-                .filter(|_| CounterSeries::amortizes(timestamps.len(), eval_ctx.step, range_micros))
-                .map(|kind| CounterSeries::new(&metric.samples, kind));
+            let counter = CounterSeries::try_new(
+                &metric.samples,
+                func.counter_extrapolation(),
+                eval_ctx,
+                range_micros,
+            );
 
             // For each eval timestamp, compute the function value
             for &eval_ts in &timestamps {

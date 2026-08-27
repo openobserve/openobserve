@@ -420,6 +420,11 @@ impl EvalContext {
         self.start == self.end
     }
 
+    /// More than one evaluation window, and consecutive windows overlap.
+    pub fn windows_overlap(&self, range_micros: i64) -> bool {
+        self.end - self.start >= self.step && self.step <= range_micros
+    }
+
     /// Get all evaluation timestamps
     pub fn timestamps(&self) -> Vec<i64> {
         if self.is_instant() {
@@ -681,17 +686,25 @@ pub struct CounterSeries<'a> {
 }
 
 impl<'a> CounterSeries<'a> {
-    /// True when the one-pass reset scan can amortize: multiple evaluation
-    /// windows that overlap (`step <= range`). Otherwise the legacy per-window
-    /// scan touches fewer samples.
-    pub fn amortizes(eval_points: usize, step: i64, range_micros: i64) -> bool {
-        eval_points > 1 && step <= range_micros
+    /// Builds the per-series reset state when `kind` is a counter function
+    /// and the one-pass scan can amortize over overlapping windows; `None`
+    /// keeps the caller on the per-window scan.
+    pub fn try_new(
+        samples: &'a [Sample],
+        kind: Option<ExtrapolationKind>,
+        eval_ctx: &EvalContext,
+        range_micros: i64,
+    ) -> Option<Self> {
+        let kind = kind?;
+        eval_ctx
+            .windows_overlap(range_micros)
+            .then(|| Self::new(samples, kind))
     }
 
     /// # Panics
     ///
     /// Panics if `kind` is not a counter kind.
-    pub fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
+    fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
         assert!(kind.is_counter(), "CounterSeries requires a counter kind");
         let mut resets = Vec::new();
         for i in 1..samples.len() {
@@ -1173,15 +1186,16 @@ mod tests {
     }
 
     #[test]
-    fn test_counter_series_amortizes() {
+    fn test_eval_context_windows_overlap() {
         const MINUTE: i64 = 60 * 1_000_000;
+        let ctx = |end, step| EvalContext::new(MINUTE, MINUTE + end, step, "test".into());
         // Overlapping windows: 15s step inside a 5m range.
-        assert!(CounterSeries::amortizes(721, MINUTE / 4, 5 * MINUTE));
+        assert!(ctx(180 * MINUTE, MINUTE / 4).windows_overlap(5 * MINUTE));
         // Adjacent windows still reuse the boundary sample.
-        assert!(CounterSeries::amortizes(2, 5 * MINUTE, 5 * MINUTE));
+        assert!(ctx(5 * MINUTE, 5 * MINUTE).windows_overlap(5 * MINUTE));
         // Disjoint windows (1h step, 5m range) or a single window cannot.
-        assert!(!CounterSeries::amortizes(168, 60 * MINUTE, 5 * MINUTE));
-        assert!(!CounterSeries::amortizes(1, MINUTE / 4, 5 * MINUTE));
+        assert!(!ctx(7 * 24 * 60 * MINUTE, 60 * MINUTE).windows_overlap(5 * MINUTE));
+        assert!(!ctx(0, MINUTE / 4).windows_overlap(5 * MINUTE));
     }
 
     #[test]
@@ -1298,10 +1312,9 @@ mod tests {
                     match (legacy, prefixed) {
                         (None, None) => {}
                         (Some(legacy), Some(prefixed)) => {
-                            let tolerance =
-                                legacy.abs().max(prefixed.abs()).max(f64::MIN_POSITIVE) * 1.0e-9;
-                            assert!(
-                                (legacy - prefixed).abs() <= tolerance,
+                            assert_eq!(
+                                legacy.to_bits(),
+                                prefixed.to_bits(),
                                 "series {series} eval_ts {eval_ts} {kind:?}: {legacy} vs {prefixed}",
                             );
                         }

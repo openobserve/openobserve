@@ -97,11 +97,12 @@ pub(crate) fn fused_range_agg(
                     let range_micros = micros(range);
                     let mut start_index = 0;
                     let mut end_index = 0;
-                    let counter = counter_kind
-                        .filter(|_| {
-                            CounterSeries::amortizes(timestamps.len(), eval_ctx.step, range_micros)
-                        })
-                        .map(|kind| CounterSeries::new(&metric.samples, kind));
+                    let counter = CounterSeries::try_new(
+                        &metric.samples,
+                        counter_kind,
+                        eval_ctx,
+                        range_micros,
+                    );
 
                     for (slot, &eval_ts) in timestamps.iter().enumerate() {
                         let window_samples = advance_sample_window(
