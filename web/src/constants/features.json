@@ -192,15 +192,6 @@
       }
     },
     {
-      "id": "action_scripts",
-      "category": "enterprise",
-      "availability": {
-        "opensource": false,
-        "enterprise": true,
-        "cloud": false
-      }
-    },
-    {
       "id": "sensitive_data_redaction",
       "category": "enterprise",
       "availability": {

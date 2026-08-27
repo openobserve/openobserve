@@ -272,7 +272,6 @@ import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
 import templateService from "@/services/alert_templates";
-import actions from "@/services/action_scripts";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
@@ -1414,7 +1413,6 @@ const getResourceEntities = (resource: Resource | Entity) => {
     metadata: getMetadataStreams,
     report: getReports,
     service_accounts: getServiceAccounts,
-    action_scripts: getActionScripts,
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
     rfolder: getReportFolders,
@@ -1764,16 +1762,6 @@ const getMetadataStreams = async () => {
   const metadata: any = await getStreams("metadata", false);
 
   updateResourceEntities("metadata", ["name"], metadata.list);
-
-  return new Promise((resolve) => {
-    resolve(true);
-  });
-};
-
-const getActionScripts = async () => {
-  const actionScripts = await actions.list(store.state.selectedOrganization.identifier);
-
-  updateResourceEntities("action_scripts", ["id"], [...actionScripts.data], false, "name");
 
   return new Promise((resolve) => {
     resolve(true);

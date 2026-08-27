@@ -204,37 +204,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </span>
 
-                  <!-- Action ID Error -->
-                  <span
-                    class="text-status-negative"
-                    v-else-if="
-                      typeof errorMessage === 'object' && errorMessage.field == 'action_id'
-                    "
-                  >
-                    {{ errorMessage.message }}
-                    <div>
-                      <OSelect
-                        data-test="destination-import-action-input"
-                        :model-value="userSelectedActionId[index] || ''"
-                        @update:model-value="
-                          (val) => {
-                            userSelectedActionId[index] = val;
-                            updateDestinationAction(val, index);
-                            actionErrors[index] = getCorrectionRequiredError(val);
-                          }
-                        "
-                        :options="filteredActions"
-                        :label="raw(t('alert_destinations.import.actions') + ' *')"
-                        labelKey="label"
-                        valueKey="value"
-                        class="showLabelOnTop no-case w-75! py-2"
-                        :error="!!actionErrors[index]"
-                        :error-message="raw(actionErrors[index])"
-                        @search="filterActions"
-                      />
-                    </div>
-                  </span>
-
                   <!-- Skip TLS Verify Error -->
                   <span
                     class="text-status-negative"
@@ -295,13 +264,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, reactive, onMounted } from "vue";
+import { defineComponent, ref, computed, reactive } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import destinationService from "@/services/alert_destination";
 import BaseImport from "../common/BaseImport.vue";
-import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -341,7 +309,6 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
-    const { isActionsEnabled } = useActions();
 
     const baseImportRef = ref<any>(null);
     const destinationErrorsToDisplay = ref<destinationErrors>([]);
@@ -357,12 +324,9 @@ export default defineComponent({
     const userSelectedDestinationName = ref<any[]>([]);
     const userSelectedDestinationUrl = ref<any[]>([]);
     const userSelectedEmails = ref<any[]>([]);
-    const userSelectedActionId = ref<any[]>([]);
     const userSelectedSkipTlsVerify = ref<SwitchValue[]>([]);
     const filteredTemplates = ref<string[]>([]);
-    const filteredActions = ref<any[]>([]);
     const templateErrors = reactive<Record<number, string>>({});
-    const actionErrors = reactive<Record<number, string>>({});
 
     // Use computed to directly reference BaseImport's jsonArrayOfObj
     const jsonArrayOfObj = computed({
@@ -389,34 +353,6 @@ export default defineComponent({
         })
         .map((template: any) => template.name);
     });
-
-    const userSelectedActionOptions = ref([]);
-
-    onMounted(async () => {
-      try {
-        const actionsData = await store.dispatch("getActions", {
-          org_identifier: store.state.selectedOrganization.identifier,
-        });
-        // Filter to only show service-type actions
-        userSelectedActionOptions.value = actionsData.list
-          .filter((action: any) => action.execution_details_type === "service")
-          .map((action: any) => ({
-            label: raw(action.name),
-            value: action.id,
-          }));
-        filteredActions.value = userSelectedActionOptions.value;
-      } catch (error) {
-        console.error("Error fetching actions:", error);
-      }
-    });
-
-    const getServiceActions = () => {
-      return (
-        store.state.organizationData.actions.filter(
-          (action: any) => action.execution_details_type === "service",
-        ) || []
-      );
-    };
 
     const updateDestinationType = (type: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -458,14 +394,6 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationAction = (id: SelectModelValue, index: number) => {
-      if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].action_id = id;
-        // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
-      }
-    };
-
     const updateDestinationEmails = (emails: string | number, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         // OInput is a text field here, so the emitted value is always a string.
@@ -497,17 +425,6 @@ export default defineComponent({
       );
     };
 
-    const filterActions = (val: string) => {
-      if (!val) {
-        filteredActions.value = userSelectedActionOptions.value;
-        return;
-      }
-      const needle = val.toLowerCase();
-      filteredActions.value = userSelectedActionOptions.value.filter(
-        (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
-      );
-    };
-
     const importJson = async ({ jsonStr: jsonString }: any) => {
       // Validate correction fields that are currently displayed
       let hasCorrectionErrors = false;
@@ -518,13 +435,6 @@ export default defineComponent({
               const requiredError = getCorrectionRequiredError(userSelectedTemplates.value[idx]);
               if (requiredError) {
                 templateErrors[idx] = requiredError;
-                hasCorrectionErrors = true;
-              }
-            }
-            if (msg.field === "action_id") {
-              const requiredError = getCorrectionRequiredError(userSelectedActionId.value[idx]);
-              if (requiredError) {
-                actionErrors[idx] = requiredError;
                 hasCorrectionErrors = true;
               }
             }
@@ -614,7 +524,7 @@ export default defineComponent({
     };
 
     // Single source of truth for the correction "required" rule. The template
-    // and action correction controls plus the pre-import correction gate below
+    // correction control plus the pre-import correction gate below
     // all defer to this instead of re-deriving the required message inline, so
     // the destination JS validator owns the rule in one place.
     const getCorrectionRequiredError = (value: any): string =>
@@ -640,36 +550,10 @@ export default defineComponent({
       }
 
       // Validate type
-      if (
-        !input.type ||
-        (input.type !== "email" && input.type !== "http" && input.type !== "action")
-      ) {
+      if (!input.type || (input.type !== "email" && input.type !== "http")) {
         destinationErrors.push({
           message: t("alert_destinations.import.typeInvalid", { index }),
           field: "type",
-        });
-      }
-
-      // Check if action type is supported when actions are not enabled
-      if (input.type === "action" && !isActionsEnabled.value) {
-        destinationErrors.push(t("alert_destinations.import.actionTypeNotSupported", { index }));
-      }
-
-      // Validate action_id exists when type is action
-      const availableActions = getServiceActions().map((action: any) => action.id);
-
-      if (
-        isActionsEnabled.value &&
-        input.type === "action" &&
-        !availableActions.includes(input.action_id)
-      ) {
-        destinationErrors.push({
-          message: t("alert_destinations.import.actionNotFound", {
-            index,
-            actionId: input.action_id,
-            type: input.type,
-          }),
-          field: "action_id",
         });
       }
 
@@ -770,16 +654,6 @@ export default defineComponent({
         }
       }
 
-      // Validate action_id if actions are enabled
-      if (isActionsEnabled.value) {
-        if (input.action_id && typeof input.action_id !== "string") {
-          destinationErrors.push({
-            message: t("alert_destinations.import.actionIdInvalid", { index }),
-            field: "action_id",
-          });
-        }
-      }
-
       if (destinationErrors.length > 0) {
         destinationErrorsToDisplay.value.push(destinationErrors);
         return false;
@@ -846,23 +720,17 @@ export default defineComponent({
       userSelectedDestinationUrl,
       userSelectedTemplates,
       userSelectedEmails,
-      userSelectedActionId,
       userSelectedSkipTlsVerify,
       filteredTemplates,
-      filteredActions,
       templateErrors,
-      actionErrors,
       updateDestinationType,
       updateDestinationMethod,
       updateDestinationName,
       updateDestinationUrl,
       updateDestinationTemplate,
-      updateDestinationAction,
       updateDestinationEmails,
       updateSkipTlsVerify,
       filterTemplates,
-      filterActions,
-      getServiceActions,
       getCorrectionRequiredError,
       arrowBackFn,
       isDestinationImporting,
