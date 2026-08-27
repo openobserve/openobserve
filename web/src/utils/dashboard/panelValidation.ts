@@ -49,7 +49,7 @@ const validateConditionItem = (t: TranslateFn, condition: any, errors: string[])
     }
 
     if (
-      !["Is Null", "Is Not Null", "Is Empty", "Is Not Empty"].includes(condition.operator) &&
+      !["Is Null", "Is Not Null"].includes(condition.operator) &&
       (condition.value == null || condition.value == "")
     ) {
       errors.push(t("dashboard.utils.filterConditionValueRequired", { column: condition.column }));

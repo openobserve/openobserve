@@ -1487,30 +1487,6 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toBe("status IS NOT NULL");
     });
 
-    it("should build condition with Is Empty operator", () => {
-      const condition = {
-        type: "condition",
-        operator: "Is Empty",
-        column: {
-          field: "status",
-        },
-      };
-      const result = buildCondition(condition, mockDashboardPanelData);
-      expect(result).toBe("(status IS NULL OR status = '')");
-    });
-
-    it("should build condition with Is Not Empty operator", () => {
-      const condition = {
-        type: "condition",
-        operator: "Is Not Empty",
-        column: {
-          field: "status",
-        },
-      };
-      const result = buildCondition(condition, mockDashboardPanelData);
-      expect(result).toBe("(status IS NOT NULL AND status != '')");
-    });
-
     it("should build condition with IN operator", () => {
       const condition = {
         type: "condition",
