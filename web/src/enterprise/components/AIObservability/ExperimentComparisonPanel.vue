@@ -103,6 +103,15 @@
           <OTag size="sm" icon="" :variant="bucketVariant(row.bucket)" :label="bucketLabel(row)" />
         </template>
 
+        <template #cell-input="{ row }">
+          <span
+            class="text-text-body max-w-[32rem] text-xs break-words whitespace-pre-wrap"
+            data-test="ai-experiment-comparison-row-input"
+          >
+            {{ displayRowInput(row.input) }}
+          </span>
+        </template>
+
         <template
           v-for="dimension in comparison.dimensions"
           :key="dimensionColumnId(dimension)"
@@ -445,9 +454,9 @@ function selectBucket(key: string) {
 
 const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>(() => [
   {
-    id: "logicalId",
+    id: "input",
     header: t("aiObservability.experiments.comparePage.panel.datasetRow"),
-    accessorKey: "logicalId",
+    accessorFn: (row) => displayRowInput(row.input),
     sortable: true,
   },
   {
@@ -462,6 +471,16 @@ const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>((
     accessorKey: dimensionColumnId(dimension),
   })),
 ]);
+
+function displayRowInput(input: unknown): string {
+  if (input == null) return "—";
+  if (typeof input === "string") return input;
+  try {
+    return JSON.stringify(input) ?? String(input);
+  } catch {
+    return String(input);
+  }
+}
 
 function dimensionColumnId(dimension: ExperimentComparisonDimension) {
   return `dimension:${dimensionIdentity(dimension)}`;

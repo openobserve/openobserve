@@ -20,6 +20,7 @@ use openobserve_core::llm_evaluations::{
     experiment_comparison as domain, experiment_results::ScoringStatus,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
 
 #[derive(Clone, Debug, Deserialize, IntoParams)]
@@ -109,6 +110,7 @@ pub struct ExperimentComparisonDimensionBody {
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentComparisonRowBody {
     pub logical_id: String,
+    pub input: Value,
     pub baseline_row_id: Option<String>,
     pub candidate_row_id: Option<String>,
     pub bucket: ExperimentComparisonBucketBody,
@@ -307,6 +309,7 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
                 .into_iter()
                 .map(|row| ExperimentComparisonRowBody {
                     logical_id: row.logical_id,
+                    input: row.input,
                     baseline_row_id: row.baseline_row_id,
                     candidate_row_id: row.candidate_row_id,
                     bucket: row.bucket.into(),
@@ -322,6 +325,24 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn comparison_row_json_exposes_the_dataset_input() {
+        let body = ExperimentComparisonRowBody {
+            logical_id: "row-1".to_string(),
+            input: json!({"question": "What changed?", "tags": ["release", "api"]}),
+            baseline_row_id: Some("baseline-row".to_string()),
+            candidate_row_id: Some("candidate-row".to_string()),
+            bucket: ExperimentComparisonBucketBody::Unchanged,
+            dimensions: vec![],
+        };
+
+        let value = serde_json::to_value(body).unwrap();
+        assert_eq!(
+            value["input"],
+            json!({"question": "What changed?", "tags": ["release", "api"]})
+        );
+    }
 
     #[test]
     fn dimension_json_exposes_score_type_and_categorical_labels() {

@@ -82,6 +82,7 @@ const comparison: ExperimentComparison = {
   rows: [
     {
       logicalId: "case-1",
+      input: { question: "What changed?", context: ["release", "api"] },
       baselineRowId: "old-row",
       candidateRowId: "new-row",
       bucket: "regressed",
@@ -89,6 +90,7 @@ const comparison: ExperimentComparison = {
     },
     {
       logicalId: "case-2",
+      input: "A newly added row",
       baselineRowId: null,
       candidateRowId: "fresh-row",
       bucket: "new",
@@ -131,6 +133,7 @@ const stubs = {
         emits: ["row-click"],
         template: `<div><slot name="subheader" />
             <div v-for="row in data" :key="row.logicalId" data-test="row" @click="$emit('row-click', row, $event)">
+              <slot name="cell-input" :row="row" />
               <slot name="cell-bucket" :row="row" />
             </div></div>`,
       },
@@ -459,5 +462,14 @@ describe("ExperimentComparisonPanel", () => {
     // The second argument is the FILTERED order, so the drawer pages through
     // what the user is actually looking at.
     expect(wrapper.emitted("inspect")?.[0]).toEqual([comparison.rows[0], comparison.rows]);
+  });
+
+  it("shows the dataset input instead of the logical row ID", () => {
+    const wrapper = mountPanel();
+    const rows = wrapper.findAll('[data-test="row"]');
+
+    expect(rows[0].text()).toContain('{"question":"What changed?","context":["release","api"]}');
+    expect(rows[0].text()).not.toContain("case-1");
+    expect(rows[1].text()).toContain("A newly added row");
   });
 });

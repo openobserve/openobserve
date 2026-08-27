@@ -88,6 +88,7 @@ describe("normalizeExperimentComparison()", () => {
       rows: [
         {
           logical_id: "row-1",
+          input: { question: "What changed?", tags: ["release", "api"] },
           bucket: "regressed",
           dimensions: [dimension],
         },
@@ -104,6 +105,10 @@ describe("normalizeExperimentComparison()", () => {
     expect(normalized.rows[0].dimensions[0]).toMatchObject({
       scoreConfigName: "answer_quality",
       orientedDelta: -0.2,
+    });
+    expect(normalized.rows[0].input).toEqual({
+      question: "What changed?",
+      tags: ["release", "api"],
     });
   });
 });

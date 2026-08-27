@@ -74,6 +74,7 @@ function detail(experimentId: string, output: string, score: number): Experiment
 
 const row = {
   logicalId: "case-1",
+  input: { question: "When?" },
   baselineRowId: "old-row",
   candidateRowId: "new-row",
   bucket: "regressed" as const,

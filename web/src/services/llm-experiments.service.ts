@@ -309,6 +309,7 @@ export interface ExperimentComparisonSummaryDimension extends ExperimentComparis
 
 export interface ExperimentComparisonRow {
   logicalId: string;
+  input: unknown;
   baselineRowId: string | null;
   candidateRowId: string | null;
   bucket: ExperimentComparisonBucket;
@@ -666,6 +667,7 @@ export function normalizeExperimentComparison(input: any): ExperimentComparison 
     })),
     rows: value<any[]>(input, "rows", "rows", []).map((row) => ({
       logicalId: value(row, "logicalId", "logical_id", ""),
+      input: value(row, "input", "input", null),
       baselineRowId: value(row, "baselineRowId", "baseline_row_id", null),
       candidateRowId: value(row, "candidateRowId", "candidate_row_id", null),
       bucket: row.bucket,
