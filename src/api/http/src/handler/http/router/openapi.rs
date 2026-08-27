@@ -557,7 +557,6 @@ pub struct ApiDoc;
     openobserve_api_management::request::playground::delete_playground_snapshot,
     openobserve_api_management::request::playground::run_playground_cell,
     openobserve_api_management::request::playground::score_playground_cell,
-    openobserve_api_management::request::playground::seed_playground_from_span,
     openobserve_api_management::request::playground::list_provider_models,
     openobserve_api_management::request::remote_tasks::list_remote_tasks,
     openobserve_api_management::request::remote_tasks::create_remote_task,

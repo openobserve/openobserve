@@ -16,26 +16,22 @@
 
 use axum::{
     body::Body,
-    extract::{Path, Query},
-    http::StatusCode,
+    extract::{Path, Query, rejection::JsonRejection},
+    http::{HeaderValue, StatusCode, header::RETRY_AFTER},
     response::Response,
 };
 use db::authz::{remove_ownership, set_ownership};
 use futures::StreamExt;
 use openobserve_api_common::extractors::Headers;
-use o2_enterprise::enterprise::llm_evaluations::{
-    eval_jobs::{
-        hydration,
-        tasks::{EvaluationQueryWindow, EvaluationTargetScope},
-    },
-    playground_seed,
-};
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
     llm_evaluations::{
         experiment_runner::render_prompt,
         playground::{self, PlaygroundError},
-        provider::{PreparedProvider, ProviderChatMessage, ProviderChatParams, RawProviderConfig},
+        provider::{
+            PreparedProvider, ProviderChatMessage, ProviderChatParams,
+            ProviderStreamStartError, RawProviderConfig,
+        },
         provider_stream::ProviderChatDelta,
         sync_scoring::{self, SyncScoringError},
     },
@@ -46,10 +42,10 @@ use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::playground::{
         ListPlaygroundSnapshotsQuery, ListPlaygroundSnapshotsResponseBody, PlaygroundColumnBody,
-        PlaygroundMessageBody, PlaygroundRunRequestBody, PlaygroundScoreRequestBody,
-        PlaygroundScoreResponseBody, PlaygroundSnapshotDiffResponseBody,
-        PlaygroundSnapshotResponseBody, ProviderModelsResponseBody, SeedFromSpanRequestBody,
-        SeedFromSpanResponseBody, SeededColumnBody, SharePlaygroundSnapshotRequestBody,
+        PlaygroundRunRequestBody, PlaygroundScoreRequestBody, PlaygroundScoreResponseBody,
+        PlaygroundSnapshotDiffResponseBody,
+        PlaygroundSnapshotResponseBody, ProviderModelsResponseBody,
+        SharePlaygroundSnapshotRequestBody,
     },
 };
 
@@ -83,6 +79,27 @@ fn playground_error_response(error: PlaygroundError) -> Response {
             MetaHttpResponse::internal_error("Internal server error")
         }
     }
+}
+
+fn provider_stream_start_error_response(error: ProviderStreamStartError) -> Response {
+    let retry_after = error
+        .retry_after()
+        .and_then(|value| HeaderValue::from_str(value).ok());
+    let mut response = match error.http_status() {
+        400 => MetaHttpResponse::bad_request(error.to_string()),
+        429 => MetaHttpResponse::too_many_requests(error.to_string()),
+        502 => MetaHttpResponse::bad_gateway(error.to_string()),
+        504 => MetaHttpResponse::error_with_header(StatusCode::GATEWAY_TIMEOUT, error.to_string()),
+        _ => MetaHttpResponse::internal_error("Internal server error"),
+    };
+    if let Some(value) = retry_after {
+        response.headers_mut().insert(RETRY_AFTER, value);
+    }
+    response
+}
+
+fn json_rejection_response(error: JsonRejection) -> Response {
+    MetaHttpResponse::error_with_header(error.status(), error.body_text())
 }
 
 /// Confirm the caller may see this snapshot.
@@ -148,6 +165,63 @@ async fn require_provider_visibility(
     }
 }
 
+/// Confirm the caller may use every scorer before resolving or invoking any of
+/// them. Hidden scorers are reported as absent so their ids cannot be probed.
+async fn require_scorer_visibility(
+    org_id: &str,
+    scorer_ids: &[String],
+    user_id: &str,
+) -> Result<(), Response> {
+    let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
+        org_id, user_id, "GET", "scorer",
+    )
+    .await
+    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
+
+    if let Some(hidden_id) = scorer_ids.iter().find(|scorer_id| {
+        !is_ofga_object_visible(org_id, "scorer", scorer_id, permitted.as_deref())
+    }) {
+        return Err(MetaHttpResponse::not_found(format!(
+            "Scorer '{hidden_id}' not found"
+        )));
+    }
+    Ok(())
+}
+
+/// Confirm the caller may use every provider referenced by an LLM judge
+/// scorer. The permission lookup is shared across the whole batch.
+async fn require_scorer_provider_visibility(
+    org_id: &str,
+    scorers: &[infra::table::scorers::Scorer],
+    user_id: &str,
+) -> Result<(), Response> {
+    let provider_ids = scorers
+        .iter()
+        .filter(|scorer| {
+            scorer.scorer_type == infra::table::scorers::ScorerType::LlmJudge
+        })
+        .filter_map(|scorer| scorer.params.get("provider_id").and_then(Value::as_str))
+        .collect::<std::collections::HashSet<_>>();
+    if provider_ids.is_empty() {
+        return Ok(());
+    }
+
+    let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
+        org_id, user_id, "GET", "provider",
+    )
+    .await
+    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
+
+    if provider_ids.iter().any(|provider_id| {
+        !is_ofga_object_visible(org_id, "provider", provider_id, permitted.as_deref())
+    }) {
+        return Err(MetaHttpResponse::forbidden(
+            "Not allowed to use a provider configured by this scorer",
+        ));
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Snapshots
 // ---------------------------------------------------------------------------
@@ -158,6 +232,7 @@ async fn require_provider_visibility(
     context_path = "/api",
     tag = "Playground",
     operation_id = "SharePlaygroundSnapshot",
+    security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(SharePlaygroundSnapshotRequestBody)),
     responses(
@@ -168,8 +243,12 @@ async fn require_provider_visibility(
 pub async fn share_playground_snapshot(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,
-    axum::Json(body): axum::Json<SharePlaygroundSnapshotRequestBody>,
+    body: Result<axum::Json<SharePlaygroundSnapshotRequestBody>, JsonRejection>,
 ) -> Response {
+    let axum::Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => return json_rejection_response(error),
+    };
     match playground::create(
         &org_id,
         &user.user_id,
@@ -192,6 +271,7 @@ pub async fn share_playground_snapshot(
     context_path = "/api",
     tag = "Playground",
     operation_id = "ListPlaygroundSnapshots",
+    security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), ListPlaygroundSnapshotsQuery),
     responses((status = 200, body = inline(ListPlaygroundSnapshotsResponseBody))),
 )]
@@ -213,18 +293,29 @@ pub async fn list_playground_snapshots(
     };
 
     let size = query.size.unwrap_or(DEFAULT_LIST_SIZE).clamp(1, MAX_LIST_SIZE);
-    match playground::list(&org_id, query.from.unwrap_or(0), size).await {
-        Ok(mut page) => {
-            page.snapshots.retain(|snapshot| {
-                is_ofga_object_visible(
-                    &org_id,
-                    PLAYGROUND_RESOURCE,
-                    &snapshot.id,
-                    permitted.as_deref(),
-                )
-            });
-            MetaHttpResponse::json(ListPlaygroundSnapshotsResponseBody::from(page))
+    let all_object = format!("{PLAYGROUND_RESOURCE}:_all_{org_id}");
+    let visible_ids = permitted.as_ref().and_then(|objects| {
+        if objects.contains(&all_object) {
+            None
+        } else {
+            let prefix = format!("{PLAYGROUND_RESOURCE}:");
+            Some(
+                objects
+                    .iter()
+                    .filter_map(|object| object.strip_prefix(&prefix).map(str::to_string))
+                    .collect::<Vec<_>>(),
+            )
         }
+    });
+    match playground::list_visible(
+        &org_id,
+        query.from.unwrap_or(0),
+        size,
+        visible_ids.as_deref(),
+    )
+    .await
+    {
+        Ok(page) => MetaHttpResponse::json(ListPlaygroundSnapshotsResponseBody::from(page)),
         Err(error) => playground_error_response(error),
     }
 }
@@ -235,6 +326,7 @@ pub async fn list_playground_snapshots(
     context_path = "/api",
     tag = "Playground",
     operation_id = "GetPlaygroundSnapshot",
+    security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("snapshot_id" = String, Path, description = "Snapshot id"),
@@ -265,6 +357,7 @@ pub async fn get_playground_snapshot(
     context_path = "/api",
     tag = "Playground",
     operation_id = "DiffPlaygroundSnapshot",
+    security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("snapshot_id" = String, Path, description = "Snapshot id"),
@@ -296,6 +389,7 @@ pub async fn diff_playground_snapshot(
     context_path = "/api",
     tag = "Playground",
     operation_id = "DeletePlaygroundSnapshot",
+    security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("snapshot_id" = String, Path, description = "Snapshot id"),
@@ -367,14 +461,16 @@ fn render_messages(
         .iter()
         .map(|message| {
             let content = match &message.content {
-                Some(Value::String(text)) => render_prompt(text, input).map_err(|error| {
-                    MetaHttpResponse::bad_request(format!(
-                        "Message for role '{}' could not be rendered: {error}",
-                        message.role
-                    ))
-                })?,
-                Some(other) => other.to_string(),
-                None => String::new(),
+                Some(Value::String(text)) => Value::String(
+                    render_prompt(text, input).map_err(|error| {
+                        MetaHttpResponse::bad_request(format!(
+                            "Message for role '{}' could not be rendered: {error}",
+                            message.role
+                        ))
+                    })?,
+                ),
+                Some(other) => other.clone(),
+                None => Value::String(String::new()),
             };
             Ok(ProviderChatMessage {
                 role: message.role.clone(),
@@ -386,17 +482,31 @@ fn render_messages(
 
 /// Split the column's params into the fields the provider names explicitly and
 /// the rest, which ride through untouched.
-fn split_params(column: &PlaygroundColumnBody) -> (f64, u32, serde_json::Map<String, Value>) {
+fn split_params(
+    column: &PlaygroundColumnBody,
+) -> Result<(f64, u32, serde_json::Map<String, Value>), String> {
     let mut extra = column.params.clone();
-    let temperature = extra
-        .remove("temperature")
-        .and_then(|value| value.as_f64())
-        .unwrap_or(0.0);
-    let max_tokens = extra
-        .remove("max_tokens")
-        .or_else(|| extra.remove("maxTokens"))
-        .and_then(|value| value.as_u64())
-        .unwrap_or(0) as u32;
+    let temperature = match extra.remove("temperature") {
+        None => 0.0,
+        Some(value) => value
+            .as_f64()
+            .filter(|temperature| (0.0..=2.0).contains(temperature))
+            .ok_or_else(|| "params.temperature must be a number from 0 to 2".to_string())?,
+    };
+    let max_tokens_snake = extra.remove("max_tokens");
+    let max_tokens_camel = extra.remove("maxTokens");
+    if max_tokens_snake.is_some() && max_tokens_camel.is_some() {
+        return Err("params must not contain both max_tokens and maxTokens".to_string());
+    }
+    let max_tokens = match max_tokens_snake.or(max_tokens_camel) {
+        None => 0,
+        Some(value) => u32::try_from(
+            value
+                .as_u64()
+                .ok_or_else(|| "params.max_tokens must be a non-negative integer".to_string())?,
+        )
+        .map_err(|_| "params.max_tokens must be no greater than 4294967295".to_string())?,
+    };
 
     if let Some(tools) = &column.tools {
         extra.insert("tools".to_string(), tools.clone());
@@ -404,7 +514,7 @@ fn split_params(column: &PlaygroundColumnBody) -> (f64, u32, serde_json::Map<Str
     if let Some(response_format) = &column.response_format {
         extra.insert("response_format".to_string(), response_format.clone());
     }
-    (temperature, max_tokens, extra)
+    Ok((temperature, max_tokens, extra))
 }
 
 #[utoipa::path(
@@ -413,19 +523,29 @@ fn split_params(column: &PlaygroundColumnBody) -> (f64, u32, serde_json::Map<Str
     context_path = "/api",
     tag = "Playground",
     operation_id = "RunPlaygroundCell",
+    security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(PlaygroundRunRequestBody)),
     responses(
-        (status = 200, description = "Server-Sent Events carrying the model's answer", body = ()),
+        (status = 200, description = "Server-Sent Events carrying the model's answer", content_type = "text/event-stream"),
         (status = 400, description = "Column or row is not runnable", body = ()),
+        (status = 403, description = "Provider is not visible to the caller", body = ()),
         (status = 404, description = "Provider not found", body = ()),
+        (status = 429, description = "The provider rate limited the request", body = ()),
+        (status = 500, description = "The request could not be started", body = ()),
+        (status = 502, description = "The provider failed before streaming", body = ()),
+        (status = 504, description = "The provider timed out before streaming", body = ()),
     ),
 )]
 pub async fn run_playground_cell(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,
-    axum::Json(body): axum::Json<PlaygroundRunRequestBody>,
+    body: Result<axum::Json<PlaygroundRunRequestBody>, JsonRejection>,
 ) -> Response {
+    let axum::Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => return json_rejection_response(error),
+    };
     if let Err(response) =
         require_provider_visibility(&org_id, &body.column.provider_id, &user.user_id).await
     {
@@ -443,7 +563,10 @@ pub async fn run_playground_cell(
         Err(response) => return response,
     };
 
-    let (temperature, max_tokens, extra) = split_params(&body.column);
+    let (temperature, max_tokens, extra) = match split_params(&body.column) {
+        Ok(params) => params,
+        Err(error) => return MetaHttpResponse::bad_request(error),
+    };
     let params = ProviderChatParams {
         org_id: org_id.clone(),
         model: body.column.model.clone(),
@@ -472,7 +595,7 @@ pub async fn run_playground_cell(
                 user.user_id,
                 body.column.provider_id
             );
-            return MetaHttpResponse::bad_request(error.to_string());
+            return provider_stream_start_error_response(error);
         }
     };
 
@@ -541,30 +664,52 @@ pub async fn run_playground_cell(
     context_path = "/api",
     tag = "Playground",
     operation_id = "ScorePlaygroundCell",
+    security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(PlaygroundScoreRequestBody)),
     responses(
         (status = 200, body = inline(PlaygroundScoreResponseBody)),
+        (status = 403, description = "A scorer provider is not visible to the caller", body = ()),
         (status = 404, description = "A referenced scorer does not exist", body = ()),
+        (status = 500, description = "Scorer resolution failed", body = ()),
     ),
 )]
 pub async fn score_playground_cell(
     Path(org_id): Path<String>,
-    axum::Json(body): axum::Json<PlaygroundScoreRequestBody>,
+    Headers(user): Headers<UserEmail>,
+    body: Result<axum::Json<PlaygroundScoreRequestBody>, JsonRejection>,
 ) -> Response {
+    let axum::Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => return json_rejection_response(error),
+    };
     let scorer_ids = body.scorer_ids.clone();
-    match sync_scoring::score_all(&org_id, &scorer_ids, &body.into()).await {
-        Ok(results) => MetaHttpResponse::json(PlaygroundScoreResponseBody {
-            results: results.into_iter().map(Into::into).collect(),
-        }),
+    if let Err(response) =
+        require_scorer_visibility(&org_id, &scorer_ids, &user.user_id).await
+    {
+        return response;
+    }
+
+    let scorers = match sync_scoring::resolve_all(&org_id, &scorer_ids).await {
+        Ok(scorers) => scorers,
         Err(SyncScoringError::ScorerNotFound(id)) => {
-            MetaHttpResponse::not_found(format!("Scorer '{id}' not found"))
+            return MetaHttpResponse::not_found(format!("Scorer '{id}' not found"));
         }
         Err(SyncScoringError::InfraError(error)) => {
             log::error!("[Playground] scoring failed: {error}");
-            MetaHttpResponse::internal_error("Internal server error")
+            return MetaHttpResponse::internal_error("Internal server error");
         }
+    };
+    if let Err(response) =
+        require_scorer_provider_visibility(&org_id, &scorers, &user.user_id).await
+    {
+        return response;
     }
+
+    let results = sync_scoring::score_resolved_all(&org_id, &scorers, &body.into()).await;
+    MetaHttpResponse::json(PlaygroundScoreResponseBody {
+        results: results.into_iter().map(Into::into).collect(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -577,19 +722,28 @@ pub async fn score_playground_cell(
     context_path = "/api",
     tag = "Providers",
     operation_id = "ListProviderModels",
+    security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("provider_id" = String, Path, description = "Provider id"),
     ),
     responses(
         (status = 200, body = inline(ProviderModelsResponseBody)),
+        (status = 403, description = "Provider is not visible to the caller", body = ()),
         (status = 404, description = "Provider not found", body = ()),
         (status = 502, description = "The provider could not be reached", body = ()),
     ),
 )]
 pub async fn list_provider_models(
     Path((org_id, provider_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
 ) -> Response {
+    if let Err(response) =
+        require_provider_visibility(&org_id, &provider_id, &user.user_id).await
+    {
+        return response;
+    }
+
     let configured_models = match infra::table::providers::get(&provider_id).await {
         Ok(Some(provider)) if provider.org_id == org_id => provider.available_models.clone(),
         Ok(_) => return MetaHttpResponse::not_found("Provider not found"),
@@ -618,86 +772,60 @@ pub async fn list_provider_models(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Seeding from a trace
-// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::playground::PlaygroundMessageBody;
 
-/// Spans read from one trace while looking for the requested one.
-const MAX_TRACE_SPANS: usize = 500;
-
-#[utoipa::path(
-    post,
-    path = "/{org_id}/playground/seed_from_span",
-    context_path = "/api",
-    tag = "Playground",
-    operation_id = "SeedPlaygroundFromSpan",
-    params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = inline(SeedFromSpanRequestBody)),
-    responses(
-        (status = 200, body = inline(SeedFromSpanResponseBody)),
-        (status = 400, description = "The search window is invalid", body = ()),
-        (status = 404, description = "No such span in that trace and window", body = ()),
-    ),
-)]
-pub async fn seed_playground_from_span(
-    Path(org_id): Path<String>,
-    axum::Json(body): axum::Json<SeedFromSpanRequestBody>,
-) -> Response {
-    // The whole trace is fetched and the span picked out of it: hydration keys
-    // span scope on `span_id` alone, so asking for the trace is what actually
-    // guarantees the span belongs to the trace the caller named.
-    let rows = match hydration::hydrate_target(
-        &org_id,
-        &body.stream,
-        "traces",
-        EvaluationTargetScope::Trace,
-        &body.trace_id,
-        EvaluationQueryWindow {
-            start_us: body.start_time,
-            end_us: body.end_time,
-            ingest_cutoff_us: None,
-        },
-        MAX_TRACE_SPANS,
-    )
-    .await
-    {
-        Ok(rows) => rows,
-        Err(error) => {
-            log::warn!("[Playground] seed hydration failed for trace {}: {error}", body.trace_id);
-            return MetaHttpResponse::bad_request(error.to_string());
+    fn column(params: Value) -> PlaygroundColumnBody {
+        PlaygroundColumnBody {
+            provider_id: "provider-1".to_string(),
+            model: Some("model-1".to_string()),
+            messages: Vec::new(),
+            params: params.as_object().cloned().unwrap_or_default(),
+            tools: None,
+            response_format: None,
         }
-    };
+    }
 
-    let Some(row) = playground_seed::find_span(&rows, &body.span_id) else {
-        return MetaHttpResponse::not_found(
-            "Span not found in that trace and time range",
+    #[test]
+    fn playground_params_reject_invalid_or_ambiguous_core_values() {
+        assert!(split_params(&column(json!({"temperature": "hot"}))).is_err());
+        assert!(split_params(&column(json!({"temperature": 2.1}))).is_err());
+        assert!(split_params(&column(json!({"max_tokens": -1}))).is_err());
+        assert!(split_params(&column(json!({"max_tokens": 1_u64 << 32}))).is_err());
+        assert!(
+            split_params(&column(json!({"max_tokens": 10, "maxTokens": 11}))).is_err()
         );
-    };
 
-    let seed = playground_seed::seed_from_span_row(row);
+        let (temperature, max_tokens, extra) =
+            split_params(&column(json!({"temperature": 0.7, "maxTokens": 64, "top_p": 0.9})))
+                .unwrap();
+        assert_eq!(temperature, 0.7);
+        assert_eq!(max_tokens, 64);
+        assert_eq!(extra["top_p"], json!(0.9));
+    }
 
-    let providers = infra::table::providers::get_all_by_org(&org_id)
-        .await
-        .unwrap_or_default();
-    let matched = playground_seed::match_provider(&providers, seed.column.model.as_deref());
+    #[test]
+    fn structured_message_content_is_not_stringified() {
+        let mut column = column(json!({}));
+        let structured = json!([
+            {"type": "text", "text": "Describe this"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,AA=="}}
+        ]);
+        column.messages = vec![
+            PlaygroundMessageBody {
+                role: "user".to_string(),
+                content: Some(json!("Hello {{name}}")),
+            },
+            PlaygroundMessageBody {
+                role: "user".to_string(),
+                content: Some(structured.clone()),
+            },
+        ];
 
-    MetaHttpResponse::json(SeedFromSpanResponseBody {
-        column: SeededColumnBody {
-            messages: seed
-                .column
-                .messages
-                .into_iter()
-                .map(|message| PlaygroundMessageBody {
-                    role: message.role,
-                    content: message.content,
-                })
-                .collect(),
-            model: seed.column.model,
-            provider_id: matched.map(|provider| provider.id.clone()),
-            params: seed.column.params,
-            tools: seed.column.tools,
-        },
-        original_output: seed.original_output,
-        provider_matched: matched.is_some(),
-    })
+        let rendered = render_messages(&column, &json!({"name": "Ada"})).unwrap();
+        assert_eq!(rendered[0].content, json!("Hello Ada"));
+        assert_eq!(rendered[1].content, structured);
+    }
 }

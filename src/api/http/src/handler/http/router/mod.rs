@@ -1283,7 +1283,6 @@ pub fn service_routes() -> Router {
                 // but /{snapshot_id}/diff must precede /{snapshot_id}
                 .route("/{org_id}/playground/run", post(playground::run_playground_cell))
                 .route("/{org_id}/playground/score", post(playground::score_playground_cell))
-                .route("/{org_id}/playground/seed_from_span", post(playground::seed_playground_from_span))
                 .route("/{org_id}/playground/snapshots", get(playground::list_playground_snapshots).post(playground::share_playground_snapshot))
                 .route("/{org_id}/playground/snapshots/{snapshot_id}/diff", get(playground::diff_playground_snapshot))
                 .route("/{org_id}/playground/snapshots/{snapshot_id}", get(playground::get_playground_snapshot).delete(playground::delete_playground_snapshot))
