@@ -311,14 +311,10 @@ pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
 
 /// SPEC §6, item 2.3 — the free step pool the synthetics scheduler gates on.
 ///
-/// `openobserve-synthetics` does not depend on `openobserve-core`, so it cannot
-/// reach `trial_quota` itself; this crate depends on both and hands it over.
 /// Passed as an ARGUMENT to `init`, not installed into a cell, so the compiler
-/// refuses to let anyone forget it — an unset pool is §11 **F6**: no error, no
-/// log, an unmetered fleet.
-///
-/// `None` off `cloud`: §8.1, a self-hosted Enterprise build has no pool, and
-/// with no pool the scheduler does not gate (fail open).
+/// will not let anyone forget it: an unset pool is §11 **F6** — no error, no
+/// log, an unmetered fleet. `None` off `cloud` (§8.1): a self-hosted Enterprise
+/// build has no pool, and with no pool the scheduler does not gate (fail open).
 #[cfg(feature = "cloud")]
 fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks> {
     Some(openobserve_synthetics::pool::StepPoolHooks {
@@ -1364,17 +1360,10 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    /// **SPEC §6, item 2.3 — the synthetics scheduler is HANDED the free step
-    /// pool.**
-    ///
-    /// `openobserve-synthetics` cannot reach `openobserve_core::trial_quota`;
-    /// this crate depends on both and is the only place that can wire them
-    /// together. The wiring is a single argument, and losing it is silent:
-    /// `init` still starts every worker, every check still runs, and the pool is
-    /// simply never consulted — an unmetered, ungated fleet with no error
-    /// anywhere. §11 **F6**\'s shape.
-    ///
-    /// The needles are assembled at runtime so this test\'s own source does not
+    /// **SPEC §6, item 2.3.** Losing the pool argument is silent: `init` still
+    /// starts every worker, every check still runs, and the pool is simply never
+    /// consulted — an unmetered, ungated fleet with no error anywhere (§11 F6).
+    /// The needles are assembled at runtime so this test's own source does not
     /// count towards the totals it asserts.
     #[test]
     fn the_synthetics_scheduler_is_handed_the_step_pool() {

@@ -670,8 +670,8 @@ pub async fn set_ai_usage_limit(
     }
 }
 
-/// Guards and applies a limit change for one pool, shared by the AI and
-/// pool-generic routes so they cannot drift apart on who may call them.
+/// Guards and applies a limit change for one pool, shared so the AI and
+/// pool-generic routes cannot drift on who may call them.
 #[cfg(feature = "cloud")]
 async fn set_pool_limit(
     caller_org: &str,
@@ -693,10 +693,7 @@ async fn set_pool_limit(
     Ok(openobserve_core::trial_quota::get_pool_usage(target_org, pool).await)
 }
 
-/// SetQuotaUsageLimit
-///
-/// Pool-generic replacement for `SetAiUsageLimit`. `pool` is a
-/// [`TrialQuotaPool`] key — `ai_credits` or `synthetics_steps`.
+/// SetQuotaUsageLimit — pool-generic replacement for `SetAiUsageLimit`.
 #[cfg(feature = "cloud")]
 #[utoipa::path(
     put,

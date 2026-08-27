@@ -507,11 +507,8 @@ pub struct DueCheck {
     pub next_run_at: i64,
     /// Populated only for browser checks (parsed from config.browser_devices).
     pub browser_devices: Vec<config::meta::synthetics::BrowserDevice>,
-    /// Steps the journey defines right now — 1 for protocol checks, which are
-    /// one step per attempt (spec §1.1). The scheduler freezes this onto every
-    /// job it enqueues, because the ack's clamp ceiling is computed from it and
-    /// a mid-flight edit must not move the ceiling of work already dispatched
-    /// (§4.4.1).
+    /// Steps the journey defines right now — 1 for protocol checks. The scheduler
+    /// freezes it onto each job so a mid-flight edit cannot move the ack's ceiling.
     pub steps_configured: i32,
     pub tags: Vec<String>,
 }
@@ -540,20 +537,14 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
 
         let frequency: SyntheticFrequency = serde_json::from_value(m.frequency).unwrap_or_default();
 
-        // One parse, two answers. `m.config` is moved into `from_value`, so the
-        // fan-out devices and the frozen step count have to come out of the
-        // same call — parsing the same JSON twice per check per scheduler tick
-        // buys nothing.
+        // One parse, two answers: `m.config` is moved into `from_value`, so the
+        // devices and the frozen step count must come out of the same call.
         let (browser_devices, steps_configured) = if check_type == SyntheticType::Browser {
             let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
-            // `unwrap_or_default()` turns an unreadable config into ZERO steps,
-            // and `validate_browser_config` rejects an empty journey on every
-            // create and update — so a 0 here means "could not read the row",
-            // never "the journey defines nothing". Both become a clamp ceiling
-            // of 0 at ack time, i.e. real work billed as nothing, which is the
-            // outcome §4.4.2 forbids. Floored to 1, the same floor protocol
-            // gets. The saturating conversion is belt-and-braces: a negative
-            // count would be a negative ceiling.
+            // `unwrap_or_default()` makes an unreadable config ZERO steps, and
+            // `validate_browser_config` rejects an empty journey — so a 0 means
+            // "could not read the row". A 0 ceiling bills real work as nothing,
+            // hence the floor of 1; saturating stops a negative ceiling.
             let steps = i32::try_from(cfg.steps.len().max(1)).unwrap_or(i32::MAX);
             (cfg.browser_devices, steps)
         } else {
@@ -1067,10 +1058,8 @@ pub(crate) mod tests {
     use super::*;
     use crate::table::entity::synthetics_checks::Model;
 
-    /// `pub(crate)` for `table::synthetics_jobs`' T13 test, which has to enqueue
-    /// a job from a REAL check row and then edit that row: a hand-rolled second
-    /// fixture over there would drift from this one, and the day it did the
-    /// freezing test would stop testing freezing.
+    /// `pub(crate)` for `table::synthetics_jobs`' freezing test, which enqueues
+    /// from a REAL check row: a second fixture there would drift from this one.
     pub(crate) fn make_model() -> Model {
         Model {
             id: "mon-1".to_string(),
@@ -1135,9 +1124,8 @@ pub(crate) mod tests {
         assert_eq!(check_type_to_str(&SyntheticType::Ssh), "ssh");
     }
 
-    /// `check_type_to_str` writes the column; serde reads it back. If the two
-    /// ever disagree on a type, every stored row of that type turns unreadable
-    /// on the next read — so the round-trip is pinned, not assumed.
+    /// `check_type_to_str` writes the column and serde reads it back; if they
+    /// disagree, every stored row of that type turns unreadable on the next read.
     #[test]
     fn test_check_type_to_str_round_trips_through_serde() {
         for t in [
@@ -1155,19 +1143,15 @@ pub(crate) mod tests {
         }
     }
 
-    /// `Api`, `Ping` and `Dns` were removed — no probe ever implemented them.
-    /// A row that still holds one of those strings is now unreadable, and this
-    /// asserts that outcome rather than leaving it undocumented. Both
-    /// conversions are checked because both are on live paths: `Synthetic` for
-    /// the list/get APIs, `DueCheck` for the scheduler.
+    /// `Api`, `Ping` and `Dns` were removed, so a row still holding one is now
+    /// unreadable. Both conversions are on live paths, so both are checked.
     #[test]
     fn test_removed_check_types_make_a_stored_row_unreadable() {
         for dead in ["api", "ping", "dns"] {
             let mut m = make_model();
             m.synthetics_type = dead.to_string();
 
-            // Asserted on the wrapper's own text too: serde already quotes the
-            // unknown variant, so `contains(dead)` alone tests nothing of ours.
+            // serde already quotes the unknown variant, so `contains(dead)` alone proves nothing.
             let err = Synthetic::try_from(m.clone())
                 .err()
                 .unwrap_or_else(|| panic!("{dead} must not convert into Synthetic"));
@@ -1193,8 +1177,7 @@ pub(crate) mod tests {
                 err.contains(dead),
                 "{dead}: the error must name the offending value, got: {err}"
             );
-            // The scheduler converts a whole batch — an error without the row
-            // id names nothing.
+            // The scheduler converts whole batches; an error without the row id is useless.
             assert!(
                 err.contains(&m.id),
                 "{dead}: the DueCheck error must name the check id, got: {err}"
@@ -1202,9 +1185,8 @@ pub(crate) mod tests {
         }
     }
 
-    /// Rewrites `config.steps` to `n` placeholder steps, leaving the rest of
-    /// the browser config alone. `pub(crate)` for the same reason `make_model`
-    /// is — the T13 freezing test in `table::synthetics_jobs` edits a journey.
+    /// Rewrites `config.steps` to `n` placeholder steps. `pub(crate)` for the
+    /// freezing test in `table::synthetics_jobs`, which edits a journey.
     pub(crate) fn with_steps(mut m: Model, n: usize) -> Model {
         m.config["steps"] = serde_json::Value::Array(
             (0..n)
@@ -1214,11 +1196,8 @@ pub(crate) mod tests {
         m
     }
 
-    /// The frozen count is the whole input to the ack's clamp ceiling
-    /// (spec §4.4.1), so it must be the number of steps the journey DEFINES,
-    /// read from the same `BrowserConfig` parse that already produces
-    /// `browser_devices` — a second parse of the same JSON per check per tick
-    /// buys nothing.
+    /// The frozen count must be the number of steps the journey DEFINES, read
+    /// from the same `BrowserConfig` parse that produces `browser_devices`.
     #[test]
     fn a_browser_check_freezes_the_step_count_its_journey_defines() {
         let due = DueCheck::try_from(with_steps(make_model(), 14)).unwrap();
@@ -1231,10 +1210,8 @@ pub(crate) mod tests {
         );
     }
 
-    /// §1.1: a protocol check is ONE step per attempt, and §4.4.2 makes its
-    /// zero-fallback 1. Freezing 0 would give the ack a ceiling of
-    /// `0 * (retries + 1) == 0` and bill nothing at all for work that ran —
-    /// the failure both sections exist to prevent.
+    /// A protocol check is ONE step per attempt. Freezing 0 would give the ack a
+    /// ceiling of `0 * (retries + 1) == 0` and bill nothing for work that ran.
     #[test]
     fn a_protocol_check_freezes_one_step_not_zero() {
         for t in ["http", "tcp", "tls", "ssh"] {
@@ -1250,12 +1227,9 @@ pub(crate) mod tests {
         }
     }
 
-    /// A browser row whose config does not parse degrades to
-    /// `BrowserConfig::default()`, whose `steps` is empty — so a 0 here means
-    /// "we could not read the journey", never "the journey defines nothing":
-    /// `validate_browser_config` rejects an empty `steps` on every create and
-    /// update. Billing an unreadable row as zero is the same wrong answer as
-    /// billing a protocol check as zero, so it takes the same floor of 1.
+    /// A browser row whose config does not parse degrades to an empty `steps`, so
+    /// a 0 means "could not read the journey" — `validate_browser_config` rejects
+    /// an empty one on create and update. So it takes the same floor of 1.
     #[test]
     fn a_browser_check_whose_steps_cannot_be_read_still_freezes_one() {
         let empty = with_steps(make_model(), 0);

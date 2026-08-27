@@ -77,11 +77,8 @@ pub async fn load_all() -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr>
     trial_quota_usage::Entity::find().all(db).await
 }
 
-/// Get total usage for an org across the given pool's feature rows.
-///
-/// `features` scopes the sum to ONE pool (`TrialQuotaPool::feature_keys`) — see
-/// `openobserve-core::trial_quota`, item 2.1. Summing every row of the org, what
-/// this did before, reported synthetics step consumption as AI credits used.
+/// Total usage for an org across the given pool's feature rows. `features`
+/// scopes the sum to ONE pool, or synthetics steps report as AI credits used.
 ///
 /// Note: PostgreSQL SUM(bigint) returns NUMERIC, so we cast to BIGINT for Rust i64 compat.
 pub async fn get_total_usage_for_org(
@@ -120,12 +117,9 @@ pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_or
     Ok(result.flatten())
 }
 
-/// Every explicit `(org_id, feature, usage_limit)` triple.
-///
-/// Returns the FEATURE, not a per-org maximum: the caller folds these into pools
-/// (item 2.1). Collapsing to `MAX(usage_limit) GROUP BY org_id` here — what this
-/// did before — meant raising an org's AI credit limit silently raised its
-/// one-time synthetics grant by the same amount.
+/// Every explicit `(org_id, feature, usage_limit)` triple — per FEATURE, not a
+/// per-org maximum: `MAX(usage_limit) GROUP BY org_id` would let a raised AI
+/// credit limit silently raise the one-time synthetics grant.
 pub async fn load_all_usage_limits() -> Result<Vec<(String, String, i64)>, sea_orm::DbErr> {
     let db = get_orm_client_ro().await;
     let results: Vec<(String, String, Option<i64>)> = trial_quota_usage::Entity::find()
@@ -144,11 +138,8 @@ pub async fn load_all_usage_limits() -> Result<Vec<(String, String, i64)>, sea_o
 }
 
 /// Set one limit on every feature row of ONE POOL for an organization.
-///
-/// `seed_feature` is upserted first so organizations without prior usage in that
-/// pool can still be configured; `features` bounds the `UPDATE` to the pool's
-/// own rows. Without that bound, raising the AI credit limit also raised the
-/// synthetics grant and vice versa (item 2.1).
+/// `seed_feature` is upserted first so orgs with no prior usage can be
+/// configured; `features` bounds the `UPDATE` so the two pools stay independent.
 pub async fn set_usage_limit_for_org(
     org_id: &str,
     seed_feature: &str,

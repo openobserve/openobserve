@@ -45,13 +45,9 @@ pub struct EnqueueParams<'a> {
     /// JSON array of `{execution_id, engine, device}` — browser checks only. `None` for
     /// protocol checks.
     pub browser_devices: Option<&'a str>,
-    /// How many steps the journey defined AT THIS MOMENT — 1 for protocol
-    /// checks, which are one step per attempt.
-    ///
-    /// Frozen onto the row for the same reason `browser_devices` is: the ack
-    /// clamps the probe's reported count at `steps_configured x (retries + 1)`,
-    /// and reading that ceiling from the live check instead would let an edit
-    /// made while the job is in flight reprice work already dispatched.
+    /// Steps the journey defined at enqueue time — 1 for protocol checks. Frozen
+    /// onto the row: the ack clamps the probe's count at `steps_configured x
+    /// (retries + 1)`, so a live read would let an in-flight edit reprice work.
     pub steps_configured: i32,
     /// Serialized `JobMetadata` — check-level context copied at enqueue time.
     pub metadata: &'a str,
@@ -84,9 +80,8 @@ pub struct LeasedRow {
     pub dispatch_attempts: i32,
     pub run_id: String,
     pub browser_devices: Option<String>,
-    /// Steps the journey defined when this job was enqueued (1 for protocol
-    /// checks). The ack's clamp ceiling is computed from THIS, never from the
-    /// current check definition — see `EnqueueParams::steps_configured`.
+    /// Steps frozen at enqueue (1 for protocol checks). The ack's clamp ceiling
+    /// comes from THIS, never the current check — see `EnqueueParams`.
     pub steps_configured: i32,
     pub metadata: String,
 }
@@ -100,24 +95,17 @@ pub struct DeadLetteredRow {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
-    /// The SLOT this job was scheduled for, not the wall clock it died at.
-    ///
-    /// Carried for one reason: it is the third component of the free step
-    /// pool's idempotency key, `(synthetics_id, location, scheduled_ts,
-    /// job_id)` (SPEC §6.3). A job the reaper terminates never acks, so the
-    /// ack-side reconcile never runs and the enqueue's reservation would be
-    /// held against a ONE-TIME grant forever — the reaper has to give it back,
-    /// and it has to do so under the SAME key the ack would have used, or a
-    /// job could be refunded twice. Reading it off the row rather than
-    /// recomputing it is what makes the two keys byte-identical: both are the
-    /// value this column holds.
+    /// The SLOT this job was scheduled for, not the wall clock it died at, and
+    /// the third component of the free step pool's idempotency key
+    /// `(synthetics_id, location, scheduled_ts, job_id)`. A reaped job never
+    /// acks, so the reaper must return its enqueue reservation under the SAME
+    /// key the ack would have used, or the one-time grant is refunded twice.
     pub scheduled_ts: i64,
-    /// Steps the journey defined when this job was enqueued — the same frozen
-    /// column `LeasedRow` carries, and the same one the reservation was
-    /// computed from. See `scheduled_ts` for why the reaper needs it.
+    /// Steps frozen at enqueue — what the reservation was computed from. See
+    /// `scheduled_ts` for why the reaper needs it.
     pub steps_configured: i32,
-    /// The engine+device combinations frozen onto this job, `None` for a
-    /// protocol check. The other half of `configured x combos`.
+    /// Engine+device combos frozen onto this job (`None` for protocol checks) —
+    /// the other half of `configured x combos`.
     pub browser_devices: Option<String>,
     pub dispatch_attempts: i32,
     pub run_id: String,
@@ -614,13 +602,10 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
                     location: row.try_get("", "location").ok()?,
                     scheduled_ts: row.try_get("", "scheduled_ts").ok()?,
                     // The two BILLING columns degrade instead of dropping the
-                    // row. Every field above is an identity field and a row
-                    // missing one cannot be accounted for at all; these two only
-                    // size a refund, and this module's invariant — every job it
-                    // terminates has its run completed exactly once — must not be
-                    // hostage to a billing column. `steps_configured` is NOT NULL
-                    // with a DEFAULT 50 backfill, so 0 is unreachable; if it ever
-                    // were reached, `enqueue_reservation` floors it at 1 and the
+                    // row: the identity fields above make a row unaccountable if
+                    // missing, these two only size a refund. `steps_configured`
+                    // is NOT NULL with a DEFAULT 50 backfill so 0 is unreachable;
+                    // if reached, `enqueue_reservation` floors it at 1 — the
                     // refund is short, never inverted.
                     steps_configured: row.try_get("", "steps_configured").unwrap_or_default(),
                     browser_devices: row.try_get("", "browser_devices").unwrap_or_default(),
@@ -911,31 +896,18 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
 mod tests {
     use super::*;
 
-    /// **SPEC §6.3 / E10 — one job is settled by exactly one of the two paths.**
-    ///
-    /// A job that acks is reconciled by the ack (§6.3); a job the reaper
-    /// terminates is refunded by the reaper, because no ack will ever come.
-    /// Both must never happen for one job — the free grant is one-time (§6.1),
-    /// so a double refund is a permanent over-credit and a refund on top of an
-    /// ack is worse.
-    ///
-    /// Nothing in either CALLER enforces that. It is these two compare-and-swaps,
-    /// on one column of one row, arbitrated by the row lock:
-    ///
-    /// * `ack_complete` applies only from `status = 1` and returns `Ok(None)` otherwise, which the
-    ///   ack path reads as "touch nothing";
-    /// * `dead_letter_expired` re-checks the status its SELECT saw and returns ONLY the rows whose
-    ///   update matched, so a job the ack already completed is never handed to the reaper's caller
-    ///   at all.
-    ///
-    /// Delete either guard and both paths can settle one job. Neither is
-    /// reachable from a unit test without a database, so the SQL is pinned
-    /// here instead of asserted about.
+    /// **One job is settled by exactly one of the two paths.** An acked job is
+    /// reconciled by the ack, a reaped one refunded by the reaper; both firing
+    /// for one job means a double refund, or a refund on top of an ack, against
+    /// a one-time grant. Only these two compare-and-swaps enforce it:
+    /// `ack_complete` applies only from `status = 1` and returns `Ok(None)`
+    /// otherwise, and `dead_letter_expired` re-checks the status its SELECT saw
+    /// and returns only rows whose UPDATE matched. Pinned over source text
+    /// because neither guard is reachable without a database.
     #[test]
     fn an_ack_and_a_dead_letter_cannot_both_settle_one_job() {
         let src = include_str!("synthetics_jobs.rs");
 
-        // The ack side: the status guard, and the `None` that reports it.
         assert!(
             src.contains("WHERE id = $4 AND status = 1{owner_clause}"),
             "`ack_complete` must only apply to a job that is still Claimed",
@@ -945,7 +917,6 @@ mod tests {
             "an ack that did not apply must report `None`, or the caller bills a job it lost",
         );
 
-        // The reaper side: the CAS, and the filter that makes its result honest.
         assert!(
             src.contains("\"UPDATE synthetics_jobs SET status = 2 WHERE id = $1 AND status = $2\""),
             "the dead letter must re-check the status its SELECT saw",
@@ -956,10 +927,9 @@ mod tests {
         );
     }
 
-    /// The four columns SPEC §6.3's idempotency key is built from must all
-    /// leave this function, or the reaper cannot key its refund the way the ack
-    /// keys its reconcile — and two different keys let one job be paid back
-    /// twice.
+    /// The four columns the pool's idempotency key is built from must all leave
+    /// this function, or the reaper keys its refund differently from the ack's
+    /// reconcile and one job can be paid back twice.
     #[test]
     fn a_dead_lettered_row_carries_everything_the_pool_key_needs() {
         let src = include_str!("synthetics_jobs.rs");
@@ -973,9 +943,8 @@ mod tests {
                 "`dead_letter_expired` must read {column} — the refund is sized and keyed on it",
             );
         }
-        // `id`, `synthetics_id` and `location` are the other three quarters of
-        // the key and were always on the row; pinned so a tidy-up cannot drop
-        // one without failing here.
+        // `id`, `synthetics_id` and `location` are the rest of the key and were
+        // always on the row; pinned so a tidy-up cannot drop one silently.
         for column in ["id", "synthetics_id", "location"] {
             assert!(body.contains(&format!("\"{column}\"")));
         }
@@ -1029,17 +998,11 @@ mod tests {
         assert_eq!(row.steps_configured, 1);
     }
 
-    // ── The frozen step count (spec §4.4.1, T13/E5) ───────────────────────────
-
     const SCHEDULED_TS: i64 = 1_750_000_000_000_000;
 
-    /// A real sqlite holding just this table, because the property under test
-    /// is what the DATABASE hands back: `get_by_id` names its columns in a raw
-    /// SELECT, so a column added to the struct and forgotten in that list is a
-    /// runtime "column not found" that no mock can reproduce.
-    ///
-    /// One connection, not a pool — separate connections to `sqlite::memory:`
-    /// get separate databases.
+    /// A real sqlite: `get_by_id` names its columns in a raw SELECT, so a column
+    /// forgotten there is a runtime "column not found" no mock reproduces. One
+    /// connection — separate connections to `sqlite::memory:` are separate DBs.
     async fn jobs_db() -> sea_orm::DatabaseConnection {
         use sea_orm::{ConnectOptions, Database, Schema};
 
@@ -1051,11 +1014,9 @@ mod tests {
         db.execute(backend.build(&schema.create_table_from_entity(Entity)))
             .await
             .unwrap();
-        // `enqueue` names this triple as its ON CONFLICT target and sqlite
-        // rejects a conflict target with no matching unique index. The FK to
-        // `synthetics_runs` is deliberately absent: sqlite does not enforce
-        // foreign keys unless `PRAGMA foreign_keys=ON`, and the table is not
-        // what these tests are about.
+        // sqlite rejects `enqueue`'s ON CONFLICT target without a matching
+        // unique index. The FK to `synthetics_runs` is deliberately absent:
+        // sqlite ignores FKs without `PRAGMA foreign_keys=ON`.
         db.execute_unprepared(
             "CREATE UNIQUE INDEX synthetics_jobs_dedup_uq \
              ON synthetics_jobs (synthetics_id, location, scheduled_ts)",
@@ -1083,10 +1044,8 @@ mod tests {
         }
     }
 
-    /// The missed-SELECT-column catcher. `enqueue` writes the frozen count and
-    /// `get_by_id` — the read the ack path uses — must hand it back. Adding the
-    /// field to `LeasedRow` without adding it to that raw SELECT compiles fine
-    /// and fails only in production.
+    /// The missed-SELECT-column catcher: adding a field to `LeasedRow` without
+    /// adding it to `get_by_id`'s raw SELECT compiles and fails in production.
     #[tokio::test]
     async fn enqueue_then_get_by_id_round_trips_the_frozen_step_count() {
         let db = jobs_db().await;
@@ -1109,17 +1068,12 @@ mod tests {
         );
     }
 
-    /// **SPEC §6.3 / E10 — the missed-SELECT-column catcher for the reaper's
-    /// refund.**
-    ///
-    /// A job the reaper terminates never acks, so nothing else will ever give
-    /// its enqueue reservation back. Sizing and keying that refund needs three
-    /// columns that were not on this row before: the frozen `steps_configured`
-    /// and `browser_devices` for `configured x combos`, and `scheduled_ts` —
-    /// the SLOT — which is the third component of §6.3's idempotency key.
-    /// Adding them to `DeadLetteredRow` without adding them to the raw SELECT
-    /// compiles fine and fails only in production, silently, as a permanent
-    /// hold on a one-time grant.
+    /// **The missed-SELECT-column catcher for the reaper's refund.** A reaped
+    /// job never acks, so nothing else returns its enqueue reservation. Sizing
+    /// and keying it needs `steps_configured` and `browser_devices` (for
+    /// `configured x combos`) plus `scheduled_ts` (the slot, third component of
+    /// the idempotency key); omitting any from the raw SELECT fails only in
+    /// production, as a permanent hold on a one-time grant.
     #[tokio::test]
     async fn dead_letter_expired_carries_what_the_pool_refund_is_keyed_and_sized_on() {
         let db = jobs_db().await;
@@ -1143,8 +1097,8 @@ mod tests {
         );
         assert_eq!(row.reason, DeadLetterReason::NeverDispatched);
 
-        // And the CAS: a second pass finds nothing, so one job is refunded once
-        // however many reaper nodes are running.
+        // The CAS: a second pass finds nothing, so one refund per job however
+        // many reaper nodes run.
         assert!(
             dead_letter_expired(&db, SCHEDULED_TS + 1, 3)
                 .await
@@ -1154,13 +1108,10 @@ mod tests {
         );
     }
 
-    /// **A job that acked normally is never handed to the reaper.**
-    ///
-    /// This is what stops an acked job from being refunded: not a check in the
-    /// reaper, but the fact that its row is no longer in a status
+    /// **A job that acked normally is never handed to the reaper.** Not a check
+    /// in the reaper: its row is simply no longer in a status
     /// `dead_letter_expired`'s compare-and-swap will claim. The ack already
-    /// reconciled the pool (§6.3); a refund on top of that would credit the
-    /// grant for work that was done and billed.
+    /// reconciled the pool; a refund on top would credit work already billed.
     #[tokio::test]
     async fn a_job_that_acked_is_never_dead_lettered_and_so_never_refunded() {
         let db = jobs_db().await;
@@ -1188,8 +1139,8 @@ mod tests {
             "the probe's ack must apply",
         );
 
-        // Long past the lease AND the validity window — every dead-letter
-        // predicate is satisfied except the status.
+        // Past the lease AND the validity window — every dead-letter predicate
+        // is satisfied except the status.
         assert!(
             dead_letter_expired(&db, SCHEDULED_TS + 10_000_000_000, 3)
                 .await
@@ -1199,11 +1150,9 @@ mod tests {
         );
     }
 
-    /// The other order, and the other half of the same guarantee: once the
-    /// reaper has claimed a job, a late ack from the evicted holder applies
-    /// nothing — `ack_complete` returns `None`, which the ack path reads as
-    /// "touch no run accounting and no pool" (T15/E9). So the two paths can
-    /// never both move the grant, whichever one wins the race.
+    /// The other order: once the reaper has claimed a job, a late ack applies
+    /// nothing — `ack_complete` returns `None`, read as "touch no run accounting
+    /// and no pool". So neither path can move the grant twice.
     #[tokio::test]
     async fn a_late_ack_for_a_dead_lettered_job_applies_nothing() {
         let db = jobs_db().await;
@@ -1247,10 +1196,9 @@ mod tests {
         );
     }
 
-    /// `lease_batch` is the OTHER row that becomes a `LeasedRow`. It builds
-    /// from the sea-orm entity rather than a hand-written SELECT, so it cannot
-    /// miss a column — but only for as long as it keeps building from the
-    /// entity, which is what this pins.
+    /// `lease_batch` is the OTHER row that becomes a `LeasedRow`. It builds from
+    /// the sea-orm entity rather than a hand-written SELECT, so it cannot miss a
+    /// column — but only while it keeps doing so, which is what this pins.
     #[tokio::test]
     async fn lease_batch_carries_the_frozen_step_count() {
         let db = jobs_db().await;
@@ -1272,16 +1220,9 @@ mod tests {
         assert_eq!(leased[0].steps_configured, 14);
     }
 
-    /// **T13 / E5.** The ack clamps at `steps_configured × (retries + 1)`. Read
-    /// that count from the LIVE check at ack time and a customer who edits a
-    /// journey from 14 steps down to 8 reprices work that was already
-    /// dispatched — 14 real executed steps would clamp to 8 and the run bills
-    /// short. (The reverse edit is worse: 8 → 14 would raise the ceiling on a
-    /// run that never had those steps.) So the count is frozen onto the job row
-    /// at enqueue, next to `browser_devices`, and the edit cannot reach it.
-    ///
-    /// The check row is a real one, converted by the real `DueCheck::try_from`,
-    /// because "what the scheduler would have frozen" is half the claim.
+    /// An edit from 14 steps to 8 must not reprice dispatched work: 14 executed
+    /// steps would clamp to 8, and the reverse edit would raise the ceiling on a
+    /// run that never had them. Uses the real `DueCheck::try_from`.
     #[tokio::test]
     async fn a_journey_edited_mid_flight_does_not_move_the_frozen_ceiling() {
         use crate::table::synthetics_checks::{
@@ -1291,30 +1232,24 @@ mod tests {
 
         let db = jobs_db().await;
 
-        // The journey defines 14 steps when the scheduler fans it out.
         let at_enqueue = DueCheck::try_from(with_steps(make_model(), 14)).unwrap();
         assert_eq!(at_enqueue.steps_configured, 14);
         let job_id = enqueue(&db, browser_params(at_enqueue.steps_configured))
             .await
             .unwrap();
 
-        // The customer edits it down to 8 while the job is in flight. The live
-        // definition really does move …
         let after_edit = DueCheck::try_from(with_steps(make_model(), 8)).unwrap();
         assert_eq!(
             after_edit.steps_configured, 8,
             "the edit must actually have changed the live check"
         );
 
-        // … and the dispatched job's frozen count does not.
         let row = get_by_id(&db, &job_id).await.unwrap().unwrap();
         assert_eq!(
             row.steps_configured, 14,
             "the in-flight job must keep the count it was enqueued with"
         );
 
-        // Which is the number that matters, because it is the one the ack
-        // multiplies into the ceiling.
         const RETRIES: i32 = 1;
         assert_eq!(
             row.steps_configured * (RETRIES + 1),

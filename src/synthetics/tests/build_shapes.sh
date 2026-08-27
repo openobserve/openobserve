@@ -6,15 +6,7 @@
 #   T40  self-hosted Enterprise build (`enterprise`, NOT `cloud`) emits nothing.
 #   +    the `cloud` shape itself: T38 and T40 both leave `cloud` OFF, so on
 #        their own they type-check ZERO lines of the trial gate — every line of
-#        it is inside `#[cfg(feature = "cloud")]`. Without the third shape this
-#        script is green while the gate does not compile. It is one small crate,
-#        so it runs by default rather than behind an opt-in.
-#
-# These are `cargo check` + `cargo tree` over ONE package. No network, no
-# workspace build, no database. Cold (first ever run for a feature combination)
-# each shape costs about two minutes because `infra`/`datafusion` are rebuilt
-# for it; warm it is ~1s. All three combinations are ordinary developer builds,
-# so a machine that has run the test suite once already has them.
+#        it is inside `#[cfg(feature = "cloud")]`.
 #
 # Run:   bash src/synthetics/tests/build_shapes.sh
 # Opt-in extra (T39, multi-minute — builds two big leaf crates):
@@ -22,8 +14,7 @@
 #
 # Not a `#[test]` on purpose: a Rust test that shells out to cargo re-enters the
 # same target directory the outer `cargo test` already holds a lock on, so it
-# blocks until the parent finishes — i.e. forever. Keeping it a script also
-# keeps `cargo test -p openobserve-synthetics` fast.
+# blocks until the parent finishes — i.e. forever.
 
 set -uo pipefail
 cd "$(dirname "$0")/../../.." || exit 1
@@ -53,12 +44,9 @@ EMIT_IDENTS='SyntheticsSteps|UsageEvent|report_request_usage_stats|TrialQuotaFea
 # ---------------------------------------------------------------- T38 (OSS) --
 section "T38 — OSS build: --no-default-features"
 
-# NOTE: `--no-default-features` is a NO-OP for this package — its `[features]`
-# block is `default = []`, so this invocation is byte-identical to a plain
-# `cargo check -p openobserve-synthetics`. It is written out in full because
-# T38 is stated in terms of the OSS build shape, and it is pinned below: if
-# `default` ever gains a feature, the flag starts meaning something and this
-# section has to be re-read rather than silently changing what it tests.
+# NOTE: `--no-default-features` is a NO-OP for this package — `default = []`, so it is
+# byte-identical to a plain check. Pinned below: if `default` ever gains a feature the flag
+# starts meaning something and this section has to be re-read.
 if grep -q '^default = \[\]$' src/synthetics/Cargo.toml; then
   ok "\`default = []\` — --no-default-features is equivalent to a plain check here"
 else
@@ -118,10 +106,8 @@ else
   fi
 fi
 
-# Source-level guard on the emit itself. Coarse by design: it asserts per FILE,
-# not per call site, because a per-site cfg check needs a parser. It catches the
-# failure mode that matters — emit code written into a file that mentions
-# `cloud` nowhere, i.e. F6 with the cfg simply forgotten.
+# Source-level guard on the emit itself. Coarse by design — per FILE, not per call site, since
+# a per-site cfg check needs a parser. Catches F6 with the cfg simply forgotten.
 missing=""
 for f in $(grep -rlE "$EMIT_IDENTS" --include='*.rs' "$SRC" 2>/dev/null); do
   grep -q 'feature = "cloud"' "$f" || missing="$missing $f"
@@ -136,10 +122,8 @@ else
 fi
 
 # ------------------------------------------------- cloud shape (the diff) ----
-# The shape that actually type-checks the trial gate. T38 and T40 above both
-# leave `cloud` off, and every line the gate added to scheduler.rs is inside
-# `#[cfg(feature = "cloud")]` — so without this the script passes while the gate
-# contains type errors. --all-targets so the gate's tests are checked too.
+# The shape that actually type-checks the trial gate: without it the script passes while the
+# gate contains type errors. --all-targets so the gate's tests are checked too.
 section "cloud — the shape the trial gate compiles in"
 
 if cargo check -p "$PKG" --all-targets --features cloud --message-format=short >/dev/null 2>&1; then

@@ -21,21 +21,14 @@
 //! Stripe subscription, AI metering prices are auto-added to the subscription
 //! and usage is reported to the _usage stream for billing.
 //!
-//! ## Pools — SPEC §9 items 2.1 / 2.2
+//! ## Pools
 //!
-//! There are two, and they are **independent**: [`TrialQuotaPool::AiCredits`]
-//! (AI chat, incidents, incident re-analysis) and
-//! [`TrialQuotaPool::SyntheticsSteps`]. Before item 2.1 every feature deducted
-//! from one org-wide counter, so a chatty AI user would have spent the org's
-//! synthetics grant and a browser check would have spent its AI credits.
-//! Everything keyed per org — the in-memory counter, the explicit limit, the
-//! DB-total read, the `set_limit` write and the HA message — is keyed per
-//! `(org, pool)` instead. [`TrialQuotaFeature::pool`] is the only mapping;
-//! adding a feature to a pool is one arm there and nothing else.
-//!
-//! `trial_quota_usage` is unchanged: it is already keyed `(org_id, feature)`,
-//! and a pool is a fixed set of feature keys ([`TrialQuotaPool::feature_keys`]).
-//! No migration, no `period_ym` column, no reset logic (§6.1, E23).
+//! [`TrialQuotaPool::AiCredits`] and [`TrialQuotaPool::SyntheticsSteps`] are
+//! independent: every counter, limit, DB read and HA message is keyed
+//! `(org, pool)`, so spending one grant cannot drain the other, and
+//! [`TrialQuotaFeature::pool`] is the only feature-to-pool mapping. No
+//! migration — a pool is just a fixed set of `trial_quota_usage.feature` keys.
+//! The grants are one-time: no rollover column, no reset logic (§6.1, E23).
 //!
 //! ## Architecture
 //!
@@ -70,12 +63,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use utoipa::ToSchema;
 
-/// Per-`(org, pool)` total usage counter, keyed by [`scope`]. Single AtomicU64
-/// per scope — no cross-key locks. This is the hot-path structure used by
-/// [`try_deduct`].
-///
-/// **Keyed by scope, not by org (SPEC §9 item 2.1).** One counter per org meant
-/// the AI-credit pool and the synthetics step pool drained each other.
+/// Per-`(org, pool)` total usage counter, keyed by [`scope`] — one AtomicU64
+/// per scope, no cross-key locks. Keyed by scope and not by org: one counter
+/// per org made the two pools drain each other.
 static ORG_USAGE: Lazy<RwLock<HashMap<String, AtomicU64>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
@@ -83,15 +73,12 @@ static ORG_USAGE: Lazy<RwLock<HashMap<String, AtomicU64>>> =
 /// pool's deployment-wide default ([`TrialQuotaPool::default_limit`]).
 static ORG_LIMITS: Lazy<RwLock<HashMap<String, u64>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
-/// Pool adjustments already applied in THIS process — SPEC §6.3's
-/// *"every adjustment idempotent"* MUST. See [`IdempotencyLedger`].
+/// Pool adjustments already applied in THIS process. See [`IdempotencyLedger`].
 static ADJUSTMENTS: Lazy<IdempotencyLedger> =
     Lazy::new(|| IdempotencyLedger::new(ADJUSTMENT_LEDGER_CAPACITY));
 
-/// How many adjustment keys the ledger remembers. One ack produces at most one
-/// adjustment, so this is ~2 h of a very busy region's synthetics acks — far
-/// longer than the window in which a duplicate could arrive, and bounded so a
-/// long-lived scheduler cannot grow it without limit.
+/// How many adjustment keys the ledger remembers — ~2 h of a busy region's
+/// acks, and bounded so a long-lived scheduler cannot grow it without limit.
 const ADJUSTMENT_LEDGER_CAPACITY: usize = 100_000;
 
 /// Bounded channel for deduction records pending DB flush.
@@ -121,25 +108,18 @@ static INIT_WATERMARK: AtomicI64 = AtomicI64::new(0);
 /// The checkpoints at which quota notification emails are sent.
 const QUOTA_CHECKPOINTS: &[u8] = &[80, 90, 95, 100];
 
-/// A usage record buffered for periodic DB flush.
-///
-/// `cost` is SIGNED: SPEC §6.3's reconcile refunds an over-deduct, and the
-/// refund has to reach `trial_quota_usage` or the in-memory counter and the
-/// persisted one diverge at the next restart.
+/// A usage record buffered for periodic DB flush. `cost` is SIGNED: a
+/// reconcile refund must reach `trial_quota_usage`, or the in-memory and
+/// persisted counters diverge at the next restart.
 struct FlushRecord {
     org_id: String,
     feature_key: String,
     cost: i64,
 }
 
-/// A one-time free grant, and the unit of isolation between features — SPEC
-/// §9 item **2.1**.
-///
-/// Every counter, limit and DB read in this module is keyed per `(org, pool)`
-/// via [`scope`]. Two pools of the same org share nothing, which is the whole
-/// point: §6.1 grants synthetics steps their OWN one-time grant, so an org that
-/// spends its AI credits must not thereby lose its synthetics evaluation budget,
-/// and vice versa.
+/// A one-time free grant, and the unit of isolation between features. Every
+/// counter, limit and DB read is keyed per `(org, pool)` via [`scope`]: an org
+/// that spends its AI credits must not thereby lose its synthetics budget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TrialQuotaPool {
     /// AI chat, incident analysis and incident re-analysis. The original pool.
@@ -165,24 +145,17 @@ impl TrialQuotaPool {
         }
     }
 
-    /// Which pool a `trial_quota_usage.feature` value belongs to.
-    ///
-    /// `None` for an unrecognised key — a row written by a NEWER node for a pool
-    /// this build does not know. Skipped rather than folded into a pool at
-    /// random, because guessing would spend one pool's grant on another's usage.
+    /// Which pool a `trial_quota_usage.feature` value belongs to. `None` for a
+    /// key a NEWER node wrote: guessing would spend one grant on another's usage.
     pub fn from_key_of_feature(feature: &str) -> Option<Self> {
         [TrialQuotaPool::AiCredits, TrialQuotaPool::SyntheticsSteps]
             .into_iter()
             .find(|pool| pool.feature_keys().contains(&feature))
     }
 
-    /// Every `trial_quota_usage.feature` value that spends from this pool.
-    ///
-    /// This is what makes the DB side pool-aware without a migration: the table
-    /// is already keyed `(org_id, feature)`, so a pool is a fixed set of feature
-    /// keys and every per-pool query is that set as an `IN` filter. It MUST stay
-    /// in sync with [`TrialQuotaFeature::pool`] —
-    /// `every_feature_is_listed_by_its_own_pool` pins that.
+    /// Every `trial_quota_usage.feature` value that spends from this pool; each
+    /// per-pool query uses this set as an `IN` filter. MUST stay in sync with
+    /// [`TrialQuotaFeature::pool`] (`every_feature_is_listed_by_its_own_pool`).
     pub fn feature_keys(&self) -> &'static [&'static str] {
         match self {
             TrialQuotaPool::AiCredits => &["ai_chat", "new_incident", "incident_reanalysis"],
@@ -193,26 +166,16 @@ impl TrialQuotaPool {
     /// The row [`set_limit_for_pool`] upserts so that an org with no prior usage
     /// in this pool can still be given an explicit limit.
     fn seed_feature(&self) -> &'static str {
-        // `feature_keys` is never empty for either variant; the fallback exists
-        // so a future pool cannot make this panic.
+        // `feature_keys` is never empty; the fallback only avoids a panic.
         self.feature_keys().first().copied().unwrap_or("ai_chat")
     }
 
     /// The deployment-wide default grant for this pool.
     ///
-    /// ## ⚠️ SPEC §8.3 — THIS POOL IS REGION-LOCAL, AND THAT IS UNRESOLVED
-    ///
-    /// There is no super-cluster handler for `trial_quota_usage` (none among the
-    /// handlers in `src/super_cluster_queue/`), and [`TRIAL_QUOTA_HA_QUEUE`] is
-    /// an `infra::queue` subject — **local NATS**, not the super-cluster queue.
-    /// The table itself is a per-region meta store. So in an N-region super
-    /// cluster one org holds N independent grants of this size and effectively
-    /// receives `N x` the "one-time" grant (§11 **F4**).
-    ///
-    /// SPEC §9 item **2.6** owns that decision — replicate the table, hold the
-    /// pool only in the billing-home region, or accept it and size the grant as
-    /// per-region. It is deliberately NOT resolved here, and nothing in this
-    /// module may assume one of those answers.
+    /// ⚠️ §8.3 / §11 **F4**, UNRESOLVED: this pool is REGION-LOCAL — no
+    /// super-cluster handler for `trial_quota_usage`, and the HA queue is local
+    /// NATS — so in an N-region super cluster one org holds N independent
+    /// grants of this size. Item 2.6 owns the fix; nothing here may assume it.
     pub fn default_limit(&self) -> u64 {
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         match self {
@@ -222,11 +185,9 @@ impl TrialQuotaPool {
     }
 }
 
-/// The key both [`ORG_USAGE`] and [`ORG_LIMITS`] use.
-///
-/// `\u{1f}` (ASCII unit separator) rather than `/` or `:` because an org id is
-/// user-chosen and a separator it can contain would let `("a/b", AiCredits)` and
-/// `("a", ...)` collide into one pool.
+/// The key both [`ORG_USAGE`] and [`ORG_LIMITS`] use. `\u{1f}` (ASCII unit
+/// separator) rather than `/` or `:`: an org id is user-chosen, and a separator
+/// it can contain would let two different scopes collide into one pool.
 fn scope(org_id: &str, pool: TrialQuotaPool) -> String {
     format!("{org_id}\u{1f}{}", pool.key())
 }
@@ -237,8 +198,7 @@ pub enum TrialQuotaFeature {
     AiChat,
     NewIncident,
     IncidentReAnalysis,
-    /// SPEC §9 item **2.2**. One unit is one EXECUTED step (§2.1), so a
-    /// 14-step browser journey over 2 combos costs 28.
+    /// One unit is one EXECUTED step, so a 14-step journey over 2 combos costs 28.
     SyntheticsSteps,
 }
 
@@ -263,13 +223,9 @@ impl TrialQuotaFeature {
         }
     }
 
-    /// Get the credit cost of ONE unit of this feature from enterprise config.
-    ///
-    /// The AI features are one-shot: a chat turn costs `cost()` and that is the
-    /// whole deduction. Synthetics is metered in steps and a single ack carries
-    /// many of them, so its unit cost is 1 and the caller multiplies — see
-    /// [`try_deduct_units`]. A configurable per-step cost would silently rescale
-    /// the §6.1 grant, which is expressed in STEPS ("10,000 steps"), not credits.
+    /// Credit cost of ONE unit. Synthetics is fixed at 1 and the caller
+    /// multiplies ([`try_deduct_units`]): the §6.1 grant is denominated in
+    /// STEPS, so a configurable per-step cost would silently rescale it.
     pub fn cost(&self) -> u64 {
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         match self {
@@ -286,10 +242,8 @@ impl TrialQuotaFeature {
             TrialQuotaFeature::AiChat => UsageEvent::AiChat,
             TrialQuotaFeature::NewIncident => UsageEvent::NewIncident,
             TrialQuotaFeature::IncidentReAnalysis => UsageEvent::IncidentReAnalysis,
-            // SPEC §4.2: free-pool consumption is `SyntheticsFreeSteps`, NOT
-            // `SyntheticsSteps`. The latter is the billable event, and
-            // o2-enterprise's `MeteringEventName::is_billable` says so — emitting
-            // it for pool-funded work would invoice the free grant.
+            // `SyntheticsSteps` is the BILLABLE event; emitting it here would
+            // invoice work the free grant already paid for (§4.2).
             TrialQuotaFeature::SyntheticsSteps => UsageEvent::SyntheticsFreeSteps,
         }
     }
@@ -298,14 +252,11 @@ impl TrialQuotaFeature {
 /// One idempotent pool movement — SPEC §6.3's reconcile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PoolAdjustment {
-    /// The run executed FEWER steps than the enqueue reserved: give the
-    /// difference back.
+    /// The run executed FEWER steps than reserved: give the difference back.
     Refund(u64),
-    /// The run executed MORE (retries fired): take the difference.
-    ///
-    /// **Never refused.** §6.3: *"if a top-up would exhaust the pool mid-run,
-    /// complete the run and record it"* (E14) — so this can push usage PAST the
-    /// limit, and the next enqueue is where enforcement happens.
+    /// The run executed MORE (retries fired): take the difference. **Never
+    /// refused** (§6.3 / E14) — this can push usage PAST the limit, and the next
+    /// enqueue is where enforcement happens.
     TopUp(u64),
 }
 
@@ -313,8 +264,7 @@ impl PoolAdjustment {
     /// The signed movement this applies to the counter.
     pub fn delta(&self) -> i64 {
         match self {
-            // A refund larger than i64::MAX cannot arise (units come from a u32
-            // step count) but saturating keeps the sign correct for any input.
+            // A refund cannot exceed i64::MAX; saturating keeps the sign right.
             PoolAdjustment::Refund(n) => -(i64::try_from(*n).unwrap_or(i64::MAX)),
             PoolAdjustment::TopUp(n) => i64::try_from(*n).unwrap_or(i64::MAX),
         }
@@ -323,22 +273,12 @@ impl PoolAdjustment {
 
 /// A bounded, process-local record of the adjustment keys already applied.
 ///
-/// ## What it guarantees, and what it does not
-///
-/// SPEC §6.3 MUSTs that *"every adjustment is idempotent, keyed on
-/// `(synthetics_id, location, scheduled_ts, job_id)`"*. The KEY is built by the
-/// caller (`openobserve-synthetics`, which owns those four fields); this is
-/// where it is checked. [`claim`](Self::claim) returns `true` exactly once per
-/// key while that key is still in the window, so a replayed adjustment moves the
-/// counter zero times.
-///
-/// It is process-local and finite. That is honest rather than sufficient on its
-/// own, and it is enough because it is the SECOND of two gates, not the only
-/// one: `synthetics_jobs::ack_complete` returns `None` for a duplicate or
-/// evicted ack cluster-wide, so a replayed ack never reaches the reconcile at
-/// all (T14/T15, E8/E9). This catches the case that gate cannot — the same
-/// adjustment applied twice inside one process, e.g. one ack batch naming the
-/// same job twice — and it is capacity-bounded so it cannot leak.
+/// SPEC §6.3 keys every adjustment on
+/// `(synthetics_id, location, scheduled_ts, job_id)`; the caller builds it,
+/// this is where it is checked, and [`claim`](Self::claim) returns `true`
+/// exactly once per key in the window. Process-local is enough only because it
+/// is the SECOND gate — `synthetics_jobs::ack_complete` already rejects
+/// duplicate acks cluster-wide (T14/T15) — and the bound stops it leaking.
 struct IdempotencyLedger {
     inner: Mutex<LedgerInner>,
     capacity: usize,
@@ -346,10 +286,8 @@ struct IdempotencyLedger {
 
 struct LedgerInner {
     seen: HashSet<String>,
-    /// Insertion order, so eviction is FIFO rather than arbitrary. An adjustment
-    /// replayed after `capacity` further adjustments would be applied twice;
-    /// with the capacity above that window is hours and the upstream gate has
-    /// long since closed.
+    /// Insertion order, so eviction is FIFO rather than arbitrary — a key
+    /// replayed after `capacity` further adjustments would be applied twice.
     order: VecDeque<String>,
 }
 
@@ -360,16 +298,14 @@ impl IdempotencyLedger {
                 seen: HashSet::new(),
                 order: VecDeque::new(),
             }),
-            // A zero capacity would remember nothing and silently disable the
-            // guard, so it is floored rather than trusted.
+            // A zero capacity would silently disable the guard, so it is floored.
             capacity: capacity.max(1),
         }
     }
 
     /// `true` the first time this key is seen, `false` for every repeat.
     ///
-    /// Poisoning is ignored: a panic in another thread must not turn every
-    /// subsequent adjustment into a panic on a billing path.
+    /// Poisoning is ignored: a panic elsewhere must not panic a billing path.
     fn claim(&self, key: &str) -> bool {
         let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         if !inner.seen.insert(key.to_string()) {
@@ -384,9 +320,8 @@ impl IdempotencyLedger {
         true
     }
 
-    /// How many keys are remembered. Used by the bound test — the property it
-    /// pins (this map cannot grow forever on a scheduler that runs for weeks) is
-    /// not observable any other way.
+    /// How many keys are remembered. `cfg(test)` because the bound it pins —
+    /// this map cannot grow forever — is not observable any other way.
     #[cfg(test)]
     fn len(&self) -> usize {
         self.inner
@@ -423,11 +358,8 @@ impl std::fmt::Display for QuotaExhaustedError {
 impl std::error::Error for QuotaExhaustedError {}
 
 /// Get one pool's limit for an organization, falling back to the pool's
-/// deployment-wide default.
-///
-/// **⚠️ SPEC §8.3: the value returned here is REGION-LOCAL.** See
-/// [`TrialQuotaPool::default_limit`] for the constraint in full and why item 2.6
-/// — not this function — owns resolving it.
+/// deployment-wide default. ⚠️ The value is REGION-LOCAL — see
+/// [`TrialQuotaPool::default_limit`].
 fn get_pool_limit(org_id: &str, pool: TrialQuotaPool) -> u64 {
     let org_limit = ORG_LIMITS
         .read()
@@ -446,7 +378,6 @@ fn get_pool_used(org_id: &str, pool: TrialQuotaPool) -> u64 {
 }
 
 /// Ensure the per-`(org, pool)` atomic counter exists.
-/// If the scope is new, inserts an AtomicU64(0) under a brief write lock.
 fn ensure_scope_counter(key: &str) {
     {
         let map = ORG_USAGE.read().unwrap();
@@ -461,13 +392,9 @@ fn ensure_scope_counter(key: &str) {
         .or_insert_with(|| AtomicU64::new(0));
 }
 
-/// Atomically apply a SIGNED delta to one pool's in-memory counter, saturating
-/// at zero.
-///
-/// Used by the HA consumer to apply remote deductions and by [`PoolAdjustment`]
-/// to apply a local refund. A refund larger than the recorded usage cannot drive
-/// the counter negative — `u64` has no negatives, and a wrapped counter would
-/// read as an org that has used 18 quintillion steps and can never run again.
+/// Atomically apply a SIGNED delta to one pool's counter, saturating at zero:
+/// a refund larger than the recorded usage must not wrap `u64` into an org that
+/// has used 18 quintillion units and can never run again.
 fn apply_to_pool_counter(org_id: &str, pool: TrialQuotaPool, delta: i64) -> u64 {
     let key = scope(org_id, pool);
     ensure_scope_counter(&key);
@@ -501,21 +428,11 @@ fn set_cached_limit(org_id: &str, pool: TrialQuotaPool, usage_limit: u64) {
 /// HA message broadcast to other nodes after a deduction, an adjustment or a
 /// limit update.
 ///
-/// ## Wire compatibility with nodes that predate pool scoping
-///
-/// `pool` and `delta` are both `#[serde(default)]`, and `cost` is still the
-/// unsigned deduction every existing sender writes. So:
-///
-///   * an OLD message (`{cost: 50}`) deserialises with `pool = None` and `delta = 0`, and
-///     [`apply_ha_msg`] reads it as `+50` on [`TrialQuotaPool::AiCredits`] — which is exactly what
-///     it meant, because the AI features were the only senders before item 2.1;
-///   * a NEW message always sets both, and sets `cost` to the POSITIVE part of `delta` so an
-///     un-upgraded node applies a deduction correctly.
-///
-/// The residue is a refund (`delta < 0`, `cost = 0`): an un-upgraded node
-/// applies nothing and its counter stays high until it restarts and reloads from
-/// the DB, where the refund was flushed. Conservative in the safe direction — it
-/// under-credits its local view rather than over-crediting — and self-healing.
+/// Wire-compatible with nodes predating pool scoping: `pool` and `delta` are
+/// `#[serde(default)]`, so an OLD `{cost: 50}` reads as `+50` on AI credits —
+/// the only senders then — and a NEW message puts the POSITIVE part of `delta`
+/// in `cost` so an un-upgraded node still applies deductions. A refund it
+/// ignores, staying high until it reloads from the DB: safe direction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrialQuotaHaMsg {
     pub org_id: String,
@@ -536,8 +453,7 @@ pub struct TrialQuotaHaMsg {
 }
 
 impl TrialQuotaHaMsg {
-    /// Which pool this message moves. Unknown or absent keys read as
-    /// [`TrialQuotaPool::AiCredits`] — see the type doc.
+    /// Which pool this message moves. Unknown or absent keys read as AI credits.
     pub fn resolved_pool(&self) -> TrialQuotaPool {
         self.pool
             .as_deref()
@@ -573,10 +489,8 @@ fn ha_msg(
     }
 }
 
-/// Apply one remote HA message to the local counters and limits.
-///
-/// Split out of [`subscribe_ha_queue`] so §6.2's *"propagation: NATS
-/// `TRIAL_QUOTA_HA_QUEUE` — no restart"* (T32/E17) is testable without NATS.
+/// Apply one remote HA message to the local counters and limits. Split out of
+/// [`subscribe_ha_queue`] so §6.2 propagation is testable without NATS.
 fn apply_ha_msg(msg: &TrialQuotaHaMsg) -> (u64, u64) {
     let pool = msg.resolved_pool();
     if let Some(usage_limit) = msg.usage_limit {
@@ -593,12 +507,8 @@ fn apply_ha_msg(msg: &TrialQuotaHaMsg) -> (u64, u64) {
 }
 
 /// Persist and publish an explicit lifetime limit for one of an organization's
-/// pools — SPEC §6.2, which is **[EXISTS]**: raising a limit needs no new code,
-/// only the pool argument item 2.1 added.
-///
-/// Re-opens an exhausted org immediately and everywhere: the DB write is the
-/// durable record, [`set_cached_limit`] moves this node, and the HA broadcast
-/// moves the others. **No restart** (T32/E17).
+/// pools (§6.2). Re-opens an exhausted org immediately and everywhere — DB
+/// write, local cache, HA broadcast — with **no restart** (T32/E17).
 pub async fn set_limit_for_pool(
     org_id: &str,
     pool: TrialQuotaPool,
@@ -630,10 +540,9 @@ pub async fn set_limit_for_pool(
     Ok(())
 }
 
-/// Persist and publish an explicit lifetime AI credit limit for an organization.
-///
-/// The AI-pool spelling of [`set_limit_for_pool`], kept because that is what the
-/// `_meta` admin endpoint means by "credits".
+/// Persist and publish an explicit lifetime AI credit limit for an org — the
+/// AI-pool spelling of [`set_limit_for_pool`], which is what the `_meta` admin
+/// endpoint means by "credits".
 pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Error> {
     set_limit_for_pool(org_id, TrialQuotaPool::AiCredits, usage_limit).await
 }
@@ -641,11 +550,8 @@ pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Err
 /// Reconcile explicit limits from the database. This runs on the existing
 /// flush interval so missed or out-of-order HA messages remain short-lived.
 ///
-/// Folded per POOL, not per org: the table stores one `usage_limit` per
-/// `(org, feature)` row, so an org's limit for a pool is the max across that
-/// pool's feature rows. Taking the max across ALL of an org's rows — what this
-/// did before item 2.1 — would let a raised AI limit silently raise the
-/// synthetics grant too.
+/// Folded per POOL, not per org: taking the max across ALL of an org's rows
+/// would let a raised AI limit silently raise the synthetics grant.
 pub async fn refresh_limits_from_db() {
     match infra::table::trial_quota_usage::load_all_usage_limits().await {
         Ok(rows) => {
@@ -675,9 +581,8 @@ pub async fn refresh_limits_from_db() {
 /// Returns `Ok(remaining)` on success, or `Err(QuotaExhaustedError)` when
 /// the pool is depleted.
 ///
-/// The limit check is against the total usage across every feature IN THAT POOL
-/// for the org, not per-feature and not across pools (item 2.1). The per-feature
-/// counter is still tracked in the DB for breakdown.
+/// The limit check is against total usage across every feature IN THAT POOL,
+/// not per-feature and not across pools; the DB still tracks per feature.
 pub async fn try_deduct(
     org_id: &str,
     feature: TrialQuotaFeature,
@@ -692,15 +597,10 @@ pub async fn try_deduct(
 }
 
 /// Deduct `units x feature.cost()` from the feature's pool, all or nothing.
-///
-/// Synchronous on purpose. The only async work the original `try_deduct` did was
-/// the HA broadcast, and the synthetics enqueue path calls this through a
-/// function-pointer hook (`openobserve_synthetics::pool`) that cannot be
-/// `dyn`-safe and async at the same time without pulling in a boxed-future
-/// indirection. The broadcast is issued by [`broadcast_delta`] instead — from an
-/// awaited caller where there is one, and from a detached task otherwise.
-///
 /// Returns the REMAINING units in the pool on success.
+///
+/// Synchronous on purpose: the synthetics enqueue path reaches this through a
+/// function-pointer hook that cannot be `dyn`-safe and async at once.
 pub fn try_deduct_units(
     org_id: &str,
     feature: TrialQuotaFeature,
@@ -711,15 +611,12 @@ pub fn try_deduct_units(
     let pool_limit = get_pool_limit(org_id, pool);
     let key = scope(org_id, pool);
 
-    // Ensure the scope has an atomic counter
     ensure_scope_counter(&key);
 
-    // Single atomic CAS loop on the pool total — no cross-key locks.
     let map = ORG_USAGE.read().unwrap();
     let Some(counter) = map.get(&key) else {
-        // Unreachable: `ensure_scope_counter` just ran and nothing removes
-        // entries. Treated as "no room" rather than unwrapped, because a panic
-        // here would take down the scheduler tick that called it.
+        // Unreachable (`ensure_scope_counter` just ran). Treated as "no room"
+        // rather than unwrapped: a panic here kills the scheduler tick.
         return Err(QuotaExhaustedError {
             usage_count: 0,
             usage_limit: pool_limit,
@@ -739,7 +636,6 @@ pub fn try_deduct_units(
                 usage_limit: pool_limit,
             });
         }
-        // Atomic compare-and-swap: only succeeds if no one else incremented
         if counter
             .compare_exchange(current, new_total, Ordering::AcqRel, Ordering::Relaxed)
             .is_ok()
@@ -754,16 +650,12 @@ pub fn try_deduct_units(
             broadcast_delta_detached(org_id, pool, signed);
             return Ok(pool_limit - new_total);
         }
-        // CAS failed — another thread incremented first, retry
     }
 }
 
-/// Deduct `units` and NEVER refuse — SPEC §6.3 / E14.
-///
-/// *"if a top-up would exhaust the pool mid-run, complete the run and record
-/// it. The work is done and paid for; the next enqueue is where enforcement
-/// belongs."* So this can push `usage_count` past `usage_limit`; the next
-/// [`try_deduct_units`] then fails, which is exactly T28.
+/// Deduct `units` and NEVER refuse — SPEC §6.3 / E14: a top-up that would
+/// exhaust the pool mid-run is still recorded, so `usage_count` can pass
+/// `usage_limit` and the next [`try_deduct_units`] is what fails (T28).
 pub fn force_deduct_units(org_id: &str, feature: TrialQuotaFeature, units: u64) -> u64 {
     let cost = feature.cost().saturating_mul(units);
     let signed = i64::try_from(cost).unwrap_or(i64::MAX);
@@ -785,11 +677,9 @@ pub fn refund_units(org_id: &str, feature: TrialQuotaFeature, units: u64) -> u64
 
 /// Apply one [`PoolAdjustment`] AT MOST ONCE for `idempotency_key` — SPEC §6.3.
 ///
-/// Returns `true` when the adjustment moved the counter, `false` when this key
-/// had already been applied in this process (T27). The key is built by the
-/// caller and MUST identify the run:
-/// `(synthetics_id, location, scheduled_ts, job_id)`. See [`IdempotencyLedger`]
-/// for what the ledger does and does not guarantee.
+/// `false` means this key was already applied in this process (T27). The caller
+/// builds the key and it MUST identify the run:
+/// `(synthetics_id, location, scheduled_ts, job_id)` — see [`IdempotencyLedger`].
 pub fn apply_pool_adjustment(
     org_id: &str,
     feature: TrialQuotaFeature,
@@ -811,25 +701,13 @@ pub fn apply_pool_adjustment(
 
 /// Buffer one SIGNED usage movement for the periodic DB flush.
 ///
-/// ## ⚠️ SPEC §11 **F8** — what is lost when this channel is full
-///
-/// The channel is bounded at 10,000 records and `try_send` DROPS on overflow
-/// with a `warn`. What is lost is only the DB half: the in-memory counter has
-/// already moved, so THIS node keeps enforcing the correct number until it
-/// restarts, at which point `init_from_db` reloads a total that is short by the
+/// ⚠️ §11 **F8**: the channel is bounded at 10,000 and `try_send` DROPS on
+/// overflow. Only the DB half is lost — this node keeps enforcing the right
+/// number until it restarts, when `init_from_db` reloads a total short by the
 /// dropped amount and the org silently gets those units back. Under a one-time
-/// grant (§6.1) that loss is permanent and invisible to the customer until they
-/// run short.
-///
-/// The idempotency key does not prevent the drop and cannot replay it — this is
-/// a fire-and-forget channel with no acknowledgement. What it does buy is that
-/// the adjustment is safe to re-apply: §9B.3's reconciliation job compares
-/// `SUM(size)` over `SyntheticsSteps`/`SyntheticsFreeSteps` in `_usage` against
-/// `trial_quota_usage.usage_count`, and the usage rows are written on a
-/// different path (`usage_reporting::report_usage`), so the divergence is
-/// measurable and the correction is a `set_limit_for_pool` or a replayed
-/// adjustment under the same key. §9B.2 alert **A5** pages on the drop itself
-/// and **A8** on the resulting divergence.
+/// grant that is permanent. Nothing replays it (fire-and-forget, no ack); §9B.3
+/// reconciles `_usage` against `trial_quota_usage.usage_count`, and **A5**/**A8**
+/// page on the drop and on the divergence.
 fn buffer_flush(org_id: &str, feature: TrialQuotaFeature, cost: i64) {
     if let Err(e) = FLUSH_TX.try_send(FlushRecord {
         org_id: org_id.to_string(),
@@ -840,34 +718,15 @@ fn buffer_flush(org_id: &str, feature: TrialQuotaFeature, cost: i64) {
     }
 }
 
-/// SPEC §9B.1 row 9 / §9B.2 alert **A5** — one pool movement lost on its way to
-/// the database.
+/// SPEC §9B.1 row 9 / §9B.2 alert **A5** — one pool movement lost on its way
+/// to the database.
 ///
-/// The `log::error!` was already here and is already at the severity §9B.2 asks
-/// for; what it could not do is be alerted on. A log line is not a Prometheus
-/// series, and A5 is *"pool adjustment failures > 0"* — a threshold, evaluated
-/// continuously, on a number that is normally zero.
-///
-/// Labelled by `trial_quota_usage.feature`, a fixed code-defined set, so §6.1's
-/// one-time synthetics grant can be alerted on separately from AI credits. The
-/// two fail differently: an AI credit lost to a full channel is a monthly pool
-/// the org gets back, and a synthetics step is not.
-///
-/// Deliberately NOT labelled by org, even though the log line carries one: this
-/// counter's normal value is zero, an org id is customer-chosen, and the drop
-/// that produces this is a fleet-wide overload in which every org is dropping
-/// at once — which is exactly when a per-org label is at its most expensive and
-/// least useful.
-///
-/// # ⚠️ What this does not fix — §11 **F8** is still open
-///
-/// This counts the loss; nothing here recovers it. The in-memory counter has
-/// already moved, so this node keeps enforcing the right number until it
-/// restarts, at which point `init_from_db` reloads a total short by the dropped
-/// amount and the org silently gets those units back. Under a one-time grant
-/// that is permanent. The channel, its 10,000 bound and its lack of
-/// acknowledgement are unchanged and out of scope here — see `buffer_flush`'s
-/// own note, and §9B.3's reconciliation job, which measures the residue.
+/// The `log::error!` alone cannot be alerted on: A5 is a threshold on a number
+/// that is normally zero, which needs a series. Labelled by
+/// `trial_quota_usage.feature` so §6.1's one-time synthetics grant alerts
+/// separately from AI credits — an AI credit lost to a full channel comes back,
+/// a synthetics step does not — and NOT by org, since org ids are
+/// customer-chosen. This only COUNTS the loss; §11 **F8** is still open.
 fn record_flush_drop(
     org_id: &str,
     feature: TrialQuotaFeature,
@@ -877,16 +736,14 @@ fn record_flush_drop(
     config::metrics::TRIAL_QUOTA_FLUSH_DROPS_TOTAL
         .with_label_values(&[feature.feature_key()])
         .inc();
-    // §9B.2 alert A5 — "pool adjustment failures > 0" is an ERROR, because
-    // under a one-time grant the loss is permanent.
+    // A5: ERROR because under a one-time grant the loss is permanent.
     log::error!(
         "[TRIAL_QUOTA] Flush channel full, DROPPING pool record for org={org_id} feature={feature} cost={cost}: {error}"
     );
 }
 
-/// Broadcast a signed pool movement to the other nodes.
-///
-/// Skipped in single-node mode — there is nobody to tell.
+/// Broadcast a signed pool movement to the other nodes. Skipped in single-node
+/// mode — there is nobody to tell.
 async fn broadcast_delta(org_id: &str, pool: TrialQuotaPool, delta: i64) {
     if LOCAL_NODE.is_single_node() || delta == 0 {
         return;
@@ -899,13 +756,9 @@ async fn broadcast_delta(org_id: &str, pool: TrialQuotaPool, delta: i64) {
     }
 }
 
-/// Broadcast a signed pool movement from a synchronous caller.
-///
-/// The synthetics enqueue and ack paths are not `async` at the point they move
-/// the pool (they reach it through function-pointer hooks), so the publish is
-/// detached. `try_current` rather than `Handle::current`: a unit test moving the
-/// counter has no reactor, and a panic there would fail the test for the wrong
-/// reason — and in production every caller of this is inside one.
+/// Broadcast a signed pool movement from a synchronous caller. `try_current`
+/// rather than `Handle::current`: a unit test moving the counter has no
+/// reactor, and a panic there would fail the test for the wrong reason.
 fn broadcast_delta_detached(org_id: &str, pool: TrialQuotaPool, delta: i64) {
     if LOCAL_NODE.is_single_node() || delta == 0 {
         return;
@@ -1115,32 +968,23 @@ pub fn get_used(org_id: &str) -> u64 {
     get_used_for_pool(org_id, TrialQuotaPool::AiCredits)
 }
 
-/// Get the AI pool limit for an organization, falling back to the
-/// deployment-wide default.
+/// Get the AI pool limit for an org, falling back to the deployment default.
 pub fn get_limit(org_id: &str) -> u64 {
     get_limit_for_pool(org_id, TrialQuotaPool::AiCredits)
 }
 
-// ---------------------------------------------------------------------------
-// Synthetics free step pool — SPEC §6, items 2.1-2.5
-//
-// Plain `fn` signatures with no async and no trait objects, because
-// `openobserve-synthetics` reaches them through a struct of function pointers
-// (`openobserve_synthetics::pool::StepPoolHooks`). That crate does NOT depend on
-// `openobserve-core` — a dependency edge that does not exist and that this item
-// may not add — and the hooks are handed to `openobserve_synthetics::init` by
-// `openobserve-jobs`, which depends on both.
-// ---------------------------------------------------------------------------
+// Synthetics free step pool — SPEC §6. Plain `fn`, no async and no trait
+// objects: `openobserve-synthetics` reaches these through a struct of function
+// pointers and must NOT depend on `openobserve-core`; `openobserve-jobs` wires
+// the two together.
 
 /// Steps left in the org's one-time synthetics grant (§6.1).
 pub fn synthetics_steps_remaining(org_id: &str) -> u64 {
     get_remaining_for_pool(org_id, TrialQuotaPool::SyntheticsSteps)
 }
 
-/// Reserve `steps` from the org's synthetics grant — SPEC §7.1 gate 3.
-///
-/// All or nothing: `false` means the grant cannot cover this run, and §7.3
-/// decides what happens next based on the org's plan.
+/// Reserve `steps` from the org's synthetics grant — all or nothing. `false`
+/// means the grant cannot cover this run (§7.1 gate 3).
 pub fn synthetics_steps_try_deduct(org_id: &str, steps: u64) -> bool {
     try_deduct_units(org_id, TrialQuotaFeature::SyntheticsSteps, steps).is_ok()
 }
@@ -1152,17 +996,10 @@ pub fn synthetics_steps_refund(org_id: &str, steps: u64) {
 
 /// Give back the reservation of a job that will NEVER ack — SPEC §6.3, E10.
 ///
-/// The reaper's half of the reconcile. `synthetics_steps_refund` cannot serve
-/// here: it is keyless, and the reaper terminates a job on a periodic scan that
-/// can be re-entered, so the refund has to be idempotent under §6.3's key. This
-/// is [`apply_pool_adjustment`] with the direction fixed at
-/// [`PoolAdjustment::Refund`] — fixed HERE, in one place, rather than mapped at
-/// each wiring site, because the direction is the one thing the compiler cannot
-/// check: inverting it turns every refund into a second charge against a grant
-/// the org can never get back.
-///
-/// Returns whether the grant actually moved; `false` means this key was already
-/// applied.
+/// Keyed, because the reaper scan can be re-entered. The direction is fixed at
+/// [`PoolAdjustment::Refund`] HERE rather than at each wiring site — inverting
+/// it turns a refund into a second charge against a grant the org can never get
+/// back. `false` means the key was already used.
 pub fn synthetics_steps_dead_letter_refund(
     org_id: &str,
     steps: u64,
@@ -1325,20 +1162,16 @@ pub struct PoolUsageResponse {
     pub requires_additional_credits: bool,
 }
 
-/// Get one pool's usage for an org. Uses the greater of persisted and in-memory
-/// usage so a pending flush is never reported as unspent.
-///
-/// The exhaustion policy is resolved from `(subscription_type, provider)`, a
-/// property of the org's billing rather than of the pool, so the AI-named
-/// resolver is correct for every pool.
+/// Get one pool's usage for an org. Uses the greater of persisted and
+/// in-memory usage so a pending flush is never reported as unspent. The
+/// exhaustion policy is a property of the org's billing, not of the pool, so
+/// the AI-named resolver is correct for every pool.
 pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResponse {
     let limit = get_pool_limit(org_id, pool);
     let in_memory_used = get_pool_used(org_id, pool);
 
-    // Read from DB for accuracy, scoped to THIS pool's feature rows (item 2.1):
-    // summing every row of the org would report an org's synthetics step
-    // consumption as AI credits used, and drive the AI usage UI to "exhausted"
-    // for an org that never opened the chat.
+    // Scoped to THIS pool's feature rows: summing every row of the org would
+    // report synthetics step consumption as AI credits used.
     let db_used = match infra::table::trial_quota_usage::get_total_usage_for_org(
         org_id,
         pool.feature_keys(),
@@ -1354,10 +1187,8 @@ pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResp
                 in_memory_used,
                 limit,
             );
-            // Clamped: a refund is flushed as a NEGATIVE delta (§6.3), and no
-            // portable SQL floor exists across the three backends, so a row can
-            // sit at or below zero. `as u64` on a negative would read as an org
-            // that has used 18 quintillion units and can never run again.
+            // Clamped: a refund flushes as a NEGATIVE delta with no portable
+            // SQL floor, and `as u64` on it reads as 18 quintillion used.
             total.max(0) as u64
         }
         Err(e) => {
@@ -1414,8 +1245,7 @@ impl From<PoolUsageResponse> for AiUsageResponse {
     }
 }
 
-/// AI usage in the `credits_*` field names the existing AI route and UI consume.
-/// New callers should prefer [`get_pool_usage`].
+/// AI usage in the `credits_*` field names the AI route and UI consume.
 pub async fn get_usage(org_id: &str) -> AiUsageResponse {
     get_pool_usage(org_id, TrialQuotaPool::AiCredits)
         .await
@@ -1482,32 +1312,26 @@ pub async fn reset_checkpoint(org_id: &str) {
     }
 }
 
-/// Fold `trial_quota_usage` rows into per-`(org, pool)` totals and limits.
-///
-/// Pure, and split out of [`init_from_db`] because that function needs a
-/// database and this is the part that decides which grant a row belongs to —
-/// item 2.1's whole subject. Returns `(totals, limits)`, both keyed by
-/// [`scope`].
+/// Fold `trial_quota_usage` rows into per-`(org, pool)` totals and limits, both
+/// keyed by [`scope`]. Split out of [`init_from_db`] so the row-to-pool
+/// decision is testable without a database.
 fn fold_db_records(
     records: &[infra::table::entity::trial_quota_usage::Model],
 ) -> (HashMap<String, u64>, HashMap<String, u64>) {
-    // Sum per-feature counts into per-POOL totals and load explicit limits
-    // (item 2.1). Folding per ORG instead — what this did before — is what made
+    // Sum per-feature counts into per-POOL totals; folding per ORG is what made
     // the two grants one.
     let mut totals: HashMap<String, u64> = HashMap::new();
     let mut limits: HashMap<String, u64> = HashMap::new();
     for record in records {
         // A row this build does not recognise belongs to a pool it does not
-        // have. Skipped, not folded somewhere at random: counting it against a
-        // pool it does not belong to spends the wrong grant.
+        // have; counting it against another pool spends the wrong grant.
         let Some(pool) = TrialQuotaPool::from_key_of_feature(&record.feature) else {
             continue;
         };
         let key = scope(&record.org_id, pool);
-        // A refund is flushed as a NEGATIVE delta (§6.3) and `batch_increment`
-        // adds it verbatim — no portable SQL floor exists across the three
-        // backends — so a row can sit at or below zero. Read as zero rather than
-        // wrapped into an astronomical `u64` that would exhaust the org forever.
+        // A refund flushes as a NEGATIVE delta added verbatim, so a row can sit
+        // below zero. Read as zero rather than wrapped into an astronomical
+        // `u64` that would exhaust the org forever.
         *totals.entry(key.clone()).or_default() += record.usage_count.max(0) as u64;
         if let Some(limit) = record.usage_limit
             && let Ok(limit) = u64::try_from(limit)
@@ -1533,7 +1357,6 @@ pub async fn init_from_db() {
 
             let (scope_totals, scope_limits) = fold_db_records(&records);
 
-            // Populate ORG_USAGE with per-pool totals
             {
                 let mut map = ORG_USAGE.write().unwrap();
                 for (key, total) in scope_totals {
@@ -1558,14 +1381,11 @@ pub async fn init_from_db() {
 mod tests {
     use super::*;
 
-    // ── SPEC §6 free pool — items 2.1-2.5, tests T25-T33 ────────────────────
-    //
-    // These exercise the process-global counters, so every test owns a UNIQUE
-    // org id. Sharing one would make them order-dependent under `cargo test`'s
-    // default parallelism, and the failure would look like a billing bug.
+    // These exercise process-global counters, so every test owns a UNIQUE org
+    // id — sharing one makes them order-dependent under `cargo test`'s
+    // parallelism.
 
-    /// A per-test org, and its synthetics pool sized explicitly so the test does
-    /// not depend on `O2_SYNTHETICS_FREE_STEP_POOL`'s deployment default.
+    /// A per-test org with an explicit pool size, not the deployment default.
     fn steps_org(name: &str, limit: u64) -> String {
         let org_id = format!("pool-test-{name}");
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsSteps, limit);
@@ -1574,13 +1394,8 @@ mod tests {
 
     const STEPS: TrialQuotaFeature = TrialQuotaFeature::SyntheticsSteps;
 
-    // --- 2.1: the pools are separate ---
-
-    /// The mapping that makes item 2.1 work is in two places —
-    /// `TrialQuotaFeature::pool` (used by every counter operation) and
-    /// `TrialQuotaPool::feature_keys` (used by every DB query). They MUST agree,
-    /// or a feature deducts from one pool in memory and reports into another in
-    /// the table.
+    /// `TrialQuotaFeature::pool` and `TrialQuotaPool::feature_keys` MUST agree,
+    /// or a feature deducts from one pool and reports into another in the table.
     #[test]
     fn every_feature_is_listed_by_its_own_pool() {
         for feature in [
@@ -1609,40 +1424,34 @@ mod tests {
             assert_eq!(TrialQuotaPool::from_key(pool.key()), Some(pool));
         }
         assert_eq!(TrialQuotaPool::from_key("ingest"), None);
-        // A feature key a NEWER node writes must not be folded into a pool this
-        // build happens to have.
+        // A key a NEWER node writes must not be folded into a pool this build has.
         assert_eq!(TrialQuotaPool::from_key_of_feature("future_feature"), None);
     }
 
-    /// Item 2.1's whole purpose: spending one grant must not spend the other.
     #[test]
     fn ai_and_synthetics_pools_do_not_drain_each_other() {
         let org_id = format!("pool-test-{}", "isolation");
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsSteps, 100);
         set_cached_limit(&org_id, TrialQuotaPool::AiCredits, 100);
 
-        // Spend the whole synthetics grant.
         assert!(try_deduct_units(&org_id, STEPS, 100).is_ok());
         assert_eq!(
             get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
             0
         );
 
-        // The AI pool is untouched, and still spendable.
         assert_eq!(
             get_remaining_for_pool(&org_id, TrialQuotaPool::AiCredits),
             100
         );
         assert!(try_deduct_units(&org_id, TrialQuotaFeature::AiChat, 1).is_ok());
 
-        // And the reverse: AI spending leaves synthetics where it was.
         assert_eq!(
             get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
             100
         );
     }
 
-    /// The scope key must not be forgeable from an org id, which is user-chosen.
     #[test]
     fn scope_keys_cannot_collide_across_orgs_or_pools() {
         assert_ne!(
@@ -1655,26 +1464,18 @@ mod tests {
         );
     }
 
-    // --- 2.2: the feature ---
-
-    /// SPEC §4.2: pool consumption is `SyntheticsFreeSteps`. Emitting
-    /// `SyntheticsSteps` here would invoice work the free grant already paid for
-    /// — o2-enterprise's `is_billable` says the first is billable and the second
-    /// is not.
+    /// §4.2: emitting `SyntheticsSteps` here would invoice work the free grant
+    /// already paid for.
     #[test]
     fn synthetics_feature_reports_free_steps_never_billable_steps() {
         assert_eq!(STEPS.usage_event(), UsageEvent::SyntheticsFreeSteps);
         assert_ne!(STEPS.usage_event(), UsageEvent::SyntheticsSteps);
         assert_eq!(STEPS.feature_key(), "synthetics_steps");
         assert_eq!(STEPS.pool(), TrialQuotaPool::SyntheticsSteps);
-        // One unit is one step: the §6.1 grant is denominated in steps, so a
-        // per-step credit cost other than 1 would silently rescale it.
+        // One unit is one step; any per-step cost but 1 rescales the §6.1 grant.
         assert_eq!(STEPS.cost(), 1);
     }
 
-    // --- 2.3: T25 / T26 / T27 — deduct at enqueue, reconcile at ack ---
-
-    /// T25 — enqueue deducts 14, the ack bills 4, so 10 come back.
     #[test]
     fn t25_ack_billing_less_than_reserved_refunds_the_difference() {
         let org_id = steps_org("t25", 1_000);
@@ -1699,7 +1500,6 @@ mod tests {
         );
     }
 
-    /// T25, second half — the refund is idempotent.
     #[test]
     fn t25_refund_is_idempotent() {
         let org_id = steps_org("t25-idem", 1_000);
@@ -1710,7 +1510,6 @@ mod tests {
             PoolAdjustment::Refund(10),
             "t25-idem|job-1"
         ));
-        // Same key, same adjustment: refused, and the counter does not move.
         assert!(!synthetics_steps_adjust(
             &org_id,
             PoolAdjustment::Refund(10),
@@ -1722,7 +1521,6 @@ mod tests {
         );
     }
 
-    /// T26 — enqueue deducts 14, a retry pushes the ack to 18, so 4 more go out.
     #[test]
     fn t26_ack_billing_more_than_reserved_tops_up_the_difference() {
         let org_id = steps_org("t26", 1_000);
@@ -1743,7 +1541,6 @@ mod tests {
         );
     }
 
-    /// T26, second half — the top-up is idempotent.
     #[test]
     fn t26_top_up_is_idempotent() {
         let org_id = steps_org("t26-idem", 1_000);
@@ -1765,25 +1562,19 @@ mod tests {
         );
     }
 
-    /// **E10 — the reaper's refund gives steps BACK, and gives them back once.**
-    ///
-    /// The direction is the one thing no compiler can check, and it is the
-    /// difference between crediting a grant and charging it a second time.
-    /// `synthetics_steps_dead_letter_refund` fixes it here, in one place, so
-    /// that no wiring site can invert it; this is what pins it.
+    /// **E10** — the reaper's refund gives steps BACK, and gives them back once.
+    /// The direction is the one thing no compiler can check: inverting it
+    /// charges the grant a second time instead of crediting it.
     #[test]
     fn e10_a_dead_letter_refund_credits_the_grant_and_is_idempotent() {
         let org_id = steps_org("e10-reaper", 1_000);
-        // The enqueue reserved `configured x combos` for a job that then never
-        // acked — a dead agent, a lease that ran out, a slot nobody claimed.
         assert!(try_deduct_units(&org_id, STEPS, 28).is_ok());
         assert_eq!(
             get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
             28
         );
 
-        // Distinct per test: the ledger is process-global, so two tests sharing
-        // a key would make whichever ran second read as already applied.
+        // Distinct per test: the ledger is process-global.
         let key = "chk_1\u{1f}aws-us-east-1\u{1f}1787665631000000\u{1f}job-reaper";
         assert!(synthetics_steps_dead_letter_refund(&org_id, 28, key));
         assert_eq!(
@@ -1793,7 +1584,6 @@ mod tests {
              for a run that never happened",
         );
 
-        // Re-processed dead letter: the ledger absorbs it.
         assert!(!synthetics_steps_dead_letter_refund(&org_id, 28, key));
         assert!(!synthetics_steps_dead_letter_refund(&org_id, 28, key));
         assert_eq!(
@@ -1803,10 +1593,8 @@ mod tests {
     }
 
     /// The reaper and the ack share ONE ledger and ONE key shape, so a job that
-    /// somehow reached both paths moves the grant once. The DB compare-and-swap
-    /// in `infra::table::synthetics_jobs` is what actually keeps them apart —
-    /// this is the backstop behind it, and it only holds while the two build
-    /// the SAME key.
+    /// reached both paths moves the grant once — only while both build the SAME
+    /// key.
     #[test]
     fn a_reaper_refund_and_an_ack_reconcile_under_one_key_apply_once() {
         let org_id = steps_org("e10-onekey", 1_000);
@@ -1824,10 +1612,8 @@ mod tests {
         );
     }
 
-    /// T27 — the same adjustment applied twice has no double effect, while a
-    /// DIFFERENT run's adjustment still applies. Both halves matter: a key that
-    /// swallowed everything would pass the first assertion and silently stop
-    /// billing.
+    /// T27 — a key that swallowed everything would pass the first half and
+    /// silently stop billing, so a DIFFERENT run's adjustment must still apply.
     #[test]
     fn t27_the_same_adjustment_twice_has_no_double_effect() {
         let org_id = steps_org("t27", 1_000);
@@ -1856,7 +1642,6 @@ mod tests {
             18
         );
 
-        // A different job_id is a different adjustment and DOES apply.
         assert!(synthetics_steps_adjust(
             &org_id,
             PoolAdjustment::Refund(10),
@@ -1868,16 +1653,13 @@ mod tests {
         );
     }
 
-    /// T28 / E14 — a top-up that would exhaust the pool mid-run is RECORDED
-    /// anyway ("the work is done and paid for"), and enforcement lands on the
-    /// next enqueue.
+    /// T28 / E14 — a top-up past the limit is RECORDED anyway, and enforcement
+    /// lands on the next enqueue.
     #[test]
     fn t28_top_up_past_the_limit_records_and_the_next_enqueue_blocks() {
         let org_id = steps_org("t28", 20);
         assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
 
-        // The run retried: 18 executed against a 14-step reservation, and 14 + 4
-        // is 18 of a 20 grant — but the retry ceiling took it past the limit.
         assert!(synthetics_steps_adjust(
             &org_id,
             PoolAdjustment::TopUp(12),
@@ -1893,15 +1675,12 @@ mod tests {
             0
         );
 
-        // The NEXT enqueue is where enforcement happens.
         assert!(!synthetics_steps_try_deduct(&org_id, 1));
         let err = try_deduct_units(&org_id, STEPS, 1).unwrap_err();
         assert_eq!(err.usage_count, 26);
         assert_eq!(err.usage_limit, 20);
     }
 
-    /// The enqueue deduct is all-or-nothing: a partial reservation would let a
-    /// run start that the grant cannot cover.
     #[test]
     fn an_enqueue_deduct_that_does_not_fit_takes_nothing() {
         let org_id = steps_org("partial", 10);
@@ -1910,7 +1689,6 @@ mod tests {
             get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
             0
         );
-        // Exactly the remaining amount still fits.
         assert!(synthetics_steps_try_deduct(&org_id, 10));
         assert_eq!(
             get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
@@ -1918,9 +1696,8 @@ mod tests {
         );
     }
 
-    /// E10/E11, T29 — the enqueue never happened, so the whole reservation goes
-    /// back. Saturating rather than wrapping: a refund larger than the recorded
-    /// usage must read as zero used, not as 18 quintillion.
+    /// E10/E11, T29 — saturating rather than wrapping: a refund larger than the
+    /// recorded usage must read as zero used, not as 18 quintillion.
     #[test]
     fn a_refund_larger_than_the_usage_saturates_at_zero() {
         let org_id = steps_org("saturate", 1_000);
@@ -1936,20 +1713,14 @@ mod tests {
         );
     }
 
-    // --- 2.5: T32 / E17 — raising the limit re-opens an exhausted org ---
-
-    /// T32 / E17 — §6.2 is **[EXISTS]**: raising the limit re-opens the org
-    /// immediately, with no restart and no re-init. This exercises both halves
-    /// of the propagation §6.2 names — the local cache write `set_limit_for_pool`
-    /// performs, and the `TRIAL_QUOTA_HA_QUEUE` message every other node applies
-    /// — without needing a database or NATS.
+    /// T32 / E17 — raising the limit re-opens the org immediately, with no
+    /// restart and no re-init.
     #[test]
     fn t32_raising_the_limit_reopens_an_exhausted_org_without_a_restart() {
         let org_id = steps_org("t32", 10);
         assert!(synthetics_steps_try_deduct(&org_id, 10));
         assert!(!synthetics_steps_try_deduct(&org_id, 1));
 
-        // The `_meta` admin raises it on ONE node.
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsSteps, 50);
         assert!(synthetics_steps_try_deduct(&org_id, 1));
         assert_eq!(
@@ -1979,31 +1750,23 @@ mod tests {
             50
         );
         assert!(synthetics_steps_try_deduct(&org_id, 1));
-        // And it did NOT raise the org's AI pool.
         assert_eq!(
             get_limit_for_pool(&org_id, TrialQuotaPool::AiCredits),
             TrialQuotaPool::AiCredits.default_limit(),
         );
     }
 
-    // --- E23 / T33 — the month boundary ---
-
-    /// T33 / E23 — *"nothing happens: the pool is one-time"*.
+    /// T33 / E23 — the pool is one-time, so a month boundary does nothing.
     ///
-    /// Two halves, because the assertion that matters cannot be made by moving a
-    /// clock: the pool API takes no time input at all, so the only way a month
-    /// boundary could reset it is code that reads one. The first half pins the
-    /// counter across the boundary; the second pins the ABSENCE of any reset
-    /// machinery — a `period_ym` column, a monthly rollover, a scheduled reset —
-    /// which is what §6.1 means by *"no `period_ym` column, no reset logic"*.
+    /// The pool API takes no time input at all, so the only way a boundary could
+    /// reset it is code that reads one; the next test pins that absence.
     #[test]
     fn t33_a_month_boundary_leaves_the_one_time_pool_unchanged() {
         let org_id = steps_org("t33", 100);
         assert!(synthetics_steps_try_deduct(&org_id, 60));
         let before = get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps);
 
-        // Every read a month boundary could plausibly go through, on both sides
-        // of it. None of them takes a timestamp, so none of them can reset.
+        // None of these reads takes a timestamp, so none of them can reset.
         assert_eq!(
             get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsSteps),
             before
@@ -2027,17 +1790,14 @@ mod tests {
 
     #[test]
     fn t33_the_pool_has_no_period_or_reset_machinery() {
-        // CODE only. Comments — this test's own doc included — name the thing
-        // they forbid, and a guard that matched them would fail on its own
-        // explanation instead of on a regression.
+        // CODE only: comments name the thing they forbid, and a guard that
+        // matched them would fail on its own explanation, not on a regression.
         let source: String = include_str!("trial_quota.rs")
             .lines()
             .filter(|line| !line.trim_start().starts_with("//"))
             .collect::<Vec<_>>()
             .join("\n");
-        // Assembled at runtime so the guard cannot match its own text — the
-        // failure mode that makes a source guard pass for the wrong reason, or
-        // (here) fail for it.
+        // Assembled at runtime so the guard cannot match its own text.
         let banned = [
             ["period", "ym"].join("_"),
             ["monthly", "reset"].join("_"),
@@ -2052,8 +1812,6 @@ mod tests {
         }
     }
 
-    // --- the idempotency ledger itself ---
-
     #[test]
     fn the_ledger_claims_a_key_exactly_once() {
         let ledger = IdempotencyLedger::new(8);
@@ -2063,9 +1821,6 @@ mod tests {
         assert_eq!(ledger.len(), 2);
     }
 
-    /// Bounded, FIFO. An unbounded ledger on a scheduler that runs for weeks is
-    /// a leak; a ledger that evicted arbitrarily would forget a key it had just
-    /// been given.
     #[test]
     fn the_ledger_evicts_oldest_first_and_stays_bounded() {
         let ledger = IdempotencyLedger::new(3);
@@ -2085,15 +1840,12 @@ mod tests {
         assert!(!ledger.claim("d"));
     }
 
-    /// A zero capacity would remember nothing and turn the guard off silently.
     #[test]
     fn a_zero_capacity_ledger_still_remembers_one_key() {
         let ledger = IdempotencyLedger::new(0);
         assert!(ledger.claim("a"));
         assert!(!ledger.claim("a"));
     }
-
-    // --- the HA wire ---
 
     fn ha(cost: u64, pool: Option<&str>, delta: i64) -> TrialQuotaHaMsg {
         TrialQuotaHaMsg {
@@ -2107,8 +1859,7 @@ mod tests {
         }
     }
 
-    /// A message from a node that predates item 2.1 carries neither field. It
-    /// meant an AI credit deduction, because nothing else could send one.
+    /// A node predating item 2.1 sends neither field; it meant an AI deduction.
     #[test]
     fn an_ha_message_without_a_pool_reads_as_ai_credits() {
         let msg = ha(50, None, 0);
@@ -2130,8 +1881,7 @@ mod tests {
     fn an_ha_refund_travels_as_a_negative_delta() {
         let msg = ha_msg("acme", TrialQuotaPool::SyntheticsSteps, -10, None);
         assert_eq!(msg.delta, -10);
-        // `cost` is the positive part, so a node that predates `delta` applies
-        // nothing rather than applying a refund as a deduction.
+        // `cost` is the positive part, so an old node applies nothing, not a charge.
         assert_eq!(msg.cost, 0);
         assert_eq!(msg.resolved_delta(), -10);
         assert_eq!(msg.resolved_pool(), TrialQuotaPool::SyntheticsSteps);
@@ -2166,15 +1916,9 @@ mod tests {
         assert_eq!(get_used_for_pool(&org_id, TrialQuotaPool::AiCredits), 0);
     }
 
-    // --- the deployment default, and the DB fold ---
-
-    /// The two pools have their OWN deployment-wide defaults —
-    /// `O2_SYNTHETICS_FREE_STEP_POOL` and `O2_AI_FREE_CREDIT_POOL` (item 2.5).
-    ///
-    /// Every other pool test installs an explicit per-org limit, so none of them
-    /// touches this path: an org that has never been configured — which is every
-    /// org — falls through to it, and a synthetics grant sized from the AI knob
-    /// would be a tenth of what §6.1 specifies with nothing anywhere saying so.
+    /// The two pools have their OWN deployment-wide defaults (item 2.5), and
+    /// every other pool test installs an explicit limit, so nothing else covers
+    /// this path — a synthetics grant sized from the AI knob would be a tenth.
     #[test]
     fn each_pool_has_its_own_deployment_default() {
         // A never-configured org, so nothing in ORG_LIMITS answers for it.
@@ -2189,10 +1933,8 @@ mod tests {
             get_limit_for_pool(org_id, TrialQuotaPool::AiCredits),
             cfg.cloud.ai_free_credit_pool,
         );
-        // §6.1 sizes the grant at 10,000 STEPS; the AI pool is 1,000 credits.
-        // They are different numbers, and reading one for the other is exactly
-        // the mistake item 2.1 exists to make impossible.
-        assert_eq!(cfg.cloud.synthetics_free_step_pool, 10_000);
+        // §6.1 sizes the grant at 50,000 STEPS; the AI pool is 1,000 credits.
+        assert_eq!(cfg.cloud.synthetics_free_step_pool, 50_000);
         assert_ne!(
             cfg.cloud.synthetics_free_step_pool,
             cfg.cloud.ai_free_credit_pool,
@@ -2214,9 +1956,8 @@ mod tests {
         }
     }
 
-    /// The startup fold is where item 2.1 either holds or silently does not: a
-    /// node that reloads its counters folded per ORG has one pool again the
-    /// moment it restarts, and nothing at runtime would ever say so.
+    /// A node that reloads its counters folded per ORG has one pool again the
+    /// moment it restarts, and nothing at runtime would say so.
     #[test]
     fn the_startup_fold_keeps_the_two_pools_apart() {
         let rows = vec![
@@ -2237,9 +1978,8 @@ mod tests {
         );
     }
 
-    /// A `feature` a NEWER node wrote for a pool this build does not have.
-    /// Folding it into a pool at random spends that pool's grant on usage that
-    /// was never its own.
+    /// Folding a NEWER node's unknown `feature` into a pool at random spends
+    /// that pool's grant on usage that was never its own.
     #[test]
     fn the_startup_fold_skips_a_feature_it_does_not_recognise() {
         let rows = vec![
@@ -2259,9 +1999,8 @@ mod tests {
         );
     }
 
-    /// A refund is flushed as a negative delta and `batch_increment` adds it
-    /// verbatim, so a row can sit below zero. `as u64` on that is 18 quintillion
-    /// — an org exhausted forever, by a refund.
+    /// A refund flushes as a negative delta added verbatim, so a row can sit
+    /// below zero; `as u64` on that is an org exhausted forever, by a refund.
     #[test]
     fn the_startup_fold_reads_a_negative_row_as_zero() {
         let rows = vec![db_row("acme", "synthetics_steps", -12)];
@@ -2272,9 +2011,8 @@ mod tests {
         );
     }
 
-    /// An explicit limit belongs to the pool whose feature row carries it. Taking
-    /// the max across ALL of an org's rows — what this did before item 2.1 —
-    /// meant raising the AI credit limit also raised the one-time step grant.
+    /// An explicit limit belongs to the pool whose feature row carries it, or
+    /// raising the AI credit limit also raises the one-time step grant.
     #[test]
     fn the_startup_fold_keeps_explicit_limits_in_their_own_pool() {
         let mut ai = db_row("acme", "ai_chat", 0);
@@ -2293,13 +2031,9 @@ mod tests {
         );
     }
 
-    // ── SPEC §9B.1 row 9 / §9B.2 alert A5 ───────────────────────────────────
-
-    /// **A5.** A dropped flush record is counted, under its own pool's label.
-    ///
+    /// **A5.** A dropped flush record is counted under its own pool's label.
     /// Reached through a function pointer so the call does not count towards
-    /// `every_dropped_pool_record_is_counted` below, and asserted on one label
-    /// value so it is deterministic under `cargo test`'s thread pool.
+    /// `every_dropped_pool_record_is_counted` below.
     #[test]
     fn a_dropped_pool_record_is_counted_against_its_own_pool() {
         let record: fn(&str, TrialQuotaFeature, i64, &dyn std::fmt::Display) = record_flush_drop;
@@ -2333,16 +2067,10 @@ mod tests {
         );
     }
 
-    /// The drop path must stay behind the counter.
-    ///
-    /// `buffer_flush`'s error branch is unreachable from a unit test: it needs
-    /// the process-global 10,000-slot channel to be full, and filling it would
-    /// leave every later test in this binary running against a saturated queue.
-    /// So the wiring is pinned in source instead — the same reason the branch
-    /// existed for years with nothing but a log line to show for it.
-    ///
-    /// The needles are assembled so this test's own source does not satisfy
-    /// them.
+    /// The drop path must stay behind the counter. The error branch needs the
+    /// 10,000-slot channel full, which would leave every later test running
+    /// against a saturated queue, so the wiring is pinned in source. The needles
+    /// are assembled so this test's own source does not satisfy them.
     #[test]
     fn every_dropped_pool_record_is_counted() {
         let source = include_str!("trial_quota.rs");

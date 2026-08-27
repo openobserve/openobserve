@@ -43,46 +43,26 @@
 pub(crate) static CONFIG_SWAP_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Whether THIS crate was compiled with the `cloud` feature — the fixture for
-/// the compile-time guard against **F6**.
+/// the compile-time guard against SPEC §11 **F6**.
 ///
 /// `openobserve-synthetics` had no `cloud` feature at all, so every
-/// `#[cfg(feature = "cloud")]` written inside it compiled to nothing, silently.
-/// The failure mode is the worst kind: no error, no log, no metric — the emit
-/// simply is not there, and the first symptom is a revenue number that never
-/// moves. Nothing at runtime can detect it, because the detector would be the
-/// code that vanished.
+/// `#[cfg(feature = "cloud")]` written inside it compiled to nothing, silently:
+/// no error, no log, no metric, just a revenue number that never moves. So the
+/// check is made at COMPILE time by the crates that know the answer — `src/jobs`
+/// and `src/api/management` each carry
+/// `#[cfg(feature = "cloud")] const _: () = assert!(BUILT_WITH_CLOUD);`.
 ///
-/// So the check is made at COMPILE time and placed in the crates that know the
-/// answer. Every crate that depends on this one and defines its own `cloud`
-/// (`src/jobs`, `src/api/management`) carries
+/// **It must stay `cfg!`, never `#[cfg]`.** The macro form always evaluates, so
+/// the constant exists in every build shape and is simply `false` without
+/// `cloud`; the attribute form would delete it from exactly those builds, and
+/// each downstream assertion would then fail on a missing item rather than on
+/// the condition — or be "fixed" by another `#[cfg]`, which is silent absence
+/// one level further out.
 ///
-/// ```ignore
-/// #[cfg(feature = "cloud")]
-/// const _: () = assert!(openobserve_synthetics::BUILT_WITH_CLOUD);
-/// ```
-///
-/// — so a `cloud` build that fails to forward the feature down here does not
-/// compile. See §8.1, §9C T39, §11 F6.
-///
-/// **It must stay `cfg!`, never `#[cfg]`.** The macro form always evaluates,
-/// so the constant exists in every build shape and is simply `false` in the
-/// ones without `cloud`. Attributing the constant instead would delete it from
-/// exactly those builds, and each downstream `const _: () = assert!(...)` would
-/// then fail on a missing item rather than on the condition it is there to
-/// check — or be "fixed" by wrapping it in a `#[cfg]` of its own, which is
-/// silent absence again, one level further out.
-///
-/// **Known limit of the T39 guard.** It proves `cloud` reached this crate *from
-/// a crate that has it*. It cannot prove `cloud` reached those crates: the
-/// assertions in `src/jobs` and `src/api/management` are themselves
-/// `#[cfg(feature = "cloud")]`, so if the root's `cloud` list ever stopped
-/// forwarding to `openobserve-jobs` (or to `openobserve-api-management`, which
-/// it reaches only through `openobserve-api-http/cloud`) the assertion would
-/// not be compiled at all — the same silent-absence bug one level up. The root
-/// binary crate cannot carry the guard either: it has no direct dependency on
-/// `openobserve-synthetics`. `src/synthetics/tests/build_shapes.sh` compiles
-/// those two crates with `--features cloud` (T39, opt-in) rather than relying
-/// on the root.
+/// Known limit: those downstream assertions are themselves
+/// `#[cfg(feature = "cloud")]`, so a root that stopped forwarding `cloud` to
+/// either crate would not compile them at all. `tests/build_shapes.sh` builds
+/// both with `--features cloud` to cover that (T39, opt-in).
 pub const BUILT_WITH_CLOUD: bool = cfg!(feature = "cloud");
 
 pub mod alerting;
@@ -160,20 +140,18 @@ const JOB_CLUSTER_POLL: std::time::Duration = std::time::Duration::from_secs(10)
 /// `step_pool` is SPEC §6's free step pool, item **2.3** — the scheduler's
 /// gate 3.
 ///
-/// A REQUIRED argument, and `Option` rather than a `OnceCell` the caller may or
-/// may not have set: the pool lives in `openobserve-core`, this crate has no
-/// edge to it, and the only defence against §11 **F6** — a wiring mistake that
-/// produces no error and no log, just an unmetered fleet — is making the wiring
-/// impossible to omit. `None` is a valid answer (an OSS build has no pool), and
-/// it means the scheduler does not gate. See [`pool`] for the fail-open
-/// reasoning.
+/// A REQUIRED argument rather than a `OnceCell` the caller may forget to set:
+/// §11 **F6** is a wiring mistake that produces no error and no log, just an
+/// unmetered fleet, so the wiring is made impossible to omit. `None` is a valid
+/// answer (an OSS build has no pool) and means the scheduler does not gate — see
+/// [`pool`] for the fail-open reasoning.
 pub async fn init(step_pool: Option<pool::StepPoolHooks>) {
     if !config::get_config().synthetics.enabled {
         tracing::info!("[synthetics] disabled via ZO_SYNTHETICS_ENABLED — workers not started");
         return;
     }
 
-    // Before any worker is spawned, so `scheduler::run` cannot observe a
+    // Before any worker is spawned: `scheduler::run` must not see a
     // half-installed pool on its first tick.
     if let Some(step_pool) = step_pool {
         pool::install(step_pool);
@@ -410,14 +388,10 @@ mod tests {
     /// the ones that have moved here, with the same allowance table. A file
     /// arriving in this crate must be added to one list or the other, never
     /// dropped from both.
-    /// **SPEC §6, item 2.3 — `init` must INSTALL the pool it was handed.**
-    ///
-    /// A call site, and the one whose loss is completely silent: `init` still
-    /// starts every worker, the scheduler still runs every check, and every
-    /// test in `pool_gate_tests` still passes — the pool is simply never there,
-    /// so `resolve_pool_gate` returns `None` forever and the fleet is unmetered
-    /// and ungated. That is SPEC §11 **F6**'s exact shape, one layer down from
-    /// the `cfg` it names.
+    /// A call site whose loss is completely silent: `init` still starts every
+    /// worker and every `pool_gate_tests` test still passes, but the pool is
+    /// never installed, so `resolve_pool_gate` returns `None` forever and the
+    /// fleet is unmetered and ungated — SPEC §11 **F6**, one layer down.
     #[test]
     fn init_installs_the_step_pool_it_was_handed() {
         let source = include_str!("lib.rs");

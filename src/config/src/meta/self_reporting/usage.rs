@@ -588,28 +588,18 @@ impl UsageData {
 /// The bucket key `ingest_usages` (openobserve-core `self_reporting::ingestion`)
 /// aggregates `UsageData` rows by, per org/hour/event.
 ///
-/// ## What actually accumulates on a bucket collision
-///
-/// Only **three** fields are touched, and only **two** of them truly sum:
+/// On a bucket collision only three fields are touched, and only two truly sum:
 ///
 /// | field | behaviour |
 /// |---|---|
 /// | `size` | **sums** — the only reliable summation channel |
 /// | `num_records` | **sums** |
-/// | `response_time` | summed, then **divided by `count`** ⇒ it is an **AVERAGE, not a sum** |
+/// | `response_time` | summed then divided by `count` ⇒ an AVERAGE, not a sum |
 ///
-/// SPEC §4.2 lists `response_time` alongside `size` and `num_records` as if all
-/// three accumulate. They do not — do **not** reach for `response_time` as a
-/// second summation channel. This strengthens §4.2's own conclusion: anything
-/// that must survive summation has to travel in `size`, as its own `UsageEvent`.
-///
-/// Every other field — `request_body` included — is taken from the **FIRST**
-/// row inserted into the bucket and the rest are discarded.
-///
-/// Note also that **`dropped_records` is not summed**: it silently keeps the
-/// first row's value, so it under-counts across an aggregated bucket. That is
-/// pre-existing behaviour, unrelated to step billing, and deliberately left
-/// alone — recorded here so it is not rediscovered as new.
+/// Every other field — `request_body` included — is taken from the FIRST row
+/// inserted into the bucket and the rest are discarded. `dropped_records` is
+/// likewise not summed: it keeps the first row's value and so under-counts
+/// (pre-existing behaviour, left alone deliberately).
 #[derive(Hash, PartialEq, Eq)]
 pub struct GroupKey {
     pub stream_name: String,
@@ -661,13 +651,8 @@ pub enum UsageEvent {
     SyntheticsFreeSteps,
     /// Steps the journey DEFINES (`configured × combos`). `size` carries that
     /// product. Reported, never billed — the leading `_` is the non-billable
-    /// marker, matching `MeteringEventName::_AiChat` and friends.
-    ///
-    /// This is a separate event rather than a field on `SyntheticsSteps`
-    /// because `ingest_usages` sums only `size` and `num_records` — see
-    /// [`GroupKey`], `response_time` is averaged rather than summed — and keeps
-    /// every other field, `request_body` included, from the FIRST row of the
-    /// group. So anything needing summation must travel in `size`.
+    /// marker, matching `MeteringEventName::_AiChat` and friends. Separate event
+    /// because only `size` survives bucket summation — see [`GroupKey`].
     _SyntheticsStepsDefined,
     /// Browser run duration in milliseconds — the v2 duration hedge. `size`
     /// carries `browser_ms`. Reported, never billed.
@@ -2404,29 +2389,13 @@ mod tests {
         assert!(obj.contains_key("peak_memory_usage"));
     }
 
-    // -----------------------------------------------------------------------
-    // Synthetics step billing — SPEC §4.2, §9 item 1.5, §9C T21/T24, §11 F2.
-    //
-    // `UsageEvent`'s serde representation and its `Display` output are BOTH
-    // wire formats. `Display` is what lands in the `_usage` stream's `event`
-    // column; the metering loop in o2-enterprise then groups by that column
-    // (`SELECT event, org_id, SUM(size) ... GROUP BY event, org_id`) and
-    // deserializes the column straight back into a `UsageEvent`. The two
-    // representations must agree, and neither may drift.
-    // -----------------------------------------------------------------------
-
-    /// Item 1.11 — `region` follows the struct's existing optional-field
-    /// convention (`#[serde(skip_serializing_if = "Option::is_none")]`, no
-    /// explicit `default` — serde already treats a missing `Option` as `None`).
-    ///
-    /// Absent must serialize to **nothing**, not to a JSON `null`: the `_usage`
+    /// Absent `region` must serialize to nothing, not a JSON `null`: the `_usage`
     /// stream's schema is inferred by reflection over the rows written to it, so
     /// a null would put an untyped column into the schema.
     #[test]
     fn test_usage_data_region_round_trip() {
         let mut data = UsageData::init_for_reflection();
 
-        // Present: serializes, round-trips, and reconstructs an equal value.
         data.region = Some("us-west-2".to_string());
         let json = serde_json::to_value(&data).unwrap();
         assert_eq!(
@@ -2437,7 +2406,6 @@ mod tests {
         assert_eq!(back.region.as_deref(), Some("us-west-2"));
         assert_eq!(back, data);
 
-        // Absent: the key is omitted entirely — NOT serialized as null.
         data.region = None;
         let json = serde_json::to_value(&data).unwrap();
         assert!(
@@ -2449,15 +2417,13 @@ mod tests {
         assert_eq!(back.region, None);
         assert_eq!(back, data);
 
-        // A row written before `region` existed still decodes, with `region`
-        // defaulting to `None`.
+        // A row written before `region` existed still decodes as `None`.
         let mut legacy = serde_json::to_value(UsageData::init_for_reflection()).unwrap();
         assert!(legacy.as_object_mut().unwrap().remove("region").is_some());
         let decoded: UsageData = serde_json::from_value(legacy).unwrap();
         assert_eq!(decoded.region, None);
     }
 
-    /// Every synthetics variant's `Display` output, asserted literally.
     #[test]
     fn test_usage_event_display_synthetics() {
         assert_eq!(UsageEvent::SyntheticsSteps.to_string(), "SyntheticsSteps");
@@ -2475,8 +2441,6 @@ mod tests {
         );
     }
 
-    /// Every synthetics variant round-trips through serde with its exact wire
-    /// string.
     #[test]
     fn test_usage_event_synthetics_serde_roundtrip() {
         for (event, wire) in [
@@ -2528,16 +2492,10 @@ mod tests {
         }
     }
 
-    /// T21's shape, as far as it is pinnable from this crate.
-    ///
-    /// *Which* variants are billable is decided in o2-enterprise
-    /// (`MeteringEventName::is_billable`). What this side owns is the naming
-    /// convention that side keys off, inherited from `MeteringEventName`'s
-    /// `_AiChat` / `_NewIncident` / `_RumSession` family: a leading `_` marks a
-    /// variant that is reported but never billed, and `Free` marks free-pool
-    /// consumption. Of the four synthetics events exactly one —
-    /// `SyntheticsSteps` — carries neither marker, and it is the one and only
-    /// billable synthetics event (SPEC §4.2).
+    /// o2-enterprise (`MeteringEventName::is_billable`) keys off the naming
+    /// convention this side owns: a leading `_` marks reported-but-never-billed,
+    /// `Free` marks free-pool consumption. Exactly one synthetics event —
+    /// `SyntheticsSteps` — carries neither, and it is the only billable one.
     #[test]
     fn test_synthetics_event_naming_convention_marks_non_billable() {
         let billable = UsageEvent::SyntheticsSteps.to_string();
@@ -2563,17 +2521,9 @@ mod tests {
         }
     }
 
-    /// SPEC §4.2 — why each synthetics count is its OWN event rather than a
-    /// field on one event.
-    ///
-    /// `ingest_usages` (openobserve-core `self_reporting::ingestion`) buckets
-    /// rows by `GroupKey`, which includes `event`. On a bucket collision it sums
-    /// ONLY `num_records`, `size` and `response_time` and keeps every other
-    /// field — `request_body` included — from the FIRST row of the bucket. So
-    /// any quantity that must survive summation needs its own `UsageEvent` and
-    /// must travel in `size`. This pins the half of that contract that lives in
-    /// this crate: the four synthetics events key four distinct buckets, so
-    /// their `size` values never merge into each other.
+    /// Each synthetics count is its OWN event rather than a field on one event:
+    /// `GroupKey` buckets by `event`, and only `size` survives summation (see
+    /// [`GroupKey`]), so four events key four distinct buckets that never merge.
     #[test]
     fn test_synthetics_events_bucket_separately_in_group_key() {
         use std::collections::HashSet;
@@ -2604,18 +2554,16 @@ mod tests {
             4,
             "each synthetics event must aggregate into its own bucket"
         );
-        // Same event, everything else equal => one bucket, so the `size`
-        // values of repeated acks sum into it. (`GroupKey` has no `Debug`, so
-        // this is `assert!` rather than `assert_eq!`.)
+        // Same event => one bucket. (`GroupKey` has no `Debug`, so `assert!`
+        // rather than `assert_eq!`.)
         assert!(
             key_for(UsageEvent::SyntheticsSteps) == key_for(UsageEvent::SyntheticsSteps),
             "repeated SyntheticsSteps acks must share one bucket"
         );
     }
 
-    /// T24 — SPEC §9C and §11 **F2**.
-    ///
-    /// ⚠️ **THIS TEST DOCUMENTS A KNOWN, UNMITIGATED HAZARD. IT IS NOT A FIX.**
+    /// KNOWN, UNMITIGATED HAZARD (SPEC §11 F2) — this test asserts it, not fixes
+    /// it.
     ///
     /// `UsageEvent` has no `#[serde(other)]`, so an `event` string a binary has
     /// no variant for is a hard deserialization error. The metering loop
@@ -2629,24 +2577,15 @@ mod tests {
     /// // on Err: return Err(..) — out of handle_metering_event entirely
     /// ```
     ///
-    /// That `return` sits inside the per-org loop but exits the whole function,
-    /// so ONE unknown row aborts the entire metering cycle — every remaining
-    /// org, every dimension, silently. Adding the four synthetics variants is
-    /// precisely what puts unknown strings in `_usage` during a rolling upgrade:
-    /// an un-upgraded scheduler reading rows an upgraded node wrote.
-    ///
-    /// F2's mitigation is deploy ordering / flag discipline (SPEC §12 item 3),
-    /// **not** a code change here — changing the deserialization contract is out
-    /// of scope for item 1.5. So this test asserts the CURRENT, UNSAFE
-    /// behaviour: the collect *does* abort, and it throws away the perfectly
-    /// decodable rows either side of the bad one. If someone later adds
-    /// `#[serde(other)]` or a lenient decode, this test will fail — and that
-    /// failure is the signal to delete it, because the hazard is gone.
+    /// That `return` exits the whole function, so ONE unknown row silently
+    /// aborts the entire metering cycle for every remaining org. A rolling
+    /// upgrade produces exactly that: an un-upgraded scheduler reading rows an
+    /// upgraded node wrote. F2's mitigation is deploy ordering / flag discipline
+    /// (SPEC §12 item 3), not a code change here. If this test starts failing,
+    /// the decode became lenient and the hazard is gone — delete it.
     #[test]
     fn test_unknown_usage_event_aborts_metering_collect_documents_f2_hazard() {
-        /// Mirror of o2-enterprise `metering::common::UsageResult` — the shape
-        /// the metering loop deserializes each row of
-        /// `SELECT event, org_id, SUM(size) AS value FROM "usage" ...` into.
+        /// Mirror of o2-enterprise `metering::common::UsageResult`.
         #[derive(Debug, Deserialize)]
         #[allow(dead_code)]
         struct UsageResult {
@@ -2655,8 +2594,6 @@ mod tests {
             value: f64,
         }
 
-        // `SyntheticsSteps` is known to *this* build, so the stand-in for "a row
-        // written by a newer node" is an event name from a future release.
         const UNKNOWN_TO_THIS_BUILD: &str = "SyntheticsFutureEventFromANewerNode";
 
         let rows = || {
@@ -2668,8 +2605,7 @@ mod tests {
             ]
         };
 
-        // Precondition: a single unknown event string is a hard error, not a
-        // skip. This is the "no `#[serde(other)]`" half of F2.
+        // Precondition: an unknown event string is a hard error, not a skip.
         assert!(
             serde_json::from_value::<UsageResult>(
                 serde_json::json!({"org_id": "org_b", "event": UNKNOWN_TO_THIS_BUILD, "value": 7.0})
@@ -2678,11 +2614,7 @@ mod tests {
             "UsageEvent has no #[serde(other)] — an unknown event string must fail to decode"
         );
 
-        // The metering loop's exact collect.
-        //
-        // HAZARD, asserted as it behaves today: the batch is poisoned. In the
-        // real loop this becomes `return Err(..)`, ending the cycle for every
-        // org that had not yet been processed.
+        // The metering loop's exact collect: the whole batch is poisoned.
         let collected = rows()
             .into_iter()
             .map(serde_json::from_value::<UsageResult>)
@@ -2693,8 +2625,6 @@ mod tests {
              changed and this hazard test should be deleted"
         );
 
-        // What that costs: three of the four rows decode perfectly. The strict
-        // collect discards all of them along with the one it could not read.
         let decodable = rows()
             .into_iter()
             .filter_map(|row| serde_json::from_value::<UsageResult>(row).ok())

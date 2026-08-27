@@ -901,8 +901,7 @@ pub async fn job_ack(
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         };
         let mut results = Vec::with_capacity(req.acks.len());
-        // Collected across the WHOLE batch and reported once: `report_usage`
-        // spawns a task per call, and a batch is one probe's lease cycle.
+        // One send for the WHOLE batch: `report_usage` spawns a task per call.
         let mut usage = Vec::new();
         for ack in req.acks {
             let job_id = ack.job_id.clone();
@@ -916,9 +915,8 @@ pub async fn job_ack(
                     }));
                 }
                 Err(e) => {
-                    // No response, so no events: an ack that failed did not
-                    // complete a job, and `ack_complete` is what authorises a
-                    // bill (spec §4.1 step 3c).
+                    // No response, so no events: `ack_complete` is what
+                    // authorises a bill (spec §4.1 step 3c).
                     tracing::error!(job_id = %job_id, "[synthetics] job_ack: {e}");
                     results.push(serde_json::json!({
                         "job_id": job_id,
@@ -940,8 +938,7 @@ pub async fn job_ack(
     };
     match process_ack(req, &org_id).await {
         Ok(mut resp) => {
-            // Same two steps as the batch arm, so neither path can drift from
-            // the other and the source guard below can count both.
+            // Same two steps as the batch arm, so the source guard counts both.
             let mut usage = Vec::new();
             take_usage(&mut resp, &mut usage);
             report_step_usage(usage);
@@ -958,13 +955,9 @@ pub async fn job_ack(
     }
 }
 
-/// Moves the usage rows one ack produced into a batch accumulator.
-///
-/// Trivial on purpose, and a named function rather than an inline `append` so
-/// that both arms of `job_ack` go through the same two steps and a source guard
-/// can count them. Dropping this call is the failure mode that matters: the
-/// send below still happens, with an empty vector, and the ack still returns
-/// 200 — silent lost revenue with nothing to alert on.
+/// Moves the usage rows one ack produced into a batch accumulator. Named rather
+/// than an inline `append` so a source guard can count both `job_ack` arms:
+/// dropping the call still sends an empty vector and still returns 200.
 fn take_usage(
     resp: &mut openobserve_synthetics::job_api::AckResponse,
     into: &mut Vec<config::meta::self_reporting::usage::UsageData>,
@@ -973,28 +966,17 @@ fn take_usage(
 }
 
 /// Emits the synthetics step-billing usage rows an ack produced — SPEC §4.1
-/// step 3g, item 1.10.
+/// step 3g.
 ///
-/// `job_api::ack` computes these rows and returns them as data, and this is
-/// where they are sent. The split exists because `openobserve-synthetics` does
-/// not depend on `usage_reporting` while this crate depends on both, and
-/// because the alternative — a `OnceCell` callback installed from
-/// `openobserve_synthetics::init()` — is SPEC §11 **F6** in a new disguise:
-/// `init()` runs only under `if LOCAL_NODE.is_scheduler()`
-/// (`src/jobs/src/job/mod.rs:1000`), while this handler serves the ack on API
-/// nodes, where the cell would be unset and the emit would silently do nothing.
+/// Deliberately NOT a `OnceCell` callback from `openobserve_synthetics::init()`:
+/// `init()` runs only under `if LOCAL_NODE.is_scheduler()` while acks are served
+/// on API nodes, so the cell would be unset and the emit silently do nothing (F6).
 ///
-/// Fire-and-forget by design: `report_usage` spawns and returns, and a probe
-/// that did its work is owed its 200 whether or not the usage queue accepted
-/// the row.
+/// Fail-open: `report_usage` spawns and returns, and a probe that did its work
+/// is owed its 200 whether or not the usage queue accepted the row.
 ///
-/// Deliberately branchless. An earlier version skipped the send for an empty
-/// vector — which it is on every non-cloud build and on every ack the guards in
-/// `job_api::billing` dropped — but that branch is unreachable from a unit test
-/// (the send spawns onto the global usage queue), so a mutation that turned it
-/// into "never send" survived, on the revenue path, silently. A no-op spawn per
-/// ack is cheaper than an untestable branch there, and this handler already
-/// makes one unconditional usage-queue call per ack for trigger telemetry.
+/// Deliberately branchless — an empty-vector early return is unreachable from a
+/// unit test, so a mutation turning it into "never send" survived once here.
 fn report_step_usage(usage: Vec<config::meta::self_reporting::usage::UsageData>) {
     record_step_usage_metrics(&usage);
     usage_reporting::report_usage(usage);
@@ -1002,52 +984,26 @@ fn report_step_usage(usage: Vec<config::meta::self_reporting::usage::UsageData>)
 
 /// SPEC §9B.1 rows 1-5 — the Prometheus half of the step-billing signals.
 ///
-/// ## Why this exists when the usage stream already has the numbers
+/// A deliberate SECOND copy of four numbers the usage stream already carries
+/// (the stream stays the invoice's source of truth). `report_usage` returns
+/// `()`, so comparing this counter against the stream is the only thing that
+/// detects the fire-and-forget path losing rows; a counter at zero means nothing
+/// reached this function at all.
 ///
-/// §9B.1 sources four of its ten signals from the stream: `SUM(size) WHERE
-/// event = ...`, per org, per hour. That stays their source of truth — it is
-/// retained, queryable after the fact, and it is what the invoice is built
-/// from. These counters are a SECOND copy of the same four numbers, taken here,
-/// on a different path.
-///
-/// Two copies is the point. `report_usage` above spawns a task and returns
-/// `()`, so §9B.1 row 8's *"emit failures"* has nothing to observe at this call
-/// site — there is no `Result` to inspect, and inventing one would produce an
-/// alert that can never fire. What CAN be counted honestly is what was handed
-/// over. Compare it against the stream and the difference is the fire-and-forget
-/// path losing rows:
-///
-/// ```text
-///   counter above stream  ⇒  rows were computed and never landed
-///   counter equals stream ⇒  the emit is whole
-///   counter at zero       ⇒  nothing reached this function at all
-/// ```
-///
-/// The last line is the one no other test or log covers: `take_usage` dropping
-/// its rows, or this call being removed, leaves the ack returning 200 with
-/// nothing metered.
-///
-/// ## What it does NOT catch
-///
-/// It cannot see anything that happens after the hand-off *inside* one process
-/// and be believed on its own: a queue that rejects every row still leaves this
-/// counter advancing. That failure is counted where it is actually observable —
-/// `usage_reporting::publish_usage`, which does get a `Result` back —
-/// as `zo_usage_enqueue_failures_total`. Nor does it see rows the guards in
-/// `job_api::billing` correctly dropped, because those never become rows.
+/// It cannot see failures AFTER the hand-off — a queue rejecting every row still
+/// advances it. Those are `zo_usage_enqueue_failures_total`, counted in
+/// `usage_reporting::publish_usage`, which does get a `Result` back.
 fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::UsageData]) {
     use config::meta::self_reporting::usage::UsageEvent;
 
     for row in usage {
-        // `size` is the count itself (§4.2: it is the only field `ingest_usages`
-        // sums), and it is an `f64` on the wire while a Prometheus counter takes
-        // a `u64`. Negative is not representable by anything upstream — every
-        // producer is a `u32`/`u64` widened — so the floor is a guard against a
-        // future one, not a case that fires today.
+        // `size` is the count itself (§4.2), `f64` on the wire against a `u64`
+        // counter. Every producer today is a widened `u32`/`u64`, so the floor
+        // guards a future negative one, not a case that fires now.
         let size = if row.size > 0.0 { row.size as u64 } else { 0 };
         match row.event {
-            // Steps, all three of them, under one counter so §4.3's
-            // `executed / defined` ratio is one PromQL division.
+            // All three step events share a counter: §4.3's `executed / defined`
+            // ratio is then one PromQL division.
             UsageEvent::SyntheticsSteps
             | UsageEvent::SyntheticsFreeSteps
             | UsageEvent::_SyntheticsStepsDefined => {
@@ -1061,33 +1017,23 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
                     .with_label_values(&[row.org_id.as_str()])
                     .inc_by(size);
             }
-            // Everything else is another dimension's row travelling through the
-            // shared usage type. A catch-all is right here — this function owns
-            // four events, not the twenty-odd in the enum — but it does mean a
-            // FIFTH synthetics event would be silently uncounted until it is
-            // added above.
+            // Other dimensions' rows travel through the shared usage type. The
+            // catch-all does mean a FIFTH synthetics event would be silently
+            // uncounted until added above.
             _ => {}
         }
     }
 }
 
-/// The org's one-time free step grant, as it stands right now — SPEC §6.1,
-/// item 2.3. Handed to `job_api::ack`, which decides §4.2's free/billable split
-/// with it and reconciles §6.3 against it.
+/// The org's one-time free step grant as it stands right now — SPEC §6.1, item
+/// 2.3. Handed to `job_api::ack`, which decides §4.2's free/billable split.
 ///
-/// # Why the billing read is behind the pool read, and not the other way round
-///
-/// `NotApplicable` has to cover **ExternalContract** orgs (§7.3: *"notify, never
-/// block, never pool-gate"*; §7.4 needs their acks billable so the NoOp provider
-/// advances a step-denominated true-up), and the only way to know an org is one
-/// is a `customer_billings` read. That read is not free and this runs on every
-/// ack, so it is issued ONLY while the org still has grant left — which is the
-/// window in which the answer can change anything. Once the grant is spent, and
-/// for every established paying org, this costs one in-memory counter read.
+/// Ordering matters: the `customer_billings` read (the only way to spot an
+/// ExternalContract org, which §7.3 says to never pool-gate) is issued ONLY while
+/// the org still has grant left, so past that an ack costs one counter read.
 #[cfg(feature = "cloud")]
 async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolView {
-    // The §9A / §9D master switch. Off — the default — means no pool is
-    // consulted anywhere, which is the Phase 1 state, and no counter is read.
+    // The §9A/§9D master switch; off by default, which is the Phase 1 state.
     let billing_enabled = o2_enterprise::enterprise::common::config::get_config()
         .cloud
         .synthetics_billing_enabled;
@@ -1096,7 +1042,6 @@ async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::Ste
     } else {
         0
     };
-    // The one DB read, issued only while it can still change the answer.
     let is_contract = needs_plan_read(billing_enabled, remaining)
         && o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
             org_id,
@@ -1107,18 +1052,14 @@ async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::Ste
 }
 
 /// Whether the org's PLAN still has to be read to answer [`step_pool_view`].
-///
 /// False once the answer cannot change: nothing is metered on this node, or the
-/// grant is already spent and the ack is billable either way. That is what keeps
-/// [`resolve_step_pool`] to one in-memory counter read for every org past its
-/// evaluation budget, which is every established paying org.
+/// grant is spent and the ack is billable either way.
 #[cfg(feature = "cloud")]
 fn needs_plan_read(billing_enabled: bool, remaining: u64) -> bool {
     billing_enabled && remaining > 0
 }
 
-/// SPEC §6.1 / §7.3 — the whole free/billable decision for one ack, as pure
-/// arithmetic over the three facts that decide it.
+/// SPEC §6.1 / §7.3 — the free/billable decision for one ack, as arithmetic.
 #[cfg(feature = "cloud")]
 fn step_pool_view(
     billing_enabled: bool,
@@ -1131,9 +1072,8 @@ fn step_pool_view(
         return StepPoolView::NotApplicable;
     }
     if remaining == 0 {
-        // §7.3, E16/T31 — the grant is gone. A plan that can be charged runs as
-        // metered overage; a Free org never got here, because its slot was
-        // skipped at the enqueue.
+        // §7.3, E16/T31 — grant gone, so metered overage. A Free org never got
+        // here; its slot was skipped at the enqueue.
         return StepPoolView::Spent;
     }
     if is_contract {
@@ -1153,9 +1093,8 @@ async fn resolve_step_pool(_org_id: &str) -> openobserve_synthetics::job_api::St
 /// Applies the free-pool movement one ack owes — SPEC §6.3, item 2.3.
 ///
 /// Idempotent on `(synthetics_id, location, scheduled_ts, job_id)`, which
-/// `job_api` built into `idempotency_key`. A refund is saturating and a top-up
-/// is NEVER refused (E14): *"if a top-up would exhaust the pool mid-run,
-/// complete the run and record it"* — enforcement belongs at the next enqueue.
+/// `job_api` built into `idempotency_key`. A refund saturates and a top-up is
+/// NEVER refused (E14) — enforcement belongs at the next enqueue.
 #[cfg(feature = "cloud")]
 fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
     let Some(adjustment) = resp.pool_adjustment.as_ref() else {
@@ -1168,12 +1107,10 @@ fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
     );
 }
 
-/// Translate `openobserve-synthetics`'s movement into the pool's own.
-///
-/// Two crates that never see each other's types describe the same two
-/// directions, and the compiler cannot check that this maps them the right way
-/// round. Inverting it turns every refund into a second charge — the org loses
-/// twice what the run cost, silently, against a grant it can never get back.
+/// Translate `openobserve-synthetics`'s movement into the pool's own. No
+/// compiler checks that this maps the two directions the right way round;
+/// inverted, every refund becomes a second charge against a one-time grant the
+/// org can never get back.
 #[cfg(feature = "cloud")]
 fn core_movement(
     movement: openobserve_synthetics::job_api::PoolMovement,
@@ -1196,9 +1133,8 @@ fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
     let _ = resp;
 }
 
-/// Runs one job ack through the enterprise service plus the per-ack side
-/// effects (telemetry, run-complete notification). Shared by the single and
-/// batch forms of `job_ack`.
+/// Runs one job ack through the enterprise service plus the per-ack side effects
+/// (telemetry, run-complete notification). Shared by both forms of `job_ack`.
 async fn process_ack(
     req: openobserve_synthetics::job_api::AckRequest,
     token_org: &str,
@@ -1212,12 +1148,8 @@ async fn process_ack(
         openobserve_synthetics::job_api::ack(req, token_org, resolve_step_pool(token_org).await)
             .await?;
 
-    // SPEC §4.1 step 3h / §6.3, item 2.3 — the free-pool reconcile.
-    //
-    // `ack` computes it and returns it as data for exactly the reason
-    // `report_step_usage` explains for the usage rows: the pool is
-    // `openobserve_core::trial_quota`, `openobserve-synthetics` has no edge to
-    // it, and this crate depends on both.
+    // SPEC §4.1 step 3h / §6.3, item 2.3 — the free-pool reconcile. Returned as
+    // data for the reason `report_step_usage` gives for the usage rows.
     apply_pool_adjustment(&resp);
 
     // Emit trigger usage record for synthetics telemetry.
@@ -1896,14 +1828,10 @@ mod tests {
         }
     }
 
-    /// SPEC §4.1 step 3g. A batch is one probe's lease cycle, and every ack in
-    /// it that billed must be reported — in order, and in ONE send, because
-    /// `report_usage` spawns a task per call.
-    ///
-    /// An ack that ERRORED contributes nothing: it produced no `AckResponse`,
-    /// and `ack_complete` is what authorises a bill (§4.1 step 3c). This mirrors
-    /// the accumulation in the batch arm of `job_ack`, which cannot be called
-    /// here without an HTTP request and a database.
+    /// SPEC §4.1 step 3g. A batch is one probe's lease cycle: every ack in it
+    /// that billed must be reported, in order, in ONE send. An ack that ERRORED
+    /// contributes nothing — it produced no `AckResponse`, and `ack_complete` is
+    /// what authorises a bill (§4.1 step 3c).
     #[test]
     fn a_batch_reports_the_usage_of_every_ack_in_it() {
         let batch: Vec<anyhow::Result<AckResponse>> = vec![
@@ -1918,9 +1846,6 @@ mod tests {
         // towards the source guard below, which counts calls by name.
         let drain: fn(&mut AckResponse, &mut Vec<UsageData>) = take_usage;
         let mut usage = Vec::new();
-        // `.flatten()` drops the errored ack, which is exactly the handler's
-        // behaviour: an ack that errored produced no `AckResponse` and so has
-        // no events to take.
         for mut resp in batch.into_iter().flatten() {
             drain(&mut resp, &mut usage);
         }
@@ -1932,23 +1857,16 @@ mod tests {
         );
     }
 
-    /// Every path out of the ack handler must report the usage it produced.
-    ///
+    /// Every path out of the ack handler must report the usage it produced;
     /// `report_usage` is fire-and-forget, so an unreported vector is silent lost
-    /// revenue — §9B alert A4's "emit failures", except that a dropped vector
-    /// never even reaches the counter. There are exactly two paths today, the
-    /// single ack and the batch, and this pins that a third cannot be added
-    /// without one.
-    ///
-    /// The needles are assembled rather than written out, so that this test's
-    /// own source does not count towards the totals it asserts — the same
-    /// device `openobserve-synthetics`'s `nothing_on_the_run_path_publishes`
-    /// uses.
+    /// revenue that never even reaches the counter. Two paths exist today; this
+    /// pins that a third cannot be added without one. The needles are assembled
+    /// so this test's own source does not count towards its totals.
     #[test]
     fn every_ack_path_reports_the_usage_it_produced() {
         let source = include_str!("mod.rs");
-        // One definition plus one call per path, for each of the three steps an
-        // ack path must take: run the ack, take its usage rows, send them.
+        // One definition plus one call per path, for each of three steps: run
+        // the ack, take its usage rows, send them.
         for (needle, what) in [
             (["process", "_ack("].concat(), "runs an ack"),
             (
@@ -1965,10 +1883,8 @@ mod tests {
             );
         }
 
-        // And the send itself. `report_step_usage` is the one line in this file
-        // that a unit test cannot reach — it hands off to the global usage
-        // queue — so it is pinned here instead. Without this, emptying that
-        // function's body is a silent "never meter anything".
+        // And the send itself, the one line here a unit test cannot reach:
+        // emptying that body is a silent "never meter anything".
         assert_eq!(
             source
                 .matches(&["usage_reporting::report", "_usage("].concat())
@@ -1978,14 +1894,10 @@ mod tests {
         );
     }
 
-    // ── SPEC §9B.1 rows 1-5 — the emit-side counters ────────────────────────
-    //
-    // Deterministic without a mutex, unlike the two guard counters in
-    // `openobserve-synthetics`: these are labelled per org, so each test reads
-    // back only the label values it wrote and no other test can touch them.
+    // SPEC §9B.1 rows 1-5. Deterministic without a mutex: these counters are
+    // labelled per org, so each test reads back only the label values it wrote.
 
-    /// The four counts one ack can carry, read back from the labelled
-    /// counters. `None` where the label value does not exist yet.
+    /// The four counts one ack can carry, read back from the labelled counters.
     fn recorded(org: &str) -> (u64, u64, u64, u64) {
         let steps = |event: &str| {
             config::metrics::SYNTHETICS_STEPS_TOTAL
@@ -2003,9 +1915,7 @@ mod tests {
     }
 
     /// Reached through a function pointer so these calls do not count towards
-    /// `the_emit_hand_off_counts_what_it_sends`, which counts call sites by
-    /// name — the same device `a_batch_reports_the_usage_of_every_ack_in_it`
-    /// uses for `take_usage`.
+    /// `the_emit_hand_off_counts_what_it_sends`, which counts call sites by name.
     fn record(usage: &[UsageData]) {
         let record_metrics: fn(&[UsageData]) = super::record_step_usage_metrics;
         record_metrics(usage);
@@ -2023,13 +1933,8 @@ mod tests {
     /// **§9B.1 rows 1, 2, 3 and 5.** Every count lands under its own label, and
     /// under the right one.
     ///
-    /// The three sizes are deliberately all different. §4.3 calls `executed /
-    /// defined` *"the single most useful number"*, and the way to get it wrong
-    /// is to record the ratio upside down — which two equal numbers would hide
-    /// completely. 4 billed against 14 defined is §9C's **T4**: a journey that
-    /// failed at step 4 of 14. Inverted, that org reads as 3.5x retries firing
-    /// instead of a check failing three quarters of the way through, and A1
-    /// alerts on the drift in the wrong direction.
+    /// The three sizes differ deliberately: §4.3's `executed / defined` recorded
+    /// upside down is what two equal numbers would hide.
     #[test]
     fn the_emit_counters_record_each_count_under_its_own_label() {
         let org = "o9b1-billable";
@@ -2048,13 +1953,10 @@ mod tests {
         assert_eq!(after.3 - before.3, 9_100, "browser milliseconds");
     }
 
-    /// **§9B.1 row 4.** Free-pool consumption is its own label value, not a
-    /// second name for the billable one.
-    ///
-    /// §4.2 emits exactly one of `SyntheticsSteps` / `SyntheticsFreeSteps` per
-    /// ack, and they answer opposite questions: one is the invoice line, the
-    /// other is §6.1's grant burning down. Folding them together would show a
-    /// free org generating revenue.
+    /// **§9B.1 row 4.** §4.2 emits exactly one of `SyntheticsSteps` /
+    /// `SyntheticsFreeSteps` per ack and they answer opposite questions — the
+    /// invoice line versus §6.1's grant burning down. Folded together, a free
+    /// org would show as generating revenue.
     #[test]
     fn free_pool_consumption_is_counted_apart_from_billable_steps() {
         let org = "o9b1-free";
@@ -2072,10 +1974,8 @@ mod tests {
     }
 
     /// Milliseconds and steps are different units, so `browser_ms` must never
-    /// reach the step counter. Summing a counter across its label values is the
-    /// first thing any dashboard does, and a family that mixes units produces a
-    /// number that means nothing — and here it would mean "this org executed
-    /// nine thousand steps".
+    /// reach the step counter: dashboards sum a counter across its label values,
+    /// and here that would read as "this org executed nine thousand steps".
     #[test]
     fn browser_milliseconds_never_reach_the_step_counter() {
         let org = "o9b1-units";
@@ -2085,9 +1985,8 @@ mod tests {
 
         let after = recorded(org);
         assert_eq!((after.0, after.1, after.2), (before.0, before.1, before.2));
-        // …and not under a `_SyntheticsBrowserMs` label value of the step
-        // counter either, which `recorded` does not read and a dashboard
-        // summing the family would.
+        // …nor under a `_SyntheticsBrowserMs` label value of the step counter,
+        // which `recorded` does not read but a dashboard summing the family does.
         assert_eq!(
             config::metrics::SYNTHETICS_STEPS_TOTAL
                 .with_label_values(&[org, "_SyntheticsBrowserMs"])
@@ -2097,19 +1996,11 @@ mod tests {
         assert_eq!(after.3 - before.3, 9_100);
     }
 
-    /// An ack carries only synthetics rows today, but the same handler already
-    /// makes an unconditional trigger-telemetry call, and `report_usage` is
-    /// shared with every other billed dimension. A row that is not one of §4.2's
-    /// four must contribute nothing rather than open a label value named after
-    /// it.
-    ///
-    /// The foreign event's OWN label value is asserted, not just the four
-    /// synthetics ones. Reading only the four is how this test first passed
-    /// against a mutant that dropped the `match` entirely and counted every row
-    /// under `event = "<whatever it was>"`: the bogus series existed, it was
-    /// simply not one this test looked at. `zo_synthetics_steps_total` summed
-    /// across its label values is what a dashboard shows, so a series nobody
-    /// asserts on is still on the chart.
+    /// `report_usage` is shared with every other billed dimension, so a row that
+    /// is not one of §4.2's four must contribute nothing rather than open a label
+    /// value named after it. The foreign event's OWN label value is asserted, not
+    /// just the four: reading only the four let a mutant that dropped the `match`
+    /// pass, counting every row under its own event name.
     #[test]
     fn a_non_synthetics_row_is_not_counted_as_steps() {
         let org = "o9b1-foreign";
@@ -2139,8 +2030,8 @@ mod tests {
         }
     }
 
-    /// Counting is per org — A1 asks *"has THIS org's ratio drifted from its own
-    /// trailing baseline"*, which an aggregate cannot answer.
+    /// Counting is per org — A1 asks about THIS org's drift from its own
+    /// trailing baseline, which an aggregate cannot answer.
     #[test]
     fn each_org_is_counted_separately() {
         let (a, b) = ("o9b1-org-a", "o9b1-org-b");
@@ -2155,21 +2046,12 @@ mod tests {
         assert_eq!(recorded(b).0 - before_b.0, 7);
     }
 
-    /// The emit hand-off must count what it sends — SPEC §9B.1 row 8, and the
-    /// reason there are two copies of the same number at all.
+    /// SPEC §9B.1 row 8. The hand-off cannot be called from a unit test, so this
+    /// pins in source that the counting call is still there and unconditional —
+    /// deleting it fails nothing else, the Prometheus side just reads zero.
     ///
-    /// `report_step_usage` cannot be called from a unit test: it hands off to
-    /// the global usage queue. So this pins, in source, that the counting call
-    /// is still there and still unconditional. Deleting it does not fail
-    /// anything else — the ack still returns 200, the rows are still sent, and
-    /// the Prometheus side simply reads zero, which is indistinguishable from
-    /// "this deployment bills nothing".
-    ///
-    /// It also pins that `report_step_usage` stays BRANCHLESS. An earlier
-    /// version skipped the send for an empty vector; that branch was
-    /// unreachable from a unit test, so a mutation turning it into "never send"
-    /// survived on the revenue path. A `if usage.is_empty() { return; }` in
-    /// front of the counter would reintroduce exactly that.
+    /// It also pins that the hand-off stays BRANCHLESS: an empty-vector early
+    /// return is unreachable from a test, and that mutation survived once.
     #[test]
     fn the_emit_hand_off_counts_what_it_sends() {
         let source = include_str!("mod.rs");
@@ -2200,10 +2082,9 @@ mod tests {
         }
     }
 
-    /// SPEC §6.1 / §7.3 — every state of the org's grant maps to exactly one
-    /// answer, and the wrong answer is invisible: `Funded` where the grant is
-    /// gone is free service, `Spent`/`NotApplicable` where it is not is a grant
-    /// that never burns down and an invoice for work §6.1 gave away.
+    /// SPEC §6.1 / §7.3 — every grant state maps to exactly one answer, and the
+    /// wrong answer is invisible: `Funded` with the grant gone is free service;
+    /// `Spent`/`NotApplicable` with grant left invoices work §6.1 gave away.
     #[cfg(feature = "cloud")]
     #[test]
     fn the_step_pool_view_is_spec_6_1_and_7_3() {
@@ -2211,8 +2092,7 @@ mod tests {
 
         use super::step_pool_view;
 
-        // §9A/§9D master switch off — the Phase 1 state. Nothing is consulted,
-        // so nothing is free and nothing is reconciled.
+        // §9A/§9D master switch off — the Phase 1 state, nothing is consulted.
         assert_eq!(
             step_pool_view(false, 10_000, false),
             StepPoolView::NotApplicable,
@@ -2226,8 +2106,7 @@ mod tests {
         // Spent ⇒ metered overage (E16/T31).
         assert_eq!(step_pool_view(true, 0, false), StepPoolView::Spent);
 
-        // A contract org is never pool-gated (E18/T36), so it never reads as
-        // funded even with a grant sitting there untouched.
+        // A contract org is never pool-gated (E18/T36), grant or no grant.
         assert_eq!(
             step_pool_view(true, 10_000, true),
             StepPoolView::NotApplicable,
@@ -2252,9 +2131,8 @@ mod tests {
         );
     }
 
-    /// The two crates describe the same two directions and no compiler checks
-    /// that this maps them the right way round. Inverted, every refund becomes a
-    /// second charge against a grant the org can never get back.
+    /// No compiler checks that the two crates' directions map the right way
+    /// round; inverted, every refund becomes a second charge.
     #[cfg(feature = "cloud")]
     #[test]
     fn a_refund_stays_a_refund_across_the_crate_boundary() {
@@ -2278,19 +2156,11 @@ mod tests {
         );
     }
 
-    /// The same guarantee for the OTHER half of an ack — SPEC §4.1 step 3h,
-    /// §6.3, item 2.3.
+    /// The same guarantee for the OTHER half of an ack — SPEC §4.1 step 3h, §6.3.
     ///
-    /// `job_api::ack` computes the free-pool movement and returns it; if this
-    /// crate never applies it, every reconcile is silently dropped. Under a
-    /// ONE-TIME grant (§6.1) a dropped refund is a step the org never gets back
-    /// and a dropped top-up is a step it never pays for — and neither produces
-    /// an error, a log or a failing test anywhere else, because the ack still
+    /// Under a ONE-TIME grant (§6.1) a dropped refund is a step the org never gets
+    /// back and a dropped top-up one it never pays for, silently: the ack still
     /// returns 200 and the usage row is still written.
-    ///
-    /// Two of the three steps below are unreachable from a unit test (they read
-    /// process-global config and the process-global pool), which is exactly why
-    /// they are pinned here.
     #[test]
     fn every_ack_path_applies_the_pool_reconcile_it_computed() {
         let source = include_str!("mod.rs");
@@ -2312,8 +2182,7 @@ mod tests {
             );
         }
 
-        // The hand-off to the pool itself. Emptying this function's body is a
-        // silent "never reconcile anything".
+        // The hand-off to the pool itself; emptying it never reconciles anything.
         assert_eq!(
             source
                 .matches(&["trial_quota::synthetics_steps", "_adjust("].concat())

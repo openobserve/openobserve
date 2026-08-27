@@ -52,13 +52,9 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-//
-// Bump this whenever a sea-orm migration is added. `init_db` returns early when
-// the stored version already matches, and `infra::table::migrate()` — the only
-// caller of `Migrator::up` — sits below that early return, so a new migration
-// added without a bump never runs on a deployment that is already current. A
-// fresh install still gets it, which is exactly why the omission survives local
-// testing.
+// Bump on every new sea-orm migration: `init_db` returns early when the stored
+// version matches, so an un-bumped migration never runs on an existing
+// deployment. Fresh installs still get it, which hides the omission locally.
 pub const DB_SCHEMA_VERSION: u64 = 74;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

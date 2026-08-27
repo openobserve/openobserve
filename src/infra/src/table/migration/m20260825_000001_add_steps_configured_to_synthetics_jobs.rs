@@ -14,30 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use sea_orm_migration::prelude::*;
 
-/// Backfill value for rows that were enqueued before this column existed.
-///
-/// These rows have no frozen truth to recover — the scheduler that wrote them
-/// did not know the number — so the only question is which wrong answer does
-/// least damage at the ack, where the count becomes the clamp ceiling
-/// `steps_configured × (retries + 1)`.
-///
-/// A small default (0, or 1) is a ceiling that clamps real executed work down
-/// to nothing, or to one step per attempt: an in-flight 14-step journey would
-/// bill 2 instead of 14. That is a WRONG BILL. This value is the largest step
-/// count a browser journey can legally define — `validate_browser_config`
-/// rejects anything above `MAX_STEPS = 50` on every create and update — so
-/// `50 × (retries + 1)` is at or above the true ceiling of every legacy row and
-/// the clamp is a no-op for all of them: the probe's own count is believed,
-/// which is the best available answer for a row we cannot ask.
-///
-/// Deliberately finite, not `i32::MAX`: the clamp still catches a runaway probe
-/// report, the multiply cannot overflow, and the §4.4.2 zero-fallback (which
-/// bills `configured` when a probe reports 0) has a bounded blast radius.
-///
-/// It applies only to rows already in the table when the migration runs — every
-/// later insert supplies the column explicitly, and a job's `valid_until` is at
-/// most one check interval, so the window in which any row carries this value
-/// is minutes long.
+/// Backfill for rows enqueued before this column existed. At the ack this count
+/// becomes the clamp ceiling `steps_configured × (retries + 1)`, so a small
+/// default (0 or 1) would clamp real work down and WRONG-BILL an in-flight
+/// 14-step journey as 2. 50 is `MAX_STEPS`, the most a browser journey may
+/// legally define, so the clamp is a no-op for every legacy row; finite rather
+/// than `i32::MAX` so the multiply cannot overflow. Later inserts set it.
 const LEGACY_STEPS_CONFIGURED: i32 = 50;
 
 #[derive(DeriveMigrationName)]
@@ -103,12 +85,8 @@ mod tests {
         );
     }
 
-    /// The two string tests assert what we ASK the database for. SQLite is the
-    /// one that can refuse: `ALTER TABLE ... ADD COLUMN` rejects a NOT NULL
-    /// column unless it carries a default — and making the rows already in the
-    /// table valid is the entire job of that default. So run it for real,
-    /// against a table that already holds a row, and read the backfilled value
-    /// back out.
+    /// SQLite can refuse: `ALTER TABLE ... ADD COLUMN` rejects a NOT NULL column
+    /// without a default, and validating the rows already there is its whole job.
     #[tokio::test]
     async fn the_alter_applies_on_sqlite_and_backfills_the_rows_already_there() {
         use sea_orm::{ConnectionTrait, Database, Statement};
@@ -140,12 +118,8 @@ mod tests {
         );
     }
 
-    /// Registration is TWO edits in `mod.rs` — the `mod` declaration and the
-    /// `Box::new(..)` line in `Migrator::migrations()` — and only the second
-    /// one makes the migration run. Miss it and everything stays green: the
-    /// tests above build the SQL directly, and every other test that needs this
-    /// table builds it from the sea-orm entity, which already has the column.
-    /// Only production would be missing it, and only at the first ack.
+    /// Only the `Box::new(..)` line in `Migrator::migrations()` makes the
+    /// migration run; miss it and every other test still passes regardless.
     #[test]
     fn the_migration_runs_and_runs_after_the_table_it_alters() {
         use sea_orm_migration::MigratorTrait as _;

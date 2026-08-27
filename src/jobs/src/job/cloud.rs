@@ -46,11 +46,6 @@ const TRIAL_QUOTA_FLUSH_INTERVAL: u64 = 10;
 const EXTERNAL_CONTRACT_CHECK_INTERVAL: u64 = 3600;
 
 /// Interval for the SPEC §9B.3 synthetics step reconciliation (1 hour).
-///
-/// Both sides of the comparison are cumulative lifetime totals under §6.1's
-/// one-time grant, so nothing is missed by a slow cadence — a divergence that
-/// appears stays. An hour keeps this to one federated-off search and one table
-/// scan per hour per region.
 const SYNTHETICS_STEP_RECONCILE_INTERVAL: u64 = 3600;
 
 /// (days-remaining threshold, stage stored after the warning fires).
@@ -591,24 +586,11 @@ fn find_pending_expiry_stage(
         .map(|(_, stage)| *stage)
 }
 
-// ── SPEC §9B.3 — the reconciliation job ─────────────────────────────────────
-//
-// > A periodic job comparing, per org:
-// >
-// > SUM(size) WHERE event IN (SyntheticsSteps, SyntheticsFreeSteps)  [usage stream]
-// > vs
-// > trial_quota_usage.usage_count                                    [pool counter]
-// >
-// > They should agree. **Divergence is the only signal that pool adjustments are
-// > being lost**, and under a one-time grant (§6.1) that loss is permanent and
-// > invisible to the customer until they run short.
-//
-// The two numbers reach the two stores by completely separate paths — the usage
-// rows through `usage_reporting::report_usage`'s spawned queue, the pool count
-// through `trial_quota`'s bounded flush channel — which is exactly what makes
-// the comparison worth anything. §11 **F8** drops a flush record with a
-// `log::error!` when that channel is full; the usage row for the same ack is
-// unaffected, so the divergence is the loss, measured.
+// SPEC §9B.3 — per org, `SUM(size)` over the two step events in the usage stream
+// vs `trial_quota_usage.usage_count`. They arrive by entirely separate paths, so
+// divergence is the only signal that pool adjustments are being lost (§11 **F8**
+// drops a flush record but not the usage row for the same ack), and under §6.1's
+// one-time grant that loss is permanent and invisible until the org runs short.
 
 /// One org's two answers, and their difference.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -621,14 +603,9 @@ struct StepReconciliation {
 }
 
 impl StepReconciliation {
-    /// `stream - pool`, signed — the number **A8** alerts on.
-    ///
-    /// POSITIVE: the usage stream recorded steps the pool counter never
-    /// charged. That is §11 **F8** — a dropped flush record — and under §6.1's
-    /// one-time grant the org silently keeps steps it has spent.
-    ///
-    /// NEGATIVE: the pool charged steps the stream never recorded, which is the
-    /// emit side losing rows.
+    /// `stream - pool`, signed — the number **A8** alerts on. POSITIVE: the pool
+    /// never charged steps the usage stream recorded (§11 **F8**; under §6.1's
+    /// one-time grant the org silently keeps them). NEGATIVE: the emit lost rows.
     fn divergence(&self) -> i64 {
         self.stream_steps - self.pool_steps
     }
@@ -636,17 +613,9 @@ impl StepReconciliation {
 
 /// Joins the two sides over the UNION of their orgs — SPEC §9B.3.
 ///
-/// A union and not an intersection, and this is the whole point of the job. The
-/// interesting cases are precisely the ones where an org appears on one side
-/// only:
-///
-///   * in the stream, not in the pool — every flush record for that org was dropped, or the pool
-///     was never credited at all;
-///   * in the pool, not in the stream — steps were charged against a grant with no usage row to
-///     show for them, which is the emit failing.
-///
-/// An inner join reports both as "nothing to see", which is the same answer it
-/// gives for a healthy org.
+/// Union, not intersection: an org present on one side only is the serious case
+/// (every flush record dropped, or steps charged against a grant with no usage
+/// row), and an inner join reports it exactly like a healthy org.
 ///
 /// Sorted by org so the caller's log lines and the gauge order are stable.
 fn reconcile_steps(stream: &[(String, i64)], pool: &[(String, i64)]) -> Vec<StepReconciliation> {
@@ -672,14 +641,10 @@ fn reconcile_steps(stream: &[(String, i64)], pool: &[(String, i64)]) -> Vec<Step
 
 /// Publishes §9B.3's three gauges and advances the pass counter.
 ///
-/// The gauges are RESET first, for the reason the synthetics reaper's
-/// `publish_backlog_metrics` states: a label set that stops being reported keeps
-/// its last value forever, so an org that unsubscribes — or one whose divergence
-/// was corrected — would alert indefinitely at whatever it last had.
-///
-/// The pass counter advances even when there is nothing to report, because the
-/// reset above means "no divergence anywhere" and "this job stopped running"
-/// produce the identical scrape.
+/// The gauges are RESET first: a label set that stops being reported keeps its
+/// last value forever, so a corrected or unsubscribed org would alert forever.
+/// The counter advances even with nothing to report, because after the reset
+/// "no divergence anywhere" and "this job stopped running" scrape identically.
 fn publish_step_reconciliation(rows: &[StepReconciliation]) {
     config::metrics::SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.reset();
     config::metrics::SYNTHETICS_STEP_RECONCILE_POOL_STEPS.reset();
@@ -703,16 +668,11 @@ fn publish_step_reconciliation(rows: &[StepReconciliation]) {
 
 /// The `SUM(size)` half of §9B.3, as SQL.
 ///
-/// Both of §4.2's step events, because §6.1's grant is spent by whichever one
-/// the ack emitted: `SyntheticsFreeSteps` while the grant has room and
-/// `SyntheticsSteps` once it is gone. Summing only the billable one would report
-/// every org still inside its evaluation budget as diverging by its entire
-/// consumption.
-///
-/// The event names are interpolated from `UsageEvent`'s own `Display` rather
-/// than written as literals, so a rename cannot leave this querying a string
-/// nothing is written under any more — which would read as "zero steps in the
-/// stream", i.e. maximum divergence for every org at once.
+/// BOTH of §4.2's step events: §6.1's grant is spent by whichever one the ack
+/// emitted — `SyntheticsFreeSteps` while the grant has room, `SyntheticsSteps`
+/// once it is gone — so summing only the billable one reports every org still
+/// inside its evaluation budget as diverging by its entire consumption. Names
+/// come from `UsageEvent`'s `Display`, so a rename cannot silently zero this.
 fn step_usage_sql() -> String {
     format!(
         "SELECT org_id, SUM(size) AS value FROM \"{USAGE_STREAM}\" WHERE event IN ('{}', '{}') \
@@ -724,14 +684,10 @@ fn step_usage_sql() -> String {
 
 /// One row of [`step_usage_sql`], or `None` if it is not one.
 ///
-/// Read field by field rather than through a `Deserialize` derive so that a row
-/// the search returns in an unexpected shape is SKIPPED rather than aborting the
-/// pass. §11 **F2** is the same failure one layer up — a `collect::<Result<..>>`
-/// over usage rows, where one unreadable row halts metering fleet-wide — and
-/// there is no reason to reproduce it here for a diagnostic job.
-///
-/// `as_f64` also accepts an integer, which is what `SUM(size)` returns when
-/// every summand happens to be whole.
+/// Read field by field rather than through a `Deserialize` derive so a row in
+/// an unexpected shape is SKIPPED rather than aborting the pass — §11 **F2** is
+/// the same failure one layer up, where one unreadable usage row halts metering
+/// fleet-wide. `as_f64` also accepts the integer `SUM(size)` returns.
 fn step_usage_row(hit: &json::Value) -> Option<(String, i64)> {
     let org_id = hit.get("org_id")?.as_str()?;
     let steps = hit.get("value")?.as_f64()?;
@@ -740,29 +696,16 @@ fn step_usage_row(hit: &json::Value) -> Option<(String, i64)> {
 
 /// One §9B.3 pass.
 ///
-/// ## Why the usage read is REGION-LOCAL when metering's is not
+/// The usage read is REGION-LOCAL (`local = true`) where metering's is federated
+/// (§8.3): `trial_quota_usage` is a per-region meta table with no super-cluster
+/// handler (§8.3's **F4**, item 2.6), so the pool side is this region's only.
+/// Reading the stream side federated would compare N regions' usage against one
+/// region's counter and report every org as diverging, forever.
 ///
-/// `get_usage(.., local = false)` federates across every region, and the
-/// metering loop uses it that way deliberately (§8.3: exactly one region holds
-/// the billing row, and it bills the org's GLOBAL usage). This job passes
-/// `true`, on purpose.
-///
-/// `trial_quota_usage` is a per-region meta table with no super-cluster handler
-/// — §8.3's **F4**, item 2.6, still unresolved — so the pool side of this
-/// comparison is this region's pool and nothing else. Reading the stream side
-/// federated would compare N regions' usage against one region's counter and
-/// report the other regions' entirely healthy consumption as divergence, on
-/// every org, forever. Both sides region-local is the only comparison that can
-/// be true, and the same query runs in every region.
-///
-/// ## The window
-///
-/// `start_time = 0`. §6.1's grant is one-time and never resets, so
-/// `usage_count` is a lifetime total and the stream side must be one too. Where
-/// the `usage` stream's retention is shorter than the org's lifetime the stream
-/// side under-reports by whatever aged out, which shows up as a NEGATIVE
-/// divergence that grows with retention rather than with any defect — see A8's
-/// threshold note.
+/// `start_time = 0`: §6.1's grant never resets, so `usage_count` is a lifetime
+/// total and the stream side must be one too. Where the `usage` stream's
+/// retention is shorter, the stream side under-reports whatever aged out — a
+/// NEGATIVE divergence that grows with retention, not with any defect.
 async fn reconcile_synthetics_steps() {
     let stream = match get_usage(step_usage_sql(), 0, now_micros(), true).await {
         Ok(hits) => hits
@@ -775,10 +718,9 @@ async fn reconcile_synthetics_steps() {
             })
             .collect::<Vec<_>>(),
         Err(e) => {
-            // Return rather than publish: the gauges are sticky and resetting
-            // them here would turn a failed read into "no divergence anywhere",
-            // which is A8's healthy state. The pass counter does not advance
-            // either, so a read that keeps failing is visible as a stalled job.
+            // Return rather than publish: the gauges are sticky, so resetting
+            // them after a failed read would write A8's healthy state over a real
+            // divergence, and the un-advanced pass counter shows the stalled job.
             log::error!("[SYNTHETICS_STEP_RECONCILE] usage query failed: {e}");
             return;
         }
@@ -802,8 +744,6 @@ async fn reconcile_synthetics_steps() {
 
     let rows = reconcile_steps(&stream, &pool);
     for row in rows.iter().filter(|row| row.divergence() != 0) {
-        // Warn, matching §9B.2's severity for A8. The alert is on the gauge;
-        // this is what someone reads once it fires.
         log::warn!(
             "[SYNTHETICS_STEP_RECONCILE] org={} usage stream reports {} steps, the free pool \
              counter reports {} (divergence {})",
@@ -833,16 +773,12 @@ mod tests {
 
     use super::*;
 
-    // ── SPEC §9B.3 — the reconciliation job, and A8 ─────────────────────────
-
     /// The three gauges are process-global and `publish_step_reconciliation`
-    /// RESETS them, so two of these running at once would wipe each other's
-    /// label values.
+    /// resets them, so two of these at once would wipe each other's labels.
     static RECONCILE_METRICS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     /// Reached through a function pointer so these calls do not count towards
-    /// `the_reconciliation_publishes_what_it_computed`, which counts call sites
-    /// by name.
+    /// `the_reconciliation_publishes_what_it_computed`'s by-name call count.
     fn publish(rows: &[StepReconciliation]) {
         let publish_rows: fn(&[StepReconciliation]) = publish_step_reconciliation;
         publish_rows(rows);
@@ -862,13 +798,8 @@ mod tests {
         }
     }
 
-    /// **§9B.3.** The two sides are joined per org, and the two sides are not
-    /// interchangeable.
-    ///
-    /// The four numbers are all different on purpose. Comparing the wrong two —
-    /// pool against pool, or the divergence taken the other way round — is a
-    /// mutation that leaves the shape of the output identical, and equal inputs
-    /// would hide every one of them.
+    /// **§9B.3.** The two sides are joined per org and are not interchangeable;
+    /// the four numbers differ on purpose, so a swapped comparison cannot pass.
     #[test]
     fn the_reconciliation_compares_the_stream_against_the_pool() {
         let rows = reconcile_steps(
@@ -889,12 +820,7 @@ mod tests {
         assert_eq!(rows[1].divergence(), 0, "the healthy case");
     }
 
-    /// The sign carries the diagnosis, so it must not be taken the other way
-    /// round.
-    ///
-    /// Positive is a lost pool adjustment (F8, the org silently keeps spent
-    /// steps); negative is the emit losing rows (the org is charged for work
-    /// with no usage record behind it). Inverted, A8 fires with the two causes
+    /// The sign carries the diagnosis: inverted, A8 fires with the two causes
     /// swapped and the operator looks at the wrong half of the system.
     #[test]
     fn the_divergence_is_the_stream_minus_the_pool() {
@@ -925,10 +851,9 @@ mod tests {
         );
     }
 
-    /// The pool side arrives as one row per `(org_id, feature)`, so an org with
-    /// more than one synthetics feature key must sum rather than overwrite.
-    /// Overwriting under-reports the pool and manufactures a positive
-    /// divergence — F8's exact signature — out of nothing.
+    /// The pool side is one row per `(org_id, feature)`, so an org with several
+    /// synthetics feature keys must SUM rather than overwrite; overwriting
+    /// under-reports the pool and manufactures F8's signature out of nothing.
     #[test]
     fn several_rows_for_one_org_are_summed_on_both_sides() {
         let rows = reconcile_steps(
@@ -970,12 +895,8 @@ mod tests {
     }
 
     /// The gauges are reset each pass, so a divergence that is CORRECTED stops
-    /// being reported.
-    ///
-    /// Without this, the fix for an A8 alert — a `set_limit_for_pool`, or a
-    /// replayed adjustment — leaves the alert firing on a number that is no
-    /// longer true, and the next real divergence arrives on an alert everybody
-    /// has already learned to ignore.
+    /// being reported — otherwise the fix for an A8 alert leaves it firing on a
+    /// stale number and the next real one lands on an alert everyone ignores.
     #[test]
     fn a_corrected_divergence_stops_being_reported() {
         let _serialised = RECONCILE_METRICS
@@ -1005,12 +926,9 @@ mod tests {
         );
     }
 
-    /// A pass that finds nothing still advances the counter.
-    ///
-    /// The reset above means "every org agrees" and "this job stopped running"
-    /// produce an identical scrape: three empty gauge families. Only a counter
-    /// scraped from outside separates them, which is the same dead-man's switch
-    /// `SYNTHETICS_ORPHAN_SCANS_TOTAL` provides for orphan detection.
+    /// A pass that finds nothing still advances the counter: after the reset,
+    /// "every org agrees" and "this job stopped running" produce an identical
+    /// scrape, so only a counter scraped from outside separates them.
     #[test]
     fn a_pass_that_finds_nothing_still_advances_the_scan_counter() {
         let _serialised = RECONCILE_METRICS
@@ -1024,14 +942,9 @@ mod tests {
         );
     }
 
-    /// **§9B.3's SQL.** Both of §4.2's step events, and the names come from
-    /// `UsageEvent`'s own `Display`.
-    ///
-    /// `SyntheticsFreeSteps` is the half that is easy to forget, and forgetting
-    /// it is not a small error: every org still inside §6.1's evaluation budget
-    /// emits ONLY that event, so the stream side would read zero for exactly
-    /// the orgs whose grant this job exists to protect, and A8 would fire on all
-    /// of them at their full consumption.
+    /// **§9B.3's SQL.** `SyntheticsFreeSteps` is the half that is easy to forget
+    /// and not a small error: orgs still inside §6.1's evaluation budget emit
+    /// ONLY that event, so the stream side would read zero for exactly them.
     #[test]
     fn the_usage_query_covers_both_step_events() {
         let sql = step_usage_sql();
@@ -1049,11 +962,9 @@ mod tests {
         );
     }
 
-    /// One malformed row must not cost the whole pass.
-    ///
-    /// §11 **F2** is this exact mistake one layer up — a `collect::<Result<..>>`
-    /// over usage rows, where a single unreadable row halts metering fleet-wide
-    /// and silently. A diagnostic job has even less business doing it.
+    /// One malformed row must not cost the whole pass. §11 **F2** is this exact
+    /// mistake one layer up, where a single unreadable row halts metering
+    /// fleet-wide and silently.
     #[test]
     fn an_unreadable_usage_row_is_skipped_not_fatal() {
         let good = json::json!({"org_id": "acme", "value": 84.0});
@@ -1074,15 +985,10 @@ mod tests {
         }
     }
 
-    /// A failed read must NOT publish.
-    ///
-    /// Both gauges are reset before they are set, so publishing an empty result
-    /// after a failed query would write "no divergence anywhere" — A8's healthy
-    /// state — on top of a real one. Pinned in source because neither error arm
-    /// is reachable without a search cluster and a database.
-    ///
-    /// The needles are assembled so this test's own source does not satisfy
-    /// them.
+    /// A failed read must NOT publish: both gauges are reset before they are set,
+    /// so publishing after a failed query writes A8's healthy state over a real
+    /// divergence. Pinned in source because neither error arm is reachable here;
+    /// the needles are assembled so this test's own source does not satisfy them.
     #[test]
     fn the_reconciliation_publishes_what_it_computed() {
         let source = include_str!("cloud.rs");
@@ -1123,12 +1029,10 @@ mod tests {
         );
     }
 
-    /// The job has to be spawned, or none of the above ever runs.
-    ///
-    /// `start()` is called once from `job::init` behind a scheduler check and
-    /// cannot be exercised here — it spawns six long-running loops onto the runtime. A
-    /// missing line there fails nothing: the gauges simply never appear, which
-    /// is indistinguishable from "no org has ever diverged".
+    /// The job has to be spawned, or none of the above ever runs. `start()`
+    /// cannot be exercised here, and a missing spawn fails nothing: the gauges
+    /// simply never appear, which is indistinguishable from "no org has ever
+    /// diverged".
     #[test]
     fn the_reconciliation_job_is_spawned() {
         let source = include_str!("cloud.rs");

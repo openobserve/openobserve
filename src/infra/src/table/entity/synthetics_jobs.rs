@@ -27,12 +27,9 @@ pub struct Model {
     pub run_id: String,
     /// JSON array of BrowserDevice {execution_id, engine, device} — browser checks only.
     pub browser_devices: Option<String>,
-    /// Number of steps the check's journey defined at ENQUEUE time — 1 for
-    /// protocol checks (one step per attempt). Frozen here, next to
-    /// `browser_devices`, rather than read from the live check at ack time: the
-    /// ack clamps the probe's reported count at `steps_configured x
-    /// (retries + 1)`, so a journey edited while its jobs are in flight would
-    /// otherwise reprice work that was already dispatched.
+    /// Steps the journey defined at ENQUEUE time — 1 for protocol checks. Frozen
+    /// here rather than read live at ack: the ack clamps the probe's count at
+    /// `steps_configured x (retries + 1)`, so an edit would reprice dispatched work.
     pub steps_configured: i32,
     /// JSON blob of check metadata copied at enqueue time e.g. {"tags": ["prod"]}.
     pub metadata: String,

@@ -376,28 +376,16 @@ async fn publish_usage(usages: Vec<UsageData>) {
     }
 }
 
-/// SPEC §9B.1 row 8 / §9B.2 alert **A4** — a usage row the queue refused.
+/// Counts a usage row the queue refused, so alert A4 has a signal:
+/// `increase(zo_usage_enqueue_failures_total{event=~"Synthetics.*"}[15m]) > 0`.
 ///
-/// ## Why the counter is here and not at the caller
+/// Not counted at the caller: [`report_usage`] is fire-and-forget and returns
+/// `()`, so the call site can only ever count rows it handed over, never rows
+/// that were lost. Only this spawned task sees the enqueue's `Result`.
 ///
-/// §9B.1 puts *"emit failures"* at §4.1 step 3g, the synthetics emit, and notes
-/// that `report_usage` is fire-and-forget so the failure is *"otherwise
-/// invisible"*. It is invisible AT THAT CALL SITE specifically:
-/// [`report_usage`] spawns [`publish_usage`] and returns `()`, so its caller has
-/// no `Result` to inspect and could only ever count rows it handed over — which
-/// is a useful number (`openobserve-api-management` keeps it) but is not a
-/// failure signal, and dressing it up as one would give A4 an alert that can
-/// never fire.
-///
-/// Inside the spawned task the enqueue DOES return a `Result`, and this is it.
-/// A4 becomes real: `increase(zo_usage_enqueue_failures_total{event=~"Synthetics.*"}[15m]) > 0`.
-///
-/// Labelled by event and not by org: the variant set is closed and small, the
-/// counter is shared with every other billed dimension, and an org label on a
-/// metric whose normal value is zero would put a customer-chosen string into its
-/// cardinality.
-///
-/// The `event` is taken BEFORE the enqueue because the row is moved into it.
+/// Labelled by event and never by org: the event set is closed and small, while
+/// an org label would put a customer-chosen string into the cardinality of a
+/// counter whose normal value is zero.
 fn record_usage_enqueue_failure(event: UsageEvent, error: &dyn std::fmt::Display) {
     config::metrics::USAGE_ENQUEUE_FAILURES_TOTAL
         .with_label_values(&[event.to_string().as_str()])
@@ -758,12 +746,9 @@ mod tests {
         assert!(shutdown_receiver.await.is_ok());
     }
 
-    /// SPEC §9B.1 row 8 / **A4**. The one place in the emit path where a
-    /// failure is observable at all.
-    ///
-    /// Called through a function pointer, and asserted on its own label value,
-    /// so this is deterministic under `cargo test`'s thread pool: no other test
-    /// writes these labels.
+    /// Asserts only on deltas of its own label values, so it is deterministic
+    /// under `cargo test`'s shared metric registry. Invoked through a function
+    /// pointer so this file keeps exactly one literal call site (see below).
     #[test]
     fn a_refused_usage_row_is_counted_under_its_own_event() {
         let record: fn(UsageEvent, &dyn std::fmt::Display) = record_usage_enqueue_failure;
@@ -792,12 +777,9 @@ mod tests {
         );
     }
 
-    /// The enqueue error is the only failure signal the emit path has, so the
-    /// counting must not drift back to being a bare `log::error!`.
-    ///
-    /// A log line is not alertable from Prometheus, and §9B.2 rates A4 an
-    /// **error** — silent revenue loss. The needles are assembled so this
-    /// test's own source does not satisfy them.
+    /// Guards the counter against drifting back to a bare `log::error!`, which
+    /// Prometheus cannot alert on. The needles are assembled from fragments so
+    /// this test's own source does not satisfy them.
     #[test]
     fn every_refused_usage_row_goes_through_the_counter() {
         let source = include_str!("lib.rs");

@@ -174,20 +174,11 @@ async fn handle_dead_letter(
         );
     }
 
-    // The free-pool refund — SPEC §6.3, E10, item 2.3.
-    //
-    // Here for the same reason `increment_jobs_done` is here: everything below
-    // this point can return early, and this job's reservation has nowhere else
-    // to go. §6.3 reserves `configured x combos` at enqueue and reconciles it on
-    // the ACK; a job the reaper terminates never acks, so without this the
-    // reservation is held against a ONE-TIME grant (§6.1) forever — E10 states
-    // it directly: *"Reaper requeues before the run | no ack => no bill; enqueue
-    // deduct refunded."*
-    //
-    // Only `dead_letter_expired`'s rows reach here, and that is the whole set of
-    // terminal paths this loop owns: `requeue_expired` puts a job BACK to
-    // Pending, so it can still ack (or be dead-lettered later) and refunding it
-    // would give the grant back under a job that then runs anyway.
+    // The free-pool refund — SPEC §6.3, E10, item 2.3. Above the early returns
+    // below, like `increment_jobs_done`: a job the reaper terminates never acks,
+    // so without this its reservation is held against a ONE-TIME grant (§6.1)
+    // forever. Only `dead_letter_expired`'s rows reach here; `requeue_expired`
+    // puts a job BACK to Pending, and refunding it would double-credit the grant.
     #[cfg(feature = "cloud")]
     refund_dead_letter(row).await;
 
@@ -284,19 +275,14 @@ async fn handle_dead_letter(
 #[cfg(feature = "cloud")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DeadLetterRefund {
-    /// The enqueue took nothing, so there is nothing to give back: this node
-    /// does not meter, the location is a private agent (§7.1 gate 2, E13), the
-    /// org is on an external contract (§7.3, E18), or the grant was already
-    /// spent and the run went out as metered overage (E16).
+    /// The enqueue took nothing: unmetered node, private agent (§7.1 gate 2,
+    /// E13), external contract (§7.3, E18), or a grant already spent (E16).
     NothingReserved,
-    /// The location registry could not say whose hardware ran this job, so
-    /// whether anything was reserved is unknowable. Declining is the safe
-    /// direction — see [`ReservationVerdict::VenueUnknown`].
+    /// The registry could not say whose hardware ran this job, so whether
+    /// anything was reserved is unknowable — see [`ReservationVerdict`].
     VenueUnknown,
-    /// The reservation went back to the grant.
     Refunded(u64),
-    /// This dead letter's key had already been applied. Not a failure: the
-    /// grant already has the steps back.
+    /// This key had already been applied — not a failure, the grant has it back.
     AlreadyRefunded(u64),
 }
 
@@ -304,30 +290,23 @@ enum DeadLetterRefund {
 /// been dead-lettered, and how much — SPEC §7.1 gate 2 / §7.3, as pure
 /// arithmetic.
 ///
-/// This mirrors `scheduler::reserve_for_slot`, which is the only place a
-/// synthetics job is ever enqueued, and it must keep mirroring it: the number
-/// refunded here has to be the number reserved there, computed the same way,
-/// or the grant drifts in whichever direction the two disagree.
-///
-/// One input it CANNOT mirror is whether `try_deduct` actually succeeded — no
-/// column records it (SPEC §5 adds none), which is the same gap the ack has and
-/// answers the same way: by the pool's state now. `remaining == 0` is exactly
-/// the ack's [`crate::job_api::StepPoolView::Spent`], and reading it the same
-/// way is what keeps the two paths in agreement. A job either acks or is
-/// reaped; it must not be treated as funded by one and unfunded by the other.
+/// Mirrors `scheduler::reserve_for_slot`, the only place a job is enqueued, and
+/// must keep mirroring it: the number refunded here has to be the number
+/// reserved there, computed the same way, or the grant drifts. The one input it
+/// cannot mirror is whether `try_deduct` succeeded — no column records it — so
+/// it reads the pool's state now, exactly as the ack does: `remaining == 0` is
+/// the ack's [`crate::job_api::StepPoolView::Spent`]. A job must not be treated
+/// as funded by one path and unfunded by the other.
 #[cfg(feature = "cloud")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReservationVerdict {
     /// `configured x combos` came out of the grant and must go back.
     Reserved(u32),
-    /// Nothing came out of it.
     Nothing,
-    /// The registry could not answer. A lookup failure there is FLEET-WIDE
-    /// (see `job_api::billing::resolve_venue`), so refunding on it would hand
-    /// every free org steps back during a database outage. Declining instead
-    /// loses at most one run's reservation per dead letter — and under a
-    /// one-time grant that loss is PERMANENT (§11 **F8**), which is why the
-    /// caller logs it at `error` (§9B.2 **A5**).
+    /// The registry could not answer. That failure is FLEET-WIDE, so refunding
+    /// on it would hand every free org steps back at once. Declining loses one
+    /// run's reservation, permanently under a one-time grant (§11 **F8**) —
+    /// hence the caller's `error` log (§9B.2 A5).
     VenueUnknown,
 }
 
@@ -341,64 +320,38 @@ fn dead_letter_reservation(
 ) -> ReservationVerdict {
     use crate::job_api::billing::Venue;
 
-    // §7.3 first, and neither of these depends on the venue: an external
-    // contract org is *"never pool-gated"* so its slots never even attempt a
-    // reservation (E18/T36), and a spent grant means the enqueue's `try_deduct`
-    // failed and the run went out holding nothing (E16/T31). Checking them
-    // ahead of the registry also keeps an unreadable registry from being
-    // reported as a lost refund for an org that had nothing to lose.
+    // §7.3 first, venue-independent: a contract org never attempts a reservation
+    // (E18/T36) and a spent grant means `try_deduct` failed at enqueue (E16/T31).
+    // Ahead of the registry, so an unreadable one is not a reported lost refund.
     if !crate::scheduler::pool_reserves(policy) || remaining == 0 {
         return ReservationVerdict::Nothing;
     }
     match venue {
         // §6.3's `configured x combos`, from the columns FROZEN on this job's
-        // row — never from the live check, which may have been edited since
-        // (E5). The same call `reserve_for_slot` made at enqueue.
+        // row — never the live check, which may have been edited since (E5).
         Venue::Public => ReservationVerdict::Reserved(crate::job_api::enqueue_reservation(
             steps_configured,
             combos,
         )),
-        // §7.1 gate 2, E13/T17 — the customer's own hardware: no gate, no
-        // deduct, no bill, and so nothing to give back.
+        // §7.1 gate 2, E13/T17 — customer hardware: no deduct, so nothing back.
         Venue::Private => ReservationVerdict::Nothing,
         Venue::Unresolved => ReservationVerdict::VenueUnknown,
     }
 }
 
 /// The refund for one dead letter, with every read already done — SPEC §6.3,
-/// E10, item **2.3**.
+/// E10, item **2.3**. Split from [`refund_dead_letter`] so the decision and the
+/// pool call are testable without a database, a registry or a config.
 ///
-/// Split from [`refund_dead_letter`] so the decision and the pool call are
-/// testable without a database, a registry or an enterprise config.
+/// **A job settles exactly once — by ack or by dead letter, never both.** Both
+/// paths are single-row compare-and-swaps on `status`, so the row lock
+/// serialises them: `dead_letter_expired` returns only rows whose CAS it won, so
+/// a later `ack_complete` matches nothing and returns `pool_adjustment: None`;
+/// if the ack lands first this is never called for that row.
 ///
-/// ## Why a concurrent ack cannot cause a second refund
-///
-/// `dead_letter_expired` returns ONLY the rows whose per-row compare-and-swap
-/// it won — `UPDATE ... SET status = 2 WHERE id = $1 AND status = $2`, where
-/// `$2` is the status the SELECT saw. `ack_complete` is the same shape from the
-/// other side: `UPDATE ... WHERE id = $1 AND status = 1`, returning `None` when
-/// it matches nothing. Both are single-row updates guarded on the same column,
-/// so the row lock serialises them:
-///
-///   * the reaper's CAS lands first => status is 2, the ack's UPDATE matches no row, `ack_complete`
-///     returns `None`, and `ack` takes its stale-lease return with `pool_adjustment: None`. Only
-///     the reaper moves the grant.
-///   * the ack lands first => status is 3 or 4, the reaper's CAS requires the 0 or 1 it observed
-///     and matches no row, so the row is never pushed onto `dead` and this function is never called
-///     for it. Only the ack moves the grant.
-///
-/// That is the same guarantee that already makes `increment_jobs_done`
-/// exactly-once here, and the refund rides it rather than inventing a second
-/// one.
-///
-/// The idempotency key is the BACKSTOP behind it, not the primary guard: both
-/// paths build it with [`crate::job_api::adjustment_key`] from the same four
-/// columns of the same job row, so a refund and an ack reconcile for one job
-/// collide on one key. The ledger behind that key is per-process
-/// (`trial_quota::ADJUSTMENTS`) and the ack runs on API nodes while this runs on
-/// scheduler nodes, so it cannot arbitrate BETWEEN them — the CAS above is what
-/// does that. What the key does buy is that re-processing the same dead letter
-/// in this process is free.
+/// The idempotency key is the BACKSTOP, not the primary guard: its ledger is
+/// per-process and the two paths run on different node types, so it cannot
+/// arbitrate between them — it only makes re-processing here free.
 #[cfg(feature = "cloud")]
 fn refund_dead_letter_with(
     gate: Option<(
@@ -410,8 +363,7 @@ fn refund_dead_letter_with(
     row: &synthetics_jobs::DeadLetteredRow,
 ) -> DeadLetterRefund {
     // No pool on this node: an OSS build, `O2_SYNTHETICS_BILLING_ENABLED` off,
-    // or a failed billing read. Nothing was reserved, so nothing is owed —
-    // the same fail-open the enqueue takes.
+    // or a failed billing read. Nothing reserved, nothing owed — fail open.
     let Some((hooks, policy)) = gate else {
         return DeadLetterRefund::NothingReserved;
     };
@@ -428,11 +380,9 @@ fn refund_dead_letter_with(
         ReservationVerdict::VenueUnknown => return DeadLetterRefund::VenueUnknown,
     };
 
-    // SPEC §6.3's MUST, and the SAME key the ack would have built for this job:
-    // all four values are columns of this one `synthetics_jobs` row, read here
-    // off `DeadLetteredRow` and there off `LeasedRow`. Rebuilding
-    // `scheduled_ts` from the schedule instead of reading the column is what
-    // would break that — the slot is stamped once, at enqueue.
+    // SPEC §6.3's MUST, and the SAME key the ack would have built: all four
+    // values are columns of this one `synthetics_jobs` row. Rebuilding
+    // `scheduled_ts` from the schedule instead of reading it would break that.
     let key = crate::job_api::adjustment_key(
         &row.synthetics_id,
         &row.location,
@@ -447,16 +397,13 @@ fn refund_dead_letter_with(
 }
 
 /// Give back the reservation of a job that will never ack — SPEC §6.3, E10.
-///
-/// Returns nothing and can fail nothing: a refund that cannot be worked out
-/// must not cost this job its dead letter, its run accounting or the rest of
-/// the batch. See [`refund_dead_letter_with`] for the decision and for why a
-/// concurrent ack cannot double-refund.
+/// Returns nothing and can fail nothing: a refund that cannot be worked out must
+/// not cost this job its dead letter, its run accounting or the rest of the
+/// batch. See [`refund_dead_letter_with`] for the decision.
 #[cfg(feature = "cloud")]
 async fn refund_dead_letter(row: &synthetics_jobs::DeadLetteredRow) {
-    // Resolved before the registry read so an unmetered node — the default,
-    // since `O2_SYNTHETICS_BILLING_ENABLED` ships off — does no extra work per
-    // dead letter.
+    // Before the registry read, so an unmetered node — the default, since
+    // `O2_SYNTHETICS_BILLING_ENABLED` ships off — does no extra work here.
     let gate = crate::scheduler::resolve_pool_gate(&row.org_id).await;
     let Some((hooks, _)) = gate else {
         return;
@@ -468,9 +415,8 @@ async fn refund_dead_letter(row: &synthetics_jobs::DeadLetteredRow) {
         // The steady state for every paid, contract and private-venue job.
         DeadLetterRefund::NothingReserved => {}
         DeadLetterRefund::VenueUnknown => {
-            // §9B.2 **A5** — a pool adjustment that could not be applied is an
-            // ERROR, because under a one-time grant (§6.1) the loss is
-            // permanent and invisible to the customer until they run short.
+            // §9B.2 **A5** — an unappliable adjustment is an ERROR: under a
+            // one-time grant (§6.1) the loss is permanent and invisible.
             tracing::error!(
                 synthetics_id = %row.synthetics_id,
                 org_id = %row.org_id,
@@ -591,11 +537,7 @@ async fn write_triggers_stream(
     }
 }
 
-// ── SPEC §6.3 / E10 — the free-pool refund, item 2.3 ─────────────────────────
-//
-// `cloud` only: the venue registry read, the exhaustion policy and the pool
-// itself all live behind that feature (§8.1), so on an OSS or self-hosted
-// Enterprise build there is nothing here to test.
+// `cloud` only: registry, policy and pool all live behind that feature (§8.1).
 #[cfg(all(test, feature = "cloud"))]
 mod pool_refund_tests {
     use std::sync::{
@@ -614,11 +556,8 @@ mod pool_refund_tests {
         scheduler::{PoolExhaustionPolicy, PoolGate, reserve_for_slot},
     };
 
-    // ── the fake pool ────────────────────────────────────────────────────────
-    //
-    // Process-global, because a `fn` pointer cannot capture. Same shape as
-    // `scheduler`'s, plus a one-key ledger so the idempotency contract is
-    // exercised rather than assumed.
+    // Process-global, because a `fn` pointer cannot capture. The one-key ledger
+    // is what exercises the idempotency contract rather than assuming it.
     static FAKE_LOCK: Mutex<()> = Mutex::new(());
     static REFUNDED: AtomicU64 = AtomicU64::new(0);
     static REFUND_CALLS: AtomicU64 = AtomicU64::new(0);
@@ -637,8 +576,7 @@ mod pool_refund_tests {
         unreachable!("the pure decision takes `remaining` as data; the hook is only wiring")
     }
 
-    /// The real `trial_quota::synthetics_steps_dead_letter_refund` contract:
-    /// apply at most once per key, and report whether the grant moved.
+    /// The real contract: apply at most once per key, report whether it moved.
     fn fake_dead_letter_refund(org_id: &str, steps: u64, idempotency_key: &str) -> bool {
         REFUND_CALLS.fetch_add(1, Ordering::Relaxed);
         *LAST_KEY.lock().unwrap_or_else(|e| e.into_inner()) = idempotency_key.to_string();
@@ -707,12 +645,9 @@ mod pool_refund_tests {
 
     /// Every way `dead_letter_expired` can terminate a job.
     ///
-    /// The inner match is exhaustive and has no other purpose: a fourth
-    /// `DeadLetterReason` stops COMPILING here, which is the only mechanism
-    /// that reliably makes someone extend the list below. A bare array would
-    /// go on compiling and the new terminal path would silently never be
-    /// tested — and a terminal path nobody tests is a reservation nobody
-    /// refunds.
+    /// The inner match exists only to be exhaustive: a fourth `DeadLetterReason`
+    /// stops COMPILING here, where a bare array would go on compiling with the
+    /// new terminal path untested — a reservation nobody refunds.
     fn every_terminal_reason() -> [DeadLetterReason; 3] {
         fn exhaustive(reason: DeadLetterReason) {
             match reason {
@@ -732,10 +667,7 @@ mod pool_refund_tests {
         reasons
     }
 
-    // ── the reservation, as pure arithmetic ──────────────────────────────────
-
-    /// **E10.** A funded public slot reserved `configured x combos` at enqueue,
-    /// and that is exactly what comes back.
+    /// **E10.** What a funded public slot reserved is what comes back.
     #[test]
     fn a_reaped_job_gives_back_configured_times_combos() {
         assert_eq!(
@@ -750,13 +682,9 @@ mod pool_refund_tests {
         );
     }
 
-    /// **The refunded amount IS the reserved amount, computed the same way.**
-    ///
-    /// Not "28 == 28" written twice: the enqueue's own `reserve_for_slot` is
-    /// run over the same inputs and the two numbers are compared. A change to
-    /// either formula that is not made to the other fails here, which is the
-    /// only thing that keeps a refund from silently becoming a partial credit
-    /// or a second charge.
+    /// Not "28 == 28" twice: the enqueue's own `reserve_for_slot` runs over the
+    /// same inputs, so changing one formula and not the other fails here rather
+    /// than becoming a silent partial credit.
     #[test]
     fn the_refund_is_the_same_number_the_enqueue_reserved() {
         let _guard = fake_pool();
@@ -790,9 +718,8 @@ mod pool_refund_tests {
         }
     }
 
-    /// **T17 / E13.** A private agent is the customer's own hardware: §7.1 gate
-    /// 2 gave it *"no gate, no deduct, no bill"*, so there is nothing to give
-    /// back. Refunding here would credit a grant the org never spent.
+    /// **T17 / E13.** §7.1 gate 2 gives a private agent no deduct, so a refund
+    /// here would credit a grant the org never spent.
     #[test]
     fn t17_a_private_venue_job_reserved_nothing_and_is_not_refunded() {
         assert_eq!(
@@ -807,8 +734,8 @@ mod pool_refund_tests {
         );
     }
 
-    /// **T36 / E18.** *"Never pool-gate"* — a contract org's enqueue never even
-    /// attempted a reservation, whatever its grant looked like.
+    /// **T36 / E18.** A contract org is never pool-gated, so its enqueue never
+    /// reserved, whatever its grant looked like.
     #[test]
     fn t36_a_contract_org_job_reserved_nothing_and_is_not_refunded() {
         assert_eq!(
@@ -823,11 +750,9 @@ mod pool_refund_tests {
         );
     }
 
-    /// **T31 / E16.** A spent grant means the enqueue's `try_deduct` failed and
-    /// the run went out as metered overage holding nothing. The ack reads that
-    /// same state as `StepPoolView::Spent` and does not reconcile; the reaper
-    /// must not refund it either, or a paid org's grant grows every time an
-    /// agent dies.
+    /// **T31 / E16.** A spent grant means `try_deduct` failed and the run went
+    /// out as metered overage holding nothing. The ack reads that state as
+    /// `StepPoolView::Spent` and does not reconcile; nor may the reaper refund.
     #[test]
     fn t31_an_overage_run_reserved_nothing_and_is_not_refunded() {
         assert_eq!(
@@ -842,9 +767,8 @@ mod pool_refund_tests {
         );
     }
 
-    /// A registry that cannot answer is NOT a refund. A lookup failure there is
-    /// fleet-wide, so refunding on it would hand every free org steps back at
-    /// once, during the outage least likely to be noticed.
+    /// A registry that cannot answer is NOT a refund: the failure is fleet-wide,
+    /// so refunding on it would hand every free org steps back at once.
     #[test]
     fn an_unresolved_venue_is_not_refunded_and_is_reported() {
         assert_eq!(
@@ -859,9 +783,8 @@ mod pool_refund_tests {
         );
     }
 
-    /// …but an org that reserved nothing anyway is not reported as a lost
-    /// refund just because the registry was down. §9B.2 **A5** pages on
-    /// `VenueUnknown`, and a contract org has nothing to lose.
+    /// …but §9B.2 **A5** pages on `VenueUnknown`, so an org that reserved
+    /// nothing anyway must not be reported as a lost refund.
     #[test]
     fn an_unresolved_venue_for_an_org_that_never_reserves_is_silent() {
         for (policy, remaining) in [
@@ -875,13 +798,8 @@ mod pool_refund_tests {
         }
     }
 
-    // ── the refund itself ────────────────────────────────────────────────────
-
-    /// **E10 — every terminal reaper path refunds exactly the reservation.**
-    ///
-    /// All three reasons `dead_letter_expired` can return. They differ only in
-    /// the message the reaper writes to the results stream; not one of them
-    /// produces an ack, so every one of them owes the grant its steps back.
+    /// All three reasons differ only in the message written to the results
+    /// stream; none produces an ack, so each owes the grant its steps (E10).
     #[test]
     fn e10_every_terminal_dead_letter_reason_refunds_the_reservation() {
         for reason in every_terminal_reason() {
@@ -905,14 +823,10 @@ mod pool_refund_tests {
         }
     }
 
-    /// **SPEC §6.3's MUST — the key is the ACK-SIDE key, byte for byte.**
-    ///
-    /// `job_api::ack` builds it as `adjustment_key(row.synthetics_id,
-    /// check.location, check.scheduled_ts, row.id)` from a `LeasedRow`; this
-    /// builds it from a `DeadLetteredRow`. Both are the same four columns of
-    /// the same `synthetics_jobs` row, so the two keys must be equal — a key
-    /// that differed would let one job be refunded by the reaper AND
-    /// reconciled by a late ack.
+    /// **SPEC §6.3's MUST — the key is the ACK-SIDE key, byte for byte.** The
+    /// ack builds it from a `LeasedRow`, this from a `DeadLetteredRow`, both the
+    /// same four columns of one `synthetics_jobs` row; a key that differed would
+    /// let one job be refunded here AND reconciled by a late ack.
     #[test]
     fn the_refund_key_is_the_key_the_ack_would_have_used() {
         let _guard = fake_pool();
@@ -943,10 +857,8 @@ mod pool_refund_tests {
         );
     }
 
-    /// **T27 — the same dead letter processed twice refunds once.**
-    ///
-    /// The reaper is a periodic scan and its work is re-entrant by
-    /// construction. The key is what makes a second pass free.
+    /// **T27.** The reaper is a periodic scan; the key is what makes a second
+    /// pass over the same dead letter free.
     #[test]
     fn t27_the_same_dead_letter_processed_twice_refunds_once() {
         let _guard = fake_pool();
@@ -970,9 +882,8 @@ mod pool_refund_tests {
             "the grant moved once, however many times the dead letter was seen",
         );
 
-        // A DIFFERENT job of the same check and slot is a different key and
-        // still refunds — a key that swallowed everything would pass the
-        // assertion above while silently dropping every other refund.
+        // A DIFFERENT job of the same check and slot keys differently and still
+        // refunds — an over-broad key would pass the assertion above anyway.
         let mut sibling = dead_row(DeadLetterReason::AttemptsExhausted);
         sibling.id = "2MNfNTxePfZ1pnY5gKVLkwsVRXw".to_string();
         sibling.location = "aws-eu-west-1".to_string();
@@ -983,8 +894,7 @@ mod pool_refund_tests {
         assert_eq!(REFUNDED.load(Ordering::Relaxed), 56);
     }
 
-    /// A job whose enqueue reserved nothing never reaches the pool AT ALL — the
-    /// hook is not called, so it cannot burn an idempotency key either.
+    /// The hook is not called at all, so it cannot burn an idempotency key.
     #[test]
     fn a_job_that_reserved_nothing_never_touches_the_pool() {
         for (policy, venue, remaining) in [
@@ -1011,7 +921,6 @@ mod pool_refund_tests {
         }
     }
 
-    /// An unresolved venue is reported, and still touches nothing.
     #[test]
     fn an_unresolved_venue_reports_without_touching_the_pool() {
         let _guard = fake_pool();
@@ -1041,9 +950,8 @@ mod pool_refund_tests {
         assert_eq!(REFUND_CALLS.load(Ordering::Relaxed), 0);
     }
 
-    /// A protocol job froze no `browser_devices`, so its reservation was one
-    /// step. Refunding `configured x combos` with an invented combo count would
-    /// over-credit every protocol check that ever dies.
+    /// A protocol job froze no `browser_devices`, so its reservation was 1 step.
+    /// An invented combo count would over-credit every protocol check that dies.
     #[test]
     fn a_protocol_dead_letter_refunds_one_step() {
         let _guard = fake_pool();
@@ -1061,14 +969,9 @@ mod pool_refund_tests {
         );
     }
 
-    /// **A pool that says no does not stop the reaper.**
-    ///
-    /// `false` from the hook is the only "no" the pool can give — the key is
-    /// already in the ledger. `refund_dead_letter_with` still RETURNS, with a
-    /// value, and the batch's remaining rows are refunded normally. It cannot
-    /// panic and it cannot propagate: it has no error type to propagate one
-    /// through, which is the property that keeps a billing decision from
-    /// costing a job its dead letter.
+    /// `false` from the hook is the only "no" the pool can give, and there is no
+    /// error type to propagate: a billing decision cannot cost a job its dead
+    /// letter.
     #[test]
     fn a_pool_that_declines_the_refund_does_not_stop_the_batch() {
         let _guard = fake_pool();
@@ -1085,7 +988,6 @@ mod pool_refund_tests {
         );
         assert_eq!(REFUNDED.load(Ordering::Relaxed), 0);
 
-        // The next row of the same batch is unaffected.
         POOL_ACCEPTS.store(true, Ordering::Relaxed);
         let mut next = dead_row(DeadLetterReason::Expired);
         next.id = "2MNfNTxePfZ1pnY5gKVLkwsVRXx".to_string();
@@ -1101,12 +1003,8 @@ mod pool_refund_tests {
         assert_eq!(REFUNDED.load(Ordering::Relaxed), 28);
     }
 
-    /// **A refund that cannot be worked out does not stop the reaper either.**
-    ///
     /// The registry read is the one input that can fail outright, and it fails
-    /// FLEET-WIDE. The row is still terminated, still accounted for, and the
-    /// next row of the same batch still gets its steps back — a database
-    /// outage must not turn one lost refund into a batch of them.
+    /// FLEET-WIDE: a database outage must not turn one lost refund into a batch.
     #[test]
     fn a_refund_that_cannot_be_worked_out_does_not_stop_the_batch() {
         let _guard = fake_pool();
@@ -1135,16 +1033,10 @@ mod pool_refund_tests {
         assert_eq!(REFUNDED.load(Ordering::Relaxed), 28);
     }
 
-    // ── call sites ───────────────────────────────────────────────────────────
-
-    /// **The refund is a CALL SITE, and losing it is silent.**
-    ///
-    /// Every function above still returns the right answer with the call
-    /// deleted; what breaks is invisible until a free org runs short of a grant
-    /// it never spent. So the site is counted, and its POSITION is pinned:
-    /// everything after the ingest-token lookup in `handle_dead_letter` can
-    /// return early, and a refund below that point is lost for every org that
-    /// has no enabled token.
+    /// Losing the call site is silent — every function above still returns the
+    /// right answer. Its POSITION is pinned too: everything after the
+    /// ingest-token lookup can return early, so a refund below that point is
+    /// lost for every org with no enabled token.
     #[test]
     fn the_refund_runs_before_anything_that_can_return_early() {
         let whole = include_str!("mod.rs");
@@ -1181,18 +1073,10 @@ mod pool_refund_tests {
         );
     }
 
-    /// **The reaper's key and the ack's key are the SAME key.**
-    ///
-    /// Both call [`crate::job_api::adjustment_key`], and both must feed it the
-    /// same four columns of the same `synthetics_jobs` row — the reaper off
-    /// `DeadLetteredRow`, the ack off `LeasedRow`. Two keys that differed would
-    /// leave the §6.3 ledger unable to see that one job had already been paid
-    /// back, and the ledger is the backstop behind the database
-    /// compare-and-swap that normally keeps the two paths apart.
-    ///
-    /// Read across the two files because there is no runtime moment at which
-    /// both keys exist: a job that acks is never dead-lettered, and a job that
-    /// is dead-lettered never acks — which is the whole point.
+    /// Both sides must feed [`crate::job_api::adjustment_key`] the same four
+    /// columns of the same `synthetics_jobs` row, or the §6.3 ledger cannot see
+    /// that one job was already paid back. Read across the two files because no
+    /// runtime moment has both keys: a job that acks is never dead-lettered.
     #[test]
     fn the_ack_and_the_reaper_key_on_the_same_four_columns() {
         let ack = include_str!("../job_api.rs");
@@ -1209,8 +1093,7 @@ mod pool_refund_tests {
             assert!(call.contains(arg), "the ack's key must still carry {arg}");
         }
         // `inputs` is built by `inputs_from` FROM THE JOB ROW, so those two
-        // arguments are the row's own columns and not the live check's — the
-        // same source the reaper reads.
+        // arguments are the row's own columns, not the live check's.
         assert!(ack.contains("synthetics_id: &row.synthetics_id,"));
         assert!(ack.contains("job_id: &row.id,"));
         assert_eq!(
@@ -1219,20 +1102,16 @@ mod pool_refund_tests {
             "one ack, one key",
         );
 
-        // And the constructor itself still joins all four, in that order, on a
-        // separator no location name can contain.
+        // Still all four, in order, on a separator no location name can contain.
         assert_eq!(
             crate::job_api::adjustment_key("chk_1", "aws-us-east-1", SLOT_TS, "job-a"),
             format!("chk_1\u{1f}aws-us-east-1\u{1f}{SLOT_TS}\u{1f}job-a"),
         );
     }
 
-    /// The refund reaches only the dead-letter arm of the reaper's loop.
-    ///
-    /// `handle_dead_letter` is where the refund lives, and it must be called
-    /// for the rows `dead_letter_expired` returned and for nothing else — those
-    /// are the rows whose compare-and-swap this node won, which is what makes
-    /// one job's refund one node's business.
+    /// `handle_dead_letter` holds the refund and must be called for the rows
+    /// `dead_letter_expired` returned and nothing else — the rows whose CAS this
+    /// node won.
     #[test]
     fn the_refund_reaches_only_the_dead_letter_arm() {
         let whole = include_str!("mod.rs");
@@ -1252,12 +1131,9 @@ mod pool_refund_tests {
         );
     }
 
-    /// **`requeue_expired` must NOT refund.**
-    ///
-    /// It is the one reaper path that is not terminal: the job goes back to
-    /// Pending and can still be leased, acked and billed. A refund there would
-    /// give the grant back for a run that then happens anyway — the pool would
-    /// pay for it twice over.
+    /// **`requeue_expired` must NOT refund.** It is the one non-terminal reaper
+    /// path — the job goes back to Pending and can still ack, so a refund there
+    /// double-credits the grant.
     #[test]
     fn a_requeue_is_not_a_terminal_path_and_does_not_refund() {
         let whole = include_str!("mod.rs");

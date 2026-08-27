@@ -229,8 +229,7 @@ pub struct SetAiUsageLimitRequest {
     pub credits_limit: u64,
 }
 
-/// `limit` is the pool's new ceiling, not an increment: an org that has spent
-/// 40 of 50 and should get 20 more is set to 70.
+/// `limit` is the pool's new ceiling, not an increment (spent 40 of 50, +20 => 70).
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct SetQuotaUsageLimitRequest {

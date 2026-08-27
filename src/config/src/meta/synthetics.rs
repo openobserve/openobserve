@@ -1348,7 +1348,6 @@ const MAX_TAGS: usize = 20;
 const MAX_VARIABLES: usize = 50;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
 /// Minimum schedule interval (seconds) for protocol checks (http/tcp/tls/ssh).
-/// A protocol check is a single request, so 1s granularity is legitimate.
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
 /// resolution — allowed here, but effective cadence is bounded by the tick.
 const MIN_INTERVAL_SECS: i64 = 1;
@@ -2382,9 +2381,8 @@ mod tests {
         assert_eq!(mt, SyntheticType::Browser);
     }
 
-    /// Every live variant survives a round-trip through the exact snake_case
-    /// string that the `synthetics_type` column and the probe payload both
-    /// carry. A drift here makes every stored row of that type unreadable.
+    /// Wire strings must match the `synthetics_type` column and probe payload
+    /// exactly; drift makes every stored row of that type unreadable.
     #[test]
     fn every_live_type_round_trips_through_serde() {
         for (variant, wire) in [
@@ -2401,11 +2399,8 @@ mod tests {
         }
     }
 
-    /// The removed types are documented by their failure. A stored
-    /// `synthetics_type` of `"api"`, `"ping"` or `"dns"` no longer
-    /// deserializes, and that is deliberate rather than accidental: `infra`'s
-    /// `convert_batch` skips-and-logs such a row instead of failing the batch,
-    /// so the blast radius is that one check.
+    /// Deliberate: `infra`'s `convert_batch` skips-and-logs an undeserializable
+    /// row instead of failing the batch, so the blast radius is that one check.
     #[test]
     fn removed_check_types_no_longer_deserialize() {
         for dead in ["api", "ping", "dns"] {

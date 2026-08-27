@@ -24,18 +24,11 @@ use openobserve_core as service;
 /// **T39 / F6 — the `cloud` feature must reach `openobserve-synthetics`.**
 ///
 /// `#[cfg(feature = "cloud")]` in a crate that does not DEFINE `cloud` compiles
-/// to nothing and says nothing. Applied to the synthetics billing emit that is
-/// total, silent revenue loss, and no runtime test can catch it: the code that
-/// would report the problem is exactly the code that disappeared.
-///
-/// This crate defines `cloud` and depends on `openobserve-synthetics`, so it is
-/// a place that can tell. If `cloud` is on here and did not arrive there, the
-/// build stops. Spec §8.1, §9C T39, §11 F6.
-///
-/// The fix when this fires is item 1.3 — give `openobserve-synthetics` a
-/// `cloud = ["enterprise", "o2_enterprise/cloud"]` feature and add
-/// `"openobserve-synthetics/cloud"` to this crate's own `cloud` list. Silencing
-/// the assertion instead re-opens F6.
+/// to nothing, silently taking the synthetics billing emit with it — revenue
+/// loss no runtime test can catch. Do not remove or silence this assert:
+/// `src/synthetics/tests/build_shapes.sh` requires it to fire during this
+/// crate's compile, and the fix is `openobserve-synthetics/cloud` in this
+/// crate's `cloud` feature (item 1.3).
 #[cfg(feature = "cloud")]
 const _: () = assert!(
     openobserve_synthetics::BUILT_WITH_CLOUD,
