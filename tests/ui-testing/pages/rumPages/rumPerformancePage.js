@@ -10,6 +10,8 @@ export class RumPerformancePage {
         this.summaryLoadingIndicator = page.locator(
             '[data-test="performance-summary-loading-indicator"]',
         );
+        // Share-link button (feature: RUM Share Link)
+        this.performanceShareButton = page.locator('[data-test="rum-performance-share-link-btn"]');
     }
 
     async gotoPerformance() {

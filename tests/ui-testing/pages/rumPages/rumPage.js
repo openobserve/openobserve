@@ -33,6 +33,10 @@ export class RumPage {
         this.prettyUnavailableText = page.getByText('Source Maps Not Available');
         this.prettyTranslateFailedText = page.getByText(/Unable to translate stack trace/i);
 
+        // Share-link buttons (feature: RUM Share Link)
+        this.errorsShareButton = page.locator('[data-test="rum-app-errors-share-link-btn"]');
+        this.errorHeaderShareButton = page.locator('[data-test="error-header-share-link-btn"]');
+
         // Store first error data from query response
         this.firstErrorId = null;
         this.firstErrorTimestamp = null;

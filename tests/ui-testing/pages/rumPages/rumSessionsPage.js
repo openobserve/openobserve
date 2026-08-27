@@ -8,6 +8,9 @@ export class RumSessionsPage {
         // Locators
         this.sessionsTable = page.locator('[data-test="rum-sessions-table"]');
         this.tableRow = page.locator('[data-test^="o2-table-row-"]');
+        // Share-link buttons (feature: RUM Share Link)
+        this.sessionsShareButton = page.locator('[data-test="rum-app-sessions-share-link-btn"]');
+        this.sessionViewerShareButton = page.locator('[data-test="session-viewer-share-link-btn"]');
     }
 
     /**

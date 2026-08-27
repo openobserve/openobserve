@@ -1,0 +1,47 @@
+[
+  {
+    "title": "should copy a valid short link to clipboard via the Errors list share button",
+    "action": "new",
+    "verifies": "the Errors-list share button shortens the current URL and copies a valid /web/short/<id> link, showing the success toast"
+  },
+  {
+    "title": "should copy a valid short link to clipboard via the Performance share button",
+    "action": "new",
+    "verifies": "the Performance header share button shortens and copies a valid short link"
+  },
+  {
+    "title": "should copy a valid short link to clipboard via the Sessions list share button",
+    "action": "new",
+    "verifies": "the Sessions-list toolbar share button shortens and copies a valid short link (guarded on replay availability)"
+  },
+  {
+    "title": "should copy a valid short link to clipboard via the Session Viewer share button",
+    "action": "new",
+    "verifies": "the Session Viewer header share button shortens and copies a valid short link for the opened session"
+  },
+  {
+    "title": "should copy a valid short link to clipboard via the Error detail share button",
+    "action": "new",
+    "verifies": "the Error detail header share button shortens and copies a valid short link for the opened error"
+  },
+  {
+    "title": "should copy the Errors list share URL via the Ctrl+Shift+C shortcut",
+    "action": "new",
+    "verifies": "the Ctrl+Shift+C keyboard shortcut invokes the same share-and-copy flow on the Errors list"
+  },
+  {
+    "title": "should copy the Sessions list share URL via the Ctrl+Shift+C shortcut",
+    "action": "new",
+    "verifies": "the Ctrl+Shift+C keyboard shortcut invokes the same share-and-copy flow on the Sessions list"
+  },
+  {
+    "title": "should return an identical short link for an unchanged page (idempotency)",
+    "action": "new",
+    "verifies": "re-clicking share on an unchanged page returns the identical short id (stable md5 hash)"
+  },
+  {
+    "title": "Safari polling copy branch — not runnable under the Chromium-only Playwright project (ShareButton.vue:123,231-233,243-245)",
+    "action": "new",
+    "verifies": "documents the Safari polling branch as an environment limitation (fixme, no runnable assertion)"
+  }
+]

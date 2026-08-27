@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/RUM/rumShareLink.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/shareLink.spec.js",
+    "tests/ui-testing/playwright-tests/Metrics/metrics-share-deep-link.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-share-link.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-page-dataflow.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_location": "tests/ui-testing/ci-matrix/ci_matrix.json -> testfolder \"RUM\" (actual_folder \"RUM\") -> run_files[] — append \"rumShareLink.spec.js\"",
+  "rationale": "Share-link E2E coverage exists only for Logs, Metrics, and Dashboards — no RUM surface is covered. This feature adds a ShareButton to five RUM views plus two keyboard shortcuts, so it needs its own spec in the RUM area. The on-disk directory is uppercase `RUM` (run-context spec_path says `Rum` but `ls` confirms `RUM/`), and the spec must be appended to the existing `RUM` shard in ci_matrix.json. The closest reusable pattern for data setup is rum-page-dataflow.spec.js (SDK fixture ingestion + serial mode)."
+}

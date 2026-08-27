@@ -1,0 +1,32 @@
+{
+  "feature_slug": "rum-share-link",
+  "feature_title": "RUM Share Link",
+  "area": "Rum",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "rumShareLink.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Rum/rumShareLink.spec.js",
+  "playwright_group": "Rum",
+  "source_files": [
+    "web/src/components/common/ShareButton.vue",
+    "web/src/composables/rum/useRum.ts",
+    "web/src/views/RUM/AppErrors.vue",
+    "web/src/views/RUM/AppPerformance.vue",
+    "web/src/views/RUM/AppSessions.vue",
+    "web/src/views/RUM/SessionViewer.vue",
+    "web/src/components/rum/errorTracking/view/ErrorHeader.vue",
+    "web/src/lib/vue-shortcut-manager/shortcutRegistry.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives under web/src/ and scripts/translations/ — the open-source frontend + translation files owned by openobserve/openobserve (the o2-enterprise repo has no web/ tree). No enterprise/, o2_enterprise/, or src/enterprise/ path appears, and no enterprise keyword (SSO/SAML/RBAC/SDR/cipher/logo-management) shows up in the paths or symbols. RUM is an OSS product area. → oss.",
+    "skip": "No skip marker is present: feature_hint.txt and trigger_comment.txt are empty, and no tests-added label was passed. The diff is not docs/CI-only — it changes user-facing RUM pages (adds a ShareButton to AppErrors, AppPerformance, AppSessions, SessionViewer, and the ErrorHeader). → not skipped.",
+    "e2e": "The change adds a ShareButton control to five RUM views, wires Ctrl/Cmd+Shift+C keyboard shortcuts to copy the share URL, and hardens ShareButton.handleShareClick for programmatic (shortcut) invocation. That is a new user-facing control plus a changed interaction, so E2E is warranted to verify the share/copy flow and the new keyboard shortcuts on each RUM page.",
+    "area": "All UI changes live under web/src/views/RUM/ and web/src/components/rum/ — the Real User Monitoring (RUM) product area. RUM specs belong in tests/ui-testing/playwright-tests/Rum/ (matching the Logs/Metrics/Traces title-casing); the OSS repo already ships a rum-error-ingestion.js test utility for this area.",
+    "group": "No RUM shard exists in the visible matrix (the enterprise overlay ci_matrix.ent.json lists Logs-Core/Features, GeneralTests, Pipelines, Traces, Correlation, SDR-*, and Workflows — no RUM). The closest fit is a new 'Rum' testfolder group, which the Engineer must create in the matrix if the OSS ci_matrix.json doesn't already define it.",
+    "existing_tests": "No Playwright E2E specs in the diff — the changed test files are all Vitest unit specs (web/src/**/*.spec.ts) plus locale/translation JSON. No tests/ui-testing/playwright-tests/ file is touched, so there is no existing E2E coverage for this feature."
+  }
+}
