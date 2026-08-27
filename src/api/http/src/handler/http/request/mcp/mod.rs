@@ -785,7 +785,11 @@ mod tests {
 
         openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
 
-        assert!(!openobserve_mcp::tools::get_mcp_tools().is_empty());
+        let tools = openobserve_mcp::tools::get_mcp_tools();
+        assert!(!tools.is_empty());
+        // stream-scoped time range stays an MCP tool; the org-level one opted out
+        assert!(tools.iter().any(|tool| tool.name == "GetTraceTimeRange"));
+        assert!(tools.iter().all(|tool| tool.name != "GetOrgTraceTimeRange"));
     }
 
     #[test]
