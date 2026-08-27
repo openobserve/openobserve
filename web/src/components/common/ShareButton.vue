@@ -222,6 +222,9 @@ export default defineComponent({
         return;
       }
 
+      // Shortcuts call this directly, so the button's :disabled cannot gate them.
+      if (props.disabled || isWebUrlNotConfigured.value) return;
+
       // Start loading and fetch short URL
       isLoading.value = true;
 

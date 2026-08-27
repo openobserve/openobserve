@@ -39,8 +39,7 @@ const useRum = () => {
     rumState = reactive(Object.assign({}, defaultObject));
   };
 
-  // Every RUM page already pushes its full state into the router query, so the live
-  // location is the shareable link and no page rebuilds its params a second time.
+  // Every RUM page pushes its full state into the router query, so location is the link.
   const shareUrl = computed(() => window.location.origin + router.resolve(route.fullPath).href);
 
   return { rumState, resetSessionState, shareUrl };
