@@ -104,8 +104,13 @@ async fn persist_alert_run_state(
             }
         };
         let at = now_micros();
-        let plan =
-            config::meta::alerts::grouping::plan_group_updates(alert_id, classification, &prev, at);
+        let plan = config::meta::alerts::grouping::plan_group_updates(
+            alert_id,
+            classification,
+            &prev,
+            at,
+            alert.pending_period_sec,
+        );
         if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
@@ -281,6 +286,8 @@ async fn load_tracked_group_states(
 struct GroupDispatchOutcome {
     delivered: usize,
     failed: usize,
+    // how many have transitioned to pending state
+    pending: usize,
     errors: Vec<String>,
     /// Group keys whose send succeeded. A dedup reservation is confirmed by
     /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
@@ -344,6 +351,7 @@ async fn dispatch_per_group(
         return Some(GroupDispatchOutcome {
             delivered: 0,
             failed: 0,
+            pending: 0,
             errors: vec!["group state did not commit".to_string()],
             delivered_groups: Default::default(),
             state_failed: true,
@@ -357,6 +365,7 @@ async fn dispatch_per_group(
             return Some(GroupDispatchOutcome {
                 delivered: 0,
                 failed: 0,
+                pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
                 delivered_groups: Default::default(),
                 state_failed: true,
@@ -510,13 +519,15 @@ async fn dispatch_per_group(
 
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
-         failed={failed} suppressed={} candidates={}",
+         pending={} failed={failed} suppressed={} candidates={}",
         plan.suppressed,
+        plan.pending,
         plan.items.len()
     );
     Some(GroupDispatchOutcome {
         delivered,
         failed,
+        pending: plan.pending,
         errors,
         delivered_groups,
         state_failed: false,
@@ -2603,6 +2614,22 @@ async fn handle_alert_triggers(
                 // Partial-destination failures reach the record too, even when
                 // the group counts as delivered.
                 trigger_data_stream.error = Some(dispatch.errors.join("; "));
+            }
+
+            if dispatch.delivered == 0 && dispatch.pending != 0 {
+                // this is when no group was fired, but some were pending,
+                // in which case mark the whole alert in pending state
+                trigger_data_stream.status = RunOutcome::Pending;
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert,
+                        &alert_id.to_string(),
+                        &RunOutcome::Pending,
+                        eval_level,
+                        None,
+                    )
+                    .await;
+                }
             }
             // MN-6: a reservation is confirmed by its own group's delivery.
             // An unkeyed one falls back to "any delivery confirms".
