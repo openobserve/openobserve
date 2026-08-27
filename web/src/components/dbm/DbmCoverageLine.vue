@@ -42,33 +42,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The line itself. `min-h-6.5` holds the 26px budget the space plan
          allocates it, so a healthy page spends no more than that. -->
     <div
-      class="px-page-edge flex min-h-6.5 min-w-0 items-center gap-2 py-1"
+      class="px-page-edge flex min-h-6.5 min-w-0 items-center justify-between gap-4 py-1"
       :class="toneSurface"
       data-test="dbm-coverage-line"
     >
-      <span class="size-1.5 shrink-0 rounded-full" :class="dotTone" aria-hidden="true"></span>
+      <div class="flex min-w-0 items-center gap-2">
+        <span class="size-1.5 shrink-0 rounded-full" :class="dotTone" aria-hidden="true"></span>
 
-      <span class="text-2xs min-w-0 truncate" :class="toneText" data-test="dbm-coverage-text">
-        {{ summary }}
-      </span>
+        <span class="text-2xs min-w-0 truncate" :class="toneText" data-test="dbm-coverage-text">
+          {{ summary }}
+        </span>
 
-      <!-- The bar is the same claim as the number beside it, drawn. It appears
-           only when there IS a share to draw — and `showBar` requires a healthy
-           line, so it is always the success variant: a degraded line already
-           speaks through its sentence and wash, not through a bar. -->
-      <OProgressBar
-        v-if="showBar"
-        :value="coverage ?? 0"
-        variant="success"
-        size="xs"
-        class="w-12 shrink-0"
-        data-test="dbm-coverage-bar"
-      />
+        <!-- The bar is the same claim as the number beside it, drawn. It appears
+             only when there IS a share to draw — and `showBar` requires a healthy
+             line, so it is always the success variant: a degraded line already
+             speaks through its sentence and wash, not through a bar. -->
+        <OProgressBar
+          v-if="showBar"
+          :value="coverage ?? 0"
+          variant="success"
+          size="xs"
+          class="w-12 shrink-0"
+          data-test="dbm-coverage-bar"
+        />
+      </div>
 
-      <template v-if="countedTo">
-        <span class="text-text-muted text-2xs shrink-0" aria-hidden="true">·</span>
-        <span class="text-2xs shrink-0" :class="toneText">{{ countedTo }}</span>
-      </template>
+      <div
+        v-if="countedTo"
+        class="text-text-muted flex shrink-0 items-center gap-1.5"
+        data-test="dbm-coverage-counted"
+      >
+        <OIcon name="access-time" size="xs" class="shrink-0" aria-hidden="true" />
+        <i18n-t
+          v-if="countedTo.behind !== null"
+          keypath="dbm.coverage.lineCountedToBehind"
+          tag="span"
+          class="text-2xs"
+          :class="toneText"
+        >
+          <template #time>
+            <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
+          </template>
+          <template #minutes>
+            <span class="font-semibold tabular-nums">{{ countedTo.behind }}</span>
+          </template>
+        </i18n-t>
+        <i18n-t
+          v-else
+          keypath="dbm.coverage.lineCountedTo"
+          tag="span"
+          class="text-2xs"
+          :class="toneText"
+        >
+          <template #time>
+            <span class="font-semibold tabular-nums">{{ countedTo.time }}</span>
+          </template>
+        </i18n-t>
+      </div>
     </div>
   </div>
 </template>
@@ -76,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { Freshness, QueryStatsRow } from "@/services/db_monitoring";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -263,8 +294,8 @@ const dotTone = computed(() => {
 
 const showBar = computed(() => !degraded.value && coverage.value !== null);
 
-/** Wall-clock time our counting reaches, for "counted up to 16:11:53". */
-const countedTo = computed<I18nText | null>(() => {
+/** Wall-clock time the counting reaches; `behind` is set only past {@link BEHIND_NOTE_MINUTES}, where the "still coming in" phrasing would assert a freshness the lag no longer supports. */
+const countedTo = computed<{ time: string; behind: number | null } | null>(() => {
   if (degraded.value) return null;
   const through = props.freshness?.data_through ?? 0;
   if (through <= 0) return null;
@@ -274,16 +305,8 @@ const countedTo = computed<I18nText | null>(() => {
     second: "2-digit",
     hour12: false,
   });
-  // "The last half-minute is still coming in" is true only while the counting
-  // really is current. Under the stale threshold but past ordinary rollup
-  // delay, that sentence asserts a freshness the data does not support — at 25
-  // minutes behind it is simply false — so the line states the real lag
-  // instead. It stays the quiet grey trailer either way: this is a correction
-  // to a claim, not a promotion to a warning.
   const behind = behindMinutes.value ?? 0;
-  return behind > BEHIND_NOTE_MINUTES
-    ? t("dbm.coverage.lineCountedToBehind", { time, minutes: behind })
-    : t("dbm.coverage.lineCountedTo", { time });
+  return { time, behind: behind > BEHIND_NOTE_MINUTES ? behind : null };
 });
 
 /**

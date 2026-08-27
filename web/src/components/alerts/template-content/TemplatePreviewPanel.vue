@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                naming the channel here, switching the Channel select looks like
                it did nothing, because the card genuinely does not change. -->
           <div
-            class="text-text-secondary text-2xs flex items-center gap-1 font-medium uppercase"
+            class="text-text-secondary text-2xs flex items-center gap-1 font-medium"
             data-test="template-preview-panel-channel-badge"
           >
             {{ activeChannelLabel }}

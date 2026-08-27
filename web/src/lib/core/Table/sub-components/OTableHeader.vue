@@ -606,7 +606,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </span>
               <span
                 v-if="headerSubLabel(header)"
-                class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+                class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
                 :data-test="`o2-table-th-sublabel-${header.id}`"
               >
                 {{ headerSubLabel(header) }}
@@ -664,7 +664,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             </span>
             <span
               v-if="headerSubLabel(header)"
-              class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+              class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
               :data-test="`o2-table-th-sublabel-${header.id}`"
             >
               {{ headerSubLabel(header) }}
@@ -935,7 +935,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </span>
               <span
                 v-if="headerSubLabel(header)"
-                class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+                class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
                 :data-test="`o2-table-th-sublabel-${header.id}`"
               >
                 {{ headerSubLabel(header) }}

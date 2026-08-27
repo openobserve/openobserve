@@ -46,28 +46,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <!-- The placeholder already names the dimension ("All engines"), so a
-           label above each select would say it twice. -->
-      <div class="flex w-72 flex-col gap-1.5 p-1">
-        <p class="text-text-label text-3xs px-1 font-semibold tracking-wide uppercase">
-          {{ t("dbm.filters.popoverTitle") }}
-        </p>
-        <OSelect
-          v-for="filter in filters"
-          :key="filter.key"
-          :model-value="filter.value"
-          :options="filter.options"
-          size="sm"
-          :searchable="false"
-          clearable
-          :placeholder="filter.placeholder"
-          :data-test="`dbm-queries-filter-${filter.key}`"
-          @update:model-value="filter.onChange"
-        />
-        <div v-if="activeCount" class="flex items-center gap-1.5 px-1 pt-0.5">
+      <div class="flex w-72 flex-col">
+        <div class="flex flex-col gap-2.5 p-3">
+          <p class="text-text-heading text-sm font-semibold" data-test="dbm-queries-scope-title">
+            {{ t("dbm.filters.popoverTitle") }}
+          </p>
+          <OSelect
+            v-for="filter in filters"
+            :key="filter.key"
+            :label="filter.dimension"
+            :model-value="filter.value"
+            :options="filter.options"
+            size="md"
+            :searchable="false"
+            clearable
+            :placeholder="filter.placeholder"
+            :data-test="`dbm-queries-filter-${filter.key}`"
+            @update:model-value="filter.onChange"
+          />
+        </div>
+
+        <div class="border-border-default flex items-center border-t px-3 py-2.5">
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="outline"
+            size="sm"
+            :disabled="!activeCount"
             data-test="dbm-queries-scope-clear"
             @click="emit('clear')"
           >
@@ -80,15 +83,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The chips scroll rather than push: five set dimensions are wider than
          the toolbar, and a chip strip that grows must not shove the refresh and
          column controls off the right edge. -->
-    <div class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+    <!-- `overflow-x-auto` forces overflow-y to auto, clipping the remove badge that pokes above each chip; the `py-1`/`-my-1` pair grows the clip box to fit it. -->
+    <div class="-my-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-1">
       <!-- Active scope, inline and clearable. The chip is the app-standard
            ODimensionChip, so `service` here is the same colour it is on the
-           incident list; the remove button sits beside it rather than inside,
-           because the chip is a shared primitive with no slot for one. -->
+           incident list. The remove button sits outside the chip because
+           ODimensionChip is a shared primitive with no slot for one. -->
       <span
         v-for="filter in activeFilters"
         :key="filter.key"
-        class="inline-flex min-w-0 shrink-0 items-center gap-0.5"
+        class="group relative inline-flex min-w-0 shrink-0 items-center"
         :data-test="`dbm-queries-scope-chip-${filter.key}`"
       >
         <ODimensionChip
@@ -97,15 +101,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value="filter.value ?? ''"
           class="min-w-0"
         />
-        <OButton
-          variant="ghost-muted"
-          size="icon-xs-circle"
-          icon-left="close"
+        <button
+          type="button"
+          :aria-label="t('dbm.filters.removeScope')"
+          class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 z-10 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border opacity-0 shadow-sm transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1"
           :data-test="`dbm-queries-scope-chip-${filter.key}-remove`"
           @click="filter.onChange(null)"
         >
+          <OIcon name="close" size="xs" />
           <OTooltip side="bottom" :content="t('dbm.filters.removeScope')" />
-        </OButton>
+        </button>
       </span>
 
       <!-- The insight filter deliberately stays amber and stays hand-rolled: it
@@ -114,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            segments, sm badge metrics, rounded-default) so it sits level. -->
       <span
         v-if="insightChip"
-        class="inline-flex min-w-0 shrink-0 items-center gap-0.5"
+        class="group relative inline-flex min-w-0 shrink-0 items-center"
         data-test="dbm-queries-scope-chip-insight"
       >
         <span
@@ -127,15 +132,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             insightChip.label
           }}</span>
         </span>
-        <OButton
-          variant="ghost-muted"
-          size="icon-xs-circle"
-          icon-left="close"
+        <button
+          type="button"
+          :aria-label="t('dbm.filters.removeScope')"
+          class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 z-10 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border opacity-0 shadow-sm transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1"
           data-test="dbm-queries-scope-chip-insight-remove"
           @click="emit('clearInsight')"
         >
+          <OIcon name="close" size="xs" />
           <OTooltip side="bottom" :content="t('dbm.filters.removeScope')" />
-        </OButton>
+        </button>
       </span>
 
       <!-- Clear all, INLINE beside the chips.
@@ -165,6 +171,7 @@ import { computed, ref } from "vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

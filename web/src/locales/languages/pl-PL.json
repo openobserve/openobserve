@@ -14923,6 +14923,7 @@
       "disabled": "Wyłączone",
       "emptyTitle": "Brak jeszcze alertów na tym SLO.",
       "emptyHint": "Alerty wskaźnika wypalania powiadamiają Cię, dopóki pozostał budżet do ochrony.",
+      "emptyActionDesc": "Otrzymuj ostrzeżenie zanim budżet się wyczerpie",
       "loadFailed": "Nie udało się wczytać alertów tego SLO.",
       "editTargetMissing": "Ten alert nie jest już przypisany do tego SLO.",
       "describeBurn": "Wskaźnik wypalania > {critical} w ciągu {long} i {short}",
@@ -15215,7 +15216,12 @@
     "common": {
       "reload": "Odśwież",
       "lastRefreshed": "Ostatnio odświeżono {age}",
-      "loadFailed": "Nie udało się załadować danych z bazy danych. Spróbuj ponownie lub zawęź zakres czasu."
+      "loadFailed": "Nie udało się załadować danych z bazy danych. Spróbuj ponownie lub zawęź zakres czasu.",
+      "actions": "Akcje"
+    },
+    "header": {
+      "title": "Bazy danych",
+      "subtitle": "Wydajność i kondycja zapytań w Twoich bazach danych"
     },
     "ai": {
       "suggestFix": "Zapytaj AI, jak to naprawić",
@@ -15237,12 +15243,12 @@
       "removeScope": "Usuń ten filtr",
       "popoverTitle": "Zawęź to",
       "dimension": {
-        "system": "silnik",
-        "instance": "baza danych",
-        "namespace": "schemat",
-        "env": "środowisko",
-        "service": "usługa",
-        "insight": "spostrzeżenie"
+        "system": "Silnik",
+        "instance": "Baza danych",
+        "namespace": "Schemat",
+        "env": "Środowisko",
+        "service": "Usługa",
+        "insight": "Wgląd"
       }
     },
     "delta": {
@@ -15257,8 +15263,6 @@
       "wasValue": "było {value}"
     },
     "databases": {
-      "title": "Bazy danych",
-      "subtitle": "Wydajność zapytań i kondycja w podziale na bazy danych",
       "searchPlaceholder": "Szukaj bazy danych lub usługi…",
       "unnamedInstance": "Instancja bez nazwy",
       "unnamedInstanceHint": "Raporty o instrukcjach samej bazy danych potwierdzają, że ten silnik działa, ale nie podają nazwy hosta. Wiersz pokaże adres, gdy zostanie skonfigurowane źródło danych, które go przenosi — próbkowanie sesji lub metryki instancji.",
@@ -15305,9 +15309,6 @@
       }
     },
     "queries": {
-      "title": "Czołowe zapytania",
-      "subtitle": "Zapytania zużywające najwięcej czasu bazy danych",
-      "subtitleServer": "Instrukcje wykonane przez Twoje bazy danych, zliczane wewnątrz bazy — od najczęściej wykonywanych",
       "searchPlaceholder": "Szukaj tekstu zapytania, tabeli lub usługi…",
       "trendLabel": "Jak zmieniał się czas tego zapytania w wybranym zakresie",
       "otherRow": "Wszystkie pozostałe zapytania",
@@ -15316,7 +15317,8 @@
         "query": "Zapytania",
         "queryHint": "Tylko prawdziwy SQL — SELECT, INSERT, UPDATE i DELETE.",
         "all": "Zapytania + narzut połączeń",
-        "allHint": "Liczy również narzut, który sterownik wysyła między zapytaniami: BEGIN i COMMIT, SET oraz testy, które utrzymują połączenie z puli przy życiu."
+        "allHint": "Liczy również narzut, który sterownik wysyła między zapytaniami: BEGIN i COMMIT, SET oraz testy, które utrzymują połączenie z puli przy życiu.",
+        "overheadLabel": "Uwzględnij narzut połączenia"
       },
       "completionBias": {
         "title": "Wywołania spadły o {drop}%, a liczba nieudanych wzrosła",
@@ -15559,13 +15561,13 @@
       "noSamples": "Nie załadowano żadnych pojedynczych wykonań dla tego zakresu.",
       "noSeries": "Brak historii dla tego zapytania w wybranym zakresie.",
       "liveSeries": "Najnowsze punkty są nadal zliczane i mogą się zmienić.",
-      "noStream": "Nie udało nam się ustalić, który strumień śladów przenosi to zapytanie, więc jego wywołujący i przykłady nie mogą zostać załadowane.",
-      "ambiguousStream": "Ta organizacja ma więcej niż jeden strumień śladów i nie możemy określić, na którym działa to zapytanie. Wybierz strumień, aby załadować jego wywołujących i przykładowe ślady.",
-      "pickStream": "Wybierz strumień śladów",
-      "invalidStream": "Ta nazwa strumienia śladów nie jest przez nas rozpoznawana, więc nie uruchomiliśmy wyszukiwania.",
-      "firstSeen": "PO RAZ PIERWSZY POJAWIŁO SIĘ NA TEJ LIŚCIE O {time}",
+      "noStream": "Nie mogliśmy ustalić, który strumień śledzenia przenosi to zapytanie, więc nie można załadować jego wywołujących i przykładów.",
+      "ambiguousStream": "Ta organizacja ma więcej niż jeden strumień śledzenia i nie możemy określić, na którym działa to zapytanie. Wybierz strumień, aby załadować jego wywołujących i przykładowe ślady.",
+      "pickStream": "Wybierz strumień śledzenia",
+      "invalidStream": "Ta nazwa strumienia śledzenia nie jest nam znana, więc nie uruchomiliśmy wyszukiwania.",
+      "firstSeen": "Po raz pierwszy pojawiło się na tej liście o {time}",
       "firstSeenHint": "Najwcześniejszy punkt w tym zakresie, w którym to zapytanie było na tyle ciężkie, aby śledzić je osobno.",
-      "lastSeen": "OSTATNIO POJAWIŁO SIĘ O {time}",
+      "lastSeen": "Ostatnio pojawiło się o {time}",
       "lastSeenHint": "Najnowszy punkt w tym zakresie, w którym to zapytanie było na tyle ciężkie, aby śledzić je osobno. Może nadal działać — to ostatni raz, gdy znalazło się na liście.",
       "errorsByCode": {
         "title": "Błędy według kodu przyczyny",
@@ -15732,9 +15734,6 @@
       }
     },
     "samples": {
-      "title": "Najwolniejsze wywołania",
-      "subtitle": "Najwolniejsze pojedyncze wywołania baz danych w tym oknie, we wszystkich bazach danych i zapytaniach — mierzone przez ich wywołujących, tylko zakończone wywołania",
-      "subtitleServer": "Najwolniejsze instrukcje, które Twoje bazy danych ukończyły w tym oknie, mierzone wewnątrz bazy danych.",
       "logOffTitle": "Twoje bazy danych nie rejestrują jeszcze wolnych instrukcji.",
       "logOffDescription": "Nic nie prześledziło tych wywołań, więc zapytaliśmy bazy danych o ich własne najwolniejsze instrukcje — a one nie rejestrują żadnych. Ta lista pochodzi z dziennika instrukcji PostgreSQL (log_min_duration_statement), który jest domyślnie wyłączony — krok logowania w karcie konfiguracji włącza go. Przechwytywanie pojedynczych instrukcji jest obecnie dostępne tylko dla PostgreSQL, więc MySQL i MariaDB nie mogą jeszcze zasilać tej listy. Najczęstsze zapytania nadal pokazują, co działa najczęściej, ponieważ odczytują tabele liczników.",
       "searchPlaceholder": "Szukaj tekstu zapytania, usługi lub bazy danych…",
@@ -15776,16 +15775,14 @@
       }
     },
     "rowChips": {
-      "new": "NOWE NA TEJ LIŚCIE",
-      "slower": "{ratio}× WOLNIEJ NIŻ ZWYKLE",
-      "loop": "URUCHOMIENIA {multiplier}× NA ŻĄDANIE",
-      "allFailed": "WSZYSTKIE {count} NIEUDANE",
-      "busier": "BARDZIEJ OBCIĄŻONE, NIE WOLNIEJSZE",
-      "climbed": "NOWE NAJCIĘŻSZE ZAPYTANIE"
+      "new": "Nowość na tej liście",
+      "slower": "{ratio}× wolniej niż zwykle",
+      "loop": "Uruchamiane {multiplier}× na żądanie",
+      "allFailed": "Wszystkie {count} nie powiodły się",
+      "busier": "Bardziej obciążone, nie wolniejsze",
+      "climbed": "Nowe najcięższe zapytanie"
     },
     "deadlocks": {
-      "title": "Bazy danych",
-      "subtitle": "Transakcje, które wzajemnie się blokowały i zostały wycofane",
       "deadlockCount": "brak zakleszczeń | {count} zakleszczenie | {count} zakleszczeń",
       "pairCount": "brak par zapytań | {count} para zapytań | {count} par zapytań",
       "searchPlaceholder": "Szukaj tekstu zapytania, tabeli lub aplikacji…",
@@ -15812,10 +15809,10 @@
         "mysqlPartial": "Twoja baza danych MySQL przechowuje tylko najnowsze zakleszczenie, chyba że włączono innodb_print_all_deadlocks."
       },
       "chips": {
-        "oppositeOrder": "PRZECIWNA KOLEJNOŚĆ WIERSZY",
-        "cadence": "CO {seconds}s",
-        "noQueries": "ZAPYTANIA NIEPRZECHWYCONE",
-        "partial": "TYLKO JEDNA STRONA"
+        "oppositeOrder": "Odwrotna kolejność wierszy",
+        "cadence": "Co {seconds}s",
+        "noQueries": "Zapytania nie przechwycone",
+        "partial": "Tylko jedna strona"
       },
       "rowActions": {
         "topQueries": "Znajdź je w Top queries",
@@ -15832,8 +15829,8 @@
         "pid": "pid {pid}",
         "thread": "wątek {pid}",
         "transaction": "transakcja {id}",
-        "eachWaits": "każde z nich czeka na drugie",
-        "deadlock": "zakleszczenie",
+        "eachWaits": "Każdy czeka na drugi",
+        "deadlock": "Zakleszczenie",
         "noQueryCaptured": "Dziennik zarejestrował to zakleszczenie, ale nie zapytanie.",
         "waitingFor": "Czekało na zakończenie {target}.",
         "waitingForRow": "Czekało na zakończenie {target} — druga sesja zmieniła już wiersz, którego chciało.",
@@ -15935,9 +15932,6 @@
       }
     },
     "blocked": {
-      "title": "Bazy danych",
-      "subtitle": "Sesje aktualnie oczekujące na blokadę",
-      "subtitlePast": "Sesje, które czekały na blokadę w tym oknie",
       "waitingCount": "brak sesji oczekujących na blokadę | {count} sesja oczekuje teraz na blokadę | {count} sesji oczekuje teraz na blokadę",
       "waitingCountPast": "brak sesji, które czekały na blokadę | {count} sesja czekała na blokadę w tym oknie | {count} sesji czekało na blokadę w tym oknie",
       "sessionCount": "brak sesji | {count} sesja | {count} sesji",
@@ -15983,14 +15977,14 @@
       },
       "deep": "głębokość: {count}",
       "notWaiting": "nie oczekuje",
-      "longestWait": "NAJDŁUŻSZE OCZEKIWANIE",
-      "holdsTheLock": "TRZYMA BLOKADĘ, KTÓREJ WSZYSCY CHCĄ",
+      "longestWait": "Najdłuższe oczekiwanie",
+      "holdsTheLock": "Posiada blokadę, której wszyscy chcą",
       "lastStatement": "ostatnie polecenie {age} temu",
       "idleInTransaction": "nie oczekuje na nic · bezczynna w otwartej transakcji",
       "pills": {
-        "root": "KORZEŃ — ZACZNIJ TUTAJ",
-        "waitingBlocking": "OCZEKUJE I BLOKUJE {count}",
-        "waiting": "OCZEKUJE"
+        "root": "Źródło — zacznij tutaj",
+        "waitingBlocking": "Oczekujące i blokujące {count}",
+        "waiting": "Oczekiwanie"
       },
       "waitingOn": "oczekuje na {pid}",
       "degraded": "Jedna sesja blokuje {count}. Ma otwartą transakcję od {age} i w tym czasie nie wykonała żadnego zapytania — najprawdopodobniej aplikacja zapomniała o commicie.",
@@ -16068,9 +16062,6 @@
       }
     },
     "activity": {
-      "title": "Aktywność",
-      "subtitle": "Co Twoje bazy danych robią teraz, próbkowane z ich tabel sesji.",
-      "subtitlePast": "Co Twoje bazy danych robiły w tym oknie, próbkowane z ich tabel sesji.",
       "searchPlaceholder": "Szukaj sesji, użytkowników, aplikacji",
       "wait": {
         "onCpu": "Na CPU / bez oczekiwania",
@@ -16194,8 +16185,6 @@
       "deadlockLabel": "Zakleszczenia"
     },
     "tableHealth": {
-      "title": "Kondycja tabel",
-      "subtitle": "Rozmiar, rozrost i stan vacuum dla każdej tabeli, najnowsza migawka pierwsza.",
       "searchPlaceholder": "Szukaj tabel",
       "never": "Nigdy",
       "countersCumulative": "Liczby skanowań i próżni to sumy całkowite od ostatniego resetu statystyk, a nie liczby dla wybranego zakresu czasu.",

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <article
-    class="rounded-surface border-border-default bg-surface-base hover:border-border-strong focus-visible:ring-accent/40 flex h-full cursor-pointer flex-col gap-2 border p-3 outline-none focus-visible:ring-2"
+    class="rounded-default border-border-default bg-surface-base hover:border-border-strong focus-visible:ring-accent/40 flex h-full cursor-pointer flex-col gap-2 border p-3 outline-none focus-visible:ring-2"
     role="button"
     tabindex="0"
     :aria-label="t('alert_library.openDetails', { title: entry.title })"
@@ -57,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </h3>
       <OTag
         type="severity"
-        size="xs"
         :value="severityValue"
         :label="severityText"
         class="shrink-0"
@@ -75,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              would colour the norm. -->
         <OTag
           variant="default-soft"
-          size="xs"
-          :label="queryTypeLabel"
+          :label="queryTypeLabelText"
           data-test="alert-library-card-query-type"
         />
 
@@ -104,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="!ready"
         variant="warning-quiet"
-        size="xs"
         class="max-w-full min-w-0 self-start"
         :title="t('alert_library.notIngestedHint', { stream: entry.stream })"
         data-test="alert-library-card-needs-data"
@@ -129,9 +126,9 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-import { severityBadgeValue, severityLabel } from "./libraryFacets";
+import { queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
 
 const props = defineProps<{
   entry: AlertLibraryEntry;
@@ -146,5 +143,5 @@ const { t } = useI18nTyped();
 const severityValue = computed(() => severityBadgeValue(props.entry.severity));
 const severityText = computed(() => severityLabel(t, props.entry.severity));
 // A query language, not prose — one correct form worldwide.
-const queryTypeLabel = computed(() => raw(String(props.entry.query_type ?? "").toUpperCase()));
+const queryTypeLabelText = computed(() => queryTypeLabel(props.entry.query_type));
 </script>
