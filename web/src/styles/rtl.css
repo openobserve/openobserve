@@ -17,9 +17,12 @@
   unicode-bidi: isolate;
 }
 
-[dir="rtl"] input[type="email"],
-[dir="rtl"] input[type="url"],
-[dir="rtl"] input[type="tel"] {
+/* Only the VALUE is machine-readable. While the field is empty its placeholder
+   is translated prose, and forcing that to LTR drags it to the opposite edge
+   from every neighbouring field's placeholder. */
+[dir="rtl"] input[type="email"]:not(:placeholder-shown),
+[dir="rtl"] input[type="url"]:not(:placeholder-shown),
+[dir="rtl"] input[type="tel"]:not(:placeholder-shown) {
   direction: ltr;
   text-align: left;
   unicode-bidi: isolate;
