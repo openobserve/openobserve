@@ -5,11 +5,6 @@
   transform: scaleX(-1);
 }
 
-/* RTL switches use the negative size-specific offset supplied by OSwitch. */
-[dir="rtl"] .o-switch__thumb--checked {
-  transform: translateX(var(--o-switch-thumb-translate-rtl)) !important;
-}
-
 /* Machine-readable content remains isolated LTR inside RTL pages. */
 [dir="rtl"] pre,
 [dir="rtl"] code,
