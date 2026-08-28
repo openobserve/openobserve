@@ -1,0 +1,172 @@
+===== COMPLETE LIST OF CHANGED FILES (4 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/alerts/AlertSectionTabs.spec.ts
+web/src/components/alerts/AlertSectionTabs.vue
+web/src/lib/core/Navbar/ONavGroup.spec.ts
+web/src/lib/core/Navbar/ONavGroup.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/alerts/AlertSectionTabs.spec.ts b/web/src/components/alerts/AlertSectionTabs.spec.ts
+index 8a0ee315f8f..72121d09049 100644
+--- a/web/src/components/alerts/AlertSectionTabs.spec.ts
++++ b/web/src/components/alerts/AlertSectionTabs.spec.ts
+@@ -36,6 +36,7 @@ const mountTabs = () =>
+ describe("AlertSectionTabs", () => {
+   beforeEach(async () => {
+     vi.restoreAllMocks();
++    store.state.zoConfig.custom_hide_menus = "";
+     await router.push({ name: "alertList" });
+     await router.isReady();
+   });
+@@ -80,4 +81,20 @@ describe("AlertSectionTabs", () => {
+     const wrapper = mountTabs();
+     expect(wrapper.findAll('[aria-selected="true"]')).toHaveLength(0);
+   });
++
++  it("drops the Library tab when custom_hide_menus lists 'alertLibrary'", () => {
++    store.state.zoConfig.custom_hide_menus = "openapi,reports,alertLibrary";
++    const wrapper = mountTabs();
++    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
++      "All Alerts",
++      "Destinations",
++      "Destination Templates",
++    ]);
++  });
++
++  it("keeps the Library tab when the flag lists other menus", () => {
++    store.state.zoConfig.custom_hide_menus = "openapi,reports";
++    const wrapper = mountTabs();
++    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain("Library");
++  });
+ });
+diff --git a/web/src/components/alerts/AlertSectionTabs.vue b/web/src/components/alerts/AlertSectionTabs.vue
+index 35ed3fd81eb..ba80b00d78c 100644
+--- a/web/src/components/alerts/AlertSectionTabs.vue
++++ b/web/src/components/alerts/AlertSectionTabs.vue
+@@ -70,6 +70,10 @@ interface Section {
+ 
+ const sections = computed<Section[]>(() => {
+   const query = { org_identifier: orgIdentifier.value };
++  // Raw split (no trim) to match how the rest of the app reads the flag.
++  const hideLibrary = (store.state.zoConfig?.custom_hide_menus ?? "")
++    .split(",")
++    .includes("alertLibrary");
+   return [
+     // "All Alerts", not "Alerts": the page title above this strip already says
+     // "Alerts", so a tab repeating it names nothing. The rail's Alerts
+@@ -94,12 +98,16 @@ const sections = computed<Section[]>(() => {
+     },
+     // Last: the catalog is where you go once to fetch an alert, not where you
+     // work. The rail's Reliability flyout lists these four in this same order.
+-    {
+-      key: "alertLibrary",
+-      label: t("alert_library.sectionTab"),
+-      icon: "menu-book",
+-      to: { name: "alertLibrary", query },
+-    },
++    ...(hideLibrary
++      ? []
++      : [
++          {
++            key: "alertLibrary",
++            label: t("alert_library.sectionTab"),
++            icon: "menu-book" as IconName,
++            to: { name: "alertLibrary", query },
++          },
++        ]),
+   ];
+ });
+ 
+diff --git a/web/src/lib/core/Navbar/ONavGroup.spec.ts b/web/src/lib/core/Navbar/ONavGroup.spec.ts
+index 0069ac528a1..cdd809f434d 100644
+--- a/web/src/lib/core/Navbar/ONavGroup.spec.ts
++++ b/web/src/lib/core/Navbar/ONavGroup.spec.ts
+@@ -642,4 +642,63 @@ describe("ONavGroup", () => {
+       expect(query.get("query")).toBe("c2VydmljZQ==");
+     });
+   });
++  // A child with no top-level rail entry of its own (Alert Library, Destinations,
++  // Enrichment Tables…) is unreachable by MainLayout's linksList filter, and
++  // `requires` only tracks its PARENT. Matching custom_hide_menus against the
++  // child's own route name is what makes those hideable at all.
++  describe("custom_hide_menus names a child directly", () => {
++    function mountWithHidden(hidden: string) {
++      const hiddenStore = createStore({
++        state: () => ({
++          theme: "light",
++          zoConfig: { custom_hide_menus: hidden },
++          organizationData: {},
++          selectedOrganization: { identifier: "default" },
++        }),
++      });
++      return mount(ONavGroup, {
++        props: {
++          groupKey: "data",
++          title: "Data",
++          icon: "database",
++          children,
++          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
++        },
++        global: {
++          plugins: [makeRouter(), hiddenStore, i18n],
++          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
++        },
++      });
++    }
++
++    async function openFlyout() {
++      await wrapper.trigger("mouseenter");
++      vi.advanceTimersByTime(OPEN_DELAY);
++      await flushPromises();
++      return wrapper.find('[data-test="nav-group-flyout-data"]');
++    }
++
++    it("drops the named child and keeps its siblings", async () => {
++      wrapper = mountWithHidden("openapi,reports,pipelines");
++      const panel = await openFlyout();
++      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(false);
++      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
++    });
++
++    it("keeps every child when the flag names none of them", async () => {
++      wrapper = mountWithHidden("openapi,reports");
++      const panel = await openFlyout();
++      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
++      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
++    });
++
++    it("ignores an empty flag rather than hiding an unnamed child", async () => {
++      // "".split(",") is [""], so a child whose name is "" would match — none is,
++      // but the empty entry must not be treated as a wildcard either.
++      wrapper = mountWithHidden("");
++      const panel = await openFlyout();
++      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
++      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
++    });
++  });
+ });
+diff --git a/web/src/lib/core/Navbar/ONavGroup.vue b/web/src/lib/core/Navbar/ONavGroup.vue
+index 4bb3e12428e..370293e520b 100644
+--- a/web/src/lib/core/Navbar/ONavGroup.vue
++++ b/web/src/lib/core/Navbar/ONavGroup.vue
+@@ -111,11 +111,17 @@ const gateContext = computed<NavGateContext>(() => {
+   };
+ });
+ 
+-// A child shows only when (a) its route is registered in this build AND (b) its
+-// visibility gate (if any) passes — exactly as the target page would decide.
++// A child shows only when (a) its route is registered in this build, (b)
++// custom_hide_menus does not name it, AND (c) its visibility gate (if any)
++// passes — exactly as the target page would decide.
++//
++// The custom_hide_menus check is by route NAME so a child with no top-level
++// rail entry of its own is hideable at all: `requires` only tracks the parent,
++// and MainLayout's filter only ever sees top-level links.
+ const visibleChildren = computed(() =>
+   props.children.filter((c) => {
+     if (!router.hasRoute(c.name)) return false;
++    if (gateContext.value.hiddenMenus.has(c.name)) return false;
+     if (c.gate) {
+       const predicate = GATE_PREDICATES[c.gate];
+       if (predicate && !predicate(gateContext.value)) return false;

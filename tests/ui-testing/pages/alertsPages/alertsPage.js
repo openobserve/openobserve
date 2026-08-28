@@ -45,6 +45,14 @@ export class AlertsPage {
         return {
             // Alert related locators
             alertMenuItem: '[data-test="menu-link-\\/alerts-item"]',
+            // Alert section tabs (AlertSectionTabs.vue) — the four alerting siblings strip.
+            alertSectionTabAllAlerts: '[data-test="alert-section-tab-alertList"]',
+            alertSectionTabLibrary: '[data-test="alert-section-tab-alertLibrary"]',
+            // Left-rail Reliability flyout children (ONavGroup.vue).
+            navGroupReliability: '[data-test="nav-group-reliability"]',
+            navGroupFlyoutReliability: '[data-test="nav-group-flyout-reliability"]',
+            navGroupItemAlertList: '[data-test="nav-group-item-alertList"]',
+            navGroupItemAlertLibrary: '[data-test="nav-group-item-alertLibrary"]',
             newFolderButton: '[data-test="dashboard-new-folder-btn"]',
             folderNameInput: '[data-test="dashboard-folder-add-name"]',
             // OInput inner native input (-field) — used for fill/click per §4
@@ -1222,6 +1230,47 @@ export class AlertsPage {
         await expect(choice).toBeVisible({ timeout: 15000 });
         await expect(choice.locator('[role="radio"][data-test-value="true"]')).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
         await expect(choice.locator('[role="radio"][data-test-value="false"]')).toHaveAttribute('aria-checked', 'false');
+    }
+
+    // ==================== CUSTOM HIDE MENUS (ALERT LIBRARY TAB) HELPERS ====================
+
+    /** Assert the "All Alerts" tab is visible — guard that the section strip itself rendered. */
+    async expectAllAlertsTabVisible() {
+        await expect(this.page.locator(this.locators.alertSectionTabAllAlerts)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Alert "All Alerts" tab is visible');
+    }
+
+    /** Assert the "Library" tab is shown (custom_hide_menus does not list alertLibrary). */
+    async expectLibraryTabVisible() {
+        await expect(this.page.locator(this.locators.alertSectionTabLibrary)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Alert "Library" tab is visible');
+    }
+
+    /** Assert the "Library" tab is NOT rendered (custom_hide_menus listed alertLibrary). */
+    async expectLibraryTabHidden() {
+        await expect(this.page.locator(this.locators.alertSectionTabLibrary)).toBeHidden();
+        testLogger.info('Alert "Library" tab is hidden');
+    }
+
+    /** Hover the Reliability rail tile to reveal the section flyout. */
+    async openReliabilityFlyout() {
+        const tile = this.page.locator(this.locators.navGroupReliability);
+        await expect(tile).toBeVisible({ timeout: 15000 });
+        await tile.hover();
+        await expect(this.page.locator(this.locators.navGroupFlyoutReliability)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Reliability flyout opened');
+    }
+
+    /** Assert the "All Alerts" child is present in the Reliability flyout. */
+    async expectNavGroupAllAlertsItemVisible() {
+        await expect(this.page.locator(this.locators.navGroupItemAlertList)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Reliability flyout "All Alerts" item is visible');
+    }
+
+    /** Assert the "Alert Library" child is absent from the Reliability flyout. */
+    async expectNavGroupLibraryItemHidden() {
+        await expect(this.page.locator(this.locators.navGroupItemAlertLibrary)).toBeHidden();
+        testLogger.info('Reliability flyout "Alert Library" item is hidden');
     }
 
     // ==================== ALERTS 4.0 (PRIORITY & TAGS) HELPERS ====================
