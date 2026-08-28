@@ -195,8 +195,7 @@
       "js-transform-type.spec.js",
       "row-expansion.spec.js",
       "enrichment-table-url.spec.js",
-      "functions-form-validation.spec.js",
-      "action-scripts-form-validation.spec.js"
+      "functions-form-validation.spec.js"
     ],
     "disabled": []
   },

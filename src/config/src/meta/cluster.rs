@@ -126,15 +126,6 @@ impl Node {
     pub fn is_scheduler(&self) -> bool {
         self.role.contains(&Role::Scheduler) || self.role.contains(&Role::All)
     }
-    pub fn is_action_server(&self) -> bool {
-        self.role.contains(&Role::ActionServer) || self.role.contains(&Role::All)
-    }
-    pub fn is_standalone(&self) -> bool {
-        // standalone implies there is no external dependency required
-        // for this node. All role will always have DB dep.
-        // currently only action server has no external dep
-        !self.role.contains(&Role::All) && self.role.contains(&Role::ActionServer)
-    }
 }
 
 impl Default for Node {
@@ -207,7 +198,6 @@ pub enum Role {
     #[serde(alias = "AlertManager")]
     Scheduler,
     FlattenCompactor,
-    ActionServer,
 }
 
 impl FromStr for Role {
@@ -222,9 +212,6 @@ impl FromStr for Role {
             "router" => Ok(Role::Router),
             "scheduler" | "alertmanager" | "alert_manager" => Ok(Role::Scheduler),
             "flatten_compactor" => Ok(Role::FlattenCompactor),
-            "action_server" | "actionserver" | "script_server" | "scriptserver" => {
-                Ok(Role::ActionServer)
-            }
             _ => Err(format!("Invalid cluster role: {s}")),
         }
     }
@@ -240,7 +227,6 @@ impl std::fmt::Display for Role {
             Role::Router => write!(f, "router"),
             Role::Scheduler => write!(f, "scheduler"),
             Role::FlattenCompactor => write!(f, "flatten_compactor"),
-            Role::ActionServer => write!(f, "action_server"),
         }
     }
 }
@@ -378,10 +364,6 @@ mod tests {
         node.role = vec![Role::Scheduler];
         assert!(node.is_scheduler());
 
-        // Test action server
-        node.role = vec![Role::ActionServer];
-        assert!(node.is_action_server());
-
         // Test flatten compactor
         node.role = vec![Role::FlattenCompactor];
         assert!(node.is_flatten_compactor());
@@ -465,29 +447,6 @@ mod tests {
     }
 
     #[test]
-    fn test_node_is_standalone() {
-        let mut node = Node {
-            role: vec![Role::ActionServer],
-            ..Default::default()
-        };
-
-        // ActionServer alone → standalone
-        assert!(node.is_standalone());
-
-        // All role → NOT standalone (has external deps)
-        node.role = vec![Role::All];
-        assert!(!node.is_standalone());
-
-        // All + ActionServer → NOT standalone
-        node.role = vec![Role::All, Role::ActionServer];
-        assert!(!node.is_standalone());
-
-        // Ingester → not standalone
-        node.role = vec![Role::Ingester];
-        assert!(!node.is_standalone());
-    }
-
-    #[test]
     fn test_node_is_same() {
         let a = Node {
             id: 1,
@@ -529,10 +488,6 @@ mod tests {
             "flatten_compactor".parse::<Role>().unwrap(),
             Role::FlattenCompactor
         );
-        assert_eq!("action_server".parse::<Role>().unwrap(), Role::ActionServer);
-        assert_eq!("actionserver".parse::<Role>().unwrap(), Role::ActionServer);
-        assert_eq!("script_server".parse::<Role>().unwrap(), Role::ActionServer);
-        assert_eq!("scriptserver".parse::<Role>().unwrap(), Role::ActionServer);
         // unknown → Err
         assert!("unknown_role".parse::<Role>().is_err());
     }
@@ -546,7 +501,6 @@ mod tests {
         assert_eq!(Role::Router.to_string(), "router");
         assert_eq!(Role::Scheduler.to_string(), "scheduler");
         assert_eq!(Role::FlattenCompactor.to_string(), "flatten_compactor");
-        assert_eq!(Role::ActionServer.to_string(), "action_server");
     }
 
     #[test]

@@ -122,8 +122,7 @@ export interface Destination {
   headers?: Headers;
   template?: string | Template;
   emails?: string;
-  type: "http" | "email" | "sns" | "action";
-  action_id?: string;
+  type: "http" | "email" | "sns";
   output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // Frontend internal use
   destination_type_name?: string; // From backend
@@ -140,8 +139,7 @@ export interface DestinationPayload {
   headers?: Headers;
   template?: string; // Persisted/sent as the template name
   emails?: string[];
-  type: "http" | "email" | "sns" | "action";
-  action_id?: string;
+  type: "http" | "email" | "sns";
   output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // New field added
   separator?: string; // For stringseparated format separator value

@@ -67,7 +67,6 @@ const mockStore = {
     },
     zoConfig: {
       timestamp_column: "_timestamp",
-      actions_enabled: false,
       super_cluster_enabled: false,
     },
     theme: "light",
@@ -768,16 +767,6 @@ describe("logsUtils", () => {
       expect(queryReq.query).toHaveProperty("query_fn");
     });
 
-    it("should add action_id when transform type is action", () => {
-      mockSearchObj.data.transformType = "action";
-      mockSearchObj.data.selectedTransform = { id: "action-123" };
-
-      const queryReq = { query: {} };
-      utils.addTransformToQuery(queryReq);
-
-      expect(queryReq.query).toHaveProperty("action_id", "action-123");
-    });
-
     it("should not modify query when no transform to add", () => {
       mockSearchObj.data.tempFunctionContent = "";
       mockSearchObj.data.transformType = "";
@@ -787,7 +776,6 @@ describe("logsUtils", () => {
       utils.addTransformToQuery(queryReq);
 
       expect(queryReq.query).not.toHaveProperty("query_fn");
-      expect(queryReq.query).not.toHaveProperty("action_id");
     });
   });
 });

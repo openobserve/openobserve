@@ -54,7 +54,6 @@ export const makeAddDestinationSchema = (
       // Recipients are org users, chosen from a list — an array of their
       // email addresses rather than the comma-separated string this used to be.
       emails: z.array(z.string()).optional().default([]),
-      action_id: z.string().optional().default(""),
       skip_tls_verify: z.boolean().optional().default(false),
 
       // ── Form-owned dynamic api-headers rows ──────────────────────────────
@@ -137,15 +136,6 @@ export const makeAddDestinationSchema = (
         }
       }
 
-      // action_id: required for action destinations.
-      if (!isPrebuilt && val.type === "action" && !val.action_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["action_id"],
-          message: t("alerts.validation.fieldRequired"),
-        });
-      }
-
       // Prebuilt credentials: validate the active type's credential fields from
       // the SAME config-driven schema, re-homed under `credentials.*` so each
       // issue lands on its OFormInput (name=`credentials.<key>`). This is what
@@ -179,7 +169,6 @@ export const addDestinationDefaults = (): AddDestinationForm => ({
   method: "post",
   output_format: "json",
   emails: [] as string[],
-  action_id: "",
   skip_tls_verify: false,
   apiHeaders: [{ key: "", value: "" }],
   credentials: {},

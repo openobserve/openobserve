@@ -58,8 +58,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //
 // 74: create llm_playground_snapshots for Phase 3.1 shared Playground
 // snapshots.
-// 75: add steps_configured to synthetics_jobs.
-pub const DB_SCHEMA_VERSION: u64 = 75;
+// 75: drop action_scripts, the actions feature is removed.
+// 76: add steps_configured to synthetics_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 76;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1235,8 +1236,6 @@ pub struct Auth {
         help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
     )]
     pub alert_chart_signing_key: String,
-    #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
-    pub action_server_token: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
     pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
@@ -3621,11 +3620,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && !local_node_role.contains(&cluster::Role::Querier)
     {
         cfg.common.tracing_enabled = false;
-    }
-
-    if local_node_role.contains(&cluster::Role::ActionServer) {
-        // action server does not have external dep, so can ignore their config check
-        return Ok(());
     }
 
     // format local_mode_storage
