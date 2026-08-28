@@ -1,6 +1,0 @@
-{
-  "group": "GeneralTests",
-  "spec_filename": "organizationSyntheticsSteps.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

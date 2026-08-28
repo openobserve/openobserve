@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/organizationSyntheticsSteps.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/GeneralTests/org.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "No existing spec covers the Usage Allowance quota dialog (grep for usage_limits/quota/browser_steps/protocol_steps across tests/ui-testing returned zero hits). The closest spec, org.spec.js, covers org CRUD and the _meta admin-org LIST endpoint only — and its GET /organizations assertion (data.list) is documented as stale/wrong and must NOT be copied. The synthetics-steps quota is a distinct feature area (cloud + _meta-gated quota dialog with two step pools) and the run-context provides a dedicated spec_filename/spec_path, so a new spec in GeneralTests is the correct home. Registration: the new file must be appended to the GeneralTests run_files entry in tests/ui-testing/ci-matrix/ci_matrix.json (the single source of truth for shard matrix)."
-}
