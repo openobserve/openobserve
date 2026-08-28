@@ -49,6 +49,16 @@ const RTL_LOCALES = new Set(["ar"]);
 
 export const isRtlLocale = (locale: string): boolean => RTL_LOCALES.has(locale);
 
+// A BCP-47 tag matches an app language code only when the code is the tag's
+// leading subtag. A substring test lets a REGION stand in for a language:
+// `es-AR` (Spanish, Argentina) contains "ar", and `ar` is registered ahead of
+// `es`, so indexOf() would hand Argentinian users an Arabic right-to-left UI.
+export const localeMatchesTag = (tag: string, code: string): boolean =>
+  tag === code || tag.startsWith(`${code}-`);
+
+// localeFileMap's values double as the <html lang> tags. That holds because
+// every language file is named after its canonical BCP-47 tag, and the spec
+// asserts it stays that way — rename a file and the guard fails, not the DOM.
 export const applyDocumentLocale = (locale: string): void => {
   if (typeof document === "undefined") return;
   document.documentElement.lang = localeFileMap[locale] ?? "en-US";
@@ -63,7 +73,7 @@ export const getLocale = () => {
   const language = navigator.language.toLowerCase();
   const locales = Object.keys(localeFileMap);
   for (const locale of locales) {
-    if (language.indexOf(locale) > -1) {
+    if (localeMatchesTag(language, locale)) {
       return locale;
     }
   }

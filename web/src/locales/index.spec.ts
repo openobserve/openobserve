@@ -25,7 +25,7 @@ vi.mock("@/utils/cookies", () => ({
 }));
 
 import { getNumberLocale, APP_LOCALE_TO_BCP47 } from "@/locales/numberFormat";
-import { applyDocumentLocale, isRtlLocale, localeFileMap } from "@/locales";
+import { applyDocumentLocale, getLocale, isRtlLocale, localeFileMap } from "@/locales";
 
 describe("locale registry stays in sync", () => {
   // locales/index.ts code-splits via import.meta.glob("./languages/*.json"), so
@@ -51,6 +51,15 @@ describe("locale registry stays in sync", () => {
 
   it("formats numbers for every locale it can load", () => {
     expect(Object.keys(APP_LOCALE_TO_BCP47).sort()).toEqual(Object.keys(localeFileMap).sort());
+  });
+
+  // applyDocumentLocale writes these straight into <html lang>. They are file
+  // names, so nothing but this guard stops a rename from putting a bogus tag on
+  // the document — which silently breaks screen readers and hyphenation.
+  it("names every language file after a canonical BCP-47 tag", () => {
+    for (const tag of Object.values(localeFileMap)) {
+      expect(Intl.getCanonicalLocales(tag)).toEqual([tag]);
+    }
   });
 });
 
@@ -109,6 +118,44 @@ describe("getNumberLocale (locale format unit)", () => {
     }).format(1234567890);
 
     expect(ar).toBe("1234567890");
+  });
+});
+
+describe("navigator language detection", () => {
+  // Both resolvers used to substring-match, which let a REGION subtag stand in
+  // for a language: `es-AR` contains "ar", and `ar` is registered ahead of `es`,
+  // so Argentinian Spanish resolved to an Arabic right-to-left UI. Every case
+  // below is a real navigator.language value.
+  const withNavigatorLanguage = (tag: string, assert: () => void) => {
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, "language");
+    Object.defineProperty(navigator, "language", { value: tag, configurable: true });
+    try {
+      assert();
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, "language", descriptor);
+    }
+  };
+
+  beforeEach(() => {
+    (getLanguage as any).mockReturnValue(undefined);
+  });
+
+  it.each([
+    ["es-AR", "es"],
+    ["es-ES", "es"],
+    ["en-AR", "en-us"],
+    ["pa-Arab-PK", "en-us"],
+    ["ks-Arab-IN", "en-us"],
+    ["ar-SA", "ar"],
+    ["ar-EG", "ar"],
+    ["ar", "ar"],
+    ["fr-FR", "fr"],
+  ])("resolves %s to %s", (tag, expected) => {
+    withNavigatorLanguage(tag, () => expect(getLocale()).toBe(expected));
+  });
+
+  it("keeps the number locale in step with the UI locale", () => {
+    withNavigatorLanguage("es-AR", () => expect(getNumberLocale()).toBe("es-ES"));
   });
 });
 
