@@ -13343,6 +13343,13 @@
     },
     "histogramQueryFailed": "Histogram query failed",
     "hoursAgo": "{count}h ago",
+    "inherited": {
+      "overriddenHere": "Overridden here",
+      "override": "Override",
+      "overrideSecretBlocked": "A secret cannot be overridden on a check — the override would be readable. Use a different value in the environment instead.",
+      "title": "Inherited",
+      "unbound": "Not defined anywhere: {names}. These are typed as literal text when the check runs."
+    },
     "journey": {
       "actionLabels": {
         "navigate": "Navigate",
@@ -13762,6 +13769,11 @@
         "notFound": "Location not found"
       }
     },
+    "promote": {
+      "done": "Variable is now global",
+      "failed": "Could not make the variable global",
+      "toGlobal": "Make global"
+    },
     "protocolConfig": {
       "http": {
         "addAssertion": "Add assertion",
@@ -14057,6 +14069,16 @@
       "thisFolder": "This folder"
     },
     "secondsAgo": "{count}s ago",
+    "split": {
+      "action": "Scope to environments",
+      "confirm": "Scope to environments",
+      "description": "Each environment gets its own value. The global variable is replaced.",
+      "done": "Variable scoped to environments",
+      "failed": "Could not scope the variable",
+      "title": "Scope {name} to environments",
+      "unselectedWarning": "Not selected: {envs}. Checks running against them will stop resolving this variable.",
+      "valuePlaceholder": "Value for this environment"
+    },
     "status": {
       "critical": "Critical",
       "degraded": "Degraded",

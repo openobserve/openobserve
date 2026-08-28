@@ -27,6 +27,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { getUUID } from "@/utils/uuid";
+import SyntheticsInheritedVariables from "@/components/synthetics/variables/SyntheticsInheritedVariables.vue";
+import { placeholderNames } from "@/components/synthetics/variables/placeholders";
 
 type CheckVariable = NonNullable<BrowserCheck["variables"]>[number];
 
@@ -54,6 +56,20 @@ function usageCount(name: string): number {
 }
 
 const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)));
+
+/** Every `{{NAME}}` the journey references, whatever scope binds it. */
+const referencedNames = computed(() => {
+  const names = new Set<string>();
+  for (const step of props.check.journey) {
+    for (const field of [step.value, step.selector]) {
+      for (const name of placeholderNames(field ?? "")) names.add(name);
+    }
+    for (const candidate of step.locator?.candidates ?? []) {
+      for (const name of placeholderNames(candidate.value)) names.add(name);
+    }
+  }
+  return [...names];
+});
 
 function usageText(count: number): I18nText {
   return count > 0
@@ -115,6 +131,23 @@ function openAdd() {
     attempted.value = false;
     draft.value = { name: "", value: "", secure: false };
   }
+  nextTick(() => {
+    addFormRef.value?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  });
+}
+
+/**
+ * Start overriding an inherited variable: open the add form with the name
+ * already filled and the value empty.
+ *
+ * The name is copied down rather than the value — the shared value may be one
+ * this author cannot read, and an override exists precisely to replace it.
+ */
+function startOverride(name: string) {
+  editingIndex.value = null;
+  adding.value = true;
+  attempted.value = false;
+  draft.value = { name, value: "", secure: false };
   nextTick(() => {
     addFormRef.value?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   });
@@ -232,6 +265,14 @@ onBeforeUnmount(() => {
     class="border-border-default bg-surface-base flex h-full min-h-0 flex-col border-l px-0.5 pt-4 pb-1"
     data-test="synthetics-check-variables-panel"
   >
+    <!-- Inherited first: the steps below reference names from three scopes, and
+         the panel used to show only the third. -->
+    <SyntheticsInheritedVariables
+      :check-id="(check as any).id ?? ''"
+      :referenced="referencedNames"
+      @override="startOverride"
+    />
+
     <!-- Header — pinned; h-8.5 matches the Journey toolbar row so the two
          headers sit on the same baseline across the splitter -->
     <div class="border-border-default shrink-0 border-b px-3">
