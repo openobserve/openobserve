@@ -1488,6 +1488,7 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            synthetics_replay_autofill: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1516,6 +1517,7 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            synthetics_replay_autofill: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
