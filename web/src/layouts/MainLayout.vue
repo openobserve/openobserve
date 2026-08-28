@@ -202,6 +202,7 @@ import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
+import { languageOptions } from "@/locales/languageOptions";
 import { getLocale } from "../locales";
 
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
@@ -487,72 +488,7 @@ export default defineComponent({
     );
     const navLinks = computed(() => (menuReady.value ? linksList.value : []));
 
-    const langList = [
-      {
-        label: raw("English"),
-        code: "en-us",
-      },
-      {
-        label: raw("العربية"),
-        code: "ar",
-      },
-      {
-        label: raw("Türkçe"),
-        code: "tr-turk",
-      },
-      {
-        label: raw("简体中文"),
-        code: "zh-cn",
-      },
-      {
-        label: raw("繁體中文"),
-        code: "zh-tw",
-      },
-      {
-        label: raw("Français"),
-        code: "fr",
-      },
-      {
-        label: raw("Español"),
-        code: "es",
-      },
-      {
-        label: raw("Deutsch"),
-        code: "de",
-      },
-      {
-        label: raw("Italiano"),
-        code: "it",
-      },
-      {
-        label: raw("日本語"),
-        code: "ja",
-      },
-      {
-        label: raw("한국어"),
-        code: "ko",
-      },
-      {
-        label: raw("Nederlands"),
-        code: "nl",
-      },
-      {
-        label: raw("Português"),
-        code: "pt",
-      },
-      {
-        label: raw("Русский"),
-        code: "ru",
-      },
-      {
-        label: raw("Polski"),
-        code: "pl",
-      },
-      {
-        label: raw("Tiếng Việt"),
-        code: "vi",
-      },
-    ];
+    const langList = languageOptions;
 
     onBeforeMount(() => {
       try {

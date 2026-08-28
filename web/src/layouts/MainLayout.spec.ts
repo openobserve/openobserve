@@ -17,6 +17,8 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, ref, h } from "vue";
 import * as cookies from "@/utils/cookies";
+import { languageOptions } from "@/locales/languageOptions";
+import { localeFileMap } from "@/locales";
 
 // ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
 // update:open / click:* emits). Mirrors stubs used in other migrated specs.
@@ -721,29 +723,17 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Language Configuration", () => {
-    it("should have correct language list", () => {
-      const langList = [
-        { code: "en-us", label: "English" },
-        { code: "ar", label: "العربية" },
-        { code: "tr-turk", label: "Türkçe" },
-        { code: "zh-cn", label: "简体中文" },
-        { code: "zh-tw", label: "繁體中文" },
-        { code: "fr", label: "Français" },
-        { code: "es", label: "Español" },
-        { code: "de", label: "Deutsch" },
-        { code: "it", label: "Italiano" },
-        { code: "ja", label: "日本語" },
-        { code: "ko", label: "한국어" },
-        { code: "nl", label: "Nederlands" },
-        { code: "pt", label: "Português" },
-        { code: "ru", label: "Русский" },
-        { code: "pl", label: "Polski" },
-        { code: "vi", label: "Tiếng Việt" },
-      ];
+    // MainLayout feeds this straight to Header's lang-list prop. Asserting a
+    // copy of the array proves nothing, so both checks read the shipped module.
+    it("offers English first", () => {
+      expect(languageOptions[0]).toEqual({ code: "en-us", label: "English" });
+    });
 
-      expect(langList).toHaveLength(16);
-      expect(langList[0].code).toBe("en-us");
-      expect(langList[0].label).toBe("English");
+    // The two registries drift silently in both directions: a locale in
+    // localeFileMap but not here builds a chunk nothing can select, and an
+    // option with no file quietly renders English when picked.
+    it("offers exactly the locales the app can load", () => {
+      expect(languageOptions.map((l) => l.code).sort()).toEqual(Object.keys(localeFileMap).sort());
     });
   });
 
