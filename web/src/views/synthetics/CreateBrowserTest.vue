@@ -31,6 +31,14 @@ import type {
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import type { WireStep } from "@/types/synthetics";
+import ReplaySecretPrompt from "@/components/synthetics/variables/ReplaySecretPrompt.vue";
+import type { ResolvedVariable } from "@/components/synthetics/variables/resolved";
+import {
+  mergeReplayVariables,
+  partitionReplaySecrets,
+  secretsNeededForReplay,
+} from "@/components/synthetics/variables/replaySecrets";
 import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
@@ -879,14 +887,69 @@ function validateJourneyBeforeReplay(): boolean {
   return journeyRef.value?.validateStepSelectors?.() ?? true;
 }
 
+/**
+ * The check's resolved set, for deciding which secrets replay has to ask for.
+ *
+ * Empty for an unsaved check, which is correct: with no id there is nothing to
+ * resolve against, and every placeholder is the check's own or unbound.
+ */
+const resolvedVariables = ref<ResolvedVariable[]>([]);
+watch(
+  () => (check.value as any).id,
+  async (id) => {
+    if (!id) {
+      resolvedVariables.value = [];
+      return;
+    }
+    try {
+      const org = store.state.selectedOrganization.identifier;
+      const res = await syntheticsService.resolvedVariables(org, id);
+      resolvedVariables.value = res.data ?? [];
+    } catch {
+      // Costs the prompt, not the replay — an unsupplied secret types as
+      // literal text and the failure names itself on the page.
+      resolvedVariables.value = [];
+    }
+  },
+  { immediate: true },
+);
+
+/** Steps waiting on secret values, held between the prompt and the replay. */
+const pendingReplaySteps = ref<WireStep[] | null>(null);
+const replaySecretNames = ref<string[]>([]);
+const replaySecretPromptOpen = ref(false);
+
 function runReplay(journey: BrowserStep[]) {
   const steps = journeyToWireSteps(journey);
   if (steps.length === 0) return;
+
+  // A shared secret has no value on the client by design, so replay either
+  // asks for it or types the placeholder literally. Ask, once per session.
+  const needed = secretsNeededForReplay(steps, resolvedVariables.value);
+  const { known, missing } = partitionReplaySecrets(needed);
+  if (missing.length > 0) {
+    pendingReplaySteps.value = steps;
+    replaySecretNames.value = missing;
+    replaySecretPromptOpen.value = true;
+    return;
+  }
+  startReplay(steps, known);
+}
+
+function onReplaySecretsSupplied(supplied: Record<string, string>) {
+  const steps = pendingReplaySteps.value;
+  pendingReplaySteps.value = null;
+  if (!steps) return;
+  const { known } = partitionReplaySecrets(replaySecretNames.value);
+  startReplay(steps, { ...known, ...supplied });
+}
+
+function startReplay(steps: WireStep[], secrets: Record<string, string>) {
   recorder
     .replay(
       steps,
       check.value.url,
-      check.value.variables,
+      mergeReplayVariables(check.value.variables ?? [], secrets),
       check.value.auth,
       check.value.headers,
       check.value.cookies,
@@ -1324,4 +1387,9 @@ function onClearResults() {
       <p class="py-2">{{ t("synthetics.newCheck.unsavedBody") }}</p>
     </ODialog>
   </OPageLayout>
+  <ReplaySecretPrompt
+    v-model:open="replaySecretPromptOpen"
+    :names="replaySecretNames"
+    @supplied="onReplaySecretsSupplied"
+  />
 </template>

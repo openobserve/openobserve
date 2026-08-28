@@ -13866,6 +13866,15 @@
     },
     "queryFailed": "Query failed",
     "relationNotContaining": "not containing",
+    "replaySecrets": {
+      "confirm": "Replay",
+      "description": "Replay runs in your browser, so shared secrets cannot be filled in automatically. Enter them to replay with real values.",
+      "remember": "Remember for this session",
+      "rememberHint": "Kept in this tab only, never saved to the browser or sent anywhere.",
+      "skip": "Replay without them",
+      "title": "Values needed for replay",
+      "valuePlaceholder": "Value"
+    },
     "results": {
       "p95Label": "p95",
       "clearFilters": "Clear filters",
