@@ -271,7 +271,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef">
         <div
           ref="histogramRef"
-          dir="ltr"
           :style="histogramPinStyle"
           :class="[
             'histogram-container histogram-container--pinned-x',
@@ -366,7 +365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           :style="histogramPinStyle"
-          dir="ltr"
           :class="[
             'histogram-container histogram-container--pinned-x',
             searchObj.meta.showHistogram
