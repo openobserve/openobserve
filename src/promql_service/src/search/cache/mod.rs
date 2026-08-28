@@ -354,6 +354,10 @@ pub async fn set(
         .map_err(|e| Error::Message(e.to_string()))?;
 
     // store the cache item
+    // held across the insert so a concurrent disk eviction orders after it and prunes the entry
+    let Some(_indexed) = infra::cache::file_data::disk::indexed_file_guard(&cache_key).await else {
+        return Ok(());
+    };
     let cache_item = MetricsIndexCacheItem::new(&cache_key, start, new_end);
     let evicted = insert_index(bucket_id, key, query, cache_item).await;
     if evicted > 0 {
