@@ -141,6 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="gap-1.5"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
+            <OSwitch
+              v-model="searchObj.meta.showHistogram"
+              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+              @click.stop
+            />
             <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
             <OTooltip
               :content="
@@ -149,11 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('search.showHistogramLabel')
               "
               shortcut-id="logsToggleHistogram"
-            />
-            <OSwitch
-              v-model="searchObj.meta.showHistogram"
-              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
-              @click.stop
             />
           </OButton>
 
@@ -166,14 +166,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="gap-1.5"
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
-            <OIcon name="code" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
-            <OTooltip :content="t('search.sqlModeLabel')" />
             <OSwitch
               :model-value="searchObj.meta.sqlMode"
               :disabled="isSqlModeDisabled"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
             />
+            <OIcon name="code" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+            <OTooltip :content="t('search.sqlModeLabel')" />
           </OButton>
 
           <!-- Quick Mode (pinned) -->
@@ -185,8 +185,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="gap-1.5"
             @click="handleQuickMode"
           >
-            <OIcon name="bolt" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
-            <OTooltip :content="t('search.quickModeLabel')" />
             <OSwitch
               :model-value="searchObj.meta.quickMode"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
@@ -196,6 +194,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                gives the switch its own tooltip (the button-level tooltip below
                only covers the bolt icon). -->
             <OTooltip :content="t('search.quickModeLabel')" :side-offset="2" />
+            <OIcon name="bolt" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+            <OTooltip :content="t('search.quickModeLabel')" />
           </OButton>
 
           <!-- Saved Views (pinned) — button group styled to match the function
@@ -840,13 +840,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="element-box-shadow order-1 me-1 gap-1.5"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
-          <span class="text-accent shrink-0 font-mono text-sm font-bold italic">fx</span>
-          <OTooltip :content="t('search.functionEditorLabel')" />
           <OSwitch
             v-model="searchObj.meta.showTransformEditor"
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
+          <span class="text-accent shrink-0 font-mono text-sm font-bold italic">fx</span>
+          <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
         <div class="order-1 me-1">
