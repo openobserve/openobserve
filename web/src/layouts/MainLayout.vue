@@ -493,6 +493,10 @@ export default defineComponent({
         code: "en-us",
       },
       {
+        label: raw("العربية"),
+        code: "ar",
+      },
+      {
         label: raw("Türkçe"),
         code: "tr-turk",
       },

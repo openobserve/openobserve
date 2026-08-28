@@ -18,6 +18,8 @@ import { getLanguage } from "@/utils/cookies";
 // App language codes are not all valid BCP-47, so map them for Intl.NumberFormat.
 export const APP_LOCALE_TO_BCP47: Record<string, string> = {
   "en-us": "en-US",
+  // Arabic telemetry and configuration values use Western 0-9 digits.
+  ar: "ar-SA-u-nu-latn",
   "tr-turk": "tr-TR",
   "zh-cn": "zh-CN",
   "zh-tw": "zh-TW",

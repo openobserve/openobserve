@@ -305,6 +305,15 @@ describe("General", () => {
         true,
       );
     });
+
+    it("isolates the numeric and translated runs in the mixed-direction placeholder", () => {
+      const wrapper = createWrapper();
+      const input = wrapper.get('[data-test="general-settings-max-series-per-query"] input');
+
+      expect(input.attributes("placeholder")).toBe(
+        `\u206640000\u2069 (\u2068system default\u2069)`,
+      );
+    });
   });
 
   describe("Form submission (real OForm)", () => {

@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="activeSectionItem?.icon as any"
         class="border-border-default shrink-0 border-b"
       />
-      <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
+      <ConstrainedPage size="lg" align="start" :padded="false" class="min-h-0 flex-1 px-4 py-3">
         <router-view title="" />
       </ConstrainedPage>
     </div>

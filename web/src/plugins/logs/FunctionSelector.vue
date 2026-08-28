@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OButtonGroup
-    class="function-selector element-box-shadow border-button-outline-border float-left mr-1 border p-0"
+    class="function-selector element-box-shadow border-button-outline-border float-start me-1 border p-0"
   >
     <div v-if="!hideToggle" class="flex items-center px-1">
       <OSwitch
@@ -30,11 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
-          class="ml-1!"
+          class="ms-1!"
           size="icon-toolbar"
         >
           <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
-          <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+          <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
           <OTooltip :content="raw(selectedFunctionTooltip)" :side-offset="2" />
         </OButton>
       </template>

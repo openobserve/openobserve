@@ -755,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-l-solid border-l-card-glass-border h-full overflow-hidden border-l"
+                class="border-s-solid border-s-card-glass-border h-full overflow-hidden border-s"
                 style="width: 40%; min-width: 18.75rem"
               >
                 <TraceDetailsSidebar

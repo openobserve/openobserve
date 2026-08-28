@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="scrape_interval"
               type="number"
               min="0"
-              class="ml-2 w-30!"
+              class="ms-2 w-30!"
               data-test="general-settings-scrape-interval"
             />
             <span class="individual-setting-description text-compact opacity-70">
@@ -61,8 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :min="1000"
               :max="1000000"
-              class="ml-2 w-45!"
-              :placeholder="raw('40000 (' + t('settings.systemDefault') + ')')"
+              class="ms-2 w-45!"
+              :placeholder="maxSeriesPlaceholder"
               data-test="general-settings-max-series-per-query"
             >
               <template v-slot:icon-right>
@@ -83,10 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.manageTheme") }}
             </span>
-            <div class="-ml-15 flex items-center gap-2">
+            <div class="-ms-15 flex items-center gap-2">
               <!-- Light Mode Theme -->
               <div
-                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
+                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Dark Mode Theme -->
               <div
-                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
+                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center gap-2"
           >
             <OInput
-              class="mr-sm w-62.5"
+              class="me-sm w-62.5"
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loadingState"
               variant="outline"
               size="icon-xs-sq"
-              class="ml-2"
+              class="ms-2"
               type="button"
               @click="editingText = !editingText"
               icon-left="edit"
@@ -596,6 +596,7 @@ import {
   watch,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { APP_LOCALE_TO_BCP47 } from "@/locales/numberFormat";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -653,7 +654,7 @@ export default defineComponent({
     OColor,
   },
   setup() {
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
 
     const store = useStore();
     const { isDark } = useTheme();
@@ -667,6 +668,13 @@ export default defineComponent({
       max_series_per_query:
         store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
     }));
+
+    // Unicode isolates keep mixed Arabic text, parentheses, and Western digits in order.
+    const maxSeriesPlaceholder = computed(() => {
+      const numberLocale = APP_LOCALE_TO_BCP47[locale.value] ?? "en-US";
+      const value = new Intl.NumberFormat(numberLocale, { useGrouping: false }).format(40000);
+      return raw(`\u2066${value}\u2069 (\u2068${t("settings.systemDefault")}\u2069)`);
+    });
 
     const loadingState = ref(false);
     const customText = ref("");
@@ -1346,6 +1354,7 @@ export default defineComponent({
       // resolves and validation runs).
       generalSettingsSchema,
       generalSettingsDefaults,
+      maxSeriesPlaceholder,
       saveGeneralSettings,
       files,
       filesLight,

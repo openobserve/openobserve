@@ -1156,6 +1156,7 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
+                        :dir="valueDirection"
                         class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-flex max-w-40 shrink-0 items-center truncate px-2 py-0.5 text-xs leading-none"
                       >
                         {{ labelText }}
@@ -1172,6 +1173,7 @@ const fieldWidthClass = computed(() => {
                 </template>
                 <span
                   v-else
+                  :dir="valueDirection"
                   :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
                   :class="[
                     'text-start',
@@ -1296,6 +1298,7 @@ const fieldWidthClass = computed(() => {
                 <ListboxFilter
                   v-if="inputEnabled"
                   v-model="searchTerm"
+                  :dir="valueDirection"
                   auto-focus
                   :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
                   :class="[
@@ -1526,7 +1529,7 @@ const fieldWidthClass = computed(() => {
                               filteredOptions[vRow.index].subLabelInline
                             "
                           >
-                            <span class="shrink-0 font-medium">{{
+                            <span :dir="valueDirection" class="shrink-0 font-medium">{{
                               filteredOptions[vRow.index].label
                             }}</span>
                             <span class="text-select-placeholder mx-1 shrink-0">–</span>
@@ -1552,6 +1555,7 @@ const fieldWidthClass = computed(() => {
                                      nothing to separate from, and every option in
                                      the list reading bold emphasises nothing. -->
                                 <span
+                                  :dir="valueDirection"
                                   class="truncate"
                                   :class="filteredOptions[vRow.index].subLabel ? 'font-medium' : ''"
                                   :title="
@@ -1611,6 +1615,7 @@ const fieldWidthClass = computed(() => {
                             />
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
                             <span
+                              :dir="valueDirection"
                               class="truncate"
                               :title="optionTooltip ? filteredOptions[vRow.index].label : undefined"
                               >{{ filteredOptions[vRow.index].label }}</span
@@ -1740,6 +1745,7 @@ const fieldWidthClass = computed(() => {
           >
             <SelectValue
               :placeholder="placeholder"
+              :dir="valueDirection"
               :class="[
                 'text-start',
                 isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
@@ -1863,6 +1869,7 @@ const fieldWidthClass = computed(() => {
               <OSelectItem
                 v-for="opt in normalizedOptions"
                 :key="String(opt.value)"
+                :dir="valueDirection"
                 :value="opt.value"
                 :label="opt.label"
                 :disabled="opt.disabled"

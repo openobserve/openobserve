@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Chart Type Selection Sidebar -->
       <div>
         <div
-          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-r"
+          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-e"
         >
           <ChartSelection
             v-model:selectedChartType="dashboardPanelData.data.type"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-r"
+          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-e"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
         >
@@ -398,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-r"
+          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-e"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
         >

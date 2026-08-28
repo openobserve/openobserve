@@ -21,4 +21,15 @@ describe("ODropdownGroup", () => {
     const wrapper = mount(ODropdownGroup);
     expect(wrapper.text().trim()).toBe("");
   });
+
+  it("pushes label actions to logical end in both writing directions", () => {
+    const wrapper = mount(ODropdownGroup, {
+      props: { label: "Actions" },
+      slots: { "label-action": '<button data-testid="action">More</button>' },
+    });
+    const actionWrapper = wrapper.get('[data-testid="action"]').element.parentElement;
+
+    expect(actionWrapper?.classList.contains("ms-auto")).toBe(true);
+    expect(actionWrapper?.classList.contains("ml-auto")).toBe(false);
+  });
 });

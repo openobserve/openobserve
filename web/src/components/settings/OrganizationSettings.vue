@@ -21,6 +21,7 @@
           data-test="settings-org-trace-id-input"
           name="traceIdFieldName"
           :label="t('settings.traceIdFieldName')"
+          input-direction="ltr"
           required
           class="showLabelOnTop py-3"
           :help-text="t('settings.organizationSettings.fieldNameHelp')"
@@ -32,6 +33,7 @@
           data-test="settings-org-span-id-input"
           name="spanIdFieldName"
           :label="t('settings.spanIdFieldName')"
+          input-direction="ltr"
           required
           class="showLabelOnTop py-3"
           :help-text="t('settings.organizationSettings.fieldNameHelp')"

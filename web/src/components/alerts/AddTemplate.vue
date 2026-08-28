@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="bg-card-glass-bg border-border-default flex h-full flex-col overflow-auto border-l px-2 pt-2"
+          class="bg-card-glass-bg border-border-default flex h-full flex-col overflow-auto border-s px-2 pt-2"
         >
           <template v-if="editorMode === 'content'">
             <!--

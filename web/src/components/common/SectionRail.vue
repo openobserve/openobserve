@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          directly above 'Users'. Matches FolderList's heading. -->
     <div
       v-if="title"
-      class="pl-page-edge text-text-heading shrink-0 truncate pt-3 pr-1.5 pb-1 text-sm font-semibold"
+      class="ps-page-edge text-text-heading shrink-0 truncate pe-1.5 pt-3 pb-1 text-sm font-semibold"
     >
       {{ title }}
     </div>
@@ -43,10 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-for="(group, idx) in visibleGroups" :key="group.label">
           <!-- Section label. Each group after the first gets top spacing so the
                sub-sections read as separate blocks rather than one merged list. -->
-          <!-- pl-1.5 (on top of the container's px-1.5) puts the section label on
-               the same 12px item-label grid line as the tabs below it. -->
           <div
-            class="text-text-secondary py-1 pl-1.5 text-xs font-semibold"
+            class="text-text-secondary py-1 ps-1.5 text-xs font-semibold"
             :class="{ 'mt-3': idx > 0 }"
           >
             {{ group.label }}

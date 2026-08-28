@@ -142,6 +142,16 @@ describe("OrganizationSettings", () => {
       expect(wrapper.find('[data-test="settings-org-span-id-input"]').exists()).toBe(true);
     });
 
+    it("keeps machine-readable trace and span identifiers LTR", () => {
+      const wrapper = createWrapper();
+      expect(wrapper.get('[data-test="settings-org-trace-id-input"] input').attributes("dir")).toBe(
+        "ltr",
+      );
+      expect(wrapper.get('[data-test="settings-org-span-id-input"] input').attributes("dir")).toBe(
+        "ltr",
+      );
+    });
+
     it("should render the ingestion + usage stream toggles (data-tests preserved)", () => {
       const wrapper = createWrapper();
       expect(wrapper.find('[data-test="add-toggle-ingestion"]').exists()).toBe(true);

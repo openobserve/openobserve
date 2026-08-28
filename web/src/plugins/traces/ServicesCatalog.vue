@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            rails. The stream selector lives in the top toolbar alongside the
            search. -->
       <div
-        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-r px-1.5 py-2"
+        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-e px-1.5 py-2"
       >
         <!-- Entity-type filter: All / Services / Datastores / Queues /
              External / RPC. A vertical nav rail — same OTabs pattern as the

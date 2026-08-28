@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      OFieldList) so they line up — they're controls, not scrolling
                      surfaces. -->
                 <div
-                  class="relative-position border-border-default bg-surface-panel h-full border-r pt-2.5"
+                  class="relative-position border-border-default bg-surface-panel h-full border-e pt-2.5"
                 >
                   <IndexList
                     v-if="searchObj.meta.showFields"

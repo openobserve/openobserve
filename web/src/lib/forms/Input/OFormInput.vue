@@ -39,6 +39,7 @@ if (import.meta.env.DEV && !form) {
         :debounce="props.debounce"
         :mask="props.mask"
         :autocomplete="props.autocomplete"
+        :input-direction="props.inputDirection"
         :name="props.name"
         :id="props.id"
         :size="props.size"

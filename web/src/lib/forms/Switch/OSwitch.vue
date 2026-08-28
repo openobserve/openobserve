@@ -59,28 +59,37 @@ function toggle() {
 // ── Track sizes ────────────────────────────────────────────────────────────
 // border-2 (2px each side) + p-0.5 (2px each side) = 4px eaten from each dimension
 // thumb = track_height - 4(border) - 4(padding), translate = track_width - 4 - 4 - thumb
-type TrackSize = { track: string; thumb: string; thumbTranslate: string };
+type TrackSize = {
+  track: string;
+  thumb: string;
+  thumbTranslate: string;
+  thumbTranslateRtl: string;
+};
 
 const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
   sm: {
     track: "w-6 h-3.5",
     thumb: "size-1.5",
-    thumbTranslate: "translate-x-2",
+    thumbTranslate: "0.5rem",
+    thumbTranslateRtl: "-0.5rem",
   },
   md: {
     track: "w-7 h-4.5",
     thumb: "size-2.5",
-    thumbTranslate: "translate-x-2.5",
+    thumbTranslate: "0.625rem",
+    thumbTranslateRtl: "-0.625rem",
   },
   lg: {
     track: "w-8 h-5",
     thumb: "size-3",
-    thumbTranslate: "translate-x-3",
+    thumbTranslate: "0.75rem",
+    thumbTranslateRtl: "-0.75rem",
   },
   xl: {
     track: "w-11.5 h-6",
     thumb: "size-4.5",
-    thumbTranslate: "translate-x-5",
+    thumbTranslate: "1.25rem",
+    thumbTranslateRtl: "-1.25rem",
   },
 };
 
@@ -117,6 +126,10 @@ const hasLabel = computed(
       :data-test="parentDataTest ? `${parentDataTest}-btn` : undefined"
       :disabled="disabled"
       :tabindex="inputTabindex"
+      :style="{
+        '--o-switch-thumb-translate': currentSizes.thumbTranslate,
+        '--o-switch-thumb-translate-rtl': currentSizes.thumbTranslateRtl,
+      }"
       :class="[
         'relative inline-flex shrink-0 rounded-full',
         'items-center border-2 p-0.5',
@@ -138,7 +151,7 @@ const hasLabel = computed(
     >
       <span
         :class="[
-          'block rounded-full',
+          'o-switch__thumb block rounded-full',
           'transition-transform duration-200',
           currentSizes.thumb,
           props.disabled
@@ -146,7 +159,7 @@ const hasLabel = computed(
             : isChecked
               ? 'bg-white'
               : 'bg-switch-thumb-off',
-          isChecked ? currentSizes.thumbTranslate : 'translate-x-0',
+          isChecked ? 'o-switch__thumb--checked' : 'translate-x-0',
         ]"
       />
     </button>
@@ -174,3 +187,10 @@ const hasLabel = computed(
     </span>
   </div>
 </template>
+
+<style scoped>
+/* RTL reverses the size-specific checked-thumb offset in the global stylesheet. */
+.o-switch__thumb--checked {
+  transform: translateX(var(--o-switch-thumb-translate));
+}
+</style>

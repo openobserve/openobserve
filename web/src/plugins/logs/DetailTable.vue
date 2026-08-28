@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OTabs>
       </div>
-      <div class="flex shrink-0 items-center gap-2 pr-3">
+      <div class="flex shrink-0 items-center gap-2 pe-3">
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
@@ -139,13 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-field="{ value }">
                 <!-- `log-key` (assets/styles/log-highlighting.css) is the same class the
                      JSON tab puts on its keys, so both tabs stay one color in both themes. -->
-                <div :data-test="`log-detail-${value}-key`" class="log-key text-left">
+                <div :data-test="`log-detail-${value}-key`" class="log-key text-start" dir="ltr">
                   {{ value }}
                 </div>
               </template>
 
               <template #cell-value="{ row }">
-                <div class="text-left" :class="!shouldWrapValues ? 'ellipsis' : ''">
+                <div class="text-start" dir="auto" :class="!shouldWrapValues ? 'ellipsis' : ''">
                   <div class="flex items-start gap-2">
                     <ODropdown
                       v-model:open="tableDropdownOpenMap[row.field]"
@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-            ><OIcon name="navigate-before" size="sm" class="mr-1" />{{
+            ><OIcon name="navigate-before" size="sm" class="me-1" />{{
               t("common.previous")
             }}</OButton
           >
@@ -451,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-            >{{ t("common.next") }}<OIcon name="navigate-next" size="sm" class="ml-1"
+            >{{ t("common.next") }}<OIcon name="navigate-next" size="sm" class="ms-1"
           /></OButton>
         </div>
       </div>
@@ -1158,14 +1158,14 @@ export default defineComponent({
 .o2-schema-table :deep(thead th),
 .o2-schema-table :deep(tbody td) {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
-  border-right: 1px solid var(--color-card-glass-border);
+  border-inline-end: 1px solid var(--color-card-glass-border);
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-card-glass-border);
 }
 
 .o2-schema-table :deep(thead th:last-child),
 .o2-schema-table :deep(tbody td:last-child) {
-  border-right: none;
+  border-inline-end: none;
 }
 
 .o2-schema-table :deep(tbody tr:last-child td) {

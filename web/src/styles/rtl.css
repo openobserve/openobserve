@@ -1,0 +1,31 @@
+/* Direction-sensitive primitives shared by every right-to-left locale. */
+
+/* Mirror only the SVG so wrapper transforms continue to compose. */
+[dir="rtl"] [data-rtl-mirror="true"] > svg {
+  transform: scaleX(-1);
+}
+
+/* RTL switches use the negative size-specific offset supplied by OSwitch. */
+[dir="rtl"] .o-switch__thumb--checked {
+  transform: translateX(var(--o-switch-thumb-translate-rtl)) !important;
+}
+
+/* Machine-readable content remains isolated LTR inside RTL pages. */
+[dir="rtl"] pre,
+[dir="rtl"] code,
+[dir="rtl"] kbd,
+[dir="rtl"] samp,
+[dir="rtl"] .monaco-editor,
+[dir="rtl"] .monaco-editor * {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+}
+
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="url"],
+[dir="rtl"] input[type="tel"] {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+}

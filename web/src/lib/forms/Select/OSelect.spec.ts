@@ -34,6 +34,34 @@ describe("OSelect", () => {
     expect(wrapper.find("button").exists()).toBe(true);
   });
 
+  it("isolates a technical selected value without changing the trigger direction", () => {
+    wrapper = mount(OSelect, {
+      props: {
+        modelValue: "arabic_demo",
+        options: [{ label: "arabic_demo", value: "arabic_demo" }],
+        valueDirection: "ltr",
+      },
+    });
+
+    const trigger = wrapper.find('button[role="combobox"]');
+    const value = trigger.find('span[dir="ltr"]');
+    expect(trigger.attributes("dir")).toBeUndefined();
+    expect(value.text()).toBe("arabic_demo");
+  });
+
+  it("isolates technical values rendered as multi-select chips", () => {
+    wrapper = mount(OSelect, {
+      props: {
+        multiple: true,
+        modelValue: ["arabic_demo"],
+        options: [{ label: "arabic_demo", value: "arabic_demo" }],
+        valueDirection: "ltr",
+      },
+    });
+
+    expect(wrapper.get('button[role="combobox"] span[dir="ltr"]').text()).toBe("arabic_demo");
+  });
+
   it("shows placeholder text when no value is selected", () => {
     // searchable: false forces the native SelectRoot branch where reka-ui's
     // SelectValue renders the placeholder prop correctly in JSDOM. The listbox

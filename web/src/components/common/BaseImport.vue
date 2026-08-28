@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :horizontal="false"
         >
           <template #before>
-            <div class="border-border-default flex h-full w-full flex-col border-r">
+            <div class="border-border-default flex h-full w-full flex-col border-e">
               <!-- Tabs Section -->
               <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
                 <div class="app-tabs-container h-9 w-fit">

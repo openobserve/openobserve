@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="icon-xs-sq"
-          class="ml-1.5 shrink-0"
+          class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="toggleFieldList"
         >
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <div
-          class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 pl-2 text-left"
+          class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 ps-2 text-start"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-start"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex flex-none items-center justify-end gap-1 pr-2">
+        <div class="flex flex-none items-center justify-end gap-1 pe-2">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -271,6 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef">
         <div
           ref="histogramRef"
+          dir="ltr"
           :style="histogramPinStyle"
           :class="[
             'histogram-container histogram-container--pinned-x',
@@ -365,6 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           :style="histogramPinStyle"
+          dir="ltr"
           :class="[
             'histogram-container histogram-container--pinned-x',
             searchObj.meta.showHistogram
@@ -2622,7 +2624,7 @@ export default defineComponent({
 .oo-pin-tooltip__count {
   font-weight: 600;
   min-width: 2rem;
-  text-align: right;
+  text-align: end;
   transition: opacity 0.1s;
 }
 
@@ -2630,7 +2632,7 @@ export default defineComponent({
   display: flex;
   gap: 0.1875rem;
   flex-shrink: 0;
-  margin-left: 0.25rem;
+  margin-inline-start: 0.25rem;
 }
 
 .oo-pin-tooltip__action {

@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="false"
       >
         <template #before>
-          <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
+          <div class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{

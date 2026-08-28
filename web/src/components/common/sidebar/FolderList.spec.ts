@@ -188,6 +188,12 @@ describe("FolderList.vue", () => {
       const name = wrapper.find('[data-test^="dashboard-folder-name-"]');
       expect(name.classes()).toContain("flex-1");
       expect(name.classes()).toContain("truncate");
+      expect(name.classes()).toContain("text-start");
+    });
+
+    it("draws the rail divider on logical end", () => {
+      expect(wrapper.find(".border-e").exists()).toBe(true);
+      expect(wrapper.find(".border-r").exists()).toBe(false);
     });
   });
 

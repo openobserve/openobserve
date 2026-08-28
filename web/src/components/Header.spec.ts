@@ -873,6 +873,31 @@ describe("Header Component", () => {
       expect(wrapper.props("langList")[0].code).toBe("en-us");
     });
 
+    it("should position and align the language submenu with logical RTL-safe utilities", async () => {
+      const languageWrapper = createWrapper({
+        stubsOverrides: {
+          ODropdown: {
+            template: '<div><slot name="trigger" /><slot /></div>',
+          },
+        },
+      });
+
+      languageWrapper.vm.showLanguageSubmenu = true;
+      await languageWrapper.vm.$nextTick();
+
+      const submenu = languageWrapper.find('[data-test="language-dropdown-item"]');
+      expect(submenu.exists()).toBe(true);
+      expect(submenu.classes()).toContain("end-full");
+      expect(submenu.classes()).toContain("me-1");
+      expect(submenu.classes()).not.toContain("right-full");
+      expect(submenu.classes()).not.toContain("mr-1");
+
+      const languageOption = submenu.find("button");
+      expect(languageOption.classes()).toContain("text-start");
+
+      languageWrapper.unmount();
+    });
+
     it("should have access to current language from cookies", () => {
       // Verify that getLanguage can be called (it's mocked to return "en-us")
       const currentLang = cookies.getLanguage();

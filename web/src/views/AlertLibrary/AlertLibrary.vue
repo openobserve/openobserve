@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="flex min-h-0 flex-1">
-        <div class="w-rail border-border-default h-full shrink-0 border-r">
+        <div class="w-rail border-border-default h-full shrink-0 border-e">
           <LibraryRail
             :categories="categoryFacets"
             :selected-categories="selectedCategories"

@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="bg-surface-panel border-border-default flex h-full w-full flex-col border-r">
+  <div class="bg-surface-panel border-border-default flex h-full w-full flex-col border-e">
     <div class="px-page-edge my-3 flex shrink-0 items-center justify-between">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton

@@ -120,6 +120,8 @@ export interface SelectProps {
   required?: boolean;
   /** Placeholder text shown when no value is selected */
   placeholder?: I18nText;
+  /** Direction of option values without changing the surrounding field. */
+  valueDirection?: "ltr" | "rtl" | "auto";
   /** Error message — when truthy the field shows error styling */
   errorMessage?: I18nText;
   /** Marks the field in error state without a message */

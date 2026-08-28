@@ -3,7 +3,7 @@
     <div class="copy-log-btn flex justify-start px-3 pb-1">
       <AppTabs
         v-if="filteredTabs.length"
-        class="border-card-glass-border rounded-default mr-2 mb-1.5 h-fit overflow-hidden border-t border-r border-l border-solid"
+        class="border-card-glass-border rounded-default me-2 mb-1.5 h-fit overflow-hidden border border-b-0 border-solid"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -14,9 +14,9 @@
         :label="t('common.copyToClipboard')"
         size="xs"
         variant="outline"
-        class="mr-2 mb-1.5"
+        class="me-2 mb-1.5"
         @click="copyLogToClipboard"
-        ><OIcon name="content-copy" size="xs" class="mr-1" />{{
+        ><OIcon name="content-copy" size="xs" class="me-1" />{{
           t("common.copyToClipboard")
         }}</OButton
       >
@@ -24,11 +24,11 @@
         v-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
-        class="mr-2 mb-1.5"
+        class="me-2 mb-1.5"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <OIcon name="link" size="xs" class="mr-1" />{{ t("search.viewRelated") }}
+        <OIcon name="link" size="xs" class="me-1" />{{ t("search.viewRelated") }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <!-- Stream picker and its action read as one control, sized to sit level
@@ -58,7 +58,7 @@
         >
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="pl-3">
+    <div v-show="activeTab === 'unflattened'" class="ps-3" dir="ltr">
       <OSpinner size="md" />
       <div v-if="!loading">
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
@@ -76,7 +76,7 @@
         <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
-    <div v-show="activeTab !== 'unflattened'" class="pl-3">
+    <div v-show="activeTab !== 'unflattened'" class="ps-3" dir="ltr">
       {
       <div
         class="log_json_content flex font-mono text-xs whitespace-pre-wrap"
@@ -95,7 +95,7 @@
               data-test="log-details-include-exclude-field-btn"
               size="xs"
               variant="ghost"
-              class="ml-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+              class="ms-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
               :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -172,7 +172,7 @@
           </ODropdownItem>
         </ODropdown>
 
-        <span class="pl-1" :data-test="`log-expand-detail-key-${key}`">
+        <span class="ps-1" :data-test="`log-expand-detail-key-${key}`">
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
           ><span
@@ -192,6 +192,7 @@
       }
       <div
         v-if="showMenu"
+        dir="auto"
         class="context-menu rounded-default [font-size: var(--text-compact)] bg-surface-overlay border-border-default text-text-body min-w-50 border py-1 shadow-lg"
         :style="{
           position: 'fixed',
@@ -204,7 +205,7 @@
           class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
           @click="copySelectedText"
         >
-          <OIcon name="content-copy" size="sm" class="mr-2" />
+          <OIcon name="content-copy" size="sm" class="me-2" />
           {{ t("logs.jsonPreview.copy") }}
         </div>
         <div
@@ -213,7 +214,7 @@
         >
           <img
             :src="regexIconForContextMenu"
-            class="mr-2"
+            class="me-2"
             style="width: 0.875rem; height: 0.875rem"
             alt=""
           />

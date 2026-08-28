@@ -114,6 +114,49 @@ describe("ONavGroup", () => {
     expect(flyout().exists()).toBe(true);
   });
 
+  it("positions the flyout after the rail in LTR", async () => {
+    document.documentElement.dir = "ltr";
+    wrapper = mountGroup();
+    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+      left: 10,
+      right: 98,
+      top: 40,
+      bottom: 100,
+      width: 88,
+      height: 60,
+      x: 10,
+      y: 40,
+      toJSON: () => ({}),
+    });
+
+    await hoverOpen();
+
+    expect(flyout().attributes("style")).toContain("left: 102px");
+    expect(flyout().attributes("style")).not.toContain("right:");
+  });
+
+  it("positions the flyout before the right-hand rail in RTL", async () => {
+    document.documentElement.dir = "rtl";
+    wrapper = mountGroup();
+    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+      left: window.innerWidth - 88,
+      right: window.innerWidth,
+      top: 40,
+      bottom: 100,
+      width: 88,
+      height: 60,
+      x: window.innerWidth - 88,
+      y: 40,
+      toJSON: () => ({}),
+    });
+
+    await hoverOpen();
+
+    expect(flyout().attributes("style")).toContain("right: 92px");
+    expect(flyout().attributes("style")).not.toContain("left:");
+    document.documentElement.dir = "ltr";
+  });
+
   // The Infra tile holds ONE child (Database Monitoring) behind the
   // `databaseMonitoring` runtime gate. Rendering the tile regardless of its
   // children would leave a dead "Infra" entry on every build with the feature

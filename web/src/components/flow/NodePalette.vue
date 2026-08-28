@@ -71,7 +71,7 @@ export default {
 
 <template>
   <div
-    class="np-sidebar bg-surface-panel border-border-default flex h-full w-44 shrink-0 flex-col border-r"
+    class="np-sidebar bg-surface-panel border-border-default flex h-full w-44 shrink-0 flex-col border-e"
     :data-test="testPrefix"
   >
     <div class="np-body min-h-0 flex-1 overflow-y-auto px-1.5 py-2">

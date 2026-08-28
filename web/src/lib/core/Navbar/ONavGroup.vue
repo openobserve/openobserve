@@ -42,7 +42,7 @@ const openGroupKey = moduleRef<string | null>(null);
  * does not render (see `hasVisibleChildren`), so a fully-gated section leaves no
  * empty tile behind. It is
  * teleported to <body> (escapes the rail's overflow clip), styled like O2's
- * native dropdown, and positioned flush against the rail's right edge.
+ * native dropdown, and positioned against the rail's content-facing edge.
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
@@ -293,10 +293,13 @@ async function positionFlyout() {
   const rect = wrapper.getBoundingClientRect();
   // Small breathing gap between the rail and the flyout so they don't touch.
   const GAP = 4;
-  const left = rect.right + GAP;
+  const isRtl = document.documentElement.dir === "rtl";
+  const horizontalPosition: Record<string, string> = isRtl
+    ? { right: `${window.innerWidth - rect.left + GAP}px` }
+    : { left: `${rect.right + GAP}px` };
   flyoutStyle.value = {
     position: "fixed",
-    left: `${left}px`,
+    ...horizontalPosition,
     top: `${rect.top}px`,
     zIndex: "6000",
   };

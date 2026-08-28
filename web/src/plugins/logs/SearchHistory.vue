@@ -25,7 +25,7 @@
       <div
         class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2"
       >
-        <OIcon name="info" class="mr-1" size="sm" />
+        <OIcon name="info" class="me-1" size="sm" />
         <div>
           {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
         </div>
@@ -107,7 +107,7 @@
           </div>
           <div v-show="activeTab === 'query'">
             <div
-              class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-left"
+              class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-start"
             >
               <div class="flex items-center gap-2 py-2">
                 <strong
@@ -120,7 +120,7 @@
                       data-test="search-history-copy-sql-btn"
                       variant="outline"
                       size="icon-chip"
-                      class="ml-2"
+                      class="ms-2"
                       @click.stop="
                         copyToClipboard(row.sql, t, {
                           successMessage: t('logs.searchHistory.sqlQueryCopied'),
@@ -160,7 +160,7 @@
               </div>
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                  class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
                            as the dashboard Query Inspector. Falls back to plain
@@ -181,7 +181,7 @@
             </div>
             <div
               v-if="row?.function"
-              class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-left"
+              class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-start"
             >
               <div class="flex items-center py-2">
                 <strong
@@ -192,7 +192,7 @@
                       data-test="search-history-copy-function-btn"
                       variant="outline"
                       size="icon-chip"
-                      class="ml-2"
+                      class="ms-2"
                       @click.stop="
                         copyToClipboard(row.function, t, {
                           successMessage: t('logs.searchHistory.functionDefinitionCopied'),
@@ -206,7 +206,7 @@
 
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                  class="border-border-default border-s-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <pre
                     v-if="colorizedFunction[row.uuid]"
@@ -245,10 +245,10 @@
 
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="mr-md flex w-25 items-center text-xs font-normal">
+            <div class="me-4 flex w-25 items-center text-xs font-normal">
               {{ resultTotal }} {{ t("search_history.results") }}
             </div>
-            <div class="mr-2 ml-auto">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
+            <div class="ms-auto me-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
           </div>
         </template>
       </OTable>
@@ -267,7 +267,7 @@
           {{ t("logs.index.searchHistoryNotEnabled") }}
         </div>
         <div class="mt-2 flex items-center justify-center opacity-80">
-          <OIcon name="info" class="mr-1" size="md" />
+          <OIcon name="info" class="me-1" size="md" />
           <span class="text-center text-xl font-semibold">
             {{ t("logs.index.enableUsageReporting") }}</span
           >

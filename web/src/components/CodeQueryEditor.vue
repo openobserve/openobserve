@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative flex h-full w-full flex-col" v-bind="$attrs">
+  <div class="relative flex h-full w-full flex-col" dir="ltr" v-bind="$attrs">
     <div
       data-test="query-editor"
       class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"

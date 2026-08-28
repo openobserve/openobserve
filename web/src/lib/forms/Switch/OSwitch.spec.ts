@@ -63,6 +63,16 @@ describe("OSwitch", () => {
     expect(wrapper.emitted("update:modelValue")![0][0]).toBe(true);
   });
 
+  it("provides mirrored checked-thumb offsets for RTL", () => {
+    wrapper = mount(OSwitch, { props: { modelValue: true } });
+    const track = wrapper.find('[role="switch"]');
+    const thumb = track.find("span");
+
+    expect(track.attributes("style")).toContain("--o-switch-thumb-translate: 0.625rem");
+    expect(track.attributes("style")).toContain("--o-switch-thumb-translate-rtl: -0.625rem");
+    expect(thumb.classes()).toContain("o-switch__thumb--checked");
+  });
+
   it("renders correctly with lg size and still toggles", async () => {
     wrapper = mount(OSwitch, { props: { size: "lg", modelValue: false } });
     expect(wrapper.find("button").exists()).toBe(true);

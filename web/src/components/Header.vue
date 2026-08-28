@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
-    <div class="flex shrink-0 items-center justify-start pl-3">
+    <div class="hidden shrink-0 items-center justify-start ps-3 sm:flex">
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
       <!-- Shows custom logo/text if configured in enterprise mode -->
       <div
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :href="homeUrl"
           @click.prevent="goToHome"
-          class="mr-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
+          class="me-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
           >{{ store.state.zoConfig.custom_logo_text }}</a
         >
 
@@ -133,10 +133,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-w-0 flex-1" />
 
     <!-- RIGHT SIDE: Controls -->
-    <div class="flex shrink-0 items-center justify-end gap-1 pr-3">
+    <div class="flex min-w-0 shrink-0 items-center justify-end gap-1 pe-3">
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
-        class="mr-4 flex items-center gap-1"
+        class="me-4 flex items-center gap-1"
         v-if="store.state.organizationData.quotaThresholdMsg"
       >
         <div type="warning" icon="cloud" class="bg-status-warning-bg rounded-default inline p-1.25">
@@ -179,28 +179,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- EDITION BADGE / UPGRADE BUTTON -->
         <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
         <!-- Open Source: primary CTA to drive upgrades -->
-        <OButton
-          :variant="
-            config.isEnterprise === 'true' || config.isCloud === 'true'
-              ? 'outline-primary'
-              : 'primary'
-          "
-          size="xs"
-          data-test="upgrade-to-enterprise-btn"
-          @click="openEnterpriseDialog"
-        >
-          <template #icon-left>
-            <OIcon
-              :name="
-                config.isEnterprise === 'true' || config.isCloud === 'true'
-                  ? 'verified'
-                  : 'card-giftcard'
-              "
-              size="sm"
-            />
-          </template>
-          {{ enterpriseButtonText }}
-        </OButton>
+        <div class="hidden lg:block">
+          <OButton
+            :variant="
+              config.isEnterprise === 'true' || config.isCloud === 'true'
+                ? 'outline-primary'
+                : 'primary'
+            "
+            size="xs"
+            data-test="upgrade-to-enterprise-btn"
+            @click="openEnterpriseDialog"
+          >
+            <template #icon-left>
+              <OIcon
+                :name="
+                  config.isEnterprise === 'true' || config.isCloud === 'true'
+                    ? 'verified'
+                    : 'card-giftcard'
+                "
+                size="sm"
+              />
+            </template>
+            {{ enterpriseButtonText }}
+          </OButton>
+        </div>
 
         <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
         <OrganizationSelector
@@ -241,63 +243,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ThemeSwitcher></ThemeSwitcher>
 
           <!-- SLACK COMMUNITY LINK -->
-          <OButton
-            variant="ghost"
-            size="icon-toolbar"
-            data-test="menu-link-slack-item"
-            @click="openSlack"
-          >
-            <component :is="slackIcon" class="size-5 shrink-0" />
-            <OTooltip side="top" align="center" :content="raw('Slack')" />
-          </OButton>
+          <div class="hidden sm:block">
+            <OButton
+              variant="ghost"
+              size="icon-toolbar"
+              data-test="menu-link-slack-item"
+              @click="openSlack"
+            >
+              <component :is="slackIcon" class="size-5 shrink-0" />
+              <OTooltip side="top" align="center" :content="raw('Slack')" />
+            </OButton>
+          </div>
 
           <!-- HELP MENU: Contains links to docs, API, and about page -->
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
-                <OIcon name="help-outline" size="sm" class="size-5!" />
-                <OTooltip side="top" align="center" :content="t('menu.help')" />
-              </OButton>
-            </template>
-            <div class="header-menu-bar min-w-62.5">
-              <!-- OpenAPI link (only for non-cloud deployments) -->
-              <template
-                v-if="
-                  config.isCloud !== 'true' &&
-                  !store.state.zoConfig?.custom_hide_menus?.split(',')?.includes('openapi')
-                "
-              >
-                <ODropdownItem
-                  data-test="menu-link-openapi-item"
-                  @select="navigateToOpenAPI(zoBackendUrl)"
+          <div class="hidden sm:block">
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
+                  <OIcon name="help-outline" size="sm" class="size-5!" />
+                  <OTooltip side="top" align="center" :content="t('menu.help')" />
+                </OButton>
+              </template>
+              <div class="header-menu-bar min-w-62.5">
+                <!-- OpenAPI link (only for non-cloud deployments) -->
+                <template
+                  v-if="
+                    config.isCloud !== 'true' &&
+                    !store.state.zoConfig?.custom_hide_menus?.split(',')?.includes('openapi')
+                  "
                 >
-                  {{ raw("OpenAPI") }}
+                  <ODropdownItem
+                    data-test="menu-link-openapi-item"
+                    @select="navigateToOpenAPI(zoBackendUrl)"
+                  >
+                    {{ raw("OpenAPI") }}
+                  </ODropdownItem>
+                  <ODropdownSeparator />
+                </template>
+
+                <!-- Documentation link -->
+                <ODropdownItem data-test="menu-link-docs-item" @select="navigateToDocs()">
+                  {{ t(`menu.docs`) }}
                 </ODropdownItem>
                 <ODropdownSeparator />
-              </template>
 
-              <!-- Documentation link -->
-              <ODropdownItem data-test="menu-link-docs-item" @select="navigateToDocs()">
-                {{ t(`menu.docs`) }}
-              </ODropdownItem>
-              <ODropdownSeparator />
+                <!-- Keyboard shortcuts -->
+                <ODropdownItem
+                  data-test="menu-link-shortcuts-item"
+                  shortcut-id="openCheatsheet"
+                  @select="openShortcuts"
+                >
+                  {{ t("menu.keyboardShortcuts") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
 
-              <!-- Keyboard shortcuts -->
-              <ODropdownItem
-                data-test="menu-link-shortcuts-item"
-                shortcut-id="openCheatsheet"
-                @select="openShortcuts"
-              >
-                {{ t("menu.keyboardShortcuts") }}
-              </ODropdownItem>
-              <ODropdownSeparator />
-
-              <!-- About page link -->
-              <ODropdownItem data-test="menu-link-about-item" @select="goToAbout">
-                {{ t(`menu.about`) }}
-              </ODropdownItem>
-            </div>
-          </ODropdown>
+                <!-- About page link -->
+                <ODropdownItem data-test="menu-link-about-item" @select="goToAbout">
+                  {{ t(`menu.about`) }}
+                </ODropdownItem>
+              </div>
+            </ODropdown>
+          </div>
 
           <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
           <ODropdown
@@ -358,10 +364,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OIcon size="xs" name="chevron-right" />
 
-                <!-- Submenu — absolutely positioned to the left of parent dropdown -->
                 <div
                   v-if="showLanguageSubmenu"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"
+                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"
                   data-test="language-dropdown-item"
                   @click.stop
                 >
@@ -370,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="lang.code"
                     type="button"
                     :data-test="`language-dropdown-item-${lang.code}`"
-                    class="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left text-sm leading-[1.2] text-inherit"
+                    class="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-start text-sm leading-[1.2] text-inherit"
                     :class="[
                       'hover:bg-dropdown-item-hover-bg',
                       { 'font-semibold': selectedLanguage.code === lang.code },

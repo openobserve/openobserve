@@ -25,7 +25,7 @@ vi.mock("@/utils/cookies", () => ({
 }));
 
 import { getNumberLocale, APP_LOCALE_TO_BCP47 } from "@/locales/numberFormat";
-import { localeFileMap } from "@/locales";
+import { applyDocumentLocale, isRtlLocale, localeFileMap } from "@/locales";
 
 describe("locale registry stays in sync", () => {
   // locales/index.ts code-splits via import.meta.glob("./languages/*.json"), so
@@ -62,6 +62,7 @@ describe("getNumberLocale (locale format unit)", () => {
   it("maps app language codes to valid BCP-47 tags", () => {
     const cases: Array<[string, string]> = [
       ["en-us", "en-US"],
+      ["ar", "ar-SA-u-nu-latn"],
       ["tr-turk", "tr-TR"],
       ["zh-cn", "zh-CN"],
       ["zh-tw", "zh-TW"],
@@ -99,5 +100,32 @@ describe("getNumberLocale (locale format unit)", () => {
       maximumFractionDigits: 2,
     }).format(1234567.89);
     expect(en).toBe("1,234,567.89");
+  });
+
+  it("keeps Western digits for the Arabic UI", () => {
+    (getLanguage as any).mockReturnValue("ar");
+    const ar = new Intl.NumberFormat(getNumberLocale(), {
+      useGrouping: false,
+    }).format(1234567890);
+
+    expect(ar).toBe("1234567890");
+  });
+});
+
+describe("applyDocumentLocale", () => {
+  it("identifies only registered RTL locales", () => {
+    expect(isRtlLocale("ar")).toBe(true);
+    expect(isRtlLocale("en-us")).toBe(false);
+    expect(isRtlLocale("fr")).toBe(false);
+  });
+
+  it.each([
+    ["ar", "ar-SA", "rtl"],
+    ["fr", "fr-FR", "ltr"],
+    ["unknown", "en-US", "ltr"],
+  ])("sets %s document attributes", (locale, language, direction) => {
+    applyDocumentLocale(locale);
+    expect(document.documentElement.lang).toBe(language);
+    expect(document.documentElement.dir).toBe(direction);
   });
 });

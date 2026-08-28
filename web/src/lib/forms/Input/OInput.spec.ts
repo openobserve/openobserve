@@ -27,6 +27,15 @@ describe("OInput", () => {
     expect(wrapper.find("input").exists()).toBe(false);
   });
 
+  it("can isolate a technical value direction without changing its label", () => {
+    wrapper = mount(OInput, {
+      props: { label: "اسم الحقل", modelValue: "trace_id", inputDirection: "ltr" },
+    });
+
+    expect(wrapper.get("input").attributes("dir")).toBe("ltr");
+    expect(wrapper.get("label").attributes("dir")).toBeUndefined();
+  });
+
   it("renders label when prop is provided", () => {
     wrapper = mount(OInput, { props: { label: "Username" } });
     expect(wrapper.find("label").text()).toBe("Username");

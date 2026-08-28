@@ -101,7 +101,7 @@
             </div>
             <div
               v-if="$slots['field-actions']"
-              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg invisible absolute top-1/2 right-1 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] group-hover:visible group-hover:opacity-100"
+              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg invisible absolute end-1 top-1/2 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] group-hover:visible group-hover:opacity-100"
             >
               <slot name="field-actions" :row="row" :index="row._index" />
             </div>
@@ -423,6 +423,6 @@ defineExpose({ scrollToTop });
 }
 .o-field-list__actions > :deep(*:not(:first-child)) {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel chip separator must not scale with text or it smears at fractional zoom */
-  border-left: 1px solid var(--color-field-list-actions-border) !important;
+  border-inline-start: 1px solid var(--color-field-list-actions-border) !important;
 }
 </style>

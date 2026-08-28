@@ -326,6 +326,7 @@ const wrapperClasses = computed(() => [
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
         :autocomplete="autocomplete"
+        :dir="inputDirection"
         :tabindex="inputTabindex"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
@@ -365,6 +366,7 @@ const wrapperClasses = computed(() => [
         :autofocus="autofocus"
         :maxlength="maxlength"
         :autocomplete="autocomplete"
+        :dir="inputDirection"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
         :aria-describedby="describedBy"

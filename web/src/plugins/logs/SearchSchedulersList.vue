@@ -111,14 +111,14 @@
             <div class="app-tabs-schedule-list h-fit w-fit px-4 py-2">
               <AppTabs
                 data-test="expanded-list-tabs"
-                class="mr-3"
+                class="me-3"
                 :tabs="tabs"
                 v-model:active-tab="activeTab"
               />
             </div>
             <div v-if="activeTab == 'query'">
               <div
-                class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-left"
+                class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-start"
               >
                 <div class="flex items-center gap-2 py-2">
                   <strong
@@ -127,7 +127,7 @@
                       <OButton
                         variant="outline"
                         size="icon-chip"
-                        class="ml-2"
+                        class="ms-2"
                         data-test="search-scheduler-copy-sql-btn"
                         @click.stop="
                           copyToClipboard(row.sql, t, {
@@ -151,7 +151,7 @@
                 </div>
                 <div class="flex items-start justify-center">
                   <div
-                    class="border-border-default border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                    class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                   >
                     <!-- Monaco-colorized SQL (sanitized in colorizeRow). Falls
                            back to plain text before colorize resolves / if it throws. -->
@@ -170,7 +170,7 @@
               </div>
               <div
                 v-if="row?.function"
-                class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-left"
+                class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-start"
               >
                 <div class="flex items-center gap-2 py-2">
                   <strong
@@ -180,7 +180,7 @@
                         data-test="search-scheduler-copy-function-btn"
                         variant="outline"
                         size="icon-chip"
-                        class="ml-2"
+                        class="ms-2"
                         @click.stop="
                           copyToClipboard(row.function, t, {
                             successMessage: t('logs.searchSchedulersList.functionDefinitionCopied'),
@@ -194,7 +194,7 @@
 
                 <div class="flex items-start justify-center">
                   <div
-                    class="border-border-default border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                    class="border-border-default border-s-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                   >
                     <pre
                       v-if="colorizedFunction[row.trace_id]"
@@ -212,7 +212,7 @@
             </div>
             <div class="py-3" v-else>
               <div
-                class="mb-2 flex max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] flex-col overflow-hidden px-4 py-0 text-left"
+                class="mb-2 flex max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] flex-col overflow-hidden px-4 py-0 text-start"
               >
                 <QueryEditor
                   style="height: 8.125rem"
@@ -229,10 +229,10 @@
           </template>
           <template #bottom>
             <div class="flex h-12 w-full items-center justify-between">
-              <div class="mr-md flex w-25 items-center text-xs font-normal">
+              <div class="me-4 flex w-25 items-center text-xs font-normal">
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
-              <div class="mr-2 ml-auto">
+              <div class="ms-auto me-2">
                 {{ t("search_scheduler_job.max_limit") }} :
                 <b>1000</b>
               </div>

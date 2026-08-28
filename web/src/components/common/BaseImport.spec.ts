@@ -148,6 +148,7 @@ describe("BaseImport.vue", () => {
       // OSplitter stub renders with data-test="o-splitter-stub"
       // Check that the before-slot content (tabs section) is present
       expect(wrapper.find('[data-test="o-splitter-stub"]').exists()).toBe(true);
+      expect(wrapper.find(".border-e").exists()).toBe(true);
     });
 
     it("does not render splitter when showSplitter is false", () => {

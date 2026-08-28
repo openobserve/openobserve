@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="min-h-0 flex-1 overflow-hidden"
     >
       <template #before>
-        <div class="border-r4 border-border-default flex h-full flex-col border-r">
+        <div class="border-r4 border-border-default flex h-full flex-col border-e">
           <div class="sticky top-0 shrink-0 px-2">
             <div class="flex items-center justify-between p-2 text-lg">
               <span class="flex items-center gap-1">

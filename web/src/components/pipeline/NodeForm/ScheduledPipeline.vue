@@ -711,7 +711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></div>
           </template>
           <template #after>
-            <div class="border-border-default flex h-full w-full flex-col border-l">
+            <div class="border-border-default flex h-full w-full flex-col border-s">
               <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
               <div
                 class="w-full flex-1 overflow-auto"

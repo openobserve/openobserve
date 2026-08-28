@@ -5,7 +5,7 @@
 -->
 
 <template>
-  <div class="relative flex w-full flex-col outline-transparent" :style="rootStyle">
+  <div class="relative flex w-full flex-col outline-transparent" dir="ltr" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
     <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
@@ -38,6 +38,7 @@
       <template v-else>
         <OInput
           v-model="aiInputText"
+          input-direction="auto"
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
           :class="aiInputFieldClass"
           :data-test="`${dataTestPrefix}-ai-input-field`"

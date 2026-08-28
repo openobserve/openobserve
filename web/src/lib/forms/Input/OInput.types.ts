@@ -83,6 +83,8 @@ export interface InputProps {
   name?: string;
   /** HTML autocomplete */
   autocomplete?: string;
+  /** Direction of the editable value without changing its label. */
+  inputDirection?: "ltr" | "rtl" | "auto";
   /**
    * Semantic field width — controls how wide the component renders.
    * Defaults to `"full"` (fills the container).

@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-surface bg-surface-subtle border-card-glass-border mb-4 flex items-center gap-2 border border-solid p-2.5"
             data-test="pattern-detail-actions"
           >
-            <span class="text-text-secondary mr-1 text-xs font-medium tracking-wide uppercase">
+            <span class="text-text-secondary me-1 text-xs font-medium tracking-wide uppercase">
               {{ t("logs.patternList.actionsLabel") }}
             </span>
             <OButton
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.patternVariablesHeader") }}
             </div>
             <div
-              class="rounded-default border-l-accent bg-surface-subtle border-l-4 border-solid px-2.5 py-1.5"
+              class="rounded-default border-s-accent bg-surface-subtle border-s-4 border-solid px-2.5 py-1.5"
             >
               {{
                 selectedPattern.pattern.examples?.[0]?.variables
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.patternTemplate") }}
             </div>
             <div
-              class="text-compact rounded-default border-l-accent bg-surface-subtle border-l-4 border-solid px-2.5 py-1.5 font-mono leading-[1.6] break-all whitespace-pre-wrap"
+              class="text-compact rounded-default border-s-accent bg-surface-subtle border-s-4 border-solid px-2.5 py-1.5 font-mono leading-[1.6] break-all whitespace-pre-wrap"
             >
               <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
                 <span v-if="tok.kind === 'text'">{{ tok.value }}</span>
@@ -249,13 +249,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-card-glass-border w-full border border-solid"
             >
               <template #cell-name="{ row }">
-                <div class="text-primary text-left font-bold">
+                <div class="text-primary text-start font-bold">
                   {{ raw(row.name || "var_" + row.index) }}
                 </div>
               </template>
 
               <template #cell-type="{ row }">
-                <div class="text-left">
+                <div class="text-start">
                   <OTag
                     type="fieldType"
                     :value="row.var_type"
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(example, exIdx) in selectedPattern.pattern.examples"
               :key="exIdx"
-              class="rounded-default bg-surface-panel border-l-border-default mb-1.5 border-l-[0.1875rem] border-solid px-2.5 py-1.5 font-mono text-xs leading-[1.6] break-all whitespace-pre-wrap"
+              class="rounded-default bg-surface-panel border-s-border-default mb-1.5 border-s-[0.1875rem] border-solid px-2.5 py-1.5 font-mono text-xs leading-[1.6] break-all whitespace-pre-wrap"
             >
               <LogsHighLighting
                 :data="example.log_message"
