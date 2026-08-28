@@ -208,14 +208,15 @@ impl FileData {
         }
     }
 
-    /// Returns the evicted `metrics_results/...` keys when the write triggered a gc.
+    /// Files evicted by a triggered gc are appended to `evicted_metrics_files` even when the
+    /// write itself fails, so the caller can still notify the metrics evict hook.
     async fn set(
         &mut self,
         file: &str,
         tmp_file: &str,
         data_size: usize,
-    ) -> Result<Vec<String>, anyhow::Error> {
-        let mut evicted_metrics_files = Vec::new();
+        evicted_metrics_files: &mut Vec<String>,
+    ) -> Result<(), anyhow::Error> {
         if self.cur_size + data_size >= self.max_size {
             log::info!(
                 "[CacheType:{}] File disk cache is full, can't cache extra {data_size} bytes",
@@ -226,7 +227,7 @@ impl FileData {
                 self.max_size,
                 max(get_config().disk_cache.release_size, data_size * 100),
             );
-            evicted_metrics_files = self.gc(need_release_size).await?;
+            *evicted_metrics_files = self.gc(need_release_size).await;
         }
 
         // rename tmp file to real file
@@ -248,8 +249,7 @@ impl FileData {
         }
 
         // set size
-        self.set_size(file, data_size).await?;
-        Ok(evicted_metrics_files)
+        self.set_size(file, data_size).await
     }
 
     async fn set_size(&mut self, file: &str, data_size: usize) -> Result<(), anyhow::Error> {
@@ -283,7 +283,7 @@ impl FileData {
 
     /// Returns the evicted `metrics_results/...` keys; the caller invokes the metrics evict
     /// hook after releasing the bucket lock.
-    async fn gc(&mut self, need_release_size: usize) -> Result<Vec<String>, anyhow::Error> {
+    async fn gc(&mut self, need_release_size: usize) -> Vec<String> {
         let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
@@ -373,7 +373,7 @@ impl FileData {
             start.elapsed().as_millis()
         );
 
-        Ok(remove_metrics_files)
+        remove_metrics_files
     }
 
     async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
@@ -715,7 +715,10 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         }
         return Ok(());
     }
-    let ret = files.set(&file, &tmp_file, data_size).await;
+    let mut evicted_metrics_files = Vec::new();
+    let ret = files
+        .set(&file, &tmp_file, data_size, &mut evicted_metrics_files)
+        .await;
     drop(files);
 
     let set_took = start.elapsed().as_millis() as usize;
@@ -723,8 +726,9 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         log::info!("disk->cache: set file {file} took: {set_took} ms");
     }
 
-    notify_metrics_evicted(ret?);
-    Ok(())
+    // notify even when the write failed: a triggered gc already deleted these files
+    notify_metrics_evicted(evicted_metrics_files);
+    ret
 }
 
 #[inline]
@@ -957,7 +961,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
     }
     let scale_factor = std::cmp::max(1, cfg.disk_cache.max_size / cfg.disk_cache.result_max_size);
@@ -973,7 +977,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        let evicted_metrics_files = w.gc(cfg.disk_cache.gc_size).await?;
+        let evicted_metrics_files = w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
         notify_metrics_evicted(evicted_metrics_files);
     }
@@ -993,7 +997,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
     }
     Ok(())
@@ -1196,7 +1200,9 @@ mod tests {
                 i
             );
             let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
-            let resp = file_data.set(&file_key, &tmp_file, data_size).await;
+            let resp = file_data
+                .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+                .await;
             assert!(resp.is_ok());
         }
     }
@@ -1214,14 +1220,14 @@ mod tests {
         let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(&file_key, &tmp_file, data_size)
+            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
 
         let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(&file_key, &tmp_file, data_size)
+            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
@@ -1238,14 +1244,14 @@ mod tests {
         let (file_key1, tmp_file) = write_tmp_file(file_key1, content.clone()).await.unwrap();
         // set one key
         file_data
-            .set(&file_key1, &tmp_file, data_size)
+            .set(&file_key1, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key1).await);
         // set another key, will release first key
         let (file_key2, tmp_file) = write_tmp_file(file_key2, content.clone()).await.unwrap();
         file_data
-            .set(&file_key2, &tmp_file, data_size)
+            .set(&file_key2, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key2).await);
@@ -1265,7 +1271,9 @@ mod tests {
                 i
             );
             let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
-            let resp = file_data.set(&file_key, &tmp_file, data_size).await;
+            let resp = file_data
+                .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+                .await;
             if let Some(e) = resp.as_ref().err() {
                 println!("set file_key: {} error: {:?}", file_key, e);
             }
@@ -1286,14 +1294,14 @@ mod tests {
         let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(&file_key, &tmp_file, data_size)
+            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
 
         let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(&file_key, &tmp_file, data_size)
+            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
@@ -1310,14 +1318,14 @@ mod tests {
         let (file_key1, tmp_file) = write_tmp_file(file_key1, content.clone()).await.unwrap();
         // set one key
         file_data
-            .set(&file_key1, &tmp_file, data_size)
+            .set(&file_key1, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key1).await);
         // set another key, will release first key
         let (file_key2, tmp_file) = write_tmp_file(file_key2, content.clone()).await.unwrap();
         file_data
-            .set(&file_key2, &tmp_file, data_size)
+            .set(&file_key2, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key2).await);
@@ -1345,14 +1353,14 @@ mod tests {
         let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(&file_key, &tmp_file, data_size)
+            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
 
         let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(&file_key, &tmp_file, data_size)
+            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
@@ -1510,7 +1518,9 @@ mod tests {
         let bucket_id = gxhash::new().sum64(&file_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
-        let _ = file_data.set(&file_key, &tmp_file, data_size).await;
+        let _ = file_data
+            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+            .await;
         drop(file_data);
 
         // Get stats after adding data
@@ -1545,7 +1555,9 @@ mod tests {
             let bucket_id = gxhash::new().sum64(&file_key);
             let bucket_id = (bucket_id as usize) % RESULT_FILES.len();
             let mut file_data = RESULT_FILES[bucket_id].write().await;
-            let _ = file_data.set(&file_key, &tmp_file, data_size).await;
+            let _ = file_data
+                .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+                .await;
             drop(file_data);
         }
 
