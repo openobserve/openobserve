@@ -459,6 +459,12 @@ pub async fn get_cached_results(
             log::error!(
                 "[trace_id {trace_id}] Get results from disk failed: file: {file_path}/{file_name}, error: {e}"
             );
+            // file gone: drop the stale meta; matching flags prove the missed name is its own file
+            if matching_meta.is_aggregate == cache_req.is_aggregate
+                && matching_meta.is_descending == cache_req.is_descending
+            {
+                remove_stale_cache_meta(file_path, &file_name, &query_key, &matching_meta).await;
+            }
             return None;
         }
     };
@@ -788,6 +794,29 @@ pub fn select_cache_meta(
             } else {
                 0
             }
+        }
+    }
+}
+
+/// Drops the stale meta unless a concurrent writer already recreated its file on disk.
+async fn remove_stale_cache_meta(
+    file_path: &str,
+    file_name: &str,
+    query_key: &str,
+    meta: &ResultCacheMeta,
+) {
+    let Some(abs_path) = disk::get_file_path(&format!("results/{file_path}/{file_name}")) else {
+        return;
+    };
+    let mut w = QUERY_RESULT_CACHE.write().await;
+    // checked under the lock: a rewrite lands its file before its meta push can take this lock
+    if std::path::Path::new(&abs_path).exists() {
+        return;
+    }
+    if let Some(metas) = w.get_mut(query_key) {
+        metas.retain(|m| !m.eq(meta));
+        if metas.is_empty() {
+            w.remove(query_key);
         }
     }
 }
@@ -1265,6 +1294,67 @@ mod tests {
         assert!(result.is_ok());
         let filtered_responses = result.unwrap();
         assert_eq!(filtered_responses.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_remove_stale_cache_meta_keeps_recreated_file() {
+        let file_path = "heal2_org/logs/heal2_stream/heal2_hash";
+        let query_key = file_path.replace('/', "_");
+        let file_name = "1000_2000_0_0.json";
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![meta.clone()]);
+
+        // a concurrent writer recreated the file between the read miss and the prune: keep the meta
+        let abs_path = disk::get_file_path(&format!("results/{file_path}/{file_name}")).unwrap();
+        tokio::fs::create_dir_all(std::path::Path::new(&abs_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&abs_path, b"x").await.unwrap();
+        remove_stale_cache_meta(file_path, file_name, &query_key, &meta).await;
+        assert!(QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+
+        // with the file truly gone the stale meta is removed
+        tokio::fs::remove_file(&abs_path).await.unwrap();
+        remove_stale_cache_meta(file_path, file_name, &query_key, &meta).await;
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_results_heals_stale_meta_on_disk_miss() {
+        let file_path = "heal_org/logs/heal_stream/heal_hash";
+        let query_key = file_path.replace('/', "_");
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![meta]);
+
+        let cache_req = CacheQueryRequest {
+            q_start_time: 1000,
+            q_end_time: 2000,
+            is_aggregate: false,
+            ts_column: "_timestamp".to_string(),
+            histogram_interval: 0,
+            is_descending: false,
+            is_histogram_non_ts_order: false,
+        };
+        let res = get_cached_results("heal_trace", file_path, cache_req, None).await;
+        assert!(res.is_none());
+        // the meta pointing at the missing file was removed on the miss
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
     }
 
     #[tokio::test]

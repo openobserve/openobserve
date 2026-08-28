@@ -19,7 +19,7 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
     sync::{
-        LazyLock as Lazy,
+        LazyLock as Lazy, OnceLock,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::SystemTime,
@@ -106,6 +106,10 @@ pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
 
 pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
 
+static METRICS_RESULT_CACHE_EVICT_HOOK: OnceLock<fn(Vec<String>)> = OnceLock::new();
+
+static TRASH_ID: AtomicUsize = AtomicUsize::new(0);
+
 pub static LOADING_FROM_DISK_NUM: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
@@ -125,6 +129,24 @@ pub enum FileType {
     Aggregation,
 }
 
+/// Eviction cleanup whose Drop spawns a task, so it also runs when the gc future is cancelled.
+#[derive(Default)]
+struct EvictionCleanup {
+    metrics_files: Vec<String>,
+    trash_files: Vec<String>,
+}
+
+/// While held, the file's disk cache bucket cannot evict, so the file stays on disk.
+pub struct IndexedFileGuard {
+    _guard: tokio::sync::RwLockReadGuard<'static, FileData>,
+}
+
+enum TrashOutcome {
+    Moved(String),
+    SourceMissing,
+    Failed,
+}
+
 impl fmt::Display for FileType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -138,6 +160,36 @@ impl fmt::Display for FileType {
 impl Default for FileData {
     fn default() -> Self {
         Self::new(FileType::Data)
+    }
+}
+
+impl Drop for EvictionCleanup {
+    fn drop(&mut self) {
+        if self.metrics_files.is_empty() && self.trash_files.is_empty() {
+            return;
+        }
+        let metrics_files = std::mem::take(&mut self.metrics_files);
+        let trash_files = std::mem::take(&mut self.trash_files);
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            log::error!(
+                "File disk cache eviction cleanup dropped outside a runtime, index entries may be stale"
+            );
+            return;
+        };
+        handle.spawn(async move {
+            if !metrics_files.is_empty()
+                && let Some(hook) = METRICS_RESULT_CACHE_EVICT_HOOK.get()
+            {
+                hook(metrics_files);
+            }
+            for trash_file in trash_files {
+                if let Err(e) = tokio::fs::remove_file(&trash_file).await
+                    && e.kind() != std::io::ErrorKind::NotFound
+                {
+                    log::error!("File disk cache remove trash file {trash_file} error: {e}");
+                }
+            }
+        });
     }
 }
 
@@ -218,18 +270,22 @@ impl FileData {
                 self.file_type,
             );
             // cache is full, need release some space
+            let cfg = get_config();
+            // scaled so one full-cache write cannot flush a whole result/aggregation bucket
+            let scale_factor = max(1, cfg.disk_cache.max_size / max(1, self.max_size));
             let need_release_size = min(
                 self.max_size,
-                max(get_config().disk_cache.release_size, data_size * 100),
+                max(cfg.disk_cache.release_size / scale_factor, data_size * 100),
             );
-            self.gc(need_release_size).await?;
+            self.gc(need_release_size).await;
         }
 
         // rename tmp file to real file
         let file_ops_start = std::time::Instant::now();
         let file_path = self.get_file_path(file);
-        tokio::fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
-        tokio::fs::rename(tmp_file, &file_path).await.map_err(|e| {
+        std::fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
+        // sync on purpose: the rename and the set_size index insert must be one uncancellable poll
+        std::fs::rename(tmp_file, &file_path).map_err(|e| {
             anyhow::anyhow!(
                 "[CacheType:{}] File disk cache rename tmp file {tmp_file} to real file {file_path} error: {e}",
                 self.file_type,
@@ -276,7 +332,9 @@ impl FileData {
         Ok(())
     }
 
-    async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
+    /// Cancellation-safe: per-item bookkeeping completes before every await; the guard finishes
+    /// cleanup.
+    async fn gc(&mut self, need_release_size: usize) {
         let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
@@ -286,7 +344,9 @@ impl FileData {
             need_release_size
         );
         let mut release_size = 0;
-        let mut remove_result_files = vec![];
+        let mut move_failures = 0;
+        let mut result_query_keys = Vec::new();
+        let mut cleanup = EvictionCleanup::default();
         loop {
             let item = self.data.remove();
             if item.is_none() {
@@ -297,29 +357,34 @@ impl FileData {
                 break;
             }
             let (key, data_size) = item.unwrap();
-            // delete file from local disk
             let file_path = self.get_file_path(key.as_str());
             log::debug!(
                 "[CacheType:{}] File disk cache gc remove file: {key}",
                 self.file_type,
             );
-            if let Err(e) = tokio::fs::remove_file(&file_path).await {
-                log::error!(
-                    "[CacheType:{}] File disk cache gc remove file: {file_path}, error: {e}",
-                    self.file_type,
-                );
+            match self.move_to_trash(&key, &file_path) {
+                TrashOutcome::Moved(trash_path) => cleanup.trash_files.push(trash_path),
+                TrashOutcome::SourceMissing => {}
+                TrashOutcome::Failed => {
+                    // the file still occupies its path: keep the entry so accounting stays true
+                    self.data.insert(key, data_size);
+                    move_failures += 1;
+                    if move_failures >= 3 {
+                        log::error!(
+                            "[CacheType:{}] File disk cache gc stopped after repeated trash failures",
+                            self.file_type,
+                        );
+                        break;
+                    }
+                    continue;
+                }
             }
+            self.cur_size -= data_size;
+            release_size += data_size;
 
-            if key.starts_with("results/") {
-                let columns = key.split('/').collect::<Vec<&str>>();
-                let query_key = format!(
-                    "{}_{}_{}_{}",
-                    columns[1], columns[2], columns[3], columns[4]
-                );
-                remove_result_files.push(query_key);
-            }
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
+            let is_metrics_key = columns[0] == "metrics_results";
             if columns[0] == "files" {
                 metrics::QUERY_DISK_CACHE_FILES
                     .with_label_values(&[columns[1], columns[2]])
@@ -331,6 +396,10 @@ impl FileData {
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                     .with_label_values(&[columns[1], columns[2], "results"])
                     .sub(data_size as i64);
+                result_query_keys.push(format!(
+                    "{}_{}_{}_{}",
+                    columns[1], columns[2], columns[3], columns[4]
+                ));
             } else if columns[0] == "metrics_results" {
                 metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                     .with_label_values(&[columns[1]])
@@ -340,49 +409,57 @@ impl FileData {
                     .with_label_values(&[columns[1], columns[2], "aggregations"])
                     .sub(data_size as i64);
             }
+            if is_metrics_key {
+                cleanup.metrics_files.push(key);
+            }
 
-            release_size += data_size;
             if release_size >= need_release_size {
                 break;
             }
+            // the sync renames must not monopolize the worker for a whole batch
+            tokio::task::consume_budget().await;
         }
-        self.cur_size -= release_size;
 
-        if !remove_result_files.is_empty() {
+        // pruned inline so the prune completes before the caller can insert a new meta
+        if !result_query_keys.is_empty() {
             let mut r = QUERY_RESULT_CACHE.write().await;
-            for query_key in remove_result_files {
+            for query_key in result_query_keys {
                 r.remove(&query_key);
             }
-            drop(r);
         }
+
         log::info!(
             "[CacheType:{}] File disk cache gc done, released {release_size} bytes, took: {} ms",
             self.file_type,
             start.elapsed().as_millis()
         );
-
-        Ok(())
     }
 
-    async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
+    /// Returns the trash path the file was vacated to; the caller deletes it off-lock.
+    async fn remove(&mut self, file: &str) -> Result<Option<String>, anyhow::Error> {
         log::debug!(
             "[CacheType:{}] File disk cache remove file {file}",
             self.file_type,
         );
 
         let Some((key, data_size)) = self.data.remove_key(file) else {
-            return Ok(());
-        };
-        self.cur_size -= data_size;
-
-        // delete file from local disk
-        let file_path = self.get_file_path(key.as_str());
-        if let Err(e) = tokio::fs::remove_file(&file_path).await {
-            log::error!(
-                "[CacheType:{}] File disk cache remove file: {file_path}, error: {e}",
+            log::debug!(
+                "[CacheType:{}] File disk cache remove file {file} not in the index",
                 self.file_type,
             );
-        }
+            return Ok(None);
+        };
+        let file_path = self.get_file_path(key.as_str());
+        let trash_file = match self.move_to_trash(key.as_str(), &file_path) {
+            TrashOutcome::Moved(trash_path) => Some(trash_path),
+            TrashOutcome::SourceMissing => None,
+            TrashOutcome::Failed => {
+                // the file still occupies its path: keep the entry so accounting stays true
+                self.data.insert(key, data_size);
+                return Ok(None);
+            }
+        };
+        self.cur_size -= data_size;
 
         // metrics
         let columns = key.split('/').collect::<Vec<&str>>();
@@ -407,7 +484,7 @@ impl FileData {
                 .sub(data_size as i64);
         }
 
-        Ok(())
+        Ok(trash_file)
     }
 
     fn choose_multi_dir(&self, file: &str) -> String {
@@ -418,6 +495,43 @@ impl FileData {
         let h = gxhash::new().sum64(file);
         let index = h % (self.multi_dir.len() as u64);
         format!("{}/", self.multi_dir.get(index as usize).unwrap())
+    }
+
+    /// Vacates the deterministic path under the bucket lock, so same-key writers never collide.
+    fn move_to_trash(&self, key: &str, file_path: &str) -> TrashOutcome {
+        let trash_path = format!(
+            "{}{}trash/{}",
+            self.root_dir,
+            self.choose_multi_dir(key),
+            TRASH_ID.fetch_add(1, Ordering::Relaxed)
+        );
+        match std::fs::rename(file_path, &trash_path) {
+            Ok(()) => TrashOutcome::Moved(trash_path),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                if !Path::new(file_path).exists() {
+                    return TrashOutcome::SourceMissing;
+                }
+                // first eviction of a run creates the trash dir, then the rename is retried
+                let created = Path::new(&trash_path)
+                    .parent()
+                    .is_some_and(|parent| std::fs::create_dir_all(parent).is_ok());
+                if created && std::fs::rename(file_path, &trash_path).is_ok() {
+                    return TrashOutcome::Moved(trash_path);
+                }
+                log::error!(
+                    "[CacheType:{}] File disk cache move file {file_path} to trash error",
+                    self.file_type,
+                );
+                TrashOutcome::Failed
+            }
+            Err(e) => {
+                log::error!(
+                    "[CacheType:{}] File disk cache move file {file_path} to trash error: {e}",
+                    self.file_type,
+                );
+                TrashOutcome::Failed
+            }
+        }
     }
 
     fn size(&self) -> (usize, usize) {
@@ -457,6 +571,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
         let root_dir = FILES[0].read().await.root_dir.clone();
+        // clear the trash of a previous run so the scan cannot adopt half-deleted files
+        let cfg = get_config();
+        let mut trash_dirs = vec![format!("{root_dir}trash/")];
+        for dir in cfg.disk_cache.multi_dir.split(',') {
+            if !dir.trim().is_empty() {
+                trash_dirs.push(format!("{root_dir}{}/trash/", dir.trim()));
+            }
+        }
+        for dir in trash_dirs {
+            if let Err(e) = std::fs::remove_dir_all(&dir) {
+                log::debug!("clean trash dir {dir} error: {e}");
+            }
+        }
         let root_dir = tokio::fs::canonicalize(&root_dir).await.unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {e}");
@@ -465,6 +592,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
             "Loading disk cache done, total files: {}",
             LOADING_FROM_DISK_NUM.load(Ordering::Relaxed)
         );
+        // the scan can bring a bucket back far over its budget; trim once instead of thrashing
+        for files in [&*FILES, &*RESULT_FILES, &*AGGREGATION_FILES] {
+            for file in files.iter() {
+                let r = file.read().await;
+                let over_size = r.cur_size.saturating_sub(r.max_size);
+                drop(r);
+                if over_size == 0 {
+                    continue;
+                }
+                let mut w = file.write().await;
+                w.gc(over_size).await;
+                drop(w);
+            }
+        }
         LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
@@ -704,6 +845,7 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         return Ok(());
     }
     let ret = files.set(&file, &tmp_file, data_size).await;
+    drop(files);
 
     let set_took = start.elapsed().as_millis() as usize;
     if set_took > 100 {
@@ -753,7 +895,40 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     } else {
         RESULT_FILES[idx].write().await
     };
-    files.remove(file).await
+    let trash_file = files.remove(file).await?;
+    drop(files);
+    if let Some(trash_file) = trash_file
+        && let Err(e) = tokio::fs::remove_file(&trash_file).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        log::error!("File disk cache remove trash file {trash_file} error: {e}");
+    }
+    Ok(())
+}
+
+/// Returns a guard proving the file is indexed; while held, the bucket cannot evict it.
+pub async fn indexed_file_guard(file: &str) -> Option<IndexedFileGuard> {
+    let idx = get_bucket_idx(file);
+    let files = if file.starts_with("files") {
+        FILES[idx].read().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].read().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].read().await
+    } else {
+        RESULT_FILES[idx].read().await
+    };
+    if !files.exist(file).await {
+        return None;
+    }
+    Some(IndexedFileGuard { _guard: files })
+}
+
+/// The hook runs on a detached task and may run concurrently with held disk cache locks.
+pub fn set_metrics_result_cache_evict_hook(hook: fn(Vec<String>)) {
+    if METRICS_RESULT_CACHE_EVICT_HOOK.set(hook).is_err() {
+        log::warn!("metrics result cache evict hook is already registered");
+    }
 }
 
 #[async_recursion]
@@ -864,6 +1039,11 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .or_insert_with(Vec::new)
                             .push(meta);
                     } else if file_key.starts_with("metrics_results") {
+                        let mut w = RESULT_FILES[idx].write().await;
+                        w.cur_size += data_size;
+                        w.data.insert(file_key.clone(), data_size);
+                        drop(w);
+
                         // metrics
                         let columns = file_key.split('/').collect::<Vec<&str>>();
                         metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
@@ -925,10 +1105,13 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
     }
-    let scale_factor = std::cmp::max(1, cfg.disk_cache.max_size / cfg.disk_cache.result_max_size);
+    let scale_factor = std::cmp::max(
+        1,
+        cfg.disk_cache.max_size / std::cmp::max(1, cfg.disk_cache.result_max_size),
+    );
     let release_size = std::cmp::max(
         10 * config::SIZE_IN_MB as usize,
         cfg.disk_cache.release_size / scale_factor,
@@ -941,12 +1124,12 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
     }
     let scale_factor = std::cmp::max(
         1,
-        cfg.disk_cache.max_size / cfg.disk_cache.aggregation_max_size,
+        cfg.disk_cache.max_size / std::cmp::max(1, cfg.disk_cache.aggregation_max_size),
     );
     let release_size = std::cmp::max(
         10 * config::SIZE_IN_MB as usize,
@@ -960,7 +1143,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
     }
     Ok(())
@@ -1326,6 +1509,91 @@ mod tests {
         assert!(file_data.size().0 > 0);
 
         assert_eq!(file_data.get(&file_key, None).await, Some(content))
+    }
+
+    #[tokio::test]
+    async fn test_disk_move_to_trash() {
+        let file_data = FileData::with_capacity_and_cache_strategy(FileType::Result, 1024, "lru");
+        let key = "results/trash_org/logs/default/hash/1000_2000_0_0.json";
+        let file_path = file_data.get_file_path(key);
+        tokio::fs::create_dir_all(std::path::Path::new(&file_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&file_path, b"x").await.unwrap();
+
+        let TrashOutcome::Moved(trash_path) = file_data.move_to_trash(key, &file_path) else {
+            panic!("expected the file to move to trash");
+        };
+        assert!(!std::path::Path::new(&file_path).exists());
+        assert!(std::path::Path::new(&trash_path).exists());
+
+        // a missing source is not an error, just nothing to move
+        assert!(matches!(
+            file_data.move_to_trash(key, &file_path),
+            TrashOutcome::SourceMissing
+        ));
+        tokio::fs::remove_file(&trash_path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_disk_remove_vacates_path_via_trash() {
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(FileType::Result, 1024, "lru");
+        let key = "results/trash_rm_org/logs/default/hash/1000_2000_0_0.json";
+        let file_path = file_data.get_file_path(key);
+        tokio::fs::create_dir_all(std::path::Path::new(&file_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&file_path, b"x").await.unwrap();
+        file_data.set_size(key, 1).await.unwrap();
+
+        let trash_file = file_data.remove(key).await.unwrap().unwrap();
+        assert!(!file_data.exist(key).await);
+        assert!(!std::path::Path::new(&file_path).exists());
+        assert!(std::path::Path::new(&trash_file).exists());
+        tokio::fs::remove_file(&trash_file).await.unwrap();
+
+        // removing an unknown key vacates nothing
+        assert!(file_data.remove(key).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cancelled_set_leaves_no_destination() {
+        let key = "metrics_results/cancelset_org/2024/01/01/00/fff_1_2_3.pb";
+        let idx = get_bucket_idx(key);
+
+        // park the write on the bucket lock, then abort it before the rename can happen
+        let w = RESULT_FILES[idx].write().await;
+        let task_key = key.to_string();
+        let handle = tokio::spawn(async move {
+            let _ = set(&task_key, Bytes::from("x")).await;
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        handle.abort();
+        let _ = handle.await;
+        drop(w);
+
+        // the destination file and the index entry either both exist or neither does
+        let indexed = RESULT_FILES[idx].read().await.exist(key).await;
+        let on_disk = get_file_path(key).is_some_and(|path| std::path::Path::new(&path).exists());
+        assert_eq!(indexed, on_disk);
+        assert!(!indexed);
+    }
+
+    #[tokio::test]
+    async fn test_indexed_file_guard() {
+        let indexed_key = "metrics_results/guard_org/2024/01/01/00/aaa_1_2_3.pb";
+        let evicted_key = "metrics_results/guard_org/2024/01/01/00/bbb_1_2_3.pb";
+        let idx = get_bucket_idx(indexed_key);
+        RESULT_FILES[idx]
+            .write()
+            .await
+            .set_size(indexed_key, 1)
+            .await
+            .unwrap();
+
+        assert!(indexed_file_guard(indexed_key).await.is_some());
+        assert!(indexed_file_guard(evicted_key).await.is_none());
     }
 
     #[tokio::test]
