@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OButtonGroup
-    class="function-selector element-box-shadow border-button-outline-border float-start me-1 border p-0"
+    class="function-selector element-box-shadow border-button-outline-border me-1 border p-0"
   >
     <div v-if="!hideToggle" class="flex items-center px-1">
       <OSwitch
