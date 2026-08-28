@@ -105,7 +105,7 @@ export default {
               </template>
             </OTooltip>
             <div
-              class="node-content grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 py-1 pr-1.5"
+              class="node-content grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 py-1 pe-1.5"
             >
               <div class="node-icon-section flex items-center gap-2">
                 <img
@@ -118,7 +118,7 @@ export default {
                 <OSeparator vertical class="node-separator h-4" />
               </div>
               <div
-                class="node-label min-w-0 overflow-hidden text-left text-xs font-medium text-ellipsis whitespace-nowrap"
+                class="node-label min-w-0 overflow-hidden text-start text-xs font-medium text-ellipsis whitespace-nowrap"
               >
                 {{ node.label }}
               </div>

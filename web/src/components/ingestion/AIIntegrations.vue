@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="h-full w-full">
             <div class="bg-surface-panel border-border-default h-full border-e">
               <div class="flex h-full flex-col">
-                <div class="pt-2 pr-4 pl-2">
+                <div class="ps-2 pe-4 pt-2">
                   <OSearchInput
                     data-test="ai-integrations-search-input"
                     v-model="integrationFilter"

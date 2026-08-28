@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2"
           :style="{
             width: !store.state.isAiChatEnabled
               ? '100%'
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // The chat is a floating card in both modes — match the main content
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
-            'pr-2 pb-2',
+            'pe-2 pb-2',
           ]"
           :style="[
             {

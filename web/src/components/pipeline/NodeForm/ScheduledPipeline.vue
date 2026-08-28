@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="collapseFieldList"
                 />
               </div>
-              <div class="flex min-h-0 flex-1 flex-col pl-2">
+              <div class="flex min-h-0 flex-1 flex-col ps-2">
                 <div class="min-h-0 w-full flex-1 overflow-y-auto">
                   <!-- fieldlist section -->
                   <div class="flex flex-col overflow-hidden">
@@ -157,10 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       <div
                                         v-for="p in PERCENTILE_LABELS"
                                         :key="p.key"
-                                        class="flex items-center justify-between py-[0.15rem] pl-2"
+                                        class="flex items-center justify-between py-[0.15rem] ps-2"
                                       >
                                         <span class="text-2xs w-8 shrink-0">{{ p.label }}</span>
-                                        <span class="text-2xs flex-1 pr-1 text-right">
+                                        <span class="text-2xs flex-1 pe-1 text-end">
                                           {{ formatPercentile(durationPercentiles[p.key]) }}
                                         </span>
                                         <div class="flex w-[2.7rem]">
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                 `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
                                               )
                                             "
-                                            class="border-card-glass-border! ml-0.5! border!"
+                                            class="border-card-glass-border! ms-0.5! border!"
                                           >
                                             <OIcon
                                               name="arrow-forward-ios"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                 `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
                                               )
                                             "
-                                            class="border-card-glass-border! mr-2! ml-auto! border!"
+                                            class="border-card-glass-border! ms-auto! me-2! border!"
                                           >
                                             <OIcon
                                               name="arrow-back-ios"
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                         </div>
                                       </div>
                                     </template>
-                                    <div v-else class="text-2xs text-text-secondary py-1 pl-2">
+                                    <div v-else class="text-2xs text-text-secondary py-1 ps-2">
                                       {{ durationPercentileErrMsg || t("common.noValuesFound") }}
                                     </div>
                                   </template>
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div
                         v-if="_isAggregationEnabled && aggregationData"
-                        class="mr-2 mb-2 flex flex-nowrap items-center"
+                        class="me-2 mb-2 flex flex-nowrap items-center"
                       >
                         <div
                           data-test="scheduled-pipeline-group-by-title"
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 data-test="scheduled-pipeline-group-by-delete-btn"
                                 variant="ghost-destructive"
                                 size="icon-xs-sq"
-                                class="mr-2 mb-2 ml-1"
+                                class="ms-1 me-2 mb-2"
                                 :title="t('alert_templates.delete')"
                                 @click="deleteGroupByColumn(Number(index))"
                                 icon-left="delete"
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="scheduled-pipeline-group-by-add-btn"
                             variant="ghost"
                             size="icon-xs-sq"
-                            class="mr-2 mb-2 ml-1"
+                            class="ms-1 me-2 mb-2"
                             :title="t('common.add')"
                             @click="addGroupByColumn()"
                             icon-left="add"
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             name="info"
                             size="sm"
-                            class="ml-1 cursor-pointer"
+                            class="ms-1 cursor-pointer"
                             :class="'text-text-secondary'"
                           >
                             <OTooltip side="right" max-width="18.75rem">
@@ -364,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div class="flex items-center justify-start">
                               <div
                                 data-test="scheduled-pipeline-threshold-function-select"
-                                class="threshould-input o2-input mr-1"
+                                class="threshould-input o2-input me-1"
                               >
                                 <OFormSelect
                                   name="query_condition.aggregation.function"
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 />
                               </div>
                               <div
-                                class="threshould-input o2-input mr-1"
+                                class="threshould-input o2-input me-1"
                                 data-test="scheduled-pipeline-threshold-column-select"
                               >
                                 <OFormSelect
@@ -386,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </div>
                               <div
                                 data-test="scheduled-pipeline-threshold-operator-select"
-                                class="threshould-input o2-input mt-2 mr-1"
+                                class="threshould-input o2-input me-1 mt-2"
                               >
                                 <OFormSelect
                                   name="query_condition.aggregation.having.operator"
@@ -435,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   class="border-border-subtle w-22! border"
                                 />
                               </div>
-                              <div class="border-border-subtle flex items-center border border-l-0">
+                              <div class="border-border-subtle flex items-center border border-s-0">
                                 <div
                                   style="width: 5.5625rem; margin-left: 0 !important"
                                   class="silence-notification-input"
@@ -836,7 +836,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-no-stream-selected-text"
                         class="mx-0 w-5/6 text-center"
                       >
-                        <OIcon name="info" size="md" class="mr-1 align-middle" />
+                        <OIcon name="info" size="md" class="me-1 align-middle" />
                         {{ t("search.noStreamSelectedMessage") }}
                       </h6>
                       <h6
@@ -918,7 +918,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
-        class="ml-2 w-1/4 max-w-full"
+        class="ms-2 w-1/4 max-w-full"
         v-if="store.state.isAiChatEnabled"
         style="min-width: 4.6875rem; height: calc(100vh - 70px) !important"
       >

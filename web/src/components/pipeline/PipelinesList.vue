@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="row?.sql_query"
               data-test="scheduled-pipeline-expanded-content"
-              class="mb-2 max-h-screen overflow-hidden px-12 py-0 text-left"
+              class="mb-2 max-h-screen overflow-hidden px-12 py-0 text-start"
             >
               <div class="flex items-center py-2">
                 <strong>{{ t("pipeline_list.sql_query") }} : <span></span></strong>
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="bottomProps">
             <div class="flex w-full items-center justify-between py-1">
-              <div class="mr-4 flex items-center text-xs font-normal">
+              <div class="me-4 flex items-center text-xs font-normal">
                 {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
               </div>
               <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
-                class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
+                class="error-message rounded-default bg-banner-error-soft-bg border-s-status-negative text-banner-error-soft-text border-s-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
               >
                 {{ msg }}
               </div>

@@ -389,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg">
         <div class="enable-rum max-w-[64rem] p-4">
           <div class="pb-4">
-            <div class="pb-3 text-left text-xl font-bold font-semibold">
+            <div class="pb-3 text-start text-xl font-bold font-semibold">
               {{ t("rum.discoverSessionTitle") }}
             </div>
             <div class="text-base font-medium">

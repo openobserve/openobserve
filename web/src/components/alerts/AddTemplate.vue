@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               column's own `overflow-auto` do the scrolling instead.
             -->
             <TemplatePreviewPanel :spec="contentSpec" data-test="add-template-preview-panel" />
-            <OSeparator class="mt-2 mr-2 -ml-2" />
+            <OSeparator class="-ms-2 me-2 mt-2" />
           </template>
 
           <OCollapsible

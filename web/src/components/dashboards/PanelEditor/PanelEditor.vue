@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.meta.dateTime.start_time &&
                           dashboardPanelData.meta.dateTime.end_time))
                     "
-                    class="pl-3"
+                    class="ps-3"
                     :variablesConfig="dashboardData?.variables"
                     :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
                     :selectedTimeDate="dateTimeForVariables || dashboardPanelData.meta.dateTime"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Warning icons and last refreshed time -->
-                  <div class="mr-2 flex items-center justify-end gap-2">
+                  <div class="me-2 flex items-center justify-end gap-2">
                     <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
@@ -511,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Chart Preview -->
                     <template #after>
                       <div class="flex h-full flex-col">
-                        <div class="mt-1 mr-2 flex items-center justify-end gap-2">
+                        <div class="me-2 mt-1 flex items-center justify-end gap-2">
                           <PanelErrorButtons
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"

@@ -42,6 +42,7 @@ const RTL_MIRRORED_ICONS = new Set([
   "logout",
   "navigate-before",
   "navigate-next",
+  "send",
   "undo",
 ]);
 

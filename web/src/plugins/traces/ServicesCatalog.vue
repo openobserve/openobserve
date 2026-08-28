@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Search + pills group — occupies the table's column (everything right
            of the rail). A left pad adds breathing room after the stream
            selector while the column's outer edge still aligns to the table. -->
-      <div class="flex min-w-0 flex-1 items-center gap-2 pl-2">
+      <div class="flex min-w-0 flex-1 items-center gap-2 ps-2">
         <!-- Search input — grows to fill, aligning to the table below. -->
         <div class="min-w-0 flex-1">
           <OSearchInput
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Status legend -->
       <!-- <div
-        class="ml-auto flex items-center gap-3 px-2.5 py-[0.325rem] rounded-default border border-card-glass-border"
+        class="ms-auto flex items-center gap-3 px-2.5 py-[0.325rem] rounded-default border border-card-glass-border"
         data-test="services-catalog-status-legend"
       >
         <span
@@ -188,10 +188,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Column-visibility toggle + refresh — pinned to the right end of the
            filter bar so the catalog matches the other list pages (column
-           toggle, then refresh). Wrapped in a real element with ml-2 because
+           toggle, then refresh). Wrapped in a real element with ms-2 because
            OTableColumnToggle's root is a reka-ui DropdownMenuRoot that renders
            no DOM node, so a fallthrough class on it would be dropped. -->
-      <div class="ml-2 flex shrink-0 items-center gap-2">
+      <div class="ms-2 flex shrink-0 items-center gap-2">
         <OTableColumnToggle
           :columns="tableColumns"
           :column-visibility="columnVisibility"
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`services-catalog-type-${cat}`"
             >
               <div class="flex w-full flex-nowrap items-center justify-between gap-2">
-                <span class="min-w-0 flex-1 truncate text-left">{{
+                <span class="min-w-0 flex-1 truncate text-start">{{
                   t(`traces.servicesCatalog.types.${cat}`)
                 }}</span>
                 <span class="flex shrink-0 items-center gap-1">

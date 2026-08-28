@@ -250,7 +250,7 @@ onBeforeUnmount(() => {
           <OIcon
             name="info"
             size="sm"
-            class="text-text-secondary ml-1 cursor-help"
+            class="text-text-secondary ms-1 cursor-help"
             data-test="synthetics-check-variables-panel-hint-icon"
           />
         </OTooltip>
@@ -379,7 +379,7 @@ onBeforeUnmount(() => {
               <OBadge
                 :variant="usageCounts[index] ? 'primary-soft' : 'default-soft'"
                 size="sm"
-                class="ml-1"
+                class="ms-1"
                 :data-test="`synthetics-check-variables-panel-usage-${index}-badge`"
               >
                 {{ usageCounts[index] }}
