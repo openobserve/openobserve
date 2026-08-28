@@ -11,6 +11,10 @@ pub struct Model {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
+    /// `synthetics_environments.id` this job was fanned out for, or None for an
+    /// unscoped check. Part of the dedup key, so it is what distinguishes two
+    /// jobs that differ only by environment at the same tick.
+    pub env: Option<String>,
     pub pool: String,
     pub scheduled_ts: i64,
     pub valid_until: i64,
@@ -58,6 +62,7 @@ mod tests {
             synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
             location: "aws-us-east-1".to_string(),
+            env: None,
             pool: "aws-browser".to_string(),
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,

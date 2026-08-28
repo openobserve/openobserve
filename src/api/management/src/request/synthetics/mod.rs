@@ -1259,6 +1259,7 @@ async fn process_ack(
             degraded,
             status_reason: resp.status_reason.clone(),
             failing_locations: resp.failing_locations.clone(),
+            failing_environments: resp.failing_environments.clone(),
             passing_locations: resp.passing_locations.clone(),
         };
         tokio::spawn(async move {

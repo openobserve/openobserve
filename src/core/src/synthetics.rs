@@ -70,6 +70,13 @@ pub struct CheckNotification {
     /// a partial recovery is expressible too: "2 of 3 recovered, the third is
     /// still down".
     pub passing_locations: Vec<String>,
+    /// Environments that did not pass, worst first.
+    ///
+    /// Empty for a check that targets none, which is every check that pre-dates
+    /// fan-out — so the message shape is unchanged for them. Once a check runs
+    /// against staging and production together, "the check is failing" no
+    /// longer tells the reader whether production is affected.
+    pub failing_environments: Vec<String>,
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -260,6 +267,20 @@ fn run_url(n: &CheckNotification) -> String {
 }
 
 #[cfg(feature = "enterprise")]
+/// The environments a message should name, or None when there is nothing to add.
+///
+/// Absent for a check that targets no environment, which keeps every existing
+/// notification byte-identical. Present the moment a check fans out, because
+/// then "the check is failing" leaves the reader unable to tell whether
+/// production is affected — the one thing they need before deciding to act.
+fn environments_line(n: &CheckNotification) -> Option<String> {
+    if n.failing_environments.is_empty() {
+        return None;
+    }
+    Some(n.failing_environments.join(", "))
+}
+
+#[cfg(feature = "enterprise")]
 /// "2 of 6: mumbai, frankfurt" — or just the count when we could not attribute.
 ///
 /// Answers "which region is broken", which the message previously could not: it
@@ -320,6 +341,9 @@ fn build_slack_json(n: &CheckNotification) -> String {
         format!("*Target:* {}", n.target),
         format!("*Locations:* {}", locations_line(n)),
     ];
+    if let Some(envs) = environments_line(n) {
+        lines.push(format!("*Environments:* {envs}"));
+    }
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("*Error:* ```{e}```"));
     }
@@ -341,6 +365,9 @@ fn build_plain_text(n: &CheckNotification) -> String {
         format!("Status: {}", n.status),
         format!("Locations: {}", locations_line(n)),
     ];
+    if let Some(envs) = environments_line(n) {
+        lines.push(format!("Environments: {envs}"));
+    }
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("Error: {e}"));
     }
@@ -713,6 +740,7 @@ mod tests {
         let n = CheckNotification {
             recovery: true,
             passing_locations: vec![],
+            failing_environments: vec![],
             failing_locations: vec![],
             ..recovered()
         };

@@ -175,6 +175,7 @@ mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
 mod m20260827_000001_create_synthetics_shared_variables;
 mod m20260827_000001_drop_table_action_scripts;
+mod m20260828_000001_add_env_to_synthetics_jobs;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -433,6 +434,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
             Box::new(m20260827_000001_create_synthetics_shared_variables::Migration),
+            Box::new(m20260828_000001_add_env_to_synthetics_jobs::Migration),
         ]
     }
 }

@@ -1359,6 +1359,14 @@ const MAX_TAGS: usize = 20;
 /// shared tier merged with the check's own — because that is what the probe
 /// receives and what an author has to reason about.
 pub const MAX_VARIABLES: usize = 50;
+
+/// Environments one check may fan out over.
+///
+/// Bounded because job volume is `environments × locations × browser-devices`:
+/// at 3 × 6 × 2 a one-minute check already enqueues 36 jobs a minute. The cap
+/// is on the multiplier a single save can introduce, not on how many
+/// environments an org may have.
+pub const MAX_ENVIRONMENTS_PER_CHECK: usize = 5;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
 /// Minimum schedule interval (seconds) for protocol checks (http/tcp/tls/ssh).
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
@@ -1694,18 +1702,22 @@ impl Synthetic {
         }
 
         // ── environments ───────────────────────────────────────────────────
-        // One entry until fan-out: runs, alerts and results are per check, so a
-        // second environment would put two environments' runs in one table with
-        // nothing distinguishing them.
-        if self.environments.len() > 1 {
+        if self.environments.len() > MAX_ENVIRONMENTS_PER_CHECK {
             return Err(format!(
-                "environments: at most one environment per check ({} given)",
+                "environments: too many ({} > {MAX_ENVIRONMENTS_PER_CHECK})",
                 self.environments.len()
             ));
         }
+        let mut seen_envs = std::collections::HashSet::new();
         for env in &self.environments {
             if env.trim().is_empty() {
                 return Err("environments: empty environment id not allowed".to_string());
+            }
+            // A duplicate would enqueue the same job twice per tick, and the
+            // dedup key would swallow the second — so it is rejected rather
+            // than silently collapsed.
+            if !seen_envs.insert(env.as_str()) {
+                return Err(format!("environments: duplicate environment '{env}'"));
             }
         }
 
@@ -2821,25 +2833,42 @@ mod tests {
     }
 
     #[test]
-    fn a_check_may_name_at_most_one_environment() {
+    fn a_check_may_fan_out_over_several_environments() {
         let (locs, brs, devs) = allowed();
 
-        // No environment is the shape every check that pre-dates shared
-        // variables has, so it must stay valid with nothing to migrate.
+        // No environment is the shape every check that pre-dates this feature
+        // has, so it must stay valid with nothing to migrate.
         let mut s = valid_tcp_synthetic();
         s.environments = vec![];
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
 
         let mut s = valid_tcp_synthetic();
-        s.environments = vec!["env-1".to_string()];
-        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
-
-        // Two would put two environments' runs in one results table with
-        // nothing distinguishing them, since runs and alerts are per check.
-        let mut s = valid_tcp_synthetic();
         s.environments = vec!["env-1".to_string(), "env-2".to_string()];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn the_environment_count_is_bounded_because_it_multiplies_jobs() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.environments = (0..=MAX_ENVIRONMENTS_PER_CHECK)
+            .map(|i| format!("env-{i}"))
+            .collect();
+
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.starts_with("environments:"), "{err}");
+        assert!(err.starts_with("environments: too many"), "{err}");
+    }
+
+    #[test]
+    fn a_duplicate_environment_is_rejected_not_collapsed() {
+        // The dedup key would swallow the second job silently, so the check
+        // would look like it fanned out and not have.
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.environments = vec!["env-1".to_string(), "env-1".to_string()];
+
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("duplicate environment"), "{err}");
     }
 
     #[test]

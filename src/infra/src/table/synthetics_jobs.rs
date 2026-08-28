@@ -37,6 +37,8 @@ pub struct EnqueueParams<'a> {
     pub synthetics_name: &'a str,
     pub org_id: &'a str,
     pub location: &'a str,
+    /// Environment this job runs against, or None for an unscoped check.
+    pub env: Option<&'a str>,
     pub pool: &'a str,
     pub scheduled_ts: i64,
     pub valid_until: i64,
@@ -73,6 +75,9 @@ pub struct LeasedRow {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
+    /// Environment this job runs against; None for an unscoped check. `resolve`
+    /// filters the shared variable tier by it.
+    pub env: Option<String>,
     pub pool: String,
     pub scheduled_ts: i64,
     pub valid_until: i64,
@@ -164,11 +169,11 @@ pub async fn enqueue<C: ConnectionTrait>(
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
     let sql = r#"
         INSERT INTO synthetics_jobs
-            (id, synthetics_id, synthetics_name, org_id, location, pool,
+            (id, synthetics_id, synthetics_name, org_id, location, env, pool,
              scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices,
              steps_configured, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11, $12)
-        ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, $10, $11, $12, $13)
+        ON CONFLICT (synthetics_id, location, scheduled_ts, COALESCE(env, '')) DO NOTHING
     "#;
 
     conn.execute(Statement::from_sql_and_values(
@@ -180,6 +185,9 @@ pub async fn enqueue<C: ConnectionTrait>(
             Value::from(p.synthetics_name),
             Value::from(p.org_id),
             Value::from(p.location),
+            p.env
+                .map(Value::from)
+                .unwrap_or(Value::from(None::<String>)),
             Value::from(p.pool),
             Value::from(p.scheduled_ts),
             Value::from(p.valid_until),
@@ -202,7 +210,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
     id: &str,
 ) -> Result<Option<LeasedRow>, errors::Error> {
     let sql = r#"
-        SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
+        SELECT id, synthetics_id, synthetics_name, org_id, location, env, pool,
                scheduled_ts, valid_until, dispatch_attempts, run_id, browser_devices,
                steps_configured, metadata
         FROM synthetics_jobs
@@ -225,6 +233,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
                 synthetics_name: row.try_get("", "synthetics_name")?,
                 org_id: row.try_get("", "org_id")?,
                 location: row.try_get("", "location")?,
+                env: row.try_get("", "env").unwrap_or_default(),
                 pool: row.try_get("", "pool")?,
                 scheduled_ts: row.try_get("", "scheduled_ts")?,
                 valid_until: row.try_get("", "valid_until")?,
@@ -373,6 +382,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
             synthetics_name: m.synthetics_name,
             org_id: m.org_id,
             location: m.location,
+            env: m.env,
             pool: m.pool,
             scheduled_ts: m.scheduled_ts,
             valid_until: m.valid_until,
@@ -805,6 +815,47 @@ pub async fn run_location_outcomes<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Environments of a run that did not pass, worst first.
+///
+/// Once a check fans out, "the check is failing" stops being enough: with
+/// staging and production on one check the reader needs to know which one broke
+/// before deciding whether to get out of bed. An unscoped job contributes
+/// nothing here — it has no environment to name — which is why this can be
+/// empty on a perfectly ordinary failing run.
+///
+/// Returns environment IDs; the caller maps them to names, because that lookup
+/// belongs to the layer that already reads the environments table.
+pub async fn failing_environments<C: ConnectionTrait>(
+    conn: &C,
+    run_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    const STATUS_PASSED: i32 = 3;
+
+    let mut rows = Entity::find()
+        .select_only()
+        .column(Column::Env)
+        .column(Column::Status)
+        .filter(Column::RunId.eq(run_id))
+        .into_tuple::<(Option<String>, i32)>()
+        .all(conn)
+        .await?;
+
+    // Worst first, matching `run_location_outcomes`: a reader scanning the
+    // first line should see the most severe environment.
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+    let mut failing = Vec::new();
+    for (env, status) in rows {
+        let Some(env) = env else { continue };
+        // One environment can fail in several locations; naming it once per
+        // location would read as several separate outages.
+        if status != STATUS_PASSED && !failing.contains(&env) {
+            failing.push(env);
+        }
+    }
+    Ok(failing)
+}
+
 /// One location+pool's share of the pending queue.
 #[derive(Debug, PartialEq, Eq)]
 pub struct PendingBacklogRow {
@@ -957,6 +1008,7 @@ mod tests {
             synthetics_name: "Login Flow",
             org_id: "org1",
             location: "aws-us-east-1",
+            env: Some("env-prod"),
             pool: "aws-browser",
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
@@ -972,6 +1024,9 @@ mod tests {
         assert_eq!(p.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert!(p.browser_devices.is_some());
         assert_eq!(p.steps_configured, 14);
+        // Part of the dedup key: without it two environments at one tick
+        // collapse into a single job.
+        assert_eq!(p.env, Some("env-prod"));
     }
 
     #[test]
@@ -982,6 +1037,7 @@ mod tests {
             synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
             location: "aws-us-east-1".to_string(),
+            env: None,
             pool: "aws-browser".to_string(),
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
@@ -1032,6 +1088,7 @@ mod tests {
             synthetics_name: "Login Flow",
             org_id: "org1",
             location: "aws-us-east-1",
+            env: None,
             pool: "aws-browser",
             scheduled_ts: SCHEDULED_TS,
             valid_until: i64::MAX,

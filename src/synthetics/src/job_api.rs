@@ -1245,6 +1245,12 @@ pub struct AckResponse {
     /// has no business knowing an org's grant balance.
     #[serde(skip)]
     pub pool_adjustment: Option<StepPoolAdjustment>,
+    /// Environments of this run that did not pass, worst first, by name.
+    ///
+    /// Empty for a check targeting no environment. Once a check runs against
+    /// staging and production together, "the check is failing" no longer tells
+    /// the reader whether production is affected.
+    pub failing_environments: Vec<String>,
 }
 
 /// The notification a completed run should send, resolved against the check's
@@ -1314,10 +1320,10 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
             Ok::<(), ()>(())
         });
     }
-    // The environment this job runs against, or None for an unscoped run. Read
-    // from the check because `environments` is capped at one until fan-out — the
-    // job row carries no environment of its own yet.
-    let env_id = synthetic.environments.first().cloned();
+    // The environment this job was fanned out for. Read from the JOB, not the
+    // check: with fan-out a check produces jobs for several environments at
+    // once, so the check no longer knows which one this job is.
+    let env_id = check.env.clone();
     // Widened past the check's own fields: a check whose variables all live in
     // the shared tier has an empty `variables` vec, and computing `needs_dek`
     // without this skipped the whole decrypt block, so it resolved nothing at
@@ -1620,6 +1626,7 @@ fn stale_lease_response(
         consecutive_failures: 0,
         failing_locations: Vec::new(),
         passing_locations: Vec::new(),
+        failing_environments: Vec::new(),
         usage_events: Vec::new(),
         // Nothing billed, so nothing to reconcile: a duplicate or evicted ack
         // must not move the pool either, and this is the only way out of `ack`
@@ -1870,6 +1877,15 @@ pub async fn ack(
     };
     let (failing_locations, passing_locations) = (outcomes.failing, outcomes.passing);
 
+    // Which environments broke, resolved to names. Empty for a check that
+    // targets none — every check that pre-dates fan-out — so the message shape
+    // is unchanged for them.
+    let failing_environments = if run_complete && !matches!(alert, AlertDecision::Silent) {
+        environment_names(&check.org_id, &check.run_id).await
+    } else {
+        Vec::new()
+    };
+
     Ok(AckResponse {
         run_complete,
         run_status,
@@ -1893,7 +1909,39 @@ pub async fn ack(
         passing_locations,
         usage_events,
         pool_adjustment,
+        failing_environments,
     })
+}
+
+/// Failing environment IDs for a run, mapped to the names a reader recognises.
+///
+/// A failure here costs the notification one detail, so it degrades to an empty
+/// list rather than failing the ack — the ack is what completes the run.
+async fn environment_names(org_id: &str, run_id: &str) -> Vec<String> {
+    let conn = get_orm_client_rw().await;
+    let ids = match synthetics_jobs::failing_environments(conn, run_id).await {
+        Ok(ids) if !ids.is_empty() => ids,
+        Ok(_) => return Vec::new(),
+        Err(e) => {
+            tracing::warn!(run_id = %run_id, "[synthetics] failing_environments: {e}");
+            return Vec::new();
+        }
+    };
+    let known = match infra::table::synthetics_environments::list(conn, org_id).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!(org_id = %org_id, "[synthetics] environment lookup: {e}");
+            return ids;
+        }
+    };
+    ids.into_iter()
+        .map(|id| {
+            known
+                .iter()
+                .find(|e| e.id == id)
+                .map_or(id, |e| e.name.clone())
+        })
+        .collect()
 }
 
 /// Resolves the alert decision for a completed run and persists the new state.
