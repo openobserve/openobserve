@@ -54,53 +54,62 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
     // Always use range query path - compute all timestamps at once
     let timestamps = eval_ctx.timestamps();
 
-    // Group metrics by their signature (without bucket label)
-    let mut metrics_by_sig: HashMap<u64, Vec<RangeValue>> = HashMap::default();
+    // Parse each upper bound once and group metrics by their signature (without
+    // bucket label). The previous implementation reparsed every bound for every
+    // evaluation timestamp.
+    let mut metrics_by_sig: HashMap<u64, Vec<(f64, RangeValue)>> = HashMap::default();
 
     for rv in in_matrix {
         // Verify this metric has a bucket label
-        if rv.labels.get_value(BUCKET_LABEL).parse::<f64>().is_err() {
+        let Ok(upper_bound) = rv.labels.get_value(BUCKET_LABEL).parse::<f64>() else {
             continue;
-        }
+        };
 
         let sig = signature_without_labels(&rv.labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
-        metrics_by_sig.entry(sig).or_default().push(rv);
+        metrics_by_sig
+            .entry(sig)
+            .or_default()
+            .push((upper_bound, rv));
     }
 
-    let mut range_values = Vec::new();
+    let group_count = metrics_by_sig.len();
+    let mut range_values = Vec::with_capacity(group_count);
 
-    for (_sig, bucket_series) in metrics_by_sig {
+    for (_sig, mut bucket_series) in metrics_by_sig {
+        // Sort bucket bounds once per output series. `bucket_quantile_sorted`
+        // can then consume them directly for every timestamp.
+        bucket_series.sort_by(|a, b| sort_float(&a.0, &b.0));
         // Get the labels (without bucket label) from the first series
-        let mut base_labels = bucket_series[0].labels.clone();
+        let mut base_labels = bucket_series[0].1.labels.clone();
         base_labels
             .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
 
         let mut samples = Vec::with_capacity(timestamps.len());
+        let mut cursors = vec![0usize; bucket_series.len()];
 
         // For each timestamp, compute histogram_quantile
         for &eval_ts in &timestamps {
-            let mut buckets = Vec::new();
+            let mut buckets = Vec::with_capacity(bucket_series.len());
 
             // Collect bucket values at this timestamp
-            for bucket_rv in &bucket_series {
-                let upper_bound: f64 = match bucket_rv.labels.get_value(BUCKET_LABEL).parse() {
-                    Ok(u) => u,
-                    Err(_) => continue,
-                };
-
-                // Find the sample closest to eval_ts
-                if let Some(sample) = bucket_rv
-                    .samples
-                    .iter()
-                    .find(|s| s.timestamp == eval_ts)
-                    .or_else(|| bucket_rv.samples.first())
+            for ((upper_bound, bucket_rv), cursor) in bucket_series.iter().zip(cursors.iter_mut()) {
+                while *cursor < bucket_rv.samples.len()
+                    && bucket_rv.samples[*cursor].timestamp < eval_ts
                 {
-                    buckets.push(Bucket::new(upper_bound, sample.value));
+                    *cursor += 1;
+                }
+                let sample = bucket_rv
+                    .samples
+                    .get(*cursor)
+                    .filter(|sample| sample.timestamp == eval_ts)
+                    .or_else(|| bucket_rv.samples.first());
+                if let Some(sample) = sample {
+                    buckets.push(Bucket::new(*upper_bound, sample.value));
                 }
             }
 
             if !buckets.is_empty() {
-                let quantile_value = bucket_quantile(phi, buckets);
+                let quantile_value = bucket_quantile_sorted(phi, buckets);
                 samples.push(Sample::new(eval_ts, quantile_value));
             }
         }
@@ -119,7 +128,8 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L76
-fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
+/// Compute a classic histogram quantile from buckets already sorted by upper bound.
+fn bucket_quantile_sorted(phi: f64, buckets: Vec<Bucket>) -> f64 {
     if phi.is_nan() || buckets.is_empty() {
         return f64::NAN;
     }
@@ -129,8 +139,7 @@ fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
     if phi > 1.0 {
         return f64::INFINITY;
     }
-    buckets.sort_by(|a, b| sort_float(&a.upper_bound, &b.upper_bound));
-    // The caller of `bucket_quantile` guarantees that `buckets` is non-empty.
+    // The caller guarantees that `buckets` is non-empty.
     let highest_bucket = &buckets[buckets.len() - 1];
     if !(highest_bucket.upper_bound.is_infinite() && highest_bucket.upper_bound.is_sign_positive())
     {
@@ -217,9 +226,47 @@ fn ensure_monotonic(buckets: &mut [Bucket]) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use config::meta::promql::value::Label;
     use expect_test::expect;
 
     use super::*;
+
+    #[test]
+    fn test_histogram_quantile_handles_unsorted_buckets_and_sparse_timestamps() {
+        let eval_ctx = EvalContext::new(1, 3, 1, "test".to_string());
+        let series = |le: &str, samples: Vec<Sample>| RangeValue {
+            labels: vec![
+                Arc::new(Label::new("__name__", "request_duration_bucket")),
+                Arc::new(Label::new("path", "/api")),
+                Arc::new(Label::new("le", le)),
+            ],
+            samples,
+            exemplars: None,
+            time_window: None,
+        };
+        let input = Value::Matrix(vec![
+            // Intentionally put +Inf before the finite bound. Timestamp 2 is
+            // absent, so the established fallback-to-first-sample behavior is
+            // exercised as well as the cursor fast path.
+            series("+Inf", vec![Sample::new(1, 10.0), Sample::new(3, 30.0)]),
+            series("1", vec![Sample::new(1, 5.0), Sample::new(3, 15.0)]),
+        ]);
+
+        let Value::Matrix(result) = histogram_quantile(0.5, input, &eval_ctx).unwrap() else {
+            panic!("expected matrix");
+        };
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0]
+                .samples
+                .iter()
+                .map(|sample| (sample.timestamp, sample.value))
+                .collect::<Vec<_>>(),
+            vec![(1, 1.0), (2, 1.0), (3, 1.0)],
+        );
+    }
 
     #[test]
     fn test_coalesce_buckets() {
