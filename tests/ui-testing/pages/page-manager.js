@@ -15,6 +15,7 @@ import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
 import DashboardMultiSQL from "./dashboardPages/dashboard-multi-sql";
 import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
+import DashboardCellExplorerPage from "./dashboardPages/dashboard-cell-explorer";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
@@ -112,7 +113,6 @@ import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationP
 
 // ===== FUNCTIONS PAGE OBJECTS =====
 const FunctionsPage = require("./functionsPages/functionsPage.js");
-const { ActionScriptsFormValidationPage } = require("./functionsPages/actionScriptsFormValidationPage.js");
 const FunctionsFormValidationPage = require("./functionsPages/functionsFormValidationPage.js");
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
@@ -143,6 +143,7 @@ class PageManager {
     this.dashboardMultiSQL = new DashboardMultiSQL(page);
     this.dashboardMaxQueryRange = new DashboardMaxQueryRange(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
+    this.dashboardCellExplorer = new DashboardCellExplorerPage(page);
     this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
     this.dashboardFilter = new DashboardFilter(page);
     this.dashboardImport = new DashboardImport(page);
@@ -238,7 +239,6 @@ class PageManager {
 
     // ===== FUNCTIONS PAGE OBJECTS =====
     this.functionsPage = new FunctionsPage(page);
-    this.actionScriptsFormValidation = new ActionScriptsFormValidationPage(page);
     this.functionsFormValidation = new FunctionsFormValidationPage(page);
 
     // ===== CIPHER KEYS PAGE OBJECTS =====

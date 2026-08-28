@@ -30,7 +30,7 @@ use aws_config::{BehaviorVersion, Region};
 use aws_sdk_lambda::{Client as LambdaClient, primitives::Blob};
 use dashmap::DashMap;
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     table::{synthetics_checks, synthetics_jobs, synthetics_runs},
 };
 
@@ -102,7 +102,7 @@ pub async fn run() {
     loop {
         tokio::time::sleep(TICK).await;
 
-        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let db = get_orm_client_rw().await;
 
         let now_us = config::utils::time::now_micros();
 
@@ -258,10 +258,7 @@ async fn mint_default_token(org_id: &str) -> Option<String> {
 }
 
 async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) -> bool {
-    let db = match ORM_CLIENT.get() {
-        Some(db) => db,
-        None => return false,
-    };
+    let db = get_orm_client_rw().await;
     let now_us = config::utils::time::now_micros();
     // SyntheticStatus Error = DB int 4; job status Error = 6.
     //
@@ -631,17 +628,15 @@ async fn handle_dispatch_failure(
     ingest_token: &str,
     error_msg: &str,
 ) {
-    let outcome = match ORM_CLIENT.get() {
-        Some(db) => synthetics_jobs::fail_dispatch(
-            db,
-            &row.id,
-            row.dispatch_attempts,
-            crate::MAX_DISPATCH_ATTEMPTS,
-        )
-        .await
-        .unwrap_or(synthetics_jobs::DispatchFailureOutcome::DeadLettered),
-        None => synthetics_jobs::DispatchFailureOutcome::DeadLettered,
-    };
+    let db = get_orm_client_rw().await;
+    let outcome = synthetics_jobs::fail_dispatch(
+        db,
+        &row.id,
+        row.dispatch_attempts,
+        crate::MAX_DISPATCH_ATTEMPTS,
+    )
+    .await
+    .unwrap_or(synthetics_jobs::DispatchFailureOutcome::DeadLettered);
 
     match outcome {
         synthetics_jobs::DispatchFailureOutcome::Requeued => {

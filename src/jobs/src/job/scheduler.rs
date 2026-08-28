@@ -15,6 +15,8 @@
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
 #[cfg(feature = "enterprise")]
+use infra::db::get_orm_client_rw;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
 use crate::service;
@@ -145,14 +147,7 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
 async fn cleanup_alert_dedup_state() -> Result<(), anyhow::Error> {
     log::debug!("[ALERT DEDUP CLEANUP] Starting cleanup of old deduplication state");
 
-    // Get database connection
-    let db = match infra::db::ORM_CLIENT.get() {
-        Some(db) => db,
-        None => {
-            log::warn!("[ALERT DEDUP CLEANUP] ORM client not available, skipping cleanup");
-            return Ok(());
-        }
-    };
+    let db = get_orm_client_rw().await;
 
     // Default cleanup: Remove records older than 24 hours
     // This is conservative - most alerts have shorter time windows

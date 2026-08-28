@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-stream-name-select-dropdown"
                   :options="indexOptions"
                   :loading="isFetchingStreams"
-                  class="stream-name-select w-full! min-w-0"
+                  class="stream-name-select w-full! max-w-75 min-w-0"
                   :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                   @update:model-value="updateStreamFields($event)"
                 />

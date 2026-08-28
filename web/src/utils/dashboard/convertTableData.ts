@@ -383,11 +383,10 @@ export const convertMultiQueryTableData = (
   const allRows: any[] = [];
   const isDynamicColumns = panelSchema?.config?.table_dynamic_columns == true;
 
-  // Collect all rows
-  searchQueryData.forEach((queryData: any[]) => {
+  searchQueryData.forEach((queryData: any[], queryIndex: number) => {
     if (!queryData || !Array.isArray(queryData)) return;
     queryData.forEach((row: any) => {
-      allRows.push({ ...row });
+      allRows.push({ ...row, __q: queryIndex });
     });
   });
 

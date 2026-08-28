@@ -140,11 +140,6 @@ export const useSearchQuery = (t: TranslateFn) => {
     // get function definition
     addTransformToQuery(queryReq);
 
-    // Add action ID if it exists
-    if (searchObj.data.actionId && searchObj.data.transformType === "action") {
-      queryReq.query["action_id"] = searchObj.data.actionId;
-    }
-
     if (searchObj.data.datetime.type === "relative") {
       if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
       else {
@@ -174,8 +169,6 @@ export const useSearchQuery = (t: TranslateFn) => {
     delete searchObj.data.histogramQuery.query.from;
     delete searchObj.data.histogramQuery.aggs;
     delete queryReq.aggs;
-    if (searchObj.data.histogramQuery.query.action_id)
-      delete searchObj.data.histogramQuery.query.action_id;
 
     searchObj.data.customDownloadQueryObj = JSON.parse(JSON.stringify(queryReq));
 

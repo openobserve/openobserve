@@ -544,9 +544,7 @@ mod tests {
         use sea_orm::{ConnectionTrait, Schema};
 
         infra::db::create_table().await.unwrap();
-        let client = infra::db::ORM_CLIENT
-            .get_or_init(infra::db::connect_to_orm)
-            .await;
+        let client = infra::db::get_orm_client_rw().await;
         let backend = client.get_database_backend();
         let mut stmt = Schema::new(backend)
             .create_table_from_entity(infra::table::entity::source_maps::Entity);

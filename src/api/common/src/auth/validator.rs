@@ -1273,7 +1273,7 @@ fn _extract_full_url(req: &Request) -> String {
 mod tests {
     use infra::{
         db as infra_db,
-        db::{ORM_CLIENT, connect_to_orm},
+        db::{get_orm_client_ro, get_orm_client_rw},
         table as infra_table,
     };
     use openobserve_core::{organization, users};
@@ -1575,7 +1575,7 @@ mod tests {
         let sa_email = "sa-nostatic@example.com";
         let token = "sa_static_token_nostatic_test";
 
-        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let _ = get_orm_client_rw().await;
         let _ = infra_db::create_table().await;
         let _ = infra_table::create_user_tables().await;
         let _ = organization::check_and_create_org_without_ofga(org_id).await;
@@ -1631,7 +1631,7 @@ mod tests {
         let pwd = "Complexpass#123";
 
         // Initialize ORM client and clear database tables for test isolation
-        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let _ = get_orm_client_ro().await;
         let _ = infra::table::org_users::clear().await;
         let _ = infra::table::users::clear().await;
         let _ = infra::table::organizations::clear().await;

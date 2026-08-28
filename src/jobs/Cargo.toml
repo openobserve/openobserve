@@ -29,6 +29,7 @@ cloud = [
     "enterprise",
     "o2_enterprise/cloud",
     "openobserve-core/cloud",
+    "openobserve-synthetics/cloud",
     "stream/cloud",
 ]
 vectorscan = [

@@ -27,12 +27,6 @@ vi.mock("@/services/alert_templates", () => ({
   },
 }));
 
-vi.mock("@/composables/useActions", () => ({
-  default: () => ({
-    getAllActions: vi.fn().mockResolvedValue({}),
-  }),
-}));
-
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {

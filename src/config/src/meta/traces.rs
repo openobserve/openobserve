@@ -125,13 +125,17 @@ pub mod session {
         trace_ids
     }
 
-    pub fn trace_id_predicate(trace_ids: &[String]) -> String {
-        let values = trace_ids
-            .iter()
-            .map(|trace_id| quote_sql_string(trace_id))
+    pub fn key_in_predicate<'a>(column: &str, values: impl IntoIterator<Item = &'a str>) -> String {
+        let values = values
+            .into_iter()
+            .map(quote_sql_string)
             .collect::<Vec<_>>()
             .join(", ");
-        format!("{} IN ({values})", quote_identifier("trace_id"))
+        format!("{} IN ({values})", quote_identifier(column))
+    }
+
+    pub fn trace_id_predicate(trace_ids: &[String]) -> String {
+        key_in_predicate("trace_id", trace_ids.iter().map(String::as_str))
     }
 
     pub fn span_rows_sql(

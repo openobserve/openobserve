@@ -414,7 +414,6 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
@@ -442,7 +441,6 @@ describe("Search Service", () => {
         is_multistream: true,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
@@ -467,38 +465,12 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&query_fn=custom_function",
-        params.body,
-      );
-    });
-
-    it("should add action_id parameter when provided", async () => {
-      const params = {
-        org_identifier: "test-org",
-        index: "logs",
-        key: "key123",
-        size: "10",
-        query_context: "SELECT * FROM logs",
-        query_fn: "",
-        stream_type: "logs",
-        regions: "",
-        clusters: "",
-        is_multistream: false,
-        traceparent: "trace-123",
-        body: { filter: "test" },
-        action_id: "action123",
-      };
-
-      await search.search_around(params);
-
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&action_id=action123",
         params.body,
       );
     });
@@ -517,7 +489,6 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);

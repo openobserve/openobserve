@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          rail that scrolls as one block carries its own controls off-screen. -->
     <div class="flex shrink-0 flex-col gap-3 px-2 pt-3 pb-2">
       <section class="flex flex-col gap-1">
-        <h2 class="text-text-secondary text-2xs font-semibold uppercase">
+        <h2 class="text-text-secondary text-xs font-semibold">
           {{ t("alert_library.severity") }}
         </h2>
         <!-- Chips rather than three more tick rows: it is single-select — one
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in severities"
             :key="item.id"
             :value="item.id"
-            size="xs"
+            size="sm"
             :data-test="`alert-library-rail-severity-${item.id}`"
           >
             {{ item.label }}
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
 
       <section class="flex flex-col gap-1">
-        <h2 class="text-text-secondary text-2xs font-semibold uppercase">
+        <h2 class="text-text-secondary text-xs font-semibold">
           {{ t("alert_library.categories") }}
         </h2>
 
@@ -105,10 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+    <div class="min-h-0 flex-1 overflow-y-auto pb-3">
       <OEmptyState
         v-if="visibleItems.length === 0"
         size="inline"
+        class="px-2"
         illustration="no-results"
         variant="no-results"
         :title="t('alert_library.noCategoryMatch')"

@@ -36,7 +36,7 @@ use sqlx::{Executor, PgConnection, Postgres, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, delete_index},
+        postgres::{CLIENT_DDL, CLIENT_RO, CLIENT_RW, add_column, create_index, delete_index},
     },
     errors::{Error, Result},
     file_list::FileRecord,
@@ -69,7 +69,7 @@ impl Default for PostgresFileList {
 #[async_trait]
 impl super::FileList for PostgresFileList {
     async fn health_check(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let is_writable: bool = sqlx::query_scalar(
             r#"SELECT NOT pg_is_in_recovery() 
             AND current_setting('transaction_read_only')::bool = false 
@@ -105,7 +105,7 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
 
@@ -138,7 +138,7 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         // insert the dump file into file_list table
         let (stream_key, date_key, file_name) =
@@ -230,7 +230,7 @@ impl super::FileList for PostgresFileList {
         if files.is_empty() {
             return Ok(());
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let chunks = files.chunks(100);
         for files in chunks {
             // we don't care the id here, because the id is from file_list table not for this table
@@ -274,7 +274,7 @@ impl super::FileList for PostgresFileList {
         let chunks = files.chunks(100);
         for files in chunks {
             // get ids of the files
-            let pool = CLIENT.clone();
+            let pool = CLIENT_RW.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
                 if file.id > 0 {
@@ -380,7 +380,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
     }
 
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
@@ -399,7 +399,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
     }
 
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
@@ -421,7 +421,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         if ids.is_empty() {
             return Ok(());
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         // Use ANY($2) with a bigint array — postgres handles arbitrary length
         // without needing chunking, and the partition pruning works on the
         // file_list_*_pkey index.
@@ -876,7 +876,7 @@ SELECT date
             return Ok(Vec::new());
         }
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_deleted:query_deleted";
         let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
@@ -1174,7 +1174,7 @@ GROUP BY stream;
         stream_name: &str,
     ) -> Result<()> {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["delete", "stream_stats"])
             .inc();
@@ -1194,7 +1194,7 @@ GROUP BY stream;
         is_recent: bool,
     ) -> Result<()> {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         let start = std::time::Instant::now();
         DB_QUERY_NUMS
@@ -1249,7 +1249,7 @@ DO UPDATE SET
     }
 
     async fn reset_stream_stats(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "stream_stats"])
             .inc();
@@ -1298,7 +1298,7 @@ DO UPDATE SET
         offset: i64,
     ) -> Result<i64> {
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list_jobs"])
@@ -1381,7 +1381,7 @@ DO UPDATE SET
             return Ok(Vec::new());
         }
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_jobs";
         let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
@@ -1491,7 +1491,7 @@ DO UPDATE SET
         offsets: i64,
         stream: Option<&str>,
     ) -> Result<u64> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut conditions: Vec<String> = Vec::new();
         if !ids.is_empty() {
             conditions.push(format!(
@@ -1528,7 +1528,7 @@ DO UPDATE SET
 
     async fn set_job_done(&self, ids: &[i64]) -> Result<()> {
         let cfg = get_config();
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
@@ -1551,7 +1551,7 @@ DO UPDATE SET
     }
 
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
@@ -1570,7 +1570,7 @@ DO UPDATE SET
     }
 
     async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
@@ -1610,7 +1610,7 @@ DO UPDATE SET
     }
 
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["delete", "file_list_jobs"])
             .inc();
@@ -1629,7 +1629,7 @@ DO UPDATE SET
     }
 
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_jobs"])
@@ -1673,7 +1673,7 @@ DO UPDATE SET
         node: &str,
         limit: i64,
     ) -> Result<Vec<(i64, String, i64)>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_dump_jobs";
         let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
@@ -1752,7 +1752,7 @@ DO UPDATE SET
     }
 
     async fn set_job_dumped_status(&self, ids: &[i64], dumped: bool) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
@@ -1771,7 +1771,7 @@ DO UPDATE SET
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).expect("parse file key failed");
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         // Ensure partition exists for this date
         ensure_file_list_partition(&pool, "file_list_dump_stats", &date_key).await?;
@@ -1814,7 +1814,7 @@ DO UPDATE SET
     async fn delete_dump_stats(&self, file: &str) -> Result<()> {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).expect("parse file key failed");
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["delete", "file_list_dump_stats"])
             .inc();
@@ -1909,7 +1909,7 @@ WHERE org = $1 AND account = $2;"#;
     }
 
     async fn delete_by_org(&self, org_id: &str) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let created_at = now_micros();
         let mut tx = pool.begin().await?;
         // Move remaining rows into file_list_deleted first so the file GC removes
@@ -1949,7 +1949,7 @@ impl PostgresFileList {
         meta: &FileMeta,
     ) -> Result<i64> {
         let now_ts = now_micros();
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
@@ -2002,7 +2002,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             return Ok(());
         }
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         // Ensure partitions exist for all distinct date keys before batch INSERT
         let mut date_keys = HashSet::new();
@@ -3291,7 +3291,7 @@ pub async fn spawn_maintenance_task() -> std::result::Result<(), anyhow::Error> 
 }
 
 async fn run_maintenance() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_RW.clone();
 
     // Acquire the distributed lock; another node acquiring it first will run (or
     // has run) this cycle. wait_ttl=0 waits for the current holder to finish.
@@ -3693,7 +3693,7 @@ mod tests {
 
         let _result = postgres_list.add("test_account", file_key, &meta).await;
 
-        // This test would pass with proper CLIENT mocking
+        // This test would pass with proper CLIENT_RW mocking
         // assert!(result.is_ok());
         // assert!(result.unwrap() > 0);
     }

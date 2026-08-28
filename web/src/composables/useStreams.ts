@@ -134,7 +134,7 @@ const useStreams = (t: TranslateFn) => {
               );
               getStreamsPromise.value
                 .then((res: any) => {
-                  setStreams(streamName, res.data.list);
+                  setStreams(streamName, res.data.list, force);
                   const streamData = {
                     name: streamName,
                     list: res.data.list,

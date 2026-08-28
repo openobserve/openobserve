@@ -28,11 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :has-input="meta?.ioType !== 'input'"
     :has-output="meta?.ioType !== 'output'"
     :data-test="`workflow-node-${data?.node_type}`"
-    :class="{ 'wf-node-disabled': isDisabled, 'wf-result-active': isActiveResult }"
+    :class="{
+      'wf-node-disabled': isDisabled,
+      'wf-result-active': isActiveResult,
+      'wf-needs-setup': needsSetupHighlight,
+    }"
     @click="onClick"
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
-    @output-click="onOutputClick"
   >
     <!-- Two-line body: the custom NAME (bold) on top when renamed, then a single
          muted line combining the TYPE and config DETAIL as "Type · detail". Without
@@ -241,7 +244,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas(t);
+const { editNode, requestDeleteNode } = useWorkflowCanvas(t);
 
 // This node's live record in the shared graph — the source for meta-backed
 // display (custom name, comment, disabled). Reactive: mutating meta re-renders.
@@ -256,12 +259,16 @@ const isDisabled = computed(() => isNodeDisabled(node.value));
 const isIncomplete = computed(() => isNodeIncomplete(node.value));
 const onToggleDisabled = () => toggleNodeDisabled(props.id);
 
-// This node is the one currently shown in the results dock — highlight it on the
-// canvas so, even with the step list hidden (right dock), it's clear which node's
-// Input/Output is on screen.
+// This node is the one whose results are open in the NDV — highlight it on the
+// canvas so it's clear which node's Input/Output is on screen (matters when the NDV
+// navigates prev/next between steps).
 const isActiveResult = computed(
-  () => !!workflowObj.testRun.result && workflowObj.testRun.resultDrawer.nodeId === props.id,
+  () => !!workflowObj.testRun.result && workflowObj.currentSelectedNodeID === props.id,
 );
+
+// This node was flagged by Publish validation as needing setup (incomplete/dummy) —
+// flash a warning ring so the user sees exactly which steps block publishing.
+const needsSetupHighlight = computed(() => workflowObj.incompleteHighlight.includes(props.id));
 
 // Test result badge state — read from the last Test run. Null (no run, or this
 // node wasn't part of a `from_node` run) → no badge. A node is a real ✓ only when
@@ -374,14 +381,10 @@ const handleActionsLeave = () => {
   }, 200);
 };
 
-// Clicking the source handle is the "add next step" affordance (it replaced the
-// hover-`+` that used to sit under the card). Terminal action nodes render no
-// source handle at all, so this can only fire where a next step is legal — and
-// it stays inert on the read-only Runs canvas.
-const onOutputClick = (event: MouseEvent) => {
-  if (workflowObj.readOnly) return;
-  openStepPicker(props.id, "out", event);
-};
+// Adding the next step / a fan-out branch is now the canvas-level append `+` under
+// (or beside) each node — see WorkflowCanvas.appendPoints — so the source handle is
+// just a connection point again (no click-to-add). The source dot still drags to
+// wire edges manually.
 
 // On the read-only Runs canvas the node body isn't editable — the error badge
 // (openResult) is the only affordance. In the editor, click opens the config.
@@ -390,9 +393,13 @@ const onClick = () => {
   editNode(props.id);
 };
 
-// Open the per-node Input/Output result drawer (from the ✓ / error badge).
+// Clicking a node's ✓/✗ badge opens the node's NDV — the SAME Input · Config · Output
+// panel a node-click opens, now populated with this run's Input/Output (testRun.result
+// is set). One UI everywhere: the editor and the read-only Runs view both inspect a
+// step through the NDV (read-only there — see canvasReadOnly in WorkflowNodeDrawer),
+// so there's no separate results dock.
 const openResult = () => {
-  workflowObj.testRun.resultDrawer = { show: true, nodeId: props.id };
+  editNode(props.id);
 };
 </script>
 

@@ -205,16 +205,11 @@ pub struct Synthetic {
 pub enum SyntheticType {
     #[default]
     Http,
-    Api,
     Tcp,
     /// TLS/SSL certificate check — checks expiry, chain validity, hostname.
     Tls,
     Ssh,
     Browser,
-    /// ICMP ping — checks host reachability and round-trip time.
-    Ping,
-    /// DNS record check — verifies record type/value from a nameserver.
-    Dns,
 }
 
 /// Retry ceiling for browser checks. Lower than the protocol types because a
@@ -260,9 +255,11 @@ impl SyntheticType {
             // storing those in plaintext is exactly the bug this mechanism
             // exists to prevent. Encrypting non-secret header values is
             // harmless (decrypted at edit-read and probe resolve).
-            Self::Http | Self::Api => &["/headers/*/value"],
+            Self::Http => &["/headers/*/value"],
             Self::Browser => &["/secrets/*/value", "/headers/*/value"],
-            _ => &[],
+            // No `_` arm: a new type silently defaulting to "has no secrets"
+            // is a plaintext-credential bug, so make it a compile error.
+            Self::Tcp | Self::Tls => &[],
         }
     }
 }
@@ -641,31 +638,6 @@ pub struct TlsConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PingConfig {
-    /// Number of ICMP packets to send per check.
-    #[serde(default = "default_ping_count")]
-    pub packet_count: u32,
-    /// Packet size in bytes.
-    #[serde(default = "default_ping_packet_size")]
-    pub packet_size: u32,
-    #[serde(default = "default_timeout_ms")]
-    pub timeout_ms: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DnsConfig {
-    /// DNS record type to query: "A", "AAAA", "CNAME", "MX", "TXT", "NS".
-    #[serde(default = "default_dns_record_type")]
-    pub record_type: String,
-    /// Optional expected value to assert against (e.g. expected IP or CNAME target).
-    pub expected_value: Option<String>,
-    /// Nameserver to query (e.g. "8.8.8.8"). Defaults to system resolver.
-    pub nameserver: Option<String>,
-    #[serde(default = "default_timeout_ms")]
-    pub timeout_ms: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SshConfig {
     #[serde(default = "default_ssh_port")]
     pub port: u16,
@@ -946,18 +918,6 @@ fn default_ssh_port() -> u16 {
 
 fn default_min_days() -> u32 {
     30
-}
-
-fn default_ping_count() -> u32 {
-    4
-}
-
-fn default_ping_packet_size() -> u32 {
-    56
-}
-
-fn default_dns_record_type() -> String {
-    "A".to_string()
 }
 
 fn default_browser_devices() -> Vec<BrowserDevice> {
@@ -1387,8 +1347,7 @@ const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
 const MAX_VARIABLES: usize = 50;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
-/// Minimum schedule interval (seconds) for protocol checks (http/tcp/ping/…).
-/// Ping-style checks legitimately run at 1s granularity.
+/// Minimum schedule interval (seconds) for protocol checks (http/tcp/tls/ssh).
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
 /// resolution — allowed here, but effective cadence is bounded by the tick.
 const MIN_INTERVAL_SECS: i64 = 1;
@@ -1536,7 +1495,7 @@ impl Synthetic {
 
         // ── target ─────────────────────────────────────────────────────────
         match self.check_type {
-            SyntheticType::Http | SyntheticType::Api | SyntheticType::Browser => {
+            SyntheticType::Http | SyntheticType::Browser => {
                 validate_http_url("target", &self.target)?
             }
             _ => validate_host_target(&self.target)?,
@@ -1736,7 +1695,7 @@ impl Synthetic {
                     self.wait_before_retry_secs,
                 )
             }
-            SyntheticType::Http | SyntheticType::Api => {
+            SyntheticType::Http => {
                 let cfg: HttpConfig = serde_json::from_value(self.config.clone())
                     .map_err(|e| format!("config: not a valid http config: {e}"))?;
                 const METHODS: &[&str] =
@@ -1777,12 +1736,6 @@ impl Synthetic {
             SyntheticType::Tls => serde_json::from_value::<TlsConfig>(self.config.clone())
                 .map(|_| ())
                 .map_err(|e| format!("config: not a valid tls config: {e}")),
-            SyntheticType::Ping => serde_json::from_value::<PingConfig>(self.config.clone())
-                .map(|_| ())
-                .map_err(|e| format!("config: not a valid ping config: {e}")),
-            SyntheticType::Dns => serde_json::from_value::<DnsConfig>(self.config.clone())
-                .map(|_| ())
-                .map_err(|e| format!("config: not a valid dns config: {e}")),
             SyntheticType::Ssh => {
                 let cfg: SshConfig = serde_json::from_value(self.config.clone())
                     .map_err(|e| format!("config: not a valid ssh config: {e}"))?;
@@ -2428,6 +2381,38 @@ mod tests {
         assert_eq!(mt, SyntheticType::Browser);
     }
 
+    /// Wire strings must match the `synthetics_type` column and probe payload
+    /// exactly; drift makes every stored row of that type unreadable.
+    #[test]
+    fn every_live_type_round_trips_through_serde() {
+        for (variant, wire) in [
+            (SyntheticType::Browser, "browser"),
+            (SyntheticType::Http, "http"),
+            (SyntheticType::Tcp, "tcp"),
+            (SyntheticType::Tls, "tls"),
+            (SyntheticType::Ssh, "ssh"),
+        ] {
+            let encoded = serde_json::to_value(&variant).unwrap();
+            assert_eq!(encoded, serde_json::json!(wire), "{wire}: serialize");
+            let decoded: SyntheticType = serde_json::from_value(encoded).unwrap();
+            assert_eq!(decoded, variant, "{wire}: deserialize");
+        }
+    }
+
+    /// Deliberate: `infra`'s `convert_batch` skips-and-logs an undeserializable
+    /// row instead of failing the batch, so the blast radius is that one check.
+    #[test]
+    fn removed_check_types_no_longer_deserialize() {
+        for dead in ["api", "ping", "dns"] {
+            let err = serde_json::from_value::<SyntheticType>(serde_json::json!(dead))
+                .expect_err("a removed check type must not deserialize");
+            assert!(
+                err.to_string().contains("unknown variant"),
+                "{dead}: unexpected error: {err}"
+            );
+        }
+    }
+
     #[test]
     fn test_secret_config_paths() {
         assert_eq!(SyntheticType::Ssh.secret_config_paths(), &["/auth/secret"]);
@@ -2439,14 +2424,8 @@ mod tests {
             SyntheticType::Http.secret_config_paths(),
             &["/headers/*/value"]
         );
-        assert_eq!(
-            SyntheticType::Api.secret_config_paths(),
-            &["/headers/*/value"]
-        );
         assert!(SyntheticType::Tcp.secret_config_paths().is_empty());
         assert!(SyntheticType::Tls.secret_config_paths().is_empty());
-        assert!(SyntheticType::Ping.secret_config_paths().is_empty());
-        assert!(SyntheticType::Dns.secret_config_paths().is_empty());
     }
 
     #[test]

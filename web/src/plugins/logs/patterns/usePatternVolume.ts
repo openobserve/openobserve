@@ -37,7 +37,6 @@ export interface PatternVolumeContext {
    * would count a different population than the one the patterns came from.
    */
   queryFn?: string | null;
-  actionId?: string | null;
   regions?: string[];
   clusters?: string[];
 }
@@ -70,7 +69,6 @@ export function buildPatternVolumeContext(args: {
     endUs,
     baseSql: lastQuery?.query?.sql ?? null,
     queryFn: lastQuery?.query?.query_fn ?? null,
-    actionId: lastQuery?.query?.action_id ?? null,
     regions: lastQuery?.regions ?? undefined,
     clusters: lastQuery?.clusters ?? undefined,
   };
@@ -203,7 +201,6 @@ function volumeSearchPayload(ctx: PatternVolumeContext, sql: string, size: numbe
         end_time: ctx.endUs,
         size,
         ...(ctx.queryFn ? { query_fn: ctx.queryFn } : {}),
-        ...(ctx.actionId ? { action_id: ctx.actionId } : {}),
       },
       ...(ctx.regions?.length ? { regions: ctx.regions } : {}),
       ...(ctx.clusters?.length ? { clusters: ctx.clusters } : {}),

@@ -44,9 +44,12 @@ use config::{
     },
     utils::time::now_micros,
 };
-use infra::table::{
-    folders, slo_backfill_jobs as backfill_jobs, slo_budget, slos as slos_table,
-    slos::GenerationEffect,
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::{
+        folders, slo_backfill_jobs as backfill_jobs, slo_budget, slos as slos_table,
+        slos::GenerationEffect,
+    },
 };
 use serde::Serialize;
 use svix_ksuid::Ksuid;
@@ -355,9 +358,7 @@ pub fn source_alert_condition_changed(before: &Alert, after: &Alert) -> bool {
 /// SLO, and refusing a save because the ORM was not warm yet would be a new way
 /// for alerts to fail.
 pub async fn slos_sourced_from_alert(org: &str, alert_id: &str) -> Result<Vec<Slo>, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
+    let db = infra::db::get_orm_client_ro().await;
     slos_table::list_by_source_alert(db, org, alert_id)
         .await
         .map_err(Into::into)
@@ -374,9 +375,7 @@ pub async fn redefine_for_source_alert(org: &str, slo_ids: &[String]) {
     // runs on the alert write path, and silently skipping the bump would leave
     // one window mixing two definitions — the one corruption D59 exists to
     // prevent.
-    let db = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
+    let db = infra::db::get_orm_client_rw().await;
     let now = now_micros() / 1_000_000;
     for id in slo_ids {
         let mut slo = match slos_table::get(db, org, id).await {
@@ -469,9 +468,7 @@ pub async fn list_slo_eligible_alerts(
     org: &str,
     user_id: Option<&str>,
 ) -> Result<Vec<SloEligibleAlert>, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_ro().await;
     let params = config::meta::alerts::alert::ListAlertsParams::new(org);
     let alerts = crate::alerts::alert::list_v2(db, user_id, params)
         .await
@@ -714,9 +711,7 @@ pub fn reservation(slo: &Slo) -> (i64, i64) {
 
 pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
     let cfg = get_config();
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
 
     validate(slo).await?;
     // Before the budget charge: a bad folder should cost nothing, and the
@@ -757,9 +752,7 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
 }
 
 pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
 
     validate(slo).await?;
     // An update carries `folder_id` too, so it is also a move.
@@ -845,9 +838,7 @@ pub async fn move_to_folder(
     dst_folder_id: &str,
     editor: Option<&str>,
 ) -> Result<u64, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
 
     ensure_folder(org, dst_folder_id).await?;
 
@@ -863,9 +854,7 @@ pub async fn move_to_folder(
 }
 
 pub async fn delete(org: &str, id: &str) -> Result<bool, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
 
     let Some(slo) = slos_table::get(db, org, id).await? else {
         return Ok(false);
@@ -934,9 +923,7 @@ fn plan_alert_cascade(dependents: &[(String, String)]) -> Vec<(Ksuid, String)> {
 }
 
 pub async fn set_enabled(org: &str, id: &str, enabled: bool) -> Result<bool, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
     let now = now_micros() / 1_000_000;
     let changed = slos_table::set_enabled(db, org, id, enabled, now).await?;
     if changed && let Some(slo) = slos_table::get(db, org, id).await? {
@@ -954,9 +941,7 @@ pub async fn get_with_status(
     org: &str,
     id: &str,
 ) -> Result<Option<(Slo, Option<config::meta::slo::SloStatusView>)>, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let Some(slo) = slos_table::get(db, org, id).await? else {
         return Ok(None);
     };
@@ -969,9 +954,7 @@ pub async fn list_with_status(
     org: &str,
     folder: Option<&str>,
 ) -> Result<Vec<(Slo, Option<config::meta::slo::SloStatusView>)>, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let mut out = Vec::new();
     for slo in slos_table::list(db, org, folder).await? {
         let status = rollup_view(db, &slo).await?;
@@ -989,9 +972,7 @@ pub async fn group_status(
     org: &str,
     id: &str,
 ) -> Result<Vec<config::meta::slo::SloStatusView>, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let Some(slo) = slos_table::get(db, org, id).await? else {
         return Ok(Vec::new());
     };
@@ -1105,10 +1086,7 @@ fn view_of(
 async fn schedule(slo: &Slo, now: i64) {
     sync_ingest_trigger(slo).await;
 
-    let db = match infra::db::ORM_CLIENT.get() {
-        Some(db) => db,
-        None => return,
-    };
+    let db = get_orm_client_rw().await;
     // A new generation has no history, so its window is meaningless until
     // backfill fills it. The range ends where the incremental writer begins,
     // which is what keeps the two writers off each other's slices (§6b.9).

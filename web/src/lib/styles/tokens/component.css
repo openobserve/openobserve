@@ -441,6 +441,30 @@
   --color-badge-blue-soft-bg: var(--color-blue-50);
   --color-badge-blue-soft-text: var(--color-blue-700);
 
+  /* Trace span-event markers.
+
+     Aliases onto the app-wide status vocabulary rather than defining colours of
+     their own, so a marker means what the same colour means everywhere else —
+     `TraceTree` already renders the span error icon and the event-count error
+     tally with `status-error-text`. The light/dark swap lives in the status
+     tokens, so these three need no dark override.
+
+     Info is `status-neutral-text`, not `status-info-text`. Standard info is blue,
+     and blue is the most heavily represented family in the span-bar palette, so a
+     blue tick would collide with the bars it is meant to stand out from.
+     Achromatic collides with nothing: every span-bar colour is saturated (min
+     OKLab chroma 0.110 light / 0.096 dark) against neutral's 0.022 / 0.012, so no
+     service bar is ever grey.
+
+     These carry hue, not contrast. No colour clears 3:1 against an arbitrary
+     service colour — the bar palette spans the whole hue circle across luminance
+     0.134-0.849, and only near-black clears it, by which point it has no chroma
+     left. Visibility comes from the tick overhanging its bar onto the row
+     background, where all three of these clear 3:1 in both themes. */
+  --color-trace-event-error: var(--color-status-error-text);
+  --color-trace-event-warning: var(--color-status-warning-text);
+  --color-trace-event-info: var(--color-status-neutral-text);
+
   /* Bracket-pair colorization — Monaco rainbow brackets (vs light) */
   --color-bracket-1: #0431fa;
   --color-bracket-2: #319331;
@@ -554,11 +578,7 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  /* `border-control`, not `border-default`: the edge IS the affordance here —
-     it is the only signal that this is something you type into — so WCAG 2.1
-     SC 1.4.11 applies and wants 3:1. `border-default` reaches 1.48:1, which is
-     right for a card outline and not for a control. */
-  --color-input-border: var(--color-border-control);
+  --color-input-border: var(--color-border-default);
   --color-input-border-hover: var(--color-primary-300);
   --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
@@ -583,10 +603,7 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  /* Same reasoning as --color-input-border: an operable control's edge. */
-  --color-select-border: var(--color-border-control);
-  /* Quieted like the input's, so a disabled select does not keep drawing the
-     3:1 edge that means "you can operate this". */
+  --color-select-border: var(--color-border-default);
   --color-select-disabled-border: var(--color-border-default);
   --color-select-border-hover: var(--color-primary-300);
   --color-select-border-focus: var(--color-primary-300);
@@ -1672,6 +1689,7 @@
   --color-dialog-close-active-bg: var(--color-dialog-close-active-bg);
   --color-dialog-focus-ring: var(--color-dialog-focus-ring);
   --spacing-page-edge: var(--spacing-page-edge);
+  --spacing-table-edge: var(--spacing-table-edge);
   --spacing-rail: var(--spacing-rail);
   --spacing-dialog-header-px: var(--spacing-dialog-header-px);
   --spacing-dialog-header-py: var(--spacing-dialog-header-py);
@@ -1804,6 +1822,11 @@
   --color-badge-blue-ol-text: var(--color-badge-blue-ol-text);
   --color-badge-blue-soft-bg: var(--color-badge-blue-soft-bg);
   --color-badge-blue-soft-text: var(--color-badge-blue-soft-text);
+
+  /* Trace span-event markers */
+  --color-trace-event-error: var(--color-trace-event-error);
+  --color-trace-event-warning: var(--color-trace-event-warning);
+  --color-trace-event-info: var(--color-trace-event-info);
 
   /* Editor bracket-pair colorization */
   --color-bracket-1: var(--color-bracket-1);

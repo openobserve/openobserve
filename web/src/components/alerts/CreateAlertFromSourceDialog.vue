@@ -112,12 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroup
           v-model="thresholdShape"
           type="single"
+          class="self-start"
           data-test="create-alert-threshold-shape"
         >
-          <OToggleGroupItem value="matching-rows" size="xs" data-test="create-alert-threshold-rows">
+          <OToggleGroupItem value="matching-rows" size="sm" data-test="create-alert-threshold-rows">
             {{ t("alerts.prefill.dialog.thresholdMatchingRows") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="count" size="xs" data-test="create-alert-threshold-count">
+          <OToggleGroupItem value="count" size="sm" data-test="create-alert-threshold-count">
             {{ t("alerts.prefill.dialog.thresholdCount") }}
           </OToggleGroupItem>
         </OToggleGroup>

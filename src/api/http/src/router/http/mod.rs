@@ -721,6 +721,7 @@ const STREAMING_ENDPOINTS: &[&str] = &[
     "/_values_stream",
     "/_search_multi_stream",
     "/ai/chat_stream",
+    "/playground/run",
     "/prometheus/api/v1/query_range",
 ];
 

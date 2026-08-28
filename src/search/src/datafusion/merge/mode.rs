@@ -49,18 +49,18 @@ pub enum MergeMode {
     TraceTimeIndex,
     /// The file-list stream has no `_timestamp`; order by `min_ts DESC`.
     FileList,
-    /// Metrics downsampling (enterprise): aggregate every series by the rule's
-    /// step, size-split output files. Only for a closed hour, which is merged
-    /// as a whole.
-    #[cfg(feature = "enterprise")]
-    Downsampling(DownsamplingRule),
     /// Metrics index stream, hour still open: the ingester and the incremental
-    /// compactor merges write one `hash-sorted-v1-*` Parquet file
+    /// compactor merges write one `hash-sorted-v1-*` file
     /// ordered by `(__hash__, _timestamp)`.
     MetricsHashSorted,
     /// Metrics index stream, closed hour: the whole hour merges into
     /// size-split `indexed-v1-*` files in the same order.
     MetricsIndexed,
+    /// Metrics downsampling (enterprise): aggregate every series by the rule's
+    /// step, size-split output files. Only for a closed hour, which is merged
+    /// as a whole.
+    #[cfg(feature = "enterprise")]
+    Downsampling(DownsamplingRule),
 }
 
 impl MergeMode {

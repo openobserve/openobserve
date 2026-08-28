@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import config from "@/aws-exports";
 import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
 import { canvasFont } from "@/utils/fonts";
 
@@ -330,29 +328,14 @@ export const logsUtils = () => {
   };
 
   const shouldAddFunctionToSearch = () => {
-    if (!isActionsEnabled.value)
-      return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
-
-    return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
+    return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
   };
 
   const addTransformToQuery = (queryReq: any) => {
     if (shouldAddFunctionToSearch()) {
       queryReq.query["query_fn"] = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
     }
-
-    // Add action ID if it exists
-    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-      queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
-    }
   };
-
-  const isActionsEnabled = computed(() => {
-    return (
-      (config.isEnterprise == "true" || config.isCloud == "true") &&
-      store.state.zoConfig.actions_enabled
-    );
-  });
 
   /**
    * Helper function to calculate width of the column based on its content(from first 5 rows)
@@ -573,34 +556,27 @@ export const logsUtils = () => {
     return false;
   }
 
-  // validate if timestamp column alias is used for any field
+  // Reject a query that aliases a column as the reserved timestamp column.
+  // A regex over the `AS <ts>` forms is enough and, unlike astify(), stays cheap
+  // on large nested queries (parsing per visible panel froze the dashboard).
   const checkTimestampAlias = (query: string): boolean => {
     const tsCol = timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
-    const parsedSQL = fnParsedSQL(query);
 
-    const columns = parsedSQL?.columns;
-    if (Array.isArray(columns)) {
-      const invalid = columns.some((field: any) => field.as === tsCol);
-      if (invalid) {
-        return false;
-      }
+    // A query that never mentions the timestamp column cannot alias it.
+    if (!query || !query.toLowerCase().includes(tsCol.toLowerCase())) {
+      return true;
     }
 
-    // Escape special regex characters in timestamp column name
     const escapedTimestamp = tsCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    // Patterns for alias check
-    const patterns = [
+    const aliasPatterns = [
       new RegExp(`\\bas\\s*'${escapedTimestamp}'`, "i"), // AS '_timestamp'
       new RegExp(`\\bas\\s*"${escapedTimestamp}"`, "i"), // AS "_timestamp"
+      new RegExp(`\\bas\\s*\`${escapedTimestamp}\``, "i"), // AS `_timestamp`
       new RegExp(`\\bas\\s+${escapedTimestamp}\\b`, "i"), // AS _timestamp (unquoted)
     ];
 
-    if (patterns.some((p) => p.test(query))) {
-      return false;
-    }
-
-    return true;
+    return !aliasPatterns.some((p) => p.test(query));
   };
 
   return {
@@ -615,7 +591,6 @@ export const logsUtils = () => {
     removeTraceId,
     shouldAddFunctionToSearch,
     addTransformToQuery,
-    isActionsEnabled,
     getColumnWidth,
     showCancelSearchNotification,
     generateURLQuery,
