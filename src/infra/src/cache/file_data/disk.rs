@@ -405,7 +405,8 @@ impl FileData {
         );
     }
 
-    async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
+    /// Returns the trash path the file was vacated to; the caller deletes it off-lock.
+    async fn remove(&mut self, file: &str) -> Result<Option<String>, anyhow::Error> {
         log::debug!(
             "[CacheType:{}] File disk cache remove file {file}",
             self.file_type,
@@ -416,18 +417,12 @@ impl FileData {
                 "[CacheType:{}] File disk cache remove file {file} not in the index",
                 self.file_type,
             );
-            return Ok(());
+            return Ok(None);
         };
         self.cur_size -= data_size;
 
-        // delete file from local disk
         let file_path = self.get_file_path(key.as_str());
-        if let Err(e) = tokio::fs::remove_file(&file_path).await {
-            log::error!(
-                "[CacheType:{}] File disk cache remove file: {file_path}, error: {e}",
-                self.file_type,
-            );
-        }
+        let trash_file = self.move_to_trash(key.as_str(), &file_path);
 
         // metrics
         let columns = key.split('/').collect::<Vec<&str>>();
@@ -452,7 +447,7 @@ impl FileData {
                 .sub(data_size as i64);
         }
 
-        Ok(())
+        Ok(trash_file)
     }
 
     fn choose_multi_dir(&self, file: &str) -> String {
@@ -560,7 +555,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
             "Loading disk cache done, total files: {}",
             LOADING_FROM_DISK_NUM.load(Ordering::Relaxed)
         );
-        LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
         // the scan can bring a bucket back far over its budget; trim once instead of thrashing
         for files in [&*FILES, &*RESULT_FILES, &*AGGREGATION_FILES] {
             for file in files.iter() {
@@ -575,6 +569,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 drop(w);
             }
         }
+        // the metrics replay must not adopt keys the trim just evicted, so prune before publishing
+        prune_pending_metrics_replay().await;
+        LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
     spawn_pausable_job!("disk_cache_gc", get_config().disk_cache.gc_interval, {
@@ -863,7 +860,15 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     } else {
         RESULT_FILES[idx].write().await
     };
-    files.remove(file).await
+    let trash_file = files.remove(file).await?;
+    drop(files);
+    if let Some(trash_file) = trash_file
+        && let Err(e) = tokio::fs::remove_file(&trash_file).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        log::error!("File disk cache remove trash file {trash_file} error: {e}");
+    }
+    Ok(())
 }
 
 /// The hook runs on a detached task and may run concurrently with held disk cache locks.
@@ -1147,6 +1152,18 @@ pub async fn download(
         ));
     };
     Ok(data_len)
+}
+
+/// Drops pending metrics replay keys whose files are no longer in the disk cache index.
+async fn prune_pending_metrics_replay() {
+    let mut pending = METRICS_RESULT_CACHE.write().await;
+    let keys = std::mem::take(&mut *pending);
+    for key in keys {
+        let idx = get_bucket_idx(&key);
+        if RESULT_FILES[idx].read().await.exist(&key).await {
+            pending.push(key);
+        }
+    }
 }
 
 fn get_bucket_idx(file: &str) -> usize {
@@ -1470,6 +1487,51 @@ mod tests {
         // a missing source is not an error, just nothing to move
         assert!(file_data.move_to_trash(key, &file_path).is_none());
         tokio::fs::remove_file(&trash_path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_disk_remove_vacates_path_via_trash() {
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(FileType::Result, 1024, "lru");
+        let key = "results/trash_rm_org/logs/default/hash/1000_2000_0_0.json";
+        let file_path = file_data.get_file_path(key);
+        tokio::fs::create_dir_all(std::path::Path::new(&file_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&file_path, b"x").await.unwrap();
+        file_data.set_size(key, 1).await.unwrap();
+
+        let trash_file = file_data.remove(key).await.unwrap().unwrap();
+        assert!(!file_data.exist(key).await);
+        assert!(!std::path::Path::new(&file_path).exists());
+        assert!(std::path::Path::new(&trash_file).exists());
+        tokio::fs::remove_file(&trash_file).await.unwrap();
+
+        // removing an unknown key vacates nothing
+        assert!(file_data.remove(key).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_prune_pending_metrics_replay() {
+        let kept_key = "metrics_results/replay_org/2024/01/01/00/aaa_1_2_3.pb";
+        let evicted_key = "metrics_results/replay_org/2024/01/01/00/bbb_1_2_3.pb";
+        let idx = get_bucket_idx(kept_key);
+        RESULT_FILES[idx]
+            .write()
+            .await
+            .set_size(kept_key, 1)
+            .await
+            .unwrap();
+        METRICS_RESULT_CACHE
+            .write()
+            .await
+            .extend([kept_key.to_string(), evicted_key.to_string()]);
+
+        prune_pending_metrics_replay().await;
+
+        let pending = METRICS_RESULT_CACHE.read().await;
+        assert!(pending.contains(&kept_key.to_string()));
+        assert!(!pending.contains(&evicted_key.to_string()));
     }
 
     #[tokio::test]
