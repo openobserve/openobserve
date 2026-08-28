@@ -58,7 +58,7 @@
         >
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="ps-3" dir="ltr">
+    <div v-show="activeTab === 'unflattened'" class="ps-3">
       <OSpinner size="md" />
       <div v-if="!loading">
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto

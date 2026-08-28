@@ -1297,7 +1297,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="editorContainerRef"
       class="query-editor-container relative flex w-full overflow-visible"
-      dir="ltr"
       :class="{ 'bg-theme-body-bg-primary! overflow-hidden!': isFocused }"
       :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"

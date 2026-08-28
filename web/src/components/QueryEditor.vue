@@ -5,7 +5,9 @@
 -->
 
 <template>
-  <div class="relative flex w-full flex-col outline-transparent" dir="ltr" :style="rootStyle">
+  <!-- No dir="ltr" here: CodeQueryEditor isolates the editor itself, and forcing
+       it on the root would drag the AI status line — streamed model prose — with it. -->
+  <div class="relative flex w-full flex-col outline-transparent" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
     <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
