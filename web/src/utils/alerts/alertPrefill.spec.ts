@@ -211,6 +211,23 @@ describe("normalizePrefill — invariants", () => {
     expect(normalizePrefill(basePrefill()).periodMinutes).toBeUndefined();
   });
 
+  it("floors the trigger threshold at 1 — the form's own rule", () => {
+    expect(normalizePrefill(basePrefill({ triggerThreshold: 0 })).triggerThreshold).toBe(1);
+    expect(normalizePrefill(basePrefill({ triggerThreshold: 4.6 })).triggerThreshold).toBe(5);
+  });
+
+  it("keeps a silence of 0 — 'notify every time' is a real choice, not unset", () => {
+    expect(normalizePrefill(basePrefill({ silenceMinutes: 0 })).silenceMinutes).toBe(0);
+    expect(normalizePrefill(basePrefill({ silenceMinutes: -5 })).silenceMinutes).toBe(0);
+  });
+
+  it("leaves the trigger fields absent when the surface has no opinion", () => {
+    const result = normalizePrefill(basePrefill());
+    expect(result.triggerThreshold).toBeUndefined();
+    expect(result.triggerOperator).toBeUndefined();
+    expect(result.silenceMinutes).toBeUndefined();
+  });
+
   it("dedupes identical warnings", () => {
     const result = normalizePrefill(
       basePrefill({

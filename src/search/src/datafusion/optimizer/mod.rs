@@ -129,7 +129,11 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         sql.timezone.clone(),
     )));
     if let Some(limit) = limit {
-        rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
+        rules.push(Arc::new(AddSortAndLimitRule::new(
+            limit,
+            offset,
+            sql.stream_type,
+        )));
     };
     #[cfg(feature = "enterprise")]
     rules.push(Arc::new(RewriteCipherCall::new()));
@@ -156,6 +160,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     {
         rules.push(Arc::new(LimitJoinRightSide::new(
             cfg.search.feature_join_right_side_max_rows,
+            sql.stream_type,
         )));
     }
     // ************************************

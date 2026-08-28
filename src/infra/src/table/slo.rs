@@ -344,6 +344,7 @@ pub async fn reconcile_from_slices(
     recomputed: (f64, f64, i32),
 ) -> Result<(), errors::Error> {
     let (good, total, covered) = recomputed;
+
     // Assignment, not increment: this is a rebuild from the source of truth,
     // and the watermark is deliberately untouched — reconciliation repairs the
     // aggregate, not the read clamp.
@@ -367,6 +368,7 @@ pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), err
     if slo_ids.is_empty() {
         return Ok(());
     }
+
     slo_status::Entity::delete_many()
         .filter(slo_status::Column::SloId.is_in(slo_ids))
         .exec(db)

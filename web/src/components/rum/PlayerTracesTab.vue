@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="traceDetailsRef"
           mode="embedded"
           :trace-id-prop="selectedTrace.traceId"
-          stream-name-prop="default"
+          :stream-name-prop="selectedTrace.stream || RUM_CORRELATION_TRACES_STREAM"
           :span-list-prop="[]"
           :start-time-prop="selectedTraceStartTime"
           :end-time-prop="selectedTraceEndTime"
@@ -212,9 +212,15 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
-import { rumFieldSql, rumFieldNotNullSql } from "@/utils/rum/fields";
+import {
+  rumFieldSql,
+  rumFieldNotNullSql,
+  normalizeTraceId,
+  RUM_CORRELATION_TRACES_STREAM,
+} from "@/utils/rum/fields";
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -227,6 +233,7 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 const { getStream } = useStreams(t);
+const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
 
 const props = defineProps({
   sessionId: {
@@ -352,7 +359,10 @@ function traceTimeOffset(startTimeNs: number): string {
 }
 
 // ── Data fetching ───────────────────────────────────────────
-async function fetchTraceMetadata(traceIds: string[]): Promise<Record<string, any>> {
+async function fetchTraceMetadata(
+  traceIds: string[],
+  streamName: string,
+): Promise<Record<string, any>> {
   if (traceIds.length === 0) return {};
 
   const orgId = store.state.selectedOrganization.identifier;
@@ -374,7 +384,7 @@ async function fetchTraceMetadata(traceIds: string[]): Promise<Record<string, an
     fetchQueryDataWithHttpStream(
       {
         queryReq: {
-          stream_name: "default",
+          stream_name: streamName,
           filter,
           start_time: searchStartTime,
           end_time: searchEndTime,
@@ -481,10 +491,13 @@ async function fetchTraces() {
       return;
     }
 
-    // Deduplicate by trace_id, keep first occurrence for view context
+    // Deduplicate by trace_id, keep first occurrence for view context.
+    // Canonicalize the id: SDK 0.4.x stored it zero-stripped, while the traces
+    // stream stores the padded 32-char form — the metadata join and the embedded
+    // trace view both need the stream's form.
     const traceMap = new Map<string, any>();
     for (const hit of rumHits) {
-      const traceId = hit._trace_id;
+      const traceId = normalizeTraceId(hit._trace_id) || hit._trace_id;
       if (!traceId || traceMap.has(traceId)) continue;
       const viewUrl = hit._view_url || hit.view_url || "";
       traceMap.set(traceId, {
@@ -507,7 +520,31 @@ async function fetchTraces() {
     if (views.length > 0) {
       metadataLoading.value = true;
       try {
-        const metadata = await fetchTraceMetadata(views.map((v) => v.traceId));
+        // Which stream holds each trace (one bulk request; cached in the store).
+        // Every row keeps ITS OWN stream so multi-stream sessions list fully and
+        // each click opens against the right stream; unresolved ids fall back to
+        // the default correlation stream — today's behavior.
+        const streamById = await resolveTracesStreamsBulk(
+          views.map((v) => v.traceId),
+          searchStartTime,
+          searchEndTime,
+        );
+        for (const view of views as any[]) {
+          view.stream = streamById[view.traceId] ?? RUM_CORRELATION_TRACES_STREAM;
+        }
+
+        // Metadata is fetched per distinct stream (usually one, at most a few).
+        const idsByStream = new Map<string, string[]>();
+        for (const view of views as any[]) {
+          const ids = idsByStream.get(view.stream) ?? [];
+          ids.push(view.traceId);
+          idsByStream.set(view.stream, ids);
+        }
+        const metadata: Record<string, any> = {};
+        const metadataPerStream = await Promise.all(
+          [...idsByStream.entries()].map(([stream, ids]) => fetchTraceMetadata(ids, stream)),
+        );
+        for (const part of metadataPerStream) Object.assign(metadata, part);
 
         // Only keep views whose trace_id exists in the traces stream, sorted by start time
         filteredViews = views
@@ -524,7 +561,7 @@ async function fetchTraces() {
 
         traceMetadata.value = metadata;
       } catch (err: any) {
-        metadataError.value = err?.message || "Failed to fetch trace metadata";
+        metadataError.value = err?.message || t("rum.fetchTraceMetadataFailed");
         console.warn("Trace metadata fetch failed:", err);
       } finally {
         metadataLoading.value = false;

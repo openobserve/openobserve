@@ -41,8 +41,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 {
                     log::error!("[SERVICE_GRAPH::JOB] Processing failed: {e}");
                 }
-            },
-            sleep_after
+            }
         );
     }
 

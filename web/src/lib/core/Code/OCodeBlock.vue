@@ -30,7 +30,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { hclLanguage } from "./hclLanguage";
 import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
+
+// highlight.js has no HCL grammar of its own, so `lang="hcl"` is registered here
+// — once per module, not per instance — and behaves like a built-in from then on.
+if (!hljs.getLanguage("hcl")) hljs.registerLanguage("hcl", hclLanguage);
 
 const { t } = useI18nTyped();
 
@@ -44,6 +49,7 @@ const CODE_LINE_HEIGHT = 1.55;
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   wrap: false,
   copyable: true,
+  lineNumbers: false,
   dataTest: "code-block",
 });
 
@@ -105,6 +111,20 @@ const highlightOne = (code: string, lang?: string): string => {
 // Highlights the DISPLAYED code (masked or real) — copy still uses the real `code`.
 const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
 
+// Wrapping breaks the one-number-per-row assumption a gutter rests on, so the
+// two features are exclusive rather than quietly misaligned.
+const showLineNumbers = computed(() => props.lineNumbers && !props.wrap);
+
+// One number per visible line, as a single pre-formatted string: the gutter is
+// then one text node the browser lays out on the same leading as the code, with
+// no per-line wrapper elements to keep in sync with the highlighted markup.
+// A trailing newline gets no number — it is the end of the last line, not a line.
+const lineNumberText = computed(() => {
+  if (!showLineNumbers.value) return "";
+  const lines = displayCode.value.replace(/\n$/, "").split("\n").length;
+  return Array.from({ length: lines }, (_, i) => String(i + 1)).join("\n");
+});
+
 const onCopy = () => {
   copyToClipboard(props.code, t, {
     successMessage: props.copyMessage ?? t("common.copySuccess"),
@@ -116,7 +136,7 @@ const onCopy = () => {
 
 <template>
   <div
-    class="o2-code-block rounded-default border-border-default my-3 overflow-hidden border"
+    class="o2-code-block rounded-default border-border-default bg-syntax-bg my-3 overflow-hidden border"
     :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >
@@ -138,7 +158,7 @@ const onCopy = () => {
       </span>
       <span
         v-else-if="chrome === 'editor'"
-        class="o2-code-head inline-flex min-w-0 items-center gap-2"
+        class="o2-code-head bg-theme-tab-bg inline-flex min-w-0 items-center gap-2"
       >
         <OIcon name="code" size="xs" class="opacity-60" />
         <span class="font-mono text-xs font-semibold tracking-[0.01em] opacity-75">{{
@@ -173,11 +193,23 @@ const onCopy = () => {
         </OButton>
       </div>
     </div>
+    <!-- `text-syntax-text!` — the `!` is load-bearing.
+         `highlight.js/styles/github-dark.css` is imported globally (by O2AIChat)
+         and its unlayered `.hljs { color }` beats anything in @layer utilities,
+         so without it every token hljs leaves unclassed renders in the dark
+         theme's pale grey, unreadable on the light syntax surface.
+         Tag and content stay on one line: Vue preserves whitespace inside
+         <pre>, so a newline here would indent the first line of code. -->
     <pre
       class="o2-code-pre"
-      :class="wrap ? 'o2-code-pre--wrap' : ''"
+      :class="[wrap ? 'o2-code-pre--wrap' : '', showLineNumbers ? 'o2-code-pre--numbered' : '']"
       :style="preStyle"
-    ><code class="hljs" v-html="highlighted"></code></pre>
+    ><span
+      v-if="showLineNumbers"
+      class="o2-code-gutter bg-syntax-bg text-syntax-comment sticky left-0 tabular-nums select-none"
+      aria-hidden="true"
+      :data-test="`${dataTest}-line-numbers`"
+    >{{ lineNumberText }}</span><code class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
   </div>
 </template>
 
@@ -188,12 +220,6 @@ const onCopy = () => {
    rules here are the ones whose values are unregistered tokens
    (--color-syntax-bg / --color-syntax-text have no @theme entry, so `bg-syntax-bg`
    would compile to nothing) or need color-mix over one. */
-.o2-code-block {
-  /* --color-syntax-* are :root-only (no @theme registration) → no utility exists.
-     They flip light→dark in dark.css, so one rule set covers both themes. */
-  background: var(--color-syntax-bg);
-}
-
 .o2-code-toolbar {
   background: color-mix(in srgb, var(--color-syntax-text) 4%, transparent);
 }
@@ -203,7 +229,6 @@ const onCopy = () => {
   padding: 0.18rem 0.6rem;
   margin: -0.05rem 0;
   border-radius: 0.375rem;
-  background: var(--color-theme-tab-bg);
 }
 /* Dark keeps a neutral white wash rather than the accent-tinted token, so the
    tab reads as a highlight on the near-black syntax surface. `.dark` is set on
@@ -228,7 +253,22 @@ const onCopy = () => {
   font-size: inherit;
   line-height: inherit;
   padding: 0;
-  color: var(--color-syntax-text);
+}
+
+/* Line-number gutter. A flex row rather than a floated or absolutely-placed
+   column, so the numbers cannot overlap the code at any width, and `sticky` keeps
+   them in view while a long line scrolls sideways underneath — which is also why
+   the gutter carries the block's own background. */
+.o2-code-pre--numbered {
+  display: flex;
+}
+
+.o2-code-gutter {
+  flex: none;
+  padding-right: 1rem;
+  text-align: right;
+  /* Muted rather than hidden: the numbers are for reference, not for reading. */
+  opacity: 0.65;
 }
 
 /* Wrapped mode: break anywhere, because a long SQL string can be one

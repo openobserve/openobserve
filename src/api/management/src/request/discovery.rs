@@ -36,7 +36,8 @@ fn discovery_error_response(error: DiscoveryError) -> Response {
     match error {
         error @ (DiscoveryError::InvalidQueueStatus(_)
         | DiscoveryError::InvalidTimeRange
-        | DiscoveryError::InvalidPageSize) => MetaHttpResponse::bad_request(error),
+        | DiscoveryError::InvalidPageSize
+        | DiscoveryError::UnsupportedExperimentScope) => MetaHttpResponse::bad_request(error),
         DiscoveryError::Infra(error) => {
             log::error!("[Discovery] score-config database error: {error}");
             MetaHttpResponse::internal_error("Internal server error")
@@ -122,6 +123,12 @@ mod tests {
         );
         assert_eq!(
             discovery_error_response(DiscoveryError::InvalidTimeRange)
+                .status()
+                .as_u16(),
+            400
+        );
+        assert_eq!(
+            discovery_error_response(DiscoveryError::UnsupportedExperimentScope)
                 .status()
                 .as_u16(),
             400

@@ -17,7 +17,7 @@
 // https://openobserve.ai/blog/monitor-databricks/ — Databricks ships LOGS by
 // POSTing them from a notebook to OpenObserve's logs API (no OTel collector).
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -35,14 +35,14 @@ headers = {
 records = [{"source": "databricks", "message": "hello from databricks"}]
 requests.post(url, headers=headers, json=records)`;
 
-export default function databricksCard(subs: CardSubstitutions): RichCardContent {
+export default function databricksCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Databricks",
-      tagline: gt("ingestion.setupCard.taglineDatabricks"),
+      name: raw("Databricks"),
+      tagline: t("ingestion.setupCard.taglineDatabricks"),
       logo: getImageURL("images/ingestion/databricks.svg"),
       tone: "#FF3621",
-      metaBadges: [gt("common.logs")],
+      metaBadges: [t("common.logs")],
     },
     steps: [
       {

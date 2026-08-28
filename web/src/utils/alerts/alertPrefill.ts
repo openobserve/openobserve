@@ -301,6 +301,18 @@ export const normalizePrefill = (input: AlertPrefill): AlertPrefill => {
       input.frequencyMinutes === undefined
         ? undefined
         : Math.max(1, Math.round(input.frequencyMinutes)),
+    // Same floors the alert form's own schema enforces (threshold >= 1,
+    // silence >= 0) — a prefill must not hand the form a value it would then
+    // refuse to save. `silence: 0` is legitimate ("notify every time"), so
+    // this floors rather than truthy-checks.
+    triggerThreshold:
+      input.triggerThreshold === undefined
+        ? undefined
+        : Math.max(1, Math.round(input.triggerThreshold)),
+    silenceMinutes:
+      input.silenceMinutes === undefined
+        ? undefined
+        : Math.max(0, Math.round(input.silenceMinutes)),
     warnings: dedupeWarnings(warnings),
   };
 };

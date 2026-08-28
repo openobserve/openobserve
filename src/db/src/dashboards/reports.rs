@@ -167,6 +167,7 @@ async fn create_default_reports_folder(org_id: &str) -> Result<Folder, anyhow::E
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
         description: "default".to_owned(),
+        icon: None,
     };
     Ok(folders::save_folder(org_id, default_folder, FolderType::Reports, true).await?)
 }

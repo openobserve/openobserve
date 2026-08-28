@@ -338,6 +338,12 @@ export default class DashboardPanelConfigs {
     await this._clickVirtualOption("dashboard-config-legend-position", position);
   }
 
+  // Select chart alignment ("Auto" | "Left" | "Center"). Same OToggleGroup shape as
+  // legend position — the items are always rendered, so click the label directly.
+  async selectChartAlign(align) {
+    await this._clickVirtualOption("dashboard-config-chart-align", align);
+  }
+
   // Return the panel description input field locator
   getDescriptionField() {
     return this.descriptionField;
@@ -854,6 +860,18 @@ export default class DashboardPanelConfigs {
     );
   }
 
+  /**
+   * The inner input for a value-mapping row field, for reading back persisted values.
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index - mapping row index
+   * @param {"value"|"text"|"from"|"to"} kind - which field of the row
+   */
+  valueMappingRowField(popup, index, kind) {
+    return popup
+      .locator(`[data-test="dashboard-addpanel-config-value-mapping-${kind}-input-${index}"]`)
+      .locator('[data-test$="-field"]');
+  }
+
   /** Apply the value-mapping dialog (primary button) and wait for it to close. */
   async applyValueMappingPopup(popup) {
     await popup.locator('[data-test="o-dialog-primary-btn"]').click();
@@ -1054,6 +1072,102 @@ export default class DashboardPanelConfigs {
     return isChecked;
   }
 
+  /**
+   * Drive an OSwitch config toggle to `desired` and prove it got there.
+   *
+   * A bare `toggle.click()` is not enough in the config sidebar: the toggle is
+   * inside an OCollapsible that is still running its open animation right after
+   * expandAllConfigSections(), so a click can land while the row is moving and
+   * either miss or be swallowed. Nothing surfaces at that point — the test only
+   * fails much later, at the post-save persistence assertion, pointing at the
+   * wrong step.
+   *
+   * Read the state first and click only when it actually needs to change, so the
+   * helper is idempotent and safe to retry; then assert on the OSwitch's own
+   * `aria-checked` (an expect, so it retries while Vue commits the update).
+   *
+   * @param {import('@playwright/test').Locator} toggleLocator - the OSwitch wrapper
+   * @param {boolean} [desired=true]
+   */
+  async setConfigToggle(toggleLocator, desired = true) {
+    const button = toggleLocator.locator('[data-test$="-btn"]');
+    const want = desired ? "true" : "false";
+
+    await expect(async () => {
+      await this.scrollSidebarToElement(toggleLocator);
+      await button.waitFor({ state: "visible", timeout: 10000 });
+      if ((await button.getAttribute("aria-checked")) !== want) {
+        await button.click();
+      }
+      await expect(button).toHaveAttribute("aria-checked", want, { timeout: 5000 });
+    }).toPass({ timeout: 30000, intervals: [300, 700, 1500] });
+  }
+
+  /**
+   * Assert a config toggle's persisted state, retrying while the reopened panel
+   * hydrates. The raw `getAttribute` this replaces resolved on the FIRST poll,
+   * so a config sidebar that had not yet applied the saved value read as the
+   * component default and failed a correct panel.
+   *
+   * @param {import('@playwright/test').Locator} toggleLocator - the OSwitch wrapper
+   * @param {boolean} [expected=true]
+   */
+  async expectConfigToggle(toggleLocator, expected = true) {
+    await this.scrollSidebarToElement(toggleLocator);
+    await expect(toggleLocator.locator('[data-test$="-btn"]')).toHaveAttribute(
+      "aria-checked",
+      expected ? "true" : "false",
+      { timeout: 15000 }
+    );
+  }
+
+  /**
+   * Open an OSelect in the config sidebar and wait until its popover is really open.
+   *
+   * Two failure modes this closes over a bare `wrapper.click()`:
+   *  - `disabled` lives on the inner trigger <button>, never on the `data-test`
+   *    wrapper <div>, so clicking the wrapper skips Playwright's enabled check
+   *    and can fire at a disabled control, which the browser silently drops;
+   *  - the sidebar's collapsible animations move the trigger, and OSelect closes
+   *    its popover when an ancestor scrolls — so a click that did open the list
+   *    can have it dismissed again before the option is clicked.
+   *
+   * @param {string} baseTestId - e.g. "dashboard-config-aggregation"
+   */
+  async openConfigSelect(baseTestId) {
+    const trigger = this.page.locator(`[data-test="${baseTestId}-trigger"]`);
+    await this.scrollSidebarToElement(trigger);
+    await expect(trigger).toBeEnabled({ timeout: 15000 });
+
+    await expect(async () => {
+      if ((await trigger.getAttribute("data-state")) !== "open") {
+        await trigger.click();
+      }
+      await expect(trigger).toHaveAttribute("data-state", "open", { timeout: 2000 });
+    }).toPass({ timeout: 20000, intervals: [200, 500, 1000] });
+  }
+
+  /**
+   * Open a config OSelect and pick an option by its label, confirming the popover
+   * closed so the caller can click Apply without the list intercepting the click.
+   *
+   * @param {string} baseTestId - e.g. "dashboard-config-aggregation"
+   * @param {string} label - full option label, e.g. "Max (maximum value)"
+   */
+  async selectConfigOption(baseTestId, label) {
+    const trigger = this.page.locator(`[data-test="${baseTestId}-trigger"]`);
+    const option = this.page.locator(
+      `[data-test="${baseTestId}-option"][data-test-label="${label}"]`
+    );
+
+    await expect(async () => {
+      await this.openConfigSelect(baseTestId);
+      await option.waitFor({ state: "visible", timeout: 5000 });
+      await option.click();
+      await expect(trigger).not.toHaveAttribute("data-state", "open", { timeout: 5000 });
+    }).toPass({ timeout: 30000, intervals: [300, 700, 1500] });
+  }
+
   // ========== Time Shift (Compare Against / Multi-Window) ==========
 
   /**
@@ -1117,45 +1231,101 @@ export default class DashboardPanelConfigs {
   }
 
   /**
-   * Select a series from the autocomplete dropdown at the given row index.
-   * Can select by index or by matching text (e.g., "ago" to find comparison series).
+   * Returns the option locators for a color-by-series row's combobox.
+   * OCombobox uses ComboboxPortal — options render at document root, outside the
+   * popup — so this must be a page-level locator, not a colorBySeriesPopup-scoped one.
    * @param {number} rowIndex - Row index in the color-by-series popup (0-based)
-   * @param {Object} options - Selection options
-   * @param {number} [options.optionIndex] - Which option to select by index (0-based)
-   * @param {string} [options.matchText] - Text to match in the option (e.g., "ago", "Minutes")
-   * @returns {string} The selected series name
    */
-  async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
-    // OCombobox input — `dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input`
-    const comboboxInput = this.colorBySeriesPopup.locator(
+  colorBySeriesOptions(rowIndex = 0) {
+    return this.page.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
+    );
+  }
+
+  /** Returns the combobox input locator for a color-by-series row. */
+  colorBySeriesSeriesInput(rowIndex = 0) {
+    return this.colorBySeriesPopup.locator(
       `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input"]`
     );
+  }
+
+  /**
+   * Open a row's series dropdown and return every option label, then close it again.
+   * Lets a test assert on which series the chart is actually offering (e.g. that a
+   * time-shift comparison series exists) without reaching for raw locators.
+   * @param {number} rowIndex - Row index (0-based)
+   * @returns {Promise<string[]>} The option labels
+   */
+  async getColorBySeriesOptionLabels(rowIndex = 0) {
+    const comboboxInput = this.colorBySeriesSeriesInput(rowIndex);
     await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
     await comboboxInput.click();
 
-    // OCombobox uses ComboboxPortal — options are rendered at document root, outside the popup.
-    // Must use page-level locator, not colorBySeriesPopup-scoped locator.
-    const optionLocators = this.page.locator(
-      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
+    const optionLocators = this.colorBySeriesOptions(rowIndex);
+    await optionLocators
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 })
+      .catch(() => {});
+
+    const labels = await optionLocators.evaluateAll((els) =>
+      els.map((el) => (el.getAttribute("data-test-label") || el.textContent || "").trim())
     );
+    // Close the portal without picking anything, so the caller can re-open it.
+    await this.page.keyboard.press("Escape");
+    return labels;
+  }
+
+  /** Returns the currently committed series name for a color-by-series row. */
+  async getColorBySeriesRowValue(rowIndex = 0) {
+    return this.colorBySeriesSeriesInput(rowIndex).inputValue();
+  }
+
+  /** Returns the currently committed colour (hex string) for a color-by-series row. */
+  async getColorBySeriesRowColor(rowIndex = 0) {
+    const colorSection = this.colorBySeriesPopup.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-color-section-${rowIndex}"]`
+    );
+    await colorSection.waitFor({ state: "visible", timeout: 5000 });
+    return colorSection.locator("input").first().inputValue();
+  }
+
+  /**
+   * Select a series from the autocomplete dropdown at the given row index.
+   * Can select by index or by matching text (e.g., "ago" to find comparison series).
+   *
+   * `matchText` is strict: if no option contains it, this throws and lists what was
+   * on offer. It used to fall back to the first/last option, which silently turned
+   * "colour the comparison series" into "colour whatever series happened to exist"
+   * — a test that passed without exercising the behaviour it named.
+   *
+   * @param {number} rowIndex - Row index in the color-by-series popup (0-based)
+   * @param {Object} options - Selection options
+   * @param {number} [options.optionIndex] - Which option to select by index (0-based)
+   * @param {string} [options.matchText] - Text the option must contain (e.g. "15 Minutes ago")
+   * @returns {string} The selected series name
+   */
+  async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
+    const comboboxInput = this.colorBySeriesSeriesInput(rowIndex);
+    await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
+    await comboboxInput.click();
+
+    const optionLocators = this.colorBySeriesOptions(rowIndex);
     await optionLocators.first().waitFor({ state: "visible", timeout: 10000 });
 
     let targetOption;
 
     if (matchText) {
-      const count = await optionLocators.count();
-      for (let i = 0; i < count; i++) {
-        const text = await optionLocators.nth(i).textContent();
-        if (text && text.includes(matchText)) {
-          targetOption = optionLocators.nth(i);
-          break;
-        }
+      const labels = await optionLocators.evaluateAll((els) =>
+        els.map((el) => (el.getAttribute("data-test-label") || el.textContent || "").trim())
+      );
+      const index = labels.findIndex((label) => label.includes(matchText));
+      if (index === -1) {
+        throw new Error(
+          `No color-by-series option matching "${matchText}" in row ${rowIndex}. ` +
+            `Available options: ${JSON.stringify(labels)}`
+        );
       }
-      if (!targetOption && count > 1) {
-        targetOption = optionLocators.nth(count - 1);
-      } else if (!targetOption) {
-        targetOption = optionLocators.first();
-      }
+      targetOption = optionLocators.nth(index);
     } else {
       targetOption = optionLocators.nth(optionIndex ?? 0);
     }
@@ -1575,6 +1745,40 @@ export default class DashboardPanelConfigs {
     return this.page.locator(
       `[data-test="dashboard-config-markline-type-${index}-option"][data-test-label="${label}"]`
     );
+  }
+
+  /**
+   * Set the mark line type for row `index` and prove the row actually changed.
+   *
+   * Each row's OSelect follows the standard `-trigger` / `-option` shape, so this
+   * is selectConfigOption plus a per-row confirmation. Asserting on the trigger's
+   * `data-test-selected-label` replaces the old
+   * `getMarklineTypeOption(...).waitFor({state:"hidden"}).catch(() => {})`, which
+   * swallowed its own failure: a dropdown that never closed left the next fill()
+   * landing on the open option list, and the value-input visibility assertion that
+   * follows a type change could resolve before the v-if had been re-evaluated.
+   *
+   * @param {number} index - mark line row
+   * @param {string} label - option label, e.g. "Average" / "Y-Axis" / "Max"
+   */
+  async selectMarklineType(index, label) {
+    await this.selectConfigOption(`dashboard-config-markline-type-${index}`, label);
+    await expect(this.getMarklineTypeTrigger(index)).toHaveAttribute(
+      "data-test-selected-label",
+      label,
+      { timeout: 10000 }
+    );
+  }
+
+  /**
+   * Fill a mark line row's name field and confirm the value stuck, so a fill that
+   * raced a re-render fails here rather than at a much later persistence check.
+   */
+  async setMarklineName(index, value) {
+    const field = this.getMarklineName(index).locator('[data-test$="-field"]');
+    await this.scrollSidebarToElement(field);
+    await field.fill(value);
+    await expect(field).toHaveValue(value, { timeout: 5000 });
   }
 
   /** Mark line value input wrapper for row `index`. */

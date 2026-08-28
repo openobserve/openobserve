@@ -8,6 +8,7 @@
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
       "alerts-destinations-prebuilt.spec.js",
+      "dl-email-destinations.spec.js",
       "alerts-vrl-encoding.spec.js",
       "alerts-history.spec.js",
       "alerts-template-prebuilt-guard.spec.js",
@@ -151,7 +152,8 @@
       "dashboard-table-column-formatting.spec.js",
       "dashboard-table-column-filtering.spec.js",
       "dashboard-table-pagination.spec.js",
-      "dashboard-pivot-table.spec.js"
+      "dashboard-pivot-table.spec.js",
+      "interactive-dashboard-table.spec.js"
     ],
     "disabled": []
   },
@@ -193,8 +195,7 @@
       "js-transform-type.spec.js",
       "row-expansion.spec.js",
       "enrichment-table-url.spec.js",
-      "functions-form-validation.spec.js",
-      "action-scripts-form-validation.spec.js"
+      "functions-form-validation.spec.js"
     ],
     "disabled": []
   },
@@ -226,7 +227,8 @@
       "shared-components-form-validation.spec.js",
       "onboarding-form-validation.spec.js",
       "rum-form-validation.spec.js",
-      "login-form-validation.spec.js"
+      "login-form-validation.spec.js",
+      "datetime-picker-copy-paste.spec.js"
     ],
     "disabled": []
   },
@@ -302,7 +304,8 @@
     "browser": "chrome",
     "quick_mode_enabled": "true",
     "run_files": [
-      "logsVisualizeSelectStar.spec.js"
+      "logsVisualizeSelectStar.spec.js",
+      "logsBuildStreamList.spec.js"
     ],
     "disabled": []
   },
@@ -417,6 +420,34 @@
       "traceAdvancedFiltering.spec.js",
       "tracesAnalyzeDimensions.spec.js",
       "traces-autocomplete-suggestions.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "SLO",
+    "_comment": "SLO lifecycle, form validation and the alert SLI type. No backfill dependency, so these run in parallel \u2014 but pinned to 3 workers: at 5 the concurrent SLO/alert/destination writes trip SQLite's 'database is locked' on the single-node meta store. The REST contract is covered by pytest in tests/api-testing/tests/slos/.",
+    "actual_folder": "SLO",
+    "browser": "chrome",
+    "ingest_allowed_upto": "240",
+    "workers": 3,
+    "run_files": [
+      "slo-crud.spec.js",
+      "slo-form-validation.spec.js",
+      "slo-alert-sli.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "SLO-Measurement",
+    "_comment": "SEPARATE SHARD ON PURPOSE. These two specs seed 8 days of history and wait for the backfill job (ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1, so its 3 backfilled SLOs queue strictly one at a time). slo_backfill_chunk_secs is bumped from the 86400 (1-day) server default to the full 604800 (7-day) window each of those SLOs uses, so each finishes in 1 chunk instead of 7 -- no test here asserts on per-chunk timing or partial coverage, only on the final measured state. Any spec creating SLOs on the same instance queues behind them and starves the wait, so they must not share a runner with the SLO shard. Both specs are mode:serial and pay the backfill once in beforeAll.",
+    "actual_folder": "SLO",
+    "browser": "chrome",
+    "ingest_allowed_upto": "240",
+    "slo_backfill_chunk_secs": "604800",
+    "workers": 1,
+    "run_files": [
+      "slo-timeslice.spec.js",
+      "slo-alerts.spec.js"
     ],
     "disabled": []
   }

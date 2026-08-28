@@ -6,6 +6,7 @@
 // (at your option) any later version.
 
 import type { ScoreDataType, ScorerType } from "@/services/online-evals.service";
+import { gt } from "@/types/i18n";
 
 export const ONLINE_EVALS_CATALOG_URL =
   "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/score_configs_and_scorers.json";
@@ -43,7 +44,7 @@ export interface OnlineEvalsCatalog {
 export async function fetchOnlineEvalsCatalog(): Promise<OnlineEvalsCatalog> {
   const response = await fetch(ONLINE_EVALS_CATALOG_URL, { credentials: "omit" });
   if (!response.ok) {
-    throw new Error(`Failed to fetch catalog (${response.status})`);
+    throw new Error(gt("onlineEvals.failedToFetchCatalog", { status: response.status }));
   }
 
   const catalog = await response.json();

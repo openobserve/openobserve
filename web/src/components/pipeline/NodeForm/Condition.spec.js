@@ -212,7 +212,7 @@ describe("Condition.vue (drawer chrome)", () => {
     builderGroup.value = { filterType: "group", conditions: [{ column: "changed" }] };
     await wrapper.find('[data-test="cancel-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
-    expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+    expect(wrapper.vm.dialog.title).toBe("Discard changes");
   });
 
   it("clears the selected/clicked node when closing", () => {

@@ -40,7 +40,7 @@ import CheckCapture from "./CheckCapture.vue";
 
 const props = defineProps<{
   check: BrowserCheck;
-  checkType?: SyntheticCheckType | "api";
+  checkType?: SyntheticCheckType;
   locations?: SyntheticsLocation[];
   browsers?: string[];
   devices?: SyntheticsDevice[];
@@ -62,20 +62,16 @@ const isHostTarget = computed(() => ["tcp", "tls", "ssh"].includes(props.checkTy
 // Target field wording: browser keeps "Starting URL"; http is a plain "URL".
 const targetLabel = computed(() => {
   if (isHostTarget.value) return t("synthetics.checkDetails.hostTarget");
-  if (props.checkType === "http" || props.checkType === "api")
-    return t("synthetics.checkDetails.urlTarget");
+  if (props.checkType === "http") return t("synthetics.checkDetails.urlTarget");
   return undefined;
 });
 const targetPlaceholder = computed(() => {
   if (isHostTarget.value) return t("synthetics.checkDetails.hostTargetPlaceholder");
-  if (props.checkType === "http" || props.checkType === "api")
-    return t("synthetics.checkDetails.urlTargetPlaceholder");
+  if (props.checkType === "http") return t("synthetics.checkDetails.urlTargetPlaceholder");
   return undefined;
 });
 // Basic auth + variables only make sense where the probe sends them today.
-const showAuthNetwork = computed(() =>
-  ["browser", "http", "api"].includes(props.checkType ?? "browser"),
-);
+const showAuthNetwork = computed(() => ["browser", "http"].includes(props.checkType ?? "browser"));
 
 // Shared with the Journey page so a drag on either page carries to the other.
 // Check types with no variables pin the content pane to 100% — the panel and

@@ -11,6 +11,7 @@
 // GNU Affero General Public License for more details.
 
 import { describe, it, expect } from "vitest";
+import { gt } from "@/types/i18n";
 import { useVariablesManager, getVariableKey, type VariableConfig } from "./useVariablesManager";
 
 describe("useVariablesManager", () => {
@@ -33,7 +34,7 @@ describe("useVariablesManager", () => {
 
   describe("Variable Expansion", () => {
     it("should expand global variable without modification", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -52,7 +53,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should expand tab variable into multiple instances", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "region",
@@ -76,7 +77,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should expand panel variable into multiple instances", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "status",
@@ -100,7 +101,7 @@ describe("useVariablesManager", () => {
     it("should use the option marked as default (selected) for single-select custom variables", () => {
       // Regression: previously the first option was always used as the default,
       // ignoring the per-option "Default" checkbox (option.selected).
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "custom_stream",
@@ -123,7 +124,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should use options marked as default (selected) for multiSelect custom variables", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "custom_multi",
@@ -145,7 +146,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should fall back to the first option when no custom option is marked default", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "custom_no_default",
@@ -166,7 +167,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should migrate legacy variables to global scope", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: any[] = [
         {
           name: "legacy",
@@ -186,7 +187,7 @@ describe("useVariablesManager", () => {
 
   describe("Dependency Graph", () => {
     it("should build dependency graph for global variables", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -218,7 +219,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should build dependency graph across scopes", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -251,7 +252,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should detect circular dependencies", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "var1",
@@ -281,7 +282,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should ignore invalid cross-scope dependencies when parent not found", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "tabVar",
@@ -317,7 +318,7 @@ describe("useVariablesManager", () => {
 
   describe("Variable Loading", () => {
     it("should load independent global variables in parallel", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "var1",
@@ -340,7 +341,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should load dependent variables after parent completes", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "parent",
@@ -385,7 +386,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should only load tab variables when tab is visible", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "tabVar",
@@ -413,7 +414,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should only load panel variables when panel is visible", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "panelVar",
@@ -443,7 +444,7 @@ describe("useVariablesManager", () => {
 
   describe("Variable Updates", () => {
     it("should update variable value and trigger dependents", async () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "parent",
@@ -479,7 +480,7 @@ describe("useVariablesManager", () => {
 
   describe("URL Synchronization", () => {
     it("should format global variables for URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -504,7 +505,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should format tab variables for URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "region",
@@ -531,7 +532,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should format panel variables for URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "status",
@@ -558,7 +559,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should parse global variables from URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "country",
@@ -582,7 +583,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should parse tab variables from URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "region",
@@ -608,7 +609,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should parse panel variables from URL", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "status",
@@ -635,7 +636,7 @@ describe("useVariablesManager", () => {
 
   describe("Variable Queries", () => {
     it("should get variables for panel (merged: global + tab + panel)", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "globalVar",
@@ -677,7 +678,7 @@ describe("useVariablesManager", () => {
     });
 
     it("should get variables for tab (merged: global + tab)", () => {
-      const manager = useVariablesManager();
+      const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [
         {
           name: "globalVar",

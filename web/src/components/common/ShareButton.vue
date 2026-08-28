@@ -208,7 +208,8 @@ export default defineComponent({
     };
 
     /**
-     * Handler for share button click
+     * Handler for share button click. Also the entry point for copy-URL keyboard
+     * shortcuts, which call it through a template ref — keep it exposed.
      * Safari: Uses polling mechanism to maintain user gesture context
      * Chrome/Firefox: Copies directly in API response
      */
@@ -220,6 +221,9 @@ export default defineComponent({
         });
         return;
       }
+
+      // Shortcuts call this directly, so the button's :disabled cannot gate them.
+      if (props.disabled || isWebUrlNotConfigured.value) return;
 
       // Start loading and fetch short URL
       isLoading.value = true;

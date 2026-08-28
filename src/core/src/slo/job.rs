@@ -31,7 +31,7 @@ use config::{
     meta::{
         search::{Query, Request, RequestEncoding},
         slo::{
-            SliConfig, Slo,
+            CountSource, QueryLanguage, SliConfig, Slo,
             alert_uptime::{EvalInterval, UptimeGrid, uptime_slices},
             slice::SliceRow,
             stream::{SLO_SLICES_STREAM, SloSliceRow},
@@ -41,7 +41,10 @@ use config::{
     },
     utils::{json, time::now_micros},
 };
-use infra::table::{slo as slo_table, slos as slos_table};
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::{slo as slo_table, slos as slos_table},
+};
 
 use super::{
     ingest::{
@@ -70,9 +73,7 @@ pub enum PassOutcome {
 /// Run one SLI ingest pass for `slo`.
 pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::Error> {
     let cfg = get_config();
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
 
     let status = slo_table::load_status(db, &slo.id, "").await?;
     // A status row whose generation has already moved on means this pass was
@@ -99,8 +100,31 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
         recompute_slices: cfg.slo.recompute_slices,
         generation_reset_time,
     }) else {
+        log::warn!("here, skipped the pass");
         return Ok(PassOutcome::NothingToDo);
     };
+
+    // for promql query, we add the slice interval sec to start to get the actual query start time
+    // see the prom_query fn for more details. But if after that calculation the start > = end
+    // we will get error in downstream processing and the slo will freeze. Thus instead we check
+    // here and skip early
+    match &slo.definition.sli_config {
+        SliConfig::TimeSlice { query_language, .. }
+            if matches!(query_language, QueryLanguage::PromQl)
+                && range.start + slo.definition.slice_interval_secs >= range.end =>
+        {
+            return Ok(PassOutcome::NothingToDo);
+        }
+
+        SliConfig::Count { source }
+            if matches!(source, CountSource::PromQl { .. })
+                && range.start + slo.definition.slice_interval_secs >= range.end =>
+        {
+            return Ok(PassOutcome::NothingToDo);
+        }
+
+        _ => {}
+    }
 
     let group_by = slo.definition.group_by.clone().unwrap_or_default();
     let params = PassParams {
@@ -528,7 +552,9 @@ async fn prom_search(
         // The same rule as a partial SQL response: an unusable result is an
         // ERROR that fails the pass, so coverage falls — never an empty
         // window that reads as data.
-        anyhow::bail!("SLO PromQL query returned a non-matrix response");
+        anyhow::bail!(
+            "SLO PromQL query returned a non-matrix response : {resp:?} trace : {trace_id}",
+        );
     };
     Ok(matrix
         .into_iter()
@@ -871,9 +897,7 @@ pub async fn run_range(
     writer: config::meta::slo::slice::Writer,
 ) -> Result<usize, anyhow::Error> {
     let cfg = get_config();
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let group_by = slo.definition.group_by.clone().unwrap_or_default();
     let params = PassParams {

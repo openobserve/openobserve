@@ -281,7 +281,23 @@ export class LogsPage {
         this.xAxisItemsAny = `${this.xAxisLayout} [data-test^="dashboard-x-item-"]`;
         this.yAxisItemsAny = `${this.yAxisLayout} [data-test^="dashboard-y-item-"]`;
 
-        // Field list for builder
+        // Field list for builder.
+        // Scoped under [data-test="logs-build-query-page"]: the Visualize tab mounts a
+        // SECOND PanelEditor (pageType="logs") that Index.vue keeps in the DOM with
+        // v-show, so both tabs render an `index-dropdown-stream` and an unscoped
+        // locator is a strict-mode violation.
+        this.buildStreamTypeDropdown = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream_type"]';
+        this.buildStreamTypeTrigger = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream_type-trigger"]';
+        this.buildStreamDropdown = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream"]';
+        this.buildStreamTrigger = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream-trigger"]';
+        // OSelect popovers teleport to <body>, so popover/option/search locators are
+        // NOT scoped to the build page — only one popover is ever open at a time.
+        this.buildStreamPopover = '[data-test="index-dropdown-stream-popover"]';
+        this.buildStreamSearch = '[data-test="index-dropdown-stream-search"]';
+        this.buildStreamOptions = '[data-test="index-dropdown-stream-popover"] [data-test="index-dropdown-stream-option"]';
+        this.buildStreamOption = (name) => `[data-test="index-dropdown-stream-option"][data-test-value="${name}"]`;
+        this.buildStreamTypePopover = '[data-test="index-dropdown-stream_type-popover"]';
+        this.buildStreamTypeOption = (type) => `[data-test="index-dropdown-stream_type-popover"] [data-test="index-dropdown-stream_type-option"][data-test-value="${type}"]`;
         this.streamTypeDropdown = '[data-test="index-dropdown-stream_type"]';
         this.streamDropdown = '[data-test="index-dropdown-stream"]';
         this.addToXAxis = '[data-test="dashboard-add-x-data"]';
@@ -9478,6 +9494,131 @@ export class LogsPage {
         testLogger.info('Clicked Build tab toggle');
     }
 
+    // ── Build tab: panel field list stream selectors ────────────────────────
+    // PanelFieldList (pageKey "build") owns these. Unlike the Visualize tab's
+    // copy (pageKey "logs", read-only), both selects here are the user's own.
+    // All locator work and every assertion lives here — specs call the semantic
+    // methods only, matching the other Logs specs.
+
+    /**
+     * Assert the LOGS page has no stream selected.
+     *
+     * Asserts the count too, and deliberately fails CLOSED: this selector also
+     * exists in JsonPreview.vue (rendered when a log row is expanded), so a bare
+     * .first() could silently read the wrong control and report '' for a page
+     * that does have a stream. A second match is a broken precondition, not a
+     * detail to skip past.
+     */
+    async expectNoLogsStreamSelected() {
+        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        await expect(
+            trigger,
+            'expected exactly one logs stream select — a second match means the locator is ambiguous'
+        ).toHaveCount(1, { timeout: 20000 });
+        await expect(
+            trigger,
+            'logs page must start with no stream selected — the Build tab inherits that blank stream'
+        ).toHaveAttribute('data-test-selected-value', '', { timeout: 20000 });
+        testLogger.info('Verified logs page has no stream selected');
+    }
+
+    /** Assert the Build tab's stream type. Retries — the model settles a tick late. */
+    async expectBuildStreamType(type) {
+        await expect(this.page.locator(this.buildStreamTypeTrigger))
+            .toHaveAttribute('data-test-selected-value', type, { timeout: 20000 });
+        testLogger.info(`Verified Build tab stream type: ${type}`);
+    }
+
+    /** Assert which stream the Build tab's field list has selected. */
+    async expectBuildStreamSelected(name) {
+        await expect(this.page.locator(this.buildStreamTrigger))
+            .toHaveAttribute('data-test-selected-value', name, { timeout: 20000 });
+        testLogger.info(`Verified Build tab selected stream: ${name}`);
+    }
+
+    /** The stream select must be the user's own control, not read-only. */
+    async expectBuildStreamDropdownEditable() {
+        await expect(
+            this.page.locator(this.buildStreamTrigger),
+            'Build tab stream select must be user-editable'
+        ).toBeEnabled({ timeout: 20000 });
+    }
+
+    /** The open dropdown offers real streams instead of OSelect's empty state. */
+    async expectBuildStreamListPopulated() {
+        await expect(
+            this.page.locator(this.buildStreamPopover).getByText('No options found', { exact: true }),
+            'stream list never loaded — dropdown fell through to its empty state'
+        ).toHaveCount(0, { timeout: 15000 });
+        await expect(this.page.locator(this.buildStreamOptions).first())
+            .toBeVisible({ timeout: 15000 });
+    }
+
+    /** Assert a stream IS offered. Filters first — the option list is virtualised. */
+    async expectBuildStreamOptionVisible(name) {
+        await this.filterBuildStreamOptions(name);
+        await expect(this.page.locator(this.buildStreamOption(name)).first())
+            .toBeVisible({ timeout: 15000 });
+    }
+
+    /** Assert a stream is NOT offered (e.g. a logs stream under stream type traces). */
+    async expectBuildStreamOptionAbsent(name) {
+        await this.filterBuildStreamOptions(name);
+        await expect(this.page.locator(this.buildStreamOption(name)))
+            .toHaveCount(0, { timeout: 15000 });
+    }
+
+    /** Field rows render for the selected stream. Any row — this shard runs with
+     *  ZO_QUICK_MODE_ENABLED, which narrows which fields are listed. */
+    async expectBuildFieldListPopulated() {
+        await expect(
+            this.page.locator('[data-test="logs-build-query-page"] [data-test^="o-field-list-row-"]').first()
+        ).toBeVisible({ timeout: 20000 });
+    }
+
+    async openBuildStreamDropdown() {
+        const dropdown = this.page.locator(this.buildStreamDropdown);
+        await dropdown.waitFor({ state: 'visible', timeout: 20000 });
+        await dropdown.click();
+        await this.page.locator(this.buildStreamPopover).waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Opened Build tab stream dropdown');
+    }
+
+    async closeBuildStreamDropdown() {
+        await this.page.keyboard.press('Escape');
+        await this.page.locator(this.buildStreamPopover)
+            .waitFor({ state: 'hidden', timeout: 10000 })
+            .catch(() => {});
+    }
+
+    /**
+     * Filter the open stream dropdown. The option list is virtualised, so
+     * filtering — not scrolling — is the only reliable way to assert that a
+     * specific stream is present or absent.
+     */
+    async filterBuildStreamOptions(text) {
+        const search = this.page.locator(this.buildStreamSearch);
+        await search.waitFor({ state: 'visible', timeout: 10000 });
+        await search.fill(text);
+    }
+
+    /** Click an offered stream and wait for the dropdown to commit the pick. */
+    async clickBuildStreamOption(name) {
+        await this.page.locator(this.buildStreamOption(name)).first().click();
+        await expect(this.page.locator(this.buildStreamPopover)).toBeHidden({ timeout: 10000 });
+        testLogger.info(`Picked Build tab stream: ${name}`);
+    }
+
+    /** Change the Build tab's Stream Type. Clears the stream by design. */
+    async selectBuildStreamType(type) {
+        await this.page.locator(this.buildStreamTypeDropdown).click();
+        const popover = this.page.locator(this.buildStreamTypePopover);
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+        await popover.locator(`[data-test="index-dropdown-stream_type-option"][data-test-value="${type}"]`).first().click();
+        await popover.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        testLogger.info(`Selected Build tab stream type: ${type}`);
+    }
+
     /**
      * Click the Logs tab toggle to switch back to Logs mode
      */
@@ -9771,7 +9912,11 @@ export class LogsPage {
     async isQuickModeEnabledOnInstance() {
         return await this.page
             .evaluate(async () => {
-                const res = await fetch('/config');
+                // quick_mode_enabled lives on the AUTHENTICATED per-org config;
+                // the unauthenticated /config bootstrap no longer carries flags.
+                const org =
+                    new URLSearchParams(location.search).get('org_identifier') || 'default';
+                const res = await fetch(`/api/${org}/config`, { credentials: 'include' });
                 if (!res.ok) return false;
                 const cfg = await res.json();
                 return cfg.quick_mode_enabled === true;

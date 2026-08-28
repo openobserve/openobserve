@@ -520,7 +520,7 @@ export default defineComponent({
                   const convertedSchema = migrateSchema(dashboard);
 
                   // Validate the converted schema before importing
-                  const validationErrors = validateDashboardJson(convertedSchema);
+                  const validationErrors = validateDashboardJson(t, convertedSchema);
                   if (validationErrors.length > 0) {
                     const errorMessage = validationErrors.join("; ");
                     results.push({
@@ -636,7 +636,7 @@ export default defineComponent({
             const converted = migrateSchema(dashboard);
 
             // Validate the converted schema before importing
-            const validationErrors = validateDashboardJson(converted);
+            const validationErrors = validateDashboardJson(t, converted);
             if (validationErrors.length > 0) {
               const errorMessage = validationErrors.join("; ");
               return Promise.reject({ index, error: new Error(errorMessage) });
@@ -687,7 +687,7 @@ export default defineComponent({
         const convertedSchema = migrateSchema(oldImportedSchema);
 
         // Validate the converted schema before importing
-        const validationErrors = validateDashboardJson(convertedSchema);
+        const validationErrors = validateDashboardJson(t, convertedSchema);
         if (validationErrors.length > 0) {
           const errorMessage = validationErrors.join("; ");
           showErrorNotification(
@@ -776,7 +776,7 @@ export default defineComponent({
       }
 
       // Comprehensive dashboard validation using validateDashboardJson
-      const validationErrors = validateDashboardJson(input);
+      const validationErrors = validateDashboardJson(t, input);
       if (validationErrors.length > 0) {
         validationErrors.forEach((error) => {
           dashboardErrorsToDisplay.value.push({

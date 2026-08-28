@@ -203,19 +203,58 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 **Key props:** `open` (boolean, `v-model:open`) · `modal` (boolean — default `false`; traps focus + blocks outside pointer events) · `side` (`"top"|"right"|"bottom"|"left"` — default `"bottom"`) · `align` (`"start"|"center"|"end"` — default `"start"`) · `sideOffset` (number — default `4`) · `hideWhenDetached` (boolean — default `true`; hide when trigger scrolls out of view) · `ariaLabel` (string) · `zIndex` (number — default `6000`) · `contentClass` (string)
 **Slots:** `trigger` (as-child), `default` (content)
 **Emits:** `update:open` (boolean)
-**Example:**
+
+**Filter-popover recipe.** A "Filters" / "Narrow results" popover is not a loose
+stack of selects — build it as **one panel you fill in and dismiss**: a title, a
+column of **labelled** fields, then a **pinned action row**. Three rules:
+
+- **Every field carries a label**, even when its placeholder names the dimension
+  (`ENGINE` label above an `All engines` placeholder). The label is the axis; the
+  placeholder is the *unset* state. Prefer the field component's own `label` prop
+  (it wires `for`/`id` + a11y); drop to a hand-rolled micro-label
+  (`text-text-label text-3xs font-semibold tracking-wide uppercase`) only when the
+  label must match a string shown elsewhere (e.g. a toolbar chip) and be cased up.
+- **A pinned action row** at the bottom, divided by `border-t border-border-default`,
+  holding **Clear all** (`variant="outline"`, `:disabled` when nothing is set so its
+  place never shifts). **No Done/Apply button when filters apply live** — each
+  `@update` already commits, so there is nothing to submit, and the popover
+  dismisses on outside-click. Add a primary Done only if the popover *stages*
+  changes and commits on close.
+- **Don't reserve/hide the reset by presence** — keep Clear all in the layout and
+  toggle `:disabled`, so opening the popover doesn't shift the fields upward.
 
 ```vue
-<OPopover align="end">
+<OPopover v-model:open="open" align="end">
   <template #trigger>
-    <OButton variant="outline" icon="filter">Filters</OButton>
+    <OButton variant="outline" icon-left="filter-list">{{ t("dbm.filters.scope") }}</OButton>
   </template>
-  <div class="flex flex-col gap-2 p-3">
-    <OSelect v-model="status" :options="statusOptions" label="Status" />
-    <OInput v-model="search" label="Contains" />
+  <div class="flex w-72 flex-col">
+    <div class="flex flex-col gap-2.5 p-3">
+      <p class="text-text-primary text-sm font-semibold">{{ t("dbm.filters.popoverTitle") }}</p>
+      <OSelect
+        v-for="f in filters"
+        :key="f.key"
+        :label="f.dimension"
+        :model-value="f.value"
+        :options="f.options"
+        size="sm"
+        clearable
+        :placeholder="f.placeholder"
+        @update:model-value="f.onChange"
+      />
+    </div>
+    <div class="border-border-default flex items-center border-t px-3 py-2.5">
+      <OButton variant="outline" size="sm" :disabled="!activeCount" @click="clear">
+        {{ t("dbm.filters.clearScope") }}
+      </OButton>
+    </div>
   </div>
 </OPopover>
 ```
+
+Reference implementation: `web/src/components/dbm/DbmScopeFilters.vue` (adds the
+set dimensions back to the toolbar as removable `ODimensionChip`s, so an
+unfiltered page spends one button and a filtered one shows its scope as chips).
 
 **Family:** ODropdown (menu sibling — shares overlay coordination).
 
@@ -223,7 +262,8 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 
 ### OTooltip
 **Import:** `@/lib/overlay/Tooltip/OTooltip.vue`
-**Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot — attaches to its parent element as its tooltip).
+**Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot).
+**Child mode binds to the nearest previous VISIBLE ELEMENT SIBLING, and only falls back to the parent when there is none** — it is not simply "the parent". So put a child-mode `OTooltip` **first** inside the element you want as the trigger; placed after an `<OIcon>` it silently binds to that icon, and only the icon becomes hoverable. Text nodes do not count as siblings, so `<OIcon/> {{ count }} <OTooltip/>` binds to the icon and leaves the count dead. This shipped in the alert-dependency count chips, where the tooltip fired on a 12px glyph inside a 52px chip.
 **Don't use for:** Anything the user interacts with inside the bubble (use **OPopover**); an action menu (use **ODropdown**).
 **Key props:** `content` (string — plain-text shorthand for `#content`) · `side` (`"top"|"right"|"bottom"|"left"` — default `"top"`) · `align` (`"start"|"center"|"end"` — default `"center"`) · `sideOffset` (number — default `4`) · `alignOffset` (number — default `0`) · `delay` (number ms — default `700`) · `maxWidth` (string — default `"320px"`) · `disabled` (boolean) · `open` (boolean — controlled) · `contentClass` (string) · `shortcut` (`string | string[]`) · `shortcutId` (string — prefer over `shortcut`)
 **Slots:** `default` (trigger — single focusable element; omit for child mode), `content` (rich content, overrides `content` prop)

@@ -359,25 +359,40 @@ export class ReportsPage {
   }
 
   async createReportSaveButton() {
-    await this.saveButton.click({ force: true });
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (resp) => {
+          const pathname = new URL(resp.url()).pathname;
+          return /^\/api\/(?:v2\/)?[^/]+\/reports\/?$/.test(pathname) &&
+            resp.request().method() === 'POST';
+        },
+        { timeout: 30000 }
+      ),
+      this.saveButton.click({ force: true }),
+    ]);
+
+    if (!response.ok()) {
+      const responseBody = await response.text().catch(() => '<response body unavailable>');
+      throw new Error(
+        `Report creation failed with HTTP ${response.status()}: ${responseBody}`
+      );
+    }
   }
 
   async verifyReportCreated(reportName) {
-    // Wait for save success toast
-    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 30000 });
-    await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });
+    await expect(this.page).toHaveURL(/\/web\/reports(?:\?|$)/, { timeout: 30000 });
 
-    // Navigate to reports list. waitForLoadState('networkidle') is insufficient
-    // here because Vue's onBeforeMount API call starts AFTER the browser idles —
-    // wait for the reports GET response explicitly so data is in the table before
-    // we attempt to search.
+    // Reload the reports list and wait for its collection request. Both v1 and
+    // v2 are accepted so this helper works across mixed-version deployments.
     const reportsApiPromise = this.page.waitForResponse(
-      (resp) =>
-        /\/api\/[^/]+\/reports(\?|$)/.test(resp.url()) &&
-        resp.request().method() === 'GET' &&
-        resp.status() === 200,
+      (resp) => {
+        const pathname = new URL(resp.url()).pathname;
+        return /^\/api\/(?:v2\/)?[^/]+\/reports\/?$/.test(pathname) &&
+          resp.request().method() === 'GET' &&
+          resp.ok();
+      },
       { timeout: 30000 }
-    ).catch(() => null);
+    );
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
     await reportsApiPromise;
 

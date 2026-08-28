@@ -177,6 +177,32 @@ describe("TabList", () => {
       );
     });
 
+    it("shows a panel-count badge per tab, excluding section headers", () => {
+      const dashboard = {
+        ...mockDashboardData,
+        tabs: [
+          {
+            tabId: "tab1",
+            name: "First Tab",
+            // Two real panels + one section header → count should be 2.
+            panels: [{ id: "p1" }, { o2SectionHeader: true, id: "h1" }, { id: "p2" }],
+          },
+        ],
+      };
+      wrapper = createWrapper({ dashboardData: dashboard });
+
+      const badge = wrapper.find('[data-test="dashboard-tab-tab1-panel-count"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("2");
+    });
+
+    it("shows 0 on a tab with no panels", () => {
+      wrapper = createWrapper();
+      const badge = wrapper.find('[data-test="dashboard-tab-tab1-panel-count"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("0");
+    });
+
     it("should display tab names correctly", () => {
       wrapper = createWrapper();
 
@@ -247,7 +273,8 @@ describe("TabList", () => {
         expect(classes).toContain("whitespace-nowrap");
         expect(classes).toContain("overflow-hidden");
         expect(classes).toContain("text-ellipsis");
-        expect(classes).toContain("w-full");
+        // flex-1 (was w-full) so the name shares the row with the panel-count badge.
+        expect(classes).toContain("flex-1");
       });
     });
   });
@@ -710,6 +737,21 @@ describe("TabList", () => {
       expect(input.exists()).toBe(true);
       expect((input.element as HTMLInputElement).value).toBe("Second Tab");
       expect(wrapper.vm.editingTabId).toBe("tab2");
+    });
+
+    // A 0 min track (`minmax(0,max-content)`) lets the editing tab shrink to 0px
+    // once the strip overflows, hiding the input. jsdom has no layout engine, so
+    // assert the declaration rather than the width.
+    it("should size the rename field with a max-content track that cannot collapse", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename({ tabId: "tab2", name: "Second Tab" });
+      await flushPromises();
+
+      const grid = wrapper.find('[data-test="dashboard-tab-tab2-rename-input"]').element
+        .parentElement as HTMLElement;
+      expect(grid.className).toContain("grid-cols-[max-content]");
+      expect(grid.className).not.toContain("minmax(0");
     });
 
     it("should persist a changed name via editTab and emit refresh", async () => {

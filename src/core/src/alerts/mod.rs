@@ -42,6 +42,8 @@ use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;
 pub mod backfill;
+pub mod composite;
+pub mod composite_graph_lock;
 #[cfg(feature = "enterprise")]
 pub mod deduplication;
 pub mod derived_streams;
@@ -573,7 +575,6 @@ impl QueryConditionExt for QueryCondition {
                     quick_mode: false,
                     query_type: "".to_string(),
                     track_total_hits: false,
-                    action_id: None,
                     uses_zo_fn: false,
                     query_fn: encode_query_fn,
                     skip_wal: false,
@@ -875,7 +876,6 @@ async fn run_alert_count_query(
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            action_id: None,
             uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts
             skip_wal: false,
@@ -1050,6 +1050,22 @@ impl ConditionExt for ConditionList {
 #[async_trait]
 impl ConditionExt for Condition {
     async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        // this is a special case introduced for draft workflows
+        // ideal in other places FE does not allow empty cols,
+        // but on BE we do not have specific restrictions, so when col is empty
+        // it is UB. Thus we use that for draft workflows and cond always evaluates to true
+        if self.column.is_empty() {
+            return true;
+        }
+        match self.operator {
+            Operator::IsNull => return row.get(&self.column).is_none_or(Value::is_null),
+            Operator::IsNotNull => return row.get(&self.column).is_some_and(|v| !v.is_null()),
+            Operator::IsEmpty => return row.get(&self.column).is_none_or(is_empty_value),
+            Operator::IsNotEmpty => {
+                return row.get(&self.column).is_some_and(|v| !is_empty_value(v));
+            }
+            _ => {}
+        }
         let val = match row.get(&self.column) {
             Some(val) => val,
             None => {
@@ -1069,6 +1085,7 @@ impl ConditionExt for Condition {
                     Operator::LessThanEquals => val <= con_val,
                     Operator::Contains => val.contains(con_val),
                     Operator::NotContains => !val.contains(con_val),
+                    _ => false,
                 }
             }
             Value::Number(_) => {
@@ -1287,6 +1304,11 @@ async fn evaluate_condition_items(
     result
 }
 
+/// Null, or an empty string; a missing column is handled by the callers.
+fn is_empty_value(v: &Value) -> bool {
+    v.is_null() || matches!(v, Value::String(s) if s.is_empty())
+}
+
 /// Evaluates a single condition against a record
 async fn evaluate_condition(
     row: &Map<String, Value>,
@@ -1295,6 +1317,20 @@ async fn evaluate_condition(
     condition_value: &Value,
     ignore_case: bool,
 ) -> bool {
+    // this is a special case introduced for draft workflows
+    // ideal in other places FE does not allow empty cols,
+    // but on BE we do not have specific restrictions, so when col is empty
+    // it is UB. Thus we use that for draft workflows and cond always evaluates to true
+    if column.is_empty() {
+        return true;
+    }
+    match operator {
+        Operator::IsNull => return row.get(column).is_none_or(Value::is_null),
+        Operator::IsNotNull => return row.get(column).is_some_and(|v| !v.is_null()),
+        Operator::IsEmpty => return row.get(column).is_none_or(is_empty_value),
+        Operator::IsNotEmpty => return row.get(column).is_some_and(|v| !is_empty_value(v)),
+        _ => {}
+    }
     let val: &Value = match row.get(column) {
         Some(val) => val,
         None => {
@@ -1320,6 +1356,7 @@ async fn evaluate_condition(
                     Operator::LessThanEquals => val_lower <= con_val_lower,
                     Operator::Contains => val_lower.contains(&con_val_lower),
                     Operator::NotContains => !val_lower.contains(&con_val_lower),
+                    _ => false,
                 }
             } else {
                 match operator {
@@ -1331,6 +1368,7 @@ async fn evaluate_condition(
                     Operator::LessThanEquals => val <= con_val,
                     Operator::Contains => val.contains(con_val),
                     Operator::NotContains => !val.contains(con_val),
+                    _ => false,
                 }
             }
         }
@@ -1587,8 +1625,33 @@ fn build_expr(
     } else {
         cond.column.as_str()
     };
+    // Null/empty checks take no value. On non-string columns "empty" can only
+    // mean null, so the empty checks degrade to the null checks there.
+    let is_string_type = matches!(
+        field_type,
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
+    );
+    match cond.operator {
+        Operator::IsNull => return Ok(format!("\"{field_alias}\" IS NULL")),
+        Operator::IsNotNull => return Ok(format!("\"{field_alias}\" IS NOT NULL")),
+        Operator::IsEmpty => {
+            return Ok(if is_string_type {
+                format!("(\"{field_alias}\" IS NULL OR \"{field_alias}\" = '')")
+            } else {
+                format!("\"{field_alias}\" IS NULL")
+            });
+        }
+        Operator::IsNotEmpty => {
+            return Ok(if is_string_type {
+                format!("(\"{field_alias}\" IS NOT NULL AND \"{field_alias}\" != '')")
+            } else {
+                format!("\"{field_alias}\" IS NOT NULL")
+            });
+        }
+        _ => {}
+    }
     let expr = match field_type {
-        DataType::Utf8 | DataType::LargeUtf8 => {
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
             let val = if cond.value.is_string() {
                 cond.value.as_str().unwrap_or_default().to_string()
             } else {
@@ -1606,6 +1669,14 @@ fn build_expr(
                 Operator::Contains => format!("str_match(\"{field_alias}\", '{val}')"),
                 Operator::NotContains => {
                     format!("\"{field_alias}\" NOT LIKE '%{val}%'")
+                }
+                // Null checks returned above; keep the dead arm panic-free.
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
+                        cond.column,
+                        cond.operator
+                    ));
                 }
             }
         }
@@ -2488,6 +2559,103 @@ mod tests {
         println!("✓ All deeply nested group tests with operator precedence passed!");
     }
 
+    #[tokio::test]
+    async fn test_condition_evaluate_null_operators() {
+        use config::utils::json::json;
+
+        let is_null = make_cond("err", Operator::IsNull, Value::String(String::new()));
+        let is_not_null = make_cond("err", Operator::IsNotNull, Value::String(String::new()));
+
+        let missing = json!({"other": 1});
+        let null_val = json!({"err": null});
+        let present = json!({"err": "boom"});
+
+        assert!(is_null.evaluate(missing.as_object().unwrap()).await);
+        assert!(is_null.evaluate(null_val.as_object().unwrap()).await);
+        assert!(!is_null.evaluate(present.as_object().unwrap()).await);
+
+        assert!(!is_not_null.evaluate(missing.as_object().unwrap()).await);
+        assert!(!is_not_null.evaluate(null_val.as_object().unwrap()).await);
+        assert!(is_not_null.evaluate(present.as_object().unwrap()).await);
+    }
+
+    #[tokio::test]
+    async fn test_condition_evaluate_empty_operators() {
+        use config::utils::json::json;
+
+        let is_empty = make_cond("input", Operator::IsEmpty, Value::String(String::new()));
+        let is_not_empty = make_cond("input", Operator::IsNotEmpty, Value::String(String::new()));
+
+        let missing = json!({"other": 1});
+        let null_val = json!({"input": null});
+        let empty_str = json!({"input": ""});
+        let present = json!({"input": "hello"});
+        let number = json!({"input": 0});
+
+        assert!(is_empty.evaluate(missing.as_object().unwrap()).await);
+        assert!(is_empty.evaluate(null_val.as_object().unwrap()).await);
+        assert!(is_empty.evaluate(empty_str.as_object().unwrap()).await);
+        assert!(!is_empty.evaluate(present.as_object().unwrap()).await);
+        assert!(!is_empty.evaluate(number.as_object().unwrap()).await);
+
+        assert!(!is_not_empty.evaluate(missing.as_object().unwrap()).await);
+        assert!(!is_not_empty.evaluate(null_val.as_object().unwrap()).await);
+        assert!(!is_not_empty.evaluate(empty_str.as_object().unwrap()).await);
+        assert!(is_not_empty.evaluate(present.as_object().unwrap()).await);
+        assert!(is_not_empty.evaluate(number.as_object().unwrap()).await);
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_empty_operators() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![Field::new("input", DataType::Utf8, true)]);
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "input".to_string(),
+                operator: Operator::IsEmpty,
+                value: Value::String(String::new()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+
+        assert_eq!(
+            group.to_sql(&schema).await.unwrap(),
+            "((\"input\" IS NULL OR \"input\" = ''))"
+        );
+        let empty_str = json!({"input": ""});
+        assert!(group.evaluate(empty_str.as_object().unwrap()).await);
+        let present = json!({"input": "x"});
+        assert!(!group.evaluate(present.as_object().unwrap()).await);
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_null_operators() {
+        use config::utils::json::json;
+
+        let schema = Schema::new(vec![Field::new("err", DataType::Utf8, true)]);
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "err".to_string(),
+                operator: Operator::IsNull,
+                value: Value::String(String::new()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+
+        assert_eq!(group.to_sql(&schema).await.unwrap(), "(\"err\" IS NULL)");
+        let empty = json!({});
+        assert!(group.evaluate(empty.as_object().unwrap()).await);
+        let present = json!({"err": "x"});
+        assert!(!group.evaluate(present.as_object().unwrap()).await);
+    }
+
     // ── build_expr sync unit tests ───────────────────────────────────────────
 
     fn make_cond(column: &str, operator: Operator, value: Value) -> Condition {
@@ -2572,6 +2740,73 @@ mod tests {
         );
         let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
         assert_eq!(expr, "\"msg\" NOT LIKE '%spam%'");
+    }
+
+    #[test]
+    fn test_build_expr_null_operators_any_type() {
+        let cond = make_cond("msg", Operator::IsNull, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"msg\" IS NULL");
+
+        let cond = make_cond("code", Operator::IsNull, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" IS NULL");
+
+        let cond = make_cond("msg", Operator::IsNotNull, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"msg\" IS NOT NULL");
+    }
+
+    #[test]
+    fn test_build_expr_utf8view_value_comparisons() {
+        let cond = make_cond(
+            "level",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "\"level\" = 'error'");
+
+        let cond = make_cond("msg", Operator::Contains, Value::String("oom".to_string()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "str_match(\"msg\", 'oom')");
+
+        let cond = make_cond(
+            "msg",
+            Operator::NotContains,
+            Value::String("spam".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "\"msg\" NOT LIKE '%spam%'");
+    }
+
+    #[test]
+    fn test_build_expr_empty_operators() {
+        let cond = make_cond("msg", Operator::IsEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NULL OR \"msg\" = '')");
+
+        let cond = make_cond("msg", Operator::IsNotEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NOT NULL AND \"msg\" != '')");
+
+        // Utf8View is a string type too — it must get the empty-string check.
+        let cond = make_cond("msg", Operator::IsEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NULL OR \"msg\" = '')");
+
+        let cond = make_cond("msg", Operator::IsNotEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Utf8View).unwrap();
+        assert_eq!(expr, "(\"msg\" IS NOT NULL AND \"msg\" != '')");
+
+        // Non-string columns can only be "empty" by being null.
+        let cond = make_cond("code", Operator::IsEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" IS NULL");
+
+        let cond = make_cond("code", Operator::IsNotEmpty, Value::String(String::new()));
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" IS NOT NULL");
     }
 
     #[test]

@@ -503,7 +503,7 @@ mod tests {
         .unwrap();
         let sample_df = ctx.read_batch(sample_batch).unwrap();
         let (metrics, _) =
-            load_samples_from_datafusion("test", &DataType::UInt64, sample_df, false)
+            load_samples_from_datafusion("test", &DataType::UInt64, sample_df, false, 1, 0)
                 .await
                 .unwrap();
         let label_df = ctx.read_batch(label_batch).unwrap();

@@ -5,17 +5,27 @@
        action buttons (#actions). The name + transType controls are form-owned
        (OForm*); the parent AddFunction.vue provides the <OForm> context they
        inject — which is what lets the title live in the #title slot. -->
+  <!-- Embedded (workflow NDV): the host panel owns the title, close (×) and
+       navigation, so drop this component's own back chevron + "Add Function"
+       subtitle — they read as a competing, mid-flow page header. -->
   <OPageHeader
-    :subtitle="t('function.addFunction')"
+    :subtitle="embedded ? undefined : t('function.addFunction')"
     title-overflow="visible"
-    :back="{
-      label: t('function.header'),
-      onClick: redirectToFunctions,
-      dataTest: 'add-function-back-btn',
-    }"
+    :back="
+      embedded
+        ? undefined
+        : {
+            label: t('function.header'),
+            onClick: redirectToFunctions,
+            dataTest: 'add-function-back-btn',
+          }
+    "
   >
     <template #title>
+      <!-- Embedded (workflow NDV): no inline function name here — the name is asked at
+           SAVE time in the Update|Create dialog, mirroring the Logs editor. -->
       <OFormInlineEdit
+        v-if="!embedded"
         name="name"
         data-test="add-function-name-input"
         :placeholder="t('function.name')"
@@ -105,7 +115,7 @@
                     <template #content>
                       <div class="flex flex-col">
                         <div class="mb-1 font-semibold">
-                          {{ t("function.javascript") }} {{ t("function.tipLabel") }}
+                          {{ raw("JavaScript") }} {{ t("function.tipLabel") }}
                         </div>
                         <div>{{ t("function.jsFunctionHint") }}</div>
                       </div>
@@ -129,7 +139,7 @@
               <template #content>
                 <div class="flex flex-col">
                   <div class="mb-1 font-semibold">
-                    {{ transTypeValue === "1" ? t("function.javascript") : t("function.vrl") }}
+                    {{ transTypeValue === "1" ? raw("JavaScript") : t("function.vrl") }}
                     {{ t("function.tipLabel") }}
                   </div>
                   <div>
@@ -151,13 +161,14 @@
         v-if="
           config.isEnterprise == 'true' &&
           !isAddFunctionComponent &&
-          store.state.zoConfig.ai_enabled
+          store.state.zoConfig.ai_enabled &&
+          !hideChat
         "
         variant="ghost"
         size="icon-sm"
         @click="emit('open:chat', !store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
-        class="rounded-default transition-[background,box-shadow] duration-300 ease-in-out ![background:var(--color-gradient-ai-subtle)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] hover:![background:var(--color-gradient-ai)]"
+        class="rounded-default hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-in-out ![background:var(--color-gradient-ai-subtle)] hover:shadow-md hover:![background:var(--color-gradient-ai)]"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         :disabled="isSubmitting"
         @mouseenter="isHovered = true"
@@ -169,6 +180,7 @@
         />
       </OButton>
       <OButton
+        v-if="!embedded"
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
         variant="outline"
@@ -180,6 +192,7 @@
         {{ t("common.fullscreen") }}
       </OButton>
       <OButton
+        v-if="!hideTest"
         data-test="add-function-test-btn"
         variant="outline"
         size="sm-action"
@@ -190,6 +203,7 @@
         {{ t("function.testFunction") }}
       </OButton>
       <OButton
+        v-if="!embedded"
         data-test="add-function-cancel-btn"
         variant="outline"
         size="sm-action"
@@ -249,6 +263,24 @@ defineProps({
   // Hides the VRL/JS language toggle entirely (used when a host forces a single
   // language — e.g. workflow function nodes are JavaScript-only).
   hideTransType: {
+    type: Boolean,
+    default: false,
+  },
+  // Hides the top "Ask AI" chat toggle (workflows keep only the inline editor AI).
+  hideChat: {
+    type: Boolean,
+    default: false,
+  },
+  // Hides the "Test Function" action (workflows test via the NDV's Replay instead of
+  // the embedded test panel, which is removed there).
+  hideTest: {
+    type: Boolean,
+    default: false,
+  },
+  // Embedded in a host panel (workflow NDV): drop this component's own page-header
+  // navigation — the back chevron, the "Add Function" subtitle, Go Full Screen and
+  // Cancel — since the host frame already provides title, close and navigation.
+  embedded: {
     type: Boolean,
     default: false,
   },

@@ -23,7 +23,7 @@ use config::{
 };
 
 use crate::{
-    db::postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, drop_column},
+    db::postgres::{CLIENT_DDL, CLIENT_RO, CLIENT_RW, drop_column},
     errors::{DbError, Error, Result},
 };
 
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     }
 
     async fn put(&self, pipeline: &Pipeline) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
 
         if let Err(e) = match &pipeline.source {
@@ -187,7 +187,7 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
     }
 
     async fn update(&self, pipeline: &Pipeline) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
 
         if let Err(e) = match &pipeline.source {
@@ -375,7 +375,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
     }
 
     async fn delete(&self, pipeline_id: &str) -> Result<Pipeline> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         let pipeline = sqlx::query_as::<_, Pipeline>("SELECT * FROM pipeline WHERE id = $1;")
             .bind(pipeline_id)

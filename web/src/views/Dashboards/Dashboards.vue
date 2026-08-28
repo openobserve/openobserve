@@ -644,7 +644,7 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -762,7 +762,7 @@ export default defineComponent({
       // navigates to the pinned dashboard's CURRENT folder even if it was moved
       // on another system since this tab last loaded.
       const org = store.state.selectedOrganization?.identifier;
-      if (org) useHomeDashboard().load(org);
+      if (org) useHomeDashboard(t).load(org);
       // Favorites are loaded by the landing-view onMounted below, before the
       // favorites-first landing decision needs them.
     });
@@ -964,12 +964,7 @@ export default defineComponent({
             const searchResults = await fetchSearchResults.execute(searchQuery.value);
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            // Latent bug preserved: `!x === "AbortError"` compares a boolean to a
-            // string, so this body never runs. Kept as-is to avoid changing
-            // runtime behavior in a type-only fix; the mistaken comparison is
-            // what makes this branch dead, not the types.
-            // @ts-expect-error -- intentional no-op comparison (boolean vs string), see note
-            if (!asCaughtError(error).name === "AbortError") {
+            if (asCaughtError(error).name !== "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }
@@ -1305,7 +1300,7 @@ export default defineComponent({
           // of lingering until the next navigation.
           if (deletedWasHome) {
             const org = store.state.selectedOrganization?.identifier;
-            if (org) useHomeDashboard().load(org);
+            if (org) useHomeDashboard(t).load(org);
           }
         } catch (err) {
           showErrorNotification(
@@ -1638,7 +1633,7 @@ export default defineComponent({
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {
           const org = store.state.selectedOrganization?.identifier;
-          if (org) await useHomeDashboard().load(org);
+          if (org) await useHomeDashboard(t).load(org);
         }
       } catch (error) {
         dismiss();

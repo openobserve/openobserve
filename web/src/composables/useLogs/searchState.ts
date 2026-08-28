@@ -16,7 +16,7 @@
 import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { raw, type I18nText } from "@/types/i18n";
+import { gt, raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
@@ -44,18 +44,12 @@ export interface Transform {
   [key: string]: unknown;
 }
 
-// The currently applied transform/action; spread from a source item at runtime.
+// The currently applied transform; spread from a source item at runtime.
 export interface SelectedTransform {
   id?: string;
   name?: string;
   type?: string;
   [key: string]: unknown;
-}
-
-// An action entry shown in the action selector.
-export interface ActionItem {
-  name: string;
-  id: string;
 }
 
 export interface RefreshTimeItem {
@@ -186,8 +180,6 @@ export interface SearchObjectData {
   transformType: string;
   selectedTransform: SelectedTransform | null;
   selectedFunction?: { name?: string; function?: string } | null;
-  actions: ActionItem[];
-  actionId: string | null;
   // Polymorphic: used both flat (startTime/endTime) and nested
   // (relative.period.label) with unguarded deep access, so kept as any.
   datetime: any;
@@ -378,7 +370,7 @@ export const searchState = () => {
    */
   const resetSearchObj = (): void => {
     // Reset error message and stream data
-    searchObj.data.errorMsg = "No stream found in selected organization!";
+    searchObj.data.errorMsg = gt("search.noStreamFoundInOrganization");
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];

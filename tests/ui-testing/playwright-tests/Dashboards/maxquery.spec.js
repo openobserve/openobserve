@@ -12,15 +12,19 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
 import { generateDashboardName } from "./utils/configPanelHelpers.js";
 
 import PageManager from "../../pages/page-manager";
+import DashboardMaxQueryRange from "../../pages/dashboardPages/dashboard-max-query-range.js";
 const testLogger = require("../utils/test-logger.js");
 
 // Use a dedicated stream for max query range tests (not e2e_automate)
 const MAX_QUERY_STREAM = "e2e_max_query_range";
 
-// Serial mode is required: all tests share the same stream (e2e_max_query_range)
-// and its max_query_range setting. Running in parallel would cause tests to
-// reset each other's stream state mid-execution.
-test.describe.configure({ mode: "default" });
+// Serial mode is required: all tests share the same stream
+// (e2e_max_query_range) and its max_query_range setting, so in parallel one
+// test's afterEach reset wipes another's restriction mid-query. This said
+// "default", which under the config's fullyParallel:true means PARALLEL — the
+// very thing this comment forbids. A dedicated stream per test would allow
+// parallelism, but that is a larger change.
+test.describe.configure({ mode: "serial" });
 
 
 // ============================================================================
@@ -58,9 +62,13 @@ async function buildPanelWithWideRange(page, pm, panelName, chartType = "area") 
 
 test.describe("Dashboard Max Query Range", () => {
   test.beforeEach(async ({ page }) => {
+    const pm = new PageManager(page);
     await navigateToBase(page);
     await ingestion(page, MAX_QUERY_STREAM);
-    await page.waitForTimeout(2000);
+    // Poll until the stream is actually queryable instead of sleeping 2s: the
+    // ingest -> queryable delay scales with load, so a constant wait is both
+    // wasteful when the box is idle and too short when it is not.
+    await pm.dashboardMaxQueryRange.waitForStreamReady(MAX_QUERY_STREAM);
   });
 
   // Ensure max query range is always reset even when a test fails mid-way,
@@ -99,6 +107,7 @@ test.describe("Dashboard Max Query Range", () => {
       const searchDone1 = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
       await searchDone1;
+      await mqr.waitForPanelsIdle();
 
       // Assert warning icon is visible
       await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
@@ -107,8 +116,8 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Verify tooltip text
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("Query duration is modified due to query range restriction");
-      expect(tooltipText).toContain("Data returned for:");
+      // Accept either backend wording — see expectRangeRestrictionTooltip.
+      mqr.expectRangeRestrictionTooltip(expect, tooltipText);
 
       testLogger.info("Tooltip text verified", { tooltipText });
 
@@ -145,6 +154,7 @@ test.describe("Dashboard Max Query Range", () => {
       const searchDone6w = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
       await searchDone6w;
+      await mqr.waitForPanelsIdle();
 
       // Warning should be visible
       await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
@@ -157,6 +167,7 @@ test.describe("Dashboard Max Query Range", () => {
       const searchDone2h = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("2-h");
       await searchDone2h;
+      await mqr.waitForPanelsIdle();
 
       // Warning should disappear
       await expect(pm.dashboardMaxQueryRange.warningIcon).not.toBeVisible({
@@ -314,17 +325,29 @@ test.describe("Dashboard Max Query Range", () => {
       const searchDone5 = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
       await searchDone5;
+      await mqr.waitForPanelsIdle();
 
       // Verify warning is present
       await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
         timeout: 15000,
       });
 
-      // Hover and verify the tooltip mentions the correct restriction hours
+      // Hover and verify the tooltip reports the restriction.
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("restriction of 3 hours");
-      expect(tooltipText).toContain("Data returned for:");
-      testLogger.info("Tooltip correctly shows 3-hour restriction", { tooltipText });
+      mqr.expectRangeRestrictionTooltip(expect, tooltipText);
+
+      // Only the non-streaming backend names the limit in hours; the streaming
+      // path reports the cached window and never says "restriction of N hours".
+      // Assert the number where the message actually carries it, rather than
+      // pinning the whole test to one deployment mode.
+      if (DashboardMaxQueryRange.statesRestrictionHours(tooltipText)) {
+        expect(tooltipText).toContain("restriction of 3 hours");
+      } else {
+        testLogger.info(
+          "Streaming backend: tooltip reports the limit without naming hours",
+          { tooltipText }
+        );
+      }
 
       // Cleanup
       await pm.dashboardCreate.backToDashboardList();
@@ -412,7 +435,8 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Verify tooltip
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("Query duration is modified due to query range restriction");
+      // Accept either backend wording — see expectRangeRestrictionTooltip.
+      mqr.expectRangeRestrictionTooltip(expect, tooltipText);
 
       // Cleanup
       await pm.dashboardPanelActions.addPanelName("MultiSQL Max Query Panel");

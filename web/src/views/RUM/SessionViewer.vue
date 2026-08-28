@@ -69,6 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
+    <template #actions>
+      <ShareButton
+        data-test="session-viewer-share-link-btn"
+        :url="shareUrl"
+        variant="outline"
+        size="icon-toolbar"
+      />
+    </template>
     <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
       <OSplitter
         v-model="splitterSize"
@@ -140,6 +148,8 @@ import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import useRum from "@/composables/rum/useRum";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
@@ -164,6 +174,7 @@ const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
 const { t } = useI18nTyped();
+const { shareUrl } = useRum();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
@@ -293,8 +304,8 @@ const getSessionDetails = () => {
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
     user_email: sessionState.data.selectedSession?.user_email || t("common.unknownUser"),
-    city: sessionState.data.selectedSession?.city || "Unknown",
-    country: sessionState.data.selectedSession?.country || "Unknown",
+    city: sessionState.data.selectedSession?.city || t("common.unknown"),
+    country: sessionState.data.selectedSession?.country || t("common.unknown"),
     id: sessionState.data.selectedSession?.session_id,
   };
 };
@@ -453,7 +464,10 @@ const getSessionEvents = () => {
     .then((res) => {
       const events = ["action", "view", "error"];
 
-      if (!sessionDetails.value.user_email || sessionDetails.value.user_email === "Unknown User")
+      // Test the SOURCE field, not the rendered value: user_email is filled with
+      // t("common.unknownUser") when absent, so comparing it to the English
+      // literal stopped this backfill firing in every non-English locale.
+      if (!sessionState.data.selectedSession?.user_email)
         sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
 
       segmentEvents.value = res.data.hits.filter((hit: any) => {
@@ -555,7 +569,11 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
+  _event.name =
+    t("rum.actionOnTarget", {
+      action: event?.action_type,
+      target: event?.action_target_name,
+    }) || "--";
 
   // Add frustration information if present
   if (event?.action_frustration_type) {

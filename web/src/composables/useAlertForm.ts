@@ -49,6 +49,7 @@ import {
 } from "@/utils/zincutils";
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
@@ -107,6 +108,12 @@ export const defaultAlertValue: any = () => {
     stream_type: "logs",
     stream_name: "",
     is_real_time: "false",
+    composite_condition: {
+      expression: "",
+      warning_counts_as_firing: true,
+      stale_child_policy: "use_last_state",
+    },
+    children: [],
     query_condition: {
       conditions: {
         filterType: "group",
@@ -213,6 +220,7 @@ export interface AlertFormProps {
   isUpdated: boolean;
   destinations: any[];
   templates?: any[];
+  folderId?: string;
 }
 
 export interface AlertFormEmit {
@@ -531,8 +539,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
 
   const folderQuery = router.currentRoute.value.query.folder;
+  // Prefer the folder the caller (AlertList) hands us over the URL query: the
+  // folder tab's v-model is the authoritative current folder, while the URL
+  // query can be stale when the "New alert" dialog is opened from a tab.
   const activeFolderId = ref<string>(
-    (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
+    props.folderId || (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
   );
   const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
@@ -674,6 +685,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const sqlUtilsContext: SqlUtilsContext = {
       parser,
       sqlQueryErrorMsg,
+      t,
     };
     return getParserUtil(sqlQuery, sqlUtilsContext);
   };
@@ -847,7 +859,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return false;
     }
     if (conditions.filterType === "condition") {
-      return !!(conditions.column && conditions.value !== undefined && conditions.value !== "");
+      return !!(
+        conditions.column &&
+        (isUnaryOperator(conditions.operator) ||
+          (conditions.value !== undefined && conditions.value !== ""))
+      );
     }
     if (conditions.filterType === "group" && Array.isArray(conditions.conditions)) {
       return conditions.conditions.every((cond: any) => allConditionsValid(cond));
@@ -997,7 +1013,37 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     };
     // Read the synchronous source of truth (the form store), not the reactive
     // read-view, so a value written by setF immediately before save is included.
-    return getAlertPayloadUtil(form.state.values, payloadContext);
+    if (form.state.values.is_real_time === "composite") {
+      const source = cloneDeep(form.state.values) as any;
+      const contextAttributes = Object.fromEntries(
+        (Array.isArray(source.context_attributes) ? source.context_attributes : [])
+          .filter((attribute: any) => attribute.key?.trim() && attribute.value?.trim())
+          .map((attribute: any) => [attribute.key, attribute.value]),
+      );
+      return {
+        ...(source.id ? { id: source.id } : {}),
+        alert_type: "composite",
+        name: source.name,
+        description: raw(String(source.description ?? "").trim()),
+        enabled: source.enabled,
+        destinations: source.destinations ?? [],
+        template: source.template,
+        context_attributes: contextAttributes,
+        trigger_condition: {
+          silence: Number(source.trigger_condition?.silence ?? 0),
+        },
+        owner: source.owner || undefined,
+        creates_incident: source.creates_incident ?? false,
+        workflows: source.workflows ?? [],
+        priority: source.priority ?? null,
+        tags: source.tags ?? [],
+        composite_condition: source.composite_condition,
+      };
+    }
+    const payload = getAlertPayloadUtil(form.state.values, payloadContext);
+    delete payload.composite_condition;
+    delete payload.children;
+    return payload;
   };
 
   const validateInputs = (input: any, notify: boolean = true) => {
@@ -1028,6 +1074,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   const validateConditionsAgainstUDS = () => {
+    if (formData.value.is_real_time === "composite") {
+      return { isValid: true, invalidFields: [] };
+    }
     if (
       !formData.value.stream_name ||
       !formData.value.stream_type ||
@@ -1594,20 +1643,31 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         data.trigger_condition.period = prefill.periodMinutes;
       }
       if (prefill.frequencyMinutes) {
-        data.trigger_condition.frequency = Math.max(
-          data.trigger_condition.frequency,
-          prefill.frequencyMinutes,
-        );
+        // The source's own schedule wins. The only floor is the org's minimum
+        // evaluation frequency, which is the rule the schema enforces on save;
+        // clamping to the form's DEFAULT instead (as this used to) silently
+        // overrode a curated alert that runs every minute with "every ten".
+        const floorMinutes = Math.max(1, Math.ceil(minAutoRefreshInterval() / 60));
+        data.trigger_condition.frequency = Math.max(floorMinutes, prefill.frequencyMinutes);
+      }
+      if (prefill.silenceMinutes !== undefined) {
+        data.trigger_condition.silence = prefill.silenceMinutes;
       }
       if (prefill.timezone) {
         data.trigger_condition.timezone = prefill.timezone;
       }
 
-      // With a threshold expressed inside the query (HAVING / promql condition),
-      // the trigger itself only needs "at least one row came back".
+      // A source that carries a real trigger says so explicitly, and is believed.
+      // Otherwise: with a threshold expressed inside the query (HAVING / promql
+      // condition), the trigger itself only needs "at least one row came back".
       const hasQueryThreshold =
         !!prefill.promqlCondition || !!prefill.meta?.sqlHaving || !!prefill.aggregation;
-      if (hasQueryThreshold) {
+      if (prefill.triggerThreshold !== undefined) {
+        data.trigger_condition.threshold = prefill.triggerThreshold;
+        if (prefill.triggerOperator) {
+          data.trigger_condition.operator = prefill.triggerOperator;
+        }
+      } else if (hasQueryThreshold) {
         data.trigger_condition.threshold = 1;
         data.trigger_condition.operator = ">=";
       }
@@ -1876,6 +1936,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // (threshold / frequency / conditions / promql-condition / group_by / period /
   // silence / destinations / name / stream) are covered by the composed schema.
   const runImperativeQueryChecks = (): boolean => {
+    if (formData.value.is_real_time === "composite") return true;
     // ── Cron gate (R4 RESTORE) ───────────────────────────────────────────────
     // Pre-migration AlertSettings.validate() ran validateFrequency() first and
     // returned {valid:false} on any cronJobError, which the orchestrator turned
@@ -2075,11 +2136,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
     }
 
-    // VERSION HANDLING - wrap conditions with version field for backend
-    payload.query_condition.conditions = {
-      version: 2,
-      conditions: form.state.values.query_condition.conditions,
-    };
+    if (formData.value.is_real_time !== "composite") {
+      // VERSION HANDLING - wrap conditions with version field for backend
+      payload.query_condition.conditions = {
+        version: 2,
+        conditions: form.state.values.query_condition.conditions,
+      };
+    }
 
     if (beingUpdated.value) {
       payload.folder_id = router.currentRoute.value.query.folder || "default";
@@ -2186,6 +2249,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (!props.isUpdated) {
       data.is_real_time = alertType.value === "realTime" ? true : false;
     }
+    if (data.alert_type === "composite") data.is_real_time = "composite";
     data.is_real_time = data.is_real_time.toString();
 
     if (store.state?.zoConfig?.min_auto_refresh_interval)
@@ -2205,15 +2269,19 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // `formData.value = cloneDeep(modelValue)` full swap).
       Object.keys(data).forEach((k) => delete data[k]);
       Object.assign(data, cloneDeep(props.modelValue));
+      // The swap above replaces every key with the raw GET response, which for
+      // a composite carries `alert_type` but not `is_real_time`. Re-derive the
+      // composite flag so the composite form (not the scheduled form) renders.
+      if (data.alert_type === "composite") data.is_real_time = "composite";
       // Guard the enterprise workflows link: the edited alert is expected to
       // carry `workflows` (v2 GET returns it, serde-defaulted to []), but if a
       // partially-populated row is ever passed, default it so an edit-save can't
       // silently wipe existing links. Must run AFTER the swap above, which
       // replaces every key on `data`.
       if (!Array.isArray(data.workflows)) data.workflows = [];
-      isAggregationEnabled.value = !!data.query_condition.aggregation;
+      isAggregationEnabled.value = !!data.query_condition?.aggregation;
 
-      if (data.query_condition.promql_condition) {
+      if (data.query_condition?.promql_condition) {
         if (!data.query_condition.promql_condition.column) {
           data.query_condition.promql_condition.column = "value";
         }
@@ -2230,21 +2298,21 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       lastValidStep.value = 6;
 
-      if (!data.trigger_condition?.timezone) {
+      if (data.is_real_time !== "composite" && !data.trigger_condition?.timezone) {
         if (data.tz_offset === 0) {
           data.trigger_condition.timezone = "UTC";
         } else {
           // Resolved async AFTER the form.reset below → setF in the .then.
           pendingTimezoneOffset = data.tz_offset;
         }
-      } else {
+      } else if (data.is_real_time !== "composite") {
         // Heal legacy alerts (e.g. created on older releases) that persisted a
         // "Browser Time (<zone>)" label — resolve it to a plain IANA zone so the
         // picker shows a valid value and the save path computes a real offset.
         data.trigger_condition.timezone = resolveBrowserTimezone(data.trigger_condition.timezone);
       }
 
-      if (data.query_condition.vrl_function) {
+      if (data.query_condition?.vrl_function) {
         showVrlFunction.value = true;
         data.query_condition.vrl_function = smartDecodeVrlFunction(
           data.query_condition.vrl_function,
@@ -2270,7 +2338,22 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     // VERSION DETECTION AND CONVERSION
-    if (
+    if (data.is_real_time === "composite") {
+      data.query_condition ??= defaultAlertValue().query_condition;
+      data.stream_type ??= "";
+      data.stream_name ??= "";
+      // The composite GET response may carry `null` for optional fields; the
+      // form inputs expect strings/arrays, so normalize them here.
+      data.description ??= "";
+      data.template ??= "";
+      data.tags ??= [];
+      data.composite_condition ??= {
+        expression: "",
+        warning_counts_as_firing: true,
+        stale_child_policy: "use_last_state",
+      };
+      data.children ??= [];
+    } else if (
       data.query_condition.conditions?.version === "2" ||
       data.query_condition.conditions?.version === 2
     ) {
@@ -2333,9 +2416,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       await applyAlertPrefill();
     }
 
-    updateStreams(false)?.then(() => {
-      updateEditorContent(formData.value.stream_name);
-    });
+    if (data.is_real_time !== "composite") {
+      updateStreams(false)?.then(() => {
+        updateEditorContent(formData.value.stream_name);
+      });
+    }
   };
 
   // ── Watchers ────────────────────────────────────────────────────────────

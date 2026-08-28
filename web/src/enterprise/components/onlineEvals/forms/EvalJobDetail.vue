@@ -51,7 +51,7 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
+          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-sm"
         >
           <div class="kpi-label text-2xs text-text-secondary mb-1 leading-normal font-semibold">
             {{ card.label }}
@@ -115,7 +115,7 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
@@ -158,11 +158,11 @@
             <!-- Filter rendered as a code block with a header bar + copy action,
                  matching the Alert History condition view. -->
             <div
-              class="border-dialog-header-border rounded-default overflow-hidden border bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
+              class="border-dialog-header-border rounded-default bg-card-bg-tint-neutral-faint overflow-hidden border"
               data-test="eval-job-detail-filter"
             >
               <div
-                class="border-b-dialog-header-border flex items-center justify-between border-b bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,var(--color-card-bg))] px-2.5 py-1.5"
+                class="border-b-dialog-header-border bg-card-bg-tint-neutral flex items-center justify-between border-b px-2.5 py-1.5"
               >
                 <span class="text-2xs text-text-secondary font-medium">{{
                   t("onlineEvals.job.detail.filterLabel")
@@ -192,7 +192,7 @@
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -217,7 +217,7 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-accent)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-accent)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
+                  class="group bg-card-bg rounded-default border-text-secondary/16 enabled:hover:border-accent/45 enabled:hover:bg-card-bg-tint-subtle enabled:hover:shadow-accent/12 flex w-full cursor-pointer items-center gap-3.5 border px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
@@ -229,8 +229,7 @@
                         item.scorerType === 'llm_judge',
                       'bg-badge-orange-soft-bg text-badge-orange-soft-text':
                         item.scorerType === 'remote',
-                      'text-text-secondary bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)]':
-                        item.scorerType === 'unknown',
+                      'text-text-secondary bg-text-secondary/14': item.scorerType === 'unknown',
                     }"
                   >
                     <OIcon :name="item.scorerType === 'remote' ? 'cloud' : 'smart-toy'" size="sm" />
@@ -296,7 +295,7 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
@@ -323,7 +322,7 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
@@ -966,12 +965,12 @@ function relativeTime(timestampMs: number): string {
   const diff = Date.now() - timestampMs;
   if (diff < 0 || !Number.isFinite(diff)) return "—";
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
   const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+  return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
 }
 </script>

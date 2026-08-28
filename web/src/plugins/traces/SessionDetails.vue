@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :cache-pct="cacheRatio"
                     >
                       <span
-                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))] hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))]"
+                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors"
                         @click="jumpToTurn(chip.n)"
                         >{{ chip.label }}</span
                       >
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <!-- collapsed header (click to expand) -->
                       <div
-                        class="grid cursor-pointer grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.6rem] hover:bg-[color-mix(in_srgb,var(--color-text-heading)_3%,var(--color-surface-base))]"
+                        class="hover:bg-surface-tint-neutral-faint grid cursor-pointer grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.6rem]"
                         :data-test="`session-turn-header-${trace.traceId}`"
                         @click="toggleTurn(trace.traceId)"
                       >
@@ -437,8 +437,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-bold tabular-nums"
                           :class="
                             trace.status === 'error'
-                              ? 'text-error-500 bg-[color-mix(in_srgb,var(--color-error-500)_15%,transparent)]'
-                              : 'text-status-success-text bg-[color-mix(in_srgb,var(--color-success-500)_15%,transparent)]'
+                              ? 'text-error-500 bg-error-500/15'
+                              : 'text-status-success-text bg-success-500/15'
                           "
                         >
                           {{ originalTurnIndex(trace.traceId) + 1 }}
@@ -710,11 +710,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span v-for="(row, i) in toolHotspots" :key="row.name" class="contents">
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(originalTurnIndex(row.topTraceId) + 1)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -732,14 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="text-text-muted">
                           ·
-                          {{
-                            t(
-                              row.calls === 1
-                                ? "traces.sessionDetail.rail.call"
-                                : "traces.sessionDetail.rail.calls",
-                              { n: row.calls },
-                            )
-                          }}
+                          {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                         </span>
                       </span>
                       <OIcon name="chevron-right" size="xs" class="text-text-muted flex-shrink-0" />
@@ -752,14 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
                           <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
                           <div class="text-3xs text-text-muted mb-1.75">
-                            {{
-                              t(
-                                row.calls === 1
-                                  ? "traces.sessionDetail.rail.call"
-                                  : "traces.sessionDetail.rail.calls",
-                                { n: row.calls },
-                              )
-                            }}
+                            {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                           </div>
                           <div
                             class="text-3xs text-text-secondary mb-1 font-bold tracking-[0.05em]"
@@ -806,11 +792,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side="right"
                   >
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -859,11 +845,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side="right"
                   >
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -917,9 +903,8 @@ import {
   type SessionDetail,
   type SessionTraceRow,
   type TurnDetail,
-  type TurnMessage,
 } from "./composables/useSessions";
-import { messagesFromInput, messagesFromOutput, getModel } from "./threadView.utils";
+import { buildTurnDetail } from "./threadView.utils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -1080,8 +1065,7 @@ function cacheInputDenominator(d: SessionDetail): number {
 function kpiCardClass(variant?: "danger"): string {
   const base =
     "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-sm";
-  if (variant === "danger")
-    return `${base} bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))] border-[color-mix(in_srgb,var(--color-error-500)_35%,var(--color-border-default))]`;
+  if (variant === "danger") return `${base} bg-surface-tint-error border-border-tint-error`;
   return `${base} bg-surface-base border-border-default`;
 }
 
@@ -1303,10 +1287,9 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 // Per-turn detail is DERIVED from the session spans we already fetch eagerly
 // (`sessionSpans`) — the SAME single source that powers the Pretty view and the
 // Tool Hotspots. This guarantees the collapsed turn body, the tool hotspots, and
-// the transcript can never disagree. Spans are grouped by `trace_id` and
-// classified exactly like ThreadView.
-const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
-
+// the transcript can never disagree. Spans are grouped by `trace_id`; the
+// per-trace projection lives in `threadView.utils` alongside ThreadView's, so
+// the two views classify spans identically.
 const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
   const byTrace: Record<string, any[]> = {};
   for (const s of sessionSpans.value) {
@@ -1317,72 +1300,7 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
 
   const out: Record<string, TurnDetail> = {};
   for (const tid of Object.keys(byTrace)) {
-    const spans = byTrace[tid]
-      .slice()
-      .sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
-
-    let llmCalls = 0;
-    let toolCalls = 0;
-    let otherCalls = 0;
-    const otherOps = new Set<string>();
-    for (const sp of spans) {
-      const op = String(sp.gen_ai_operation_name || "").toLowerCase();
-      if (LLM_OPS.has(op)) llmCalls += 1;
-      else if (op === "execute_tool") toolCalls += 1;
-      else {
-        otherCalls += 1;
-        if (op) otherOps.add(op);
-      }
-    }
-
-    // user question = last user-role entry of a span's full prompt; model = the
-    // first span that carries one.
-    let userMessage: TurnMessage | null = null;
-    let model: string | null = null;
-    for (const sp of spans) {
-      if (!model) {
-        const m = getModel(sp);
-        if (m) model = m;
-      }
-      if (!userMessage) {
-        const inputMsgs = messagesFromInput(sp.gen_ai_input_messages);
-        for (let i = inputMsgs.length - 1; i >= 0; i--) {
-          if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
-            userMessage = { role: "user", content: raw(inputMsgs[i].content) };
-            break;
-          }
-        }
-      }
-      if (userMessage && model) break;
-    }
-
-    // assistant reply = final non-empty assistant message (walk newest → oldest).
-    let assistantMessage: TurnMessage | null = null;
-    for (let s = spans.length - 1; s >= 0; s--) {
-      const outputMsgs = messagesFromOutput(spans[s].gen_ai_output_messages);
-      let a: any = null;
-      for (let i = outputMsgs.length - 1; i >= 0; i--) {
-        if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
-          a = outputMsgs[i];
-          break;
-        }
-      }
-      if (a) {
-        assistantMessage = { role: "assistant", content: a.content };
-        break;
-      }
-    }
-
-    out[tid] = {
-      traceId: tid,
-      userMessage,
-      assistantMessage,
-      model,
-      llmCalls,
-      toolCalls,
-      otherCalls,
-      otherOps: [...otherOps].sort(),
-    };
+    out[tid] = buildTurnDetail(tid, byTrace[tid]);
   }
   return out;
 });
@@ -1646,10 +1564,7 @@ function turnRowClass(trace: SessionTraceRow): string {
   const n = originalTurnIndex(trace.traceId) + 1;
   // Status is conveyed by a subtle surface tint (red for errors) instead of a
   // coloured left border — keeps the row chrome flat, matching the KPI tiles.
-  const surface =
-    trace.status === "error"
-      ? "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]"
-      : "bg-surface-base";
+  const surface = trace.status === "error" ? "bg-surface-tint-error" : "bg-surface-base";
   const flash = flashTurn.value === n ? " ring-2 ring-accent" : "";
   return `rounded-default border border-border-default ${surface} overflow-hidden${flash}`;
 }

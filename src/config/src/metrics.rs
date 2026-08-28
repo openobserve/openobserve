@@ -16,8 +16,8 @@
 use std::{collections::HashMap, sync::LazyLock as Lazy};
 
 use prometheus::{
-    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts,
-    Registry, TextEncoder,
+    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts, Registry, TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -203,6 +203,329 @@ pub static SYNTHETICS_OLDEST_PENDING_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(
     .expect("Metric created")
 });
 
+/// Enabled checks no scheduler has claimed within several of their own
+/// intervals, per org.
+///
+/// The queue gauges above only see work that was *created*; an orphaned check
+/// never reaches the queue, so it is invisible from that side by construction.
+pub static SYNTHETICS_ORPHANED_CHECKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "synthetics_orphaned_checks",
+            "Number of enabled synthetics checks no scheduler has claimed.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// Completed orphan-detection passes. A dead-man's switch, not a workload count.
+///
+/// The detector runs only on scheduler nodes and reads only its own region's
+/// database, so it shares fate with the thing it watches: a region whose
+/// scheduler never started has no detector either, and every check in it is
+/// orphaned with nothing left to say so. No stream record can report that —
+/// the absence of records is indistinguishable from "nothing was wrong".
+///
+/// A counter that stops advancing is the one signal that survives, because it
+/// is scraped from outside the region. Alert on
+/// `rate(zo_synthetics_orphan_scans_total[15m]) == 0`. That is why this is
+/// incremented on EVERY completed pass, including passes that find zero
+/// orphans: a detector that reports nothing and a detector that is gone must
+/// not look the same.
+pub static SYNTHETICS_ORPHAN_SCANS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_orphan_scans_total",
+            "Completed synthetics orphan-detection passes.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+/// Check rows this node read and could not parse, and therefore skipped.
+///
+/// Skipping is the right call — one unreadable row must not stop the scheduler
+/// or the list API for everything else — but it has to be visible, or a check
+/// silently stops running. Every skip also logs with the row's id; this counter
+/// is the part an alert can watch.
+///
+/// Deliberately unlabelled. The one question worth alerting on is "is this node
+/// dropping rows at all", the log line answers "which", and a per-org label
+/// would put an attacker- or migration-controlled string into the cardinality
+/// of a metric that should normally sit at zero.
+///
+/// Orphan detection covers only part of this: it runs on scheduler nodes only,
+/// so a row skipped on the list path in a non-scheduler region has nothing else
+/// to report it.
+pub static SYNTHETICS_UNREADABLE_CHECKS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_unreadable_checks_total",
+            "Synthetics check rows skipped because they could not be parsed.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+// SPEC §9B.1 — synthetics step billing observability. These counters are a
+// deliberate SECOND, independent copy of numbers whose source of truth is
+// `SUM(size)` over the `usage` stream: `report_usage` is fire-and-forget, so
+// stream-below-counter is the only way to see rows that were computed and lost.
+
+/// Executed / defined / free steps handed to the usage queue, per org, by
+/// event (SPEC §9B.1 rows 1-4). Incremented by `size`, not by 1: `size` IS the
+/// step count. One counter with an `event` label rather than three, so §4.3's
+/// `executed / defined` ratio is one PromQL division over one metric.
+pub static SYNTHETICS_STEPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "synthetics_steps_total",
+            "Synthetics steps emitted to the usage queue, by usage event.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "event"],
+    )
+    .expect("Metric created")
+});
+
+/// Browser milliseconds handed to the usage queue, per org — SPEC §9B.1 row 5.
+/// Its own metric, not another `event` label on [`SYNTHETICS_STEPS_TOTAL`]: the
+/// unit is milliseconds, and mixing units in one counter's label values makes
+/// the default sum-across-labels meaningless.
+pub static SYNTHETICS_BROWSER_MS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "synthetics_browser_ms_total",
+            "Synthetics browser milliseconds emitted to the usage queue.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// SPEC §4.4.1 clamp firings — §9B.1 row 6, alerted on by **A2**.
+///
+/// A probe reported more executed steps than `steps_configured × combos ×
+/// (retries + 1)` — billable work reported wrong, so it must not be silent.
+/// Unlabelled: see [`SYNTHETICS_UNREADABLE_CHECKS_TOTAL`]; the `warn` at the
+/// call site carries `job_id`, `synthetics_id` and `org_id`.
+pub static SYNTHETICS_STEP_CLAMP_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_step_clamp_total",
+            "Synthetics acks whose reported step count exceeded the frozen ceiling.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+/// SPEC §4.4.2 zero-fallback firings — §9B.1 row 7, alerted on by **A3**.
+///
+/// A probe reported `steps_executed = 0`, so the frozen definition was billed
+/// instead of zero. Expected during probe rollout; afterwards it is §11 **F9**,
+/// an inverted deploy order billing the fallback on every browser ack.
+/// Unlabelled, like the clamp counter above.
+pub static SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_step_zero_fallback_total",
+            "Synthetics acks that reported zero executed steps and fell back to the definition."
+                .to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+/// Usage rows the self-reporting queue REFUSED — SPEC §9B.1 row 8, alerted on
+/// by **A4**. The only observable failure in the emit path: `report_usage`
+/// spawns and returns `()`, so callers cannot see a failure; the enqueue inside
+/// the spawned task does return a `Result`, and this counts its errors.
+/// Labelled by `UsageEvent` (closed, small set), not by org.
+pub static USAGE_ENQUEUE_FAILURES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "usage_enqueue_failures_total",
+            "Usage rows the self-reporting queue rejected, by usage event.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["event"],
+    )
+    .expect("Metric created")
+});
+
+/// Trial-quota pool movements dropped before reaching the database — SPEC
+/// §9B.1 row 9, alerted on by **A5**, and the direct signal for §11 **F8**.
+///
+/// The flush channel is bounded at 10,000 and `try_send` drops on overflow. The
+/// in-memory counter has already moved, so enforcement stays right until this
+/// node restarts, when `init_from_db` reloads a total short by the dropped
+/// amount and the org silently gets those units back — permanently, under
+/// §6.1's ONE-TIME grant. Labelled by `trial_quota_usage.feature`, a fixed
+/// code-defined set.
+pub static TRIAL_QUOTA_FLUSH_DROPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "trial_quota_flush_drops_total",
+            "Trial-quota pool movements dropped because the DB flush channel was full.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["feature"],
+    )
+    .expect("Metric created")
+});
+
+/// Age of an org's `customer_billings.metering_offset`, in seconds — SPEC
+/// §9B.1 row 10, alerted on by **A6**. A stuck org looks identical to a skipped
+/// one in the logs; the age is the difference. Published for EVERY org holding
+/// a billing row, including skipped ones, and reset each pass: a gauge that
+/// stops being reported keeps its last value forever, so an unsubscribed org
+/// would alert at its final age indefinitely.
+pub static METERING_OFFSET_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "metering_offset_age_seconds",
+            "Age of an organization's metering offset, in seconds.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// One per `customer_billings` row this REGION holds with a non-empty
+/// `customer_id` — the local half of SPEC §8.3's invariant, alerted on by
+/// **A7**.
+///
+/// §8.3: exactly one such row per org ACROSS ALL REGIONS; violate it and both
+/// regions run the federated query ⇒ 2× over-charge. `customer_billings` is not
+/// super-cluster replicated and `list_customer_billings()` reads only the local
+/// meta store, so no node can evaluate `COUNT(*) > 1` across regions. This gauge
+/// publishes each region's own answer under the `cluster` const label, leaving
+/// `count by (organization) (zo_metering_billing_rows) > 1` to the Prometheus
+/// that scrapes every region. A region that stops publishing drops out of that
+/// count silently — see [`METERING_CYCLES_TOTAL`].
+pub static METERING_BILLING_ROWS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "metering_billing_rows",
+            "Billing rows with a customer id held by this region, per organization.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// Completed metering passes. A dead-man's switch, not a workload count:
+/// incremented on every pass that read the billing rows, including passes that
+/// meter nothing, because a region that stops reporting makes A6 and A7 quietly
+/// correct-looking by removing their inputs.
+pub static METERING_CYCLES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "metering_cycles_total",
+            "Completed metering passes over the billing rows.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+/// SPEC §9B.3's reconciliation, published as three gauges — **A8**'s input.
+/// `SUM(size)` over all four synthetics step events in the usage
+/// stream, per org. See `openobserve-jobs`' `synthetics_step_reconcile` for why
+/// this side is read REGION-LOCAL even though metering reads it federated.
+pub static SYNTHETICS_STEP_RECONCILE_STREAM_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "synthetics_step_reconcile_stream_steps",
+            "Synthetics steps recorded in the usage stream, per organization.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// The other side of §9B.3: `trial_quota_usage.usage_count` for the synthetics
+/// pool, per org.
+pub static SYNTHETICS_STEP_RECONCILE_POOL_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "synthetics_step_reconcile_pool_steps",
+            "Synthetics steps recorded by the free-pool counter, per organization.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// `stream - pool`, signed — the number **A8** alerts on. Its own gauge rather
+/// than PromQL subtraction: an org present in one side and absent from the
+/// other must contribute a difference, not vanish from the join.
+///
+/// POSITIVE: the stream recorded steps the pool never charged — §11 **F8**'s
+/// dropped flush, permanent under a one-time grant. NEGATIVE: the pool charged
+/// steps the stream never recorded, i.e. the emit side failing.
+pub static SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "synthetics_step_reconcile_divergence_steps",
+            "Usage-stream steps minus free-pool steps, per organization.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// Completed §9B.3 reconciliation passes — a dead-man's switch like
+/// [`METERING_CYCLES_TOTAL`]: the three gauges above are sticky, so a stopped
+/// job leaves A8 reading a stale zero divergence forever.
+pub static SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_step_reconcile_scans_total",
+            "Completed synthetics step reconciliation passes.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
 pub static INGEST_PACK_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -220,6 +543,33 @@ pub static INGEST_PACK_SEGMENTS: Lazy<IntGaugeVec> = Lazy::new(|| {
         Opts::new(
             "ingest_pack_segments",
             "Number of wal pack segments in the ingester pending upload to object store."
+                .to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static INGEST_WAL_SEARCHING_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_wal_searching_files",
+            "Number of wal files locked by in-flight searches on the ingester.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static INGEST_WAL_PENDING_DELETE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_wal_pending_delete_files",
+            "Number of uploaded wal files on the ingester still awaiting local deletion."
                 .to_owned()
                 + HELP_SUFFIX,
         )
@@ -1139,6 +1489,46 @@ pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_OPERATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "trace_time_index_operations_total",
+            "Trace time index operations by outcome",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "operation", "status"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_QUERY_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "trace_time_index_query_duration_seconds",
+            "Trace time index query duration in seconds by lookup-key kind",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "kind", "status"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_QUERY_ROUNDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "trace_time_index_query_rounds",
+            "Trace time index query rounds by lookup-key kind and phase",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0, 34.0]),
+        &["organization", "kind", "phase"],
     )
     .expect("Metric created")
 });
@@ -2141,7 +2531,61 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(SYNTHETICS_ORPHANED_CHECKS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_ORPHAN_SCANS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_STEPS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_BROWSER_MS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_STEP_CLAMP_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRIAL_QUOTA_FLUSH_DROPS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METERING_OFFSET_AGE_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METERING_BILLING_ROWS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METERING_CYCLES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_STEP_RECONCILE_POOL_STEPS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(INGEST_PACK_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_WAL_SEARCHING_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_WAL_PENDING_DELETE_FILES.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_PACK_SEGMENTS.clone()))
@@ -2250,7 +2694,15 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(QUERY_CANCELED_NUMS.clone()))
         .expect("Metric registered");
-
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_OPERATIONS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_QUERY_DURATION.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_QUERY_ROUNDS.clone()))
+        .expect("Metric registered");
     // compactor stats
     registry
         .register(Box::new(COMPACT_USED_TIME.clone()))
@@ -2738,6 +3190,185 @@ mod tests {
     // the underlying metric) to touch the lazy initialiser.
     // -----------------------------------------------------------------------
 
+    /// Every step-billing metric must be REGISTERED, not merely declared: a
+    /// missing `register_metrics` line compiles and yields a metric that is never
+    /// scraped, indistinguishable on a dashboard from zero — the healthy value
+    /// for A2-A5. Registering a second time and requiring `AlreadyReg` is the
+    /// only assertion that distinguishes "registered" from "exists", because a
+    /// label-less `MetricVec` gathers as an empty family either way.
+    #[test]
+    fn synthetics_step_billing_metrics_are_registered() {
+        use prometheus::core::Collector;
+
+        let registry = Registry::new();
+        register_metrics(&registry);
+
+        let declared: Vec<(&str, Box<dyn Collector>)> = vec![
+            (
+                "SYNTHETICS_STEPS_TOTAL",
+                Box::new(SYNTHETICS_STEPS_TOTAL.clone()),
+            ),
+            (
+                "SYNTHETICS_BROWSER_MS_TOTAL",
+                Box::new(SYNTHETICS_BROWSER_MS_TOTAL.clone()),
+            ),
+            (
+                "SYNTHETICS_STEP_CLAMP_TOTAL",
+                Box::new(SYNTHETICS_STEP_CLAMP_TOTAL.clone()),
+            ),
+            (
+                "SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL",
+                Box::new(SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone()),
+            ),
+            (
+                "USAGE_ENQUEUE_FAILURES_TOTAL",
+                Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()),
+            ),
+            (
+                "TRIAL_QUOTA_FLUSH_DROPS_TOTAL",
+                Box::new(TRIAL_QUOTA_FLUSH_DROPS_TOTAL.clone()),
+            ),
+            (
+                "METERING_OFFSET_AGE_SECONDS",
+                Box::new(METERING_OFFSET_AGE_SECONDS.clone()),
+            ),
+            (
+                "METERING_BILLING_ROWS",
+                Box::new(METERING_BILLING_ROWS.clone()),
+            ),
+            (
+                "METERING_CYCLES_TOTAL",
+                Box::new(METERING_CYCLES_TOTAL.clone()),
+            ),
+            (
+                "SYNTHETICS_STEP_RECONCILE_STREAM_STEPS",
+                Box::new(SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.clone()),
+            ),
+            (
+                "SYNTHETICS_STEP_RECONCILE_POOL_STEPS",
+                Box::new(SYNTHETICS_STEP_RECONCILE_POOL_STEPS.clone()),
+            ),
+            (
+                "SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS",
+                Box::new(SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS.clone()),
+            ),
+            (
+                "SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL",
+                Box::new(SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL.clone()),
+            ),
+        ];
+
+        for (name, collector) in declared {
+            assert!(
+                matches!(
+                    registry.register(collector),
+                    Err(prometheus::Error::AlreadyReg)
+                ),
+                "{name} is declared but `register_metrics` never registers it, so it is never \
+                 scraped and reads as a permanent zero",
+            );
+        }
+    }
+
+    /// The names are the alert contract. §9B.2's queries are written against
+    /// these strings, and they live outside this repository, so a rename here
+    /// silently breaks A1-A8 with nothing failing on either side.
+    #[test]
+    fn the_step_billing_metric_names_are_the_ones_the_alerts_query() {
+        use prometheus::core::Collector;
+
+        for (metric, expected) in [
+            (
+                SYNTHETICS_STEPS_TOTAL.desc()[0].fq_name.as_str(),
+                "zo_synthetics_steps_total",
+            ),
+            (
+                SYNTHETICS_BROWSER_MS_TOTAL.desc()[0].fq_name.as_str(),
+                "zo_synthetics_browser_ms_total",
+            ),
+            (
+                SYNTHETICS_STEP_CLAMP_TOTAL.desc()[0].fq_name.as_str(),
+                "zo_synthetics_step_clamp_total",
+            ),
+            (
+                SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.desc()[0]
+                    .fq_name
+                    .as_str(),
+                "zo_synthetics_step_zero_fallback_total",
+            ),
+            (
+                USAGE_ENQUEUE_FAILURES_TOTAL.desc()[0].fq_name.as_str(),
+                "zo_usage_enqueue_failures_total",
+            ),
+            (
+                TRIAL_QUOTA_FLUSH_DROPS_TOTAL.desc()[0].fq_name.as_str(),
+                "zo_trial_quota_flush_drops_total",
+            ),
+            (
+                METERING_OFFSET_AGE_SECONDS.desc()[0].fq_name.as_str(),
+                "zo_metering_offset_age_seconds",
+            ),
+            (
+                METERING_BILLING_ROWS.desc()[0].fq_name.as_str(),
+                "zo_metering_billing_rows",
+            ),
+            (
+                METERING_CYCLES_TOTAL.desc()[0].fq_name.as_str(),
+                "zo_metering_cycles_total",
+            ),
+            (
+                SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.desc()[0]
+                    .fq_name
+                    .as_str(),
+                "zo_synthetics_step_reconcile_stream_steps",
+            ),
+            (
+                SYNTHETICS_STEP_RECONCILE_POOL_STEPS.desc()[0]
+                    .fq_name
+                    .as_str(),
+                "zo_synthetics_step_reconcile_pool_steps",
+            ),
+            (
+                SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS.desc()[0]
+                    .fq_name
+                    .as_str(),
+                "zo_synthetics_step_reconcile_divergence_steps",
+            ),
+            (
+                SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL.desc()[0]
+                    .fq_name
+                    .as_str(),
+                "zo_synthetics_step_reconcile_scans_total",
+            ),
+        ] {
+            assert_eq!(metric, expected);
+        }
+
+        // §4.3's ratio is one division over one metric only while both halves
+        // are label values of the SAME counter, or the alert stops joining.
+        assert_eq!(
+            SYNTHETICS_STEPS_TOTAL.desc()[0].variable_labels,
+            vec!["organization".to_string(), "event".to_string()],
+        );
+    }
+
+    #[test]
+    fn test_statics_synthetics_step_billing() {
+        let _ = SYNTHETICS_STEPS_TOTAL.clone();
+        let _ = SYNTHETICS_BROWSER_MS_TOTAL.clone();
+        let _ = SYNTHETICS_STEP_CLAMP_TOTAL.clone();
+        let _ = SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone();
+        let _ = USAGE_ENQUEUE_FAILURES_TOTAL.clone();
+        let _ = TRIAL_QUOTA_FLUSH_DROPS_TOTAL.clone();
+        let _ = METERING_OFFSET_AGE_SECONDS.clone();
+        let _ = METERING_BILLING_ROWS.clone();
+        let _ = METERING_CYCLES_TOTAL.clone();
+        let _ = SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.clone();
+        let _ = SYNTHETICS_STEP_RECONCILE_POOL_STEPS.clone();
+        let _ = SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS.clone();
+        let _ = SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL.clone();
+    }
+
     #[test]
     fn test_statics_http() {
         let _ = HTTP_INCOMING_REQUESTS.clone();
@@ -2755,8 +3386,13 @@ mod tests {
         let _ = INGEST_PARQUET_FILES.clone();
         let _ = SYNTHETICS_PENDING_JOBS.clone();
         let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
+        let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
+        let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
+        let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
         let _ = INGEST_PACK_FILES.clone();
         let _ = INGEST_PACK_SEGMENTS.clone();
+        let _ = INGEST_WAL_SEARCHING_FILES.clone();
+        let _ = INGEST_WAL_PENDING_DELETE_FILES.clone();
         let _ = INGEST_WAL_WRITE_BYTES.clone();
         let _ = INGEST_WAL_READ_BYTES.clone();
         let _ = INGEST_MEMTABLE_BYTES.clone();

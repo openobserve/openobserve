@@ -41,13 +41,36 @@ in **both** repos automatically — no more hand-syncing two workflow files.
 
 ## Fields
 
-| field           | meaning                                                                 |
-|-----------------|-------------------------------------------------------------------------|
-| `testfolder`    | shard label — becomes the job name `e2e / <testfolder>` (must be unique) |
-| `actual_folder` | real directory under `playwright-tests/` (e.g. `Logs-Core` → `Logs`)    |
-| `browser`       | `chrome`                                                                 |
-| `run_files`     | spec filenames run by this shard                                         |
-| `disabled`      | *(optional)* specs intentionally turned off — see below                 |
+| field                 | meaning                                                                 |
+|-----------------------|-------------------------------------------------------------------------|
+| `testfolder`          | shard label — becomes the job name `e2e / <testfolder>` (must be unique) |
+| `actual_folder`       | real directory under `playwright-tests/` (e.g. `Logs-Core` → `Logs`)    |
+| `browser`             | `chrome`                                                                 |
+| `run_files`           | spec filenames run by this shard                                         |
+| `disabled`            | *(optional)* specs intentionally turned off — see below                 |
+| `quick_mode_enabled`  | *(optional)* `true` starts this shard's server with `ZO_QUICK_MODE_ENABLED` |
+| `ingest_allowed_upto` | *(optional)* hours of backdated ingestion this shard's server accepts    |
+| `workers`             | *(optional)* pin `--workers=N` for this shard                            |
+
+The last three exist because a shard is the smallest unit that can change them.
+
+- `ingest_allowed_upto` — the workflow default is **5 hours**, and older rows are
+  dropped while ingestion still answers `200`. A suite that seeds history needs a
+  wider window; `SLO-Measurement` sets `240` because SLOs measure a rolling 7-day
+  window. Shards that omit it keep the workflow default.
+- `workers` — `fullyParallel` runs separate spec **files** concurrently, and
+  `test.describe.configure({ mode: 'serial' })` only orders tests *within* one
+  file. A shard whose specs contend for a shared server-side resource must pin
+  `workers: 1`; the specs cannot express that themselves. `SLO-Measurement` does,
+  because both of its specs wait on the SLO backfill job, which runs with
+  `ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1`.
+- `slo_backfill_chunk_secs` — the server default is **86400** (1 day), so a test
+  SLO with a 7-day window backfills in 7 sequential chunks under the concurrency-1
+  rule above. `SLO-Measurement` sets `604800` so each of its 7-day-window SLOs
+  backfills in a single chunk instead. Safe only because no spec in that shard
+  asserts on per-chunk timing or partial coverage — only on the final measured
+  state. If a future spec in this shard needs to see backfill mid-flight, give
+  that spec its own shard rather than lowering this back down.
 
 ## Disabling a spec (JSON has no `//` comments)
 

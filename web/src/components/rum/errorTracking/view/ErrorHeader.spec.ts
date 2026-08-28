@@ -16,7 +16,9 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 // Attach a mount target once for the whole file
 const node = document.createElement("div");
@@ -30,7 +32,8 @@ const { mockRouterBack, mockCopyToClipboard } = vi.hoisted(() => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ back: mockRouterBack }),
+  useRoute: () => ({ fullPath: "/rum/errors/view/error-abc123?timestamp=1700000000" }),
+  useRouter: () => ({ back: mockRouterBack, resolve: (to: string) => ({ href: to }) }),
 }));
 
 vi.mock("@/utils/clipboard", () => ({
@@ -58,7 +61,7 @@ describe("ErrorHeader", () => {
     mount(ErrorHeader, {
       attachTo: "#app",
       props: { error },
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n, store] },
     });
 
   beforeEach(() => {
@@ -215,16 +218,12 @@ describe("ErrorHeader", () => {
       ).toBeDefined();
     });
 
-    it("copies the page url when the copy-link button is clicked", async () => {
+    it("hands the current route to the share button so the link carries the error id", async () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      await wrapper.find('[data-test="error-header-copy-link-btn"]').trigger("click");
-
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(
-        window.location.href,
-        expect.any(Function),
-        expect.objectContaining({ successMessage: "Link copied to clipboard" }),
+      expect(wrapper.findComponent(ShareButton).props("url")).toBe(
+        `${window.location.origin}/rum/errors/view/error-abc123?timestamp=1700000000`,
       );
     });
   });

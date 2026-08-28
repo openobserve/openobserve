@@ -68,10 +68,11 @@ export default defineComponent({
       }
     });
 
-    const tooltipText = computed(() => {
-      const mode = darkMode.value ? t("common.lightMode") : t("common.darkMode");
-      return `${t("common.switchTo")} ${mode}`;
-    });
+    // Whole sentence per target theme: "Switch to" + mode glued two translated
+    // fragments together, which breaks wherever the word order differs.
+    const tooltipText = computed(() =>
+      darkMode.value ? t("common.switchToLightMode") : t("common.switchToDarkMode"),
+    );
 
     watch(darkMode, () => {
       setTheme(darkMode.value ? "dark" : "light");

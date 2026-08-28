@@ -21,15 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
       :labelPosition="labelPosition"
-      :options="
-        store.state.organizationData.folders.map((item: any) => {
-          return { label: item.name, value: item.folderId };
-        })
-      "
+      :options="folderOptions"
       data-test="index-dropdown-stream_type"
       labelKey="label"
       class="flex-1"
-    />
+    >
+      <template v-if="selectedFolder" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
+      </template>
+    </OSelect>
 
     <OButton
       data-test="dashboard-folder-move-new-add"
@@ -70,10 +70,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useRoute } from "vue-router";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "@/components/common/sidebar/folderIconOption";
+import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton, ODialog, OSelect },
+  components: { AddFolder, OButton, ODialog, OSelect, FolderIcon },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -89,6 +92,23 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const store: any = useStore();
+    const { iconFor } = useFolderIcons();
+
+    const selectedFolderIcon = computed(() =>
+      iconFor(
+        store.state.organizationData.folders.find(
+          (item: any) => item.folderId === selectedFolder.value,
+        ),
+      ),
+    );
+
+    const folderOptions = computed(() =>
+      store.state.organizationData.folders.map((item: any) => ({
+        label: item.name,
+        value: item.folderId,
+        iconComponent: folderIconOption(iconFor(item)),
+      })),
+    );
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
     const addFolderRef: any = ref(null);
@@ -145,6 +165,8 @@ export default defineComponent({
     );
 
     return {
+      folderOptions,
+      selectedFolderIcon,
       t,
       store,
       selectedFolder,

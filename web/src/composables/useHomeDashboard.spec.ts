@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { gt } from "@/types/i18n";
 
 vi.mock("@/services/settings", () => ({
   default: {
@@ -33,12 +34,12 @@ const D = { dashboardId: "abc", folderId: "default", label: "Payments" };
 describe("useHomeDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useHomeDashboard().homeDashboard.value = null; // reset shared state
+    useHomeDashboard(gt).homeDashboard.value = null; // reset shared state
   });
 
   it("load populates the ref from getSetting.setting_value", async () => {
     (settings.getSetting as any).mockResolvedValue({ data: { setting_value: D } });
-    const { load, homeDashboard } = useHomeDashboard();
+    const { load, homeDashboard } = useHomeDashboard(gt);
     await load("org1");
     expect(settings.getSetting).toHaveBeenCalledWith("org1", "home_dashboard");
     expect(homeDashboard.value).toEqual(D);
@@ -46,14 +47,14 @@ describe("useHomeDashboard", () => {
 
   it("load sets null when the setting is absent (404/null)", async () => {
     (settings.getSetting as any).mockResolvedValue({ data: null });
-    const { load, homeDashboard } = useHomeDashboard();
+    const { load, homeDashboard } = useHomeDashboard(gt);
     await load("org1");
     expect(homeDashboard.value).toBeNull();
   });
 
   it("setHomeDashboard optimistically sets the ref and writes the org setting", async () => {
     (settings.setOrgSetting as any).mockResolvedValue({});
-    const { setHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { setHomeDashboard, homeDashboard } = useHomeDashboard(gt);
     const p = setHomeDashboard("org1", D);
     expect(homeDashboard.value).toEqual(D); // optimistic — set before await resolves
     await p;
@@ -62,7 +63,7 @@ describe("useHomeDashboard", () => {
 
   it("setHomeDashboard reverts the ref and toasts on failure", async () => {
     const prev = { dashboardId: "old", folderId: "default", label: "Old" };
-    const { setHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { setHomeDashboard, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = prev;
     (settings.setOrgSetting as any).mockRejectedValue({ response: { status: 500 } });
     await setHomeDashboard("org1", D);
@@ -71,7 +72,7 @@ describe("useHomeDashboard", () => {
   });
 
   it("setHomeDashboard shows a permission message on 403", async () => {
-    const { setHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { setHomeDashboard, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = null;
     (settings.setOrgSetting as any).mockRejectedValue({ response: { status: 403 } });
     await setHomeDashboard("org1", D);
@@ -82,7 +83,7 @@ describe("useHomeDashboard", () => {
   });
 
   it("setHomeDashboard no-ops (no API call, no ref change) when org is falsy", async () => {
-    const { setHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { setHomeDashboard, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = null;
     await setHomeDashboard("", D);
     expect(settings.setOrgSetting).not.toHaveBeenCalled();
@@ -90,7 +91,7 @@ describe("useHomeDashboard", () => {
   });
 
   it("clearHomeDashboard no-ops when org is falsy", async () => {
-    const { clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { clearHomeDashboard, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = D;
     await clearHomeDashboard("");
     expect(settings.deleteOrgSetting).not.toHaveBeenCalled();
@@ -99,7 +100,7 @@ describe("useHomeDashboard", () => {
 
   it("clearHomeDashboard optimistically nulls and deletes the org setting", async () => {
     (settings.deleteOrgSetting as any).mockResolvedValue({});
-    const { clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { clearHomeDashboard, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = D;
     const p = clearHomeDashboard("org1");
     expect(homeDashboard.value).toBeNull(); // optimistic
@@ -108,7 +109,7 @@ describe("useHomeDashboard", () => {
   });
 
   it("clearHomeDashboard reverts on failure", async () => {
-    const { clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { clearHomeDashboard, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = D;
     (settings.deleteOrgSetting as any).mockRejectedValue({ response: { status: 500 } });
     await clearHomeDashboard("org1");
@@ -119,7 +120,7 @@ describe("useHomeDashboard", () => {
     // The backend clears home_dashboard itself when the pinned dashboard is
     // deleted, so the client's delete can race and 404. That is the desired end
     // state — keep the optimistic null, do not revert, do not toast.
-    const { clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { clearHomeDashboard, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = D;
     (settings.deleteOrgSetting as any).mockRejectedValue({
       response: { status: 404 },
@@ -130,7 +131,7 @@ describe("useHomeDashboard", () => {
   });
 
   it("isHome reflects the current value", () => {
-    const { isHome, homeDashboard } = useHomeDashboard();
+    const { isHome, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = D;
     expect(isHome("abc")).toBe(true);
     expect(isHome("xyz")).toBe(false);
@@ -138,7 +139,7 @@ describe("useHomeDashboard", () => {
 
   it("updateLabel changes the stored label AND persists it when different", () => {
     (settings.setOrgSetting as any).mockResolvedValue({});
-    const { updateLabel, homeDashboard } = useHomeDashboard();
+    const { updateLabel, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = { ...D };
     updateLabel("org1", "abc", "Renamed");
     expect(homeDashboard.value?.label).toBe("Renamed");
@@ -152,7 +153,7 @@ describe("useHomeDashboard", () => {
   });
 
   it("updateLabel does nothing when the label is unchanged", () => {
-    const { updateLabel, homeDashboard } = useHomeDashboard();
+    const { updateLabel, homeDashboard } = useHomeDashboard(gt);
     homeDashboard.value = { ...D };
     updateLabel("org1", "abc", D.label);
     expect(settings.setOrgSetting).not.toHaveBeenCalled();

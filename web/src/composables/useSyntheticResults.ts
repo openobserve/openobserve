@@ -432,7 +432,8 @@ export function useSyntheticResults(t: TranslateFn) {
         })
         .catch((e: unknown) => {
           kpi.value = { ...EMPTY_KPI };
-          kpiError.value = e instanceof Error ? e.message : String(e ?? "KPI query failed");
+          kpiError.value =
+            e instanceof Error ? e.message : String(e ?? t("synthetics.kpiQueryFailed"));
         })
         .finally(() => {
           kpiLoading.value = false;
@@ -447,7 +448,7 @@ export function useSyntheticResults(t: TranslateFn) {
         .catch((e: unknown) => {
           buckets.value = [];
           histogramError.value =
-            e instanceof Error ? e.message : String(e ?? "Histogram query failed");
+            e instanceof Error ? e.message : String(e ?? t("synthetics.histogramQueryFailed"));
         })
         .finally(() => {
           histogramLoading.value = false;
@@ -467,7 +468,8 @@ export function useSyntheticResults(t: TranslateFn) {
         })
         .catch((e: unknown) => {
           runs.value = [];
-          runsError.value = e instanceof Error ? e.message : String(e ?? "Runs query failed");
+          runsError.value =
+            e instanceof Error ? e.message : String(e ?? t("synthetics.runsQueryFailed"));
         })
         .finally(() => {
           runsLoading.value = false;
@@ -478,7 +480,7 @@ export function useSyntheticResults(t: TranslateFn) {
       // get a meaningful completion signal.
       await Promise.all([kpiPromise, histogramPromise, runsPromise]);
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : "Failed to load results";
+      error.value = e instanceof Error ? e.message : t("synthetics.failedToLoadResults");
       kpi.value = { ...EMPTY_KPI };
       buckets.value = [];
     } finally {
@@ -509,7 +511,7 @@ export function useSyntheticResults(t: TranslateFn) {
         runDetail.value = mapRunDetail(rows[0]);
       }
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : "Failed to load run";
+      error.value = e instanceof Error ? e.message : t("synthetics.failedToLoadRun");
       runDetail.value = null;
     } finally {
       loading.value = false;
@@ -540,7 +542,7 @@ export function useSyntheticResults(t: TranslateFn) {
         protocolRunDetail.value = mapProtocolRunDetail(rows[0]);
       }
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : "Failed to load run";
+      error.value = e instanceof Error ? e.message : t("synthetics.failedToLoadRun");
       protocolRunDetail.value = null;
     } finally {
       loading.value = false;
@@ -563,7 +565,8 @@ export function useSyntheticResults(t: TranslateFn) {
       stepStats.value = await fetchAndAggregateSteps(monitorId, startTime, endTime);
     } catch (e: unknown) {
       stepStats.value = emptyStepStats();
-      stepsError.value = e instanceof Error ? e.message : String(e ?? "Steps query failed");
+      stepsError.value =
+        e instanceof Error ? e.message : String(e ?? t("synthetics.stepsQueryFailed"));
     } finally {
       stepsLoading.value = false;
       stepsHasLoadedOnce.value = true;

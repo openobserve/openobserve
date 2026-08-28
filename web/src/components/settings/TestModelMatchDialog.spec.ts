@@ -107,26 +107,63 @@ const OButtonStub = {
   template: `<button data-test="o-button-stub" @click="$emit('click')"><slot /></button>`,
 };
 
+// Mirrors OInput's real contract for the parts this dialog relies on: a
+// `for`-associated label with the required marker, help text, and the built-in
+// clear button whose data-test OInput derives as `${parentDataTest}-clear`.
 const OInputStub = {
   name: "OInput",
-  props: ["modelValue", "placeholder"],
-  emits: ["update:modelValue"],
+  // Attr inheritance off, like the real OInput: otherwise the parent's
+  // `data-test` lands on the root and hides the stub's own marker.
+  inheritAttrs: false,
+  // Booleans MUST be typed: passed as bare attributes they arrive as "" and an
+  // untyped prop keeps that falsy value instead of coercing it to true.
+  props: {
+    modelValue: { type: String, default: "" },
+    placeholder: { type: String, default: "" },
+    label: { type: String, default: "" },
+    helpText: { type: String, default: "" },
+    required: { type: Boolean, default: false },
+    clearable: { type: Boolean, default: false },
+    autofocus: { type: Boolean, default: false },
+  },
+  emits: ["update:modelValue", "clear"],
   template: `
     <div data-test="o-input-stub">
+      <label v-if="label">{{ label }}<span v-if="required">*</span></label>
       <slot name="icon-left" />
       <input
         :value="modelValue"
         :placeholder="placeholder"
         @input="$emit('update:modelValue', $event.target.value)"
       />
+      <button
+        v-if="clearable && modelValue !== '' && modelValue != null"
+        :data-test="clearDataTest"
+        @click="$emit('update:modelValue', ''); $emit('clear')"
+      />
       <slot name="icon-right" />
+      <span v-if="helpText" data-test="o-input-stub-help">{{ helpText }}</span>
     </div>
   `,
-  methods: {
-    focus() {
-      /* no-op for tests */
+  computed: {
+    clearDataTest(): string {
+      return `${(this as any).$attrs["data-test"] ?? ""}-clear`;
     },
   },
+};
+
+const OTimeStub = {
+  name: "OTime",
+  props: ["modelValue", "label", "helpText", "clearable"],
+  emits: ["update:modelValue"],
+  template: `
+    <input
+      data-test="o-time-stub"
+      type="time"
+      :value="modelValue"
+      @input="$emit('update:modelValue', $event.target.value)"
+    />
+  `,
 };
 
 // ── Mount factory ────────────────────────────────────────────────────────────
@@ -139,6 +176,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         ODialog: ODialogStub,
         OButton: OButtonStub,
         OInput: OInputStub,
+        OTime: OTimeStub,
         OIcon: OIconStub,
         OBadge: OBadgeStub,
       },
@@ -158,6 +196,8 @@ describe("TestModelMatchDialog", () => {
   beforeEach(() => {
     mockTest.mockReset();
     mockTest.mockResolvedValue({ data: null });
+    // Keep local-time hints quiet unless a test opts into a real zone.
+    (store.state as any).timezone = "UTC";
     store.state.selectedOrganization = {
       label: "default Organization",
       id: 159,
@@ -318,25 +358,37 @@ describe("TestModelMatchDialog", () => {
   });
 
   describe("input clear button", () => {
+    // OInput owns the clear affordance now (`clearable`), so the button is the
+    // library's, named `${data-test}-clear`, and it refocuses the field itself.
+    const CLEAR_BTN = '[data-test="test-match-model-input-clear"]';
+
     it("does not render the clear button when input is empty", () => {
       wrapper = mountDialog({ modelValue: true });
-      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(false);
+      expect(wrapper.find(CLEAR_BTN).exists()).toBe(false);
     });
 
     it("renders the clear button when input has a value", async () => {
       wrapper = mountDialog({ modelValue: true });
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
-      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(true);
+      expect(wrapper.find(CLEAR_BTN).exists()).toBe(true);
     });
 
-    it("clears the input when clearAndFocus is invoked", async () => {
+    it("clears the model name when the clear button is pressed", async () => {
       wrapper = mountDialog({ modelValue: true });
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
-      (wrapper.vm as any).clearAndFocus();
+      await wrapper.find(CLEAR_BTN).trigger("click");
       await nextTick();
       expect((wrapper.vm as any).testModelName).toBe("");
+    });
+
+    it("labels the model-name field and marks it required", () => {
+      wrapper = mountDialog({ modelValue: true });
+      const label = wrapper.find('[data-test="o-input-stub"] label');
+      expect(label.exists()).toBe(true);
+      expect(label.text()).toContain("Model Name");
+      expect(label.text()).toContain("*");
     });
   });
 
@@ -364,8 +416,12 @@ describe("TestModelMatchDialog", () => {
       expect(mockTest).toHaveBeenCalledWith("default", {
         model_name: "gpt-4",
         usage: undefined,
-        timestamp: null,
+        // "now" in microseconds — resolves valid_from and any peak/off-peak
+        // UTC time window against the current instant.
+        timestamp: expect.any(Number),
       });
+      const sentTs = mockTest.mock.calls[0][1].timestamp;
+      expect(sentTs).toBeCloseTo(Date.now() * 1000, -7);
     });
 
     it("stores the API response on testResult after success", async () => {
@@ -822,6 +878,157 @@ describe("TestModelMatchDialog", () => {
       expect(badge.exists()).toBe(true);
       expect(badge.text()).toBe("Global");
       expect(badge.attributes("data-variant")).toBe("default-outline");
+    });
+
+    it("renders the matched tier's active UTC hours when it has time windows", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "deepseek-v4-pro";
+      (wrapper.vm as any).testResult = {
+        matched: {
+          name: "DeepSeek V4 Pro",
+          source: "built_in",
+          tiers: [
+            { name: "Off-Peak", prices: { input: 6.6e-7 } },
+            {
+              name: "Peak",
+              prices: { input: 1.32e-6 },
+              utc_windows: [
+                { start_minute: 60, end_minute: 240 },
+                { start_minute: 360, end_minute: 600 },
+              ],
+            },
+          ],
+        },
+        tier: "Peak",
+      };
+      await nextTick();
+      const windowsLine = wrapper.find('[data-test="test-match-tier-windows"]');
+      expect(windowsLine.exists()).toBe(true);
+      expect(windowsLine.text()).toContain("01:00–04:00, 06:00–10:00 UTC");
+      // A time-restricted tier is not the default — the default caption must not show.
+      expect(wrapper.text()).not.toContain("Default pricing tier");
+    });
+  });
+
+  describe("test at UTC time", () => {
+    it("renders the optional UTC time input", () => {
+      wrapper = mountDialog({ modelValue: true });
+      // The component's own data-test falls through onto the stub's root input.
+      expect(wrapper.find('[data-test="test-match-time-input"]').exists()).toBe(true);
+    });
+
+    it("sends today's UTC date at the chosen time when a time is picked", async () => {
+      mockTest.mockResolvedValue({ data: null });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "deepseek-v4-pro";
+      (wrapper.vm as any).testAtTime = "02:30";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+
+      const sentTs = mockTest.mock.calls[0][1].timestamp;
+      const now = new Date();
+      const expected =
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 2, 30) * 1000;
+      expect(sentTs).toBe(expected);
+    });
+
+    it("falls back to the current instant when the time is empty", async () => {
+      mockTest.mockResolvedValue({ data: null });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      (wrapper.vm as any).testAtTime = "";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect(mockTest.mock.calls[0][1].timestamp).toBeCloseTo(Date.now() * 1000, -7);
+    });
+
+    it("re-runs the test when the time changes while a result is shown", async () => {
+      mockTest.mockResolvedValue({
+        data: { matched: { name: "gpt-4", source: "org" }, tier: "Default" },
+      });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect(mockTest).toHaveBeenCalledTimes(1);
+
+      (wrapper.vm as any).testAtTime = "07:00";
+      await nextTick();
+      await flushPromises();
+      expect(mockTest).toHaveBeenCalledTimes(2);
+      const secondTs = mockTest.mock.calls[1][1].timestamp;
+      const now = new Date();
+      expect(secondTs).toBe(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 7, 0) * 1000,
+      );
+    });
+
+    it("does not fire a test on time change before any result exists", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      (wrapper.vm as any).testAtTime = "07:00";
+      await nextTick();
+      await flushPromises();
+      expect(mockTest).not.toHaveBeenCalled();
+    });
+
+    it("resets the chosen time when the dialog reopens", async () => {
+      wrapper = mountDialog({ modelValue: false });
+      (wrapper.vm as any).testAtTime = "07:00";
+      await wrapper.setProps({ modelValue: true });
+      await nextTick();
+      expect((wrapper.vm as any).testAtTime).toBe("");
+    });
+  });
+
+  describe("local timezone hints", () => {
+    it("shows the chosen UTC time converted to the user's timezone", async () => {
+      (store.state as any).timezone = "Asia/Kolkata"; // UTC+5:30, no DST
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testAtTime = "02:30";
+      await nextTick();
+
+      const hint = wrapper.find('[data-test="test-match-time-local-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain("08:00");
+    });
+
+    it("hides the conversion when the user's timezone is UTC", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testAtTime = "02:30";
+      await nextTick();
+      expect(wrapper.find('[data-test="test-match-time-local-hint"]').exists()).toBe(false);
+    });
+
+    it("appends the matched tier's hours in the user's timezone", async () => {
+      (store.state as any).timezone = "Asia/Kolkata";
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "deepseek-v4-pro";
+      (wrapper.vm as any).testResult = {
+        matched: {
+          name: "DeepSeek V4 Pro",
+          source: "built_in",
+          tiers: [
+            {
+              name: "Peak",
+              prices: { input: 1.32e-6 },
+              utc_windows: [
+                { start_minute: 60, end_minute: 240 },
+                { start_minute: 360, end_minute: 600 },
+              ],
+            },
+          ],
+        },
+        tier: "Peak",
+      };
+      await nextTick();
+
+      const line = wrapper.find('[data-test="test-match-tier-windows"]');
+      expect(line.text()).toContain("01:00–04:00, 06:00–10:00 UTC");
+      expect(line.text()).toContain("06:30–09:30, 11:30–15:30");
     });
   });
 });

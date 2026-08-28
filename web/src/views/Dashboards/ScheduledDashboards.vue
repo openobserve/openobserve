@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <div data-test="scheduled-dashboards-container" class="scheduled-dashboards h-fit">
+    <div data-test="scheduled-dashboards-container" class="scheduled-dashboards h-full min-h-0">
       <OTable
         class="w-full"
         data-test="scheduled-dashboard-table"
@@ -99,7 +99,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <NoData :filtered="!!scheduledFilterQuery" @action="scheduledFilterQuery = ''" />
+          <OEmptyState
+            size="hero"
+            preset="no-reports"
+            :filtered="!!scheduledFilterQuery"
+            @action="
+              (id) =>
+                id === 'clear-filters' ? (scheduledFilterQuery = '') : createScheduledReport()
+            "
+          />
         </template>
       </OTable>
     </div>
@@ -111,7 +119,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { convertUnixToDateFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";

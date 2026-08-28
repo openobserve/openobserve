@@ -414,7 +414,6 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
@@ -442,7 +441,6 @@ describe("Search Service", () => {
         is_multistream: true,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
@@ -467,38 +465,12 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&query_fn=custom_function",
-        params.body,
-      );
-    });
-
-    it("should add action_id parameter when provided", async () => {
-      const params = {
-        org_identifier: "test-org",
-        index: "logs",
-        key: "key123",
-        size: "10",
-        query_context: "SELECT * FROM logs",
-        query_fn: "",
-        stream_type: "logs",
-        regions: "",
-        clusters: "",
-        is_multistream: false,
-        traceparent: "trace-123",
-        body: { filter: "test" },
-        action_id: "action123",
-      };
-
-      await search.search_around(params);
-
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&action_id=action123",
         params.body,
       );
     });
@@ -517,7 +489,6 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
@@ -628,6 +599,23 @@ describe("Search Service", () => {
 
       expect(mockHttp.get).toHaveBeenCalledWith(
         `/api/test-org/traces/traces/latest?filter=${encodeURIComponent("service_name='webapp'")}&start_time=1609459200&end_time=1609545600&from=0&size=100`,
+      );
+    });
+  });
+
+  describe("get_trace_details", () => {
+    it("should build the trace details URL with a caller range and hint", async () => {
+      await search.get_trace_details({
+        org_identifier: "test-org",
+        stream_name: "traces",
+        trace_id: "trace/id",
+        start_time: 10,
+        end_time: 20,
+        hint_ts: 15,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/traces/trace%2Fid/details?start_time=10&end_time=20&hint_ts=15",
       );
     });
   });

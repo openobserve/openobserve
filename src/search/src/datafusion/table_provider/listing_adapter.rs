@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use arrow_schema::{SchemaRef, SortOptions};
+use arrow_schema::SchemaRef;
 use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
     catalog::{Session, TableProvider, memory::DataSourceExec},
@@ -27,15 +27,17 @@ use datafusion::{
     },
     execution::cache::cache_manager::FileStatisticsCache,
     logical_expr::TableProviderFilterPushDown,
-    physical_expr::{LexOrdering, PhysicalSortExpr},
-    physical_plan::{ExecutionPlan, expressions::Column},
+    physical_plan::ExecutionPlan,
     prelude::Expr,
 };
 use rayon::prelude::*;
 use tonic::async_trait;
 
 use crate::{
-    datafusion::table_provider::helpers::{apply_combined_filter, generate_access_plan},
+    datafusion::{
+        sort_order::FileSortOrder,
+        table_provider::helpers::{apply_combined_filter, generate_access_plan},
+    },
     index::IndexCondition,
 };
 
@@ -43,6 +45,10 @@ use crate::{
 pub struct ListingTableAdapter {
     listing_table: ListingTable,
     trace_id: String,
+    /// Physical sort order of the files. Must match the `file_sort_order` set on
+    /// the listing options; it is used to regroup files by statistics when
+    /// DataFusion could not prove the ordering itself.
+    sort_order: FileSortOrder,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
@@ -52,6 +58,7 @@ impl ListingTableAdapter {
     pub fn try_new(
         config: ListingTableConfig,
         trace_id: String,
+        sort_order: FileSortOrder,
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
         timestamp_filter: Option<(i64, i64)>,
@@ -60,6 +67,7 @@ impl ListingTableAdapter {
         Ok(Self {
             listing_table,
             trace_id,
+            sort_order,
             index_condition,
             fst_fields,
             timestamp_filter,
@@ -131,14 +139,17 @@ impl TableProvider for ListingTableAdapter {
             .scan(state, parquet_projection, filters, limit)
             .await?;
 
-        let order_by_time_desc = !self.listing_table.options().file_sort_order.is_empty();
-        let reverse = order_by_time_desc && parquet_exec.properties().output_ordering().is_none();
+        // The files are sorted but DataFusion dropped the ordering (overlapping
+        // files in one group): regroup them by statistics ourselves.
+        let regroup_order = (self.sort_order.is_sorted()
+            && parquet_exec.properties().output_ordering().is_none())
+        .then_some(self.sort_order);
         let target_partitions = self.listing_table.options().target_partitions;
         let parquet_exec = handler_tantivy_index(
             &self.trace_id,
             state,
             parquet_exec,
-            reverse,
+            regroup_order,
             target_partitions,
         );
 
@@ -179,7 +190,7 @@ fn handler_tantivy_index(
     trace_id: &str,
     state: &dyn Session,
     plan: Arc<dyn ExecutionPlan>,
-    reverse: bool,
+    regroup_order: Option<FileSortOrder>,
     target_partitions: usize,
 ) -> Arc<dyn ExecutionPlan> {
     if let Some(data_source_exec) = plan.downcast_ref::<DataSourceExec>()
@@ -189,46 +200,44 @@ fn handler_tantivy_index(
     {
         let mut file_groups = config.file_groups.clone();
 
-        if reverse {
+        if let Some(sort_order) = regroup_order {
             let schema = config.file_source().table_schema().table_schema();
-            match schema.index_of(TIMESTAMP_COL_NAME) {
-                Ok(index) => {
-                    let sort_order = LexOrdering::new(vec![PhysicalSortExpr {
-                        expr: Arc::new(Column::new(TIMESTAMP_COL_NAME, index)),
-                        options: SortOptions {
-                            descending: true,
-                            nulls_first: false,
-                        },
-                    }]);
-                    if let Some(sort_order) = sort_order {
-                        match FileScanConfig::split_groups_by_statistics_with_target_partitions(
-                            schema,
-                            &file_groups,
-                            &sort_order,
-                            target_partitions,
-                        ) {
-                            Ok(new_file_groups) => {
-                                file_groups = new_file_groups;
-                            }
-                            Err(e) => {
-                                log::warn!(
-                                    "[trace_id {trace_id}] failed to split file groups by statistics: {e}, falling back to reversing file groups"
-                                );
-                                file_groups = file_groups
-                                    .into_iter()
-                                    .map(|file_group| {
-                                        let mut files = file_group.into_inner();
-                                        files.reverse();
-                                        FileGroup::new(files)
-                                    })
-                                    .collect();
-                            }
+            match sort_order.physical_ordering(schema) {
+                Some(ordering) => {
+                    match FileScanConfig::split_groups_by_statistics_with_target_partitions(
+                        schema,
+                        &file_groups,
+                        &ordering,
+                        target_partitions,
+                    ) {
+                        Ok(new_file_groups) => {
+                            file_groups = new_file_groups;
+                        }
+                        Err(e) if sort_order.is_timestamp_desc() => {
+                            // files are listed oldest first; reversing each group
+                            // is the best effort approximation of `_timestamp DESC`
+                            log::warn!(
+                                "[trace_id {trace_id}] failed to split file groups by statistics: {e}, falling back to reversing file groups"
+                            );
+                            file_groups = file_groups
+                                .into_iter()
+                                .map(|file_group| {
+                                    let mut files = file_group.into_inner();
+                                    files.reverse();
+                                    FileGroup::new(files)
+                                })
+                                .collect();
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "[trace_id {trace_id}] failed to split file groups by statistics for {sort_order}: {e}, keeping file groups as is"
+                            );
                         }
                     }
                 }
-                Err(_) => {
+                None => {
                     log::warn!(
-                        "[trace_id {trace_id}] _timestamp column not found in schema, skipping split_groups_by_statistics"
+                        "[trace_id {trace_id}] sort columns of {sort_order} not found in schema, skipping split_groups_by_statistics"
                     );
                 }
             }
@@ -264,8 +273,9 @@ fn handler_tantivy_index(
         let mut config = config.clone();
         config.file_groups = new_file_groups;
         let mut plan = Arc::new(DataSourceExec::new(Arc::new(config))) as Arc<dyn ExecutionPlan>;
-        // skip repartitioning when `reverse` is true, becuase it is already have many groups
-        if !reverse
+        // skip repartitioning when the files were regrouped by statistics: the
+        // groups already carry the ordering and there are plenty of them
+        if regroup_order.is_none()
             && let Ok(Some(repartition_plan)) =
                 plan.repartitioned(target_partitions, state.config_options())
         {
@@ -274,4 +284,200 @@ fn handler_tantivy_index(
         return plan;
     }
     plan
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::array::{Float64Array, Int64Array, RecordBatch, UInt64Array};
+    use arrow_schema::{DataType, Field, Schema};
+    use config::{FileFormat, meta::promql::HASH_LABEL};
+    use datafusion::{
+        datasource::{
+            file_format::{FileFormat as DataFusionFileFormat, parquet::ParquetFormat},
+            listing::{ListingOptions, ListingTableUrl},
+        },
+        physical_plan::{collect, displayable},
+    };
+    use parquet::arrow::ArrowWriter;
+    use vortex::{
+        VortexSessionDefault,
+        array::ArrayRef,
+        arrow::{FromArrowArray, FromArrowType},
+        dtype::DType,
+        file::VortexWriteOptions,
+        io::session::RuntimeSessionExt,
+        session::VortexSession,
+    };
+    use vortex_datafusion::VortexFormat;
+
+    use super::*;
+    use crate::datafusion::exec::DataFusionContextBuilder;
+
+    fn hash_sorted_schema() -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+        ]))
+    }
+
+    /// Write one file whose rows are ordered by (__hash__, _timestamp).
+    async fn write_hash_sorted_file(
+        dir: &std::path::Path,
+        name: &str,
+        rows: &[(u64, i64)],
+        file_format: FileFormat,
+    ) {
+        let schema = hash_sorted_schema();
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from_iter_values(rows.iter().map(|r| r.0))),
+                Arc::new(Int64Array::from_iter_values(rows.iter().map(|r| r.1))),
+                Arc::new(Float64Array::from_iter_values(
+                    rows.iter().map(|r| r.0 as f64),
+                )),
+            ],
+        )
+        .unwrap();
+        match file_format {
+            FileFormat::Parquet => {
+                let file = std::fs::File::create(dir.join(name)).unwrap();
+                let mut writer = ArrowWriter::try_new(file, schema, None).unwrap();
+                writer.write(&batch).unwrap();
+                writer.close().unwrap();
+            }
+            FileFormat::Vortex => {
+                let session = VortexSession::default().with_tokio();
+                let mut buf = Vec::new();
+                let mut writer = VortexWriteOptions::new(session)
+                    .writer(&mut buf, DType::from_arrow(schema.as_ref()));
+                let array: ArrayRef = ArrayRef::from_arrow(batch, false).unwrap();
+                writer.push(array).await.unwrap();
+                writer.finish().await.unwrap();
+                std::fs::write(dir.join(name), buf).unwrap();
+            }
+        }
+    }
+
+    /// Hash-sorted files with overlapping hash ranges (every ingester file
+    /// covers the whole hash space) must still yield an ordered scan: one file
+    /// per partition, merged by SortPreservingMergeExec without a SortExec.
+    #[tokio::test]
+    async fn test_hash_sorted_files_merge_without_sort_exec() {
+        for file_format in [FileFormat::Parquet, FileFormat::Vortex] {
+            assert_hash_sorted_files_merge_without_sort_exec(file_format).await;
+        }
+    }
+
+    async fn assert_hash_sorted_files_merge_without_sort_exec(file_format: FileFormat) {
+        let dir = tempfile::tempdir().unwrap();
+        write_hash_sorted_file(
+            dir.path(),
+            &format!("a{}", file_format.extension()),
+            &[(1, 10), (1, 30), (5, 10), (9, 20)],
+            file_format,
+        )
+        .await;
+        write_hash_sorted_file(
+            dir.path(),
+            &format!("b{}", file_format.extension()),
+            &[(1, 20), (2, 10), (9, 10)],
+            file_format,
+        )
+        .await;
+        write_hash_sorted_file(
+            dir.path(),
+            &format!("c{}", file_format.extension()),
+            &[(3, 10), (5, 5), (5, 20)],
+            file_format,
+        )
+        .await;
+
+        let sort_order = FileSortOrder::HashTimestampAsc;
+        let ctx = DataFusionContextBuilder::new()
+            .trace_id("test_hash_sorted_merge")
+            .sort_order(sort_order)
+            .build(2)
+            .await
+            .unwrap();
+
+        let datafusion_file_format: Arc<dyn DataFusionFileFormat> = match file_format {
+            FileFormat::Parquet => Arc::new(ParquetFormat::default()),
+            FileFormat::Vortex => {
+                Arc::new(VortexFormat::new(VortexSession::default().with_tokio()))
+            }
+        };
+        let listing_options = ListingOptions::new(datafusion_file_format)
+            .with_target_partitions(2)
+            .with_collect_stat(true)
+            .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
+        let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
+        let config = ListingTableConfig::new(url)
+            .with_listing_options(listing_options)
+            .with_schema(hash_sorted_schema());
+        let table = ListingTableAdapter::try_new(
+            config,
+            "test_hash_sorted_merge".to_string(),
+            sort_order,
+            None,
+            vec![],
+            None,
+        )
+        .unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+
+        let plan = ctx
+            .state()
+            .create_logical_plan(&format!(
+                "SELECT * FROM t ORDER BY {}",
+                sort_order.order_by_clause().unwrap()
+            ))
+            .await
+            .unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+        let display = displayable(physical_plan.as_ref()).indent(true).to_string();
+        assert!(
+            display.contains("SortPreservingMergeExec"),
+            "expected a merge of pre-sorted {file_format} partitions, got:\n{display}"
+        );
+        assert!(
+            !display.contains("SortExec"),
+            "hash-sorted {file_format} inputs must not be re-sorted, got:\n{display}"
+        );
+
+        let batches = collect(physical_plan, ctx.task_ctx()).await.unwrap();
+        let mut rows = Vec::new();
+        for batch in &batches {
+            let hashes = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .unwrap();
+            let ts = batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            for i in 0..batch.num_rows() {
+                rows.push((hashes.value(i), ts.value(i)));
+            }
+        }
+        let mut expected = vec![
+            (1, 10),
+            (1, 30),
+            (5, 10),
+            (9, 20),
+            (1, 20),
+            (2, 10),
+            (9, 10),
+            (3, 10),
+            (5, 5),
+            (5, 20),
+        ];
+        expected.sort();
+        assert_eq!(rows, expected);
+    }
 }

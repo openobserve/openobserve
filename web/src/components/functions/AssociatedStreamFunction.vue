@@ -442,7 +442,9 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message: raw(JSON.stringify(err.response.data["error"]) || "Function fetching failed"),
+            message:
+              raw(JSON.stringify(err.response.data["error"])) ||
+              t("functions.functionFetchingFailed"),
           });
         });
     };
@@ -491,7 +493,9 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message: raw(JSON.stringify(err.response.data["error"]) || "Function creation failed"),
+            message:
+              raw(JSON.stringify(err.response.data["error"])) ||
+              t("functions.functionCreationFailed"),
           });
         })
         .finally(() => {

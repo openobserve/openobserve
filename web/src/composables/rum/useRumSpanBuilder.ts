@@ -19,7 +19,13 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
-import { rumField, hasRumField, rumFieldEqualsSql } from "@/utils/rum/fields";
+import {
+  rumField,
+  hasRumField,
+  rumFieldEqualsAnySql,
+  normalizeTraceId,
+  traceIdLookupVariants,
+} from "@/utils/rum/fields";
 import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
@@ -170,11 +176,15 @@ export default function useRumSpanBuilder(
       const rumStream = await getStream("_rumdata", "logs", true);
       // Match the trace id under whichever spellings this stream actually carries.
       // Naming a column the stream lacks fails the entire query, so the predicate is
-      // built from the schema rather than assuming one namespace.
-      const traceIdPredicate = rumFieldEqualsSql(
+      // built from the schema rather than assuming one namespace. The id is matched
+      // in both its padded canonical form and the zero-stripped form SDK 0.4.x
+      // stored; non-hex ids fall back to an exact match.
+      const sanitized = sanitizeTraceId(traceId);
+      const idVariants = traceIdLookupVariants(sanitized);
+      const traceIdPredicate = rumFieldEqualsAnySql(
         rumStream?.schema,
         "trace_id",
-        sanitizeTraceId(traceId),
+        idVariants.length ? idVariants : [sanitized],
       );
       if (!traceIdPredicate) return empty;
 
@@ -262,13 +272,17 @@ export default function useRumSpanBuilder(
       event.resource_duration / 1000000 || event[`${event.type}_duration`] / 1000000 || 0;
     const isTraced = hasRumField(event, "trace_id");
 
-    let operationName = "Unknown RUM Event";
+    let operationName: string = t("rum.unknownRumEvent");
     if (event.type === "resource") {
-      operationName = `${event.resource_method || "GET"} ${event.resource_url || "Unknown URL"}`;
+      operationName = `${event.resource_method || "GET"} ${event.resource_url || t("rum.unknownUrl")}`;
     } else if (event.type === "error") {
-      operationName = `Error: ${event.error_message || event.error_type || "Unknown Error"}`;
+      operationName = t("common.errorPrefix", {
+        message: event.error_message || event.error_type || t("rum.unknownErrorTitle"),
+      });
     } else if (event.type === "long_task") {
-      operationName = `Long Task: ${event.long_task_duration / 1000 || duration}ms`;
+      operationName = t("rum.longTaskOperation", {
+        duration: event.long_task_duration / 1000 || duration,
+      });
     }
 
     return {
@@ -280,7 +294,8 @@ export default function useRumSpanBuilder(
         ? String(rumField(event, "span_id"))
         : `rum_${event.type}_${event[`${event.type}_id`] || event.date}`,
       reference_parent_span_id: parentSpanId,
-      trace_id: rumField(event, "trace_id") || undefined,
+      trace_id:
+        normalizeTraceId(rumField(event, "trace_id")) || rumField(event, "trace_id") || undefined,
       operation_name: operationName,
       service_name: event.service || "Frontend",
       span_status:
@@ -340,7 +355,9 @@ export default function useRumSpanBuilder(
         span_id: `rum_view_${view.view_id}`,
         reference_parent_span_id: "",
         trace_id: traceId || undefined,
-        operation_name: `View: ${view.view_url || view.view_name || "Unknown Page"}`,
+        operation_name: t("rum.viewOperation", {
+          page: view.view_url || view.view_name || t("rum.unknownPage"),
+        }),
         service_name: view.service || "Frontend",
         span_status: "OK",
         span_kind: SPAN_KIND_UNSPECIFIED,
@@ -387,7 +404,10 @@ export default function useRumSpanBuilder(
         span_id: `rum_action_${action.action_id}`,
         reference_parent_span_id: action.view_id ? `rum_view_${action.view_id}` : "",
         trace_id: traceId || undefined,
-        operation_name: `Action: ${action.action_type || "Unknown"} on ${action.action_target_name || "Unknown"}`,
+        operation_name: t("rum.actionOperation", {
+          type: action.action_type || t("rum.unknown"),
+          target: action.action_target_name || t("rum.unknown"),
+        }),
         service_name: action.service || "Frontend",
         span_status: "OK",
         span_kind: SPAN_KIND_UNSPECIFIED,
@@ -399,7 +419,7 @@ export default function useRumSpanBuilder(
     if (actionsToCollapse.length > 0) {
       spans.push(
         makeCollapsedSpan(
-          `[${actionsToCollapse.length} other actions]`,
+          t("rum.collapsedOtherActions", { count: actionsToCollapse.length }),
           actionsToCollapse,
           firstTracedResource?.view_id,
           firstTracedResource?.session_id,
@@ -460,7 +480,7 @@ export default function useRumSpanBuilder(
     if (errors.length > 3) {
       spans.push(
         makeCollapsedSpan(
-          `[${errors.length - 3} more errors]`,
+          t("rum.collapsedMoreErrors", { count: errors.length - 3 }),
           errors.slice(3),
           firstTracedResource?.view_id,
           firstTracedResource?.session_id,
@@ -494,7 +514,7 @@ export default function useRumSpanBuilder(
     const remaining = staticAssets.length - 3;
     spans.push(
       makeCollapsedSpan(
-        `[${remaining} static assets]`,
+        t("rum.collapsedStaticAssets", { count: remaining }),
         staticAssets.slice(3),
         firstTracedResource?.view_id,
         firstTracedResource?.session_id,
@@ -520,7 +540,7 @@ export default function useRumSpanBuilder(
 
     return [
       makeCollapsedSpan(
-        `[${longTasks.length} long tasks]`,
+        t("rum.collapsedLongTasks", { count: longTasks.length }),
         longTasks,
         firstTracedResource?.view_id,
         firstTracedResource?.session_id,
@@ -554,7 +574,8 @@ export default function useRumSpanBuilder(
     if (!allViewEvents.length) return [];
 
     const firstTracedResource = tracedResources[0];
-    const traceId = rumField<string>(firstTracedResource, "trace_id") || "";
+    const rawTraceId = rumField<string>(firstTracedResource, "trace_id") || "";
+    const traceId = normalizeTraceId(rawTraceId) || rawTraceId;
     const tracedTimestamp = firstTracedResource?.date || 0;
 
     const { staticAssets, apiCalls, errors, longTasks } = classifyLeafEvents(allViewEvents);

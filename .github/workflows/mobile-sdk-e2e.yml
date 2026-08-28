@@ -1,0 +1,737 @@
+# Mobile RUM SDK — End-to-End Tests (self-contained / no secrets)
+# =============================================================================================
+# Runs tests/mobile-testing (Maestro drives 4 fixture apps → API asserts _rumdata → Playwright
+# asserts the RUM dashboard) across RN-Android, Android-native, RN-iOS and iOS-native.
+#
+# MODEL B — mirrors playwright.yml: each device job stands up its OWN OpenObserve on the runner and
+# points the app at it. No shared cluster, no secrets, and every run is fully isolated (so the
+# Android and iOS jobs run in PARALLEL — each has its own instance).
+#   · RUM ingestion is OSS, so a plain OpenObserve accepts the data.
+#   · The apps read their RUM target from a build-time-overridable config (committed default =
+#     placeholder; CI regenerates it): inline @gen consts in App.tsx (RN, via gen-config.js),
+#     BuildConfig (android-native), GeneratedConfig.swift (ios-native). See docs/CI-NOTES.md.
+#   · Emulator networking: Android reaches the host at 10.0.2.2; the iOS simulator shares the host,
+#     so it uses localhost. The suite's API/UI checks (on the host) always use localhost.
+#
+# WHY SEPARATE (not in playwright.yml): it needs Android emulators AND macOS iOS simulators and
+# builds 4 phone apps — too heavy to put on every PR.
+#
+# TRIGGERS (the `decide` job turns these into run_android / run_ios — see it for the exact matrix)
+#   - repository_dispatch (mobile-sdk-release): the real "SDK changed" signal (SDK lives in other repos;
+#     each dispatches here on release with client_payload.sdk → runs that SDK's platform). See docs/CI-NOTES.md.
+#   - pull_request touching mobile-RUM paths: Android device jobs auto-run when Android-specific or SHARED
+#     files change; iOS device jobs run only with the `mobile-e2e` label (macOS runners are scarce).
+#   - `mobile-e2e` label on a PR → both platforms (full pre-merge gate).
+#   - workflow_dispatch → manual; run_full_suite=true + platforms input to pick android/ios/both.
+#
+# STATUS: green end-to-end on GitHub runners (Android + iOS device jobs + merge). See docs/CI-NOTES.md.
+# =============================================================================================
+name: Mobile RUM SDK E2E
+
+on:
+  repository_dispatch:
+    types: [mobile-sdk-release]
+  workflow_dispatch:
+    inputs:
+      run_full_suite:
+        description: "Build apps + drive emulator/simulator (OFF = preflight only)"
+        type: boolean
+        default: false
+      platforms:
+        description: "Which device jobs to run when full suite is on"
+        type: choice
+        options: [both, android, ios]
+        default: both
+      sdk:
+        description: "Override one SDK to test its latest version (else the committed pin is used)"
+        type: choice
+        options: [none, react-native, android, ios]
+        default: none
+      sdk_version:
+        description: "SDK version to test (used with 'sdk' above)"
+        type: string
+        default: ""
+  pull_request:
+    # `labeled` so adding the 'mobile-e2e' label re-fires the run and turns the device jobs on
+    # (lets you validate the full Android + iOS suite on a PR before merging).
+    types: [opened, reopened, synchronize, labeled]
+    paths:
+      - "tests/mobile-testing/**"
+      - ".github/workflows/mobile-sdk-e2e.yml"
+      # Mobile-RUM product code: re-run the suite whenever the RUM pipeline, dashboard,
+      # or the in-app SDK install docs (version pins) change.
+      - "web/src/views/RUM/**"
+      - "web/src/composables/rum/**"
+      - "web/src/components/ingestion/setupCard/content/rumReactNative.ts"
+      - "web/src/components/ingestion/setupCard/content/rumAndroid.ts"
+      - "web/src/components/ingestion/setupCard/content/rumIOS.ts"
+      - "src/**/rum/**"
+  # schedule:
+  #   - cron: "0 2 * * 1" # Mondays 02:00 UTC — weekly safety net
+
+concurrency:
+  # PR pushes supersede each other (share the PR-number group); every non-PR run (each SDK-release
+  # dispatch / manual run) gets its OWN group via run_id, so a second SDK release can't cancel the
+  # first's in-flight device gate.
+  group: mobile-sdk-e2e-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Non-secret defaults for a fresh local OpenObserve (identical to the other test workflows).
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  # RUM-ingestion parity with the proven playwright.yml suite. Without these a fresh
+  # OpenObserve can silently reject/misfile RUM ingest (loopback SSRF guard, missing org,
+  # dynamic schema, past-timestamp window). The iOS binary inherits these from the job env;
+  # the Android Docker container gets them via explicit -e flags below.
+  ZO_SSRF_ALLOW_LOOPBACK: "true"
+  ZO_CREATE_ORG_THROUGH_INGESTION: "true"
+  ZO_ALLOW_USER_DEFINED_SCHEMAS: "true"
+  ZO_INGEST_ALLOWED_UPTO: "5"
+  OO_USER: root@example.com
+  OO_PASS: "Complexpass#123"
+  OO_ORG: default
+  # Query-side env expectation must match the app's baked O2_RUM_ENV (device jobs set "testing").
+  RN_ENV: testing
+  # Placeholder so config.js (which requires OO_URL) loads during preflight `--list`; the device
+  # jobs override this via $GITHUB_ENV with their own on-runner instance.
+  OO_URL: http://localhost:5080
+
+jobs:
+  # -------------------------------------------------------------------------------------------
+  # PREFLIGHT — always runs, no devices. Validates the suite compiles and prints a readiness note.
+  # Self-contained model → no secrets to check.
+  # -------------------------------------------------------------------------------------------
+  preflight:
+    name: Preflight & readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      suite_ok: ${{ steps.validate.outputs.suite_ok }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - name: Install suite dependencies
+        working-directory: tests/mobile-testing
+        run: npm ci || npm install
+
+      - name: Validate the suite parses (playwright --list)
+        id: validate
+        working-directory: tests/mobile-testing
+        run: |
+          set +e
+          LIST=$(npx playwright test --list 2>&1); CODE=$?
+          echo "$LIST" | tail -3
+          TOTAL=$(echo "$LIST" | grep -Eo 'Total: [0-9]+ tests' | grep -Eo '[0-9]+' | head -1)
+          [ $CODE -eq 0 ] && echo "suite_ok=true" >> "$GITHUB_OUTPUT" || echo "suite_ok=false" >> "$GITHUB_OUTPUT"
+          echo "TOTAL_TESTS=${TOTAL:-0}" >> "$GITHUB_ENV"
+
+      - name: Readiness summary
+        run: |
+          {
+            echo "## Mobile RUM SDK E2E — readiness"
+            echo ""
+            echo "Suite parsed: **${{ steps.validate.outputs.suite_ok }}** (${TOTAL_TESTS:-?} tests, 4 platforms)"
+            echo ""
+            echo "| Item | Status | Notes |"
+            echo "|---|---|---|"
+            echo "| Suite compiles | ${{ steps.validate.outputs.suite_ok == 'true' && '✅ ok' || '❌ fail' }} | gates device jobs |"
+            echo "| Secrets required | ✅ none | self-contained: each run builds its own OpenObserve |"
+            echo "| Android runner | ✅ Linux + KVM | own instance via 10.0.2.2 |"
+            echo "| iOS runner | ⚠️ macOS | free on this public repo; own instance via localhost |"
+            echo ""
+            echo "> Android device jobs auto-run when Android/shared mobile-RUM code changes in a PR."
+            echo "> iOS device jobs run on the \`mobile-e2e\` label, an SDK-release dispatch, or a manual run"
+            echo "> (macOS runners are scarce). See the \`decide\` job for the exact run matrix."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if the suite does not compile
+        if: steps.validate.outputs.suite_ok != 'true'
+        run: echo "::error::mobile-testing suite failed to parse" && exit 1
+
+  # -------------------------------------------------------------------------------------------
+  # DECIDE — which platforms to run this time. Keeps macOS (iOS) spend in check while letting the
+  # cheap Linux (Android) side auto-run on relevant PRs. Emits run_android / run_ios; every device
+  # + build job gates on these. Policy:
+  #   · pull_request (no label): Android runs if Android-specific OR shared paths changed; iOS does
+  #     NOT auto-run (label/dispatch/manual only).
+  #   · mobile-e2e label: both (full pre-merge validation gate).
+  #   · repository_dispatch (SDK release): run the platform of the SDK that changed
+  #     (client_payload.sdk: ios→iOS, android→Android, react-native/unset→both).
+  #   · workflow_dispatch: honor the platforms input (both/android/ios) when run_full_suite=true.
+  # -------------------------------------------------------------------------------------------
+  decide:
+    name: Decide platforms
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run_android: ${{ steps.d.outputs.run_android }}
+      run_ios: ${{ steps.d.outputs.run_ios }}
+    steps:
+      - uses: actions/checkout@v4
+      # Which platform's files changed in this PR? (only evaluated for pull_request events)
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            android:
+              - 'tests/mobile-testing/apps/o2-native-android/**'
+              - 'tests/mobile-testing/maestro/android-native/**'
+              - 'tests/mobile-testing/specs/android-native.*'
+              - 'tests/mobile-testing/specs/rn-android.*'
+            ios:
+              - 'tests/mobile-testing/apps/o2-native-ios/**'
+              - 'tests/mobile-testing/maestro/ios-native/**'
+              - 'tests/mobile-testing/maestro/ios-react-native/**'
+              - 'tests/mobile-testing/specs/ios-native.*'
+              - 'tests/mobile-testing/specs/rn-ios.*'
+            common:
+              - 'tests/mobile-testing/apps/o2-rum-tester/**'
+              - 'tests/mobile-testing/maestro/react-native/**'
+              - 'tests/mobile-testing/utils/**'
+              - 'tests/mobile-testing/playwright.config.js'
+              - 'tests/mobile-testing/merge.config.js'
+              - 'tests/mobile-testing/package.json'
+              - 'tests/mobile-testing/package-lock.json'
+              - '.github/workflows/mobile-sdk-e2e.yml'
+              - 'src/**/rum/**'
+              - 'web/src/views/RUM/**'
+              - 'web/src/composables/rum/**'
+              - 'web/src/components/ingestion/setupCard/content/rum*.ts'
+      - name: Compute run_android / run_ios
+        id: d
+        env:
+          EV: ${{ github.event_name }}
+          FULL: ${{ inputs.run_full_suite }}
+          PLATFORMS: ${{ inputs.platforms }}
+          SDK: ${{ github.event.client_payload.sdk }}
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'mobile-e2e') }}
+          F_ANDROID: ${{ steps.filter.outputs.android }}
+          F_COMMON: ${{ steps.filter.outputs.common }}
+        run: |
+          A=false; I=false
+          case "$EV" in
+            workflow_dispatch)
+              if [ "$FULL" = "true" ]; then
+                case "$PLATFORMS" in
+                  both) A=true; I=true ;; android) A=true ;; ios) I=true ;;
+                esac
+              fi ;;
+            repository_dispatch)
+              case "$SDK" in
+                ios) I=true ;;
+                android) A=true ;;
+                *) A=true; I=true ;;   # react-native / rn / unset → both
+              esac ;;
+            pull_request)
+              if [ "$LABELED" = "true" ]; then
+                A=true; I=true            # label = full gate (both platforms)
+              else
+                # Android auto-runs on Android-specific or shared changes; iOS stays label/dispatch-gated.
+                if [ "$F_ANDROID" = "true" ] || [ "$F_COMMON" = "true" ]; then A=true; fi
+              fi ;;
+            *) A=true; I=true ;;         # schedule / other → both
+          esac
+          echo "run_android=$A" >> "$GITHUB_OUTPUT"
+          echo "run_ios=$I"     >> "$GITHUB_OUTPUT"
+          echo "Decision (event=$EV): run_android=$A  run_ios=$I"
+
+  # -------------------------------------------------------------------------------------------
+  # BUILD OO (linux) — compile OpenObserve from THIS PR's source (like playwright.yml build_binary),
+  # so the mobile suite tests the current code, not a prebuilt image. rust-cache makes reruns fast.
+  # The Android job runs this binary NATIVELY (not Docker): the CI emulator can't reach a Docker-
+  # published port via 10.0.2.2 (proven — EMUPROBE UNREACHABLE), but reaches a native host process
+  # through the adb-reverse/localhost tunnel.
+  # -------------------------------------------------------------------------------------------
+  build_oo_linux:
+    name: Build OpenObserve (linux, from source)
+    needs: [preflight, decide]
+    if: needs.decide.outputs.run_android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mobile-e2e-linux-oo-v2
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Build binary + web UI (embedded)
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          # Mirror playwright.yml: build the web UI to /tmp/dist and point rust-embed there, so the
+          # dashboard is actually embedded (the default ../../web/dist path doesn't resolve during the
+          # crate build → empty UI → the login page never renders → UI-login tests fail).
+          mkdir -p /tmp/dist
+          (cd web && npm ci && npm run build && cp -r ./dist/. /tmp/dist/)
+          test -f /tmp/dist/index.html
+          sed -i 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs
+          grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
+          cargo build --profile release-ci
+          test -f target/release-ci/openobserve
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oo-linux-binary
+          path: target/release-ci/openobserve
+          if-no-files-found: error
+      # The release-ci profile sets debug-assertions=true, which puts rust-embed-for-web in DISK-READ
+      # mode — the binary serves the dashboard from /tmp/dist at RUNTIME rather than embedding it. So
+      # ship the built UI too (same as playwright.yml's frontend-dist); the device job extracts it to
+      # /tmp/dist so /web serves and the dashboard-UI tests can run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oo-linux-frontend
+          path: /tmp/dist
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------------------------------
+  # BUILD OO (macOS) — same as build_oo_linux but a DARWIN binary for the iOS job (iOS simulators
+  # only run on macOS; a Linux binary can't execute there and there's no published darwin binary).
+  # Runs in PARALLEL with build_oo_linux; the iOS job just downloads this artifact (no in-job build).
+  # -------------------------------------------------------------------------------------------
+  build_oo_macos:
+    name: Build OpenObserve (macOS, from source)
+    needs: [preflight, decide]
+    if: needs.decide.outputs.run_ios == 'true'
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mobile-e2e-macos-oo-v2
+      - name: Install Protoc (macOS)
+        run: brew install protobuf || true
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Build binary + web UI (embedded)
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          mkdir -p /tmp/dist
+          (cd web && npm ci && npm run build && cp -r ./dist/. /tmp/dist/)
+          test -f /tmp/dist/index.html
+          sed -i '' 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs
+          grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
+          cargo build --profile release-ci
+          test -f target/release-ci/openobserve
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oo-macos-binary
+          path: target/release-ci/openobserve
+          if-no-files-found: error
+      # Ship the built UI too (release-ci is disk-read; see build_oo_linux note) so the iOS job's OO
+      # serves /web and the dashboard-UI tests can run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oo-macos-frontend
+          path: /tmp/dist
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------------------------------
+  # ANDROID — runs the from-source OO binary NATIVELY; the app posts to it via the emulator's host
+  # alias 10.0.2.2:5080 (the suite's own API/UI checks, on the host, use localhost:5080).
+  # -------------------------------------------------------------------------------------------
+  android:
+    # Both Android platforms run in ONE job on a single emulator (proven-green config). A per-platform
+    # matrix split was tried for observability but exposed emulator first-render flakiness; revisit only
+    # with emulator hardening (disable-animations + app warm-up + launch retries).
+    name: Android (rn-android + android-native)
+    needs: [decide, build_oo_linux]
+    if: needs.decide.outputs.run_android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # Test the LATEST SDK on a release event: the mobile-sdk-release dispatch carries {sdk, version};
+      # a manual run can also override via the sdk/sdk_version inputs. Unset → committed pin (reproducible).
+      - name: Resolve SDK version override
+        # Untrusted dispatch payload / manual inputs arrive via env (NEVER interpolated into the
+        # script body) to avoid shell injection, and the version is format-validated before use.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CP_SDK: ${{ github.event.client_payload.sdk }}
+          CP_VER: ${{ github.event.client_payload.version }}
+          IN_SDK: ${{ inputs.sdk }}
+          IN_VER: ${{ inputs.sdk_version }}
+        run: |
+          SDK=''; VER=''
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then SDK="$CP_SDK"; VER="$CP_VER";
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then SDK="$IN_SDK"; VER="$IN_VER"; fi
+          [ -z "$VER" ] && { echo "no SDK override — using committed pins"; exit 0; }
+          if ! printf '%s' "$VER" | grep -qE '^[0-9A-Za-z][0-9A-Za-z.-]*$'; then
+            echo "::error::Refusing unsafe SDK version '$VER' (expected e.g. 0.1.1)"; exit 1
+          fi
+          case "$SDK" in
+            ios) echo "O2_IOS_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            android) echo "O2_ANDROID_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            react-native|rn) echo "O2_RN_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            *) echo "no SDK override" ;;
+          esac
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "17" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Download OpenObserve binary (built from PR source)
+        uses: actions/download-artifact@v4
+        with:
+          name: oo-linux-binary
+          path: oo-bin
+      - name: Download OpenObserve web UI (so /web serves for the dashboard tests)
+        uses: actions/download-artifact@v4
+        with:
+          name: oo-linux-frontend
+          path: /tmp/dist
+
+      - name: Start OpenObserve (native, from source) + mint RUM token
+        run: |
+          chmod +x oo-bin/openobserve
+          ZO_DATA_DIR="$PWD/oo-data" ./oo-bin/openobserve > oo.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf http://localhost:5080/healthz && break || sleep 2; done
+          # GET (not POST): POST /rumtoken ROTATES the token; GET reads the stable one the app must match.
+          TOKEN=$(curl -s -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
+            http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // empty')
+          if [ -z "$TOKEN" ]; then echo "::error::Could not read rum_token"; cat oo.log; exit 1; fi
+          # Fail-fast canary: prove the RUM ingest pipeline works before the device suite.
+          NOW=$(($(date +%s) * 1000))
+          curl -sf -X POST "http://localhost:5080/rum/v1/default/rum?oo-api-key=$TOKEN&ddsource=react-native" \
+            -H 'Content-Type: text/plain' \
+            --data-binary "{\"type\":\"view\",\"service\":\"ci-canary\",\"date\":$NOW,\"session\":{\"id\":\"ci-canary\",\"type\":\"user\"},\"view\":{\"id\":\"v\",\"name\":\"Canary\"},\"source\":\"react-native\"}" \
+            || { echo "::error::RUM ingest canary POST failed — aborting before suite"; exit 1; }
+          echo "RUM ingest canary OK — token + pipeline verified on the runner OpenObserve"
+          {
+            # App runs in the emulator and posts to the runner's NATIVE OO via the emulator host
+            # alias 10.0.2.2:5080 (verified by the EMUPROBE step below). The OO is a native host
+            # process, not Docker — the emulator can't reach a Docker-published port on the runner.
+            echo "O2_RUM_HOST=http://10.0.2.2:5080"
+            echo "O2_RUM_ORG=default"
+            echo "O2_RUM_TOKEN=$TOKEN"
+            echo "O2_RUM_ENV=testing"
+            echo "OO_URL=http://localhost:5080"
+          } >> "$GITHUB_ENV"
+
+      - name: Install suite deps
+        working-directory: tests/mobile-testing
+        run: |
+          npm ci || npm install
+          # The dashboard UI-login tests (crashed-session, masking) drive a real browser.
+          npx playwright install --with-deps chromium
+
+      # RN app: npm ci runs postinstall → patch-sdk + gen-config (seds App.tsx @gen consts from O2_RUM_*).
+      - name: Build RN-Android APK
+        working-directory: tests/mobile-testing/apps/o2-rum-tester
+        run: |
+          if [ -n "$O2_RN_SDK_VERSION" ]; then
+            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+                        "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
+          else
+            npm ci || npm install
+          fi
+          # Release build: embeds the JS bundle (Debug loads it from the Metro dev server, which
+          # isn't running in CI → blank screen). The release buildType is debug-signed in the RN
+          # template, so it installs on the emulator without a real keystore.
+          (cd android && ./gradlew --no-daemon assembleRelease)
+
+      # Native app: gradle reads O2_RUM_* via System.getenv into BuildConfig. Uses the setup-gradle
+      # `gradle` (a committed wrapper also works — `./gradlew` — but this keeps one Gradle across jobs).
+      - name: Build Android-native APK
+        working-directory: tests/mobile-testing/apps/o2-native-android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Boot emulator, install apps, run suite
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          # NB: the emulator-runner executes each line in a SEPARATE shell, so `cd` does not persist —
+          # the test command must chain `cd && npx` on one line.
+          script: |
+            adb reverse tcp:5080 tcp:5080
+            adb root || true
+            adb shell "toybox date @$(date +%s)" || adb shell "date $(date +%m%d%H%M%Y.%S)" || true
+            adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 10.0.2.2 5080' && echo "EMUPROBE: emulator reaches 10.0.2.2:5080 (native OO)" || echo "EMUPROBE: emulator CANNOT reach 10.0.2.2:5080"
+            adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
+            adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
+            cd tests/mobile-testing && BLOB_REPORT_NAME=report-android.zip npx playwright test --project=rn-android --project=android-native
+
+      # Diagnostic: dump what actually reached _rumdata (services, counts, and the timestamp range vs
+      # "now"). Distinguishes "app POST never landed" from "landed but outside the query window"
+      # (emulator clock skew). Runs even when the suite fails.
+      - name: Diagnose — _rumdata contents on the runner OpenObserve
+        if: always()
+        run: |
+          NOW_US=$(($(date +%s) * 1000000)); START_US=$((NOW_US - 86400000000))
+          echo "runner now_us=$NOW_US"
+          curl -s -u "$OO_USER:$OO_PASS" -X POST "http://localhost:5080/api/default/_search?type=logs" \
+            -H 'Content-Type: application/json' \
+            -d "{\"query\":{\"sql\":\"SELECT service, COUNT(*) AS n, MIN(_timestamp) AS mn, MAX(_timestamp) AS mx FROM \\\"_rumdata\\\" GROUP BY service\",\"start_time\":$START_US,\"end_time\":$NOW_US,\"size\":50}}" \
+            | jq '.hits // .' || true
+
+      - name: Upload blob report (merged by merge_reports)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-android
+          path: tests/mobile-testing/blob-report
+          if-no-files-found: ignore
+
+  # -------------------------------------------------------------------------------------------
+  # iOS — own OpenObserve built FROM SOURCE on the runner (no macOS release binary exists + no Docker
+  # on macOS runners); app + suite both use localhost (sim shares the host network). Runs in PARALLEL
+  # with android (separate instance). Alternatives to hosted macOS runners are all still macOS.
+  # -------------------------------------------------------------------------------------------
+  ios:
+    name: iOS (rn-ios + ios-native)
+    needs: [decide, build_oo_macos]
+    if: needs.decide.outputs.run_ios == 'true'
+    # macos-15 ships Xcode 16.x (RN 0.75-compatible + still includes the Swift compatibility libs the
+    # SDK references). macos-latest moved to Xcode 26, which removed libswiftCompatibility56 → link error.
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve SDK version override
+        # Untrusted dispatch payload / manual inputs arrive via env (NEVER interpolated into the
+        # script body) to avoid shell injection, and the version is format-validated before use.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CP_SDK: ${{ github.event.client_payload.sdk }}
+          CP_VER: ${{ github.event.client_payload.version }}
+          IN_SDK: ${{ inputs.sdk }}
+          IN_VER: ${{ inputs.sdk_version }}
+        run: |
+          SDK=''; VER=''
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then SDK="$CP_SDK"; VER="$CP_VER";
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then SDK="$IN_SDK"; VER="$IN_VER"; fi
+          [ -z "$VER" ] && { echo "no SDK override — using committed pins"; exit 0; }
+          if ! printf '%s' "$VER" | grep -qE '^[0-9A-Za-z][0-9A-Za-z.-]*$'; then
+            echo "::error::Refusing unsafe SDK version '$VER' (expected e.g. 0.1.1)"; exit 1
+          fi
+          case "$SDK" in
+            ios) echo "O2_IOS_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            android) echo "O2_ANDROID_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            react-native|rn) echo "O2_RN_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            *) echo "no SDK override" ;;
+          esac
+
+      # Pin Xcode so a runner-image update can't silently move the toolchain under the alpha SDK.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          # Pin 16.4 explicitly: macos-15's 'latest-stable' is now Xcode 26, which dropped the Swift
+          # compatibility libs the SDK's static libs force-load → arm64 link error. 16.x still ships them.
+          xcode-version: "16.4"
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - name: Install Maestro + xcodegen + watchman
+        run: |
+          brew install watchman xcodegen jq || true
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      # The darwin OpenObserve binary is compiled ONCE by the build_oo_macos job (in parallel with
+      # build_oo_linux) and shared as an artifact — this job just downloads and runs it, so iterating
+      # on the iOS suite never recompiles OpenObserve (same pattern as Android + playwright.yml).
+      - name: Download OpenObserve binary (built from PR source)
+        uses: actions/download-artifact@v4
+        with:
+          name: oo-macos-binary
+          path: oo-bin
+      - name: Download OpenObserve web UI (so /web serves for the dashboard tests)
+        uses: actions/download-artifact@v4
+        with:
+          name: oo-macos-frontend
+          path: /tmp/dist
+
+      - name: Start OpenObserve (native, from source) + mint RUM token
+        run: |
+          chmod +x oo-bin/openobserve
+          ZO_DATA_DIR="$PWD/oo-data" ./oo-bin/openobserve > oo.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf http://localhost:5080/healthz && break || sleep 2; done
+          # GET (not POST): POST /rumtoken ROTATES the token each call; the default org already has
+          # a token at creation, so GET reads the stable one the app must match. Validated locally.
+          TOKEN=$(curl -s -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
+            http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // empty')
+          if [ -z "$TOKEN" ]; then echo "::error::Could not read rum_token from OpenObserve"; exit 1; fi
+          # Fail-fast canary: prove the RUM ingest pipeline works before the ~1h device suite.
+          NOW=$(($(date +%s) * 1000))
+          curl -sf -X POST "http://localhost:5080/rum/v1/default/rum?oo-api-key=$TOKEN&ddsource=react-native" \
+            -H 'Content-Type: text/plain' \
+            --data-binary "{\"type\":\"view\",\"service\":\"ci-canary\",\"date\":$NOW,\"session\":{\"id\":\"ci-canary\",\"type\":\"user\"},\"view\":{\"id\":\"v\",\"name\":\"Canary\"},\"source\":\"react-native\"}" \
+            || { echo "::error::RUM ingest canary POST failed — pipeline broken, aborting before suite"; exit 1; }
+          echo "RUM ingest canary OK — token + pipeline verified on the runner OpenObserve"
+          {
+            # iOS simulator shares the host network stack, so it reaches the native OO at localhost.
+            # (10.0.2.2 is the ANDROID emulator's host alias and is unreachable from an iOS sim —
+            # using it here silently dropped every upload → 0 rows in _rumdata.)
+            echo "O2_RUM_HOST=http://127.0.0.1:5080"
+            echo "O2_RUM_ORG=default"
+            echo "O2_RUM_TOKEN=$TOKEN"
+            echo "O2_RUM_ENV=testing"
+            echo "OO_URL=http://localhost:5080"
+          } >> "$GITHUB_ENV"
+
+      - name: Install suite deps
+        working-directory: tests/mobile-testing
+        run: |
+          npm ci || npm install
+          # The dashboard UI-login tests (crashed-session, masking) drive a real browser.
+          npx playwright install --with-deps chromium
+
+      - name: Boot an iOS simulator
+        run: |
+          # Pick an iPhone specifically — `head -1` of ALL device classes could grab a watchOS/tvOS
+          # sim, and every iOS test would then fail at install for an unrelated-looking reason.
+          UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | grep -Eo '[0-9A-F-]{36}' | head -1)
+          xcrun simctl boot "$UDID" || true
+          echo "IOS_SIM_UDID=$UDID" >> "$GITHUB_ENV"
+
+      # RN iOS: npm ci runs gen-config (seds App.tsx @gen consts → localhost). Allow cleartext to localhost
+      # for App Transport Security (CI-only plist tweak; committed source stays HTTPS).
+      # The iOS app builds (CocoaPods + Xcode Release compile of React Native) are the long pole of
+      # this job (~20min cold). Cache the pods and the Xcode build products so warm runs are minutes.
+      - name: Cache CocoaPods
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods
+            tests/mobile-testing/apps/o2-rum-tester/ios/Pods
+          key: pods-${{ runner.os }}-${{ hashFiles('tests/mobile-testing/apps/o2-rum-tester/ios/Podfile.lock') }}
+          restore-keys: pods-${{ runner.os }}-
+      - name: Cache Xcode DerivedData (iOS app builds)
+        uses: actions/cache@v6
+        with:
+          path: |
+            tests/mobile-testing/apps/o2-rum-tester/ios/build
+            tests/mobile-testing/apps/o2-native-ios/build
+          key: xcode-dd-${{ runner.os }}-${{ hashFiles('tests/mobile-testing/apps/o2-rum-tester/ios/Podfile.lock', 'tests/mobile-testing/apps/o2-native-ios/project.yml') }}
+          restore-keys: xcode-dd-${{ runner.os }}-
+
+      - name: Build + install RN-iOS app
+        working-directory: tests/mobile-testing/apps/o2-rum-tester
+        run: |
+          if [ -n "$O2_RN_SDK_VERSION" ]; then
+            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+                        "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
+          else
+            npm ci || npm install
+          fi
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" ios/O2RumTester/Info.plist || true
+          (cd ios && pod install)
+          # Release: embeds the JS bundle (Debug expects the Metro dev server → blank screen in CI).
+          # Simulator builds need no code signing.
+          xcodebuild -workspace ios/O2RumTester.xcworkspace -scheme O2RumTester \
+            -configuration Release -sdk iphonesimulator -destination "id=$IOS_SIM_UDID" \
+            -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build
+          xcrun simctl install "$IOS_SIM_UDID" ios/build/Build/Products/Release-iphonesimulator/O2RumTester.app
+
+      # iOS-native: gen-config.sh writes GeneratedConfig.swift (localhost) before xcodegen.
+      - name: Build + install iOS-native app
+        working-directory: tests/mobile-testing/apps/o2-native-ios
+        run: |
+          if [ -n "$O2_IOS_SDK_VERSION" ]; then
+            sed -i '' "s/exactVersion:.*/exactVersion: $O2_IOS_SDK_VERSION/" project.yml
+          fi
+          O2_RUM_HOST="$O2_RUM_HOST" O2_RUM_ORG="$O2_RUM_ORG" O2_RUM_TOKEN="$O2_RUM_TOKEN" O2_RUM_ENV="$O2_RUM_ENV" bash gen-config.sh
+          xcodegen generate
+          xcodebuild -project O2NativeIOS.xcodeproj -scheme O2NativeIOS \
+            -configuration Debug -sdk iphonesimulator -destination "id=$IOS_SIM_UDID" \
+            -derivedDataPath build build
+          xcrun simctl install "$IOS_SIM_UDID" build/Build/Products/Debug-iphonesimulator/O2NativeIOS.app
+
+      - name: Run iOS suite
+        working-directory: tests/mobile-testing
+        run: BLOB_REPORT_NAME=report-ios.zip npx playwright test --project=rn-ios --project=ios-native
+
+      # Diagnostic: what actually reached _rumdata + the timestamp range vs "now". Distinguishes
+      # "app never uploaded" (0 rows for the services) from "landed outside the query window" (sim
+      # clock skew — the +5min buffer in ooClient targets this). ios-native uploads fine locally.
+      - name: Diagnose — _rumdata contents on the runner OpenObserve
+        if: always()
+        run: |
+          NOW_US=$(($(date +%s) * 1000000)); START_US=$((NOW_US - 86400000000))
+          echo "runner now_us=$NOW_US ; sim clock:"; xcrun simctl spawn booted date || true
+          curl -s -u "$OO_USER:$OO_PASS" -X POST "http://localhost:5080/api/default/_search?type=logs" \
+            -H 'Content-Type: application/json' \
+            -d "{\"query\":{\"sql\":\"SELECT service, COUNT(*) AS n, MIN(_timestamp) AS mn, MAX(_timestamp) AS mx FROM \\\"_rumdata\\\" GROUP BY service\",\"start_time\":$START_US,\"end_time\":$((NOW_US + 600000000)),\"size\":50}}" \
+            | jq '.hits // .' || true
+
+      - name: Upload blob report (merged by merge_reports)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-ios
+          path: tests/mobile-testing/blob-report
+          if-no-files-found: ignore
+
+  # -------------------------------------------------------------------------------------------
+  # MERGE REPORTS — always runs (even if a device job failed) so there is ONE browsable HTML report
+  # of the whole run. Mirrors playwright.yml: download every blob-report-* and `playwright merge-reports`.
+  # -------------------------------------------------------------------------------------------
+  merge_reports:
+    name: Merge Reports
+    needs: [android, ios]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Install suite deps
+        working-directory: tests/mobile-testing
+        run: npm ci || npm install
+      - name: Download all blob reports
+        uses: actions/download-artifact@v4
+        with:
+          path: tests/mobile-testing/all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+      - name: Merge into one HTML report
+        working-directory: tests/mobile-testing
+        run: |
+          if [ ! -d all-blob-reports ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+            echo "::warning::no blob reports found (device jobs may have been skipped)"; exit 0
+          fi
+          # -c merge.config.js supplies a single relative testDir so blobs from Linux (Android) and
+          # macOS (iOS) merge despite their different absolute recording paths. Never fail the job:
+          # producing the report (pass OR fail data) is the whole point, even when a device job is red.
+          npx playwright merge-reports -c merge.config.js ./all-blob-reports || echo "::warning::merge-reports reported an error"
+          test -f playwright-report/index.html && echo "merged report OK" || echo "::warning::no merged index.html produced"
+      - name: Upload merged HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-report-merged
+          path: tests/mobile-testing/playwright-report
+          if-no-files-found: ignore

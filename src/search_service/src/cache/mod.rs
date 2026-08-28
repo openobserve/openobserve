@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
 use ::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta};
 use chrono::{TimeZone, Utc};
 use common::utils::http::get_work_group;
@@ -302,6 +300,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .trace_id(trace_id.to_string())
+                .org_id(org_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("summary".to_string())
                 .search_role(search_role)
@@ -528,12 +527,6 @@ pub async fn prepare_cache_response(
         query_fn = None;
     }
 
-    let action = req
-        .query
-        .action_id
-        .as_ref()
-        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
-
     // Parse SQL first to get metadata needed for normalization
     let query: SearchQuery = req.query.clone().into();
     let sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
@@ -575,9 +568,6 @@ pub async fn prepare_cache_response(
     ];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
-    }
-    if let Some(action_id) = action {
-        hash_body.push(action_id.to_string());
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());

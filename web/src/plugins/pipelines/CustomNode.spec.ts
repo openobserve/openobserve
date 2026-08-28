@@ -35,6 +35,8 @@ const i18n = createI18n({
       // rendered text, so a drifting stub would silently weaken it.
       pipeline: {
         moreErrors: "... and {count} more errors",
+        defaultDestinationNodeWarning:
+          "Removing the default destination node stops data from being ingested into it. The source stream will then route only to the newly added destination stream. Data not routed to any destination stream will be dropped.",
       },
     },
   },
@@ -64,7 +66,7 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 vi.mock("@/utils/pipelines/constants", () => ({
-  defaultDestinationNodeWarningMessage: "This is the default destination node.",
+  defaultDestinationNodeWarningKey: "pipeline.defaultDestinationNodeWarning",
 }));
 
 const mockPush = vi.fn();

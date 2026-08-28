@@ -181,7 +181,8 @@ onMounted(async () => {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline;
   position: relative;
-  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+  box-shadow: var(--shadow-ring-hairline-geom)
+    color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
   line-height: 1.6;
   vertical-align: baseline;
   white-space: nowrap;
@@ -194,16 +195,20 @@ onMounted(async () => {
     color-mix(in srgb, var(--color-theme-accent) 20%, transparent)
   );
   transform: translateY(-0.0625rem);
+  /* Ring stays a TINT (25%), not the solid accent — a full-strength hairline
+     reads ~4x stronger than the resting 15% and turns hover into a hard outline. */
   box-shadow:
-    0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 25%, transparent),
-    0 0.125rem 0.5rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+    var(--shadow-ring-hairline-geom) color-mix(in srgb, var(--color-theme-accent) 25%, transparent),
+    var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
 }
 
 .summary-text :deep(.summary-clickable:active) {
   transform: translateY(0) scale(0.98);
   background: color-mix(in srgb, var(--color-theme-accent) 18%, transparent);
+  /* Pressed = a 1px INSET press hairline. NOT --shadow-scroll-top, which is an
+     8px inset scroll affordance and reads as a shaded band on click. */
   box-shadow:
-    0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 30%, transparent),
+    var(--shadow-ring-hairline-geom) color-mix(in srgb, var(--color-theme-accent) 30%, transparent),
     inset 0 0.0625rem 0.125rem color-mix(in srgb, var(--color-black) 10%, transparent);
 }
 

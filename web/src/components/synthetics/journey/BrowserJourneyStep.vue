@@ -81,15 +81,15 @@ const stepNumberClass = computed(() => {
   if (!props.replayDotState) return "w-6! text-center text-sm tabular-nums text-text-muted";
   switch (props.replayDotState) {
     case "active":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-primary-soft-bg)] text-[var(--color-badge-primary-soft-text)] border border-[var(--color-badge-primary-soft-text)] text-white text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-primary-soft-bg text-badge-primary-soft-text border border-badge-primary-soft-text text-white text-xs font-semi-bold";
     case "pass":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-success-soft-bg text-badge-success-soft-text border border-badge-success-soft-text text-xs font-semi-bold";
     case "fail":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)]  text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-error-soft-bg text-badge-error-soft-text border border-badge-error-soft-text  text-xs font-semi-bold";
     case "skip":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-default-soft-bg)] text-[var(--color-badge-default-soft-text)] border border-[var(--color-badge-default-soft-text)]  text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-default-soft-bg text-badge-default-soft-text border border-badge-default-soft-text  text-xs font-semi-bold";
     default:
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-border-default text-text-muted border border-[var(--color-text-muted)]  text-xs font-semi-bold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-border-default text-text-muted border border-text-muted  text-xs font-semi-bold";
   }
 });
 
@@ -166,7 +166,7 @@ function toggleExpanded() {
       :class="[
         rowOpacityClass,
         { 'border-border-default border-b': expanded },
-        showErrorCard && 'bg-[var(--color-badge-error-soft-bg)]',
+        showErrorCard && 'bg-badge-error-soft-bg',
       ]"
     >
       <!-- Drag handle — visibility:hidden during replay to preserve layout -->
@@ -283,7 +283,7 @@ function toggleExpanded() {
       data-test="synthetics-journey-step-error-card"
     >
       <!-- Header -->
-      <div class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2">
+      <div class="bg-badge-error-soft-bg flex items-center gap-2 px-3 py-2">
         <OIcon :name="errorIconName" size="sm" class="text-status-error-text" aria-hidden="true" />
         <span class="text-text-heading flex-1 text-xs font-semibold">{{ errorLabel }}</span>
         <span class="text-text-secondary font-mono text-xs"

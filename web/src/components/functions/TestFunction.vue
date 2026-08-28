@@ -1,5 +1,5 @@
 <template>
-  <div data-test="test-function-section" class="flex flex-wrap items-center pb-2">
+  <div v-if="!hideQuery" data-test="test-function-section" class="flex flex-wrap items-center pb-2">
     <div data-test="test-function-query-section" class="test-function-query-container w-full">
       <FullViewContainer
         data-test="test-function-query-title-section"
@@ -159,6 +159,7 @@
         <template #right>
           <!-- o2 ai context add button in the test function -->
           <O2AIContextAddBtn
+            v-if="!hideAiAssist"
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24"
             imageWidth="24"
@@ -305,6 +306,19 @@ const props = defineProps({
     type: Array,
     default: undefined,
   },
+  // Hide the SQL "Query" section (stream + query + Run query). Workflows run the
+  // function on the trigger event (seeded into "Events"), not a stream query, so the
+  // Query section is irrelevant there.
+  hideQuery: {
+    type: Boolean,
+    default: false,
+  },
+  // Hide the "send to AI chat" button on the Events header (workflows keep only the
+  // inline editor AI, not the chat-panel context buttons).
+  hideAiAssist: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["function-error", "sendToAiChat"]);
@@ -355,7 +369,7 @@ const outputEventsErrorMsg = ref<string>("");
 // JavaScript function failed as VRL. Reactive so flipping the toggle re-labels
 // an error already on screen.
 const functionLanguage = computed(() =>
-  isJsFunction(props.vrlFunction) ? t("function.javascript") : t("function.vrl"),
+  isJsFunction(props.vrlFunction) ? raw("JavaScript") : t("function.vrl"),
 );
 
 const loading = ref({
@@ -418,6 +432,7 @@ const { placeholder: queryEditorPlaceholder } = useQueryPlaceholder(
   ref({}),
   isSqlMode,
   noStream,
+  t,
   { noStreamText: t("pipeline.queryEditorPlaceholder") },
 );
 
@@ -596,7 +611,7 @@ const getResults = async () => {
     .catch((err: any) => {
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
-        : "Invalid SQL Query";
+        : t("functions.invalidSqlQuery");
 
       // Locate the offending token in the SQL and squiggle it in the editor.
       rangesFromServerError({
@@ -628,7 +643,7 @@ const isInputValid = () => {
     JSON.parse(inputEvents.value);
     return true;
   } catch (e: any) {
-    eventsErrorMsg.value = `Invalid events: ${e?.message}`;
+    eventsErrorMsg.value = t("functions.invalidEvents", { error: e?.message });
     toast({
       variant: "error",
       message: raw(eventsErrorMsg.value),
@@ -664,7 +679,7 @@ const processTestResults = async (results: any) => {
 };
 
 const handleTestError = (err: any) => {
-  const rawErrMsg = err.response?.data?.message || "Error in testing function";
+  const rawErrMsg = err.response?.data?.message || t("functions.testFunctionError");
 
   // Display the raw error message from the backend without modification
   // The backend now extracts detailed error information from rquickjs

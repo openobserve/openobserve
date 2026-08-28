@@ -352,7 +352,7 @@ export default defineComponent({
         toast({
           variant: "error",
           message: t("toastMessages.recommended.errorOpeningAwsConsole", {
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: error instanceof Error ? error.message : t("search.unknownError"),
           }),
           timeout: 5000,
         });
@@ -399,7 +399,9 @@ export default defineComponent({
         } catch (deleteError) {
           console.error("Error deleting existing dashboard:", deleteError);
           throw new Error(
-            `Failed to delete existing dashboard: ${deleteError instanceof Error ? deleteError.message : "Unknown error"}`,
+            t("toastMessages.recommended.failedToDeleteExistingDashboard", {
+              error: deleteError instanceof Error ? deleteError.message : t("common.unknownError"),
+            }),
           );
         }
       }
@@ -422,7 +424,11 @@ export default defineComponent({
         // Step 2: Download dashboard JSON to get the actual title
         const response = await fetch(props.integration.dashboardGithubUrl);
         if (!response.ok) {
-          throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
+          throw new Error(
+            t("toastMessages.recommended.failedToFetchDashboard", {
+              error: response.statusText,
+            }),
+          );
         }
         const dashboardJson = await response.json();
         const dashboardTitle = dashboardJson.title || props.integration.displayName;
@@ -494,7 +500,7 @@ export default defineComponent({
             toast({
               variant: "error",
               message: t("toastMessages.recommended.failedToReplaceDashboard", {
-                error: error instanceof Error ? error.message : "Unknown error",
+                error: error instanceof Error ? error.message : t("search.unknownError"),
               }),
               timeout: 5000,
             });
@@ -534,7 +540,7 @@ export default defineComponent({
         toast({
           variant: "error",
           message: t("toastMessages.recommended.failedToImportDashboard", {
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: error instanceof Error ? error.message : t("search.unknownError"),
           }),
           timeout: 5000,
         });

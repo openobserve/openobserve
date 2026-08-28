@@ -2,7 +2,8 @@
 
 pub mod prelude;
 
-pub mod action_scripts;
+pub mod alert_composite_children;
+pub mod alert_composites;
 pub mod alert_dedup_state;
 pub mod alert_eval_intervals;
 pub mod alert_incident_alerts;
@@ -32,6 +33,11 @@ pub mod llm_annotation_queue_items;
 pub mod llm_annotation_queues;
 pub mod llm_dataset_items;
 pub mod llm_datasets;
+pub mod llm_experiments;
+pub mod llm_idempotency_records;
+pub mod llm_playground_snapshots;
+pub mod llm_remote_tasks;
+pub mod llm_secrets;
 pub mod model_pricing;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;
@@ -75,6 +81,7 @@ pub mod timed_annotations;
 pub mod trial_quota_usage;
 pub mod users;
 pub mod workflow_associations;
+pub mod workflow_drafts;
 pub mod workflow_errors;
 pub mod workflow_run_data;
 pub mod workflows;

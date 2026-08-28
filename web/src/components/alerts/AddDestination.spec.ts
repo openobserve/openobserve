@@ -53,10 +53,6 @@ vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
 }));
 
-vi.mock("@/composables/useActions", () => ({
-  default: () => ({ getAllActions: vi.fn().mockResolvedValue([]) }),
-}));
-
 vi.mock("@/composables/usePrebuiltDestinations", async () => {
   const { ref, computed } = await import("vue");
   return {
@@ -239,24 +235,6 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
     expect(payload.type).toBe("email");
     expect(payload.emails).toEqual(["a@b.com", "c@d.com"]);
     expect(payload.name).toBe("dest-email");
-  });
-
-  it("action branch: missing action_id blocks the save", async () => {
-    // Enable the action tab for this org.
-    (store.state.zoConfig as any).actions_enabled = true;
-    wrapper = mountComp({ isAlerts: true });
-    const form = getForm(wrapper);
-    form.setFieldValue("destination_type", "custom");
-    form.setFieldValue("type", "action");
-    form.setFieldValue("name", "dest-action");
-    form.setFieldValue("template", "tmpl1");
-    await nextTick();
-
-    await form.handleSubmit();
-    await flushPromises();
-
-    expect(form.state.isValid).toBe(false);
-    expect(destinationService.create).not.toHaveBeenCalled();
   });
 
   it("template is required for custom alert destinations", async () => {

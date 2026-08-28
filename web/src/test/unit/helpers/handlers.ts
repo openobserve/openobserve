@@ -22,7 +22,6 @@ import logs from "../mockData/logs";
 import organizations from "../mockData/organizations";
 import home from "../mockData/home";
 import regexPatterns from "../mockData/regexPatterns";
-import actionScripts from "../mockData/actionScripts";
 import store from "./store";
 
 // TODO OK: Move below rest handlers to separate file
@@ -169,10 +168,25 @@ export const restHandlers = [
     },
   ),
 
+  // Unauthenticated login bootstrap
   http.get(`${store.state.API_ENDPOINT}/config`, () => {
     return HttpResponse.json({
+      build_type: "opensource",
+      commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
+      telemetry_enabled: true,
+      sso_enabled: false,
+      native_login_enabled: true,
+      custom_logo_text: "",
+      custom_logo_img: null,
+      custom_logo_dark_img: null,
+      custom_hide_self_logo: false,
+    });
+  }),
+
+  // Authenticated full configuration
+  http.get(`${store.state.API_ENDPOINT}/api/:org_identifier/config`, () => {
+    return HttpResponse.json({
       version: "v0.3.2",
-      instance: "7049348417797095424",
       commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
       build_date: "2023-04-05T11:01:23Z",
       default_fts_keys: ["log", "message", "msg", "content", "data"],
@@ -339,72 +353,18 @@ export const restHandlers = [
     );
   }),
 
-  // Config Service handler
-  http.get(`${store.state.API_ENDPOINT}/config`, () => {
-    return HttpResponse.json(
-      {
-        streaming_enabled: true,
-        custom_logo_text: "Test Logo Text",
-        custom_logo_img: "base64imagedata",
-        meta_org: "default",
-        version: "v0.10.0",
-        default_fts_keys: ["log", "message", "msg", "content", "data"],
-      },
-      { status: 200 },
-    );
-  }),
-
-  // Action Scripts handlers
-  http.get(
-    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
-    () => {
-      return HttpResponse.json(actionScripts.list);
-    },
-  ),
-
-  http.get(
-    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
-    () => {
-      return HttpResponse.json(actionScripts.single);
-    },
-  ),
-
-  http.post(
-    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
-    () => {
-      return HttpResponse.json({
-        code: 200,
-        message: "Action script created successfully",
-      });
-    },
-  ),
-
-  http.put(
-    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
-    () => {
-      return HttpResponse.json({
-        code: 200,
-        message: "Action script updated successfully",
-      });
-    },
-  ),
-
-  http.delete(
-    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
-    () => {
-      return HttpResponse.json({
-        code: 200,
-        message: "Action script deleted successfully",
-      });
-    },
-  ),
-
   // Service Accounts handlers
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/service_accounts`,
     () => {
       return HttpResponse.json({
-        data: actionScripts.serviceAccounts,
+        data: {
+          data: [
+            { email: "service1@example.com" },
+            { email: "service2@example.com" },
+            { email: "service3@example.com" },
+          ],
+        },
       });
     },
   ),

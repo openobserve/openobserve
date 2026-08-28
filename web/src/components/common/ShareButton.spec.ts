@@ -105,6 +105,19 @@ describe("ShareButton", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  it("exposes handleShareClick, which keyboard shortcuts invoke through a template ref", () => {
+    const wrapper = mount(ShareButton, {
+      props: {
+        url: "https://example.com/logs?query=test",
+      },
+      global: {
+        plugins: [store, i18n],
+      },
+    });
+
+    expect(typeof wrapper.vm.handleShareClick).toBe("function");
+  });
+
   it("should disable button when no URL is provided", () => {
     const wrapper = mount(ShareButton, {
       props: {
@@ -304,6 +317,47 @@ describe("ShareButton", () => {
 
     const button = wrapper.find("button");
     expect(button.attributes("disabled")).toBeDefined();
+  });
+
+  it("ignores a programmatic handleShareClick when web_url is not configured", async () => {
+    const storeWithoutWebUrl = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        pendingShortURL: null,
+        zoConfig: { web_url: "" },
+      },
+      mutations: {
+        setPendingShortURL(state, payload) {
+          state.pendingShortURL = payload;
+        },
+        clearPendingShortURL(state) {
+          state.pendingShortURL = null;
+        },
+      },
+    });
+
+    const wrapper = mount(ShareButton, {
+      props: { url: "https://example.com/logs" },
+      global: { plugins: [storeWithoutWebUrl, i18n] },
+    });
+
+    // Keyboard shortcuts call this directly, so the disabled attribute cannot gate it.
+    wrapper.vm.handleShareClick();
+    await flushPromises();
+
+    expect(shortURLService.create).not.toHaveBeenCalled();
+  });
+
+  it("ignores a programmatic handleShareClick while the disabled prop is set", async () => {
+    const wrapper = mount(ShareButton, {
+      props: { url: "https://example.com/logs", disabled: true },
+      global: { plugins: [store, i18n] },
+    });
+
+    wrapper.vm.handleShareClick();
+    await flushPromises();
+
+    expect(shortURLService.create).not.toHaveBeenCalled();
   });
 
   it("should disable button when web_url is not configured", () => {
