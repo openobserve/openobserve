@@ -35,7 +35,7 @@ use config::meta::{
     synthetics_variables::{
         SyntheticsEnvironmentRequest, SyntheticsEnvironmentView, SyntheticsVariableKind,
         SyntheticsVariableRequest, SyntheticsVariableView, normalize_variable_name,
-        validate_environment_request, validate_variable_request,
+        placeholder_names, validate_environment_request, validate_variable_request,
     },
 };
 // Re-exported so handlers can name what `get_environment` returns without

@@ -22,7 +22,7 @@
 
 use axum::{
     Json,
-    extract::Path,
+    extract::{Path, Query},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -33,6 +33,13 @@ use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
 use openobserve_synthetics::service::SyntheticsEnvironmentRecord;
+
+/// Confirmation that the caller has seen the deletion guard's list.
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct ForceQuery {
+    #[serde(default)]
+    pub force: bool,
+}
 
 /// OpenFGA resource key for an environment. Its object id is the environment
 /// *name*, which is why names are validated as FGA-safe on write.
@@ -137,11 +144,16 @@ pub async fn update_synthetics_variable(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
 )]
-pub async fn delete_synthetics_variable(Path((org_id, id)): Path<(String, String)>) -> Response {
-    match openobserve_synthetics::service::delete_variable(&org_id, None, &id).await {
+pub async fn delete_synthetics_variable(
+    Path((org_id, id)): Path<(String, String)>,
+    Query(q): Query<ForceQuery>,
+) -> Response {
+    match openobserve_synthetics::service::delete_variable(&org_id, None, &id, q.force).await {
         Ok(true) => MetaHttpResponse::ok("variable deleted"),
         Ok(false) => MetaHttpResponse::not_found("variable not found"),
-        Err(e) => variables_error("delete_variable", e),
+        // The guard names what it is guarding, so the client can render the
+        // confirmation without a second call.
+        Err(e) => MetaHttpResponse::conflict(e),
     }
 }
 
@@ -278,11 +290,14 @@ pub async fn update_synthetics_environment(
 )]
 pub async fn delete_synthetics_environment(
     Path((org_id, env)): Path<(String, String)>,
+    Query(q): Query<ForceQuery>,
 ) -> Response {
-    match openobserve_synthetics::service::delete_environment(&org_id, &env).await {
+    match openobserve_synthetics::service::delete_environment(&org_id, &env, q.force).await {
         Ok(true) => MetaHttpResponse::ok("environment deleted"),
         Ok(false) => MetaHttpResponse::not_found("environment not found"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        // The guard names the secrets or variables blocking the delete, so the
+        // client can render the confirmation without a second call.
+        Err(e) => MetaHttpResponse::conflict(e),
     }
 }
 
@@ -415,16 +430,19 @@ pub async fn update_synthetics_environment_variable(
 )]
 pub async fn delete_synthetics_environment_variable(
     Path((org_id, env, id)): Path<(String, String, String)>,
+    Query(q): Query<ForceQuery>,
 ) -> Response {
     let record = match resolve_environment(&org_id, &env).await {
         Ok(Some(record)) => record,
         Ok(None) => return MetaHttpResponse::not_found("environment not found"),
         Err(response) => return response,
     };
-    match openobserve_synthetics::service::delete_variable(&org_id, Some(&record), &id).await {
+    match openobserve_synthetics::service::delete_variable(&org_id, Some(&record), &id, q.force)
+        .await
+    {
         Ok(true) => MetaHttpResponse::ok("variable deleted"),
         Ok(false) => MetaHttpResponse::not_found("variable not found"),
-        Err(e) => variables_error("delete_variable", e),
+        Err(e) => MetaHttpResponse::conflict(e),
     }
 }
 

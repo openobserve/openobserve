@@ -20,6 +20,8 @@
 //! narrower tier wins name by name. An environment is a filter and an access
 //! boundary, never a third tier.
 
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -81,6 +83,13 @@ pub struct SyntheticsVariableView {
     pub tags: Vec<String>,
     /// Whether a value is stored at all — the only thing a client learns about it.
     pub has_value: bool,
+    /// Checks whose definition references `{{NAME}}`.
+    ///
+    /// Answers "what breaks if I change this?", and is the safety check before
+    /// a delete — which is why it is on the list row rather than behind a
+    /// second call.
+    #[serde(default)]
+    pub used_by_checks: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
     pub created_at: i64,
@@ -113,6 +122,42 @@ pub struct SyntheticsEnvironmentView {
     /// it is counted server-side; `variables.len()` is, so it is not sent.
     pub checks_count: u64,
     pub variables: Vec<SyntheticsVariableView>,
+}
+
+/// Every `{{NAME}}` a piece of text references, as written.
+///
+/// Case is preserved rather than normalised, because substitution is an exact
+/// key lookup on both sides (`envVars[k]` in the probe, `vars[k]` in the
+/// editor). `{{base_url}}` does not resolve a variable stored as `BASE_URL`, so
+/// counting it as a use would report a binding that does not exist.
+pub fn placeholder_names(text: &str) -> BTreeSet<String> {
+    let bytes = text.as_bytes();
+    let mut found = BTreeSet::new();
+    let mut i = 0;
+    while let Some(open) = text[i..].find("{{") {
+        let start = i + open + 2;
+        let mut j = start;
+        while j < bytes.len() && (bytes[j] as char).is_ascii_whitespace() {
+            j += 1;
+        }
+        let name_start = j;
+        while j < bytes.len() && ((bytes[j] as char).is_ascii_alphanumeric() || bytes[j] == b'_') {
+            j += 1;
+        }
+        let name_end = j;
+        while j < bytes.len() && (bytes[j] as char).is_ascii_whitespace() {
+            j += 1;
+        }
+        if name_end > name_start && text[j..].starts_with("}}") {
+            found.insert(text[name_start..name_end].to_string());
+            i = j + 2;
+        } else {
+            // Not a placeholder — resume just past the braces so `{{{{X}}` is
+            // still seen, rather than skipping the whole run.
+            i = start;
+        }
+    }
+    found
 }
 
 /// Upper-cases a variable name, which is how every name is stored.
@@ -300,6 +345,41 @@ mod tests {
         };
         assert!(validate_variable_request(&req, Some("env-id"), true).is_ok());
         assert!(validate_variable_request(&req, Some("env-id"), false).is_err());
+    }
+
+    #[test]
+    fn placeholders_are_found_with_and_without_padding() {
+        let found = placeholder_names("{{A}} and {{ B }} and {{\tC\t}}");
+        assert_eq!(
+            found.into_iter().collect::<Vec<_>>(),
+            vec!["A".to_string(), "B".to_string(), "C".to_string()]
+        );
+    }
+
+    #[test]
+    fn placeholder_case_is_preserved() {
+        // Substitution is an exact key lookup on both sides, so `{{base_url}}`
+        // genuinely does not resolve a variable stored as `BASE_URL`. Folding
+        // case here would report a binding that does not exist.
+        let found = placeholder_names("{{base_url}}");
+        assert!(found.contains("base_url"));
+        assert!(!found.contains("BASE_URL"));
+    }
+
+    #[test]
+    fn malformed_braces_yield_nothing() {
+        assert!(placeholder_names("{{}}").is_empty());
+        assert!(placeholder_names("{{ }}").is_empty());
+        assert!(placeholder_names("{{A").is_empty());
+        assert!(placeholder_names("{{A-B}}").is_empty());
+        assert!(placeholder_names("plain text").is_empty());
+    }
+
+    #[test]
+    fn a_placeholder_after_a_malformed_one_is_still_found() {
+        // The scan resumes just past the braces rather than past the whole run,
+        // so one bad match cannot swallow the next good one.
+        assert!(placeholder_names("{{ {{GOOD}}").contains("GOOD"));
     }
 
     #[test]

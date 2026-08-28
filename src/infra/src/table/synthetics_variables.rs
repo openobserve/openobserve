@@ -111,6 +111,9 @@ impl SyntheticsVariableRecord {
             example: self.example.clone(),
             tags: self.tags.clone(),
             has_value: !self.value.is_empty(),
+            // Stamped by the service, which is the only layer that can see
+            // checks. Zero here means "not counted yet", never "unused".
+            used_by_checks: 0,
             owner: self.owner.clone(),
             created_at: self.created_at,
             updated_at: self.updated_at,
