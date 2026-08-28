@@ -436,11 +436,11 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
     use infra::table::{
-        action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
-        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
-        incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
-        re_pattern_stream_map, reports, search_queue, short_urls, slo, slo_backfill_jobs,
-        slo_budget, slos, system_settings, templates, timed_annotations,
+        alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards, destinations,
+        distinct_values, enrichment_table_urls, enrichment_tables, folders, incident_events,
+        kv_store, org_ingestion_tokens, org_storage_providers, re_pattern, re_pattern_stream_map,
+        reports, search_queue, short_urls, slo, slo_backfill_jobs, slo_budget, slos,
+        system_settings, templates, timed_annotations,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -507,9 +507,6 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     templates::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/templates: {e}"))?;
-    action_scripts::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/action_scripts: {e}"))?;
     kv_store::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/kv_store: {e}"))?;

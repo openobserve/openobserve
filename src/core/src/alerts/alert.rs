@@ -19,11 +19,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-#[cfg(feature = "enterprise")]
-use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
-#[cfg(feature = "enterprise")]
-use common::utils::http::get_or_create_trace_id;
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -62,8 +58,6 @@ use lettre::{
     message::{Attachment, MultiPart, SinglePart},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
-#[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
@@ -71,8 +65,6 @@ use o2_openfga::{
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use search::sql::RE_ONLY_SELECT;
 use svix_ksuid::Ksuid;
-#[cfg(feature = "enterprise")]
-use tracing::{Level, span};
 
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
@@ -2593,10 +2585,8 @@ async fn send_to_destination(
                 (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
                     // Discord with a rendered chart: upload the PNG in the
                     // same webhook POST (the embed references it as
-                    // `attachment://`). Actions destinations keep the plain
-                    // JSON path — their payload is rewritten server-side.
+                    // `attachment://`).
                     if matches!(format, ChannelFormat::Discord)
-                        && endpoint.action_id.is_none()
                         && let Some(png) = ctx.chart_png.clone()
                     {
                         send_discord_with_attachment(endpoint, body, png).await
@@ -2706,37 +2696,6 @@ pub(crate) async fn dispatch_test_message(
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    let msg = if endpoint.action_id.is_some() {
-        let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
-            .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
-        let inputs = if incoming_msg.is_object() {
-            vec![incoming_msg]
-        } else if incoming_msg.is_array() {
-            incoming_msg.as_array().unwrap().to_vec()
-        } else {
-            return Err(anyhow::anyhow!(
-                "Unsupported message format for actions: {}",
-                msg
-            ));
-        };
-
-        let trace_id = get_or_create_trace_id(
-            &HeaderMap::new(),
-            &span!(Level::TRACE, "action_destinations"),
-        );
-
-        let req = TriggerActionRequest {
-            inputs,
-            trigger_source: TriggerSource::Alerts,
-            trace_id,
-        };
-        serde_json::to_string(&req)
-            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
-    } else {
-        msg
-    };
-
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.

@@ -182,7 +182,6 @@ struct ConfigResponse<'a> {
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
-    actions_enabled: bool,
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
@@ -446,7 +445,6 @@ pub async fn zo_config(
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
     let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
-    let actions_enabled = enterprise_value!(false, o2cfg.actions.enabled);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
     #[cfg(feature = "enterprise")]
@@ -572,7 +570,6 @@ pub async fn zo_config(
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
-        actions_enabled,
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,

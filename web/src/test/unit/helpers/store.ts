@@ -166,7 +166,6 @@ const store = createStore({
       },
       quotaThresholdMsg: "",
       functions: [],
-      actions: [],
       streams: {} as Record<string, unknown>,
       folders: [],
       organizationSettings: {
@@ -279,9 +278,6 @@ const store = createStore({
     },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
-    },
-    setActions(state, payload) {
-      state.organizationData.actions = payload;
     },
     setStreams(state, payload) {
       state.organizationData.streams[payload.name] = payload;
@@ -535,9 +531,6 @@ const store = createStore({
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
-    },
-    setActions(context, payload) {
-      context.commit("setActions", payload);
     },
     setStreams(context, payload) {
       context.commit("setStreams", payload);
