@@ -76,6 +76,7 @@ import { OnboardingFormValidationPage } from "./generalPages/onboardingFormValid
 import { ManagementPage } from "./generalPages/managementPage.js";
 import { AboutPage } from "./generalPages/aboutPage.js";
 import { CreateOrgPage } from "./generalPages/createOrgPage.js";
+import { OrganizationSyntheticsStepsPage } from "./generalPages/organizationSyntheticsStepsPage.js";
 import { CommonActions } from "./commonActions.js";
 import { UserPage } from "./generalPages/userPage.js";
 import { SanityPage } from "./generalPages/sanityPage.js";
@@ -208,6 +209,7 @@ class PageManager {
     this.managementPage = new ManagementPage(page);
     this.aboutPage = new AboutPage(page);
     this.createOrgPage = new CreateOrgPage(page);
+    this.organizationSyntheticsStepsPage = new OrganizationSyntheticsStepsPage(page);
     this.commonActions = new CommonActions(page);
     this.userPage = new UserPage(page);
     this.sanityPage = new SanityPage(page);

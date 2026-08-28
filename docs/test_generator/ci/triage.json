@@ -1,0 +1,29 @@
+{
+  "feature_slug": "synthetics-steps-quota",
+  "feature_title": "Synthetics Steps Quota Management",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "organizationSyntheticsSteps.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/organizationSyntheticsSteps.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/OrganizationManagement.vue",
+    "web/src/components/settings/OrganizationManagement.schema.ts",
+    "web/src/services/organizations.ts",
+    "web/src/components/synthetics/configure/CheckConfigure.vue",
+    "web/src/components/synthetics/configure/CheckRUM.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Spans both editions. The complete changed-files list contains OSS paths (src/core/src/trial_quota.rs, src/synthetics/**, web/src/components/settings/OrganizationManagement.vue, web/src/components/synthetics/configure/*) alongside enterprise-owned paths (o2_enterprise/src/enterprise/cloud/billings/org_usage.rs, o2_enterprise/src/enterprise/metering/*, o2_openfga/src/meta/route_permissions.rs). The feature is a trial-quota/billing concern whose UI lands in OSS web/src, so edition is 'both'.",
+    "skip": "Not skipped. Trigger comment is empty and no tests-added/opt-out label is present, so no explicit skip applies. The change is user-facing: the Organization Management settings page gains synthetics browser/protocol steps usage tabs and limit inputs.",
+    "e2e": "E2E is warranted. The Organization Management page adds new UI (synthetics browser/protocol steps tabs, used/total readouts, and a set-usage-limit form with validation for whole-number/negative/max per the new translation keys), and the synthetics check configure components changed. This is a user-exercisable settings flow that needs verification.",
+    "area": "GeneralTests. The bulk of the frontend changes live under web/src/components/settings/ (OrganizationManagement) and web/src/components/synthetics/configure/. There is no dedicated Settings/Synthetics folder in the playwright matrix, and GeneralTests is the catch-all shard already holding settings-adjacent specs (theme-management, languageTranslation, schema).",
+    "group": "GeneralTests. This matches the chosen area and already exists as a testfolder in the ci-matrix (actual_folder GeneralTests), so the new spec can be appended to its run_files without creating a new shard.",
+    "existing_tests": "No Playwright E2E specs in the diff. The only test files changed are Vitest unit specs (web/src/components/settings/OrganizationManagement.spec.ts, web/src/components/synthetics/configure/CheckConfigure.spec.ts, web/src/services/organizations.spec.ts), which are not E2E coverage and do not set this flag."
+  }
+}

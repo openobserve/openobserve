@@ -1,0 +1,21 @@
+{
+  "feature_slug": "synthetics-steps-quota",
+  "feature_title": "Synthetics Steps Quota Management",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "organizationSyntheticsSteps.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/organizationSyntheticsSteps.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/OrganizationManagement.vue",
+    "web/src/components/settings/OrganizationManagement.schema.ts",
+    "web/src/services/organizations.ts",
+    "web/src/components/synthetics/configure/CheckConfigure.vue",
+    "web/src/components/synthetics/configure/CheckRUM.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
