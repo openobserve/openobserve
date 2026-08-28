@@ -1,6 +1,0 @@
-{
-  "group": "Alerts",
-  "spec_filename": "alerts-custom-hide-menus.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

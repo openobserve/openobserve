@@ -1,4 +1,0 @@
-web/src/components/alerts/AlertSectionTabs.spec.ts
-web/src/components/alerts/AlertSectionTabs.vue
-web/src/lib/core/Navbar/ONavGroup.spec.ts
-web/src/lib/core/Navbar/ONavGroup.vue
