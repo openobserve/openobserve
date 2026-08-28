@@ -303,6 +303,7 @@ use crate::{
         synthetics::promote_synthetic_variable,
         synthetics::promote_environment_variable,
         synthetics::split_synthetics_variable,
+        synthetics::get_synthetic_replay_secrets,
         synthetics::list_runs,
         synthetics::get_run_detail,
         synthetics::job_resolve,

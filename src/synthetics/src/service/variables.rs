@@ -481,6 +481,90 @@ pub async fn resolved_variables(
     Ok(Some(out))
 }
 
+/// One shared secret released to a browser for replay.
+pub struct ReplaySecret {
+    pub name: String,
+    /// The environment that governs it. Always present — a secret cannot exist
+    /// without one — and it is what the caller checks write permission against.
+    pub environment: String,
+    pub value: String,
+}
+
+/// Decrypted shared secrets a check's steps reference, for replay auto-fill.
+///
+/// **This is the one path that releases a shared secret's plaintext**, and it
+/// exists only because replay substitutes in the browser: any value replay can
+/// use is a value the page can read. Three things bound it, and all three are
+/// the caller's to enforce except the last:
+///
+/// - the org opted in (off by default),
+/// - the caller holds write on each secret's environment,
+/// - only secrets the steps actually reference are returned, which is this function's job —
+///   releasing every secret in the environment would make one replay a bulk credential read.
+pub async fn replay_secrets(
+    org_id: &str,
+    check_id: &str,
+) -> anyhow::Result<Option<Vec<ReplaySecret>>> {
+    let conn = get_orm_client_ro().await;
+    let Some(check) = synthetics_checks::get(conn, org_id, check_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+    else {
+        return Ok(None);
+    };
+
+    // Names the steps reference, from the same fields the probe substitutes.
+    let mut referenced = std::collections::HashSet::new();
+    let mut text = check.target.clone();
+    text.push(' ');
+    text.push_str(&check.config.to_string());
+    for name in placeholder_names(&text) {
+        referenced.insert(name);
+    }
+    // A name the check defines itself resolves from the check, so replay
+    // already has it and there is nothing to release.
+    for own in &check.variables {
+        referenced.remove(&own.name);
+    }
+    if referenced.is_empty() {
+        return Ok(Some(Vec::new()));
+    }
+
+    let envs = synthetics_environments::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let rows = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    let candidates: Vec<_> = rows
+        .iter()
+        .filter(|v| v.is_secret() && referenced.contains(&v.name))
+        .filter(|v| applies_to(v, check.environments.first().map(String::as_str)))
+        .collect();
+    if candidates.is_empty() {
+        return Ok(Some(Vec::new()));
+    }
+
+    let dek = synthetics_dek(org_id).await?;
+    let mut out = Vec::with_capacity(candidates.len());
+    for row in candidates {
+        let Some(env_id) = row.env.as_deref() else {
+            continue;
+        };
+        let environment = envs
+            .iter()
+            .find(|e| e.id == env_id)
+            .map_or_else(|| env_id.to_string(), |e| e.name.clone());
+        out.push(ReplaySecret {
+            name: row.name.clone(),
+            environment,
+            value: decrypt_secret(&dek, &row.value)?,
+        });
+    }
+    Ok(Some(out))
+}
+
 /// Moves a check-scoped variable up into the shared tier.
 ///
 /// The ciphertext moves as-is. Both tiers are encrypted under the same org DEK,

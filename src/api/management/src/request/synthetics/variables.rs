@@ -696,3 +696,90 @@ async fn require_scope_write(
         None => "Forbidden: no write access to global variables".to_string(),
     }))
 }
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/{id}/replay-secrets",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticReplaySecrets",
+    summary = "Shared secret values for replay, when the org has opted in",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Check ID"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_synthetic_replay_secrets(
+    Path((org_id, id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    // Gate one: the org opted in. Off by default, and the default is the point
+    // — every other path treats a shared secret as write-only, and this one
+    // hands plaintext to a browser.
+    if !db::organization::get_org_setting(&org_id)
+        .await
+        .map(|s| s.synthetics_replay_autofill)
+        .unwrap_or(false)
+    {
+        return MetaHttpResponse::forbidden(
+            "Replay auto-fill is disabled for this organization. Enter the value when prompted.",
+        );
+    }
+
+    let secrets = match openobserve_synthetics::service::replay_secrets(&org_id, &id).await {
+        Ok(Some(secrets)) => secrets,
+        Ok(None) => return MetaHttpResponse::not_found("check not found"),
+        Err(e) => return variables_error("replay_secrets", e),
+    };
+
+    // Gate two: write on the environment governing each secret. Read access is
+    // not enough — this releases a value that no read path ever returns, so it
+    // is bounded by the permission that lets you replace it.
+    #[cfg(feature = "enterprise")]
+    let secrets = {
+        let mut permitted = Vec::with_capacity(secrets.len());
+        for secret in secrets {
+            if openobserve_core::auth::check_permissions(
+                &secret.environment,
+                &org_id,
+                &user_email.user_id,
+                ENVIRONMENT_RESOURCE,
+                "PUT",
+                None,
+                false,
+                false,
+                true,
+            )
+            .await
+            {
+                permitted.push(secret);
+            }
+        }
+        permitted
+    };
+
+    // Named, never valued. HTTP audit already records the request; this records
+    // which credentials it actually released, which the request line cannot say.
+    if !secrets.is_empty() {
+        let names: Vec<&str> = secrets.iter().map(|s| s.name.as_str()).collect();
+        tracing::info!(
+            org_id = %org_id,
+            synthetics_id = %id,
+            secrets = ?names,
+            "[synthetics] released shared secret values for replay"
+        );
+    }
+
+    MetaHttpResponse::json(
+        secrets
+            .into_iter()
+            .map(|s| (s.name, s.value))
+            .collect::<std::collections::HashMap<_, _>>(),
+    )
+}

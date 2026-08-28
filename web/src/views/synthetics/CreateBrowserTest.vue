@@ -918,6 +918,8 @@ watch(
 const pendingReplaySteps = ref<WireStep[] | null>(null);
 const replaySecretNames = ref<string[]>([]);
 const replaySecretPromptOpen = ref(false);
+/** Values the server supplied, merged back in when the prompt closes. */
+const autoFilledSecrets = ref<Record<string, string>>({});
 
 function runReplay(journey: BrowserStep[]) {
   const steps = journeyToWireSteps(journey);
@@ -927,13 +929,44 @@ function runReplay(journey: BrowserStep[]) {
   // asks for it or types the placeholder literally. Ask, once per session.
   const needed = secretsNeededForReplay(steps, resolvedVariables.value);
   const { known, missing } = partitionReplaySecrets(needed);
-  if (missing.length > 0) {
-    pendingReplaySteps.value = steps;
-    replaySecretNames.value = missing;
-    replaySecretPromptOpen.value = true;
+  if (missing.length === 0) {
+    startReplay(steps, known);
     return;
   }
-  startReplay(steps, known);
+  void resumeReplayWithSecrets(steps, known, missing);
+}
+
+/**
+ * Fill the missing secrets from the server if the org allows it, and prompt for
+ * whatever is left.
+ *
+ * Auto-fill is off by default and additionally requires write on each secret's
+ * environment, so a 403 or a partial answer is the ordinary case rather than an
+ * error — either way the author is asked for the remainder.
+ */
+async function resumeReplayWithSecrets(
+  steps: WireStep[],
+  known: Record<string, string>,
+  missing: string[],
+) {
+  let filled: Record<string, string> = {};
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.replaySecrets(org, (check.value as any).id ?? "");
+    filled = res.data ?? {};
+  } catch {
+    filled = {};
+  }
+
+  const stillMissing = missing.filter((name) => filled[name] === undefined);
+  if (stillMissing.length === 0) {
+    startReplay(steps, { ...known, ...filled });
+    return;
+  }
+  pendingReplaySteps.value = steps;
+  autoFilledSecrets.value = filled;
+  replaySecretNames.value = stillMissing;
+  replaySecretPromptOpen.value = true;
 }
 
 function onReplaySecretsSupplied(supplied: Record<string, string>) {
@@ -941,7 +974,8 @@ function onReplaySecretsSupplied(supplied: Record<string, string>) {
   pendingReplaySteps.value = null;
   if (!steps) return;
   const { known } = partitionReplaySecrets(replaySecretNames.value);
-  startReplay(steps, { ...known, ...supplied });
+  startReplay(steps, { ...known, ...autoFilledSecrets.value, ...supplied });
+  autoFilledSecrets.value = {};
 }
 
 function startReplay(steps: WireStep[], secrets: Record<string, string>) {
