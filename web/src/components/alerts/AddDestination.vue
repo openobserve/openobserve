@@ -380,23 +380,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OFormSelect>
           </template>
-
-          <template v-if="typeVal === 'action' && (!isAlerts || dtVal === 'custom')">
-            <div class="action-select w-1/2 py-1">
-              <OFormSelect
-                data-test="add-destination-action-select"
-                name="action_id"
-                :label="t('alert_destinations.action')"
-                required
-                :options="actionOptions"
-                searchable
-                labelKey="label"
-                valueKey="value"
-                :loading="isLoadingActions"
-                tabindex="0"
-              />
-            </div>
-          </template>
         </OForm>
       </div>
       <div class="border-border-default flex w-full justify-between border-t px-4 py-4">
@@ -493,7 +476,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import usersService from "@/services/users";
 import AddUser from "@/components/iam/users/AddUser.vue";
-import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { isPrebuiltType, detectPrebuiltTypeFromUrl } from "@/utils/prebuilt-templates";
@@ -629,11 +611,7 @@ const apiHeaders = form.useStore(
 );
 
 const isUpdatingDestination = ref(false);
-const isLoadingActions = ref(false);
 const router = useRouter();
-const actionOptions = ref<{ value: string; label: I18nText; type: string }[]>([]);
-
-const { getAllActions } = useActions();
 
 // Prebuilt destinations composable
 const {
@@ -684,8 +662,6 @@ const tabs = computed(() => {
       return [{ label: t("alerts.webhook"), value: "http", icon: "webhook" }];
     } else if (currentType === "email") {
       return [{ label: t("alerts.email"), value: "email", icon: "mail" }];
-    } else if (currentType === "action") {
-      return [{ label: t("alerts.action"), value: "action", icon: "bolt" }];
     }
   }
 
@@ -694,13 +670,6 @@ const tabs = computed(() => {
     { label: t("alerts.webhook"), value: "http", icon: "webhook" },
     { label: t("alerts.email"), value: "email", icon: "mail" },
   ];
-
-  if (
-    (config.isEnterprise == "true" || config.isCloud == "true") &&
-    store.state.zoConfig.actions_enabled
-  ) {
-    tabs.push({ label: t("alerts.action"), value: "action", icon: "bolt" });
-  }
 
   return tabs;
 });
@@ -733,7 +702,7 @@ const getDestinationTypeIcon = (typeId: string) => {
 onActivated(() => setupDestinationData());
 onBeforeMount(async () => {
   setupDestinationData();
-  await Promise.all([getActionOptions(), fetchOrgUsers(), fetchCreateUserRoles()]);
+  await Promise.all([fetchOrgUsers(), fetchCreateUserRoles()]);
 });
 
 // Watch for destination prop changes (important for edit mode dialog)
@@ -858,7 +827,6 @@ const setupDestinationData = () => {
       template: props.destination.template ?? "",
       emails: props.destination?.emails ?? [],
       type: props.destination.type || "http",
-      action_id: props.destination.action_id || "",
       // Prebuilt credentials, typed to the active type's fields. Custom → {}.
       credentials:
         destType && destType !== "custom"
@@ -1023,35 +991,6 @@ const prebuiltTemplateOptions = computed(() => {
   return options;
 });
 
-const updateActionOptions = () => {
-  actionOptions.value = [];
-  store.state.organizationData.actions.forEach((action: any) => {
-    if (action.execution_details_type === "service")
-      actionOptions.value.push({
-        value: action.id,
-        label: action.name,
-        type: action.execution_details_type,
-      });
-  });
-};
-
-const getActionOptions = async () => {
-  try {
-    isLoadingActions.value = true;
-    // Update action options with existing actions
-    updateActionOptions();
-
-    // Get all actions from the server and update the action options
-    await getAllActions();
-    isLoadingActions.value = false;
-    updateActionOptions();
-  } catch (err) {
-    console.error(err);
-  } finally {
-    isLoadingActions.value = false;
-  }
-};
-
 // Select destination type (prebuilt or custom) — bridges the card grid choice
 // into the form and swaps the discriminated branch WITHOUT carrying stale
 // inactive-branch values into the save.
@@ -1188,11 +1127,6 @@ function saveCustomDestination(value: AddDestinationForm) {
   if (value.type === "email") {
     payload["type"] = "email";
     payload["emails"] = value.emails ?? [];
-  }
-
-  if (value.type === "action") {
-    payload["type"] = "action";
-    payload["action_id"] = value.action_id;
   }
 
   if (isUpdatingDestination.value) {

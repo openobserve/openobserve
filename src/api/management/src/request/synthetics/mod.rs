@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod last_check;
+
 use axum::{
     Json,
     extract::{Path, Query},
@@ -20,13 +22,15 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
-// Used only inside #[cfg(feature = "enterprise")] handler bodies.
-#[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use serde::Deserialize;
 
+use crate::service::auth::UserEmail;
+// OSS has an arm that always returns false, so every guard below is gated
+// rather than relying on it — per-resource RBAC is enterprise, and an OSS build
+// must not 403 its way through a feature it ships.
 #[cfg(feature = "enterprise")]
-use crate::service::auth::{UserEmail, check_permissions};
+use crate::service::auth::check_permissions;
 
 // ── Local query / body types ──────────────────────────────────────────────────
 
@@ -107,32 +111,24 @@ pub async fn list_runs(
     Path((org_id, id)): Path<(String, String)>,
     Query(q): Query<ListRunsQuery>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
+    let page = q.page.unwrap_or(0).max(0);
+    let page_size = q.page_size.unwrap_or(20).clamp(1, 200);
+    match openobserve_synthetics::service::list_runs(
+        &org_id,
+        &id,
+        q.start_time,
+        q.end_time,
+        page,
+        page_size,
+    )
+    .await
     {
-        let page = q.page.unwrap_or(0).max(0);
-        let page_size = q.page_size.unwrap_or(20).clamp(1, 200);
-        match o2_enterprise::enterprise::synthetics::service::list_runs(
-            &org_id,
-            &id,
-            q.start_time,
-            q.end_time,
-            page,
-            page_size,
-        )
-        .await
-        {
-            Ok(resp) => MetaHttpResponse::json(resp),
-            Err(e) => {
-                tracing::error!("[synthetics] list_runs: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+        Ok(resp) => MetaHttpResponse::json(resp),
+        Err(e) => {
+            tracing::error!("[synthetics] list_runs: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id, q);
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -158,24 +154,14 @@ pub async fn list_runs(
 pub async fn get_run_detail(
     Path((org_id, id, run_id)): Path<(String, String, String)>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        match o2_enterprise::enterprise::synthetics::service::get_run_detail(&org_id, &id, &run_id)
-            .await
-        {
-            Ok(Some(run)) => MetaHttpResponse::json(run),
-            Ok(None) => MetaHttpResponse::not_found("run not found"),
-            Err(e) => {
-                tracing::error!("[synthetics] get_run_detail: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+    match openobserve_synthetics::service::get_run_detail(&org_id, &id, &run_id).await {
+        Ok(Some(run)) => MetaHttpResponse::json(run),
+        Ok(None) => MetaHttpResponse::not_found("run not found"),
+        Err(e) => {
+            tracing::error!("[synthetics] get_run_detail: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id, run_id);
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -229,35 +215,20 @@ pub async fn presign_artifacts(
     Path((org_id, id)): Path<(String, String)>,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::job_api::PresignArtifactsRequest,
-        >(body)
-        {
-            Ok(req) => {
-                match o2_enterprise::enterprise::synthetics::job_api::presign_artifacts(
-                    &org_id, &id, req,
-                )
-                .await
-                {
-                    Ok(resp) => MetaHttpResponse::json(resp),
-                    Err(e) => {
-                        tracing::error!(
-                            synthetics_id = %id,
-                            "[synthetics] presign_artifacts: {e}"
-                        );
-                        MetaHttpResponse::bad_request(e.to_string())
-                    }
+    match serde_json::from_value::<openobserve_synthetics::job_api::PresignArtifactsRequest>(body) {
+        Ok(req) => {
+            match openobserve_synthetics::job_api::presign_artifacts(&org_id, &id, req).await {
+                Ok(resp) => MetaHttpResponse::json(resp),
+                Err(e) => {
+                    tracing::error!(
+                        synthetics_id = %id,
+                        "[synthetics] presign_artifacts: {e}"
+                    );
+                    MetaHttpResponse::bad_request(e.to_string())
                 }
             }
-            Err(e) => MetaHttpResponse::bad_request(e.to_string()),
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id, body);
-        MetaHttpResponse::forbidden("Not Supported")
+        Err(e) => MetaHttpResponse::bad_request(e.to_string()),
     }
 }
 
@@ -266,38 +237,23 @@ pub async fn job_artifact_urls(
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Err(resp) = authorize_probe(&headers, &org_id).await {
-            return resp;
-        }
-        match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::job_api::ArtifactUrlsRequest,
-        >(body)
-        {
-            Ok(req) => {
-                match o2_enterprise::enterprise::synthetics::job_api::artifact_urls(req, &org_id)
-                    .await
-                {
-                    Ok(resp) => MetaHttpResponse::json(resp),
-                    Err(e) => {
-                        let msg = e.to_string();
-                        if msg.starts_with("forbidden") {
-                            return MetaHttpResponse::forbidden(msg);
-                        }
-                        tracing::error!("[synthetics] artifact_urls: {e}");
-                        MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                            .into_response()
-                    }
-                }
-            }
-            Err(e) => MetaHttpResponse::bad_request(e.to_string()),
-        }
+    if let Err(resp) = authorize_probe(&headers, &org_id).await {
+        return resp;
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, headers, body);
-        MetaHttpResponse::forbidden("Not Supported")
+    match serde_json::from_value::<openobserve_synthetics::job_api::ArtifactUrlsRequest>(body) {
+        Ok(req) => match openobserve_synthetics::job_api::artifact_urls(req, &org_id).await {
+            Ok(resp) => MetaHttpResponse::json(resp),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.starts_with("forbidden") {
+                    return MetaHttpResponse::forbidden(msg);
+                }
+                tracing::error!("[synthetics] artifact_urls: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                    .into_response()
+            }
+        },
+        Err(e) => MetaHttpResponse::bad_request(e.to_string()),
     }
 }
 
@@ -307,12 +263,13 @@ pub async fn job_upload(
     Query(params): Query<std::collections::HashMap<String, String>>,
     body: axum::body::Bytes,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
+    // Ungated. This is the tenant boundary for an artifact upload, and the
+    // route is registered in every build now — an OSS build that skipped it
+    // would accept writes into any org's artifact prefix from anyone who can
+    // reach the endpoint.
     if let Err(resp) = authorize_probe(&headers, &org_id).await {
         return resp;
     }
-    #[cfg(not(feature = "enterprise"))]
-    let _ = &headers;
     let key = match params.get("key") {
         Some(k) => k.clone(),
         None => return MetaHttpResponse::bad_request("missing key param"),
@@ -362,23 +319,16 @@ pub async fn list_synthetics(
     Query(query): Query<ListSyntheticsQuery>,
 ) -> Response {
     let params: config::meta::synthetics::ListSyntheticsParams = query.into();
-    #[cfg(feature = "enterprise")]
-    {
-        match o2_enterprise::enterprise::synthetics::service::list_synthetics(&org_id, &params)
-            .await
-        {
-            Ok(resp) => MetaHttpResponse::json(resp),
-            Err(e) => {
-                tracing::error!("[synthetics] list_synthetics: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+    match openobserve_synthetics::service::list_synthetics(&org_id, &params).await {
+        Ok(mut resp) => {
+            last_check::enrich(&org_id, &mut resp.checks).await;
+            MetaHttpResponse::json(resp)
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, params);
-        MetaHttpResponse::forbidden("Not Supported")
+        Err(e) => {
+            tracing::error!("[synthetics] list_synthetics: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
+        }
     }
 }
 
@@ -403,47 +353,34 @@ pub async fn list_synthetics(
 pub async fn create_synthetic(
     Path(org_id): Path<String>,
     Query(folder_query): Query<FolderQuery>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        // The permission gate for POST /synthetics checks the `?folder=` query
-        // param, so the destination folder MUST come from the same place —
-        // otherwise a crafted body.folder_id could create a check in a folder
-        // the user can't access (gate checks query, write used body). Make the
-        // query authoritative and ignore any folder in the body, exactly like
-        // regular alerts' create_alert (get_folder(query)). Default when absent.
-        // (`mut` re-bind here, not in the signature, so the OSS build — where
-        // this block is cfg'd out — doesn't warn about an unused `mut`.)
-        let mut body = body;
-        body.folder_id = folder_query
-            .folder
-            .filter(|f| !f.is_empty())
-            .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
+    // The permission gate for POST /synthetics checks the `?folder=` query
+    // param, so the destination folder MUST come from the same place —
+    // otherwise a crafted body.folder_id could create a check in a folder
+    // the user can't access (gate checks query, write used body). Make the
+    // query authoritative and ignore any folder in the body, exactly like
+    // regular alerts' create_alert (get_folder(query)). Default when absent.
+    // (`mut` re-bind here, not in the signature, so the OSS build — where
+    // this block is cfg'd out — doesn't warn about an unused `mut`.)
+    let mut body = body;
+    body.folder_id = folder_query
+        .folder
+        .filter(|f| !f.is_empty())
+        .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
 
-        let created_by = user_email.user_id.as_str();
-        match o2_enterprise::enterprise::synthetics::service::create_synthetic(
-            &org_id, body, created_by,
-        )
-        .await
-        {
-            Ok(check) => MetaHttpResponse::json(check),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.starts_with("validation: ") {
-                    return MetaHttpResponse::bad_request(msg);
-                }
-                tracing::error!("[synthetics] create_synthetic: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                    .into_response()
+    let created_by = user_email.user_id.as_str();
+    match openobserve_synthetics::service::create_synthetic(&org_id, body, created_by).await {
+        Ok(check) => MetaHttpResponse::json(check),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.starts_with("validation: ") {
+                return MetaHttpResponse::bad_request(msg);
             }
+            tracing::error!("[synthetics] create_synthetic: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, body, folder_query);
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -469,38 +406,31 @@ pub async fn get_synthetic(
     Path((org_id, id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // get_by_id returns full decrypted credentials — requires write permission.
     #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &id,
+        &org_id,
+        &user_email.user_id,
+        "synthetics",
+        "PUT",
+        None,
+        false,
+        true,
+        false,
+    )
+    .await
     {
-        // get_by_id returns full decrypted credentials — requires write permission.
-        if !check_permissions(
-            &id,
-            &org_id,
-            &user_email.user_id,
-            "synthetics",
-            "PUT",
-            None,
-            false,
-            true,
-            false,
-        )
-        .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
-        match o2_enterprise::enterprise::synthetics::service::get_synthetic(&org_id, &id).await {
-            Ok(Some(check)) => MetaHttpResponse::json(check),
-            Ok(None) => MetaHttpResponse::not_found("check not found"),
-            Err(e) => {
-                tracing::error!("[synthetics] get_synthetic: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
-        }
+        return MetaHttpResponse::forbidden("Forbidden");
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id);
-        MetaHttpResponse::forbidden("Not Supported")
+    match openobserve_synthetics::service::get_synthetic(&org_id, &id).await {
+        Ok(Some(check)) => MetaHttpResponse::json(check),
+        Ok(None) => MetaHttpResponse::not_found("check not found"),
+        Err(e) => {
+            tracing::error!("[synthetics] get_synthetic: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
+        }
     }
 }
 
@@ -531,44 +461,34 @@ pub async fn update_synthetic(
     Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &id,
+        &org_id,
+        &user_email.user_id,
+        "synthetics",
+        "PUT",
+        _folder_query.folder.as_deref(),
+        false,
+        true,
+        false,
+    )
+    .await
     {
-        if !check_permissions(
-            &id,
-            &org_id,
-            &user_email.user_id,
-            "synthetics",
-            "PUT",
-            _folder_query.folder.as_deref(),
-            false,
-            true,
-            false,
-        )
-        .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
-        match o2_enterprise::enterprise::synthetics::service::update_synthetic(&org_id, &id, body)
-            .await
-        {
-            Ok(check) => MetaHttpResponse::json(check),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.starts_with("validation: ") {
-                    return MetaHttpResponse::bad_request(msg);
-                }
-                if msg.contains("not found") {
-                    return MetaHttpResponse::not_found(msg);
-                }
-                tracing::error!("[synthetics] update_synthetic: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                    .into_response()
-            }
-        }
+        return MetaHttpResponse::forbidden("Forbidden");
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id, body);
-        MetaHttpResponse::forbidden("Not Supported")
+    match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
+        Ok(check) => MetaHttpResponse::json(check),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.starts_with("validation: ") {
+                return MetaHttpResponse::bad_request(msg);
+            }
+            if msg.contains("not found") {
+                return MetaHttpResponse::not_found(msg);
+            }
+            tracing::error!("[synthetics] update_synthetic: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
+        }
     }
 }
 
@@ -597,36 +517,29 @@ pub async fn delete_synthetic(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &id,
+        &org_id,
+        &user_email.user_id,
+        "synthetics",
+        "DELETE",
+        _folder_query.folder.as_deref(),
+        false,
+        true,
+        false,
+    )
+    .await
     {
-        if !check_permissions(
-            &id,
-            &org_id,
-            &user_email.user_id,
-            "synthetics",
-            "DELETE",
-            _folder_query.folder.as_deref(),
-            false,
-            true,
-            false,
-        )
-        .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
-        match o2_enterprise::enterprise::synthetics::service::delete_synthetic(&org_id, &id).await {
-            Ok(true) => MetaHttpResponse::ok("check deleted"),
-            Ok(false) => MetaHttpResponse::not_found("check not found"),
-            Err(e) => {
-                tracing::error!("[synthetics] delete_synthetic: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
-        }
+        return MetaHttpResponse::forbidden("Forbidden");
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id);
-        MetaHttpResponse::forbidden("Not Supported")
+    match openobserve_synthetics::service::delete_synthetic(&org_id, &id).await {
+        Ok(true) => MetaHttpResponse::ok("check deleted"),
+        Ok(false) => MetaHttpResponse::not_found("check not found"),
+        Err(e) => {
+            tracing::error!("[synthetics] delete_synthetic: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
+        }
     }
 }
 
@@ -653,27 +566,19 @@ pub async fn delete_synthetics_bulk(
     Query(_folder_query): Query<FolderQuery>,
     Json(body): Json<BulkDeleteSyntheticsRequestBody>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
+    match openobserve_synthetics::service::delete_synthetics_bulk(
+        &org_id,
+        &body.ids,
+        _folder_query.folder.as_deref(),
+    )
+    .await
     {
-        match o2_enterprise::enterprise::synthetics::service::delete_synthetics_bulk(
-            &org_id,
-            &body.ids,
-            _folder_query.folder.as_deref(),
-        )
-        .await
-        {
-            Ok(_) => MetaHttpResponse::ok("checks deleted"),
-            Err(e) => {
-                tracing::error!("[synthetics] delete_synthetics_bulk: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+        Ok(_) => MetaHttpResponse::ok("checks deleted"),
+        Err(e) => {
+            tracing::error!("[synthetics] delete_synthetics_bulk: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, body);
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -701,49 +606,42 @@ pub async fn move_synthetics(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<MoveSyntheticsRequestBody>,
 ) -> Response {
+    // RBAC: moving a check is a write — require PUT on each check being
+    // moved (same shape get_synthetic/update use). Mirrors alerts'
+    // move_to_folder check; without it a List+Delete-only role could move
+    // checks between folders. The move route is bypass:true, so this
+    // in-handler check is the only gate.
     #[cfg(feature = "enterprise")]
-    {
-        // RBAC: moving a check is a write — require PUT on each check being
-        // moved (same shape get_synthetic/update use). Mirrors alerts'
-        // move_to_folder check; without it a List+Delete-only role could move
-        // checks between folders. The move route is bypass:true, so this
-        // in-handler check is the only gate.
-        for id in &body.synthetic_ids {
-            if !check_permissions(
-                id,
-                &org_id,
-                &user_email.user_id,
-                "synthetics",
-                "PUT",
-                None,
-                false,
-                true,
-                false,
-            )
-            .await
-            {
-                return MetaHttpResponse::forbidden("Forbidden");
-            }
-        }
-        match o2_enterprise::enterprise::synthetics::service::move_synthetics(
+    for id in &body.synthetic_ids {
+        if !check_permissions(
+            id,
             &org_id,
-            &body.synthetic_ids,
-            &body.dst_folder_id,
+            &user_email.user_id,
+            "synthetics",
+            "PUT",
+            None,
+            false,
+            true,
+            false,
         )
         .await
         {
-            Ok(_) => MetaHttpResponse::ok("checks moved"),
-            Err(e) => {
-                tracing::error!("[synthetics] move_synthetics: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            return MetaHttpResponse::forbidden("Forbidden");
         }
     }
-    #[cfg(not(feature = "enterprise"))]
+    match openobserve_synthetics::service::move_synthetics(
+        &org_id,
+        &body.synthetic_ids,
+        &body.dst_folder_id,
+    )
+    .await
     {
-        let _ = (org_id, body);
-        MetaHttpResponse::forbidden("Not Supported")
+        Ok(_) => MetaHttpResponse::ok("checks moved"),
+        Err(e) => {
+            tracing::error!("[synthetics] move_synthetics: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
+        }
     }
 }
 
@@ -773,48 +671,37 @@ pub async fn set_synthetic_enabled(
     Json(body): Json<serde_json::Value>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &id,
+        &org_id,
+        &user_email.user_id,
+        "synthetics",
+        "PUT",
+        None,
+        false,
+        true,
+        false,
+    )
+    .await
     {
-        if !check_permissions(
-            &id,
-            &org_id,
-            &user_email.user_id,
-            "synthetics",
-            "PUT",
-            None,
-            false,
-            true,
-            false,
-        )
-        .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
-        let enabled = match body.get("enabled").and_then(|v| v.as_bool()) {
-            Some(v) => v,
-            None => return MetaHttpResponse::bad_request("missing boolean field 'enabled'"),
-        };
-        match o2_enterprise::enterprise::synthetics::service::set_synthetic_enabled(
-            &org_id, &id, enabled,
-        )
-        .await
-        {
-            Ok(true) => MetaHttpResponse::ok(if enabled {
-                "check enabled"
-            } else {
-                "check paused"
-            }),
-            Ok(false) => MetaHttpResponse::not_found("check not found"),
-            Err(e) => {
-                tracing::error!("[synthetics] set_synthetic_enabled: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
-        }
+        return MetaHttpResponse::forbidden("Forbidden");
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id, body);
-        MetaHttpResponse::forbidden("Not Supported")
+    let enabled = match body.get("enabled").and_then(|v| v.as_bool()) {
+        Some(v) => v,
+        None => return MetaHttpResponse::bad_request("missing boolean field 'enabled'"),
+    };
+    match openobserve_synthetics::service::set_synthetic_enabled(&org_id, &id, enabled).await {
+        Ok(true) => MetaHttpResponse::ok(if enabled {
+            "check enabled"
+        } else {
+            "check paused"
+        }),
+        Ok(false) => MetaHttpResponse::not_found("check not found"),
+        Err(e) => {
+            tracing::error!("[synthetics] set_synthetic_enabled: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
+        }
     }
 }
 
@@ -841,40 +728,31 @@ pub async fn run_synthetic_now(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &id,
+        &org_id,
+        &user_email.user_id,
+        "synthetics",
+        "PUT",
+        None,
+        false,
+        true,
+        false,
+    )
+    .await
     {
-        if !check_permissions(
-            &id,
-            &org_id,
-            &user_email.user_id,
-            "synthetics",
-            "PUT",
-            None,
-            false,
-            true,
-            false,
-        )
-        .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
-        match o2_enterprise::enterprise::synthetics::service::run_synthetic_now(&org_id, &id).await
-        {
-            Ok(()) => (StatusCode::ACCEPTED, "").into_response(),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("not found") {
-                    return MetaHttpResponse::not_found(msg);
-                }
-                tracing::error!("[synthetics] run_synthetic_now: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                    .into_response()
-            }
-        }
+        return MetaHttpResponse::forbidden("Forbidden");
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id);
-        MetaHttpResponse::forbidden("Not Supported")
+    match openobserve_synthetics::service::run_synthetic_now(&org_id, &id).await {
+        Ok(()) => (StatusCode::ACCEPTED, "").into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("not found") {
+                return MetaHttpResponse::not_found(msg);
+            }
+            tracing::error!("[synthetics] run_synthetic_now: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
+        }
     }
 }
 
@@ -903,40 +781,29 @@ pub async fn job_resolve(
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Err(resp) = authorize_probe(&headers, &org_id).await {
-            return resp;
-        }
-        let req = match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::job_api::ResolveRequest,
-        >(body)
-        {
-            Ok(r) => r,
-            Err(e) => {
-                return MetaHttpResponse::bad_request(e.to_string());
-            }
-        };
-        match o2_enterprise::enterprise::synthetics::job_api::resolve(req, &org_id).await {
-            Ok(resp) => MetaHttpResponse::json(resp),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.starts_with("forbidden") {
-                    return MetaHttpResponse::forbidden(msg);
-                }
-                if msg.contains("not found") {
-                    return MetaHttpResponse::not_found(msg);
-                }
-                tracing::error!("[synthetics] job_resolve: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                    .into_response()
-            }
-        }
+    if let Err(resp) = authorize_probe(&headers, &org_id).await {
+        return resp;
     }
-    #[cfg(not(feature = "enterprise"))]
+    let req = match serde_json::from_value::<openobserve_synthetics::job_api::ResolveRequest>(body)
     {
-        let _ = (org_id, headers, body);
-        MetaHttpResponse::forbidden("Not Supported")
+        Ok(r) => r,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(e.to_string());
+        }
+    };
+    match openobserve_synthetics::job_api::resolve(req, &org_id).await {
+        Ok(resp) => MetaHttpResponse::json(resp),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.starts_with("forbidden") {
+                return MetaHttpResponse::forbidden(msg);
+            }
+            if msg.contains("not found") {
+                return MetaHttpResponse::not_found(msg);
+            }
+            tracing::error!("[synthetics] job_resolve: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
+        }
     }
 }
 
@@ -1018,85 +885,255 @@ pub async fn job_ack(
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_enterprise::enterprise::synthetics::job_api::{AckBatchRequest, AckRequest};
+    use openobserve_synthetics::job_api::{AckBatchRequest, AckRequest};
 
-        if let Err(resp) = authorize_probe(&headers, &org_id).await {
-            return resp;
-        }
+    if let Err(resp) = authorize_probe(&headers, &org_id).await {
+        return resp;
+    }
 
-        // Batch of rich acks: {"acks": [{...}, ...]}. Cadence is the sender's
-        // choice — browser probe acks per execution (array of one), protocol
-        // agents accumulate per lease cycle. The bare single-job shape stays
-        // accepted for compatibility.
-        if body.get("acks").is_some() {
-            let req = match serde_json::from_value::<AckBatchRequest>(body) {
-                Ok(r) => r,
-                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
-            };
-            let mut results = Vec::with_capacity(req.acks.len());
-            for ack in req.acks {
-                let job_id = ack.job_id.clone();
-                match process_ack(ack, &org_id).await {
-                    Ok(resp) => results.push(serde_json::json!({
+    // Batch of rich acks: {"acks": [{...}, ...]}. Cadence is the sender's
+    // choice — browser probe acks per execution (array of one), protocol
+    // agents accumulate per lease cycle. The bare single-job shape stays
+    // accepted for compatibility.
+    if body.get("acks").is_some() {
+        let req = match serde_json::from_value::<AckBatchRequest>(body) {
+            Ok(r) => r,
+            Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+        };
+        let mut results = Vec::with_capacity(req.acks.len());
+        // One send for the WHOLE batch: `report_usage` spawns a task per call.
+        let mut usage = Vec::new();
+        for ack in req.acks {
+            let job_id = ack.job_id.clone();
+            match process_ack(ack, &org_id).await {
+                Ok(mut resp) => {
+                    usage.append(&mut resp.usage_events);
+                    results.push(serde_json::json!({
                         "job_id": job_id,
                         "ok": true,
                         "run_complete": resp.run_complete,
-                    })),
-                    Err(e) => {
-                        tracing::error!(job_id = %job_id, "[synthetics] job_ack: {e}");
-                        results.push(serde_json::json!({
-                            "job_id": job_id,
-                            "ok": false,
-                            "error": e.to_string(),
-                        }));
-                    }
+                    }));
+                }
+                Err(e) => {
+                    // No response, so no events: `ack_complete` is what
+                    // authorises a bill (spec §4.1 step 3c).
+                    tracing::error!(job_id = %job_id, "[synthetics] job_ack: {e}");
+                    results.push(serde_json::json!({
+                        "job_id": job_id,
+                        "ok": false,
+                        "error": e.to_string(),
+                    }));
                 }
             }
-            return MetaHttpResponse::json(serde_json::json!({ "results": results }));
         }
-
-        let req = match serde_json::from_value::<AckRequest>(body) {
-            Ok(r) => r,
-            Err(e) => {
-                return MetaHttpResponse::bad_request(e.to_string());
-            }
-        };
-        match process_ack(req, &org_id).await {
-            Ok(resp) => MetaHttpResponse::json(resp),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.starts_with("forbidden") {
-                    return MetaHttpResponse::forbidden(msg);
-                }
-                tracing::error!("[synthetics] job_ack: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                    .into_response()
-            }
-        }
+        report_step_usage(usage);
+        return MetaHttpResponse::json(serde_json::json!({ "results": results }));
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, headers, body);
-        MetaHttpResponse::forbidden("Not Supported")
+
+    let req = match serde_json::from_value::<AckRequest>(body) {
+        Ok(r) => r,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(e.to_string());
+        }
+    };
+    match process_ack(req, &org_id).await {
+        Ok(mut resp) => {
+            report_step_usage(std::mem::take(&mut resp.usage_events));
+            MetaHttpResponse::json(resp)
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.starts_with("forbidden") {
+                return MetaHttpResponse::forbidden(msg);
+            }
+            tracing::error!("[synthetics] job_ack: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
+        }
     }
 }
 
-/// Runs one job ack through the enterprise service plus the per-ack side
-/// effects (telemetry, run-complete notification). Shared by the single and
-/// batch forms of `job_ack`.
-#[cfg(feature = "enterprise")]
+/// Emits the synthetics step-billing usage rows an ack produced — SPEC §4.1
+/// step 3g.
+///
+/// Deliberately NOT a `OnceCell` callback from `openobserve_synthetics::init()`:
+/// `init()` runs only under `if LOCAL_NODE.is_scheduler()` while acks are served
+/// on API nodes, so the cell would be unset and the emit silently do nothing (F6).
+///
+/// Fail-open: `report_usage` spawns and returns, and a probe that did its work
+/// is owed its 200 whether or not the usage queue accepted the row.
+///
+/// Deliberately branchless — an empty-vector early return is unreachable from a
+/// unit test, so a mutation turning it into "never send" survived once here.
+fn report_step_usage(usage: Vec<config::meta::self_reporting::usage::UsageData>) {
+    record_step_usage_metrics(&usage);
+    usage_reporting::report_usage(usage);
+}
+
+/// SPEC §9B.1 rows 1-5 — the Prometheus half of the step-billing signals.
+///
+/// A deliberate SECOND copy of four numbers the usage stream already carries
+/// (the stream stays the invoice's source of truth). `report_usage` returns
+/// `()`, so comparing this counter against the stream is the only thing that
+/// detects the fire-and-forget path losing rows; a counter at zero means nothing
+/// reached this function at all.
+///
+/// It cannot see failures AFTER the hand-off — a queue rejecting every row still
+/// advances it. Those are `zo_usage_enqueue_failures_total`, counted in
+/// `usage_reporting::publish_usage`, which does get a `Result` back.
+fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::UsageData]) {
+    use config::meta::self_reporting::usage::UsageEvent;
+
+    for row in usage {
+        // `size` is the count itself (§4.2), `f64` on the wire against a `u64`
+        // counter. Every producer today is a widened `u32`/`u64`, so the floor
+        // guards a future negative one, not a case that fires now.
+        let size = if row.size > 0.0 { row.size as u64 } else { 0 };
+        match row.event {
+            // All five step events share a counter, labelled by event: §4.3's
+            // `executed / defined` ratio is then one PromQL division.
+            UsageEvent::SyntheticsBrowserSteps
+            | UsageEvent::SyntheticsProtocolSteps
+            | UsageEvent::SyntheticsFreeBrowserSteps
+            | UsageEvent::SyntheticsFreeProtocolSteps
+            | UsageEvent::_SyntheticsStepsDefined => {
+                config::metrics::SYNTHETICS_STEPS_TOTAL
+                    .with_label_values(&[row.org_id.as_str(), row.event.to_string().as_str()])
+                    .inc_by(size);
+            }
+            // Milliseconds, so its own counter — see the metric's own note.
+            UsageEvent::_SyntheticsBrowserMs => {
+                config::metrics::SYNTHETICS_BROWSER_MS_TOTAL
+                    .with_label_values(&[row.org_id.as_str()])
+                    .inc_by(size);
+            }
+            // Other dimensions' rows travel through the shared usage type. The
+            // catch-all does mean a SIXTH synthetics event would be silently
+            // uncounted until added above.
+            _ => {}
+        }
+    }
+}
+
+/// The org's one-time free step grant as it stands right now — SPEC §6.1, item
+/// 2.3. Handed to `job_api::ack`, which decides §4.2's free/billable split.
+///
+/// Ordering matters: the `customer_billings` read (the only way to spot an
+/// ExternalContract org, which §7.3 says to never pool-gate) is issued ONLY while
+/// the org still has grant left, so past that a request costs one counter read.
+#[cfg(feature = "cloud")]
+async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolViews {
+    // Both grants: this runs before `ack` reads the row that says which one the
+    // job spends from. Two in-memory counter reads, not two DB round trips.
+    let browser = openobserve_core::trial_quota::synthetics_steps_remaining(org_id, true);
+    let protocol = openobserve_core::trial_quota::synthetics_steps_remaining(org_id, false);
+    // Each grant decides for itself — summing would report an org whose browser
+    // pool is spent as still funded, and bill its browser steps as free.
+    //
+    // `> 0` first: a spent grant is billable whatever the plan says, so the
+    // `customer_billings` read is skipped once BOTH are gone.
+    let is_contract = (browser > 0 || protocol > 0)
+        && o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+            org_id,
+        )
+        .await
+        .requires_additional_credits();
+    openobserve_synthetics::job_api::StepPoolViews {
+        browser: step_pool_view(browser, is_contract),
+        protocol: step_pool_view(protocol, is_contract),
+    }
+}
+
+/// SPEC §6.1 / §7.3 — the free/billable decision for one ack, as arithmetic.
+#[cfg(feature = "cloud")]
+fn step_pool_view(
+    remaining: u64,
+    is_contract: bool,
+) -> openobserve_synthetics::job_api::StepPoolView {
+    use openobserve_synthetics::job_api::StepPoolView;
+
+    if remaining == 0 {
+        // §7.3, E16/T31 — grant gone, so metered overage. A Free org never got
+        // here; its slot was skipped at the enqueue.
+        return StepPoolView::Spent;
+    }
+    if is_contract {
+        // §7.3, E18/T36 — *"never pool-gate"*. §7.4 needs the ack billable so
+        // the NoOp provider advances a step-denominated true-up.
+        return StepPoolView::NotApplicable;
+    }
+    StepPoolView::Funded
+}
+
+/// §8.1: a build without `cloud` has no pool, so every ack is `NotApplicable`.
+#[cfg(not(feature = "cloud"))]
+async fn resolve_step_pool(_org_id: &str) -> openobserve_synthetics::job_api::StepPoolViews {
+    openobserve_synthetics::job_api::StepPoolViews::uniform(
+        openobserve_synthetics::job_api::StepPoolView::NotApplicable,
+    )
+}
+
+/// Applies the free-pool movement one ack owes — SPEC §6.3, item 2.3.
+///
+/// Idempotent on `(synthetics_id, location, scheduled_ts, job_id)`, which
+/// `job_api` built into `idempotency_key`. A refund saturates and a top-up is
+/// NEVER refused (E14) — enforcement belongs at the next enqueue.
+#[cfg(feature = "cloud")]
+fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
+    let Some(adjustment) = resp.pool_adjustment.as_ref() else {
+        return;
+    };
+    openobserve_core::trial_quota::synthetics_steps_adjust(
+        &adjustment.org_id,
+        adjustment.is_browser,
+        core_movement(adjustment.movement),
+        &adjustment.idempotency_key,
+    );
+}
+
+/// Translate `openobserve-synthetics`'s movement into the pool's own. No
+/// compiler checks that this maps the two directions the right way round;
+/// inverted, every refund becomes a second charge against a one-time grant the
+/// org can never get back.
+#[cfg(feature = "cloud")]
+fn core_movement(
+    movement: openobserve_synthetics::job_api::PoolMovement,
+) -> openobserve_core::trial_quota::PoolAdjustment {
+    use openobserve_synthetics::job_api::StepPoolDirection;
+
+    match movement.direction {
+        StepPoolDirection::Refund => {
+            openobserve_core::trial_quota::PoolAdjustment::Refund(movement.steps)
+        }
+        StepPoolDirection::TopUp => {
+            openobserve_core::trial_quota::PoolAdjustment::TopUp(movement.steps)
+        }
+    }
+}
+
+/// §8.1: no pool on this build, so nothing to apply.
+#[cfg(not(feature = "cloud"))]
+fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
+    let _ = resp;
+}
+
+/// Runs one job ack through the enterprise service plus the per-ack side effects
+/// (telemetry, run-complete notification). Shared by both forms of `job_ack`.
 async fn process_ack(
-    req: o2_enterprise::enterprise::synthetics::job_api::AckRequest,
+    req: openobserve_synthetics::job_api::AckRequest,
     token_org: &str,
-) -> anyhow::Result<o2_enterprise::enterprise::synthetics::job_api::AckResponse> {
+) -> anyhow::Result<openobserve_synthetics::job_api::AckResponse> {
     let status = req.status.clone();
     let response_time_ms = req.response_time_ms;
     let error = req.error.clone();
     let checked_at = config::utils::time::now_micros();
 
-    let resp = o2_enterprise::enterprise::synthetics::job_api::ack(req, token_org).await?;
+    let resp =
+        openobserve_synthetics::job_api::ack(req, token_org, resolve_step_pool(token_org).await)
+            .await?;
+
+    // SPEC §4.1 step 3h / §6.3, item 2.3 — the free-pool reconcile. Returned as
+    // data for the reason `report_step_usage` gives for the usage rows.
+    apply_pool_adjustment(&resp);
 
     // Emit trigger usage record for synthetics telemetry.
     usage_reporting::publish_triggers_usage(config::meta::self_reporting::usage::TriggerData {
@@ -1118,13 +1155,23 @@ async fn process_ack(
     // every completed run that had a destination, which is why `alert_if_fails:
     // 3` alerted on the first failure and a 30-minute cooldown sent thirty
     // notifications.
-    use o2_enterprise::enterprise::synthetics::job_api::AlertDecision;
+    #[cfg(feature = "enterprise")]
+    use openobserve_synthetics::job_api::AlertDecision;
+    #[cfg(feature = "enterprise")]
     let recovery = matches!(resp.alert, AlertDecision::Recovered);
+    #[cfg(feature = "enterprise")]
     let flaky = matches!(resp.alert, AlertDecision::Flaky);
     // A degrading target is `warning` on every run for as long as the condition
     // lasts, so this one is throttled by transition upstream, not by cooldown.
+    #[cfg(feature = "enterprise")]
     let degraded = matches!(resp.alert, AlertDecision::Degraded);
+    #[cfg(feature = "enterprise")]
     let should_notify = !matches!(resp.alert, AlertDecision::Silent);
+    // Enterprise-gated because alert *destinations* are: the dispatch it ends in
+    // (`alerts::alert::dispatch_notification`) is not built in OSS. An OSS build
+    // runs the check, records the run and serves the result — it just has
+    // nowhere to send a notification, exactly as it has for alerts.
+    #[cfg(feature = "enterprise")]
     if should_notify && !resp.destinations.is_empty() {
         let notification = openobserve_core::synthetics::CheckNotification {
             org_id: resp.org_id.clone(),
@@ -1158,7 +1205,6 @@ async fn process_ack(
 /// Resolves the org owning the `o2syn_` token in a Basic Authorization header.
 /// The auth middleware has already validated the token; this recovers the org
 /// for scoping, which the middleware does not propagate on probe paths.
-#[cfg(feature = "enterprise")]
 async fn probe_token_org(headers: &axum::http::HeaderMap) -> Option<String> {
     let auth = headers
         .get(axum::http::header::AUTHORIZATION)?
@@ -1195,7 +1241,6 @@ async fn probe_token_id(headers: &axum::http::HeaderMap) -> Option<String> {
 /// token org matches, Err(response) otherwise — this is the tenant boundary for
 /// every probe-facing route (the org in the URL, the token's org, and the
 /// job's org must all agree; the service layer enforces the last leg).
-#[cfg(feature = "enterprise")]
 async fn authorize_probe(headers: &axum::http::HeaderMap, org_id: &str) -> Result<(), Response> {
     match probe_token_org(headers).await {
         Some(token_org) if token_org == org_id => Ok(()),
@@ -1314,7 +1359,6 @@ pub async fn agent_heartbeat(
 // ── Locations CRUD ────────────────────────────────────────────────────────────
 
 /// Maps a location service error onto the right HTTP status.
-#[cfg(feature = "enterprise")]
 fn location_error_response(e: anyhow::Error) -> Response {
     let msg = e.to_string();
     if msg.starts_with("validation:") {
@@ -1347,56 +1391,46 @@ fn location_error_response(e: anyhow::Error) -> Response {
 )]
 pub async fn create_location(
     Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_enterprise::enterprise::synthetics::service::{
-            CreateLocationRequest, create_location,
-        };
+    use openobserve_synthetics::service::{CreateLocationRequest, create_location};
 
-        let is_root = db::user::is_root_user(&user_email.user_id);
+    let is_root = db::user::is_root_user(&user_email.user_id);
 
-        // Batch shape: {"locations": [{...}, ...]} → per-item results, same
-        // pattern as batch acks. Single-object shape stays unchanged.
-        if body.get("locations").is_some() {
-            #[derive(serde::Deserialize)]
-            struct Batch {
-                locations: Vec<CreateLocationRequest>,
-            }
-            let batch = match serde_json::from_value::<Batch>(body) {
-                Ok(b) => b,
-                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
-            };
-            let mut results = Vec::with_capacity(batch.locations.len());
-            for req in batch.locations {
-                let label = req.label.clone();
-                match create_location(&org_id, is_root, req).await {
-                    Ok(resp) => results.push(serde_json::json!({
-                        "id": resp.location.id, "pool": resp.location.pool, "ok": true,
-                    })),
-                    Err(e) => results.push(serde_json::json!({
-                        "label": label, "ok": false, "error": e.to_string(),
-                    })),
-                }
-            }
-            return MetaHttpResponse::json(serde_json::json!({ "results": results }));
+    // Batch shape: {"locations": [{...}, ...]} → per-item results, same
+    // pattern as batch acks. Single-object shape stays unchanged.
+    if body.get("locations").is_some() {
+        #[derive(serde::Deserialize)]
+        struct Batch {
+            locations: Vec<CreateLocationRequest>,
         }
-
-        let req = match serde_json::from_value::<CreateLocationRequest>(body) {
-            Ok(r) => r,
+        let batch = match serde_json::from_value::<Batch>(body) {
+            Ok(b) => b,
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         };
-        match create_location(&org_id, is_root, req).await {
-            Ok(loc) => MetaHttpResponse::json(loc),
-            Err(e) => location_error_response(e),
+        let mut results = Vec::with_capacity(batch.locations.len());
+        for req in batch.locations {
+            let label = req.label.clone();
+            match create_location(&org_id, is_root, req).await {
+                Ok(resp) => results.push(serde_json::json!({
+                    "id": resp.location.id, "pool": resp.location.pool, "ok": true,
+                })),
+                Err(e) => results.push(serde_json::json!({
+                    "label": label, "ok": false, "error": e.to_string(),
+                })),
+            }
         }
+        return MetaHttpResponse::json(serde_json::json!({ "results": results }));
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, body);
-        MetaHttpResponse::forbidden("Not Supported")
+
+    let req = match serde_json::from_value::<CreateLocationRequest>(body) {
+        Ok(r) => r,
+        Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+    };
+    match create_location(&org_id, is_root, req).await {
+        Ok(loc) => MetaHttpResponse::json(loc),
+        Err(e) => location_error_response(e),
     }
 }
 
@@ -1475,21 +1509,13 @@ pub struct SetAgentTokenEnabledRequest {
     ),
 )]
 pub async fn list_agent_tokens(Path(org_id): Path<String>) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        match o2_enterprise::enterprise::synthetics::service::list_agent_tokens(&org_id).await {
-            Ok(tokens) => MetaHttpResponse::json(serde_json::json!({ "tokens": tokens })),
-            Err(e) => {
-                tracing::error!("[synthetics] list_agent_tokens: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+    match openobserve_synthetics::service::list_agent_tokens(&org_id).await {
+        Ok(tokens) => MetaHttpResponse::json(serde_json::json!({ "tokens": tokens })),
+        Err(e) => {
+            tracing::error!("[synthetics] list_agent_tokens: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = org_id;
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -1511,37 +1537,28 @@ pub async fn list_agent_tokens(Path(org_id): Path<String>) -> Response {
 )]
 pub async fn create_agent_token(
     Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<CreateAgentTokenRequest>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
+    match openobserve_synthetics::service::create_agent_token(
+        &org_id,
+        &body.name,
+        &user_email.user_id,
+    )
+    .await
     {
-        match o2_enterprise::enterprise::synthetics::service::create_agent_token(
-            &org_id,
-            &body.name,
-            &user_email.user_id,
-        )
-        .await
-        {
-            Ok(secret) => MetaHttpResponse::json(secret),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("already exists")
-                    || msg.contains("reserved")
-                    || msg.contains("required")
-                {
-                    return MetaHttpResponse::bad_request(msg);
-                }
-                tracing::error!("[synthetics] create_agent_token: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                    .into_response()
+        Ok(secret) => MetaHttpResponse::json(secret),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("already exists")
+                || msg.contains("reserved")
+                || msg.contains("required")
+            {
+                return MetaHttpResponse::bad_request(msg);
             }
+            tracing::error!("[synthetics] create_agent_token: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, body);
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -1563,34 +1580,25 @@ pub async fn create_agent_token(
 )]
 pub async fn rotate_agent_token(
     Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<RotateAgentTokenRequest>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
+    match openobserve_synthetics::service::rotate_agent_token(
+        &org_id,
+        body.name,
+        &user_email.user_id,
+    )
+    .await
     {
-        match o2_enterprise::enterprise::synthetics::service::rotate_agent_token(
-            &org_id,
-            body.name,
-            &user_email.user_id,
-        )
-        .await
-        {
-            Ok(secret) => MetaHttpResponse::json(secret),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("already exists") {
-                    return MetaHttpResponse::bad_request(msg);
-                }
-                tracing::error!("[synthetics] rotate_agent_token: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                    .into_response()
+        Ok(secret) => MetaHttpResponse::json(secret),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("already exists") {
+                return MetaHttpResponse::bad_request(msg);
             }
+            tracing::error!("[synthetics] rotate_agent_token: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, body);
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -1618,35 +1626,23 @@ pub async fn set_agent_token_enabled(
     Path((org_id, name)): Path<(String, String)>,
     Json(body): Json<SetAgentTokenEnabledRequest>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        match o2_enterprise::enterprise::synthetics::service::set_agent_token_enabled(
-            &org_id,
-            &name,
-            body.enabled,
-        )
+    match openobserve_synthetics::service::set_agent_token_enabled(&org_id, &name, body.enabled)
         .await
-        {
-            Ok(()) => {
-                let state = if body.enabled { "enabled" } else { "disabled" };
-                MetaHttpResponse::json(serde_json::json!({
-                    "message": format!("Token {state} successfully")
-                }))
-            }
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("not found") {
-                    MetaHttpResponse::not_found(msg)
-                } else {
-                    MetaHttpResponse::bad_request(msg)
-                }
+    {
+        Ok(()) => {
+            let state = if body.enabled { "enabled" } else { "disabled" };
+            MetaHttpResponse::json(serde_json::json!({
+                "message": format!("Token {state} successfully")
+            }))
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("not found") {
+                MetaHttpResponse::not_found(msg)
+            } else {
+                MetaHttpResponse::bad_request(msg)
             }
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, name, body);
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -1668,25 +1664,16 @@ pub async fn set_agent_token_enabled(
     ),
 )]
 pub async fn get_location(Path((org_id, id)): Path<(String, String)>) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        match o2_enterprise::enterprise::synthetics::service::location_detail(&org_id, &id).await {
-            Ok(detail) => MetaHttpResponse::json(detail),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("not found") {
-                    return MetaHttpResponse::not_found(msg);
-                }
-                tracing::error!("[synthetics] get_location: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                    .into_response()
+    match openobserve_synthetics::service::location_detail(&org_id, &id).await {
+        Ok(detail) => MetaHttpResponse::json(detail),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("not found") {
+                return MetaHttpResponse::not_found(msg);
             }
+            tracing::error!("[synthetics] get_location: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
         }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id);
-        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
@@ -1711,32 +1698,19 @@ pub async fn get_location(Path((org_id, id)): Path<(String, String)>) -> Respons
 )]
 pub async fn update_location(
     Path((org_id, id)): Path<(String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        let is_root = db::user::is_root_user(&user_email.user_id);
-        let req = match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::service::UpdateLocationRequest,
-        >(body)
-        {
-            Ok(r) => r,
-            Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
-        };
-        match o2_enterprise::enterprise::synthetics::service::update_location(
-            &org_id, is_root, &id, req,
-        )
-        .await
-        {
-            Ok(loc) => MetaHttpResponse::json(loc),
-            Err(e) => location_error_response(e),
-        }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id, body);
-        MetaHttpResponse::forbidden("Not Supported")
+    let is_root = db::user::is_root_user(&user_email.user_id);
+    let req = match serde_json::from_value::<openobserve_synthetics::service::UpdateLocationRequest>(
+        body,
+    ) {
+        Ok(r) => r,
+        Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+    };
+    match openobserve_synthetics::service::update_location(&org_id, is_root, &id, req).await {
+        Ok(loc) => MetaHttpResponse::json(loc),
+        Err(e) => location_error_response(e),
     }
 }
 
@@ -1761,22 +1735,12 @@ pub async fn update_location(
 )]
 pub async fn delete_location(
     Path((org_id, id)): Path<(String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        let is_root = db::user::is_root_user(&user_email.user_id);
-        match o2_enterprise::enterprise::synthetics::service::delete_location(&org_id, is_root, &id)
-            .await
-        {
-            Ok(()) => MetaHttpResponse::json(serde_json::json!({"deleted": true})),
-            Err(e) => location_error_response(e),
-        }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, id);
-        MetaHttpResponse::forbidden("Not Supported")
+    let is_root = db::user::is_root_user(&user_email.user_id);
+    match openobserve_synthetics::service::delete_location(&org_id, is_root, &id).await {
+        Ok(()) => MetaHttpResponse::json(serde_json::json!({"deleted": true})),
+        Err(e) => location_error_response(e),
     }
 }
 
@@ -1796,21 +1760,380 @@ pub async fn delete_location(
     ),
 )]
 pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        match o2_enterprise::enterprise::synthetics::service::list_locations_for_org(&_org_id).await
-        {
-            Ok(capabilities) => MetaHttpResponse::json(capabilities),
-            Err(e) => {
-                tracing::error!("[synthetics] list_locations: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+    match openobserve_synthetics::service::list_locations_for_org(&_org_id).await {
+        Ok(capabilities) => MetaHttpResponse::json(capabilities),
+        Err(e) => {
+            tracing::error!("[synthetics] list_locations: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
         }
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = _org_id;
-        MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::self_reporting::usage::{UsageData, UsageEvent};
+    use openobserve_synthetics::job_api::{AckResponse, AlertDecision};
+
+    fn ack_response(usage_events: Vec<UsageData>) -> AckResponse {
+        AckResponse {
+            run_complete: false,
+            run_status: None,
+            job_count: 1,
+            org_id: "acme".to_string(),
+            job_id: "job_1".to_string(),
+            run_id: "run_1".to_string(),
+            synthetics_id: "chk_1".to_string(),
+            synthetics_name: "checkout".to_string(),
+            synthetic_type: "browser".to_string(),
+            target: "https://example.com".to_string(),
+            destinations: Vec::new(),
+            location: "us-east-1".to_string(),
+            pool: "aws-browser".to_string(),
+            trigger_type: "scheduled".to_string(),
+            alert: AlertDecision::Silent,
+            status_reason: None,
+            consecutive_failures: 0,
+            failing_locations: Vec::new(),
+            passing_locations: Vec::new(),
+            usage_events,
+            pool_adjustment: None,
+        }
+    }
+
+    fn steps(size: f64) -> UsageData {
+        UsageData {
+            event: UsageEvent::SyntheticsBrowserSteps,
+            size,
+            ..UsageData::init_for_reflection()
+        }
+    }
+
+    /// SPEC §4.1 step 3g. A batch is one probe's lease cycle: every ack in it
+    /// that billed must be reported, in order, in ONE send. An ack that ERRORED
+    /// contributes nothing — it produced no `AckResponse`, and `ack_complete` is
+    /// what authorises a bill (§4.1 step 3c).
+    #[test]
+    fn a_batch_reports_the_usage_of_every_ack_in_it() {
+        let batch: Vec<anyhow::Result<AckResponse>> = vec![
+            Ok(ack_response(vec![steps(14.0), steps(14.0)])),
+            Err(anyhow::anyhow!("job not found")),
+            // A private-venue or duplicate ack: succeeded, billed nothing.
+            Ok(ack_response(Vec::new())),
+            Ok(ack_response(vec![steps(28.0)])),
+        ];
+
+        let mut usage = Vec::new();
+        for mut resp in batch.into_iter().flatten() {
+            usage.append(&mut resp.usage_events);
+        }
+
+        assert_eq!(
+            usage.iter().map(|u| u.size).collect::<Vec<_>>(),
+            vec![14.0, 14.0, 28.0],
+            "every billed ack in the batch, in order, and nothing from the errored one"
+        );
+    }
+
+    /// Every path out of the ack handler must report the usage it produced;
+    /// `report_usage` is fire-and-forget, so an unreported vector is silent lost
+    /// revenue that never even reaches the counter. Two paths exist today; this
+    /// pins that a third cannot be added without one. The needles are assembled
+    /// so this test's own source does not count towards its totals.
+    #[test]
+    fn every_ack_path_reports_the_usage_it_produced() {
+        let source = include_str!("mod.rs");
+        // One definition plus one call per path: run the ack, send its usage rows.
+        for (needle, what) in [
+            (["process", "_ack("].concat(), "runs an ack"),
+            (["report_step", "_usage("].concat(), "sends its usage rows"),
+        ] {
+            assert_eq!(
+                source.matches(&needle).count(),
+                3,
+                "one definition and exactly two call sites are expected for the step that \
+                 {what}; an ack path is missing it, or a third path was added"
+            );
+        }
+
+        // And the send itself, the one line here a unit test cannot reach:
+        // emptying that body is a silent "never meter anything".
+        assert_eq!(
+            source
+                .matches(&["usage_reporting::report", "_usage("].concat())
+                .count(),
+            1,
+            "the hand-off to the usage queue is gone; nothing is metered"
+        );
+    }
+
+    // SPEC §9B.1 rows 1-5. Deterministic without a mutex: these counters are
+    // labelled per org, so each test reads back only the label values it wrote.
+
+    /// The four counts one ack can carry, read back from the labelled counters.
+    fn recorded(org: &str) -> (u64, u64, u64, u64) {
+        let steps = |event: &str| {
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, event])
+                .get()
+        };
+        (
+            steps("SyntheticsBrowserSteps"),
+            steps("SyntheticsFreeBrowserSteps"),
+            steps("_SyntheticsStepsDefined"),
+            config::metrics::SYNTHETICS_BROWSER_MS_TOTAL
+                .with_label_values(&[org])
+                .get(),
+        )
+    }
+
+    /// Reached through a function pointer so these calls do not count towards
+    /// `the_emit_hand_off_counts_what_it_sends`, which counts call sites by name.
+    fn record(usage: &[UsageData]) {
+        let record_metrics: fn(&[UsageData]) = super::record_step_usage_metrics;
+        record_metrics(usage);
+    }
+
+    fn usage_row(org: &str, event: UsageEvent, size: f64) -> UsageData {
+        UsageData {
+            org_id: org.to_string(),
+            event,
+            size,
+            ..UsageData::init_for_reflection()
+        }
+    }
+
+    /// **§9B.1 rows 1, 2, 3 and 5.** Every count lands under its own label, and
+    /// under the right one.
+    ///
+    /// The three sizes differ deliberately: §4.3's `executed / defined` recorded
+    /// upside down is what two equal numbers would hide.
+    #[test]
+    fn the_emit_counters_record_each_count_under_its_own_label() {
+        let org = "o9b1-billable";
+        let before = recorded(org);
+
+        record(&[
+            usage_row(org, UsageEvent::SyntheticsBrowserSteps, 4.0),
+            usage_row(org, UsageEvent::_SyntheticsStepsDefined, 14.0),
+            usage_row(org, UsageEvent::_SyntheticsBrowserMs, 9_100.0),
+        ]);
+
+        let after = recorded(org);
+        assert_eq!(after.0 - before.0, 4, "billed steps");
+        assert_eq!(after.1 - before.1, 0, "nothing came out of the free pool");
+        assert_eq!(after.2 - before.2, 14, "defined steps");
+        assert_eq!(after.3 - before.3, 9_100, "browser milliseconds");
+    }
+
+    /// **§9B.1 row 4.** §4.2 emits exactly one step event per ack, and the free
+    /// and billable ones answer opposite questions — the invoice line versus
+    /// §6.1's grant burning down. Folded together, a free org would show as
+    /// generating revenue.
+    #[test]
+    fn free_pool_consumption_is_counted_apart_from_billable_steps() {
+        let org = "o9b1-free";
+        let before = recorded(org);
+
+        record(&[
+            usage_row(org, UsageEvent::SyntheticsFreeBrowserSteps, 28.0),
+            usage_row(org, UsageEvent::_SyntheticsStepsDefined, 28.0),
+        ]);
+
+        let after = recorded(org);
+        assert_eq!(after.0 - before.0, 0, "a free ack is not billable steps");
+        assert_eq!(after.1 - before.1, 28);
+        assert_eq!(after.2 - before.2, 28);
+    }
+
+    /// Milliseconds and steps are different units, so `browser_ms` must never
+    /// reach the step counter: dashboards sum a counter across its label values,
+    /// and here that would read as "this org executed nine thousand steps".
+    #[test]
+    fn browser_milliseconds_never_reach_the_step_counter() {
+        let org = "o9b1-units";
+        let before = recorded(org);
+
+        record(&[usage_row(org, UsageEvent::_SyntheticsBrowserMs, 9_100.0)]);
+
+        let after = recorded(org);
+        assert_eq!((after.0, after.1, after.2), (before.0, before.1, before.2));
+        // …nor under a `_SyntheticsBrowserMs` label value of the step counter,
+        // which `recorded` does not read but a dashboard summing the family does.
+        assert_eq!(
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, "_SyntheticsBrowserMs"])
+                .get(),
+            0,
+        );
+        assert_eq!(after.3 - before.3, 9_100);
+    }
+
+    /// `report_usage` is shared with every other billed dimension, so a row that
+    /// is not one of §4.2's four must contribute nothing rather than open a label
+    /// value named after it. The foreign event's OWN label value is asserted, not
+    /// just the four: reading only the four let a mutant that dropped the `match`
+    /// pass, counting every row under its own event name.
+    #[test]
+    fn a_non_synthetics_row_is_not_counted_as_steps() {
+        let org = "o9b1-foreign";
+        let before = recorded(org);
+        let foreign = |event: UsageEvent| {
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, event.to_string().as_str()])
+                .get()
+        };
+
+        record(&[
+            usage_row(org, UsageEvent::Ingestion, 1_000.0),
+            usage_row(org, UsageEvent::AiCredits, 5.0),
+        ]);
+
+        assert_eq!(
+            recorded(org),
+            before,
+            "none of the four synthetics counts moved"
+        );
+        for event in [UsageEvent::Ingestion, UsageEvent::AiCredits] {
+            assert_eq!(
+                foreign(event),
+                0,
+                "{event} opened a label value on the synthetics step counter",
+            );
+        }
+    }
+
+    /// Counting is per org — A1 asks about THIS org's drift from its own
+    /// trailing baseline, which an aggregate cannot answer.
+    #[test]
+    fn each_org_is_counted_separately() {
+        let (a, b) = ("o9b1-org-a", "o9b1-org-b");
+        let (before_a, before_b) = (recorded(a), recorded(b));
+
+        record(&[
+            usage_row(a, UsageEvent::SyntheticsBrowserSteps, 3.0),
+            usage_row(b, UsageEvent::SyntheticsBrowserSteps, 7.0),
+        ]);
+
+        assert_eq!(recorded(a).0 - before_a.0, 3);
+        assert_eq!(recorded(b).0 - before_b.0, 7);
+    }
+
+    /// SPEC §9B.1 row 8. The hand-off cannot be called from a unit test, so this
+    /// pins in source that the counting call is still there and unconditional —
+    /// deleting it fails nothing else, the Prometheus side just reads zero.
+    ///
+    /// It also pins that the hand-off stays BRANCHLESS: an empty-vector early
+    /// return is unreachable from a test, and that mutation survived once.
+    #[test]
+    fn the_emit_hand_off_counts_what_it_sends() {
+        let source = include_str!("mod.rs");
+        assert_eq!(
+            source
+                .matches(&["record_step_usage", "_metrics("].concat())
+                .count(),
+            2,
+            "one definition and exactly one call site are expected for the §9B.1 emit counter",
+        );
+
+        let body = source
+            .split_once(&["fn report_step", "_usage("].concat())
+            .expect("the emit hand-off")
+            .1;
+        let end = body.find("\n}\n").expect("end of report_step_usage");
+        let body = &body[..end];
+        assert!(
+            body.contains(&["record_step_usage", "_metrics(&usage)"].concat()),
+            "the emit counter is no longer called from the hand-off",
+        );
+        for branch in ["if ", "return", "match "] {
+            assert!(
+                !body.contains(branch),
+                "`report_step_usage` must stay branchless — a `{branch}` here is the \
+                 unreachable-branch mutation that already survived once on this path",
+            );
+        }
+    }
+
+    /// SPEC §6.1 / §7.3 — every grant state maps to exactly one answer, and the
+    /// wrong answer is invisible: `Funded` with the grant gone is free service;
+    /// `Spent`/`NotApplicable` with grant left invoices work §6.1 gave away.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn the_step_pool_view_is_spec_6_1_and_7_3() {
+        use openobserve_synthetics::job_api::StepPoolView;
+
+        use super::step_pool_view;
+
+        // The grant still has room.
+        assert_eq!(step_pool_view(1, false), StepPoolView::Funded);
+        assert_eq!(step_pool_view(10_000, false), StepPoolView::Funded);
+
+        // Spent ⇒ metered overage (E16/T31).
+        assert_eq!(step_pool_view(0, false), StepPoolView::Spent);
+
+        // A contract org with grant left is never pool-gated (E18/T36). It cannot
+        // be asked about a SPENT grant: `resolve_step_pool` short-circuits at
+        // `remaining == 0`, so `is_contract` is never computed there.
+        assert_eq!(step_pool_view(10_000, true), StepPoolView::NotApplicable);
+    }
+
+    /// No compiler checks that the two crates' directions map the right way
+    /// round; inverted, every refund becomes a second charge.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn a_refund_stays_a_refund_across_the_crate_boundary() {
+        use openobserve_synthetics::job_api::{PoolMovement, StepPoolDirection};
+
+        use super::core_movement;
+
+        assert_eq!(
+            core_movement(PoolMovement {
+                direction: StepPoolDirection::Refund,
+                steps: 10,
+            }),
+            openobserve_core::trial_quota::PoolAdjustment::Refund(10),
+        );
+        assert_eq!(
+            core_movement(PoolMovement {
+                direction: StepPoolDirection::TopUp,
+                steps: 4,
+            }),
+            openobserve_core::trial_quota::PoolAdjustment::TopUp(4),
+        );
+    }
+
+    /// The same guarantee for the OTHER half of an ack — SPEC §4.1 step 3h, §6.3.
+    ///
+    /// Under a ONE-TIME grant (§6.1) a dropped refund is a step the org never gets
+    /// back and a dropped top-up one it never pays for, silently: the ack still
+    /// returns 200 and the usage row is still written.
+    #[test]
+    fn every_ack_path_applies_the_pool_reconcile_it_computed() {
+        let source = include_str!("mod.rs");
+        // Two `cfg`-split definitions plus one call, for each half.
+        assert_eq!(
+            source.matches(&["resolve_step", "_pool("].concat()).count(),
+            3,
+            "one `cloud` definition, one non-`cloud` definition and exactly one call site are \
+             expected for the step that resolves the org's grant"
+        );
+        assert_eq!(
+            source
+                .matches(&["apply_pool", "_adjustment("].concat())
+                .count(),
+            3,
+            "one `cloud` definition, one non-`cloud` definition and exactly one call site are \
+             expected for the step that applies the movement the ack returned"
+        );
+
+        // The hand-off to the pool itself; emptying it never reconciles anything.
+        assert_eq!(
+            source
+                .matches(&["trial_quota::synthetics_steps", "_adjust("].concat())
+                .count(),
+            1,
+            "the hand-off to the free step pool is gone; no reconcile is ever applied"
+        );
     }
 }

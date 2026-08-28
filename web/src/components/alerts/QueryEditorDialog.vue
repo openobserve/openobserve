@@ -661,6 +661,7 @@ const getParser = (sqlQuery: string) => {
   const sqlUtilsContext: SqlUtilsContext = {
     parser: parser.value,
     sqlQueryErrorMsg: localSqlQueryErrorMsg,
+    t,
   };
   return getParserUtil(sqlQuery, sqlUtilsContext);
 };
@@ -725,6 +726,7 @@ const { placeholder: fullEditorPlaceholder } = useQueryPlaceholder(
   ref({}),
   isSqlModeForPlaceholder,
   noStreamForPlaceholder,
+  t,
   { noStreamText: t("pipeline.queryEditorPlaceholder") },
 );
 

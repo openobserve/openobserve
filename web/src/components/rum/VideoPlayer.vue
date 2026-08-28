@@ -491,7 +491,7 @@ const getEventTooltip = (event: any) => {
         return type.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase());
       })
       .join(", ");
-    return `⚠️ FRUSTRATION: ${frustrationLabels}\n${eventName}`;
+    return t("rum.frustrationEventTooltip", { types: frustrationLabels, name: eventName });
   }
 
   return eventName;

@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { computed, onMounted, ref, watch, type Ref, onActivated, provide } from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
@@ -279,8 +279,9 @@ const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
 
@@ -419,8 +420,8 @@ const openCancelDialog = () => {
   }
 
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel routing changes?";
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("pipeline.cancelRoutingChangesConfirm");
   dialog.value.okCallback = () => {
     // Restore original data onto the form (single source of truth).
     form.reset(JSON.parse(JSON.stringify(originalStreamRouting.value)) as QueryForm);
@@ -506,8 +507,8 @@ const saveQueryData = async () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNodeTitle");
+  dialog.value.message = t("pipeline.deleteStreamRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 
@@ -584,15 +585,13 @@ const validateSqlQuery = async () => {
         if (err) {
           isValidSqlQuery.value = false;
           const message = err?.response?.data?.message
-            ? `Invalid SQL Query: ${err?.response?.data?.message}`
-            : "Invalid SQL Query";
+            ? t("toastMessages.NodeForm.invalidSqlQueryDetail", {
+                error: err.response.data.message,
+              })
+            : t("toastMessages.NodeForm.invalidSqlQuery");
           toast({
             variant: "error",
-            message: err?.response?.data?.message
-              ? t("toastMessages.NodeForm.invalidSqlQueryDetail", {
-                  error: err.response.data.message,
-                })
-              : t("toastMessages.NodeForm.invalidSqlQuery"),
+            message,
           });
 
           // Locate the offending token in the SQL and squiggle it in the editor.

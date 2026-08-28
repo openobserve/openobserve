@@ -95,7 +95,7 @@ message SearchQuery {
     bool          uses_zo_fn = 12;
     string          query_fn = 13;
     bool            skip_wal = 14;
-    string         action_id = 15;
+    reserved 15;  // was action_id (action scripts, removed)
     int64 histogram_interval = 16;
     optional string timezone = 17;
     // Simplified sampling: just specify ratio (0.0-1.0), backend uses optimal defaults

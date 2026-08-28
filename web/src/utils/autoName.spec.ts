@@ -9,12 +9,8 @@ const templates: Record<string, string> = {
   "dashboard.autoName.measure": "{fn} of {field}",
   "dashboard.autoName.measureByDimension": "{subject} by {dimension}",
   "dashboard.autoName.streamOverview": "{stream} overview",
-  "alerts.autoName.anomaly": "anomaly_{stream}",
-  "alerts.autoName.realTime": "realtime_{stream}",
-  "alerts.autoName.queryAlert": "{stream}_query_alert",
-  "alerts.autoName.streamAlert": "{stream}_alert",
-  "alerts.autoName.aggregation": "{stream}_{fn}_{field}",
-  "alerts.autoName.condition": "{stream}_{column}_{operator}_{value}",
+  // No alerts.autoName.* entries: alert name patterns are hardcoded English in
+  // autoName.ts, because the result is slugified into the persisted alert name.
 };
 
 const t = (key: string, params: Record<string, unknown> = {}) =>

@@ -536,14 +536,20 @@ export default defineComponent({
 
               let html = `<div style="padding: 0.5rem; font-size: var(--text-xs);">`;
               html += `<strong style="font-size: var(--text-sm);">${originalNode.alert_name}</strong><br/>`;
-              html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
-              html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
-              html += `First Fired: ${firstTime}<br/>`;
+              // The <strong> markup is passed through the interpolation slot so the
+              // message keeps the whole sentence (and its word order) translatable.
+              const serviceName = `<strong>${originalNode.service_name}</strong>`;
+              const alertCount = `<strong>${originalNode.alert_count}</strong>`;
+              html += `${t("alerts.serviceGraphTooltipService", { name: serviceName })}<br/><br/>`;
+              html += `${t("alerts.serviceGraphTooltipAlertCount", { count: alertCount })}<br/>`;
+              html += `${t("alerts.serviceGraphTooltipFirstFired", { time: firstTime })}<br/>`;
               if (lastTime) {
-                html += `Last Fired: ${lastTime}<br/>`;
+                html += `${t("alerts.serviceGraphTooltipLastFired", { time: lastTime })}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span style="color: var(--color-status-negative);">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span style="color: var(--color-status-negative);">${t(
+                  "alerts.serviceGraphTooltipRootCause",
+                )}</span>`;
               }
               html += `</div>`;
               return html;
@@ -599,12 +605,24 @@ export default defineComponent({
                 else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
                 else timeStr = `${seconds}s`;
 
-                html += `<span style="color: var(--color-badge-purple-ol-text);">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
-                html += `From: ${sourceTime.toLocaleString()}<br/>`;
-                html += `To: ${targetTime.toLocaleString()}<br/>`;
-                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">Temporal correlation</span>`;
+                const duration = `<strong>${timeStr}</strong>`;
+                html += `<span style="color: var(--color-badge-purple-ol-text);">${t(
+                  "alerts.serviceGraphTooltipTimeDifference",
+                  { duration },
+                )}</span><br/>`;
+                html += `${t("alerts.serviceGraphTooltipFrom", {
+                  time: sourceTime.toLocaleString(),
+                })}<br/>`;
+                html += `${t("alerts.serviceGraphTooltipTo", {
+                  time: targetTime.toLocaleString(),
+                })}<br/>`;
+                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">${t(
+                  "alerts.serviceGraphTooltipTemporalCorrelation",
+                )}</span>`;
               } else {
-                html += `<span style="color: var(--color-text-muted);">Service dependency</span>`;
+                html += `<span style="color: var(--color-text-muted);">${t(
+                  "alerts.serviceGraphTooltipServiceDependency",
+                )}</span>`;
               }
 
               html += `</div>`;

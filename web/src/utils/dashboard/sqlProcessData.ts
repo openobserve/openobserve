@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { getDataValue } from "./aliasUtils";
 
 /**
@@ -96,8 +98,7 @@ export const processData = (
       allKeys.length > top_results) ||
     (!top_results && allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
   ) {
-    extras.limitNumberOfSeriesWarningMessage =
-      "Limiting the displayed series to ensure optimal performance";
+    extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
   }
 
   const topKeys = allKeys.slice(0, limitSeries).map(([key]) => key);

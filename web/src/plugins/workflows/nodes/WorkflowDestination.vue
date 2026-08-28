@@ -21,22 +21,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Payload -> NodeData::Destination { destination_id, template_override }
   (node_type `destination`). `destination_id` is the Pipeline Destination's NAME
-  (the shared picker returns it as `destination_name`; we remap here — pipelines
-  keep the RemoteStream shape). `template_override` is null in v1 (uses the
-  destination's own template).
+  (the shared picker returns it as `destination_name`; we remap here).
 
-  WorkflowNodeDrawer's Save calls submit() → { destination_id, template_override }
-  or null. While the inline create form is open the drawer hides its own footer —
-  it reads `createNewDestination` (exposed below, synced from the picker's expand).
+  Dummy-node model (C1): there is NO "Set up later" toggle. Leaving the picker empty
+  simply saves the node as a PLACEHOLDER (empty destination, flagged
+  `meta.incomplete`) — an unconfigured node IS a dummy node. Draft + test still run;
+  Publish is blocked until a destination is set.
 -->
 <template>
-  <div data-test="workflow-destination-body" class="w-full">
+  <div data-test="workflow-destination-body" class="flex w-full flex-col gap-2">
+    <!-- Config pane header (shared) — always shown, including while the inline
+         "Create New Destination" form is open. -->
+    <WorkflowConfigHeader />
     <!-- Workflows only support Custom HTTP destinations for now, so lock the inline
-         create form to Custom and skip its type-selection step. -->
+         create form to Custom. Optional: an empty selection saves a placeholder. -->
     <DestinationPicker
       ref="picker"
       :initial-name="savedData.destination_id || ''"
       forced-type="custom"
+      optional
       @expand="(v) => (creating = v)"
     />
   </div>
@@ -45,21 +48,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref } from "vue";
 import DestinationPicker from "@/components/flow/forms/DestinationPicker.vue";
-import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
+import WorkflowConfigHeader from "./WorkflowConfigHeader.vue";
+import { workflowObj, setNodeIncomplete } from "@/plugins/workflows/useWorkflowCanvas";
 
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
 const picker = ref<any>(null);
 const creating = ref(false);
 
-// Map the shared picker's { org_id, destination_name } into the workflow
-// destination shape { destination_id, template_override }. The picker validates
-// through its zod schema (async), returning null when the field is empty — it
-// renders the error inline, so there's nothing to report here.
+// Drawer "Save": the picker is optional, so submit() resolves a payload even with
+// no destination selected (empty name = placeholder). It only returns null while
+// the inline "Create New Destination" editor is open. Flag the node incomplete when
+// no destination was picked — that drives the warning badge and blocks Publish.
 const submit = async () => {
+  const node = workflowObj.currentSelectedNodeData;
   const payload = await picker.value?.submit();
   if (!payload) return null;
+  const destination_id = payload.destination_name || "";
+  setNodeIncomplete(node, !destination_id);
   return {
-    destination_id: payload.destination_name,
+    destination_id,
     template_override: savedData.template_override ?? null,
   };
 };

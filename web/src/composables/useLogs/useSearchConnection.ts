@@ -171,8 +171,7 @@ export const useSearchConnection = (t: TranslateFn) => {
           const parsedSQL = fnParsedSQL();
           if (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
             initialHistogramErrorCode = -1;
-            initialHistogramErrorMsg =
-              "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.";
+            initialHistogramErrorMsg = t("search.histogramUnavailableForQueries");
           }
         }
 

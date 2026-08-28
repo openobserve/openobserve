@@ -39,9 +39,9 @@ test('Logo Upload on Management', { tag: '@enterprise' }, async ({ page }) => {
     // Navigate to _meta Organization Page
     await logoManagementPage.managementOrg('_meta');
 
-    await logoManagementPage.navigateToManagement();
-
-    await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=_meta");
+    // Single settle-and-verify navigation; navigateToManagement()'s menu click
+    // used to race this goto and bounce the page back to /web/.
+    await logoManagementPage.openMetaGeneralSettings();
 
     await logoManagementPage.clickSaveSubmit();
 

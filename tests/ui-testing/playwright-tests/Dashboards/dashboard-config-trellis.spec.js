@@ -61,6 +61,7 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await colInput.locator('[data-test$="-field"]').blur();
     testLogger.info("Trellis columns capped at 16");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying trellis Custom layout and 16 columns persist after save");
@@ -90,6 +91,9 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     const dashboardName = generateDashboardName();
 
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
+    await expect(pm.dashboardPanelConfigs.trellisTrigger).toBeEnabled();
+    testLogger.info("Trellis enabled before time shift (breakdown present)");
+
     await pm.dashboardPanelConfigs.addTimeShift();
 
     await expect(pm.dashboardPanelConfigs.trellisTrigger).toBeDisabled();
@@ -106,6 +110,9 @@ test.describe("ConfigPanel — Trellis Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.selectTrellisLayout("Auto");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    // Settle before interacting with the sidebar again — the toggle below is
+    // clicked while this query would otherwise still be running.
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     const groupByYAxisToggle = pm.dashboardPanelConfigs.trellisGroupByYAxis;
     await pm.dashboardPanelConfigs.scrollSidebarToElement(groupByYAxisToggle);

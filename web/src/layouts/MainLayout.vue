@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import AppHeader from "../components/Header.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   useLocalCurrentUser,
   useLocalOrganization,
@@ -348,13 +348,6 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
-    const isActionsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig.actions_enabled
-      );
-    });
-
     const isIncidentsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -385,14 +378,12 @@ export default defineComponent({
       );
     });
 
-    // Backend `/config` flag `synthetics_enabled` — controlled by enterprise
-    // `O2_SYNTHETICS_ENABLED`. Reactive so the menu picks it up regardless of
-    // whether the config response arrived before or after mount.
+    // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
+    // no longer an enterprise build check: synthetics ships in OSS, and only the
+    // private-agent path behind it is enterprise. Reactive so the menu picks it
+    // up regardless of whether the config response arrived before or after mount.
     const isSyntheticsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        Boolean(store.state.zoConfig?.synthetics_enabled)
-      );
+      return Boolean(store.state.zoConfig?.synthetics_enabled);
     });
 
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
@@ -433,7 +424,7 @@ export default defineComponent({
         name: "traces",
       },
       {
-        title: t("menu.rum"),
+        title: raw("RUM"),
         icon: "devices",
         link: "/rum",
         name: "rum",
@@ -498,63 +489,63 @@ export default defineComponent({
 
     const langList = [
       {
-        label: "English",
+        label: raw("English"),
         code: "en-us",
       },
       {
-        label: "Türkçe",
+        label: raw("Türkçe"),
         code: "tr-turk",
       },
       {
-        label: "简体中文",
+        label: raw("简体中文"),
         code: "zh-cn",
       },
       {
-        label: "繁體中文",
+        label: raw("繁體中文"),
         code: "zh-tw",
       },
       {
-        label: "Français",
+        label: raw("Français"),
         code: "fr",
       },
       {
-        label: "Español",
+        label: raw("Español"),
         code: "es",
       },
       {
-        label: "Deutsch",
+        label: raw("Deutsch"),
         code: "de",
       },
       {
-        label: "Italiano",
+        label: raw("Italiano"),
         code: "it",
       },
       {
-        label: "日本語",
+        label: raw("日本語"),
         code: "ja",
       },
       {
-        label: "한국어",
+        label: raw("한국어"),
         code: "ko",
       },
       {
-        label: "Nederlands",
+        label: raw("Nederlands"),
         code: "nl",
       },
       {
-        label: "Português",
+        label: raw("Português"),
         code: "pt",
       },
       {
-        label: "Русский",
+        label: raw("Русский"),
         code: "ru",
       },
       {
-        label: "Polski",
+        label: raw("Polski"),
         code: "pl",
       },
       {
-        label: "Tiếng Việt",
+        label: raw("Tiếng Việt"),
         code: "vi",
       },
     ];
@@ -611,14 +602,31 @@ export default defineComponent({
       announcementBarObserver = null;
     });
 
+    const needsFullConfig = () =>
+      !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
+      store.state.zoConfig.version == "";
+
+    // Which org the full config was fetched for — the response carries
+    // org-scoped fields (e.g. per-user permission flags), so an org switch
+    // must refetch even when a config is already loaded.
+    let fullConfigOrg = "";
+
+    // The full config endpoint is authenticated and org-scoped; on a fresh
+    // session the org can resolve after this component mounts.
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      (identifier) => {
+        if (identifier && (needsFullConfig() || identifier !== fullConfigOrg)) {
+          getConfig();
+        }
+      },
+    );
+
     onMounted(async () => {
       filterMenus();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
-      if (
-        !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
-        store.state.zoConfig.version == ""
-      ) {
+      if (needsFullConfig()) {
         getConfig();
       } else {
         if (config.isCloud == "false") {
@@ -651,33 +659,14 @@ export default defineComponent({
       }
     };
 
-    const updateActionsMenu = () => {
-      if (isActionsEnabled.value) {
-        const incidentIndex = linksList.value.findIndex((link) => link.name === "incidentList");
-
-        const actionExists = linksList.value.some((link) => link.name === "actionScripts");
-
-        if (incidentIndex !== -1 && !actionExists) {
-          linksList.value.splice(incidentIndex + 1, 0, {
-            title: t("menu.actions"),
-            icon: "code",
-            link: "/actions",
-            name: "actionScripts",
-          });
-        }
-      }
-    };
-
-    // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
+    // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
 
       if (isWorkflowsEnabled.value) {
         if (existingIndex !== -1) return;
 
-        const actionIndex = linksList.value.findIndex((link) => link.name === "actionScripts");
-        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
-        const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+        const anchor = linksList.value.findIndex((link) => link.name === "alertList");
         if (anchor === -1) return;
 
         linksList.value.splice(anchor + 1, 0, {
@@ -760,7 +749,6 @@ export default defineComponent({
 
     const filterMenus = () => {
       updateIncidentsMenu();
-      updateActionsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
       updateAIObservabilityMenu();
@@ -1118,7 +1106,7 @@ export default defineComponent({
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
         // settings so it's available on boot and every org switch.
-        await useHomeDashboard().load(store.state?.selectedOrganization?.identifier);
+        await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
           orgSettings?.data?.data?.free_trial_expiry != null &&
@@ -1153,19 +1141,32 @@ export default defineComponent({
     };
 
     /**
-     * Get configuration from the backend.
-     * @return {"version":"","instance":"","commit_hash":"","build_date":"","default_fts_keys":["field1","field2"],"telemetry_enabled":true,"default_functions":[{"name":"function name","text":"match_all('v')"}}
+     * Get the full authenticated configuration from the backend. The
+     * unauthenticated bootstrap fetched in main.ts carries only the login-page
+     * fields; everything menu- and feature-related arrives here.
      * @throws {Error} If the request fails.
      */
-    const getConfig = async () => {
+    const FULL_CONFIG_RETRY_DELAYS_MS = [2000, 5000, 15000];
+
+    const getConfig = async (attempt = 0) => {
+      const orgIdentifier = store.state.selectedOrganization?.identifier;
+      if (!orgIdentifier) {
+        // No org yet on a fresh session — the selectedOrganization watcher
+        // retries as soon as one is resolved. Fail open meanwhile: a user whose
+        // org never resolves (org-list failure, zero orgs) must still see the
+        // base menu, not a blank shell.
+        menuReady.value = true;
+        return;
+      }
       await configService
-        .get_config()
+        .get_config_full(orgIdentifier)
         .then(async (res: any) => {
           if (config.isCloud == "false") {
             linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           }
 
           store.dispatch("setConfig", res.data);
+          fullConfigOrg = orgIdentifier;
           await nextTick();
 
           filterMenus();
@@ -1174,11 +1175,34 @@ export default defineComponent({
           if (res.data.rum.enabled) {
             setRumUser();
           }
+          // The empty-data → /ingestion redirect depends on
+          // restricted_routes_on_empty_data, which only arrives with the full
+          // config — the first navigation ran before it landed, so re-check now.
+          if (
+            res.data.restricted_routes_on_empty_data === true &&
+            store.state.organizationData.isDataIngested === false
+          ) {
+            await verifyStreamExist(store.state.selectedOrganization);
+          }
         })
         .catch((error) => {
-          console.log(error);
-          // Fail open: reveal the base menu even if /config never resolves.
+          console.error("Failed to load the full configuration:", error);
+          // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
+          // Session replay must not be lost to a failed config fetch — the rum
+          // settings already arrived with the unauthenticated bootstrap.
+          if (store.state.zoConfig?.rum?.enabled) {
+            setRumUser();
+          }
+          // A transient failure (expired session being refreshed, rolling
+          // deploy) would otherwise strand the session on the bootstrap subset.
+          if (attempt < FULL_CONFIG_RETRY_DELAYS_MS.length) {
+            setTimeout(() => {
+              if (needsFullConfig()) {
+                getConfig(attempt + 1);
+              }
+            }, FULL_CONFIG_RETRY_DELAYS_MS[attempt]);
+          }
         });
     };
 
@@ -1381,7 +1405,6 @@ export default defineComponent({
       userClickedOrg,
       verifyStreamExist,
       filterMenus,
-      updateActionsMenu,
       getConfig,
       setRumUser,
       openPredefinedThemes,

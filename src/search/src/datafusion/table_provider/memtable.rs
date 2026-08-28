@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
-use arrow_schema::{DataType, SchemaRef, SortOptions};
+use arrow_schema::{DataType, SchemaRef};
 use async_trait::async_trait;
 use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
@@ -24,13 +24,15 @@ use datafusion::{
     common::{Constraints, Result},
     datasource::{MemTable, TableProvider},
     logical_expr::{Expr, TableType},
-    physical_expr::{LexOrdering, PhysicalSortExpr},
-    physical_plan::{ExecutionPlan, expressions::Column, sorts::sort::SortExec},
+    physical_plan::{ExecutionPlan, sorts::sort::SortExec},
 };
 use hashbrown::HashMap;
 
 use crate::{
-    datafusion::table_provider::helpers::{apply_combined_filter, apply_projection},
+    datafusion::{
+        sort_order::FileSortOrder,
+        table_provider::helpers::{apply_combined_filter, apply_projection},
+    },
     index::IndexCondition,
 };
 
@@ -38,7 +40,7 @@ use crate::{
 pub struct NewMemTable {
     mem_table: MemTable,
     diff_rules: HashMap<String, DataType>,
-    sorted_by_time: bool,
+    sort_order: FileSortOrder,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: (i64, i64),
@@ -50,7 +52,7 @@ impl NewMemTable {
         schema: SchemaRef,
         partitions: Vec<Vec<RecordBatch>>,
         rules: HashMap<String, DataType>,
-        sorted_by_time: bool,
+        sort_order: FileSortOrder,
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
         timestamp_filter: (i64, i64),
@@ -60,7 +62,7 @@ impl NewMemTable {
         Ok(Self {
             mem_table: mem,
             diff_rules: rules,
-            sorted_by_time,
+            sort_order,
             index_condition,
             fst_fields,
             timestamp_filter,
@@ -93,7 +95,7 @@ mod tests {
             schema,
             vec![vec![]],
             HashMap::new(),
-            false,
+            FileSortOrder::None,
             None,
             vec![],
             (0, i64::MAX),
@@ -110,7 +112,7 @@ mod tests {
             schema,
             vec![vec![]],
             rules,
-            true,
+            FileSortOrder::TimestampDesc,
             None,
             vec!["message".to_string()],
             (0, 1000),
@@ -207,7 +209,7 @@ impl TableProvider for NewMemTable {
             filter_projection,
         )?;
 
-        apply_sort(filter_exec, self.sorted_by_time)
+        apply_sort(filter_exec, self.sort_order)
     }
 
     fn get_column_default(&self, column: &str) -> Option<&Expr> {
@@ -215,32 +217,16 @@ impl TableProvider for NewMemTable {
     }
 }
 
-// create sort exec by _timestamp
-fn wrap_sort(exec: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
-    let column_timestamp = config::TIMESTAMP_COL_NAME.to_string();
-    let index = exec.schema().index_of(&column_timestamp);
-    (match index {
-        Ok(index) => {
-            let ordering = LexOrdering::new(vec![PhysicalSortExpr {
-                expr: Arc::new(Column::new(&column_timestamp, index)),
-                options: SortOptions {
-                    descending: true,
-                    nulls_first: false,
-                },
-            }]);
-            Arc::new(SortExec::new(ordering.unwrap(), exec))
-        }
-        Err(_) => exec,
-    }) as _
-}
-
+/// Wrap the plan in a `SortExec` that produces `sort_order`. Memtable batches
+/// are unsorted, so this is what makes them satisfy the ordering the rest of
+/// the plan was built for. No-op when the order is `None` or when a sort
+/// column is missing from the projected schema.
 fn apply_sort(
     exec_plan: Arc<dyn ExecutionPlan>,
-    sorted_by_time: bool,
+    sort_order: FileSortOrder,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    Ok(if sorted_by_time {
-        wrap_sort(exec_plan)
-    } else {
-        exec_plan
+    Ok(match sort_order.physical_ordering(&exec_plan.schema()) {
+        Some(ordering) => Arc::new(SortExec::new(ordering, exec_plan)) as _,
+        None => exec_plan,
     })
 }

@@ -304,11 +304,10 @@ export class AlertsPage {
             // TODO: replace with context-specific dialog data-test attribute
             qDialogLocator: '[data-test$="-dialog"]',
 
-            // v3 list page tab locators
-            // Note: AppTabs.vue generates data-test="tab-{value}" (not alert-list-tab-*)
-            alertListTabAll: '[data-test="tab-all"]',
-            alertListTabScheduled: '[data-test="tab-scheduled"]',
-            alertListTabRealtime: '[data-test="tab-realTime"]',
+            // v3 list page tab locators — the OToggleGroup renders data-test="alert-list-tab-{value}"
+            alertListTabAll: '[data-test="alert-list-tab-all"]',
+            alertListTabScheduled: '[data-test="alert-list-tab-scheduled"]',
+            alertListTabRealtime: '[data-test="alert-list-tab-realTime"]',
             alertListFilterChip: '[data-test="alert-list-filter-chip"]',
 
             // v3 AddAlert wizard tabs (OToggleGroupItem with data-test="add-alert-tab-{key}")
@@ -1202,9 +1201,12 @@ export class AlertsPage {
 
     /**
      * Assert an alert with the given name is visible on the list table.
+     * The table paginates at 20 rows, so a freshly created alert is often on a
+     * later page — narrow the list to it first, exactly as clickAlertUpdateButton does.
      * @param {string} name
      */
     async expectAlertVisibleInList(name) {
+        await this.searchAlert(name);
         const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
         await expect(row).toBeVisible({ timeout: 15000 });
         testLogger.info('Alert visible on list', { name });
@@ -1421,13 +1423,25 @@ export class AlertsPage {
         ).first();
         const tabVisible = await folderTab.isVisible({ timeout: 10000 }).catch(() => false);
         if (tabVisible) {
-            // Force-click past the reflow, retrying, until the tab reports data-state="active".
-            // Re-clicking each iteration self-heals a click that landed mid-animation; the
-            // active-state assertion is the real completion signal (activeFolderId switched).
+            // Force-click past the reflow until data-state="active". But data-state flips
+            // before activeFolderId (AlertList.vue) settles, and the "New alert" route reads
+            // activeFolderId — so a createAlert() right after can create in the stale "default"
+            // folder. Also gate on the folder-scoped list refetch (GET .../alerts?...folder=<id>,
+            // id != "default"), which only fires once activeFolderId has actually flipped.
             await expect(async () => {
                 if ((await folderTab.getAttribute('data-state')) !== 'active') {
                     await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                    const scopedListSettled = folderName === 'default'
+                        ? Promise.resolve()
+                        : this.page.waitForResponse(
+                            resp => resp.request().method() === 'GET'
+                                && resp.url().includes('/alerts?')
+                                && /[?&]folder=/.test(resp.url())
+                                && !/[?&]folder=default(?:&|$)/.test(resp.url()),
+                            { timeout: 8000 }
+                          ).catch(() => {});
                     await folderTab.click({ force: true, timeout: 5000 });
+                    await scopedListSettled;
                 }
                 await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
             }).toPass({ timeout: 30000 });
@@ -1582,7 +1596,7 @@ export class AlertsPage {
         // Click Scheduled tab and count rows
 
         // Wait for tabs to be visible first (handle slow page loads)
-        const scheduledTab = this.page.locator('[data-test="tab-scheduled"]');
+        const scheduledTab = this.page.locator('[data-test="alert-list-tab-scheduled"]');
         try {
             await scheduledTab.waitFor({ state: 'visible', timeout: 15000 });
         } catch {
@@ -1602,7 +1616,7 @@ export class AlertsPage {
         const scheduledAlertsCount = String(await scheduledRows.count());
 
         // Click Real-time tab and count rows
-        await this.page.locator('[data-test="tab-realTime"]').click();
+        await this.page.locator('[data-test="alert-list-tab-realTime"]').click();
         await this.page.waitForTimeout(1000);
         const realTimeRows = this.page.locator('tbody tr[data-index]');
         const realTimeAlertsCount = String(await realTimeRows.count());
@@ -1768,11 +1782,11 @@ export class AlertsPage {
     }
 
     async verifyTabContents() {
-        await this.page.locator('[data-test="tab-scheduled"]').click();
+        await this.page.locator('[data-test="alert-list-tab-scheduled"]').click();
         await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
-        await this.page.locator('[data-test="tab-realTime"]').click();
+        await this.page.locator('[data-test="alert-list-tab-realTime"]').click();
         await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
-        await this.page.locator('[data-test="tab-all"]').click();
+        await this.page.locator('[data-test="alert-list-tab-all"]').click();
         await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
     }
 
@@ -2764,6 +2778,16 @@ export class AlertsPage {
             await expect(exportBtn).toBeEnabled({ timeout: 3000 });
         }).toPass({ timeout: 30000 });
         await exportBtn.click();
+
+        // Export no longer downloads on click: it opens a dialog offering the same
+        // definition as JSON or as a Terraform resource, and the file is written
+        // when Download is pressed there. The dialog opens on JSON, which is the
+        // format this test reads back, so no tab switch is needed.
+        const exportDialog = this.page.locator('[data-test="alert-export-dialog"]');
+        await expect(exportDialog).toBeVisible({ timeout: 15000 });
+        testLogger.info('Export dialog opened');
+        await exportDialog.locator('[data-test="o-dialog-primary-btn"]').click();
+
         await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 

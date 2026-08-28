@@ -50,10 +50,16 @@ vi.mock("vuex", async (importOriginal) => {
   };
 });
 
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (k: string) => k }),
-  createI18n: () => ({ install: vi.fn() }),
-}));
+vi.mock("vue-i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("vue-i18n")>();
+  return {
+    ...actual,
+    // Delegate to the real catalogue instead of echoing the key, so assertions
+    // on rendered copy (e.g. the row count -> "1-3 of 3") test real messages.
+    useI18n: () => ({ t: (...args: any[]) => (i18n.global.t as any)(...args) }),
+    createI18n: () => ({ install: vi.fn() }),
+  };
+});
 
 vi.mock("vue-draggable-next", () => ({
   VueDraggableNext: {
@@ -349,10 +355,10 @@ describe("TableRenderer", () => {
       expect(table.props("enableColumnReorder")).toBe(false);
     });
 
-    it("should set enableCellCopy=true on TenstackTable", () => {
+    it("should set enableCellCopy=false — copy moved to the floating hover-action toolbar", () => {
       wrapper = createWrapper();
       const table = wrapper.findComponent({ name: "OTable" });
-      expect(table.props("enableCellCopy")).toBe(true);
+      expect(table.props("enableCellCopy")).toBe(false);
     });
   });
 

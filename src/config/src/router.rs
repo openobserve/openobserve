@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 34] = [
-    ("config", 0),               // /config
+const QUERIER_ROUTES: [(&str, usize); 37] = [
+    ("config", 0),               // /config (unauthenticated bootstrap)
+    ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
     ("organizations", 1),        // /api/organizations
     ("settings", 2),             // /api/{org_id}/settings/...
@@ -28,6 +29,7 @@ const QUERIER_ROUTES: [(&str, usize); 34] = [
     ("dag", 5),                  // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
     ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
     ("traces/time_range", 3),    // /api/{org_id}/{stream_name}/traces/time_range
+    ("traces/time_range", 2),    // /api/{org_id}/traces/time_range
     ("clusters", 1),             // /api/clusters
     ("query_manager", 2),        // /api/{org_id}/query_manager/...
     ("_search", 2),              // /api/{org_id}/_search
@@ -50,6 +52,7 @@ const QUERIER_ROUTES: [(&str, usize); 34] = [
                                                * values */
     ("discovery", 2),         // /api/{org_id}/discovery
     ("annotation_queues", 2), // /api/{org_id}/annotation_queues/...
+    ("playground", 2),        // /api/{org_id}/playground/...
     ("service_streams", 2),   // /api/{org_id}/service_streams/...
     ("node/list", 2),         // /api/_meta/node/list
 ];
@@ -142,9 +145,10 @@ mod tests {
 
     #[test]
     fn test_is_querier_route() {
-        // Test config route
+        // Test config routes: the unauthenticated bootstrap and the
+        // authenticated per-org config are both served by queriers.
         assert!(is_querier_route("/config"));
-        assert!(!is_querier_route("/api/org1/config"));
+        assert!(is_querier_route("/api/org1/config"));
 
         // Test summary route
         assert!(is_querier_route("/api/org1/summary"));
@@ -172,6 +176,7 @@ mod tests {
         assert!(is_querier_route(
             "/api/org1/annotation_queues/queue-1/items/item-1/reviews"
         ));
+        assert!(is_querier_route("/api/org1/playground/run"));
         // Test trace detail routes
         assert!(is_querier_route(
             "/api/org1/default/traces/trace-id/details"
@@ -182,6 +187,11 @@ mod tests {
         assert!(is_querier_route(
             "/api/org1/default/traces/time_range?session_id=session-id"
         ));
+        assert!(is_querier_route(
+            "/api/org1/traces/time_range?trace_id=a,b,c"
+        ));
+        // the org-level entry must not swallow the OTLP ingest route
+        assert!(!is_querier_route("/api/org1/traces"));
     }
 
     #[test]

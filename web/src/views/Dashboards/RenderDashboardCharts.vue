@@ -158,6 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      is an anonymous flex item and never picks up the ellipsis. -->
                 <span class="truncate">{{ item.title }}</span>
               </h2>
+              <!-- Off-screen panels render this lightweight placeholder; the
+                   real panel mounts only when it comes near the viewport.
+                   Mounting everything up front froze large dashboards. -->
+              <div
+                v-else-if="!shouldMountPanel(item.id)"
+                class="flex h-full flex-col p-2"
+                :data-test="`dashboard-panel-placeholder-${item.id}`"
+              >
+                <span class="text-text-secondary truncate text-sm" :title="item.title">
+                  {{ item.title }}
+                </span>
+                <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
+              </div>
               <!-- Panel with Panel-Level Variables -->
               <div v-else class="panel-with-variables flex h-full flex-col">
                 <!-- Original Panel Container -->
@@ -206,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Panel Time Picker (NEW) -->
                       <div
                         v-if="hasPanelTime(item) && panelTimeValues[item.id]"
-                        class="panel-time-picker-wrapper mb-2"
+                        class="panel-time-picker-wrapper mt-1 mb-2"
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
@@ -419,6 +432,20 @@ export default defineComponent({
     // Store IntersectionObserver for cleanup
     const panelObserver = ref<IntersectionObserver | null>(null);
 
+    // Panels whose full component tree is mounted; the rest are placeholders.
+    // One-way: scrolling away never unmounts, so queries are never cancelled
+    // by scrolling and scrolling back never refetches.
+    const mountedPanelIds = reactive(new Set<string>());
+
+    // Mounts panels one viewport before they scroll into view.
+    let panelMountObserver: IntersectionObserver | null = null;
+
+    // Print/forceLoad needs every panel; they are fed into mountedPanelIds in
+    // batches (watcher below panels) instead of mounting all in one flush.
+    const mountAllPanels = computed(() => props.forceLoad || store.state.printMode);
+
+    const shouldMountPanel = (panelId: string) => mountedPanelIds.has(panelId);
+
     // inject selected tab, default will be default tab
     const selectedTabId = inject("selectedTabId", ref("default"));
 
@@ -458,11 +485,35 @@ export default defineComponent({
 
       // Store observer for cleanup
       panelObserver.value = observer;
+
+      panelMountObserver?.disconnect();
+      panelMountObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const panelId = entry.target.getAttribute("gs-id");
+            if (panelId && entry.isIntersecting) {
+              mountedPanelIds.add(panelId);
+              // Mounted for good — stop watching this panel.
+              panelMountObserver?.unobserve(entry.target);
+            }
+          });
+        },
+        {
+          // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
+          rootMargin: "100% 0px 100% 0px",
+          threshold: 0,
+        },
+      );
+      panelElements?.forEach((el: Element) => {
+        const panelId = el.getAttribute("gs-id");
+        if (panelId && mountedPanelIds.has(panelId)) return;
+        panelMountObserver?.observe(el);
+      });
     };
 
     // Create our own variables manager instead of injecting from parent
     // This makes RenderDashboardCharts self-contained and reusable
-    const variablesManager = useVariablesManager();
+    const variablesManager = useVariablesManager(t);
 
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
@@ -538,6 +589,42 @@ export default defineComponent({
         ? (props.dashboardData?.tabs?.find((it: any) => it.tabId === selectedTabId.value)?.panels ??
             [])
         : [];
+    });
+
+    // Print/forceLoad: mount remaining panels a batch per tick. Print capture
+    // waits on the all-panels-loaded flag, so this never truncates a report.
+    let mountAllTimer: any = null;
+    const mountRemainingPanelsInBatches = () => {
+      if (mountAllTimer !== null) return;
+      const BATCH_SIZE = 8;
+      const step = () => {
+        mountAllTimer = null;
+        if (!mountAllPanels.value) return;
+        const pending = panels.value
+          .map((p: any) => p.id)
+          .filter((id: string) => id && !mountedPanelIds.has(id));
+        pending.slice(0, BATCH_SIZE).forEach((id: string) => mountedPanelIds.add(id));
+        if (pending.length > BATCH_SIZE) {
+          mountAllTimer = setTimeout(step, 50);
+        }
+      };
+      step();
+    };
+
+    watch(
+      // re-fill when print mode turns on or the panel list changes
+      () => [mountAllPanels.value, panels.value],
+      () => {
+        if (mountAllPanels.value) mountRemainingPanelsInBatches();
+      },
+      { immediate: true },
+    );
+
+    onBeforeUnmount(() => {
+      if (mountAllTimer !== null) {
+        clearTimeout(mountAllTimer);
+        mountAllTimer = null;
+      }
     });
 
     const {
@@ -1173,6 +1260,8 @@ export default defineComponent({
         panelObserver.value.disconnect();
         panelObserver.value = null;
       }
+      panelMountObserver?.disconnect();
+      panelMountObserver = null;
 
       // Clean up GridStack instance
       if (gridStackInstance) {
@@ -1595,6 +1684,7 @@ export default defineComponent({
       addPanelData,
       t,
       getPanelLayout,
+      shouldMountPanel,
       getMinimumHeight,
       getMinimumWidth,
       isSectionHeader,

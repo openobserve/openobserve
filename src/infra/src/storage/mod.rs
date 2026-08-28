@@ -47,6 +47,15 @@ pub const CONCURRENT_REQUESTS: usize = 1000;
 
 static MULTI_ACCOUNTS: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(accounts::default);
 
+/// Storage tier applied consistently to every object that belongs to one
+/// logical data file, including its metrics and Tantivy indexes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum StorageTier {
+    #[default]
+    Default,
+    InfrequentAccess,
+}
+
 // Create a wrapper trait that extends ObjectStore
 #[async_trait]
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
@@ -202,6 +211,18 @@ pub async fn put(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     Ok(())
 }
 
+pub async fn put_with_tier(
+    account: &str,
+    file: &str,
+    data: bytes::Bytes,
+    tier: StorageTier,
+) -> Result<()> {
+    match tier {
+        StorageTier::Default => put(account, file, data).await,
+        StorageTier::InfrequentAccess => put_infrequent_access(account, file, data).await,
+    }
+}
+
 async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     let path = Path::from(file);
     let upload = MULTI_ACCOUNTS.put_multipart(account, &path).await?;
@@ -211,7 +232,7 @@ async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<
     Ok(())
 }
 
-pub async fn put_with_compliance(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
+async fn put_infrequent_access(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     let cfg = get_config();
     let attrs = match cfg.s3.provider.as_str() {
         "aws" | "s3" => Attributes::from_iter([(

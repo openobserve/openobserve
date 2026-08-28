@@ -44,6 +44,11 @@ pub mod state;
 pub mod state_level;
 pub mod tags;
 
+/// Minimum silence applied to a realtime alert after each notification, even
+/// when the alert's own silence is 0 — without a floor, every matching
+/// ingestion request sends a notification and its db writes.
+const REALTIME_MIN_SILENCE_SECS: i64 = 30;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
 pub struct TriggerCondition {
@@ -340,6 +345,15 @@ impl TriggerCondition {
                 start_from,
             )
         }
+    }
+
+    /// Effective realtime-alert silence in microseconds: the alert's own
+    /// silence (minutes) floored by [`REALTIME_MIN_SILENCE_SECS`].
+    pub fn effective_silence_micros(&self) -> i64 {
+        self.silence
+            .saturating_mul(60)
+            .max(REALTIME_MIN_SILENCE_SECS)
+            .saturating_mul(1_000_000)
     }
 }
 
@@ -899,6 +913,18 @@ pub enum Operator {
     #[serde(rename = "not_contains")]
     #[serde(alias = "NotContains")]
     NotContains,
+    #[serde(rename = "is_null")]
+    #[serde(alias = "IsNull")]
+    IsNull,
+    #[serde(rename = "is_not_null")]
+    #[serde(alias = "IsNotNull")]
+    IsNotNull,
+    #[serde(rename = "is_empty")]
+    #[serde(alias = "IsEmpty")]
+    IsEmpty,
+    #[serde(rename = "is_not_empty")]
+    #[serde(alias = "IsNotEmpty")]
+    IsNotEmpty,
 }
 
 impl std::fmt::Display for Operator {
@@ -912,6 +938,10 @@ impl std::fmt::Display for Operator {
             Operator::LessThanEquals => write!(f, "<="),
             Operator::Contains => write!(f, "contains"),
             Operator::NotContains => write!(f, "not contains"),
+            Operator::IsNull => write!(f, "is null"),
+            Operator::IsNotNull => write!(f, "is not null"),
+            Operator::IsEmpty => write!(f, "is empty"),
+            Operator::IsNotEmpty => write!(f, "is not empty"),
         }
     }
 }

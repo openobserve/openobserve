@@ -119,6 +119,8 @@ const props = withDefaults(
     module?: string;
     allowCustomColumns?: boolean;
     normalizeOperators?: boolean;
+    normalizeColumnNames?: boolean;
+    optional?: boolean;
   }>(),
   {
     fields: () => [],
@@ -126,6 +128,8 @@ const props = withDefaults(
     module: "pipelines",
     allowCustomColumns: true,
     normalizeOperators: false,
+    normalizeColumnNames: false,
+    optional: false,
   },
 );
 
@@ -254,17 +258,37 @@ const onInputUpdate = (_name?: string, _field?: any) => {
   // template's @input:update wiring.
 };
 
-// Host bridge: validate through the schema and return { version, conditions },
-// or null when invalid (the error renders inline under the FilterGroup).
+// When `normalizeColumnNames` is on, rewrite every leaf's `column` to the
+// flattened form (dots → underscores). FilterCondition already does this live for
+// newly-created custom columns; doing it here too guarantees the SAVED tree is
+// normalized regardless of how the column was entered (typed, edited, or loaded
+// from an older dotted rule). Predefined underscore names are a no-op.
+const normalizeConditionColumns = (node: any): void => {
+  if (!node || typeof node !== "object") return;
+  if (typeof node.column === "string" && node.column) {
+    node.column = node.column.replace(/\./g, "_");
+  }
+  if (Array.isArray(node.conditions)) node.conditions.forEach(normalizeConditionColumns);
+};
+
+// Host bridge: validate through the schema and return { version, conditions }.
 // Detach from the readonly form read-view before handing the tree to the host.
+//
+// `optional` splits the two callers:
+//  - Pipelines (default): an incomplete rule BLOCKS — return null, error shown
+//    inline under the FilterGroup.
+//  - Workflows (optional=true, dummy-node model): never block. Return the rule
+//    anyway with a `complete` flag so the host can save an incomplete rule as a
+//    placeholder (and flag the node incomplete). The `complete` field is only added
+//    in optional mode, so the pipeline payload shape is unchanged.
 const submit = async () => {
   validated.value = null;
   await form.handleSubmit();
-  if (!validated.value) return null;
-  return {
-    version: 2,
-    conditions: cloneDeep((form.state.values as any).conditions),
-  };
+  const complete = !!validated.value;
+  if (!complete && !props.optional) return null;
+  const conditions = cloneDeep((form.state.values as any).conditions);
+  if (props.normalizeColumnNames) normalizeConditionColumns(conditions);
+  return props.optional ? { version: 2, conditions, complete } : { version: 2, conditions };
 };
 
 defineExpose({ submit, conditionGroup, form });

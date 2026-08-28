@@ -32,6 +32,7 @@ env:
   ZO_QUICK_MODE_STRATEGY: first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
   ZO_INGEST_ALLOWED_UPTO: 5
+  ZO_SLO_BACKFILL_CHUNK_SECS: 86400 # matches the server default; per-shard override below
   ZO_FEATURE_QUERY_EXCLUDE_ALL: false
   ZO_USAGE_BATCH_SIZE: 200
   ZO_USAGE_PUBLISH_INTERVAL: 2
@@ -39,7 +40,24 @@ env:
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
+  # SMTP was already enabled here, but with no host/port it fell back to the
+  # server defaults (localhost:25) where nothing listens — so destinations could
+  # be SAVED (the enabled-gate passes) while every send failed silently. The
+  # Mailpit step below gives that flag something to talk to, which also makes the
+  # delivery assertions in Alerts/dl-email-destinations.spec.js runnable.
   ZO_SMTP_ENABLED: true
+  ZO_SMTP_HOST: localhost
+  # 1026 is the DL relay, not Mailpit — it expands DL_ADDRESS and forwards
+  # everything else through untouched, so non-email shards see no difference.
+  ZO_SMTP_PORT: 1026
+  ZO_SMTP_FROM_EMAIL: alerts@ci.openobserve.test
+  # Read by tests/ui-testing/playwright-tests/utils/mail-sink.js
+  MAILPIT_URL: http://localhost:8025
+  # A distribution list that exists only inside the runner: one alias, three
+  # member mailboxes. Lets the fan-out case run with no external mail provider,
+  # no secrets and no egress.
+  DL_ADDRESS: ci-dl@ci.openobserve.test
+  DL_MEMBERS: ci-dl-m1@ci.openobserve.test,ci-dl-m2@ci.openobserve.test,ci-dl-m3@ci.openobserve.test
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
@@ -245,6 +263,37 @@ jobs:
           name: frontend-dist
           path: /tmp/dist
 
+      - name: Start mail sink (Mailpit)
+        # A local SMTP server the tests can also READ. Runs as a static binary
+        # rather than a service container: these shards run on a self-hosted EKS
+        # runner where Docker-in-Docker is not guaranteed, and the app itself is
+        # already launched the same way. ~2s, and it makes ZO_SMTP_* real.
+        #
+        # Gated to the one shard that needs it — every other shard would
+        # otherwise pay a GitHub-releases download for nothing.
+        if: matrix.testfolder == 'Alerts'
+        env:
+          # Pinned, not "latest": an upstream release must never change what this
+          # shard does without a commit here.
+          MAILPIT_VERSION: v1.21.8
+        run: |
+          set +e
+          curl -fsSL -o mailpit.tar.gz \
+            "https://github.com/axllent/mailpit/releases/download/${MAILPIT_VERSION}/mailpit-linux-amd64.tar.gz" \
+            && tar -xzf mailpit.tar.gz mailpit && chmod +x ./mailpit
+          if [ ! -x ./mailpit ]; then
+            echo "::warning::Mailpit ${MAILPIT_VERSION} could not be fetched; email delivery assertions will skip"
+            exit 0
+          fi
+          # Loopback only — this runner is shared, and delivered alert bodies
+          # should not be readable from the rest of its network.
+          ./mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 > mailpit.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8025/api/v1/messages > /dev/null 2>&1 && { echo "Mailpit ready after ${i}s"; exit 0; }
+            sleep 1
+          done
+          echo "::warning::Mailpit did not start; email delivery assertions will skip"
+
       - name: Start OpenObserve
         # Per-shard override of the workflow-level default. ZO_QUICK_MODE_ENABLED is
         # read once at server start and is global to the process, so a shard is the
@@ -252,6 +301,22 @@ jobs:
         # tests/ui-testing/ci-matrix/ci_matrix.json; shards that omit it get "false".
         env:
           ZO_QUICK_MODE_ENABLED: ${{ matrix.quick_mode_enabled || 'false' }}
+          # Same per-shard rule: how far back (hours) ingestion accepts a record.
+          # The workflow default of 5 DROPS older rows while still answering 200,
+          # so a suite that seeds history (SLO measures a rolling 7-day window)
+          # would fail as "No data" with nothing in the artifacts to explain it.
+          # Set via "ingest_allowed_upto" in ci-matrix/ci_matrix.json; shards that
+          # omit it keep the workflow default.
+          ZO_INGEST_ALLOWED_UPTO: ${{ matrix.ingest_allowed_upto || env.ZO_INGEST_ALLOWED_UPTO }}
+          # Same per-shard rule: how much history one SLO backfill chunk covers.
+          # The production default (86400 = 1 day) makes a 7-day-window test SLO
+          # backfill in 7 sequential chunks under ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1
+          # (SLO-Measurement's shard note above) — no test here asserts on
+          # per-chunk timing or partial coverage, only on the final measured
+          # state, so a shard-only larger chunk is free wall-clock, not a
+          # behavior change. Set via "slo_backfill_chunk_secs" in
+          # ci-matrix/ci_matrix.json; shards that omit it keep the server default.
+          ZO_SLO_BACKFILL_CHUNK_SECS: ${{ matrix.slo_backfill_chunk_secs || env.ZO_SLO_BACKFILL_CHUNK_SECS }}
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
@@ -273,6 +338,27 @@ jobs:
         with:
           node-version: 24
 
+      - name: Start distribution-list relay
+        # Mailpit is a sink: it accepts any address but stores ONE message, so it
+        # can never show what a real distribution list does. This tiny relay sits
+        # in front of it and expands the alias into per-member deliveries, the
+        # same way alerts-content-templates.spec.js stands up an HTTP receiver to
+        # capture what a webhook destination really sent.
+        #
+        # Gated to the one shard that needs it, matching the Mailpit step above.
+        if: matrix.testfolder == 'Alerts'
+        run: |
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::warning::node not on PATH; DL fan-out case will skip"
+            exit 0
+          fi
+          node tests/ui-testing/scripts/dl-relay.js > dl-relay.log 2>&1 &
+          for i in $(seq 1 20); do
+            (echo > /dev/tcp/127.0.0.1/1026) >/dev/null 2>&1 && { echo "DL relay ready after ${i}s"; exit 0; }
+            sleep 1
+          done
+          echo "::warning::DL relay did not start; the fan-out case will skip"
+
       - name: Cache Playwright browser
         id: playwright-cache
         uses: actions/cache@v6
@@ -292,11 +378,29 @@ jobs:
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
+          echo "MAILPIT_URL=${MAILPIT_URL}" >> .env
+          echo "DL_ADDRESS=${DL_ADDRESS}" >> .env
+          echo "DL_MEMBERS=${DL_MEMBERS}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
 
-          # Install apt system dependencies (always needed)
-          npx playwright install-deps chromium
+          # Install apt system dependencies (always needed).
+          # azure.archive.ubuntu.com intermittently times out fetching font/lib
+          # packages, which makes `install-deps` exit 100 and fails the whole job.
+          # Give apt its own per-fetch retries and wrap the call in a backoff loop.
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/99retries >/dev/null
+          for attempt in 1 2 3; do
+            if npx playwright install-deps chromium; then
+              echo "install-deps succeeded on attempt ${attempt}"
+              break
+            fi
+            if [ "${attempt}" = 3 ]; then
+              echo "::error::playwright install-deps chromium failed after 3 attempts"
+              exit 1
+            fi
+            echo "install-deps attempt ${attempt} failed; retrying in $((attempt * 20))s"
+            sleep $((attempt * 20))
+          done
 
           # Get revision from playwright's own metadata
           CHROMIUM_REV=$(node -pe "
@@ -355,8 +459,19 @@ jobs:
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done
 
-            echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
-            npx playwright test $FILE_PATHS
+            # Optional per-shard worker pin. Empty keeps playwright.config.js's
+            # default; a shard whose specs contend for a shared server-side
+            # resource sets "workers": 1 in ci_matrix.json, because fullyParallel
+            # races separate spec FILES and mode:'serial' only orders tests
+            # within one file.
+            WORKERS_ARG=""
+            if [ -n "${{ matrix.workers }}" ]; then
+              WORKERS_ARG="--workers=${{ matrix.workers }}"
+              echo "DEBUG: pinning workers to ${{ matrix.workers }}"
+            fi
+
+            echo "DEBUG: Final command: npx playwright test $FILE_PATHS $WORKERS_ARG"
+            npx playwright test $FILE_PATHS $WORKERS_ARG
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi

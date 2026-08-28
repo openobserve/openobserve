@@ -161,11 +161,15 @@ async fn is_job_cluster() -> bool {
 /// window closes after one replication lag.
 #[cfg(feature = "enterprise")]
 fn may_sweep(job_cluster: &str, local_cluster: &str, live_clusters: &[String]) -> bool {
-    job_cluster.is_empty()
-        || job_cluster == local_cluster
-        // A claim is a KV key kept alive by a live scheduler, and it outlives
-        // the cluster that made it.
-        || !live_clusters.iter().any(|c| c == job_cluster)
+    // The "is someone else holding this" half is shared with the synthetics
+    // start gate, which asks the same question of the same key; only what each
+    // does with an *unclaimed* key differs, and that difference is the reason
+    // this stays a named function rather than an inlined call.
+    !o2_enterprise::enterprise::super_cluster::kv::scheduler::claim_is_held_elsewhere(
+        job_cluster,
+        local_cluster,
+        live_clusters,
+    )
 }
 
 /// One pass over every alert that currently has per-group state rows.

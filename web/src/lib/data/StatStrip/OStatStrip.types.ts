@@ -40,6 +40,11 @@ export interface StatItem {
   label: I18nText;
   /** The number / text shown large. */
   value: string | number;
+  /**
+   * Short qualifier beside the label, saying what the value IS when the label
+   * alone is ambiguous (e.g. "wait time" under a generic "Database time").
+   */
+  sub?: I18nText;
   /** Optional leading glyph, shown in a tone-coloured chip. */
   icon?: IconName;
   /** Semantic colour. Defaults to `neutral`. */

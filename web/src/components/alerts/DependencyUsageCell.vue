@@ -51,14 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         value="neutral"
         :data-test="`used-by-${key}-${b.kind}`"
       >
+        <OTooltip side="top" :content="b.label" />
         <OIcon :name="depKindIcon(b.kind)" size="xs" class="mr-0.5" :class="kindColor(b.kind)" />
         {{ b.count }}
-        <OTooltip side="top" :content="b.label" />
       </OTag>
     </template>
   </OButton>
 
-  <DependencyImpactDialog v-model:open="open" :focus="focus" @deleted="emit('deleted')" />
+  <DependencyImpactDialog v-model:open="open" :focus="focus" @deleted="emit('deleted', $event)" />
 </template>
 
 <script setup lang="ts">
@@ -74,7 +74,7 @@ import { focusSummary, depKindIcon, depKindColor } from "@/composables/alerts/us
 import type { DepGraph, DepFocus, DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 
 const props = defineProps<{ graph: DepGraph; focus: DepFocus }>();
-const emit = defineEmits<{ (e: "deleted"): void }>();
+const emit = defineEmits<{ (e: "deleted", kind: DepNodeKind): void }>();
 
 const { t } = useI18nTyped();
 

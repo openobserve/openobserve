@@ -14,16 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import useAiChat from "@/composables/useAiChat";
 import useSuggestions from "@/composables/useSuggestions";
 import { parsePromQlQuery } from "@/utils/query/promQLUtils";
-import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
+import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
 
 /**
  * Composable for Natural Language to SQL Query transformation
  * Provides auto-detection and generation capabilities without UI
  */
-export function useNLQuery() {
+export function useNLQuery(t: TranslateFn) {
   const { fetchAiChat, getStructuredContext } = useAiChat();
   const isGenerating = ref(false);
   const streamingResponse = ref(""); // Real-time streaming response for user engagement
@@ -447,7 +448,7 @@ export function useNLQuery() {
       if (!(response as Response).ok) {
         console.error("[NL2Q] AI assistant returned error:", (response as Response).status);
         if ((response as Response).status === 403) {
-          streamingResponse.value = UNAUTHORIZED_MESSAGE;
+          streamingResponse.value = t(UNAUTHORIZED_MESSAGE_KEY);
         }
         return null;
       }
@@ -487,11 +488,12 @@ export function useNLQuery() {
                 // Handle different event types
                 if (data.type === "status") {
                   // Status event (processing, etc.)
-                  streamingResponse.value = data.message || "Processing...";
+                  streamingResponse.value = data.message || t("nlMode.processing");
                 } else if (data.type === "message") {
                   // Message event (AI planning/explanation text)
                   lastMessageContent = data.content || "";
-                  streamingResponse.value = data.content?.substring(0, 100) || "Processing...";
+                  streamingResponse.value =
+                    data.content?.substring(0, 100) || t("nlMode.processing");
                 } else if (data.type === "tool_call") {
                   // Track tool execution (dashboard/alert creation)
                   toolCalls.push({
@@ -499,7 +501,8 @@ export function useNLQuery() {
                     message: data.message || "",
                     success: undefined, // Will be updated by tool_result
                   });
-                  streamingResponse.value = data.message || `Executing ${data.tool}...`;
+                  streamingResponse.value =
+                    data.message || t("nlMode.executingTool", { tool: data.tool });
                 } else if (data.type === "tool_result") {
                   // Tool execution result
                   toolResults.push({
@@ -515,15 +518,15 @@ export function useNLQuery() {
                   }
 
                   if (!data.success) {
-                    streamingResponse.value = `Tool failed: ${data.message}`;
+                    streamingResponse.value = t("nlMode.toolFailed", { message: data.message });
                   }
                 } else if (data.type === "error") {
                   // Error event
                   console.error("[NL2Q] Error event:", data.error || data.message);
                   hasError = true;
-                  const rawErr = data.error || data.message || "Unknown error";
+                  const rawErr = data.error || data.message || t("onlineEvals.unknownError");
                   errorMessage = isAuthError(rawErr, data.error_type)
-                    ? UNAUTHORIZED_MESSAGE
+                    ? t(UNAUTHORIZED_MESSAGE_KEY)
                     : rawErr;
                   streamingResponse.value = errorMessage;
                 } else if (data.type === "complete") {

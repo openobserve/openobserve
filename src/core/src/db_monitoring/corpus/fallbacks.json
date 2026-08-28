@@ -1,0 +1,85 @@
+[
+  {
+    "id": "lexer-failure-unclosed-dollar-quote",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system.name": "postgresql",
+        "db.query.text": "SELECT * FROM docs WHERE body = $tag$never closed secret-fragment-77",
+        "db.operation.name": "SELECT",
+        "db.collection.name": "docs"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": null,
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_fallback_select_docs",
+    "literals": ["secret-fragment-77"],
+    "source": "authored"
+  },
+  {
+    "id": "no-text-degraded-operation-collection",
+    "dialect": "mysql",
+    "input": {
+      "attrs": {
+        "db.system": "mysql",
+        "db.operation": "SELECT",
+        "db.sql.table": "customers"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT customers",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mysql_select_customers_no_text",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "unlisted-system-fallback-no-query-norm",
+    "dialect": null,
+    "input": {
+      "attrs": {
+        "db.system.name": "QuantumDB",
+        "db.query.text": "FETCH ROWS FROM widgets WHERE secret = 'zz-top-secret-11'",
+        "db.operation.name": "FETCH",
+        "db.collection.name": "widgets"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": null,
+      "operation": "FETCH",
+      "stmt_class": "query",
+      "system": "quantumdb",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "unlisted_fetch_widgets",
+    "literals": ["zz-top-secret-11"],
+    "source": "authored"
+  }
+]

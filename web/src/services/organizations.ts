@@ -78,8 +78,15 @@ const organizations = {
   extend_trial_period: (orgIdentifier: string, data: any) => {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
   },
-  set_ai_usage_limit: (orgIdentifier: string, data: { org_id: string; credits_limit: number }) => {
-    return http().put(`/api/${orgIdentifier}/ai/usage_limit`, data);
+  // `limit` is the pool's new ceiling, not an increment. `pool` is a
+  // TrialQuotaPool key: "ai_credits" | "synthetics_browser_steps" |
+  // "synthetics_protocol_steps".
+  set_quota_usage_limit: (
+    orgIdentifier: string,
+    pool: string,
+    data: { org_id: string; limit: number },
+  ) => {
+    return http().put(`/api/${orgIdentifier}/quota/${pool}/usage_limit`, data);
   },
   rename_organization: (orgIdentifier: string, newOrgName: string) => {
     return http().put(`/api/${orgIdentifier}/rename`, {

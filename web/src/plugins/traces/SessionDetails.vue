@@ -732,14 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="text-text-muted">
                           ·
-                          {{
-                            t(
-                              row.calls === 1
-                                ? "traces.sessionDetail.rail.call"
-                                : "traces.sessionDetail.rail.calls",
-                              { n: row.calls },
-                            )
-                          }}
+                          {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                         </span>
                       </span>
                       <OIcon name="chevron-right" size="xs" class="text-text-muted flex-shrink-0" />
@@ -752,14 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
                           <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
                           <div class="text-3xs text-text-muted mb-1.75">
-                            {{
-                              t(
-                                row.calls === 1
-                                  ? "traces.sessionDetail.rail.call"
-                                  : "traces.sessionDetail.rail.calls",
-                                { n: row.calls },
-                              )
-                            }}
+                            {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                           </div>
                           <div
                             class="text-3xs text-text-secondary mb-1 font-bold tracking-[0.05em]"
@@ -917,9 +903,8 @@ import {
   type SessionDetail,
   type SessionTraceRow,
   type TurnDetail,
-  type TurnMessage,
 } from "./composables/useSessions";
-import { messagesFromInput, messagesFromOutput, getModel } from "./threadView.utils";
+import { buildTurnDetail } from "./threadView.utils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -1302,10 +1287,9 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 // Per-turn detail is DERIVED from the session spans we already fetch eagerly
 // (`sessionSpans`) — the SAME single source that powers the Pretty view and the
 // Tool Hotspots. This guarantees the collapsed turn body, the tool hotspots, and
-// the transcript can never disagree. Spans are grouped by `trace_id` and
-// classified exactly like ThreadView.
-const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
-
+// the transcript can never disagree. Spans are grouped by `trace_id`; the
+// per-trace projection lives in `threadView.utils` alongside ThreadView's, so
+// the two views classify spans identically.
 const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
   const byTrace: Record<string, any[]> = {};
   for (const s of sessionSpans.value) {
@@ -1316,72 +1300,7 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
 
   const out: Record<string, TurnDetail> = {};
   for (const tid of Object.keys(byTrace)) {
-    const spans = byTrace[tid]
-      .slice()
-      .sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
-
-    let llmCalls = 0;
-    let toolCalls = 0;
-    let otherCalls = 0;
-    const otherOps = new Set<string>();
-    for (const sp of spans) {
-      const op = String(sp.gen_ai_operation_name || "").toLowerCase();
-      if (LLM_OPS.has(op)) llmCalls += 1;
-      else if (op === "execute_tool") toolCalls += 1;
-      else {
-        otherCalls += 1;
-        if (op) otherOps.add(op);
-      }
-    }
-
-    // user question = last user-role entry of a span's full prompt; model = the
-    // first span that carries one.
-    let userMessage: TurnMessage | null = null;
-    let model: string | null = null;
-    for (const sp of spans) {
-      if (!model) {
-        const m = getModel(sp);
-        if (m) model = m;
-      }
-      if (!userMessage) {
-        const inputMsgs = messagesFromInput(sp.gen_ai_input_messages);
-        for (let i = inputMsgs.length - 1; i >= 0; i--) {
-          if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
-            userMessage = { role: "user", content: raw(inputMsgs[i].content) };
-            break;
-          }
-        }
-      }
-      if (userMessage && model) break;
-    }
-
-    // assistant reply = final non-empty assistant message (walk newest → oldest).
-    let assistantMessage: TurnMessage | null = null;
-    for (let s = spans.length - 1; s >= 0; s--) {
-      const outputMsgs = messagesFromOutput(spans[s].gen_ai_output_messages);
-      let a: any = null;
-      for (let i = outputMsgs.length - 1; i >= 0; i--) {
-        if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
-          a = outputMsgs[i];
-          break;
-        }
-      }
-      if (a) {
-        assistantMessage = { role: "assistant", content: a.content };
-        break;
-      }
-    }
-
-    out[tid] = {
-      traceId: tid,
-      userMessage,
-      assistantMessage,
-      model,
-      llmCalls,
-      toolCalls,
-      otherCalls,
-      otherOps: [...otherOps].sort(),
-    };
+    out[tid] = buildTurnDetail(tid, byTrace[tid]);
   }
   return out;
 });

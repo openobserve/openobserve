@@ -15,7 +15,11 @@
 
 use std::{cmp::max, sync::Arc, time::Duration};
 
-use async_nats::jetstream::{self, consumer::DeliverPolicy};
+use async_nats::{
+    HeaderMap,
+    header::NATS_MESSAGE_ID,
+    jetstream::{self, consumer::DeliverPolicy},
+};
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_cluster_name, get_config};
@@ -25,7 +29,7 @@ use tokio::{sync::mpsc, task::JoinHandle};
 use crate::{db::nats::get_nats_client, errors::*, queue, queue::format_key};
 
 pub async fn init() -> Result<()> {
-    Ok(())
+    crate::db::nats::init().await
 }
 
 pub struct NatsQueue {
@@ -181,6 +185,19 @@ impl super::Queue for NatsQueue {
         // Publish a message to the stream
         let topic_name = format!("{}{}", self.prefix, format_key(topic));
         let ack = jetstream.publish(topic_name, value).await?;
+        ack.await?;
+        Ok(())
+    }
+
+    async fn publish_with_id(&self, topic: &str, value: Bytes, message_id: &str) -> Result<()> {
+        let client = get_nats_client().await.clone();
+        let jetstream = jetstream::new(client);
+        let topic_name = format!("{}{}", self.prefix, format_key(topic));
+        let mut headers = HeaderMap::new();
+        headers.insert(NATS_MESSAGE_ID, message_id);
+        let ack = jetstream
+            .publish_with_headers(topic_name, headers, value)
+            .await?;
         ack.await?;
         Ok(())
     }

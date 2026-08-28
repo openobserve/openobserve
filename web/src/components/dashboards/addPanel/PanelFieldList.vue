@@ -404,7 +404,7 @@ import useStreams from "@/composables/useStreams";
 import { applyPromqlSeed, metricsStreamsOf } from "@/utils/dashboard/promqlSeed";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
 import { buildTypeFilterBuckets } from "@/utils/metrics/metricFamily";
-import { BADGE_LABELS, getBadgeStyle } from "@/utils/metrics/metricPalette";
+import { BADGE_LABEL_KEYS, getBadgeStyle } from "@/utils/metrics/metricPalette";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -525,7 +525,7 @@ const filteredStreams = ref<any[]>([]);
 const streamListLoading = ref(false);
 
 const currentQueryFields = () =>
-  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
+  dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
 
 // Pages whose stream select is the user's own choice, so the list must load even
 // with no stream picked yet. The list is keyed on stream_type alone anyway.
@@ -538,14 +538,14 @@ const loadStreamsListBasedOnType = async () => {
   initialStreamsLoaded = true;
   streamListLoading.value = true;
   try {
-    await getStreamList(currentQueryFields().stream_type);
+    await getStreamList(currentQueryFields()?.stream_type);
   } finally {
     streamListLoading.value = false;
   }
 };
 
 watch(
-  () => currentQueryFields().stream_type,
+  () => currentQueryFields()?.stream_type,
   () => {
     if (!initialStreamsLoaded) return;
     loadStreamsListBasedOnType();
@@ -587,7 +587,7 @@ if (isEditPanel) {
       stopEditInitialLoad?.();
       loadStreamsListBasedOnType();
     };
-    stopEditInitialLoad = watch(() => currentQueryFields().stream, onStream, {
+    stopEditInitialLoad = watch(() => currentQueryFields()?.stream, onStream, {
       immediate: true,
     });
     // The immediate pass could not stop a watcher that did not exist yet.
@@ -620,7 +620,7 @@ const streamOptions = computed(() =>
     // The bucket id drives BOTH the label and the colour, so neither is
     // reconstructed from the other.
     const bucket = metricTypeBuckets.value[s.name];
-    const type = bucket ? (BADGE_LABELS[bucket] ?? "Other") : undefined;
+    const type = bucket ? t(BADGE_LABEL_KEYS[bucket] ?? "metrics.badge.other") : undefined;
     return {
       ...s,
       // The chip is the initial; hovering it (the title) spells the type out.
@@ -683,6 +683,8 @@ watch(
     if (!streamChangedForThisQuery && !streamTypeChangedForThisQuery) {
       return;
     }
+
+    if (!dashboardPanelData.data.queries?.[currentIndex]?.fields) return;
 
     const fields: any = dashboardPanelData.meta.stream.streamResults.find(
       (it: any) =>
@@ -767,7 +769,9 @@ watch(
           );
         }
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Failed to get stream fields");
+        showErrorNotification(
+          error?.message ?? t("dashboard.addSettingVariable.failedToGetStreamFields"),
+        );
       }
     }
   },
@@ -775,18 +779,20 @@ watch(
 
 watch(
   () => [
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
+    dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields
+      ?.stream_type,
     dashboardPanelData.meta.stream.streamResults,
     dashboardPanelData.meta.stream.streamResultsType,
   ],
   () => {
+    // Current query can be transiently absent (org-switch / panel reset).
+    const currentIndex = dashboardPanelData.layout.currentQueryIndex;
+    if (!dashboardPanelData.data.queries?.[currentIndex]?.fields) return;
     if (
       dashboardPanelData.meta.stream.streamResults.length > 0 &&
       dashboardPanelData.meta.stream.streamResultsType ===
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-          .stream_type
+        dashboardPanelData.data.queries[currentIndex].fields.stream_type
     ) {
-      const currentIndex = dashboardPanelData.layout.currentQueryIndex;
       const existingStream = dashboardPanelData.meta.stream.streamResults.find(
         (it: any) =>
           it.name ==
@@ -818,7 +824,7 @@ const flattenGroupedFields = computed(() => {
   if (customQueryFields.length > 0) {
     flattenedFields.push({
       isGroup: true,
-      groupName: "Query Fields",
+      groupName: t("dashboard.dashboards.queryFields"),
     });
     customQueryFields.forEach((field: any) => {
       flattenedFields.push({
@@ -833,7 +839,7 @@ const flattenGroupedFields = computed(() => {
   if (vrlFunctionFields.length > 0) {
     flattenedFields.push({
       isGroup: true,
-      groupName: "Function Fields",
+      groupName: t("dashboard.dashboards.functionFields"),
     });
     vrlFunctionFields.forEach((field: any) => {
       flattenedFields.push({
@@ -914,11 +920,12 @@ const flattenGroupedFields = computed(() => {
 watch(
   () => ({
     stream:
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields
+        ?.stream,
     streamType:
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-        .stream_type,
-    joins: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].joins,
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields
+        ?.stream_type,
+    joins: dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.joins,
   }),
   () => {
     updateGroupedFields();
@@ -1047,8 +1054,8 @@ function showSankeyActions(row: FieldItem): boolean {
 const getStreamList = async (stream_type: any) => {
   await getStreams(stream_type, false).then((res: any) => {
     const currentType =
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-        .stream_type;
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields
+        ?.stream_type;
     if (stream_type !== currentType) return;
     dashboardPanelData.meta.stream.streamResults = res.list;
     dashboardPanelData.meta.stream.streamResultsType = stream_type;

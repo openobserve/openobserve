@@ -156,12 +156,20 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick, watch } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import useResizer from "@/composables/useResizer";
 import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { escapeHtml } from "@/utils/html";
+import {
+  normalizeSpanEvents,
+  toSpanEventMarkers,
+  clusterSpanEventMarkers,
+  SEVERITY_MARKER_TOKEN,
+  type SpanEventSeverity,
+} from "@/composables/traces/useSpanEvents";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -209,6 +217,16 @@ const emit = defineEmits<{
 
 // Composables
 const { t } = useI18nTyped();
+const store = useStore();
+
+/**
+ * The stream's configured timestamp column, as the waterfall and the sidebar
+ * mini-timeline already pass. Reading events without it would silently fall
+ * back to `_timestamp` and let this surface drift from the other two.
+ */
+const eventTimestampField = computed<string | undefined>(
+  () => store.state.zoConfig?.timestamp_column,
+);
 
 // State
 const cursorVisible = ref(false);
@@ -231,6 +249,122 @@ const chartScrollRef = ref<HTMLElement | null>(null);
 const BLOCK_PADDING = 2;
 const MIN_BLOCK_WIDTH = 1;
 const BLOCK_HEIGHT = 24;
+
+/** Below this block width in pixels, markers stop being positioned. */
+const MARKER_LEGIBILITY_FLOOR_PX = 24;
+
+interface FlameEventMarker {
+  /** Offset within the block, as a percentage in [0, 100]. */
+  left: number;
+  severity: SpanEventSeverity;
+  count: number;
+  /** True when the block is too narrow to position markers honestly. */
+  isFlag: boolean;
+}
+
+/**
+ * Positions a span's events within its own block.
+ *
+ * A block narrower than the legibility floor collapses to one leading-edge
+ * flag: its width is already floored at 0.1% of the trace, so an offset inside
+ * it would describe a duration the block does not actually represent.
+ */
+const buildSpanEventMarkers = (span: any, blockWidthPx: number): FlameEventMarker[] => {
+  const events = normalizeSpanEvents(span?.events, eventTimestampField.value);
+  if (!events.length) return [];
+
+  const markers = toSpanEventMarkers(events, {
+    startUs: Number(span.start_time) / 1000,
+    durationUs: span.durationMs * 1000,
+  });
+  if (!markers.length) return [];
+
+  const clusters = clusterSpanEventMarkers(markers, blockWidthPx);
+
+  if (blockWidthPx < MARKER_LEGIBILITY_FLOOR_PX) {
+    const severities = clusters.map((cluster) => cluster.severity);
+    const severity: SpanEventSeverity = severities.includes("error")
+      ? "error"
+      : severities.includes("warning")
+        ? "warning"
+        : "info";
+    return [{ left: 0, severity, count: markers.length, isFlag: true }];
+  }
+
+  return clusters.map((cluster) => ({
+    left: cluster.left,
+    severity: cluster.severity,
+    count: cluster.events.length,
+    isFlag: false,
+  }));
+};
+
+/**
+ * Reads a registered design token's current value.
+ *
+ * `renderItem` returns raw ECharts shapes drawn to a canvas, which cannot take
+ * Tailwind utility classes. Resolving the token off the document root is the
+ * sanctioned escape hatch: the value still comes from the token, so it follows
+ * a theme flip instead of freezing whatever the light theme happened to be.
+ */
+const tokenColor = (token: string): string =>
+  getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+
+/**
+ * Severity colours read from the design tokens.
+ *
+ * The token names come from the shared vocabulary so this surface cannot drift
+ * from the waterfall and the sidebar mini-timeline.
+ */
+const severityColor = (severity: SpanEventSeverity): string =>
+  tokenColor(SEVERITY_MARKER_TOKEN[severity]);
+
+// Markers carry no halo on any surface — see SEVERITY_MARKER_CLASS for why the
+// outline was removed. This surface therefore strokes nothing either, so the
+// canvas and the DOM keep one vocabulary.
+
+/**
+ * Marker width in canvas pixels, matching the DOM surfaces' `w-0.75` (3px).
+ *
+ * A canvas cannot take a utility class, so this is the one place the shared 3px
+ * tick width is restated. `MARKER_MIN_SPACING_PX` in useSpanEvents is derived
+ * from the same number.
+ */
+const MARKER_WIDTH_PX = 3;
+
+/** Leading-edge flag for a block too narrow to position markers inside. */
+const MARKER_FLAG_WIDTH_PX = 4;
+
+/**
+ * Pixels a marker extends past its block, top and bottom.
+ *
+ * Markers used to sit inset inside the block (`0.2H` to `0.8H`), which left them
+ * wholly on an arbitrary service colour with no outline and no overhang — the one
+ * surface carrying neither of the two channels the marker vocabulary relies on
+ * (see SEVERITY_MARKER_CLASS). Overhanging puts part of every mark on the chart
+ * background, a known luminance, exactly as the waterfall tick does.
+ *
+ * 1px is what the existing layout affords and it does not collide: rows are
+ * pitched `BLOCK_HEIGHT + BLOCK_PADDING` apart, so a block owns `[y, y + 24]` and
+ * the gutter to its neighbour is 2px. A 1px overhang spans `[y - 1, y + 25]`,
+ * leaving 1px of clear gutter on each side.
+ *
+ * ROW_ORIGIN_Y exists because of this: without it the root row sits at `y = 0`
+ * and its top overhang would land at canvas `y = -1`, off the top edge. The
+ * custom series sets no `clip`, so nothing would catch that.
+ */
+const MARKER_OVERHANG_PX = 1;
+
+/**
+ * Y offset of the first row, reserving room for the root block's marker overhang.
+ *
+ * Absorbed by the `+ 20` slack already in chartContentHeight, so no other
+ * geometry moves.
+ */
+const ROW_ORIGIN_Y = MARKER_OVERHANG_PX;
+
+// Exposed for tests only — neither is part of this component's public surface.
+defineExpose({ buildSpanEventMarkers, severityColor });
 
 const GRID_LEFT = 10;
 const GRID_RIGHT = 10;
@@ -389,6 +523,7 @@ const chartOptions = computed(() => {
       formatter: (params: any) => {
         const span = params.data.spanData as EnrichedSpan;
         const percentage = ((span.durationMs / props.traceDuration) * 100).toFixed(2);
+        const eventCount = normalizeSpanEvents(span.events, eventTimestampField.value).length;
 
         return `
           <div style="padding: 0.25rem 0;">
@@ -407,6 +542,15 @@ const chartOptions = computed(() => {
                 <span>${percentage}%</span>
               </div>
               ${span.hasError ? `<div class="text-flame-tooltip-error mt-1">${t("traces.flameGraphView.hasErrors")}</div>` : ""}
+              ${
+                eventCount
+                  ? `<div class="mt-1">${escapeHtml(
+                      eventCount === 1
+                        ? t("traces.spanEventCount", { count: eventCount })
+                        : t("traces.spanEventCountPlural", { count: eventCount }),
+                    )}</div>`
+                  : ""
+              }
             </div>
           </div>
         `;
@@ -445,15 +589,39 @@ const chartOptions = computed(() => {
           const point2 = api.coord([startX + width, 0]);
 
           const x = point1[0];
-          const y = depth * (BLOCK_HEIGHT + BLOCK_PADDING);
+          const y = ROW_ORIGIN_Y + depth * (BLOCK_HEIGHT + BLOCK_PADDING);
           const rectWidth = point2[0] - point1[0];
 
-          return {
+          const blockWidth = Math.max(rectWidth, MIN_BLOCK_WIDTH);
+          const span = data[params.dataIndex].spanData;
+
+          // Markers are children of the block's own group, so they share its
+          // coordinate system and cannot drift from it. They are `silent` —
+          // hover and click stay on the block, and per-event precision lives in
+          // the sidebar mini-timeline.
+          const markerShapes = buildSpanEventMarkers(span, blockWidth).map((marker) => ({
+            type: "rect",
+            shape: {
+              x: x + (marker.isFlag ? 0 : (blockWidth * marker.left) / 100),
+              y: y - MARKER_OVERHANG_PX,
+              // 3px matches the DOM surfaces' `w-0.75` tick. The flag is wider
+              // so it stays distinguishable from a positioned marker.
+              width: marker.isFlag ? MARKER_FLAG_WIDTH_PX : MARKER_WIDTH_PX,
+              height: BLOCK_HEIGHT + 2 * MARKER_OVERHANG_PX,
+              r: 1,
+            },
+            style: {
+              fill: severityColor(marker.severity),
+            },
+            silent: true,
+          }));
+
+          const spanRect = {
             type: "rect",
             shape: {
               x,
               y,
-              width: Math.max(rectWidth, MIN_BLOCK_WIDTH),
+              width: blockWidth,
               height: BLOCK_HEIGHT,
               r: 2,
             },
@@ -488,6 +656,10 @@ const chartOptions = computed(() => {
               distance: 4,
             },
           };
+
+          return markerShapes.length
+            ? { type: "group", children: [spanRect, ...markerShapes] }
+            : spanRect;
         },
         data,
       },
@@ -526,7 +698,7 @@ const handleChartMouseMove = (event: any) => {
 const scrollToSpan = (spanId: string) => {
   const row = visualLayout.value.rowMap.get(spanId);
   if (row === undefined || !chartScrollRef.value) return;
-  const yPos = row * (BLOCK_HEIGHT + BLOCK_PADDING);
+  const yPos = ROW_ORIGIN_Y + row * (BLOCK_HEIGHT + BLOCK_PADDING);
   chartScrollRef.value.scrollTop = yPos;
 };
 

@@ -1,0 +1,106 @@
+[
+  {
+    "id": "in-list-placeholder-arity-3",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM orders WHERE id IN ($1, $2, $3)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM orders WHERE id IN (?)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_orders_in_list",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "in-list-placeholder-arity-8",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM orders WHERE id IN ($1, $2, $3, $4, $5, $6, $7, $8)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM orders WHERE id IN (?)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_orders_in_list",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "in-list-placeholder-arity-20",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM orders WHERE id IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM orders WHERE id IN (?)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_orders_in_list",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "in-list-literal-arity-3",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM orders WHERE id IN (48213, 48214, 48215)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM orders WHERE id IN (?)",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_orders_in_list",
+    "literals": ["48213", "48214", "48215"],
+    "source": "authored"
+  }
+]

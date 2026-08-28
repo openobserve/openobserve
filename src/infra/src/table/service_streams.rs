@@ -26,9 +26,8 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
 
-use super::get_lock;
 use crate::{
-    db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl},
+    db::{get_orm_client_ddl, get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -146,7 +145,7 @@ impl ServiceRecord {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -192,8 +191,7 @@ pub async fn put(
     // are stable regardless of insertion order of the original object.
     record.disambiguation = normalize_json_object(record.disambiguation);
 
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Look up the exact row via (org_id, service_name, set_id, disambiguation).
     // Scoping by set_id ensures records from different identity sets never merge.
@@ -508,7 +506,7 @@ fn union_stream_array(
 
 /// List all services for an organization
 pub async fn list(org_id: &str) -> Result<Vec<ServiceRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -524,7 +522,7 @@ pub async fn list_by_name(
     org_id: &str,
     service_name: &str,
 ) -> Result<Vec<ServiceRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -542,7 +540,7 @@ pub async fn list_filtered_by_service(
     org_id: &str,
     service_name: Option<&str>,
 ) -> Result<Vec<ServiceRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let query = match service_name {
         Some(name) => Entity::find()
@@ -562,8 +560,7 @@ pub async fn list_filtered_by_service(
 /// Delete all service records for a specific identity set within an organization.
 /// Called when a set is removed from the config to clean up stale data.
 pub async fn delete_by_set_id(org_id: &str, set_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
@@ -577,8 +574,7 @@ pub async fn delete_by_set_id(org_id: &str, set_id: &str) -> Result<(), errors::
 
 /// Delete all services for an organization, returning the number of deleted rows
 pub async fn delete_all(org_id: &str) -> Result<u64, errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let result = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
@@ -591,7 +587,7 @@ pub async fn delete_all(org_id: &str) -> Result<u64, errors::Error> {
 
 /// List distinct organization IDs that have service_streams records
 pub async fn list_distinct_orgs() -> Result<Vec<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let backend = client.get_database_backend();
 
     let sql = "SELECT DISTINCT org_id FROM service_streams ORDER BY org_id";
@@ -612,8 +608,7 @@ pub async fn list_distinct_orgs() -> Result<Vec<String>, errors::Error> {
 
 /// Delete stale records (last_seen older than threshold)
 pub async fn delete_stale(org_id: &str, older_than_micros: i64) -> Result<u64, errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let result = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
@@ -627,7 +622,7 @@ pub async fn delete_stale(org_id: &str, older_than_micros: i64) -> Result<u64, e
 
 /// Get total row count for an organization
 pub async fn count(org_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     Entity::find()
         .filter(Column::OrgId.eq(org_id))

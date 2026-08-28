@@ -17,6 +17,7 @@
 /* global BufferSource, Event, IDBCursorWithValue, IDBObjectStore, IDBRequest, IDBVersionChangeEvent, queueMicrotask, setTimeout, crypto, TextEncoder */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { gt } from "@/types/i18n";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 
 // ---------------------------------------------------------------------------
@@ -445,6 +446,7 @@ describe("useChatHistory", () => {
       const { saveToHistory } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const result = await saveToHistory([], "session-001");
       expect(result).toBeNull();
@@ -454,6 +456,7 @@ describe("useChatHistory", () => {
       const { saveToHistory } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const result = await saveToHistory(makeMessages(2), "session-001");
       expect(typeof result).toBe("number");
@@ -464,6 +467,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const chatId = await saveToHistory(makeMessages(1), "session-001", "My Custom Title");
       expect(chatId).not.toBeNull();
@@ -476,6 +480,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello, world!" },
@@ -492,6 +497,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const longContent = "A".repeat(50);
       const messages: ChatMessage[] = [{ role: "user", content: longContent }];
@@ -507,6 +513,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const exactContent = "B".repeat(40);
       const messages: ChatMessage[] = [{ role: "user", content: exactContent }];
@@ -520,6 +527,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const expectedKey = await resolveKey(USER1, ORG1);
       const chatId = await saveToHistory(makeMessages(1), "session-005");
@@ -533,6 +541,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const chatId = await saveToHistory(makeMessages(1), "session-006", "Original Title");
       expect(chatId).not.toBeNull();
@@ -550,6 +559,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const messages: ChatMessage[] = [{ role: "assistant", content: "I am ready to help." }];
       const chatId = await saveToHistory(messages, "session-007");
@@ -566,6 +576,7 @@ describe("useChatHistory", () => {
       const { loadHistory } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const history = await loadHistory();
       expect(history).toEqual([]);
@@ -575,10 +586,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       await saveUnique(h1, makeMessages(1), "s1", "Chat A");
@@ -593,6 +606,7 @@ describe("useChatHistory", () => {
       const composable = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const { loadHistory } = composable;
 
@@ -620,6 +634,7 @@ describe("useChatHistory", () => {
       const composable = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const { loadHistory } = composable;
 
@@ -636,10 +651,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       // 105 for user1; saveUnique ensures unique IDs
@@ -665,6 +682,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const messages = makeMessages(2);
       const chatId = await saveToHistory(messages, "session-load-1", "Load Test");
@@ -681,6 +699,7 @@ describe("useChatHistory", () => {
       const { loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const entry = await loadChat(99999);
       expect(entry).toBeNull();
@@ -690,10 +709,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-cross", "User1 Chat");
@@ -709,12 +730,14 @@ describe("useChatHistory", () => {
       const { loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
 
       // First: ensure DB is initialised by doing a read
       await useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       ).loadHistory();
 
       const legacyId = 777;
@@ -740,6 +763,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, deleteChatById, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const chatId = await saveToHistory(makeMessages(1), "s-del-1", "To Delete");
       expect(chatId).not.toBeNull();
@@ -755,11 +779,13 @@ describe("useChatHistory", () => {
       const { deleteChatById } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       // Initialise DB first
       await useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       ).loadHistory();
       const result = await deleteChatById(99999);
       expect(result).toBe(false);
@@ -769,10 +795,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-del-cross", "User1 Chat");
@@ -793,6 +821,7 @@ describe("useChatHistory", () => {
       const composable = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const { clearAllHistory, loadHistory } = composable;
 
@@ -810,11 +839,13 @@ describe("useChatHistory", () => {
       const { clearAllHistory } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       // Initialise DB
       await useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       ).loadHistory();
       const result = await clearAllHistory();
       expect(result).toBe(true);
@@ -824,10 +855,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       await saveUnique(h1, makeMessages(1), "s1", "User1 Chat 1");
@@ -852,6 +885,7 @@ describe("useChatHistory", () => {
       const { saveToHistory, updateChatTitle, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const chatId = await saveToHistory(makeMessages(1), "s-upd-1", "Old Title");
       expect(chatId).not.toBeNull();
@@ -868,11 +902,13 @@ describe("useChatHistory", () => {
       const { updateChatTitle } = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       // Initialise DB
       await useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       ).loadHistory();
       const result = await updateChatTitle(99999, "Any Title");
       expect(result).toBe(false);
@@ -882,10 +918,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-upd-cross", "Original");
@@ -922,10 +960,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       for (let i = 0; i < 3; i++) {
@@ -949,10 +989,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(2), "s-iso-load", "Isolated Chat");
@@ -966,10 +1008,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-iso-del", "Should Stay");
@@ -983,10 +1027,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       await saveUnique(h1, makeMessages(1), "s-clear-1", "User1 A");
@@ -1003,10 +1049,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const chatId = await h1.saveToHistory(makeMessages(1), "s-iso-upd", "Protected Title");
@@ -1024,10 +1072,12 @@ describe("useChatHistory", () => {
       const h1 = useChatHistory(
         () => USER1,
         () => ORG1,
+        gt,
       );
       const h2 = useChatHistory(
         () => USER2,
         () => ORG2,
+        gt,
       );
 
       const id1 = await saveUnique(h1, makeMessages(1), "key-cache-1", "H1 Chat");
@@ -1047,6 +1097,7 @@ describe("useChatHistory", () => {
       const composable = useChatHistory(
         () => USER1,
         () => currentOrg,
+        gt,
       );
 
       // Save a chat while in ORG1

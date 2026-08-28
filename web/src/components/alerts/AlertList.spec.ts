@@ -205,14 +205,17 @@ async function mountAlertList() {
           emits: ["update:ok", "update:cancel", "update:modelValue"],
           template: '<div class="confirm-dialog-stub" :data-open="modelValue"></div>',
         },
-        AppTabs: {
-          name: "AppTabs",
-          props: ["tabs", "activeTab"],
-          emits: ["update:active-tab"],
-          template:
-            '<div class="app-tabs-stub">' +
-            '<button v-for="tab in tabs" :key="tab.value" :class="`tab-${tab.value}`" @click="$emit(\'update:active-tab\', tab.value)">{{tab.label}}</button>' +
-            "</div>",
+        // Real reka-ui toggle groups slow every mount, and this file mounts 70 times — enough to push borderline tests past their timeouts.
+        OToggleGroup: {
+          name: "OToggleGroup",
+          props: ["modelValue"],
+          emits: ["update:modelValue"],
+          template: '<div class="toggle-group-stub"><slot /></div>',
+        },
+        OToggleGroupItem: {
+          name: "OToggleGroupItem",
+          props: ["value"],
+          template: '<button type="button"><slot /></button>',
         },
         SelectFolderDropDown: true,
       },
@@ -241,7 +244,7 @@ beforeEach(() => {
   // query.tab) run during mount(), before mountAlertList can blank the query —
   // so a leftover action/tab from an earlier test (e.g. "when action=add"
   // pushes {action:"add"}) would asynchronously re-open the add/import dialog
-  // and hide the list (and its AppTabs), breaking every later assertion.
+  // and hide the list (and its type filter), breaking every later assertion.
   router.currentRoute.value.query = {};
   router.currentRoute.value.params = {};
   router.currentRoute.value.name = "alertList";
@@ -437,6 +440,15 @@ describe("AlertList - basic rendering", () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
+  });
+
+  it("titles itself with the SECTION, so the peer tabs never move", async () => {
+    // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
+    // is NOT "Alerts": a per-page title sizes the title block and shifts the
+    // tab strip horizontally on every navigation.
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
   });
 
   it("renders search input and toggle", async () => {
@@ -673,12 +685,22 @@ describe("AlertList - row actions", () => {
     await wrapper.vm.showDeleteDialogFn({ row });
     expect(wrapper.vm.confirmDelete).toBe(true);
 
+    (alertsSvc.listByFolderId as any).mockClear();
     await wrapper.vm.deleteAlertByAlertId();
     await flushPromises();
 
     expect(
       wrapper.vm.filteredResults.find((r: any) => r.alert_id === row.alert_id),
     ).toBeUndefined();
+    // No refetch: reloading the folder would blank the table behind its skeleton
+    // and a loading toast for a row the server already confirmed gone.
+    expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+    // The store cache backs a folder revisit, so the row must leave it too or it
+    // reappears the moment the user navigates away and back.
+    const cached = store.state.organizationData.allAlertsListByFolderId[wrapper.vm.activeFolderId];
+    if (Array.isArray(cached)) {
+      expect(cached.find((r: any) => r.alert_id === row.alert_id)).toBeUndefined();
+    }
   });
 
   it("edit action navigates to update route (sets query action=update)", async () => {
@@ -696,28 +718,47 @@ describe("AlertList - row actions", () => {
     expect(call).toBeTruthy();
   });
 
-  it("exports a single alert to JSON (creates object URL)", async () => {
+  // Export fetches the definition and opens the format dialog; the file is
+  // written from there, once the user has picked JSON or Terraform.
+  it("opens the export dialog with the fetched alert definition", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     const row = wrapper.vm.filteredResults[0];
 
-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
     // Trigger export through method to avoid menu interaction
     await wrapper.vm.exportAlert(row);
-    expect(createURLSpy).toHaveBeenCalled();
+    await flushPromises();
+
+    expect(wrapper.vm.showExportDialog).toBe(true);
+    expect(wrapper.vm.alertsToExport).toHaveLength(1);
+    expect(wrapper.vm.alertsToExport[0].name).toBe(row.name);
+    // The exported id belongs to the source alert, not to what this creates.
+    expect(wrapper.vm.alertsToExport[0]).not.toHaveProperty("id");
   });
 
-  it("exports multiple selected alerts to JSON", async () => {
+  it("opens the export dialog with every selected alert", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // Select two alerts
-    wrapper.vm.selectedAlerts = [wrapper.vm.filteredResults[0], wrapper.vm.filteredResults[1]];
+    // Select two alerts. selectedAlerts is a computed over selectedAlertIds whose
+    // setter only handles clearing, so selection has to go through the ids.
+    wrapper.vm.selectedAlertIds = [
+      wrapper.vm.filteredResults[0].alert_id,
+      wrapper.vm.filteredResults[1].alert_id,
+    ];
+    await flushPromises();
+    expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+
+    await wrapper.vm.multipleExportAlert();
     await flushPromises();
 
-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
-    await wrapper.vm.multipleExportAlert();
-    expect(createURLSpy).toHaveBeenCalled();
+    expect(wrapper.vm.showExportDialog).toBe(true);
+    expect(wrapper.vm.alertsToExport).toHaveLength(2);
+
+    // The selection clears once the download actually happens.
+    expect(wrapper.vm.selectedAlerts.length).toBe(2);
+    wrapper.vm.onExportDownloaded({ format: "terraform", count: 2 });
+    await flushPromises();
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
 });
@@ -1347,8 +1388,10 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       expect(wrapper.vm.tabs).toEqual(
         expect.arrayContaining([expect.objectContaining({ value: "composite" })]),
       );
-      const tabs = wrapper.findComponent({ name: "AppTabs" });
-      await tabs.vm.$emit("update:active-tab", "composite");
+      const typeFilter = wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.attributes("data-test") === "alert-list-tabs");
+      await typeFilter.vm.$emit("update:modelValue", "composite");
       await flushPromises();
 
       expect(AlertService.listByFolderId).toHaveBeenLastCalledWith(

@@ -455,7 +455,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     } catch (error: any) {
       if (generation !== orgGeneration || requestedOrg !== org.value) return;
       loadError.value =
-        error?.response?.data?.message ?? error?.message ?? "Failed to load metrics";
+        error?.response?.data?.message ?? error?.message ?? t("metrics.failedToLoadMetrics");
       streams.value = [];
       cards.value = [];
     } finally {

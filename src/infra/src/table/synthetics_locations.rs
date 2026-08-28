@@ -28,12 +28,9 @@ use std::{
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr};
 use tokio::sync::RwLock;
 
-use super::{
-    entity::synthetics_locations::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::synthetics_locations::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -55,10 +52,13 @@ pub const KIND_PRIVATE: &str = "private";
 /// different view of the same tiny row set, so one load serves all three and
 /// there is no per-key stampede to reason about.
 ///
-/// TTL-based rather than event-invalidated: `coordinator::synthetics` does not
-/// exist yet, so a short TTL is what bounds staleness across pods. Writes in
-/// this module invalidate eagerly, so the TTL only covers changes made by a
-/// *different* node.
+/// Both event-invalidated and TTL-bounded. Writes here clear this node's copy
+/// and emit a `coordinator::synthetics` event that clears every other node's, so
+/// the TTL is the fallback for a node that missed the event rather than the
+/// normal path. In a super cluster the same holds one level up: a replicated
+/// write is applied through these same functions, so the receiving region emits
+/// its own coordinator event.
+///
 /// The cached rows and the instant they were loaded, absent until first load.
 type CachedLocations = Option<(Vec<SyntheticsLocationRecord>, Instant)>;
 
@@ -93,7 +93,7 @@ async fn ensure_fresh() -> Result<(), errors::Error> {
         return Ok(());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows: Vec<SyntheticsLocationRecord> = Entity::find()
         .order_by_asc(Column::Kind)
         .order_by_asc(Column::Label)
@@ -156,8 +156,7 @@ impl From<Model> for SyntheticsLocationRecord {
 
 /// Insert a new location row.
 pub async fn add(record: &SyntheticsLocationRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = ActiveModel {
         id: Set(record.id.clone()),
         org_id: Set(record.org_id.clone()),
@@ -176,11 +175,6 @@ pub async fn add(record: &SyntheticsLocationRecord) -> Result<(), errors::Error>
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
@@ -205,7 +199,7 @@ pub async fn list_visible(org_id: &str) -> Result<Vec<SyntheticsLocationRecord>,
 
 /// All private rows across orgs — used by the staleness watcher.
 pub async fn list_private() -> Result<Vec<SyntheticsLocationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows = Entity::find()
         .filter(Column::Kind.eq(KIND_PRIVATE))
         .all(client)
@@ -224,41 +218,43 @@ pub async fn find_by_pool(pool: &str) -> Result<Option<SyntheticsLocationRecord>
     with_cached(|rows| rows.iter().find(|r| r.pool == pool).cloned()).await
 }
 
-/// Update label/enabled on a location.
-pub async fn update(id: &str, label: &str, enabled: bool) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let now = chrono::Utc::now().timestamp_micros();
+/// Builds the `UPDATE` a location edit issues.
+///
+/// Split out of [`update`] so the column list is assertable without a database.
+/// The omission that matters is `down_notified_at`: the super-cluster consumer
+/// applies replicated edits through [`update`], so anything this statement does
+/// not name keeps this region's value. That column is a compare-and-swap claim
+/// on the right to send one "location down" notification — if an edit made in
+/// another region reset it, one outage would notify once per region.
+///
+/// See the guard test at the bottom of this file.
+fn update_stmt(id: &str, label: &str, enabled: bool, now: i64) -> sea_orm::UpdateMany<Entity> {
     Entity::update_many()
         .col_expr(Column::Label, Expr::value(label))
         .col_expr(Column::Enabled, Expr::value(enabled))
         .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::Id.eq(id))
+}
+
+/// Update label/enabled on a location.
+pub async fn update(id: &str, label: &str, enabled: bool) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    let now = chrono::Utc::now().timestamp_micros();
+    update_stmt(id, label, enabled, now)
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
 
 /// Delete a location row.
 pub async fn remove(id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_by_id(id)
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
@@ -279,8 +275,7 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
 /// Deliberately NOT cached — `LOCATIONS_CACHE` serves definition reads, and a
 /// stale `down_notified_at` would reintroduce exactly the duplicate this fixes.
 pub async fn try_claim_down_notification(id: &str, now_us: i64) -> Result<bool, errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let res = Entity::update_many()
         .col_expr(Column::DownNotifiedAt, Expr::value(now_us))
         .filter(Column::Id.eq(id))
@@ -297,8 +292,7 @@ pub async fn try_claim_down_notification(id: &str, now_us: i64) -> Result<bool, 
 /// the result is the same. Guarding it would leave the flag set if the one node
 /// that "won" the clear died before the next tick, silencing the next outage.
 pub async fn clear_down_notification(id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::DownNotifiedAt, Expr::value(0i64))
         .filter(Column::Id.eq(id))
@@ -307,4 +301,88 @@ pub async fn clear_down_notification(id: &str) -> Result<(), errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{DbBackend, QueryTrait};
+
+    use super::*;
+
+    /// The guarantee super-cluster replication of this table rests on.
+    ///
+    /// A replicated edit is applied by calling [`update`], so whatever the
+    /// statement it builds does not name keeps this region's value. The column
+    /// that must keep it is `down_notified_at`: it is a compare-and-swap claim
+    /// on the right to send one "location down" notification, and the whole
+    /// point of the claim is that exactly one watcher wins it. If an edit made
+    /// in another region cleared it, one outage would notify once per region —
+    /// the same defect class as two regions leasing one job, and just as silent
+    /// (the notifications look correct, there are simply N of them).
+    ///
+    /// Asserting on the generated SQL rather than on an `ActiveModel` because
+    /// `update` writes through `update_many`/`col_expr` and never builds one:
+    /// the statement is the thing that reaches the database.
+    #[test]
+    fn a_location_edit_never_writes_the_down_notification_claim() {
+        let sql = update_stmt("loc-1", "Renamed", false, 1_750_000_000_000_000)
+            .build(DbBackend::Postgres)
+            .to_string();
+
+        assert!(
+            sql.contains("label"),
+            "the edit itself must still apply: {sql}"
+        );
+        assert!(sql.contains("enabled"), "{sql}");
+        assert!(sql.contains("updated_at"), "{sql}");
+        assert!(
+            !sql.contains("down_notified_at"),
+            "down_notified_at is region-owned runtime state: {sql}"
+        );
+        // Addressed by primary key — a replicated edit must not fan out across
+        // rows the origin region never touched.
+        assert!(sql.contains("\"id\" = 'loc-1'"), "{sql}");
+    }
+
+    /// A location arrives from another region through [`add`], which is also
+    /// the only way a local one is created. It stamps the claim clear rather
+    /// than carrying one: a row that has never been seen down here has never
+    /// been notified about here either.
+    #[test]
+    fn a_new_location_starts_with_the_down_notification_claim_clear() {
+        let record = SyntheticsLocationRecord {
+            id: "loc-1".to_string(),
+            org_id: Some("org1".to_string()),
+            kind: KIND_PRIVATE.to_string(),
+            provider: "custom".to_string(),
+            region: "corp-hq".to_string(),
+            label: "Corp HQ".to_string(),
+            pool: "private-org1-corp-hq".to_string(),
+            enabled: true,
+            created_at: 1,
+            updated_at: 2,
+        };
+        // Mirrors the ActiveModel `add` builds; the record type has no field
+        // for the claim at all, which is what makes it unreachable from a
+        // replicated payload.
+        let model = ActiveModel {
+            id: Set(record.id.clone()),
+            org_id: Set(record.org_id.clone()),
+            kind: Set(record.kind.clone()),
+            provider: Set(record.provider.clone()),
+            region: Set(record.region.clone()),
+            label: Set(record.label.clone()),
+            pool: Set(record.pool.clone()),
+            enabled: Set(record.enabled),
+            down_notified_at: Set(0),
+            created_at: Set(record.created_at),
+            updated_at: Set(record.updated_at),
+        };
+        assert_eq!(model.down_notified_at, Set(0));
+        // The scope is stored twice and both halves must survive: `list_visible`
+        // filters on `org_id`, so a private row arriving with `org_id: None`
+        // would be handed to every org.
+        assert_eq!(model.org_id, Set(Some("org1".to_string())));
+        assert_eq!(model.kind, Set(KIND_PRIVATE.to_string()));
+    }
 }

@@ -36,8 +36,27 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   `bg-surface-base`, `--color-border-default` → `border-border-default`.) This also
   covers the v4 shorthand `bg-(--color-x)` — same rule, use `bg-x`.
   > **Retired aliases** (CI-banned, `retiredTextAlias`): `text-text-primary` →
-  > `text-text-heading`, `text-text-caption` → `text-text-secondary`. The text
-  > hierarchy is heading / body / secondary / label / muted.
+  > `text-text-heading`, `text-text-caption` → `text-text-secondary`.
+- **Text colour — pick by SEMANTIC role, never by eye.** The hierarchy is
+  heading / body / secondary / label / muted, and each has exactly one job.
+  Using the wrong tier is a bug even though CI can't catch it: `muted` on a real
+  value reads as "turned off", and a label in `body` fails to recede.
+  - `text-text-heading` — titles, section headings, and the emphasized primary
+    value in a tile/row. The strongest text.
+  - `text-text-body` — main/primary reading content: the sentence, or the data
+    value that is the row's whole point.
+  - `text-text-secondary` — labels, captions, metadata, units, sub-labels, and
+    any supporting text beside the primary. **This is where "quiet" text goes —
+    NOT muted.**
+  - `text-text-label` — a form field's own label (the `OForm*` controls render
+    it for you; reach for it directly only for a bare field label).
+  - `text-text-muted` — the faintest tier, reserved for INACTIVE / disabled /
+    absent content ONLY: a disabled control, an em-dash / "not measured" / "none"
+    placeholder, a value nobody supplied. Never a label, never body text.
+    (`text-text-disabled` is the dedicated disabled-control token when a
+    component needs a distinct one.)
+  - To make text quieter, drop ONE tier on this ladder (+ size/weight) — never a
+    raw `opacity` and never a lighter palette colour.
 - **Arbitrary `[var(--color-x)]` in a class now FAILS CI** (`rawVarInTemplate`,
   zero tolerance) — including the v4 shorthand `bg-(--color-x)` and the fallback
   form `bg-[var(--color-x,#fff)]`. "The token has no registered utility" is no

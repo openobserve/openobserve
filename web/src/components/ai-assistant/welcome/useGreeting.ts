@@ -29,9 +29,14 @@ export function useGreeting(email: () => string | undefined) {
   const greeting = computed(() => {
     // Annotated so TS checks the built key against I18nKey: `period` is a literal
     // union, so renaming or dropping any of the four keys fails the build.
+    // Two complete keys per period rather than appending ", {name}" to the
+    // translated phrase — the name's position in the sentence is per-language.
+    if (displayName.value) {
+      const namedKey: I18nKey = `aiAssistant.greetingNamed.${period.value}`;
+      return t(namedKey, { name: displayName.value });
+    }
     const key: I18nKey = `aiAssistant.greeting.${period.value}`;
-    const phrase = t(key);
-    return displayName.value ? `${phrase}, ${displayName.value}` : phrase;
+    return t(key);
   });
 
   return { displayName, period, greeting };

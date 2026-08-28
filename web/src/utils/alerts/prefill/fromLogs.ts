@@ -144,10 +144,6 @@ export const buildPrefillFromLogs = (input: LogsPrefillInput): AlertPrefill => {
     warnings.push(warn("broadMatch", "warning"));
   }
 
-  if (input.transformType === "action") {
-    warnings.push(warn("actionsDropped", "warning"));
-  }
-
   if (input.hasResults === false) {
     warnings.push(warn("noResults", "info"));
   }

@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="help" size="sm" />
           <span v-if="label">{{ label }}</span>
-          <span v-else-if="!noBorder" class="ml-1">Syntax Guide</span>
+          <span v-else-if="!noBorder" class="ml-1">{{ t("search.syntaxGuideLabel") }}</span>
           <OTooltip :content="t('search.syntaxGuideLabel')" />
         </OButton>
       </div>
@@ -79,56 +79,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mb-1.25">
             <div class="ml-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
+                <!-- The prose in each item is translated; the query fragments next to it are
+                     NOT — they are syntax, and a translated match_all() would be a query
+                     that does not run. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
-                  For inverted index search of value 'error' use
+                  {{ t("search.syntaxGuide.invertedIndex") }}
                   <span class="bg-highlight-bg px-1.25">match_all('error')</span>
-                  in query editor. Search terms are case-insensitive.
+                  {{ t("search.syntaxGuide.invertedIndexHint") }}
                 </li>
                 <li>
-                  For prefix search use
+                  {{ t("search.syntaxGuide.prefix") }}
                   <span class="bg-highlight-bg px-1.25">match_all('error*')</span>
-                  to find all terms starting with 'error'.
+                  {{ t("search.syntaxGuide.prefixHint") }}
                 </li>
                 <li>
-                  For phrase prefix search use
+                  {{ t("search.syntaxGuide.phrasePrefix") }}
                   <span class="bg-highlight-bg px-1.25">match_all('error code*')</span>
-                  to find phrases starting with 'error code'.
+                  {{ t("search.syntaxGuide.phrasePrefixHint") }}
                 </li>
                 <li>
-                  For case sensitive search use
+                  {{ t("search.syntaxGuide.caseSensitive") }}
                   <span class="bg-highlight-bg px-1.25">match_all('traceHits')</span>
-                  with exact case matching.
+                  {{ t("search.syntaxGuide.caseSensitiveHint") }}
                 </li>
                 <li>
-                  For postfix search use
+                  {{ t("search.syntaxGuide.postfix") }}
                   <span class="bg-highlight-bg px-1.25">match_all('*failed')</span>
-                  to find all terms ending with 'failed'.
+                  {{ t("search.syntaxGuide.postfixHint") }}
                 </li>
                 <li>
-                  For column search of value 'error' use
+                  {{ t("search.syntaxGuide.column") }}
                   <span class="bg-highlight-bg px-1.25">str_match(<b>fieldname</b>, 'error')</span>
                 </li>
                 <li>
-                  For case-insensitive column search of value 'error' use
+                  {{ t("search.syntaxGuide.columnIgnoreCase") }}
                   <span class="bg-highlight-bg px-1.25"
                     >str_match_ignore_case(<b>fieldname</b>, 'Error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
+                  {{ t("search.syntaxGuide.code") }}
                   <span class="bg-highlight-bg px-1.25">code=200</span>
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
+                  {{ t("search.syntaxGuide.stream") }}
                   <span class="bg-highlight-bg px-1.25">stream='stderr'</span>
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <li>
-                  For additional examples,
+                  {{ t("search.syntaxGuide.moreExamples") }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
                     class="text-primary hover:underline"
-                    >click here</a
+                    >{{ t("search.syntaxGuide.clickHere") }}</a
                   >.
                 </li>
               </ul>
@@ -138,79 +143,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="w-105">
-          <div class="label text-sm font-bold">Syntax Guide: SQL Mode</div>
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
         </div>
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
             <div class="ml-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
+                <!-- As above: the prose is translated, the SQL samples are left literal. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
-                  For inverted index search of value 'error' use
+                  {{ t("search.syntaxGuide.invertedIndex") }}
                   <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
-                  in query editor. Search terms are case-insensitive.
+                  {{ t("search.syntaxGuide.invertedIndexHint") }}
                 </li>
                 <li>
-                  For prefix search use
+                  {{ t("search.syntaxGuide.prefix") }}
                   <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error*')</span
                   >
-                  to find all terms starting with 'error'.
+                  {{ t("search.syntaxGuide.prefixHint") }}
                 </li>
                 <li>
-                  For phrase prefix search use
+                  {{ t("search.syntaxGuide.phrasePrefix") }}
                   <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error code*')</span
                   >
-                  to find phrases starting with 'error code'.
+                  {{ t("search.syntaxGuide.phrasePrefixHint") }}
                 </li>
                 <li>
-                  For case sensitive search use
+                  {{ t("search.syntaxGuide.caseSensitive") }}
                   <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('traceHits')</span
                   >
-                  with exact case matching.
+                  {{ t("search.syntaxGuide.caseSensitiveHint") }}
                 </li>
                 <li>
-                  For postfix search use
+                  {{ t("search.syntaxGuide.postfix") }}
                   <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('*failed')</span
                   >
-                  to find all terms ending with 'failed'.
+                  {{ t("search.syntaxGuide.postfixHint") }}
                 </li>
                 <li>
-                  For column search of value 'error' use
+                  {{ t("search.syntaxGuide.column") }}
                   <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
+                  {{ t("search.syntaxGuide.code") }}
                   <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
+                  {{ t("search.syntaxGuide.stream") }}
                   <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on column log use
-                  <span class="bg-highlight-bg px-1.25"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span
-                  >
+                  <!-- Both the function name and the sample are slots, so the sentence can be
+                       reordered by a translator without stranding the <i> or the space. -->
+                  <i18n-t keypath="search.syntaxGuide.queryFunction" tag="span">
+                    <template #fn>
+                      <i>extract_ip</i>
+                    </template>
+                    <template #query>
+                      <span class="bg-highlight-bg px-1.25"
+                        >SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span
+                      >
+                    </template>
+                  </i18n-t>
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <li>
-                  For additional examples,
+                  {{ t("search.syntaxGuide.moreExamples") }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
                     class="text-primary hover:underline"
-                    >click here</a
+                    >{{ t("search.syntaxGuide.clickHere") }}</a
                   >.
                 </li>
               </ul>

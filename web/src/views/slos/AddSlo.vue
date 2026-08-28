@@ -27,7 +27,7 @@
 <template>
   <OPageLayout
     :title="isEdit ? t('slos.editTitle') : t('slos.newTitle')"
-    icon="track-changes"
+    icon="target"
     :back="{ to: backTarget, label: t('slos.title') }"
     scroll
     pad-y
@@ -57,7 +57,7 @@
     <OBanner
       v-if="isEdit && definitionChanged"
       variant="warning"
-      icon="restart_alt"
+      icon="restart-alt"
       class="mb-3"
       data-test="slos-addslo-regen-warning"
     >
@@ -412,39 +412,39 @@
           <!-- OToggleGroup renders OToggleGroupItem children; it has no
                  `options` prop. Passing one rendered an empty bar, which left
                  S-3's rolling window and S-4's slice interval unreachable. -->
-          <OToggleGroup
-            v-model="form.window_secs"
-            :label="t('slos.field.window')"
-            class="mt-3"
-            data-test="slos-addslo-window"
-          >
-            <OToggleGroupItem
-              v-for="opt in windowOptions"
-              :key="opt.value"
-              :value="opt.value"
-              size="sm"
-              :data-test="`slos-addslo-window-${opt.value}`"
+          <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <OToggleGroup
+              v-model="form.window_secs"
+              :label="t('slos.field.window')"
+              data-test="slos-addslo-window"
             >
-              {{ opt.label }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <OToggleGroup
-            v-model="form.slice_interval_secs"
-            :label="t('slos.field.sliceInterval')"
-            class="mt-3"
-            data-test="slos-addslo-slice"
-          >
-            <OToggleGroupItem
-              v-for="opt in sliceOptions"
-              :key="opt.value"
-              :value="opt.value"
-              :disabled="opt.disable"
-              size="sm"
-              :data-test="`slos-addslo-slice-${opt.value}`"
+              <OToggleGroupItem
+                v-for="opt in windowOptions"
+                :key="opt.value"
+                :value="opt.value"
+                size="sm"
+                :data-test="`slos-addslo-window-${opt.value}`"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OToggleGroup
+              v-model="form.slice_interval_secs"
+              :label="t('slos.field.sliceInterval')"
+              data-test="slos-addslo-slice"
             >
-              {{ opt.label }}
-            </OToggleGroupItem>
-          </OToggleGroup>
+              <OToggleGroupItem
+                v-for="opt in sliceOptions"
+                :key="opt.value"
+                :value="opt.value"
+                :disabled="opt.disable"
+                size="sm"
+                :data-test="`slos-addslo-slice-${opt.value}`"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+          </div>
           <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
             {{ t("slos.groupedSliceNote") }}
           </p>
@@ -540,7 +540,7 @@
         <OFormSection :title="t('slos.section.summary')" class="h-fit">
           <dl class="text-compact grid grid-cols-[8rem_1fr] gap-y-2">
             <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
-            <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
+            <dd>{{ sliTypeLabel(form.sli_type, t) }}</dd>
 
             <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
             <dd>{{ formatTarget(form.target || 0) }}</dd>
@@ -572,7 +572,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -597,6 +597,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
 import { formatTarget, formatWindow, sliTypeLabel } from "@/composables/useSloFormat";
 import { smallestLegalSlice } from "@/utils/slos/alertSource";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { SloEligibleAlert } from "@/ts/interfaces/slo";
 
 const { t } = useI18nTyped();
@@ -640,7 +641,9 @@ const form = reactive<any>({
 const groupByList = ref<string[]>([]);
 const isGrouped = computed(() => groupByList.value.length > 0);
 
-const sliTypeOptions = computed(() => [
+const sliTypeOptions = computed<
+  { value: string; label: I18nText; icon: IconName; description: I18nText }[]
+>(() => [
   {
     value: "count",
     label: t("slos.type.count"),
@@ -650,13 +653,13 @@ const sliTypeOptions = computed(() => [
   {
     value: "time_slice",
     label: t("slos.type.timeSlice"),
-    icon: "timelapse",
+    icon: "timeline",
     description: t("slos.type.timeSliceDescription"),
   },
   {
     value: "alert",
     label: t("slos.type.alert"),
-    icon: "gpp_maybe",
+    icon: "shield-alert-outline",
     description: t("slos.type.alertDescription"),
   },
 ]);

@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OStep
                   data-test="cipher-key-key-store-detils-step"
                   :name="1"
-                  :title="raw(step1Title)"
+                  :title="step1Title"
                   icon="edit"
                   :done="step > 1"
                 >
@@ -212,8 +212,9 @@ const cipherKeyTypes = [
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
 
@@ -238,8 +239,10 @@ const form = useOForm<AddCipherKeyForm>({
 
 const storeType = form.useStore((s: any) => s?.values?.key?.store?.type ?? "local");
 
-const step1Title = computed(
-  () => `${t("cipherKey.step1")} (Type: ${getTypeLabel(storeType.value)})`,
+// Whole sentence in the message: "(Type: …)" was an untranslated English
+// fragment appended to a translated title.
+const step1Title = computed(() =>
+  t("cipherKey.step1WithType", { type: getTypeLabel(storeType.value) }),
 );
 
 // Deep-merge the loaded record onto the default shape so any field the backend
@@ -276,7 +279,7 @@ const setupTemplateData = () => {
         if (error.status != 403) {
           toast({
             variant: "error",
-            message: error.response?.data?.message || "Error fetching cipher key.",
+            message: error.response?.data?.message || t("cipherKeys.fetchCipherKeyError"),
           });
         }
       });
@@ -392,8 +395,8 @@ const openCancelDialog = () => {
     return;
   }
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel changes?";
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("common.cancelChangesConfirm");
   dialog.value.okCallback = goToCipherList;
 };
 

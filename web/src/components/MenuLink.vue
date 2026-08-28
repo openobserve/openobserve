@@ -208,12 +208,12 @@ export default defineComponent({
 
     // Compute ARIA label with fallback
     const ariaLabel = computed(() => {
-      let label = props.title || "Navigation link";
+      let label: string = props.title || t("menu.navigationLink");
       if (props.badge && props.badge > 0) {
-        label += ` (${props.badge} notifications)`;
+        label = t("menu.ariaWithNotifications", { label, count: props.badge });
       }
       if (isActive.value) {
-        label += " - Current page";
+        label = t("menu.ariaCurrentPage", { label });
       }
       return label;
     });

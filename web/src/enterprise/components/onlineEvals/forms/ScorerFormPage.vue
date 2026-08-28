@@ -45,7 +45,7 @@
                 <OFormInput
                   name="name"
                   :label="t('onlineEvals.scorer.nameLabel')"
-                  :placeholder="t('onlineEvals.scorer.namePlaceholder')"
+                  :placeholder="raw('faithfulness_judge')"
                   size="sm"
                   required
                   :disabled="mode === 'edit'"
@@ -742,7 +742,10 @@ const {
   scorerTestResult,
   scorerTestError,
   runScorerTest,
-} = useScorerTest(toRef(() => formValues.value.template));
+} = useScorerTest(
+  toRef(() => formValues.value.template),
+  t,
+);
 
 const canRunScorerTest = computed(() => {
   if (!props.orgId) return false;
@@ -1008,7 +1011,7 @@ async function previewOutputSchema() {
   } catch (err: any) {
     const body = err?.response?.data ?? {};
     schemaPreviewError.value =
-      body.message || body.error || err?.message || "Failed to derive schema";
+      body.message || body.error || err?.message || t("onlineEvals.failedToDeriveSchema");
   } finally {
     isLoadingSchemaPreview.value = false;
   }

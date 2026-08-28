@@ -268,6 +268,21 @@ const firstLeafCondition = (group: AlertCondition | undefined): AlertCondition |
   return null;
 };
 
+// English on purpose, and NOT in the catalogue: the result is slugified into the
+// alert's `name`, which is persisted and shared across the org. Translating these
+// made a German user's alert save with German text where an English user's saved
+// `anomaly_<stream>` — same alert, different stored identity per locale.
+const ALERT_NAME_PATTERN = {
+  anomaly: (p: Record<string, string>) => `anomaly_${p.stream}`,
+  realTime: (p: Record<string, string>) => `realtime_${p.stream}`,
+  queryAlert: (p: Record<string, string>) => `${p.stream}_query_alert`,
+  streamAlert: (p: Record<string, string>) => `${p.stream}_alert`,
+  aggregation: (p: Record<string, string>) => `${p.stream}_${p.fn}_${p.field}`,
+  condition: (p: Record<string, string>) => `${p.stream}_${p.column}_${p.operator}_${p.value}`,
+} as const;
+
+type AlertNamePattern = keyof typeof ALERT_NAME_PATTERN;
+
 /**
  * Build an alert name from its stream and what it actually watches, e.g.
  * "anomaly_k8s_logs" / "k8s_logs_status_gte_500" / "k8s_logs_avg_latency".
@@ -276,13 +291,13 @@ const firstLeafCondition = (group: AlertCondition | undefined): AlertCondition |
  */
 export function buildAlertAutoName(
   formData: AlertAutoNameInput | null | undefined,
-  t: TranslateFn,
+  _t?: TranslateFn,
 ): string {
   const stream = (formData?.stream_name || "").trim();
   if (!stream) return "";
 
-  const name = (key: string, params: Record<string, unknown>) =>
-    slugify(tidy(t(`alerts.autoName.${key}`, params)));
+  const name = (key: AlertNamePattern, params: Record<string, unknown>) =>
+    slugify(tidy(ALERT_NAME_PATTERN[key](params as Record<string, string>)));
 
   const mode = String(formData?.is_real_time ?? "false");
   if (mode === "anomaly") return name("anomaly", { stream });

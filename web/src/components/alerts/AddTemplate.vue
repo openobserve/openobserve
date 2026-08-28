@@ -301,10 +301,7 @@ import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import {
-  validateTemplateBody,
-  getTemplateValidationErrorMessage,
-} from "@/utils/templates/validation";
+import { validateTemplateBody } from "@/utils/templates/validation";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -659,7 +656,7 @@ const isTemplateBodyValid = (bodyValue: string) => {
   if (!result.valid) {
     toast({
       variant: "error",
-      message: raw(getTemplateValidationErrorMessage()),
+      message: t("alert_templates.bodyInvalidJsonHelp"),
       timeout: 1500,
     });
   }

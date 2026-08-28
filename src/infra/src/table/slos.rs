@@ -389,6 +389,7 @@ pub async fn set_enabled(
     else {
         return Ok(false);
     };
+
     let mut active = model.into_active_model();
     active.enabled = Set(enabled);
     active.updated_at = Set(now);
@@ -422,6 +423,7 @@ pub async fn move_to_folder(
     if ids.is_empty() {
         return Ok(0);
     }
+
     let res = slos::Entity::update_many()
         .col_expr(slos::Column::FolderId, Expr::value(dst_folder_id))
         .col_expr(slos::Column::UpdatedAt, Expr::value(now))

@@ -55,7 +55,7 @@
               v-model="agentNameText"
               :label="t('settings.genAiAgentMapping.agentNameFields')"
               :help-text="t('settings.genAiAgentMapping.agentNameHelp')"
-              :placeholder="t('settings.genAiAgentMapping.agentNamePlaceholder')"
+              :placeholder="raw('my.custom.agent_name\nteam.agent.label')"
               :rows="8"
               spellcheck="false"
               data-test="gen-ai-agent-name-fields-input"
@@ -74,7 +74,7 @@
               v-model="agentIdText"
               :label="t('settings.genAiAgentMapping.agentIdFields')"
               :help-text="t('settings.genAiAgentMapping.agentIdHelp')"
-              :placeholder="t('settings.genAiAgentMapping.agentIdPlaceholder')"
+              :placeholder="raw('my.custom.agent_id\nteam.agent.uid')"
               :rows="8"
               spellcheck="false"
               data-test="gen-ai-agent-id-fields-input"
@@ -93,7 +93,7 @@
               v-model="envFieldsText"
               :label="t('settings.genAiAgentMapping.envFields')"
               :help-text="t('settings.genAiAgentMapping.envHelp')"
-              :placeholder="t('settings.genAiAgentMapping.envPlaceholder')"
+              :placeholder="raw('my.custom.env\ntier')"
               :rows="8"
               spellcheck="false"
               data-test="gen-ai-env-fields-input"
@@ -109,7 +109,7 @@
               v-model="versionFieldsText"
               :label="t('settings.genAiAgentMapping.versionFields')"
               :help-text="t('settings.genAiAgentMapping.versionHelp')"
-              :placeholder="t('settings.genAiAgentMapping.versionPlaceholder')"
+              :placeholder="raw('my.custom.version\nrelease.tag')"
               :rows="8"
               spellcheck="false"
               data-test="gen-ai-version-fields-input"
@@ -164,7 +164,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

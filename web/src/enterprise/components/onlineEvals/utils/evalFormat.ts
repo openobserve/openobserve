@@ -1,10 +1,12 @@
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt, type TranslateFn } from "@/types/i18n";
 
 export function parseJson(value: string, label: string) {
   try {
     return JSON.parse(value);
   } catch {
-    throw new Error(`${label} must be valid JSON`);
+    // Module scope, no setup context — `gt` resolves against the active locale.
+    throw new Error(gt("onlineEvals.validation.mustBeValidJson", { label }));
   }
 }
 
@@ -40,10 +42,10 @@ export function formatTemplateVariable(variable: string) {
   return `{{ ${variable} }}`;
 }
 
-export function defaultTestValue(variable: string) {
-  if (variable === "input") return "The capital of France is Paris, located on the Seine river.";
-  if (variable === "output") return "Paris is the capital of France.";
-  if (variable === "context") return "France country profile: Paris is the capital city.";
+export function defaultTestValue(variable: string, t: TranslateFn) {
+  if (variable === "input") return t("onlineEvals.scorerTestSampleInput");
+  if (variable === "output") return t("onlineEvals.scorerTestSampleOutput");
+  if (variable === "context") return t("onlineEvals.scorerTestSampleContext");
   if (variable === "metadata") return "{}";
   if (variable === "trace.id") return "test_trace_123";
   if (variable === "span.id") return "test_span_456";
