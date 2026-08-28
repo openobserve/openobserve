@@ -1116,6 +1116,7 @@ impl StepPoolViews {
     /// The grant this job spends from. `browser_devices` is written iff the check
     /// is a browser check, and unlike the live `check_type` it cannot change under
     /// an in-flight job.
+    #[cfg(feature = "cloud")]
     fn for_job(&self, browser_devices: Option<&str>) -> StepPoolView {
         if browser_devices.is_some() {
             self.browser
