@@ -96,6 +96,49 @@ pub struct SyntheticsVariableView {
     pub updated_at: i64,
 }
 
+/// One name in a check's resolved set, and where it comes from.
+///
+/// Drives the check editor's Inherited group and the `{{` autocomplete. Metadata
+/// only — like every read path here, it carries no value.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct ResolvedVariableView {
+    pub name: String,
+    pub kind: SyntheticsVariableKind,
+    /// `global`, an environment name, or `check`.
+    pub scope: String,
+    /// A shared variable this check redefines. The shared row still exists; the
+    /// check's value is what resolves.
+    pub overridden: bool,
+    pub example: String,
+    pub description: String,
+    pub has_value: bool,
+}
+
+/// Where a variable is being moved to, for the two promote flows.
+#[derive(Debug, Clone, Default, Deserialize, ToSchema)]
+pub struct PromoteVariableRequest {
+    /// Destination environment name, or None for the unscoped tier.
+    #[serde(default)]
+    pub environment: Option<String>,
+}
+
+/// One destination of a global → per-environment split.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct SplitTarget {
+    pub environment: String,
+    pub value: String,
+}
+
+/// Splitting a global variable into per-environment rows.
+///
+/// Values are collected up front rather than filled in afterwards: the failure
+/// mode is silent, because scoping `BASE_URL` to production alone means every
+/// check running against staging stops resolving it.
+#[derive(Debug, Clone, Default, Deserialize, ToSchema)]
+pub struct SplitVariableRequest {
+    pub targets: Vec<SplitTarget>,
+}
+
 /// Create/update body for an environment.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct SyntheticsEnvironmentRequest {

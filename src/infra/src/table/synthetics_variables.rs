@@ -240,6 +240,47 @@ pub async fn update<C: ConnectionTrait>(
     }
 }
 
+/// Moves one variable to a different scope.
+///
+/// Separate from [`update`] on purpose: `env` decides which OpenFGA object
+/// governs the row, so changing it is a permission-relevant operation with its
+/// own checks on both the scope being left and the one being entered. Folding
+/// it into the ordinary save would let a field on a form change who can read a
+/// credential.
+pub async fn set_env<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    env: Option<&str>,
+    updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let Some(model) = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+        .one(conn)
+        .await?
+    else {
+        return Ok(false);
+    };
+    let mut am: ActiveModel = model.into();
+    am.env = Set(env.map(str::to_string));
+    am.updated_at = Set(updated_at);
+    match Entity::update(am).exec(conn).await {
+        Ok(_) => {
+            invalidate_and_publish(org_id).await;
+            Ok(true)
+        }
+        Err(e) => match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => {
+                Err(Error::DbError(DbError::SeaORMError(
+                    "a variable with that name already exists in the destination scope".to_string(),
+                )))
+            }
+            _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+        },
+    }
+}
+
 pub async fn delete<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
