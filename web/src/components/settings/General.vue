@@ -597,6 +597,7 @@ import {
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { APP_LOCALE_TO_BCP47 } from "@/locales/numberFormat";
+import { isolateAuto, isolateLtr } from "@/locales/bidi";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -669,11 +670,12 @@ export default defineComponent({
         store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
     }));
 
-    // Unicode isolates keep mixed Arabic text, parentheses, and Western digits in order.
+    // Isolates keep the digits, the parentheses, and the translated label in
+    // order once the page is RTL — see locales/bidi.ts.
     const maxSeriesPlaceholder = computed(() => {
       const numberLocale = APP_LOCALE_TO_BCP47[locale.value] ?? "en-US";
       const value = new Intl.NumberFormat(numberLocale, { useGrouping: false }).format(40000);
-      return raw(`\u2066${value}\u2069 (\u2068${t("settings.systemDefault")}\u2069)`);
+      return raw(`${isolateLtr(value)} (${isolateAuto(t("settings.systemDefault"))})`);
     });
 
     const loadingState = ref(false);
