@@ -354,12 +354,16 @@ pub async fn set(
         .map_err(|e| Error::Message(e.to_string()))?;
 
     // store the cache item
+    // a cancelled future must not leave the file on disk without a GLOBAL_CACHE entry
+    let mut cleanup = DiskFileCleanup(Some(cache_key.clone()));
     // held across the insert so a concurrent disk eviction orders after it and prunes the entry
     let Some(_indexed) = infra::cache::file_data::disk::indexed_file_guard(&cache_key).await else {
+        cleanup.0 = None;
         return Ok(());
     };
     let cache_item = MetricsIndexCacheItem::new(&cache_key, start, new_end);
     let evicted = insert_index(bucket_id, key, query, cache_item).await;
+    cleanup.0 = None;
     if evicted > 0 {
         log::debug!("[trace_id {trace_id}] promql->search->cache: evicted {evicted} index entries");
     }
@@ -622,6 +626,17 @@ impl MetricsIndexCacheItem {
             key: key.to_string(),
             start,
             end,
+        }
+    }
+}
+
+/// Queues the disk file for deletion on drop unless disarmed after the index insert commits.
+struct DiskFileCleanup(Option<String>);
+
+impl Drop for DiskFileCleanup {
+    fn drop(&mut self) {
+        if let Some(file_key) = self.0.take() {
+            infra::cache::file_data::delete::add(vec![file_key]);
         }
     }
 }
@@ -909,6 +924,57 @@ mod tests {
         );
         assert!(metrics.data.is_empty());
         assert_eq!(metrics.cur_size, 0);
+    }
+
+    #[tokio::test]
+    async fn test_cancelled_insert_is_cleaned_up() {
+        let key = get_hash_key("cancel_probe_query", 15_000_000);
+        let bucket_id = get_bucket_id(&key);
+        let file_key = "metrics_results/cancel_org/2024/01/01/00/eee_1_2_3.pb".to_string();
+        infra::cache::file_data::disk::set_size(&file_key, 1)
+            .await
+            .unwrap();
+        assert!(
+            infra::cache::file_data::disk::indexed_file_guard(&file_key)
+                .await
+                .is_some()
+        );
+
+        // park the handoff on the bucket write lock, then abort it mid-insert
+        let w = GLOBAL_CACHE[bucket_id].write().await;
+        let task_key = key.clone();
+        let task_file = file_key.clone();
+        let handle = tokio::spawn(async move {
+            let mut cleanup = DiskFileCleanup(Some(task_file.clone()));
+            let _indexed = infra::cache::file_data::disk::indexed_file_guard(&task_file).await;
+            let item = MetricsIndexCacheItem::new(&task_file, 1, 2);
+            insert_index(bucket_id, task_key, "q", item).await;
+            cleanup.0 = None;
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        handle.abort();
+        let _ = handle.await;
+        drop(w);
+
+        // nothing was inserted, and the armed guard queued the disk file for deletion
+        assert!(
+            GLOBAL_CACHE[bucket_id]
+                .read()
+                .await
+                .data
+                .get(&key)
+                .is_none()
+        );
+        for _ in 0..100 {
+            if infra::cache::file_data::disk::indexed_file_guard(&file_key)
+                .await
+                .is_none()
+            {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        panic!("cleanup guard did not queue the file for deletion");
     }
 
     #[test]
