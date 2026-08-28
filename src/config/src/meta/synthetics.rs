@@ -1368,7 +1368,51 @@ const MIN_INTERVAL_SECS: i64 = 1;
 /// one Lambda invocation per location per browser×device combo.
 const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
 
+/// Stand-in for a placeholder while validating a templated URL's shape.
+///
+/// Deliberately boring: a bare token that is legal in a host, a path and a
+/// query alike, so the substituted string parses wherever the author put the
+/// placeholder rather than only in the cases we happened to think of.
+const TEMPLATE_PROBE_TOKEN: &str = "placeholder";
+
+/// Validates a URL that may be templated.
+///
+/// A templated target cannot be resolved here — the values belong to an
+/// environment and are only known at run time — so the shape is checked against
+/// a substituted stand-in instead. The real URL is SSRF-checked by the probe,
+/// against the address it actually resolves to, which is the only check that
+/// can be right for a value that differs per environment.
 fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+    if value.contains("{{") {
+        if value.chars().any(char::is_whitespace) {
+            return Err(format!("{field}: must not contain whitespace: '{value}'"));
+        }
+        let mut probe = String::new();
+        let mut rest = value;
+        while let Some(open) = rest.find("{{") {
+            probe.push_str(&rest[..open]);
+            let after = &rest[open + 2..];
+            let Some(close) = after.find("}}") else {
+                return Err(format!("{field}: unclosed '{{{{' in '{value}'"));
+            };
+            probe.push_str(TEMPLATE_PROBE_TOKEN);
+            rest = &after[close + 2..];
+        }
+        probe.push_str(rest);
+        // A target starting with a placeholder has no scheme to parse until the
+        // placeholder supplies one, so assume the one it must resolve to.
+        //
+        // Only when there is no scheme at all: prefixing unconditionally turned
+        // `ftp://{{HOST}}/x` into `https://ftp://placeholder/x`, which parses
+        // with host `ftp` and let a rejected scheme through. A templated scheme
+        // is therefore rejected too, which is the safe direction.
+        let candidate = if probe.contains("://") {
+            probe
+        } else {
+            format!("https://{probe}")
+        };
+        return validate_http_url(field, &candidate);
+    }
     let parsed =
         url::Url::parse(value).map_err(|e| format!("{field}: invalid URL '{value}': {e}"))?;
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
@@ -2720,6 +2764,60 @@ mod tests {
             config: serde_json::json!({ "port": 5432, "timeout_ms": 10000 }),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn a_templated_target_validates_on_its_shape() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        // The whole point of phase 4: this used to be rejected outright,
+        // because url::Url::parse demands a host it cannot see yet.
+        for target in [
+            "{{BASE_URL}}/login",
+            "https://{{TENANT}}.shop.test/login",
+            "{{BASE_URL}}",
+        ] {
+            s.target = target.to_string();
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "{target} should validate"
+            );
+        }
+    }
+
+    #[test]
+    fn a_templated_target_still_has_to_look_like_a_url() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        // Permitting templates must not turn the field into a free-text box.
+        s.target = "{{BASE_URL}} /login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "whitespace");
+
+        s.target = "{{BASE_URL/login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "unclosed");
+
+        s.target = "ftp://{{HOST}}/x".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err(), "scheme");
+    }
+
+    #[test]
+    fn an_untemplated_target_validates_exactly_as_before() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.check_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
+
+        s.target = "https://shop.test/login".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+
+        s.target = "not-a-url".to_string();
+        assert!(s.validate(&locs, &brs, &devs, true).is_err());
     }
 
     #[test]

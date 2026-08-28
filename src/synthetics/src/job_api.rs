@@ -565,6 +565,7 @@ use config::meta::{
     synthetics::{
         MAX_VARIABLES, Synthetic, SyntheticAuth, SyntheticVariable, for_each_string_at_path,
     },
+    synthetics_variables::substitute_placeholders,
 };
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -1394,6 +1395,15 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
             }
         }
     }
+
+    // Resolve a templated target before it leaves the control plane.
+    //
+    // Done here rather than in the probe so the probe receives a concrete URL:
+    // its SSRF guard then checks the address the check actually reaches, per
+    // environment, and an older probe needs no change to navigate correctly.
+    // An unbound placeholder stays literal, so the failure names itself in the
+    // navigation error rather than becoming a silent request to nowhere.
+    synthetic.target = substitute_placeholders(&synthetic.target, &env_inject);
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);

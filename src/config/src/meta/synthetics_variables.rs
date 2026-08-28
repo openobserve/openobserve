@@ -20,7 +20,7 @@
 //! narrower tier wins name by name. An environment is a filter and an access
 //! boundary, never a third tier.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -201,6 +201,45 @@ pub fn placeholder_names(text: &str) -> BTreeSet<String> {
         }
     }
     found
+}
+
+/// Substitutes `{{NAME}}` from a resolved map, leaving unbound names verbatim.
+///
+/// The Rust twin of the probe's `substituteSecretsV2` and the editor's
+/// `substituteVariables`, and it makes the same choice for the same reason:
+/// `{{...}}` is not necessarily a variable reference, so an unbound name is
+/// text rather than an empty string.
+pub fn substitute_placeholders(text: &str, values: &HashMap<String, String>) -> String {
+    if !text.contains("{{") {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(open) = rest.find("{{") {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 2..];
+        match after.find("}}") {
+            Some(close) => {
+                let name = after[..close].trim();
+                match values.get(name) {
+                    Some(value) => out.push_str(value),
+                    None => {
+                        out.push_str("{{");
+                        out.push_str(&after[..close]);
+                        out.push_str("}}");
+                    }
+                }
+                rest = &after[close + 2..];
+            }
+            None => {
+                // An unclosed `{{` is ordinary text, not a broken placeholder.
+                out.push_str("{{");
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Upper-cases a variable name, which is how every name is stored.
@@ -423,6 +462,43 @@ mod tests {
         // The scan resumes just past the braces rather than past the whole run,
         // so one bad match cannot swallow the next good one.
         assert!(placeholder_names("{{ {{GOOD}}").contains("GOOD"));
+    }
+
+    #[test]
+    fn substitution_leaves_an_unbound_name_verbatim() {
+        // Same choice as the probe and the editor, for the same reason: a check
+        // may legitimately put those characters in a URL.
+        let values = HashMap::from([("BASE_URL".to_string(), "https://shop.test".to_string())]);
+        assert_eq!(
+            substitute_placeholders("{{BASE_URL}}/login", &values),
+            "https://shop.test/login"
+        );
+        assert_eq!(
+            substitute_placeholders("{{TYPO}}/login", &values),
+            "{{TYPO}}/login"
+        );
+    }
+
+    #[test]
+    fn substitution_handles_padding_and_repeats() {
+        let values = HashMap::from([("A".to_string(), "1".to_string())]);
+        assert_eq!(substitute_placeholders("{{ A }}-{{A}}", &values), "1-1");
+    }
+
+    #[test]
+    fn an_unclosed_brace_is_ordinary_text() {
+        let values = HashMap::from([("A".to_string(), "1".to_string())]);
+        assert_eq!(substitute_placeholders("{{A", &values), "{{A");
+        assert_eq!(substitute_placeholders("a {{ b", &values), "a {{ b");
+    }
+
+    #[test]
+    fn text_without_placeholders_is_returned_unchanged() {
+        let values = HashMap::from([("A".to_string(), "1".to_string())]);
+        assert_eq!(
+            substitute_placeholders("https://shop.test", &values),
+            "https://shop.test"
+        );
     }
 
     #[test]
