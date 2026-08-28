@@ -132,7 +132,7 @@ pub enum FileType {
 struct EvictionCleanup {
     result_query_keys: Vec<String>,
     metrics_files: Vec<String>,
-    file_paths: Vec<String>,
+    evicted_files: Vec<(String, String)>, // (cache key, absolute file path)
 }
 
 impl fmt::Display for FileType {
@@ -155,13 +155,13 @@ impl Drop for EvictionCleanup {
     fn drop(&mut self) {
         if self.result_query_keys.is_empty()
             && self.metrics_files.is_empty()
-            && self.file_paths.is_empty()
+            && self.evicted_files.is_empty()
         {
             return;
         }
         let result_query_keys = std::mem::take(&mut self.result_query_keys);
         let metrics_files = std::mem::take(&mut self.metrics_files);
-        let file_paths = std::mem::take(&mut self.file_paths);
+        let evicted_files = std::mem::take(&mut self.evicted_files);
         let Ok(handle) = tokio::runtime::Handle::try_current() else {
             log::error!(
                 "File disk cache eviction cleanup dropped outside a runtime, index entries may be stale"
@@ -181,10 +181,8 @@ impl Drop for EvictionCleanup {
             {
                 hook(metrics_files);
             }
-            for file_path in file_paths {
-                if let Err(e) = tokio::fs::remove_file(&file_path).await {
-                    log::error!("File disk cache gc remove file: {file_path}, error: {e}");
-                }
+            for (key, file_path) in evicted_files {
+                remove_evicted_file(&key, &file_path).await;
             }
         });
     }
@@ -287,6 +285,9 @@ impl FileData {
         let file_ops_start = std::time::Instant::now();
         let file_path = self.get_file_path(file);
         tokio::fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
+        // a stale same-name file can await the eviction cleanup; clear it so the rename works on
+        // windows
+        let _ = tokio::fs::remove_file(&file_path).await;
         tokio::fs::rename(tmp_file, &file_path).await.map_err(|e| {
             anyhow::anyhow!(
                 "[CacheType:{}] File disk cache rename tmp file {tmp_file} to real file {file_path} error: {e}",
@@ -391,11 +392,11 @@ impl FileData {
                     .with_label_values(&[columns[1], columns[2], "aggregations"])
                     .sub(data_size as i64);
             }
+            // the guard's task unlinks best effort; survivors are re-adopted by the startup scan
+            cleanup.evicted_files.push((key.clone(), file_path));
             if is_metrics_key {
                 cleanup.metrics_files.push(key);
             }
-            // the guard's task unlinks best effort; survivors are re-adopted by the startup scan
-            cleanup.file_paths.push(file_path);
 
             if release_size >= need_release_size {
                 break;
@@ -1103,6 +1104,28 @@ fn get_bucket_idx(file: &str) -> usize {
         let h = gxhash::new().sum64(file);
         (h as usize) % cfg.disk_cache.bucket_num
     }
+}
+
+/// Unlink an evicted file unless a same-key writer re-indexed the path since the eviction.
+async fn remove_evicted_file(key: &str, file_path: &str) {
+    let idx = get_bucket_idx(key);
+    let files = if key.starts_with("files") {
+        FILES[idx].read().await
+    } else if key.starts_with("results") {
+        RESULT_FILES[idx].read().await
+    } else if key.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].read().await
+    } else {
+        RESULT_FILES[idx].read().await
+    };
+    if files.exist(key).await {
+        return;
+    }
+    // the read guard is held across the unlink so no writer can recreate the path meanwhile
+    if let Err(e) = tokio::fs::remove_file(file_path).await {
+        log::error!("File disk cache gc remove file: {file_path}, error: {e}");
+    }
+    drop(files);
 }
 
 // parse the result cache key from the file name
