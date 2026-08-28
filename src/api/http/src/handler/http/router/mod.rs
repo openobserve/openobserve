@@ -1505,9 +1505,12 @@ pub fn service_routes() -> Router {
                 get(cloud::billings::create_billing_portal_session),
             )
             .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
+            // Pool-generic limit route. Replaced `/ai/usage_limit`, which was
+            // removed with it: one route, one ROUTE_PERMISSIONS entry, and no
+            // endpoint left that resolve_permission cannot authorize.
             .route(
-                "/{org_id}/ai/usage_limit",
-                put(organization::org::set_ai_usage_limit),
+                "/{org_id}/quota/{pool}/usage_limit",
+                put(organization::org::set_quota_usage_limit),
             )
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",

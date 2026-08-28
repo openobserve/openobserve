@@ -8771,7 +8771,8 @@
       "genAiAgentMappingDesc": "Map GenAI spans to agent identifiers"
     },
     "organizationManagementPage": {
-      "setAiCredits": "Set AI Credits",
+      "setUsageLimits": "Set Usage Limits",
+      "aiCreditsTab": "AI Credits",
       "setAiCreditsSubtitle": "Set the organization's lifetime AI credit allowance.",
       "saveCredits": "Save Credits",
       "totalAiCredits": "Total AI Credits",
@@ -8779,6 +8780,17 @@
       "aiCreditsTotal": "AI Credits Total",
       "currentlyUsedLabel": "Currently used:",
       "credits": "credits",
+      "syntheticsBrowserStepsTab": "Browser Steps",
+      "syntheticsProtocolStepsTab": "Protocol Steps",
+      "setSyntheticsStepsSubtitle": "Set the organization's lifetime synthetics step allowance. Browser and protocol are separate grants.",
+      "saveSteps": "Save Steps",
+      "totalBrowserSteps": "Total Browser Steps",
+      "totalProtocolSteps": "Total Protocol Steps",
+      "browserStepsUsed": "Browser Steps Used",
+      "browserStepsTotal": "Browser Steps Total",
+      "protocolStepsUsed": "Protocol Steps Used",
+      "protocolStepsTotal": "Protocol Steps Total",
+      "steps": "steps",
       "revoke": "Revoke",
       "enableStorage": "Enable Storage",
       "storageEnabled": "Storage Enabled",
@@ -8948,6 +8960,8 @@
       "errorBulkDeleting": "Error while deleting regex patterns"
     },
     "setAiCreditsFor": "Set AI Credits for {name}",
+    "setSyntheticsBrowserStepsFor": "Set Browser Steps for {name}",
+    "setSyntheticsProtocolStepsFor": "Set Protocol Steps for {name}",
     "limitExceeded": "Limit Exceeded",
     "contractEndDateRequired": "End date is required.",
     "contractNewEndDateRequired": "New end date is required.",
@@ -8956,6 +8970,10 @@
     "aiCreditsNegative": "AI credits cannot be negative.",
     "aiCreditsMax": "AI credits exceed the supported maximum.",
     "updateAiCreditsFailed": "Failed to update AI credits.",
+    "syntheticsStepsWholeNumber": "Synthetics steps must be a whole number.",
+    "syntheticsStepsNegative": "Synthetics steps cannot be negative.",
+    "syntheticsStepsMax": "Synthetics steps exceed the supported maximum.",
+    "updateSyntheticsStepsFailed": "Failed to update synthetics steps.",
     "listConjunctionAnd": "{list}, and {last}",
     "runsIn": "Runs in",
     "recommendedByFieldCoverage": "Recommended based on field coverage in your streams.",
@@ -15023,7 +15041,9 @@
     "settings": {
       "message": "{prefix}: {message}",
       "aiCreditsUpdatedSuccessfully": "AI credits updated successfully.",
-      "updatingAiCredits": "Updating AI credits..."
+      "syntheticsStepsUpdatedSuccessfully": "Synthetics steps updated successfully.",
+      "updatingAiCredits": "Updating AI credits...",
+      "updatingSyntheticsSteps": "Updating synthetics steps..."
     },
     "dashboard": {
       "clickOnTheChartDataOr": "Click on the chart data or select a range to add an annotation",
