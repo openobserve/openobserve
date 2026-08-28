@@ -372,6 +372,10 @@ pub async fn load(cache_key: &str) -> Result<()> {
     let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
         return Ok(());
     };
+    // held across the insert so a concurrent disk eviction orders after it and prunes the entry
+    let Some(_indexed) = infra::cache::file_data::disk::indexed_file_guard(cache_key).await else {
+        return Ok(());
+    };
     let bucket_id = get_bucket_id(&key);
     // an over-budget bucket rejects startup adoption; the disk gc reclaims the unindexed files
     {
