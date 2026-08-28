@@ -130,9 +130,9 @@ pub async fn get(
     index.touch();
 
     // get the best key
-    let mut best_key = String::new();
+    let mut best_idx = None;
     let mut best_diff = 0;
-    for entry in index.entries.iter() {
+    for (i, entry) in index.entries.iter().enumerate() {
         if start < entry.start {
             continue;
         }
@@ -141,31 +141,31 @@ pub async fn get(
             d = end - start;
         }
         if d >= best_diff {
-            best_key = entry.key.clone();
+            best_idx = Some(i);
             best_diff = d;
         }
     }
+    let best_key = best_idx.map(|i| index.entries[i].key.clone());
     drop(r);
-    if best_key.is_empty() {
+    let Some(best_key) = best_key else {
         return Ok(None);
-    }
+    };
 
     // get the data from disk cache
     let Some(data) = infra::cache::file_data::disk::get(&best_key, None).await else {
-        // need to drop the key from index
-        let mut w = GLOBAL_CACHE[bucket_id].write().await;
-        w.remove_files(&key, &HashSet::from_iter([best_key]));
-        drop(w);
+        remove_index_entry(bucket_id, &key, best_key).await;
         return Ok(None);
     };
     let mut resp = match proto::cluster_rpc::MetricsQueryResponse::decode(data) {
         Ok(resp) => resp,
         Err(e) => {
             log::error!("decode metrics query response error: {e}");
+            remove_index_entry(bucket_id, &key, best_key).await;
             return Ok(None);
         }
     };
     if resp.series.is_empty() {
+        remove_index_entry(bucket_id, &key, best_key).await;
         return Ok(None);
     }
 
@@ -334,6 +334,10 @@ pub async fn set(
             }
         }
     };
+    // the retention filter can drain everything; caching an empty payload would poison the range
+    if range_values.is_empty() {
+        return Ok(());
+    }
 
     // convert RangeValue to proto::cluster_rpc::MetricsQueryResponse then encode to vec
     let mut resp = proto::cluster_rpc::MetricsQueryResponse::default();
@@ -372,8 +376,7 @@ pub async fn load(cache_key: &str) -> Result<()> {
     Ok(())
 }
 
-/// Insert into the bucket index and delete the disk files of any evicted entries,
-/// so budget enforcement and file cleanup cannot be separated. Returns the evicted count.
+/// Insert into the bucket index and queue evicted entries' disk files for deletion.
 async fn insert_index(
     bucket_id: usize,
     key: String,
@@ -383,12 +386,10 @@ async fn insert_index(
     let mut w = GLOBAL_CACHE[bucket_id].write().await;
     let evicted = w.insert(key, query, item);
     drop(w);
-    let evicted_len = evicted.len();
     if !evicted.is_empty() {
-        // detached: the cleanup has no ordering dependency on the caller
-        tokio::spawn(remove_disk_files(evicted));
+        infra::cache::file_data::delete::add(evicted.iter().map(|v| v.key.clone()).collect());
     }
-    evicted_len
+    evicted.len()
 }
 
 /// drop the index entries whose disk files were evicted by the disk cache gc
@@ -415,13 +416,10 @@ async fn remove_evicted_files(files: Vec<String>) {
     }
 }
 
-/// delete the disk files of entries evicted from the index
-async fn remove_disk_files(evicted: Vec<Arc<MetricsIndexCacheItem>>) {
-    for item in evicted {
-        if let Err(e) = infra::cache::file_data::disk::remove(&item.key).await {
-            log::warn!("Remove evicted metrics cache file {} error: {e}", item.key);
-        }
-    }
+async fn remove_index_entry(bucket_id: usize, key: &str, file_key: String) {
+    let mut w = GLOBAL_CACHE[bucket_id].write().await;
+    w.remove_files(key, &HashSet::from_iter([file_key]));
+    drop(w);
 }
 
 fn get_hash_key(query: &str, step: i64) -> String {
@@ -483,8 +481,7 @@ impl MetricsIndex {
         }
     }
 
-    /// Insert the item under the key, enforcing the per-key item cap and the memory budget.
-    /// Returns the evicted items so the caller can delete their disk files.
+    /// Insert the item, enforcing the per-key item cap and the memory budget.
     fn insert(
         &mut self,
         key: String,
@@ -498,6 +495,11 @@ impl MetricsIndex {
             MetricsIndexCache::new(query)
         });
         index.touch();
+        // load() restores keys with an empty query; upgrade it so the hash-conflict guard works
+        if index.query.is_empty() && !query.is_empty() {
+            self.cur_size += query.len();
+            index.query = query.to_string();
+        }
         let mut evicted = Vec::new();
         if index.entries.len() >= METRICS_INDEX_CACHE_MAX_ITEMS {
             // remove the first half items
@@ -525,16 +527,14 @@ impl MetricsIndex {
             }
         });
         self.cur_size -= freed;
-        if !index.entries.is_empty() {
-            return;
-        }
-        if let Some(index) = self.data.remove(key) {
-            self.cur_size -= index_base_size(key, &index.query);
+        if index.entries.is_empty() {
+            let base_size = index_base_size(key, &index.query);
+            self.data.remove(key);
+            self.cur_size -= base_size;
         }
     }
 
-    /// When over budget, evict the least recently used keys until
-    /// METRICS_INDEX_CACHE_GC_PERCENT of the budget is free.
+    /// Evict the least recently used keys until a tenth of the memory budget is free.
     fn gc(&mut self) -> Vec<Arc<MetricsIndexCacheItem>> {
         if self.cur_size <= self.max_size {
             return Vec::new();
@@ -867,32 +867,15 @@ mod tests {
         assert_eq!(len, 0);
         assert_eq!(mem, 0);
 
-        metrics.insert(
-            "acct_key".to_string(),
-            "acct_query",
-            MetricsIndexCacheItem::new("metrics_results/org/acct1.pb", 100, 200),
-        );
-        metrics.insert(
-            "acct_key".to_string(),
-            "acct_query",
-            MetricsIndexCacheItem::new("metrics_results/org/acct2.pb", 200, 300),
-        );
+        let item1 = MetricsIndexCacheItem::new("metrics_results/org/acct1.pb", 100, 200);
+        let item2 = MetricsIndexCacheItem::new("metrics_results/org/acct2.pb", 200, 300);
+        let expected_mem =
+            index_base_size("acct_key", "acct_query") + item_size(&item1) + item_size(&item2);
+        metrics.insert("acct_key".to_string(), "acct_query", item1);
+        metrics.insert("acct_key".to_string(), "acct_query", item2);
         let (len, _cap, mem) = metrics.stats();
         assert_eq!(len, 2);
-        assert_eq!(
-            mem,
-            index_base_size("acct_key", "acct_query")
-                + item_size(&MetricsIndexCacheItem::new(
-                    "metrics_results/org/acct1.pb",
-                    100,
-                    200
-                ))
-                + item_size(&MetricsIndexCacheItem::new(
-                    "metrics_results/org/acct2.pb",
-                    200,
-                    300
-                ))
-        );
+        assert_eq!(mem, expected_mem);
 
         // removing one file frees its bytes; removing the last one drops the key
         metrics.remove_files(
@@ -905,6 +888,34 @@ mod tests {
         metrics.remove_files(
             "acct_key",
             &HashSet::from_iter(["metrics_results/org/acct2.pb".to_string()]),
+        );
+        assert!(metrics.data.is_empty());
+        assert_eq!(metrics.cur_size, 0);
+    }
+
+    #[test]
+    fn test_metrics_index_insert_upgrades_empty_query() {
+        let mut metrics = MetricsIndex::new(1024 * 1024);
+        metrics.insert(
+            "upgrade_key".to_string(),
+            "",
+            MetricsIndexCacheItem::new("metrics_results/org/upg1.pb", 100, 200),
+        );
+        metrics.insert(
+            "upgrade_key".to_string(),
+            "real_query",
+            MetricsIndexCacheItem::new("metrics_results/org/upg2.pb", 200, 300),
+        );
+        assert_eq!(metrics.data.get("upgrade_key").unwrap().query, "real_query");
+
+        // accounting stays symmetric after the upgrade
+        metrics.remove_files(
+            "upgrade_key",
+            &HashSet::from_iter(["metrics_results/org/upg1.pb".to_string()]),
+        );
+        metrics.remove_files(
+            "upgrade_key",
+            &HashSet::from_iter(["metrics_results/org/upg2.pb".to_string()]),
         );
         assert!(metrics.data.is_empty());
         assert_eq!(metrics.cur_size, 0);

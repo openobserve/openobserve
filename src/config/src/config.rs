@@ -3999,7 +3999,9 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.metrics_result_cache_max_size *= SIZE_IN_MB as usize;
+        // below 32 MB a bucket cannot hold one saturated key and every write evicts itself
+        cfg.limit.metrics_result_cache_max_size =
+            cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
     Ok(())
 }

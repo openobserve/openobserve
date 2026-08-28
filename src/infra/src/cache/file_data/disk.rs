@@ -127,6 +127,14 @@ pub enum FileType {
     Aggregation,
 }
 
+/// Eviction cleanup whose Drop spawns a task, so it also runs when the gc future is cancelled.
+#[derive(Default)]
+struct EvictionCleanup {
+    result_query_keys: Vec<String>,
+    metrics_files: Vec<String>,
+    file_paths: Vec<String>,
+}
+
 impl fmt::Display for FileType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -143,33 +151,41 @@ impl Default for FileData {
     }
 }
 
-/// Index cleanup for evicted cache entries that must run even when the evicting future is
-/// cancelled: on drop it spawns a task that prunes QUERY_RESULT_CACHE and notifies the
-/// metrics evict hook, with no disk cache lock held.
-#[derive(Default)]
-struct EvictionCleanup {
-    result_query_keys: Vec<String>,
-    metrics_files: Vec<String>,
-}
-
 impl Drop for EvictionCleanup {
     fn drop(&mut self) {
-        if self.result_query_keys.is_empty() && self.metrics_files.is_empty() {
+        if self.result_query_keys.is_empty()
+            && self.metrics_files.is_empty()
+            && self.file_paths.is_empty()
+        {
             return;
         }
         let result_query_keys = std::mem::take(&mut self.result_query_keys);
         let metrics_files = std::mem::take(&mut self.metrics_files);
+        let file_paths = std::mem::take(&mut self.file_paths);
         let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            log::error!(
+                "File disk cache eviction cleanup dropped outside a runtime, index entries may be stale"
+            );
             return;
         };
         handle.spawn(async move {
+            // normally drained inline by gc; only a cancelled gc leaves keys here
             if !result_query_keys.is_empty() {
                 let mut r = QUERY_RESULT_CACHE.write().await;
                 for query_key in result_query_keys {
                     r.remove(&query_key);
                 }
             }
-            notify_metrics_evicted(metrics_files);
+            if !metrics_files.is_empty()
+                && let Some(hook) = METRICS_RESULT_CACHE_EVICT_HOOK.get()
+            {
+                hook(metrics_files);
+            }
+            for file_path in file_paths {
+                if let Err(e) = tokio::fs::remove_file(&file_path).await {
+                    log::error!("File disk cache gc remove file: {file_path}, error: {e}");
+                }
+            }
         });
     }
 }
@@ -251,10 +267,19 @@ impl FileData {
                 self.file_type,
             );
             // cache is full, need release some space
-            let need_release_size = min(
-                self.max_size,
-                max(get_config().disk_cache.release_size, data_size * 100),
+            let cfg = get_config();
+            // scale the release size by cache type, the same way the periodic gc job does
+            let type_max_size = match self.file_type {
+                FileType::Data => cfg.disk_cache.max_size,
+                FileType::Result => cfg.disk_cache.result_max_size,
+                FileType::Aggregation => cfg.disk_cache.aggregation_max_size,
+            };
+            let scale_factor = max(1, cfg.disk_cache.max_size / max(1, type_max_size));
+            let release_size = max(
+                10 * config::SIZE_IN_MB as usize,
+                cfg.disk_cache.release_size / scale_factor,
             );
+            let need_release_size = min(self.max_size, max(release_size, data_size * 100));
             self.gc(need_release_size).await;
         }
 
@@ -309,9 +334,7 @@ impl FileData {
         Ok(())
     }
 
-    /// Cancellation-safe: size accounting and the cleanup lists are updated before each
-    /// await, and the index cleanup (QUERY_RESULT_CACHE + metrics evict hook) is owned by a
-    /// drop guard, so it still runs when this future is dropped mid-eviction.
+    /// Cancellation-safe: all bookkeeping precedes the only await; the drop guard finishes cleanup.
     async fn gc(&mut self, need_release_size: usize) {
         let start = std::time::Instant::now();
         log::info!(
@@ -371,19 +394,21 @@ impl FileData {
             if is_metrics_key {
                 cleanup.metrics_files.push(key);
             }
-
-            // delete file from local disk, best effort: an entry is fully evicted above,
-            // a file surviving a cancelled unlink is re-indexed by the next startup scan
-            if let Err(e) = tokio::fs::remove_file(&file_path).await {
-                log::error!(
-                    "[CacheType:{}] File disk cache gc remove file: {file_path}, error: {e}",
-                    self.file_type,
-                );
-            }
+            // the guard's task unlinks best effort; survivors are re-adopted by the startup scan
+            cleanup.file_paths.push(file_path);
 
             if release_size >= need_release_size {
                 break;
             }
+        }
+
+        // pruned inline so the prune completes before the caller can insert a new meta
+        if !cleanup.result_query_keys.is_empty() {
+            let mut r = QUERY_RESULT_CACHE.write().await;
+            for query_key in cleanup.result_query_keys.drain(..) {
+                r.remove(&query_key);
+            }
+            drop(r);
         }
 
         log::info!(
@@ -400,6 +425,10 @@ impl FileData {
         );
 
         let Some((key, data_size)) = self.data.remove_key(file) else {
+            log::debug!(
+                "[CacheType:{}] File disk cache remove file {file} not in the index",
+                self.file_type,
+            );
             return Ok(());
         };
         self.cur_size -= data_size;
@@ -786,21 +815,10 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     files.remove(file).await
 }
 
-/// Register the callback invoked with the `metrics_results/...` keys evicted by the disk
-/// cache gc, so the metrics result cache index can drop the matching entries. The hook is
-/// invoked after all disk cache locks are released.
+/// The hook runs on a detached task and may run concurrently with held disk cache locks.
 pub fn set_metrics_result_cache_evict_hook(hook: fn(Vec<String>)) {
     if METRICS_RESULT_CACHE_EVICT_HOOK.set(hook).is_err() {
         log::warn!("metrics result cache evict hook is already registered");
-    }
-}
-
-fn notify_metrics_evicted(files: Vec<String>) {
-    if files.is_empty() {
-        return;
-    }
-    if let Some(hook) = METRICS_RESULT_CACHE_EVICT_HOOK.get() {
-        hook(files);
     }
 }
 
@@ -912,6 +930,11 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .or_insert_with(Vec::new)
                             .push(meta);
                     } else if file_key.starts_with("metrics_results") {
+                        let mut w = RESULT_FILES[idx].write().await;
+                        w.cur_size += data_size;
+                        w.data.insert(file_key.clone(), data_size);
+                        drop(w);
+
                         // metrics
                         let columns = file_key.split('/').collect::<Vec<&str>>();
                         metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
