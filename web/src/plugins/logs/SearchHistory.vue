@@ -245,7 +245,7 @@
 
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="me-4 flex w-25 items-center text-xs font-normal">
+            <div class="flex w-25 items-center text-xs font-normal">
               {{ resultTotal }} {{ t("search_history.results") }}
             </div>
             <div class="ms-auto me-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
