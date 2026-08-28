@@ -287,6 +287,38 @@ const syntheticsService = {
       `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
     ),
 
+  /** The merged set for one check, with the scope each name comes from. */
+  resolvedVariables: (orgIdentifier: string, checkId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables`),
+
+  // ── Scope moves ────────────────────────────────────────────────────────
+  //
+  // Each authorizes the scope being left; the server checks the one being
+  // entered, because no single route can name both.
+
+  promoteCheckVariable: (
+    orgIdentifier: string,
+    checkId: string,
+    name: string,
+    environment: string | null,
+  ) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/${checkId}/variables/${encodeURIComponent(name)}/promote`,
+      { environment },
+    ),
+
+  promoteEnvironmentVariable: (orgIdentifier: string, env: string, id: string) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}/promote`,
+      {},
+    ),
+
+  splitGlobalVariable: (
+    orgIdentifier: string,
+    id: string,
+    targets: { environment: string; value: string }[],
+  ) => http().post(`/api/${orgIdentifier}/synthetics/variables/${id}/split`, { targets }),
+
   listRunsPayload(monitorId: string, startTime: number, endTime: number): ListRunsPayload {
     const sql = `SELECT * FROM "${STREAM_NAME}" WHERE synthetics_id = '${monitorId}' ORDER BY _timestamp DESC LIMIT 500`;
     return {

@@ -97,6 +97,28 @@ already says which scope you are in, so there is no Environment column.
           data-test="synthetics-variable-edit-btn"
           @click="openEdit(row)"
         />
+        <!-- A secret is already scoped by construction and its value is
+             write-only, so neither move applies to one. -->
+        <OButton
+          v-if="environment && row.kind !== 'secret'"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="upgrade"
+          data-test="synthetics-variable-promote-btn"
+          @click="promote(row)"
+        >
+          <OTooltip side="bottom" :content="t('synthetics.promote.toGlobal')" />
+        </OButton>
+        <OButton
+          v-if="!environment && environments.length > 0"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="call-split"
+          data-test="synthetics-variable-split-btn"
+          @click="openSplit(row)"
+        >
+          <OTooltip side="bottom" :content="t('synthetics.split.action')" />
+        </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -118,6 +140,13 @@ already says which scope you are in, so there is no Environment column.
         />
       </template>
     </OTable>
+
+    <SyntheticsSplitVariableDialog
+      v-model:open="splitDialog.show"
+      :variable="splitDialog.data"
+      :environments="environments"
+      @done="$emit('refresh')"
+    />
 
     <SyntheticsVariableForm
       v-model:open="drawer.show"
@@ -145,18 +174,32 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsVariable } from "@/types/synthetics";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { SyntheticsEnvironment } from "@/types/synthetics";
 import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
+import SyntheticsSplitVariableDialog from "./SyntheticsSplitVariableDialog.vue";
 import { filterVariables, relativeTime } from "./usage";
 
 export default defineComponent({
   name: "SyntheticsVariablesList",
-  components: { OTable, OButton, OBadge, OEmptyState, OSearchInput, SyntheticsVariableForm },
+  components: {
+    OTable,
+    OButton,
+    OBadge,
+    OEmptyState,
+    OSearchInput,
+    OTooltip,
+    SyntheticsVariableForm,
+    SyntheticsSplitVariableDialog,
+  },
   emits: ["refresh"],
   props: {
     variables: { type: Array as PropType<SyntheticsVariable[]>, default: () => [] },
     loading: { type: Boolean, default: false },
     /** Environment NAME, or null for the unscoped tier. */
     environment: { type: String as PropType<string | null>, default: null },
+    /** Split destinations. Empty on the global tab means there is nowhere to split to. */
+    environments: { type: Array as PropType<SyntheticsEnvironment[]>, default: () => [] },
   },
   setup(props, { emit }) {
     const { t } = useI18nTyped();
@@ -164,6 +207,7 @@ export default defineComponent({
     const { confirm } = useConfirmDialog();
     const filterQuery = ref("");
     const drawer = ref({ show: false, isEdit: false, data: null as SyntheticsVariable | null });
+    const splitDialog = ref({ show: false, data: null as SyntheticsVariable | null });
 
     const columns: OTableColumnDef[] = [
       {
@@ -228,6 +272,24 @@ export default defineComponent({
       drawer.value = { show: true, isEdit: true, data: row };
     }
 
+    function openSplit(row: SyntheticsVariable) {
+      splitDialog.value = { show: true, data: row };
+    }
+
+    async function promote(row: SyntheticsVariable) {
+      if (!props.environment) return;
+      const org = store.state.selectedOrganization.identifier;
+      try {
+        await syntheticsService.promoteEnvironmentVariable(org, props.environment, row.id);
+        toast.success(t("synthetics.promote.done"));
+        emit("refresh");
+      } catch (error: any) {
+        // The server names the conflicting environments, or explains why a
+        // secret cannot leave one — both are written to be shown verbatim.
+        toast.error(error?.response?.data?.message ?? t("synthetics.promote.failed"));
+      }
+    }
+
     async function removeVariable(row: SyntheticsVariable) {
       const ok = await confirm({
         title: t("synthetics.variables.deleteTitle"),
@@ -260,7 +322,10 @@ export default defineComponent({
       filterQuery,
       visibleRows,
       drawer,
+      splitDialog,
       relativeTime,
+      openSplit,
+      promote,
       openCreate,
       openEdit,
       removeVariable,

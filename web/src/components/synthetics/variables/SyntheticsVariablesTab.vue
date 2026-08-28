@@ -32,7 +32,8 @@ Production) from becoming a four-step navigation.
         :variables="variables"
         :loading="loading"
         :environment="null"
-        @refresh="fetchVariables"
+        :environments="environments"
+        @refresh="refresh"
       />
     </div>
   </OPageLayout>
@@ -45,7 +46,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
-import type { SyntheticsVariable } from "@/types/synthetics";
+import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import SyntheticsVariablesList from "./SyntheticsVariablesList.vue";
 
 export default defineComponent({
@@ -55,6 +56,9 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const variables = ref<SyntheticsVariable[]>([]);
+    // Only for the split dialog's destination list — this tab never renders
+    // environment-scoped variables.
+    const environments = ref<SyntheticsEnvironment[]>([]);
     const loading = ref(false);
 
     async function fetchVariables() {
@@ -70,9 +74,25 @@ export default defineComponent({
       }
     }
 
-    onMounted(fetchVariables);
+    async function fetchEnvironments() {
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const res = await syntheticsService.listEnvironments(org);
+        environments.value = res.data ?? [];
+      } catch {
+        // Costs the split action, not the list. Failing the whole tab because
+        // a secondary fetch failed would be the worse trade.
+        environments.value = [];
+      }
+    }
 
-    return { t, variables, loading, fetchVariables };
+    async function refresh() {
+      await Promise.all([fetchVariables(), fetchEnvironments()]);
+    }
+
+    onMounted(refresh);
+
+    return { t, variables, environments, loading, refresh, fetchVariables };
   },
 });
 </script>
