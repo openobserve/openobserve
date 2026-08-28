@@ -29,6 +29,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import { raw, type TranslateFn } from "@/types/i18n";
 
 // Walk the WHERE clause AST and replace column references whose name matches
@@ -254,8 +255,10 @@ export const useSearchQuery = (t: TranslateFn) => {
         searchObj.data.sqlSyntaxErrorRanges = [];
       }
 
-      // Pre-flight SQL syntax check — runs only in SQL mode, before firing the query
-      if (!readOnly && searchObj.meta.sqlMode && query) {
+      // Pre-flight SQL syntax check — runs only in SQL mode, before firing the query.
+      // Skipped past SQL_PARSE_MAX_DEPTH: astify() is exponential in paren nesting
+      // depth and would freeze the tab for seconds; the server still validates.
+      if (!readOnly && searchObj.meta.sqlMode && query && maxParenDepth(query) <= SQL_PARSE_MAX_DEPTH) {
         try {
           const _sqlParser = new SqlParser();
           _sqlParser.astify(query);

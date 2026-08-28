@@ -4,6 +4,7 @@
  */
 
 import type { TranslateFn } from "@/types/i18n";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
 export interface SqlUtilsContext {
   parser: any;
@@ -14,6 +15,11 @@ type ComparisonOperator = ">=" | "<=" | ">" | "<" | "=" | "!=" | "<>";
 
 export const getParser = (sqlQuery: string, context: SqlUtilsContext): boolean => {
   const { parser, sqlQueryErrorMsg, t } = context;
+  // astify() is exponential in paren nesting depth — skip a pathologically
+  // nested query rather than freeze the tab. Same "assume OK" fallback as the
+  // catch below: this only checks for a bare `SELECT *`, and the backend
+  // still validates the query regardless.
+  if (maxParenDepth(sqlQuery) > SQL_PARSE_MAX_DEPTH) return true;
   try {
     // As default is a reserved keyword in sql-parser, we are replacing it with default1
     const regex = /\bdefault\b/g;
@@ -80,6 +86,13 @@ export const addHavingClauseToQuery = (
 
   if (!parser || typeof parser.astify !== "function" || typeof parser.sqlify !== "function") {
     throw new Error("Invalid parser: must have astify and sqlify methods");
+  }
+
+  // astify() is exponential in paren nesting depth — a pathologically nested
+  // query would freeze the tab, so go straight to the regex fallback instead
+  // of attempting the AST parse at all.
+  if (maxParenDepth(sqlQuery) > SQL_PARSE_MAX_DEPTH) {
+    return fallbackHavingInsertion(sqlQuery, yAxisColumn, operator, threshold);
   }
 
   try {
