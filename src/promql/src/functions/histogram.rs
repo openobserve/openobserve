@@ -38,6 +38,9 @@ impl Bucket {
 
 /// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let start = std::time::Instant::now();
+    let trace_id = &eval_ctx.trace_id;
+
     // Handle input data - convert to matrix format if needed
     let in_matrix = match data {
         Value::Matrix(m) => m,
@@ -53,6 +56,11 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
 
     // Always use range query path - compute all timestamps at once
     let timestamps = eval_ctx.timestamps();
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) started with {} series and {} time points",
+        in_matrix.len(),
+        timestamps.len()
+    );
 
     // Parse each upper bound once and group metrics by their signature (without
     // bucket label). The previous implementation reparsed every bound for every
@@ -124,6 +132,11 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
         }
     }
 
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) completed in {:?}, folded {group_count} groups into {} series",
+        start.elapsed(),
+        range_values.len()
+    );
     Ok(Value::Matrix(range_values))
 }
 
