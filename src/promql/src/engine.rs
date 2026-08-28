@@ -1045,7 +1045,8 @@ impl Engine {
             }
         };
 
-        Ok(match func_name {
+        let start = std::time::Instant::now();
+        let result = match func_name {
             Func::Abs => functions::abs(input)?,
             Func::Absent => functions::absent(input, &self.eval_ctx)?,
             Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
@@ -1276,7 +1277,14 @@ impl Engine {
             Func::Timestamp => functions::timestamp(input)?,
             Func::Vector => functions::vector(input, &self.eval_ctx)?,
             Func::Year => functions::year(input)?,
-        })
+        };
+        log::info!(
+            "[trace_id: {}] [PromQL Timing] call_expr({}) execution took: {:?}",
+            self.trace_id,
+            func.name,
+            start.elapsed()
+        );
+        Ok(result)
     }
 }
 
