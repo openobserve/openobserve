@@ -42,8 +42,8 @@ const METRICS_INDEX_ITEM_OVERHEAD: usize = 16
 static CACHE_KEY_SUFFIX: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(now_micros()));
 
 static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
-    // metrics_cache_max_size is resolved to bytes in check_config
-    let max_bytes = get_config().limit.metrics_cache_max_size;
+    // metrics_result_cache_max_size is resolved to bytes in check_config
+    let max_bytes = get_config().limit.metrics_result_cache_max_size;
     let mut metrics = Vec::with_capacity(METRICS_INDEX_CACHE_BUCKETS);
     for _ in 0..METRICS_INDEX_CACHE_BUCKETS {
         metrics.push(RwLock::new(MetricsIndex::new(

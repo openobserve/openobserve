@@ -1739,8 +1739,6 @@ pub struct Common {
         help = "Default theme color for dark mode. If not set, uses application default."
     )]
     pub default_theme_dark_mode_color: String,
-    #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
-    pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
     #[env_config(
@@ -2267,18 +2265,14 @@ pub struct Limit {
     pub traces_query_retention: String,
     #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
-    #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
-    pub metrics_leader_push_interval: u64,
-    #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
-    pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
     pub metrics_max_series_response: usize,
     // Memory budget in MB for the PromQL result cache index. 0 (default)
     // means auto: 1% of total memory, clamped to [32, 256] MB.
-    #[env_config(name = "ZO_METRICS_CACHE_MAX_SIZE", default = 0)]
-    pub metrics_cache_max_size: usize,
+    #[env_config(name = "ZO_METRICS_RESULT_CACHE_MAX_SIZE", default = 0)]
+    pub metrics_result_cache_max_size: usize,
     // Memory budget in MB for the PromQL series label cache. 0 (default)
     // means auto: 5% of total memory, clamped to [100, 1024] MB.
     #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
@@ -3018,6 +3012,12 @@ pub struct Sns {
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct Prometheus {
+    #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
+    pub dedup_enabled: bool,
+    #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
+    pub leader_push_interval: u64,
+    #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
+    pub leader_election_interval: i64,
     #[env_config(name = "ZO_PROMETHEUS_HA_CLUSTER", default = "cluster")]
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
@@ -3992,14 +3992,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
     }
 
-    if cfg.limit.metrics_cache_max_size == 0 {
+    if cfg.limit.metrics_result_cache_max_size == 0 {
         // 1% of total mem, clamped to [32, 256] MB; the promql result cache
         // index holds roughly 200 B per entry at this size.
-        cfg.limit.metrics_cache_max_size =
+        cfg.limit.metrics_result_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.metrics_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.limit.metrics_result_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }
