@@ -58,6 +58,7 @@ import {
   type JsonValidationContext,
 } from "@/utils/alerts/alertValidation";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { astifyOffThread } from "@/utils/query/sqlAstifyWorkerClient";
 import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
@@ -681,13 +682,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     parser = await sqlParser();
   };
 
-  const getParser = (sqlQuery: string) => {
+  const getParser = async (sqlQuery: string) => {
     const sqlUtilsContext: SqlUtilsContext = {
       parser,
       sqlQueryErrorMsg,
       t,
     };
-    return getParserUtil(sqlQuery, sqlUtilsContext);
+    return await getParserUtil(sqlQuery, sqlUtilsContext);
   };
 
   // ── Stream Methods ──────────────────────────────────────────────────────
@@ -768,8 +769,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const debouncedSyncStreamFromSql = debounce(async (sql: string) => {
     if (!sql || !parser || isSyncingStreamFromSql.value) return;
     try {
-      const parsed = parser.parse(sql);
-      const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
+      const parsed: any = await astifyOffThread(sql);
+      const fromStream = parsed?.from?.[0]?.table as string | undefined;
       if (fromStream && fromStream !== formData.value.stream_name) {
         isSyncingStreamFromSql.value = true;
         setF("stream_name", fromStream);
@@ -1617,7 +1618,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           { column: string; operator: string; value: number } | undefined;
         if (sql && sqlHaving?.column) {
           if (!parser) await importSqlParser();
-          sql = addHavingClauseToQuery(
+          sql = await addHavingClauseToQuery(
             sql,
             sqlHaving.column,
             sqlHaving.operator,
@@ -2035,7 +2036,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (
       formData.value.is_real_time == "false" &&
       formData.value.query_condition.type == "sql" &&
-      !getParser(formData.value.query_condition.sql)
+      !(await getParser(formData.value.query_condition.sql))
     ) {
       activeTab.value = "condition";
       toast({

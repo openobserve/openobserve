@@ -278,6 +278,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { astifyOffThread } from "@/utils/query/sqlAstifyWorkerClient";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -555,8 +556,8 @@ watch(inputQuery, (value) => {
 const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
   if (!sql || !parser) return;
   try {
-    const parsed = parser.parse(sql);
-    const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
+    const parsed: any = await astifyOffThread(sql);
+    const fromStream = parsed?.from?.[0]?.table as string | undefined;
     if (fromStream && fromStream !== selectedStream.value.name) {
       selectedStream.value.name = fromStream;
     }

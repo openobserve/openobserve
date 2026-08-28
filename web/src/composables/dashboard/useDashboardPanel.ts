@@ -19,6 +19,7 @@ import { useStore } from "vuex";
 import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
+import { astifyOffThread } from "@/utils/query/sqlAstifyWorkerClient";
 import { validatePanel } from "@/utils/dashboard/panelValidation";
 import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
 import useStreams from "../useStreams";
@@ -955,7 +956,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     await ensureParser();
 
     // do not allow to modify custom query fields for logs page
-    updateQueryValue(pageKey == "logs" ? true : false);
+    await updateQueryValue(pageKey == "logs" ? true : false);
   };
 
   // based on chart type it will create auto sql query
@@ -1013,7 +1014,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     );
   };
 
-  const validateQuery = (query: any, variables: any) => {
+  const validateQuery = async (query: any, variables: any) => {
     // Helper to test one replacement (string or number)
     const testReplacement = (q: any, varName: any, replacement: any) => {
       const regex = new RegExp(`\\$(?:{${varName}}|${varName})(?!\\w)`, "g");
@@ -1021,11 +1022,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     };
 
     // Recursive validation function
-    const validateRecursive: any = (currentQuery: any, remainingVars: any) => {
+    const validateRecursive: any = async (currentQuery: any, remainingVars: any) => {
       if (!remainingVars.length) {
         try {
           // Try parsing the current query
-          parser.astify(currentQuery);
+          await astifyOffThread(currentQuery);
           return currentQuery; // Return valid query
         } catch (error) {
           return null; // Invalid query
@@ -1037,19 +1038,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
       // Try as string
       const stringQuery = testReplacement(currentQuery, varName, "VARIABLE_PLACEHOLDER");
-      const resultAsString: any = validateRecursive(stringQuery, restVars);
+      const resultAsString: any = await validateRecursive(stringQuery, restVars);
       if (resultAsString) return resultAsString; // Found valid query
 
       // Try as number
       const numericQuery = testReplacement(currentQuery, varName, "10");
-      const resultAsNumber = validateRecursive(numericQuery, restVars);
+      const resultAsNumber = await validateRecursive(numericQuery, restVars);
       if (resultAsNumber) return resultAsNumber; // Found valid query
 
       // If neither works, return null
       throw new Error("Invalid query");
     };
 
-    return validateRecursive(query, variables);
+    return await validateRecursive(query, variables);
   };
 
   // Extract variables from the query (supports $var, ${var}, and {{var}} syntax, with optional spaces)
@@ -1113,10 +1114,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
         );
 
         const variables = extractVariables(currentQuery); // Extract all unique variables
-        const validatedQuery = validateQuery(currentQuery, variables);
+        const validatedQuery = await validateQuery(currentQuery, variables);
 
         if (validatedQuery) {
-          dashboardPanelData.meta.parsedQuery = parser.astify(validatedQuery);
+          dashboardPanelData.meta.parsedQuery = await astifyOffThread(validatedQuery);
         } else {
           dashboardPanelData.meta.parsedQuery = null;
         }

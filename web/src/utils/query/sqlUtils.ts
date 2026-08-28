@@ -1,4 +1,5 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
+import { astifyOffThread } from "@/utils/query/sqlAstifyWorkerClient";
 
 let parser: any;
 let parserImportPromise: Promise<any> | null = null;
@@ -935,7 +936,7 @@ export const getStreamNameFromQuery = async (query: any) => {
     await importSqlParser();
     try {
       if (query && query != "") {
-        const parsedQuery = parser?.astify(query);
+        const parsedQuery: any = await astifyOffThread(query);
 
         // Recursively find the first base table, descending into sub-queries in
         // FROM / WHERE / SELECT. This resolves `FROM (SELECT ... FROM stream)` to

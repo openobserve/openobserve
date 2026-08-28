@@ -56,6 +56,30 @@ vi.mock("@/composables/useParser", () => ({
   }),
 }));
 
+// getStreamNameFromQuery() runs astify() through a Web Worker
+// (sqlAstifyWorkerClient), which doesn't exist in this test environment.
+// Routes through the same mockAstify used above so existing assertions on it
+// still work.
+class MockWorker {
+  onmessage: ((event: { data: any }) => void) | null = null;
+
+  postMessage(msg: { id: number; sql: string }) {
+    queueMicrotask(() => {
+      try {
+        const ast = mockAstify(msg.sql);
+        this.onmessage?.({ data: { id: msg.id, ok: true, ast } });
+      } catch (err: any) {
+        this.onmessage?.({
+          data: { id: msg.id, ok: false, error: { message: err?.message } },
+        });
+      }
+    });
+  }
+
+  terminate() {}
+}
+vi.stubGlobal("Worker", MockWorker);
+
 describe("isSqlQuery", () => {
   describe("returns true for full SQL statements", () => {
     it("detects SELECT * FROM", () => {

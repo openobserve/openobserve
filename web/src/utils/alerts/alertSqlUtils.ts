@@ -4,6 +4,7 @@
  */
 
 import type { TranslateFn } from "@/types/i18n";
+import { astifyOffThread } from "@/utils/query/sqlAstifyWorkerClient";
 
 export interface SqlUtilsContext {
   parser: any;
@@ -12,12 +13,12 @@ export interface SqlUtilsContext {
 }
 type ComparisonOperator = ">=" | "<=" | ">" | "<" | "=" | "!=" | "<>";
 
-export const getParser = (sqlQuery: string, context: SqlUtilsContext): boolean => {
-  const { parser, sqlQueryErrorMsg, t } = context;
+export const getParser = async (sqlQuery: string, context: SqlUtilsContext): Promise<boolean> => {
+  const { sqlQueryErrorMsg, t } = context;
   try {
     // As default is a reserved keyword in sql-parser, we are replacing it with default1
     const regex = /\bdefault\b/g;
-    const columns = parser.astify(sqlQuery.replace(regex, "default1")).columns;
+    const columns = ((await astifyOffThread(sqlQuery.replace(regex, "default1"))) as any).columns;
     for (const column of columns) {
       if (column.expr.column === "*") {
         sqlQueryErrorMsg.value = t("alerts.selectAllColumnsNotAllowed");
@@ -50,13 +51,13 @@ export const getParser = (sqlQuery: string, context: SqlUtilsContext): boolean =
  * @param parser - The node-sql-parser instance
  * @returns The modified SQL query with the HAVING clause properly inserted
  */
-export const addHavingClauseToQuery = (
+export const addHavingClauseToQuery = async (
   sqlQuery: string,
   yAxisColumn: string,
   operator: string,
   threshold: number,
   parser: any,
-): string => {
+): Promise<string> => {
   // === Input Validation ===
   if (!sqlQuery || typeof sqlQuery !== "string" || sqlQuery.trim().length === 0) {
     throw new Error("Invalid SQL query: must be a non-empty string");
@@ -84,7 +85,7 @@ export const addHavingClauseToQuery = (
 
   try {
     // Parse the SQL query into an AST
-    const ast = parser.astify(sqlQuery);
+    const ast: any = await astifyOffThread(sqlQuery);
 
     // Handle array of statements (e.g., UNION queries)
     if (Array.isArray(ast)) {

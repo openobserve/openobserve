@@ -419,7 +419,7 @@ export interface ValidationContext {
   sqlErrorRanges?: any;
   vrlFunctionError: any;
   buildQueryPayload: any;
-  getParser: (sqlQuery: string) => boolean;
+  getParser: (sqlQuery: string) => Promise<boolean>;
 }
 
 export interface AlertFormData {
@@ -456,7 +456,7 @@ export interface JsonValidationContext {
   t: Translator;
   streams: any;
   getStreams: (streamType: string, schema: boolean) => Promise<any>;
-  getParser: (sql: string) => boolean;
+  getParser: (sql: string) => Promise<boolean>;
   buildQueryPayload: (options: any) => any;
   prepareAndSaveAlert: (data: any) => Promise<void>;
 }
@@ -597,7 +597,7 @@ export const validateSqlQuery = async (
     return;
   }
 
-  if (!getParser(formData.query_condition.sql)) {
+  if (!(await getParser(formData.query_condition.sql))) {
     return;
   }
 
@@ -720,7 +720,7 @@ export const saveAlertJson = async (
   if (jsonPayload.is_real_time === false && jsonPayload.query_condition.type === "sql") {
     try {
       // First check if query has SELECT *
-      if (!getParser(jsonPayload.query_condition.sql)) {
+      if (!(await getParser(jsonPayload.query_condition.sql))) {
         validationErrors.value = [t("alerts.validation.selectAllNotAllowed")];
         return;
       }

@@ -1002,6 +1002,7 @@ import { debounce } from "lodash-es";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { astifyOffThread } from "@/utils/query/sqlAstifyWorkerClient";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -1756,8 +1757,8 @@ const updateQueryValue = (value: string) => {
 const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
   if (!sql || !parser) return;
   try {
-    const parsed = parser.parse(sql);
-    const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
+    const parsed: any = await astifyOffThread(sql);
+    const fromStream = parsed?.from?.[0]?.table as string | undefined;
     if (fromStream && fromStream !== selectedStreamName.value) {
       isSyncingStreamFromQuery.value = true;
       form.setFieldValue("stream_name", fromStream, { dontUpdateMeta: true });

@@ -657,13 +657,13 @@ onMounted(async () => {
 });
 
 // Get parser function to validate SQL queries (checks for SELECT * and reserved words)
-const getParser = (sqlQuery: string) => {
+const getParser = async (sqlQuery: string) => {
   const sqlUtilsContext: SqlUtilsContext = {
     parser: parser.value,
     sqlQueryErrorMsg: localSqlQueryErrorMsg,
     t,
   };
-  return getParserUtil(sqlQuery, sqlUtilsContext);
+  return await getParserUtil(sqlQuery, sqlUtilsContext);
 };
 
 // Dialog state
@@ -988,7 +988,7 @@ const runSqlQuery = async () => {
   queryHitCount.value = 0;
 
   // Validate SQL query before running (checks for SELECT * and reserved words)
-  const parserResult = getParser(localSqlQuery.value);
+  const parserResult = await getParser(localSqlQuery.value);
 
   if (!parserResult) {
     // Parser validation failed - don't run the query

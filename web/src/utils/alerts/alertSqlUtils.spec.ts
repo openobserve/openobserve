@@ -1,5 +1,30 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { addHavingClauseToQuery } from "./alertSqlUtils";
+import { Parser as RealSqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
+
+// addHavingClauseToQuery() runs astify() through a Web Worker
+// (sqlAstifyWorkerClient), which doesn't exist in this test environment. Uses
+// the real parser so parsing behaviour is unchanged.
+class MockWorker {
+  onmessage: ((event: { data: any }) => void) | null = null;
+  private parser = new RealSqlParser();
+
+  postMessage(msg: { id: number; sql: string }) {
+    queueMicrotask(() => {
+      try {
+        const ast = this.parser.astify(msg.sql);
+        this.onmessage?.({ data: { id: msg.id, ok: true, ast } });
+      } catch (err: any) {
+        this.onmessage?.({
+          data: { id: msg.id, ok: false, error: { message: err?.message } },
+        });
+      }
+    });
+  }
+
+  terminate() {}
+}
+vi.stubGlobal("Worker", MockWorker);
 
 describe("alertSqlUtils", () => {
   let parser: any;
@@ -12,9 +37,9 @@ describe("alertSqlUtils", () => {
   });
 
   describe("addHavingClauseToQuery", () => {
-    it("should add HAVING clause before LIMIT", () => {
+    it("should add HAVING clause before LIMIT", async () => {
       const query = "SELECT count(*) as cnt FROM table1 GROUP BY field1 ORDER BY cnt DESC LIMIT 10";
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       // Check that HAVING comes before LIMIT
       const havingIndex = result.toLowerCase().indexOf("having");
@@ -27,9 +52,9 @@ describe("alertSqlUtils", () => {
       expect(result.toLowerCase()).toMatch(/having\s+(cnt|"cnt")\s+>=\s+5/);
     });
 
-    it("should add HAVING clause before ORDER BY", () => {
+    it("should add HAVING clause before ORDER BY", async () => {
       const query = "SELECT avg(value) as avg_val FROM table1 GROUP BY region ORDER BY region";
-      const result = addHavingClauseToQuery(query, "avg_val", ">", 10, parser);
+      const result = await addHavingClauseToQuery(query, "avg_val", ">", 10, parser);
 
       const havingIndex = result.toLowerCase().indexOf("having");
       const orderByIndex = result.toLowerCase().indexOf("order by");
@@ -40,10 +65,10 @@ describe("alertSqlUtils", () => {
       expect(result.toLowerCase()).toMatch(/having\s+(avg_val|"avg_val")\s+>\s+10/);
     });
 
-    it("should add HAVING clause before LIMIT and OFFSET", () => {
+    it("should add HAVING clause before LIMIT and OFFSET", async () => {
       const query =
         "SELECT sum(amount) as total FROM sales GROUP BY category ORDER BY total DESC LIMIT 100 OFFSET 50";
-      const result = addHavingClauseToQuery(query, "total", "<=", 1000, parser);
+      const result = await addHavingClauseToQuery(query, "total", "<=", 1000, parser);
 
       const havingIndex = result.toLowerCase().indexOf("having");
       const limitIndex = result.toLowerCase().indexOf("limit");
@@ -55,10 +80,10 @@ describe("alertSqlUtils", () => {
       expect(result.toLowerCase()).toMatch(/having\s+(total|"total")\s+<=\s+1000/);
     });
 
-    it("should combine with existing HAVING clause using AND", () => {
+    it("should combine with existing HAVING clause using AND", async () => {
       const query =
         "SELECT count(*) as cnt FROM table GROUP BY field HAVING cnt > 0 ORDER BY cnt DESC";
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       expect(result.toLowerCase()).toContain("having");
       expect(result).toContain("cnt >= 5");
@@ -66,12 +91,12 @@ describe("alertSqlUtils", () => {
       expect(result).toContain("cnt > 0");
     });
 
-    it("should add HAVING to query without GROUP BY with warning", () => {
+    it("should add HAVING to query without GROUP BY with warning", async () => {
       // Note: HAVING without GROUP BY is semantically incorrect in SQL,
       // but the function adds it anyway because backend validation will catch it.
       // This allows for more flexible alert creation from various chart types.
       const query = "SELECT count(*) as cnt FROM users ORDER BY cnt LIMIT 10";
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       // Should add HAVING clause despite missing GROUP BY
       // Column name might be quoted
@@ -82,42 +107,42 @@ describe("alertSqlUtils", () => {
       // Backend SQL validation will reject this query if it's invalid
     });
 
-    it("should handle simple GROUP BY without ORDER BY or LIMIT", () => {
+    it("should handle simple GROUP BY without ORDER BY or LIMIT", async () => {
       const query = "SELECT count(*) as cnt FROM table GROUP BY field";
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       expect(result).toContain("HAVING");
       expect(result).toContain("cnt >= 5");
     });
 
-    it("should handle different operators", () => {
+    it("should handle different operators", async () => {
       const query = "SELECT avg(score) as avg_score FROM tests GROUP BY student";
 
       const operators = [">=", "<=", ">", "<", "="];
-      operators.forEach((op) => {
-        const result = addHavingClauseToQuery(query, "avg_score", op, 75, parser);
+      for (const op of operators) {
+        const result = await addHavingClauseToQuery(query, "avg_score", op, 75, parser);
         // Use regex to handle quoted column names
         // Properly escape special regex characters
         const escapedOp = op.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         expect(result.toLowerCase()).toMatch(
           new RegExp(`having\\s+(avg_score|"avg_score")\\s+${escapedOp}\\s+75`),
         );
-      });
+      }
     });
 
-    it("should preserve double quotes in table names", () => {
+    it("should preserve double quotes in table names", async () => {
       const query = 'SELECT count(*) as cnt FROM "my-table" GROUP BY field1 ORDER BY cnt LIMIT 10';
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       // Parser converts backticks to double quotes
       expect(result).toContain('"my-table"');
       expect(result.toLowerCase()).toMatch(/having\s+(cnt|"cnt")\s+>=\s+5/);
     });
 
-    it("should handle complex aggregation functions", () => {
+    it("should handle complex aggregation functions", async () => {
       const query =
         "SELECT histogram(_timestamp) AS zo_sql_key, COUNT(*) as zo_sql_val FROM stream GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
-      const result = addHavingClauseToQuery(query, "zo_sql_val", ">=", 10, parser);
+      const result = await addHavingClauseToQuery(query, "zo_sql_val", ">=", 10, parser);
 
       const havingIndex = result.toLowerCase().indexOf("having");
       const orderByIndex = result.toLowerCase().indexOf("order by");
@@ -129,59 +154,63 @@ describe("alertSqlUtils", () => {
   });
 
   describe("Input Validation", () => {
-    it("should throw error for empty SQL query", () => {
-      expect(() => addHavingClauseToQuery("", "cnt", ">=", 5, parser)).toThrow(
+    it("should throw error for empty SQL query", async () => {
+      await expect(addHavingClauseToQuery("", "cnt", ">=", 5, parser)).rejects.toThrow(
         "Invalid SQL query: must be a non-empty string",
       );
     });
 
-    it("should throw error for null column name", () => {
+    it("should throw error for null column name", async () => {
       const query = "SELECT count(*) as cnt FROM table1 GROUP BY field1";
-      expect(() => addHavingClauseToQuery(query, null as any, ">=", 5, parser)).toThrow(
-        "Column name must be a non-empty string",
-      );
+      await expect(
+        addHavingClauseToQuery(query, null as any, ">=", 5, parser),
+      ).rejects.toThrow("Column name must be a non-empty string");
     });
 
-    it("should throw error for invalid operator", () => {
+    it("should throw error for invalid operator", async () => {
       const query = "SELECT count(*) as cnt FROM table1 GROUP BY field1";
-      expect(() => addHavingClauseToQuery(query, "cnt", "INVALID" as any, 5, parser)).toThrow(
-        "Invalid operator: INVALID",
-      );
+      await expect(
+        addHavingClauseToQuery(query, "cnt", "INVALID" as any, 5, parser),
+      ).rejects.toThrow("Invalid operator: INVALID");
     });
 
-    it("should throw error for non-numeric threshold", () => {
+    it("should throw error for non-numeric threshold", async () => {
       const query = "SELECT count(*) as cnt FROM table1 GROUP BY field1";
-      expect(() => addHavingClauseToQuery(query, "cnt", ">=", NaN, parser)).toThrow(
+      await expect(addHavingClauseToQuery(query, "cnt", ">=", NaN, parser)).rejects.toThrow(
         "Invalid threshold: NaN",
       );
     });
 
-    it("should throw error for infinite threshold", () => {
+    it("should throw error for infinite threshold", async () => {
       const query = "SELECT count(*) as cnt FROM table1 GROUP BY field1";
-      expect(() => addHavingClauseToQuery(query, "cnt", ">=", Infinity, parser)).toThrow(
+      await expect(addHavingClauseToQuery(query, "cnt", ">=", Infinity, parser)).rejects.toThrow(
         "Invalid threshold: Infinity",
       );
     });
 
-    it("should accept column names with underscores", () => {
+    it("should accept column names with underscores", async () => {
       const query = "SELECT count(*) as my_count FROM table1 GROUP BY field1";
-      expect(() => addHavingClauseToQuery(query, "my_count", ">=", 5, parser)).not.toThrow();
+      await expect(
+        addHavingClauseToQuery(query, "my_count", ">=", 5, parser),
+      ).resolves.toEqual(expect.any(String));
     });
 
-    it("should accept qualified column names", () => {
+    it("should accept qualified column names", async () => {
       const query = "SELECT count(*) as cnt FROM table1 GROUP BY field1";
       // Qualified names like table.column should work
-      expect(() => addHavingClauseToQuery(query, "table1.cnt", ">=", 5, parser)).not.toThrow();
+      await expect(
+        addHavingClauseToQuery(query, "table1.cnt", ">=", 5, parser),
+      ).resolves.toEqual(expect.any(String));
     });
   });
 
   describe("Edge Cases", () => {
-    it("should handle UNION queries", () => {
+    it("should handle UNION queries", async () => {
       const query =
         "SELECT count(*) as cnt FROM table1 GROUP BY field1 UNION SELECT count(*) as cnt FROM table2 GROUP BY field2";
       // UNION queries may either throw an error or handle gracefully depending on parser
       try {
-        const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+        const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
         // If it doesn't throw, verify the query contains HAVING
         expect(result.toLowerCase()).toContain("having");
       } catch (error: any) {
@@ -190,10 +219,10 @@ describe("alertSqlUtils", () => {
       }
     });
 
-    it("should handle queries with parentheses in functions", () => {
+    it("should handle queries with parentheses in functions", async () => {
       const query =
         "SELECT func(col1, col2) as result FROM table1 GROUP BY func(col1, col2) ORDER BY result";
-      const result = addHavingClauseToQuery(query, "result", ">", 10, parser);
+      const result = await addHavingClauseToQuery(query, "result", ">", 10, parser);
 
       expect(result.toLowerCase()).toContain("having");
       const havingIndex = result.toLowerCase().indexOf("having");
@@ -201,11 +230,11 @@ describe("alertSqlUtils", () => {
       expect(havingIndex).toBeLessThan(orderByIndex);
     });
 
-    it("should not create double quotes when column name is already without quotes", () => {
+    it("should not create double quotes when column name is already without quotes", async () => {
       // Test case from the bug report: column name passed without quotes should get single quotes in output
       const query =
         'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "default" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 100';
-      const result = addHavingClauseToQuery(query, "y_axis_1", "<=", 18258, parser);
+      const result = await addHavingClauseToQuery(query, "y_axis_1", "<=", 18258, parser);
 
       // Should have HAVING with single-quoted column name, not double-quoted
       expect(result).not.toContain('""y_axis_1""');
@@ -221,10 +250,10 @@ describe("alertSqlUtils", () => {
       expect(havingIndex).toBeLessThan(limitIndex);
     });
 
-    it("should skip adding HAVING if exact condition already exists", () => {
+    it("should skip adding HAVING if exact condition already exists", async () => {
       const query =
         "SELECT count(*) as cnt FROM table1 GROUP BY field1 HAVING cnt >= 5 ORDER BY cnt";
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       // Should return unchanged query since the exact condition already exists
       expect(result.toLowerCase()).toMatch(/having\s+(cnt|"cnt")\s+>=\s+5/);
@@ -233,17 +262,17 @@ describe("alertSqlUtils", () => {
       expect(havingMatches?.length).toBe(1);
     });
 
-    it("should append to existing HAVING if condition is different", () => {
+    it("should append to existing HAVING if condition is different", async () => {
       const query =
         "SELECT count(*) as cnt FROM table1 GROUP BY field1 HAVING cnt > 0 ORDER BY cnt";
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       // Should append with AND
       expect(result.toLowerCase()).toContain("and");
       expect(result.toLowerCase()).toMatch(/having.*cnt.*>.*0.*and.*cnt.*>=.*5/);
     });
 
-    it("should handle CTE (WITH) queries with fallback", () => {
+    it("should handle CTE (WITH) queries with fallback", async () => {
       // This is the actual production issue that occurred
       const query = `WITH aggregated_data AS (
         SELECT
@@ -257,7 +286,7 @@ describe("alertSqlUtils", () => {
       ORDER BY x_axis_1 ASC
       LIMIT 100`;
 
-      const result = addHavingClauseToQuery(query, "y_axis_1", "<=", 18258, parser);
+      const result = await addHavingClauseToQuery(query, "y_axis_1", "<=", 18258, parser);
 
       // CTE queries will use fallback method
       // Should contain HAVING somewhere in the result
@@ -265,13 +294,13 @@ describe("alertSqlUtils", () => {
       expect(result.toLowerCase()).toMatch(/y_axis_1.*<=.*18258/);
     });
 
-    it("should handle CTE with existing HAVING clause", () => {
+    it("should handle CTE with existing HAVING clause", async () => {
       const query = `WITH cte AS (
         SELECT count(*) as cnt FROM users GROUP BY region HAVING cnt > 0
       )
       SELECT * FROM cte ORDER BY cnt LIMIT 100`;
 
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       // Should handle gracefully, likely using fallback
       expect(result.toLowerCase()).toContain("having");
@@ -279,12 +308,12 @@ describe("alertSqlUtils", () => {
   });
 
   describe("Fallback Regex Method", () => {
-    it("should use regex fallback when AST parsing fails", () => {
+    it("should use regex fallback when AST parsing fails", async () => {
       // Query with vendor-specific syntax that parser might not understand
       const query = "SELECT count(*) as cnt FROM users GROUP BY user_id ORDER BY cnt LIMIT 10";
 
       // Even if parser fails, fallback should work
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       expect(result.toLowerCase()).toContain("having");
       const havingIndex = result.toLowerCase().indexOf("having");
@@ -296,24 +325,24 @@ describe("alertSqlUtils", () => {
       expect(havingIndex).toBeLessThan(limitIndex);
     });
 
-    it("should handle complex nested queries in fallback", () => {
+    it("should handle complex nested queries in fallback", async () => {
       // Nested query that might force fallback
       const query =
         "SELECT region, count(*) as cnt FROM (SELECT * FROM users WHERE active = true) as active_users GROUP BY region ORDER BY cnt DESC LIMIT 50";
 
-      const result = addHavingClauseToQuery(query, "cnt", ">", 10, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">", 10, parser);
 
       // Should contain HAVING
       expect(result.toLowerCase()).toContain("having");
       expect(result.toLowerCase()).toMatch(/cnt.*>.*10/);
     });
 
-    it("should warn but not fail for queries without GROUP BY", () => {
+    it("should warn but not fail for queries without GROUP BY", async () => {
       // This tests the fallback warning behavior
       const query = "SELECT count(*) as cnt FROM users ORDER BY cnt LIMIT 10";
 
       // Should not throw, but will add HAVING anyway (backend will validate)
-      const result = addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
+      const result = await addHavingClauseToQuery(query, "cnt", ">=", 5, parser);
 
       // Column name might be quoted
       expect(result.toLowerCase()).toMatch(/(cnt|"cnt")\s+>=\s+5/);
