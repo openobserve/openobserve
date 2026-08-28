@@ -676,6 +676,38 @@ describe("WorkflowNodeDrawer", () => {
     });
   });
 
+  // Running a single step records only THAT node's output; the next node never ran,
+  // so its own recorded input is empty. Its Input then falls back to the parent's
+  // recorded output, so a step's result flows straight into the child's Input pane.
+  describe("parent output feeds the child Input", () => {
+    const inputEditor = (w: any) =>
+      w.find('[data-test="workflow-ndv-input"]').findComponent({ name: "CodeQueryEditor" });
+
+    it("seeds a child's Input from its parent's output when the child hasn't run", () => {
+      seedGraph();
+      workflowObj.testRun.result = {
+        outputs: { cond: [{ meta: {}, data: [{ propagated: 1 }] }] },
+        inputs: {},
+        errors: {},
+      } as any;
+      openNode("dest", false); // parent = cond; dest itself never ran
+      wrapper = mountDrawer();
+      expect(inputEditor(wrapper).props("query")).toContain("propagated");
+    });
+
+    it("keeps a real empty input (child ran, 0 records) instead of the parent output", () => {
+      seedGraph();
+      workflowObj.testRun.result = {
+        outputs: { cond: [{ meta: {}, data: [{ propagated: 1 }] }] },
+        inputs: { dest: [] }, // dest ran and received nothing
+        errors: {},
+      } as any;
+      openNode("dest", false);
+      wrapper = mountDrawer();
+      expect(inputEditor(wrapper).props("query")).not.toContain("propagated");
+    });
+  });
+
   // The node is already on the canvas (insert-immediately happens in the composable
   // add flow, not here). Closing the drawer merges the body's payload into it.
   describe("commit on close", () => {

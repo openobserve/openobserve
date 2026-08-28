@@ -484,6 +484,14 @@ describe("WorkflowNode", () => {
       expect(workflowObj.dialog.show).toBe(false);
       expect(workflowObj.currentSelectedNodeID).toBe("");
     });
+
+    it("opens the NDV on a body click even in read-only Runs mode (not just the badge)", async () => {
+      workflowObj.readOnly = true;
+      wrapper = mountNode("c1", CONDITION.data);
+      await wrapper.trigger("click");
+      expectNdvOpenedOn("c1");
+      workflowObj.readOnly = false;
+    });
   });
 
   // The hover-`+` under the card is gone: clicking the node's SOURCE HANDLE

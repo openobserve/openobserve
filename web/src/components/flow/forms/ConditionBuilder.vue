@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :depth="0"
           name-prefix="conditions"
           condition-input-width="w-[8.125rem]"
+          column-input-width="w-[13rem]"
           :allow-custom-columns="allowCustomColumns"
           :indent-rem="0.625"
           :module="module"

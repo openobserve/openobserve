@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :nodes-draggable="!readOnly"
     :nodes-connectable="!readOnly"
     :edges-updatable="!readOnly"
+    :pan-on-drag="!isEmptyCanvas"
     @node-change="onNodeChange"
     @nodes-change="onNodesChange"
     @edges-change="onEdgesChange"

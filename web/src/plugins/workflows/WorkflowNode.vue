@@ -386,10 +386,9 @@ const handleActionsLeave = () => {
 // just a connection point again (no click-to-add). The source dot still drags to
 // wire edges manually.
 
-// On the read-only Runs canvas the node body isn't editable — the error badge
-// (openResult) is the only affordance. In the editor, click opens the config.
+// Clicking the node body opens its NDV in both modes — read-only on the Runs
+// canvas (see canvasReadOnly in WorkflowNodeDrawer), editable in the editor.
 const onClick = () => {
-  if (workflowObj.readOnly) return;
   editNode(props.id);
 };
 

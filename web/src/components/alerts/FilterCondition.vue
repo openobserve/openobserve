@@ -50,7 +50,7 @@
         width="xs"
         :placeholder="t('alerts.column')"
         :creatable="props.allowCustomColumns"
-        :class="[inputWidth ? inputWidth : '']"
+        :class="[columnInputWidth || inputWidth || '']"
         data-test="alert-conditions-select-column"
         @search="filterColumns"
         @create="onColumnCreate"
@@ -59,7 +59,7 @@
       <!-- Reveal-on-hover: the column select is narrow and long field names
            (e.g. `gen_ai_system`) truncate. Show the full value on hover
            regardless of AI-chat mode — truncation happens in every mode. -->
-      <OTooltip v-if="condition.column" :content="condition.column" />
+      <OTooltip v-if="condition.column" :content="columnDisplay" />
     </div>
     <div class="ml-0">
       <OFormSelect
@@ -123,6 +123,11 @@ const props = defineProps({
     required: true,
   },
   inputWidth: {
+    type: String,
+    default: "",
+    required: false,
+  },
+  columnInputWidth: {
     type: String,
     default: "",
     required: false,
@@ -234,6 +239,13 @@ const toggleOperator = () => {
   form?.setFieldValue(`${props.namePrefix}.logicalOperator`, next);
   emits("input:update", "conditions", props.condition);
 };
+
+// Show the option's display label (e.g. `meta.alert_name`) in the tooltip, not the
+// stored/flattened value (`meta_alert_name`); fall back to the raw value for custom columns.
+const columnDisplay = computed(() => {
+  const match = allColumns().find((c: any) => c.value === props.condition.column);
+  return match?.label || props.condition.column;
+});
 
 const computedInputWidth = computed(() => {
   return (

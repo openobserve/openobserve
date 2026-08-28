@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <section
         v-if="showIo && !readonlyBody && !nodeMissingFromRun"
         data-test="workflow-ndv-input"
-        class="relative flex w-[var(--io-w,16.25rem)] min-w-0 shrink-0 flex-col gap-2"
+        class="relative flex w-[var(--io-w,21.25rem)] min-w-0 shrink-0 flex-col gap-2"
         :style="{ '--io-w': inputWidth + 'px' }"
       >
         <!-- Drag handle on Input's RIGHT edge (sits in the gap toward Config).
@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showIo && !nodeMissingFromRun"
         data-test="workflow-ndv-output"
         class="relative flex min-w-0 flex-col gap-2"
-        :class="isReadonlyTrigger ? 'flex-1' : 'w-[var(--io-w,16.25rem)] shrink-0'"
+        :class="isReadonlyTrigger ? 'flex-1' : 'w-[var(--io-w,21.25rem)] shrink-0'"
         :style="isReadonlyTrigger ? undefined : { '--io-w': outputWidth + 'px' }"
       >
         <!-- Drag handle on Output's LEFT edge (sits in the gap toward Config). Extends
@@ -783,7 +783,11 @@ const sourceChain = computed<SourceRow[]>(() => {
     if (!edge) break;
     const parent = byId(edge.source);
     if (!parent) break;
-    chain.push({ node: parent, records: nodeTestInput(childId) });
+    // The child's recorded input (a full run) OR — when the child never ran but its
+    // parent did (e.g. a single-node Run Step) — the parent's recorded output, so a
+    // step's result flows straight into the next node's Input. `??` keeps a real empty
+    // input (child ran, 0 records reached it) from falling back to the parent's output.
+    chain.push({ node: parent, records: nodeTestInput(childId) ?? nodeTestOutput(parent.id) });
     childId = parent.id;
   }
   // No upstream: the trigger's own input IS the event payload, so show it as a single
@@ -1062,9 +1066,9 @@ const nextStepId = computed(() => nextStep.value?.id || "");
 // Output's left edge; Config (flex-1) absorbs the change. Widths are px, clamped;
 // applied via a CSS var so no literal px lands in a class.
 const IO_MIN = 160;
-const IO_MAX = 640;
-const inputWidth = ref(260);
-const outputWidth = ref(260);
+const IO_MAX = 720;
+const inputWidth = ref(340);
+const outputWidth = ref(340);
 const clampIo = (w: number) => Math.min(IO_MAX, Math.max(IO_MIN, w));
 let resizing: "input" | "output" | null = null;
 let resizeStartX = 0;
