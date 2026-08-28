@@ -160,11 +160,14 @@ pub async fn get(
         Ok(resp) => resp,
         Err(e) => {
             log::error!("decode metrics query response error: {e}");
+            // the corrupt file would be re-adopted at every restart if left on disk
+            infra::cache::file_data::delete::add(vec![best_key.clone()]);
             remove_index_entry(bucket_id, &key, best_key).await;
             return Ok(None);
         }
     };
     if resp.series.is_empty() {
+        infra::cache::file_data::delete::add(vec![best_key.clone()]);
         remove_index_entry(bucket_id, &key, best_key).await;
         return Ok(None);
     }
@@ -370,6 +373,13 @@ pub async fn load(cache_key: &str) -> Result<()> {
         return Ok(());
     };
     let bucket_id = get_bucket_id(&key);
+    // an over-budget bucket rejects startup adoption; the disk gc reclaims the unindexed files
+    {
+        let r = GLOBAL_CACHE[bucket_id].read().await;
+        if r.cur_size >= r.max_size {
+            return Ok(());
+        }
+    }
     let cache_item = MetricsIndexCacheItem::new(cache_key, start, end);
     insert_index(bucket_id, key, "", cache_item).await;
 
@@ -387,6 +397,7 @@ async fn insert_index(
     let evicted = w.insert(key, query, item);
     drop(w);
     if !evicted.is_empty() {
+        // cache keys are never reused (monotonic suffix), so a queued delete cannot race a rewrite
         infra::cache::file_data::delete::add(evicted.iter().map(|v| v.key.clone()).collect());
     }
     evicted.len()
@@ -419,7 +430,6 @@ async fn remove_evicted_files(files: Vec<String>) {
 async fn remove_index_entry(bucket_id: usize, key: &str, file_key: String) {
     let mut w = GLOBAL_CACHE[bucket_id].write().await;
     w.remove_files(key, &HashSet::from_iter([file_key]));
-    drop(w);
 }
 
 fn get_hash_key(query: &str, step: i64) -> String {
