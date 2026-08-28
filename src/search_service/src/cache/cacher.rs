@@ -459,6 +459,18 @@ pub async fn get_cached_results(
             log::error!(
                 "[trace_id {trace_id}] Get results from disk failed: file: {file_path}/{file_name}, error: {e}"
             );
+            // file gone: drop the stale meta; matching flags prove the missed name is its own file
+            if matching_meta.is_aggregate == cache_req.is_aggregate
+                && matching_meta.is_descending == cache_req.is_descending
+            {
+                let mut w = QUERY_RESULT_CACHE.write().await;
+                if let Some(metas) = w.get_mut(&query_key) {
+                    metas.retain(|m| !m.eq(&matching_meta));
+                    if metas.is_empty() {
+                        w.remove(&query_key);
+                    }
+                }
+            }
             return None;
         }
     };
@@ -1265,6 +1277,36 @@ mod tests {
         assert!(result.is_ok());
         let filtered_responses = result.unwrap();
         assert_eq!(filtered_responses.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_results_heals_stale_meta_on_disk_miss() {
+        let file_path = "heal_org/logs/heal_stream/heal_hash";
+        let query_key = file_path.replace('/', "_");
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![meta]);
+
+        let cache_req = CacheQueryRequest {
+            q_start_time: 1000,
+            q_end_time: 2000,
+            is_aggregate: false,
+            ts_column: "_timestamp".to_string(),
+            histogram_interval: 0,
+            is_descending: false,
+            is_histogram_non_ts_order: false,
+        };
+        let res = get_cached_results("heal_trace", file_path, cache_req, None).await;
+        assert!(res.is_none());
+        // the meta pointing at the missing file was removed on the miss
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
     }
 
     #[tokio::test]

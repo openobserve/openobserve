@@ -283,8 +283,9 @@ impl FileData {
         // rename tmp file to real file
         let file_ops_start = std::time::Instant::now();
         let file_path = self.get_file_path(file);
-        tokio::fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
-        tokio::fs::rename(tmp_file, &file_path).await.map_err(|e| {
+        std::fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
+        // sync on purpose: the rename and the set_size index insert must be one uncancellable poll
+        std::fs::rename(tmp_file, &file_path).map_err(|e| {
             anyhow::anyhow!(
                 "[CacheType:{}] File disk cache rename tmp file {tmp_file} to real file {file_path} error: {e}",
                 self.file_type,
@@ -1554,6 +1555,29 @@ mod tests {
 
         // removing an unknown key vacates nothing
         assert!(file_data.remove(key).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cancelled_set_leaves_no_destination() {
+        let key = "metrics_results/cancelset_org/2024/01/01/00/fff_1_2_3.pb";
+        let idx = get_bucket_idx(key);
+
+        // park the write on the bucket lock, then abort it before the rename can happen
+        let w = RESULT_FILES[idx].write().await;
+        let task_key = key.to_string();
+        let handle = tokio::spawn(async move {
+            let _ = set(&task_key, Bytes::from("x")).await;
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        handle.abort();
+        let _ = handle.await;
+        drop(w);
+
+        // the destination file and the index entry either both exist or neither does
+        let indexed = RESULT_FILES[idx].read().await.exist(key).await;
+        let on_disk = get_file_path(key).is_some_and(|path| std::path::Path::new(&path).exists());
+        assert_eq!(indexed, on_disk);
+        assert!(!indexed);
     }
 
     #[tokio::test]
