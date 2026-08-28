@@ -37,6 +37,27 @@ function apiOrigin(): string {
   return base.endsWith("/") ? base.slice(0, -1) : base;
 }
 
+/**
+ * Create/update body for a shared variable.
+ *
+ * `value` is optional so an update can leave a write-only secret alone: the
+ * client only ever holds `has_value`, never the value, so it has nothing to
+ * send back. Omitting it means "keep what is stored".
+ */
+export interface SyntheticsVariablePayload {
+  name: string;
+  value?: string;
+  kind: "plain" | "secret";
+  description?: string;
+  example?: string;
+  tags?: string[];
+}
+
+export interface SyntheticsEnvironmentPayload {
+  name: string;
+  description?: string;
+}
+
 export interface ListRunsPayload {
   query: {
     sql: string;
@@ -204,6 +225,67 @@ const syntheticsService = {
 
   bulkDeleteLocations: (orgIdentifier: string, ids: string[]) =>
     http().delete(`/api/${orgIdentifier}/synthetics/locations`, { data: { ids } }),
+
+  // ── Shared variables and environments ──────────────────────────────────
+  //
+  // Two scopes, deliberately kept apart: unscoped variables under
+  // /synthetics/variables, environment-scoped ones under the environment that
+  // governs them. The URL is the access-control boundary, so a caller cannot
+  // reach a production secret through the global route by accident.
+
+  listGlobalVariables: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/variables`),
+
+  createGlobalVariable: (orgIdentifier: string, body: SyntheticsVariablePayload) =>
+    http().post(`/api/${orgIdentifier}/synthetics/variables`, body),
+
+  updateGlobalVariable: (orgIdentifier: string, id: string, body: SyntheticsVariablePayload) =>
+    http().put(`/api/${orgIdentifier}/synthetics/variables/${id}`, body),
+
+  // `force` is the confirmation collected after the guard listed the checks
+  // that reference this variable; without it the server refuses with 409.
+  deleteGlobalVariable: (orgIdentifier: string, id: string, force = false) =>
+    http().delete(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`),
+
+  listEnvironments: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/environments`),
+
+  createEnvironment: (orgIdentifier: string, body: SyntheticsEnvironmentPayload) =>
+    http().post(`/api/${orgIdentifier}/synthetics/environments`, body),
+
+  updateEnvironment: (orgIdentifier: string, env: string, body: SyntheticsEnvironmentPayload) =>
+    http().put(`/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}`, body),
+
+  deleteEnvironment: (orgIdentifier: string, env: string, force = false) =>
+    http().delete(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}?force=${force}`,
+    ),
+
+  createEnvironmentVariable: (
+    orgIdentifier: string,
+    env: string,
+    body: SyntheticsVariablePayload,
+  ) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables`,
+      body,
+    ),
+
+  updateEnvironmentVariable: (
+    orgIdentifier: string,
+    env: string,
+    id: string,
+    body: SyntheticsVariablePayload,
+  ) =>
+    http().put(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}`,
+      body,
+    ),
+
+  deleteEnvironmentVariable: (orgIdentifier: string, env: string, id: string, force = false) =>
+    http().delete(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
+    ),
 
   listRunsPayload(monitorId: string, startTime: number, endTime: number): ListRunsPayload {
     const sql = `SELECT * FROM "${STREAM_NAME}" WHERE synthetics_id = '${monitorId}' ORDER BY _timestamp DESC LIMIT 500`;

@@ -732,3 +732,41 @@ export interface SyntheticLocationDetail extends SyntheticLocation {
   checks: SyntheticLocationCheck[];
   install?: string;
 }
+
+// ── Shared variables and environments ────────────────────────────────────────
+
+/**
+ * One shared variable, as every read path returns it.
+ *
+ * There is no `value` field, deliberately - the server's read DTO has none
+ * either, so a secret's value cannot arrive here to be leaked into a DOM node.
+ * `example` stands in wherever the UI needs to show the shape of a value.
+ */
+export interface SyntheticsVariable {
+  id: string;
+  name: string;
+  kind: "plain" | "secret";
+  description: string;
+  example: string;
+  tags: string[];
+  /** Whether a value is stored at all - the only thing the client learns about it. */
+  has_value: boolean;
+  /** Checks whose definition references `{{NAME}}`. Drives the deletion guard. */
+  used_by_checks: number;
+  owner?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/** One environment, with its variables inline - the list renders the whole tab. */
+export interface SyntheticsEnvironment {
+  id: string;
+  name: string;
+  description: string;
+  owner?: string;
+  created_at: number;
+  updated_at: number;
+  /** Checks pinned to this environment. Not derivable from this response. */
+  checks_count: number;
+  variables: SyntheticsVariable[];
+}
