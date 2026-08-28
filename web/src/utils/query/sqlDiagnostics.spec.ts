@@ -25,7 +25,7 @@
  *     test data (10 mutation types) produce a specific error message at ≥ 94%.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   buildContextualSqlMessage,
   isParserLimitation,
@@ -35,6 +35,48 @@ import {
   type SqlErrorRange,
 } from "./sqlDiagnostics";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
+
+// validateSql() runs astify() through a Web Worker (sqlAstifyWorkerClient) that
+// doesn't exist in this test environment. Mirrors the real worker's message
+// contract using the same parser, so every assertion below still exercises the
+// genuine astify() output — only the thread it runs on differs. Safe to stub
+// after the imports above: the client only constructs a Worker lazily, on the
+// first validateSql() call inside a test, not at module load time.
+class MockWorker {
+  onmessage: ((event: { data: any }) => void) | null = null;
+  private parser = new Parser();
+
+  postMessage(msg: { id: number; sql: string }) {
+    queueMicrotask(() => {
+      try {
+        const ast = this.parser.astify(msg.sql);
+        this.onmessage?.({ data: { id: msg.id, ok: true, ast } });
+      } catch (err: any) {
+        this.onmessage?.({
+          data: {
+            id: msg.id,
+            ok: false,
+            error: {
+              message: err?.message,
+              location: err?.location,
+              expected: err?.expected,
+              found: err?.found,
+              name: err?.name,
+            },
+          },
+        });
+      }
+    });
+  }
+
+  terminate() {}
+}
+Object.defineProperty(window, "Worker", {
+  writable: true,
+  configurable: true,
+  value: MockWorker,
+});
+vi.stubGlobal("Worker", MockWorker);
 import basicSelect from "../../../../tests/test-data/query-agent/queries/basic_select.json";
 import aggregation from "../../../../tests/test-data/query-agent/queries/aggregation.json";
 import combined from "../../../../tests/test-data/query-agent/queries/combined.json";

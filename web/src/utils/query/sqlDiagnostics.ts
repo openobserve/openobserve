@@ -38,6 +38,7 @@
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 import { gt, raw, type I18nText } from "@/types/i18n";
+import { astifyOffThread } from "@/utils/query/sqlAstifyWorkerClient";
 
 export interface SqlErrorRange {
   startLine: number;
@@ -817,15 +818,6 @@ export function isParserLimitation(err: any, sql?: string): boolean {
 
 // ─── Async validator ──────────────────────────────────────────────────────────
 
-let _parserInstance: any = null;
-
-async function getParser(): Promise<any> {
-  if (_parserInstance) return _parserInstance;
-  const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
-  _parserInstance = new ((mod as any).default?.Parser ?? (mod as any).Parser)();
-  return _parserInstance;
-}
-
 /**
  * Run a client-side syntax check on a SQL string.
  * Returns `null` if valid (or the error is unclassified / a parser-grammar gap),
@@ -844,9 +836,8 @@ export async function validateSql(
   lineOffset = 0,
   colOffset = 0,
 ): Promise<SqlErrorRange | null> {
-  const parser = await getParser();
   try {
-    parser.astify(sql);
+    await astifyOffThread(sql);
     return null;
   } catch (err: any) {
     // Suppress known parser-grammar gaps — DataFusion accepts these even though
@@ -897,10 +888,9 @@ export async function rangesFromSqlParserDetail(
     //       → Fall through and use the server-reported position with a cleaned message,
     //         because the server told us there IS a real parse error at a known location.
     // Distinguish: re-parse and check if it throws at all.
-    const parser = await getParser();
     let clientThrows = false;
     try {
-      parser.astify(originalSql);
+      await astifyOffThread(originalSql);
     } catch {
       clientThrows = true;
     }

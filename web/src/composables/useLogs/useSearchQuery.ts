@@ -27,8 +27,8 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { hasLimitClause } from "@/utils/query/nonSqlLimit";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
-import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
+import { astifyOffThread } from "@/utils/query/sqlAstifyWorkerClient";
 import { raw, type TranslateFn } from "@/types/i18n";
 
 // Walk the WHERE clause AST and replace column references whose name matches
@@ -254,33 +254,35 @@ export const useSearchQuery = (t: TranslateFn) => {
         searchObj.data.sqlSyntaxErrorRanges = [];
       }
 
-      // Pre-flight SQL syntax check — runs only in SQL mode, before firing the query
+      // Pre-flight SQL syntax check — runs only in SQL mode, before firing the query.
+      // Off the main thread and fire-and-forget: astify() is exponential in paren
+      // nesting depth (10+ seconds on a pathological query) and must not block
+      // building/firing the actual search request while it runs. The query is
+      // re-checked against searchObj.data.query when the result lands, since the
+      // user may already have moved on to a different query by then.
       if (!readOnly && searchObj.meta.sqlMode && query) {
-        try {
-          const _sqlParser = new SqlParser();
-          _sqlParser.astify(query);
-        } catch (syntaxErr: any) {
+        astifyOffThread(query).catch((syntaxErr: any) => {
+          if (searchObj.data.query.trim() !== query) return;
+
           // Suppress parser-limitation false positives — these are valid SQL
           // constructs the PEG parser can't handle (e.g. SUM(COUNT(*)) OVER,
           // COALESCE in PARTITION BY) but the DataFusion backend accepts.
-          if (isParserLimitation(syntaxErr)) {
-            // continue past the error — don't block the query
-          } else {
-            const loc = syntaxErr?.location?.start;
-            const line = loc?.line ?? 1;
-            const col = loc?.column ?? 1;
-            const msg = buildContextualSqlMessage(query, syntaxErr);
-            searchObj.data.errorMsg = t("search.sqlSyntaxErrorDetail", {
-              line,
-              column: col,
-              message: msg,
-            });
-            searchObj.data.sqlSyntaxErrorRanges = [
-              // msg is string|null; `!` is compile-time only (null passes through unchanged).
-              { startLine: line, endLine: line, column: col, error: msg! },
-            ];
-          }
-        }
+          if (isParserLimitation(syntaxErr)) return; // continue past the error — don't block the query
+
+          const loc = syntaxErr?.location?.start;
+          const line = loc?.line ?? 1;
+          const col = loc?.column ?? 1;
+          const msg = buildContextualSqlMessage(query, syntaxErr);
+          searchObj.data.errorMsg = t("search.sqlSyntaxErrorDetail", {
+            line,
+            column: col,
+            message: msg,
+          });
+          searchObj.data.sqlSyntaxErrorRanges = [
+            // msg is string|null; `!` is compile-time only (null passes through unchanged).
+            { startLine: line, endLine: line, column: col, error: msg! },
+          ];
+        });
       }
 
       const req: any = {
