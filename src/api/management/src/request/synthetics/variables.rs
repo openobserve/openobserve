@@ -27,7 +27,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::meta::synthetics_variables::{SyntheticsEnvironmentRequest, SyntheticsVariableRequest};
+use config::meta::synthetics_variables::{
+    PromoteVariableRequest, SplitVariableRequest, SyntheticsEnvironmentRequest,
+    SyntheticsVariableRequest,
+};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
@@ -463,4 +466,233 @@ fn variables_error(operation: &str, error: anyhow::Error) -> Response {
         error.to_string(),
     )
     .into_response()
+}
+
+// ── Scope moves (design §9.6) ────────────────────────────────────────────────
+//
+// All three only ever touch plain variables: a secret already carries an
+// environment by construction, so it can never become global, and its value is
+// write-only so there is nothing to copy between environments.
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/{id}/resolved-variables",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticResolvedVariables",
+    summary = "The check's resolved variable set, with the scope each name comes from",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Check ID"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_synthetic_resolved_variables(
+    Path((org_id, id)): Path<(String, String)>,
+) -> Response {
+    match openobserve_synthetics::service::resolved_variables(&org_id, &id).await {
+        Ok(Some(resolved)) => MetaHttpResponse::json(resolved),
+        Ok(None) => MetaHttpResponse::not_found("check not found"),
+        Err(e) => variables_error("resolved_variables", e),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/{id}/variables/{name}/promote",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "PromoteSyntheticVariable",
+    summary = "Move a check-scoped variable into the shared tier",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Check ID"),
+        ("name" = String, Path, description = "Variable name on the check"),
+    ),
+    request_body(content = Object, description = "Destination scope", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Promoted", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn promote_synthetic_variable(
+    Path((org_id, id, name)): Path<(String, String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<PromoteVariableRequest>,
+) -> Response {
+    // OSS has no per-request identity to attribute a write to.
+    #[cfg(feature = "enterprise")]
+    let created_by = user_email.user_id.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let created_by = String::new();
+
+    // The route authorizes the CHECK. The destination scope is a second object
+    // with its own owner, so it is checked here — otherwise anyone who can edit
+    // a check could plant a value in an environment they cannot touch.
+    let destination = match &body.environment {
+        Some(env) => match resolve_environment(&org_id, env).await {
+            Ok(Some(record)) => Some(record),
+            Ok(None) => return MetaHttpResponse::not_found("environment not found"),
+            Err(response) => return response,
+        },
+        None => None,
+    };
+    #[cfg(feature = "enterprise")]
+    if let Err(response) =
+        require_scope_write(&org_id, &user_email.user_id, destination.as_ref()).await
+    {
+        return response;
+    }
+
+    match openobserve_synthetics::service::promote_check_variable(
+        &org_id,
+        &id,
+        &name,
+        destination.as_ref(),
+        &created_by,
+    )
+    .await
+    {
+        Ok(view) => MetaHttpResponse::json(view),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/environments/{env}/variables/{id}/promote",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "PromoteEnvironmentVariableToGlobal",
+    summary = "Move an environment-scoped variable to the unscoped tier",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("env" = String, Path, description = "Environment name"),
+        ("id" = String, Path, description = "Variable ID"),
+    ),
+    responses(
+        (status = 200, description = "Promoted", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn promote_environment_variable(
+    Path((org_id, env, id)): Path<(String, String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let record = match resolve_environment(&org_id, &env).await {
+        Ok(Some(record)) => record,
+        Ok(None) => return MetaHttpResponse::not_found("environment not found"),
+        Err(response) => return response,
+    };
+    // The route authorizes the environment being LEFT; the unscoped tier is
+    // governed by the module umbrella, so entering it is checked separately.
+    #[cfg(feature = "enterprise")]
+    if let Err(response) = require_scope_write(&org_id, &user_email.user_id, None).await {
+        return response;
+    }
+
+    match openobserve_synthetics::service::promote_to_global(&org_id, &record, &id).await {
+        Ok(view) => MetaHttpResponse::json(view),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/variables/{id}/split",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SplitSyntheticsVariable",
+    summary = "Split a global variable into per-environment values",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Variable ID"),
+    ),
+    request_body(content = Object, description = "One value per destination environment", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Split",   content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn split_synthetics_variable(
+    Path((org_id, id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<SplitVariableRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let created_by = user_email.user_id.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let created_by = String::new();
+
+    // Every destination is a separate object with its own owner, so each is
+    // checked before any row is written.
+    #[cfg(feature = "enterprise")]
+    for target in &body.targets {
+        match resolve_environment(&org_id, &target.environment).await {
+            Ok(Some(record)) => {
+                if let Err(response) =
+                    require_scope_write(&org_id, &user_email.user_id, Some(&record)).await
+                {
+                    return response;
+                }
+            }
+            Ok(None) => return MetaHttpResponse::not_found("environment not found"),
+            Err(response) => return response,
+        }
+    }
+
+    match openobserve_synthetics::service::split_to_environments(
+        &org_id,
+        &id,
+        body.targets,
+        &created_by,
+    )
+    .await
+    {
+        Ok(views) => MetaHttpResponse::json(views),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// Write permission on the scope a variable is moving into.
+///
+/// `None` means the unscoped tier, which the module umbrella governs. Scope
+/// moves cross an authorization boundary that no single route can express, so
+/// the destination is always checked in the handler.
+#[cfg(feature = "enterprise")]
+async fn require_scope_write(
+    org_id: &str,
+    user_id: &str,
+    destination: Option<&SyntheticsEnvironmentRecord>,
+) -> Result<(), Response> {
+    let (object, resource, use_self_parent) = match destination {
+        Some(env) => (env.name.clone(), ENVIRONMENT_RESOURCE, true),
+        None => (org_id.to_string(), "synthetics_module", true),
+    };
+    if openobserve_core::auth::check_permissions(
+        &object,
+        org_id,
+        user_id,
+        resource,
+        "PUT",
+        None,
+        destination.is_none(),
+        false,
+        use_self_parent,
+    )
+    .await
+    {
+        return Ok(());
+    }
+    Err(MetaHttpResponse::forbidden(match destination {
+        Some(env) => format!("Forbidden: no write access to environment '{}'", env.name),
+        None => "Forbidden: no write access to global variables".to_string(),
+    }))
 }

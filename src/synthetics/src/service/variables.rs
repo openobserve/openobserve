@@ -20,6 +20,7 @@
 //! be a new type rather than a forgotten redaction.
 
 use infra::db::{get_orm_client_ro, get_orm_client_rw};
+use sea_orm::TransactionTrait;
 
 use super::*;
 
@@ -410,6 +411,247 @@ pub async fn delete_variable(
     synthetics_variables::delete(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+/// A check's resolved set, name by name, with the scope each name comes from.
+///
+/// The check editor's Inherited group and the `{{` autocomplete both read this.
+/// Values never appear — the merge is over metadata, so this is safe to hand to
+/// anyone who may edit the check.
+pub async fn resolved_variables(
+    org_id: &str,
+    check_id: &str,
+) -> anyhow::Result<Option<Vec<ResolvedVariableView>>> {
+    let conn = get_orm_client_ro().await;
+    let Some(check) = synthetics_checks::get(conn, org_id, check_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+    else {
+        return Ok(None);
+    };
+    let env_id = check.environments.first().cloned();
+    let envs = synthetics_environments::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let shared = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    // Names the check defines itself. Looked up as a set because the shared
+    // rows below need to know which of them the check shadows.
+    let own: std::collections::HashSet<&str> =
+        check.variables.iter().map(|v| v.name.as_str()).collect();
+
+    let mut out: Vec<ResolvedVariableView> = shared
+        .iter()
+        .filter(|v| applies_to(v, env_id.as_deref()))
+        .map(|v| ResolvedVariableView {
+            scope: match &v.env {
+                None => "global".to_string(),
+                Some(id) => envs
+                    .iter()
+                    .find(|e| &e.id == id)
+                    .map_or_else(|| id.clone(), |e| e.name.clone()),
+            },
+            overridden: own.contains(v.name.as_str()),
+            name: v.name.clone(),
+            kind: if v.is_secret() {
+                SyntheticsVariableKind::Secret
+            } else {
+                SyntheticsVariableKind::Plain
+            },
+            example: v.example.clone(),
+            description: v.description.clone(),
+            has_value: !v.value.is_empty(),
+        })
+        .collect();
+
+    out.extend(check.variables.iter().map(|v| ResolvedVariableView {
+        name: v.name.clone(),
+        // The check tier keeps the old `secure` flag, which is a display hint
+        // rather than a storage property — so it is reported as plain here.
+        kind: SyntheticsVariableKind::Plain,
+        scope: "check".to_string(),
+        overridden: false,
+        example: v.example.clone(),
+        description: String::new(),
+        has_value: !v.value.is_empty(),
+    }));
+    out.sort_by(|a, b| a.name.cmp(&b.name).then(a.scope.cmp(&b.scope)));
+    Ok(Some(out))
+}
+
+/// Moves a check-scoped variable up into the shared tier.
+///
+/// The ciphertext moves as-is. Both tiers are encrypted under the same org DEK,
+/// so no plaintext has to materialise to promote a value — which also means a
+/// caller who cannot read the value can still promote it.
+pub async fn promote_check_variable(
+    org_id: &str,
+    check_id: &str,
+    name: &str,
+    env: Option<&SyntheticsEnvironmentRecord>,
+    owner: &str,
+) -> anyhow::Result<SyntheticsVariableView> {
+    let conn = get_orm_client_rw().await;
+    let mut check = synthetics_checks::get(conn, org_id, check_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("check not found: {check_id}"))?;
+
+    let normalized = normalize_variable_name(name);
+    let position = check
+        .variables
+        .iter()
+        .position(|v| normalize_variable_name(&v.name) == normalized)
+        .ok_or_else(|| anyhow::anyhow!("check has no variable named '{name}'"))?;
+
+    let env_id = env.map(|e| e.id.clone());
+    reject_cross_scope_conflict(conn, org_id, &normalized, env_id.as_deref(), None).await?;
+
+    let source = check.variables[position].clone();
+    let now = config::utils::time::now_micros();
+    let record = SyntheticsVariableRecord {
+        id: config::ider::uuid(),
+        org_id: org_id.to_string(),
+        env: env_id,
+        name: normalized,
+        value: source.value.clone(),
+        // Promoting does not make a check variable write-only: `secure` was a
+        // display hint and the value stays readable through `get_synthetic`.
+        // Calling it a secret here would claim a guarantee it does not have.
+        kind: synthetics_variables::KIND_PLAIN.to_string(),
+        description: String::new(),
+        example: source.example.clone(),
+        tags: Vec::new(),
+        owner: Some(owner.to_string()),
+        created_at: now,
+        updated_at: now,
+    };
+    synthetics_variables::add(conn, &record)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    // Remove the check's copy only after the shared row exists, so a failure
+    // leaves the value where it was rather than nowhere.
+    check.variables.remove(position);
+    synthetics_checks::update(conn, org_id, check_id, check)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    Ok(record.to_view())
+}
+
+/// Moves an environment-scoped variable to the unscoped tier.
+pub async fn promote_to_global(
+    org_id: &str,
+    env: &SyntheticsEnvironmentRecord,
+    id: &str,
+) -> anyhow::Result<SyntheticsVariableView> {
+    let conn = get_orm_client_rw().await;
+    let mut record = scoped_variable(conn, org_id, Some(env), id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("variable not found in environment '{}'", env.name))?;
+
+    if record.is_secret() {
+        anyhow::bail!(
+            "Secrets must belong to an environment. Change '{}' to a plain variable first.",
+            record.name
+        );
+    }
+
+    // The same name in another environment has no single correct global value,
+    // so name the conflict rather than silently picking one.
+    let others: Vec<String> = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .into_iter()
+        .filter(|v| v.name == record.name && v.id != record.id && v.env.is_some())
+        .map(|v| v.env.unwrap_or_default())
+        .collect();
+    if !others.is_empty() {
+        anyhow::bail!(
+            "'{}' also exists in {} other environment(s). Remove those first — there is no single \
+             correct global value.",
+            record.name,
+            others.len()
+        );
+    }
+
+    record.updated_at = config::utils::time::now_micros();
+    synthetics_variables::set_env(conn, org_id, id, None, record.updated_at)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    record.env = None;
+    Ok(record.to_view())
+}
+
+/// Splits one unscoped variable into per-environment rows.
+///
+/// A split, not a move: one row becomes N, each with its own value. Values
+/// arrive with the request rather than being filled in afterwards, because the
+/// half-finished state is one where checks have already stopped resolving.
+pub async fn split_to_environments(
+    org_id: &str,
+    id: &str,
+    targets: Vec<SplitTarget>,
+    owner: &str,
+) -> anyhow::Result<Vec<SyntheticsVariableView>> {
+    if targets.is_empty() {
+        anyhow::bail!("targets: at least one environment is required");
+    }
+    let conn = get_orm_client_rw().await;
+    let source = scoped_variable(conn, org_id, None, id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("global variable not found: {id}"))?;
+
+    let known = synthetics_environments::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let mut resolved = Vec::with_capacity(targets.len());
+    for target in &targets {
+        let env = known
+            .iter()
+            .find(|e| e.name == target.environment)
+            .ok_or_else(|| anyhow::anyhow!("no environment named '{}'", target.environment))?;
+        resolved.push((env.clone(), target.value.clone()));
+    }
+
+    let dek = synthetics_dek(org_id).await?;
+    let now = config::utils::time::now_micros();
+    let mut created = Vec::with_capacity(resolved.len());
+    for (env, value) in resolved {
+        created.push(SyntheticsVariableRecord {
+            id: config::ider::uuid(),
+            org_id: org_id.to_string(),
+            env: Some(env.id.clone()),
+            name: source.name.clone(),
+            value: encrypt_secret(&dek, &value)?,
+            kind: source.kind.clone(),
+            description: source.description.clone(),
+            example: source.example.clone(),
+            tags: source.tags.clone(),
+            owner: Some(owner.to_string()),
+            created_at: now,
+            updated_at: now,
+        });
+    }
+
+    // One transaction: a half-applied split leaves the name defined both
+    // globally and per-environment, which the cross-scope rule forbids and
+    // which resolves non-deterministically until someone notices.
+    let txn = conn.begin().await?;
+    for record in &created {
+        synthetics_variables::add(&txn, record)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    }
+    synthetics_variables::delete(&txn, org_id, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    txn.commit().await?;
+    synthetics_variables::invalidate_and_publish(org_id).await;
+
+    Ok(created.iter().map(|r| r.to_view()).collect())
 }
 
 /// The shared tier for one job: every unscoped variable, plus the ones scoped to
