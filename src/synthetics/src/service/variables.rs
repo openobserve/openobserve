@@ -63,16 +63,20 @@ pub async fn list_environments(org_id: &str) -> anyhow::Result<Vec<SyntheticsEnv
     let counts = synthetics_checks::count_by_environment(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let usage = placeholder_usage(org_id).await?;
 
     Ok(envs
         .into_iter()
         .map(|env| SyntheticsEnvironmentView {
             checks_count: counts.get(&env.id).copied().unwrap_or(0),
-            variables: variables
-                .iter()
-                .filter(|v| v.env.as_deref() == Some(env.id.as_str()))
-                .map(|v| v.to_view())
-                .collect(),
+            variables: with_usage(
+                variables
+                    .iter()
+                    .filter(|v| v.env.as_deref() == Some(env.id.as_str()))
+                    .map(|v| v.to_view())
+                    .collect(),
+                &usage,
+            ),
             id: env.id,
             name: env.name,
             description: env.description,
@@ -150,12 +154,17 @@ pub async fn update_environment(
     Ok(Some(environment_view(record)))
 }
 
-/// Deletes an environment and every variable scoped to it.
+/// Deletes an environment and every plain variable scoped to it.
 ///
-/// Refused while a check is still pinned to it: the check would otherwise keep
-/// naming an environment that no longer exists, and its next run would resolve
-/// a different variable set than the one it was written against.
-pub async fn delete_environment(org_id: &str, name: &str) -> anyhow::Result<bool> {
+/// Three guards, in descending severity:
+///
+/// - **A secret refuses outright**, with no `force`. Its value is write-only, so a delete is
+///   unrecoverable by anyone — there is no copy to restore from and no one who can read it back.
+/// - **A pinned check refuses**, or the check would keep naming an environment that no longer
+///   exists and its next run would resolve a different variable set than it was written against.
+/// - **Plain variables need `force`**, which is the confirmation the UI collects after listing
+///   them.
+pub async fn delete_environment(org_id: &str, name: &str, force: bool) -> anyhow::Result<bool> {
     let conn = get_orm_client_rw().await;
     let Some(record) = synthetics_environments::get_by_name(conn, org_id, name)
         .await
@@ -170,6 +179,38 @@ pub async fn delete_environment(org_id: &str, name: &str) -> anyhow::Result<bool
         anyhow::bail!("environment '{name}' is still used by {n} check(s)");
     }
 
+    let scoped: Vec<_> = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .into_iter()
+        .filter(|v| v.env.as_deref() == Some(record.id.as_str()))
+        .collect();
+    let secrets: Vec<&str> = scoped
+        .iter()
+        .filter(|v| v.is_secret())
+        .map(|v| v.name.as_str())
+        .collect();
+    if !secrets.is_empty() {
+        anyhow::bail!(
+            "environment '{name}' still holds {} secret(s): {}. Delete them individually first — a \
+             secret's value is write-only, so this cannot be undone.",
+            secrets.len(),
+            secrets.join(", ")
+        );
+    }
+    if !force && !scoped.is_empty() {
+        anyhow::bail!(
+            "environment '{name}' still holds {} variable(s): {}. Re-send with force=true to \
+             delete them with it.",
+            scoped.len(),
+            scoped
+                .iter()
+                .map(|v| v.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
     let deleted = synthetics_environments::delete(conn, org_id, &record.id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -182,16 +223,51 @@ pub async fn delete_environment(org_id: &str, name: &str) -> anyhow::Result<bool
     Ok(deleted)
 }
 
+/// Variable name → names of the checks whose definition references `{{NAME}}`.
+///
+/// One pass over the org's checks, because every list endpoint needs the count
+/// for every row at once. `target` and `config` together carry every place a
+/// placeholder can appear — steps, headers, URLs all live inside `config`.
+async fn placeholder_usage(org_id: &str) -> anyhow::Result<HashMap<String, Vec<String>>> {
+    let conn = get_orm_client_ro().await;
+    let checks = synthetics_checks::list(conn, org_id, &ListSyntheticsParams::default())
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    let mut usage: HashMap<String, Vec<String>> = HashMap::new();
+    for check in checks {
+        let mut text = check.target.clone();
+        text.push(' ');
+        text.push_str(&check.config.to_string());
+        for name in placeholder_names(&text) {
+            usage.entry(name).or_default().push(check.name.clone());
+        }
+    }
+    Ok(usage)
+}
+
+/// Stamps `used_by_checks` onto a batch of views.
+fn with_usage(
+    mut views: Vec<SyntheticsVariableView>,
+    usage: &HashMap<String, Vec<String>>,
+) -> Vec<SyntheticsVariableView> {
+    for view in &mut views {
+        view.used_by_checks = usage.get(&view.name).map_or(0, |c| c.len() as u64);
+    }
+    views
+}
+
 /// The unscoped tier — variables that apply in every environment.
 pub async fn list_global_variables(org_id: &str) -> anyhow::Result<Vec<SyntheticsVariableView>> {
     let conn = get_orm_client_ro().await;
-    Ok(synthetics_variables::list(conn, org_id)
+    let views: Vec<_> = synthetics_variables::list(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .iter()
         .filter(|v| v.env.is_none())
         .map(|v| v.to_view())
-        .collect())
+        .collect();
+    Ok(with_usage(views, &placeholder_usage(org_id).await?))
 }
 
 /// One environment's variables, or `None` when the environment does not exist.
@@ -206,15 +282,14 @@ pub async fn list_environment_variables(
     else {
         return Ok(None);
     };
-    Ok(Some(
-        synthetics_variables::list(conn, org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?
-            .iter()
-            .filter(|v| v.env.as_deref() == Some(env.id.as_str()))
-            .map(|v| v.to_view())
-            .collect(),
-    ))
+    let views: Vec<_> = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .iter()
+        .filter(|v| v.env.as_deref() == Some(env.id.as_str()))
+        .map(|v| v.to_view())
+        .collect();
+    Ok(Some(with_usage(views, &placeholder_usage(org_id).await?)))
 }
 
 /// Rejects a check that names an environment which does not exist.
@@ -306,14 +381,31 @@ pub async fn update_variable(
     Ok(Some(record.to_view()))
 }
 
+/// Deletes a variable, refusing while checks still reference it.
+///
+/// `force` is the confirmation the UI collects after showing the list. The
+/// names travel in the error rather than behind a second endpoint, so the
+/// caller cannot render the guard without having been told what it guards.
 pub async fn delete_variable(
     org_id: &str,
     env: Option<&SyntheticsEnvironmentRecord>,
     id: &str,
+    force: bool,
 ) -> anyhow::Result<bool> {
     let conn = get_orm_client_rw().await;
-    if scoped_variable(conn, org_id, env, id).await?.is_none() {
+    let Some(record) = scoped_variable(conn, org_id, env, id).await? else {
         return Ok(false);
+    };
+    if !force
+        && let Some(users) = placeholder_usage(org_id).await?.get(&record.name)
+        && !users.is_empty()
+    {
+        anyhow::bail!(
+            "'{}' is referenced by {} check(s): {}. Re-send with force=true to delete it anyway.",
+            record.name,
+            users.len(),
+            users.join(", ")
+        );
     }
     synthetics_variables::delete(conn, org_id, id)
         .await
@@ -547,6 +639,43 @@ mod tests {
             Some("prod"),
             None
         ));
+    }
+
+    #[test]
+    fn usage_counts_are_stamped_by_name() {
+        let views = vec![
+            SyntheticsVariableView {
+                name: "BASE_URL".into(),
+                ..Default::default()
+            },
+            SyntheticsVariableView {
+                name: "UNUSED".into(),
+                ..Default::default()
+            },
+        ];
+        let usage = HashMap::from([(
+            "BASE_URL".to_string(),
+            vec!["Checkout".to_string(), "Login".to_string()],
+        )]);
+
+        let stamped = with_usage(views, &usage);
+        assert_eq!(stamped[0].used_by_checks, 2);
+        // Absent from the index means genuinely unreferenced, not unknown.
+        assert_eq!(stamped[1].used_by_checks, 0);
+    }
+
+    #[test]
+    fn usage_matching_is_case_sensitive() {
+        // `{{base_url}}` does not resolve a variable stored as `BASE_URL`, so it
+        // must not be counted as a use of it — the count drives the deletion
+        // guard, and a false count would guard the wrong thing.
+        let views = vec![SyntheticsVariableView {
+            name: "BASE_URL".into(),
+            ..Default::default()
+        }];
+        let usage = HashMap::from([("base_url".to_string(), vec!["Checkout".to_string()])]);
+
+        assert_eq!(with_usage(views, &usage)[0].used_by_checks, 0);
     }
 
     #[test]
