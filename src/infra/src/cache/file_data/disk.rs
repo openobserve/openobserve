@@ -143,6 +143,37 @@ impl Default for FileData {
     }
 }
 
+/// Index cleanup for evicted cache entries that must run even when the evicting future is
+/// cancelled: on drop it spawns a task that prunes QUERY_RESULT_CACHE and notifies the
+/// metrics evict hook, with no disk cache lock held.
+#[derive(Default)]
+struct EvictionCleanup {
+    result_query_keys: Vec<String>,
+    metrics_files: Vec<String>,
+}
+
+impl Drop for EvictionCleanup {
+    fn drop(&mut self) {
+        if self.result_query_keys.is_empty() && self.metrics_files.is_empty() {
+            return;
+        }
+        let result_query_keys = std::mem::take(&mut self.result_query_keys);
+        let metrics_files = std::mem::take(&mut self.metrics_files);
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        handle.spawn(async move {
+            if !result_query_keys.is_empty() {
+                let mut r = QUERY_RESULT_CACHE.write().await;
+                for query_key in result_query_keys {
+                    r.remove(&query_key);
+                }
+            }
+            notify_metrics_evicted(metrics_files);
+        });
+    }
+}
+
 impl FileData {
     fn new(file_type: FileType) -> FileData {
         let cfg = get_config();
@@ -208,14 +239,11 @@ impl FileData {
         }
     }
 
-    /// Files evicted by a triggered gc are appended to `evicted_metrics_files` even when the
-    /// write itself fails, so the caller can still notify the metrics evict hook.
     async fn set(
         &mut self,
         file: &str,
         tmp_file: &str,
         data_size: usize,
-        evicted_metrics_files: &mut Vec<String>,
     ) -> Result<(), anyhow::Error> {
         if self.cur_size + data_size >= self.max_size {
             log::info!(
@@ -227,7 +255,7 @@ impl FileData {
                 self.max_size,
                 max(get_config().disk_cache.release_size, data_size * 100),
             );
-            *evicted_metrics_files = self.gc(need_release_size).await;
+            self.gc(need_release_size).await;
         }
 
         // rename tmp file to real file
@@ -281,9 +309,10 @@ impl FileData {
         Ok(())
     }
 
-    /// Returns the evicted `metrics_results/...` keys; the caller invokes the metrics evict
-    /// hook after releasing the bucket lock.
-    async fn gc(&mut self, need_release_size: usize) -> Vec<String> {
+    /// Cancellation-safe: size accounting and the cleanup lists are updated before each
+    /// await, and the index cleanup (QUERY_RESULT_CACHE + metrics evict hook) is owned by a
+    /// drop guard, so it still runs when this future is dropped mid-eviction.
+    async fn gc(&mut self, need_release_size: usize) {
         let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
@@ -293,8 +322,7 @@ impl FileData {
             need_release_size
         );
         let mut release_size = 0;
-        let mut remove_result_files = vec![];
-        let mut remove_metrics_files = vec![];
+        let mut cleanup = EvictionCleanup::default();
         loop {
             let item = self.data.remove();
             if item.is_none() {
@@ -305,27 +333,14 @@ impl FileData {
                 break;
             }
             let (key, data_size) = item.unwrap();
-            // delete file from local disk
+            self.cur_size -= data_size;
+            release_size += data_size;
             let file_path = self.get_file_path(key.as_str());
             log::debug!(
                 "[CacheType:{}] File disk cache gc remove file: {key}",
                 self.file_type,
             );
-            if let Err(e) = tokio::fs::remove_file(&file_path).await {
-                log::error!(
-                    "[CacheType:{}] File disk cache gc remove file: {file_path}, error: {e}",
-                    self.file_type,
-                );
-            }
 
-            if key.starts_with("results/") {
-                let columns = key.split('/').collect::<Vec<&str>>();
-                let query_key = format!(
-                    "{}_{}_{}_{}",
-                    columns[1], columns[2], columns[3], columns[4]
-                );
-                remove_result_files.push(query_key);
-            }
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
             let is_metrics_key = columns[0] == "metrics_results";
@@ -340,6 +355,10 @@ impl FileData {
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                     .with_label_values(&[columns[1], columns[2], "results"])
                     .sub(data_size as i64);
+                cleanup.result_query_keys.push(format!(
+                    "{}_{}_{}_{}",
+                    columns[1], columns[2], columns[3], columns[4]
+                ));
             } else if columns[0] == "metrics_results" {
                 metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                     .with_label_values(&[columns[1]])
@@ -350,30 +369,28 @@ impl FileData {
                     .sub(data_size as i64);
             }
             if is_metrics_key {
-                remove_metrics_files.push(key);
+                cleanup.metrics_files.push(key);
             }
 
-            release_size += data_size;
+            // delete file from local disk, best effort: an entry is fully evicted above,
+            // a file surviving a cancelled unlink is re-indexed by the next startup scan
+            if let Err(e) = tokio::fs::remove_file(&file_path).await {
+                log::error!(
+                    "[CacheType:{}] File disk cache gc remove file: {file_path}, error: {e}",
+                    self.file_type,
+                );
+            }
+
             if release_size >= need_release_size {
                 break;
             }
         }
-        self.cur_size -= release_size;
 
-        if !remove_result_files.is_empty() {
-            let mut r = QUERY_RESULT_CACHE.write().await;
-            for query_key in remove_result_files {
-                r.remove(&query_key);
-            }
-            drop(r);
-        }
         log::info!(
             "[CacheType:{}] File disk cache gc done, released {release_size} bytes, took: {} ms",
             self.file_type,
             start.elapsed().as_millis()
         );
-
-        remove_metrics_files
     }
 
     async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
@@ -715,10 +732,7 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         }
         return Ok(());
     }
-    let mut evicted_metrics_files = Vec::new();
-    let ret = files
-        .set(&file, &tmp_file, data_size, &mut evicted_metrics_files)
-        .await;
+    let ret = files.set(&file, &tmp_file, data_size).await;
     drop(files);
 
     let set_took = start.elapsed().as_millis() as usize;
@@ -726,8 +740,6 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         log::info!("disk->cache: set file {file} took: {set_took} ms");
     }
 
-    // notify even when the write failed: a triggered gc already deleted these files
-    notify_metrics_evicted(evicted_metrics_files);
     ret
 }
 
@@ -977,9 +989,8 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        let evicted_metrics_files = w.gc(cfg.disk_cache.gc_size).await;
+        w.gc(cfg.disk_cache.gc_size).await;
         drop(w);
-        notify_metrics_evicted(evicted_metrics_files);
     }
     let scale_factor = std::cmp::max(
         1,
@@ -1200,9 +1211,7 @@ mod tests {
                 i
             );
             let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
-            let resp = file_data
-                .set(&file_key, &tmp_file, data_size, &mut Vec::new())
-                .await;
+            let resp = file_data.set(&file_key, &tmp_file, data_size).await;
             assert!(resp.is_ok());
         }
     }
@@ -1220,14 +1229,14 @@ mod tests {
         let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
 
         let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
@@ -1244,14 +1253,14 @@ mod tests {
         let (file_key1, tmp_file) = write_tmp_file(file_key1, content.clone()).await.unwrap();
         // set one key
         file_data
-            .set(&file_key1, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key1, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key1).await);
         // set another key, will release first key
         let (file_key2, tmp_file) = write_tmp_file(file_key2, content.clone()).await.unwrap();
         file_data
-            .set(&file_key2, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key2, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key2).await);
@@ -1271,9 +1280,7 @@ mod tests {
                 i
             );
             let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
-            let resp = file_data
-                .set(&file_key, &tmp_file, data_size, &mut Vec::new())
-                .await;
+            let resp = file_data.set(&file_key, &tmp_file, data_size).await;
             if let Some(e) = resp.as_ref().err() {
                 println!("set file_key: {} error: {:?}", file_key, e);
             }
@@ -1294,14 +1301,14 @@ mod tests {
         let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
 
         let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
@@ -1318,14 +1325,14 @@ mod tests {
         let (file_key1, tmp_file) = write_tmp_file(file_key1, content.clone()).await.unwrap();
         // set one key
         file_data
-            .set(&file_key1, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key1, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key1).await);
         // set another key, will release first key
         let (file_key2, tmp_file) = write_tmp_file(file_key2, content.clone()).await.unwrap();
         file_data
-            .set(&file_key2, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key2, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key2).await);
@@ -1353,14 +1360,14 @@ mod tests {
         let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
 
         let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
+            .set(&file_key, &tmp_file, data_size)
             .await
             .unwrap();
         assert!(file_data.exist(&file_key).await);
@@ -1518,9 +1525,7 @@ mod tests {
         let bucket_id = gxhash::new().sum64(&file_key);
         let bucket_id = (bucket_id as usize) % FILES.len();
         let mut file_data = FILES[bucket_id].write().await;
-        let _ = file_data
-            .set(&file_key, &tmp_file, data_size, &mut Vec::new())
-            .await;
+        let _ = file_data.set(&file_key, &tmp_file, data_size).await;
         drop(file_data);
 
         // Get stats after adding data
@@ -1555,9 +1560,7 @@ mod tests {
             let bucket_id = gxhash::new().sum64(&file_key);
             let bucket_id = (bucket_id as usize) % RESULT_FILES.len();
             let mut file_data = RESULT_FILES[bucket_id].write().await;
-            let _ = file_data
-                .set(&file_key, &tmp_file, data_size, &mut Vec::new())
-                .await;
+            let _ = file_data.set(&file_key, &tmp_file, data_size).await;
             drop(file_data);
         }
 
