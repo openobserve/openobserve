@@ -46,8 +46,8 @@ const props = withDefaults(
     size?: "sm" | "md" | "lg" | "xl";
     /** Apply the default page gutter (px-6 py-6). Off → child owns padding. */
     padded?: boolean;
-    /** Places the column at the center, reading start, or physical left. */
-    align?: "center" | "start" | "left";
+    /** Column placement. `center` (default) for hubs; `start` for form pages. */
+    align?: "center" | "start";
   }>(),
   {
     size: "lg",
@@ -66,9 +66,8 @@ const SIZE_CLASS = {
 
 const maxWidthClass = computed(() => SIZE_CLASS[props.size]);
 
-const alignClass = computed(() => {
-  if (props.align === "start") return "me-auto";
-  if (props.align === "left") return "mr-auto";
-  return "mx-auto";
-});
+// `center` keeps the column centered (mx-auto); `start` pins it to the reading
+// edge so form pages read from the margin instead of floating in the middle of
+// wide screens.
+const alignClass = computed(() => (props.align === "start" ? "me-auto" : "mx-auto"));
 </script>

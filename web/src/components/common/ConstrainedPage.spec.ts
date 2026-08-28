@@ -18,9 +18,4 @@ describe("ConstrainedPage", () => {
     expect(classes).toContain("me-auto");
     expect(classes).not.toContain("mr-auto");
   });
-
-  it("keeps physical-left alignment available for legacy layouts", () => {
-    const wrapper = mount(ConstrainedPage, { props: { align: "left" } });
-    expect(content(wrapper).classes()).toContain("mr-auto");
-  });
 });
