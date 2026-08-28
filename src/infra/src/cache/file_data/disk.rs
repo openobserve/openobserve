@@ -320,7 +320,8 @@ impl FileData {
         Ok(())
     }
 
-    /// Cancellation-safe: all bookkeeping precedes the only await; the drop guard finishes cleanup.
+    /// Cancellation-safe: per-item bookkeeping completes before every await; the guard finishes
+    /// cleanup.
     async fn gc(&mut self, need_release_size: usize) {
         let start = std::time::Instant::now();
         log::info!(
@@ -388,6 +389,8 @@ impl FileData {
             if release_size >= need_release_size {
                 break;
             }
+            // the sync renames must not monopolize the worker for a whole batch
+            tokio::task::consume_budget().await;
         }
 
         // pruned inline so the prune completes before the caller can insert a new meta
