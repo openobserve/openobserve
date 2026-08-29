@@ -37,6 +37,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   flowChange: [];
+  /** `ready` means the manifest stepper reached its last step, NOT that Slack is connected. */
   readinessChange: [ready: boolean];
 }>();
 
