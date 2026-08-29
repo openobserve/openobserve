@@ -85,6 +85,13 @@
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-success-500) 60%, transparent) !important;
 }
 
+/* Publish validation flagged an INCOMPLETE (dummy) node — thicken its border, keeping
+   the node's OWN type colour (blue trigger / amber logic / green destination), so the
+   user sees exactly which steps still need setup before publishing. */
+.o2vf_node .vue-flow__node:has(.wf-needs-setup) {
+  border-width: 0.1875rem !important;
+}
+
 /* Disabled/muted node — the step is toggled off (WorkflowNode marks its card
    `wf-node-disabled`). The FRAME loses its type colour and shadow (neutral grey);
    the icon + label are desaturated SEPARATELY (below) rather than filtering the

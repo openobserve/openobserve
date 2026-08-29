@@ -47,6 +47,7 @@ import ExperimentComparePage from "./ExperimentComparePage.vue";
 
 const comparisonRow = {
   logicalId: "case-1",
+  input: { question: "When?" },
   baselineRowId: "old-row",
   candidateRowId: "new-row",
   bucket: "regressed" as const,

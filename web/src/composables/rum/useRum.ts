@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive } from "vue";
+import { computed, reactive } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 const defaultObject = {
   data: {
@@ -30,12 +31,18 @@ const defaultObject = {
 let rumState = reactive(Object.assign({}, defaultObject));
 
 const useRum = () => {
+  const route = useRoute();
+  const router = useRouter();
+
   const resetSessionState = () => {
     // delete searchObj.data;
     rumState = reactive(Object.assign({}, defaultObject));
   };
 
-  return { rumState, resetSessionState };
+  // Every RUM page pushes its full state into the router query, so location is the link.
+  const shareUrl = computed(() => window.location.origin + router.resolve(route.fullPath).href);
+
+  return { rumState, resetSessionState, shareUrl };
 };
 
 export default useRum;

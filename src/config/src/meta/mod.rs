@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod actions;
 pub mod agent_signals;
 pub mod ai;
 pub mod alerts;

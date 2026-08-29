@@ -454,7 +454,6 @@ fn convert_to_destination(config: PrebuiltDestinationConfig) -> Result<Destinati
                     } else {
                         Some(headers)
                     },
-                    action_id: None,
                     output_format: Some(output_format),
                     destination_type: Some(endpoint_config.destination_type),
                     metadata: endpoint_metadata,
@@ -522,7 +521,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("slack".to_string()),
                     metadata: HashMap::from([
@@ -550,7 +548,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("teams".to_string()),
                     metadata: HashMap::from([
@@ -580,7 +577,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "Token YOUR_INTEGRATION_KEY".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("pagerduty".to_string()),
                     metadata: HashMap::from([
@@ -607,7 +603,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("discord".to_string()),
                     metadata: HashMap::from([
@@ -634,7 +629,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("webhook".to_string()),
                     metadata: HashMap::from([
@@ -664,7 +658,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "GenieKey YOUR_API_KEY".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("opsgenie".to_string()),
                     metadata: HashMap::from([
@@ -694,7 +687,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "Basic YOUR_AUTH_TOKEN".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("servicenow".to_string()),
                     metadata: HashMap::from([

@@ -46,6 +46,8 @@ mod llm_experiment_cleanup;
 #[cfg(feature = "enterprise")]
 mod llm_idempotency_purge;
 #[cfg(feature = "enterprise")]
+mod llm_playground_cleanup;
+#[cfg(feature = "enterprise")]
 mod llm_review_reconciliation;
 #[cfg(feature = "enterprise")]
 mod llm_secret_cleanup;
@@ -307,6 +309,27 @@ pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
     }
 
     Ok(LOCAL_NODE.uuid.clone())
+}
+
+/// SPEC §6, item 2.3 — the free step pool the synthetics scheduler gates on.
+///
+/// Passed as an ARGUMENT to `init`, not installed into a cell, so the compiler
+/// will not let anyone forget it: an unset pool is §11 **F6** — no error, no
+/// log, an unmetered fleet. `None` off `cloud` (§8.1): a self-hosted Enterprise
+/// build has no pool, and with no pool the scheduler does not gate (fail open).
+#[cfg(feature = "cloud")]
+fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks> {
+    Some(openobserve_synthetics::pool::StepPoolHooks {
+        try_deduct: openobserve_core::trial_quota::synthetics_steps_try_deduct,
+        refund: openobserve_core::trial_quota::synthetics_steps_refund,
+        remaining: openobserve_core::trial_quota::synthetics_steps_remaining,
+        dead_letter_refund: openobserve_core::trial_quota::synthetics_steps_dead_letter_refund,
+    })
+}
+
+#[cfg(not(feature = "cloud"))]
+fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks> {
+    None
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -1069,7 +1092,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // `init` carries its own super-cluster arbitration: in a super cluster
         // it starts the scheduler/dispatcher/reaper only in the cluster holding
         // the job-cluster claim, the same key `scheduler::run` below elects on.
-        openobserve_synthetics::init().await;
+        openobserve_synthetics::init(synthetics_step_pool()).await;
         // The staleness watcher stays enterprise — it reports on private
         // locations, whose agents are the enterprise half.
         #[cfg(feature = "enterprise")]
@@ -1211,6 +1234,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // sweep, which retries until the Experiment's own storage is gone.
     #[cfg(feature = "enterprise")]
     llm_experiment_cleanup::run();
+    #[cfg(feature = "enterprise")]
+    llm_playground_cleanup::run();
     // Signing-key rotation retains the outgoing key only until its bounded
     // grace period ends.
     #[cfg(feature = "enterprise")]
@@ -1335,4 +1360,36 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    /// **SPEC §6, item 2.3.** Losing the pool argument is silent: `init` still
+    /// starts every worker, every check still runs, and the pool is simply never
+    /// consulted — an unmetered, ungated fleet with no error anywhere (§11 F6).
+    /// The needles are assembled at runtime so this test's own source does not
+    /// count towards the totals it asserts.
+    #[test]
+    fn the_synthetics_scheduler_is_handed_the_step_pool() {
+        let source = include_str!("mod.rs");
+        assert_eq!(
+            source
+                .matches(&["openobserve_synthetics::init(synthetics_step", "_pool())"].concat())
+                .count(),
+            1,
+            "`init` must be handed the pool; passing `None` unconditionally is an unmetered fleet"
+        );
+        for hook in [
+            "synthetics_steps_try_deduct",
+            "synthetics_steps_refund",
+            "synthetics_steps_remaining",
+            "synthetics_steps_dead_letter_refund",
+        ] {
+            assert_eq!(
+                source.matches(&["trial_quota::", hook].concat()).count(),
+                1,
+                "the `cloud` build must wire {hook} into the scheduler\'s pool hooks"
+            );
+        }
+    }
 }
