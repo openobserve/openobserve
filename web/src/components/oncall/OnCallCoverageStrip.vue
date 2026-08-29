@@ -47,13 +47,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            reader gets to WHO without the strip fragmenting into a name per
            shift. -->
       <template #band="{ band }">
-        <OTooltip
-          v-if="tooltipFor(band.key)"
-          :content="tooltipFor(band.key)!"
-          side="top"
-          content-class="whitespace-pre-line"
-        >
+        <OTooltip v-if="tooltipFor(band.key).length" side="top">
           <OScheduleBand :band="band" />
+          <template #content>
+            <div class="flex flex-col">
+              <template v-for="(segment, index) in tooltipFor(band.key)" :key="segment.key">
+                <!-- One rule per handover, not around every segment: a
+                     single-segment tooltip is one block, and the rule is only
+                     meaningful as a boundary BETWEEN two date ranges. -->
+                <hr v-if="index > 0" class="border-border-default my-1" />
+                <div class="flex flex-col gap-0.5">
+                  <span v-if="segment.range" class="text-text-secondary text-2xs">{{
+                    segment.range
+                  }}</span>
+                  <span>{{ segment.primary }}</span>
+                  <span v-if="segment.secondary">{{ segment.secondary }}</span>
+                </div>
+              </template>
+            </div>
+          </template>
         </OTooltip>
         <OScheduleBand v-else :band="band" />
       </template>
@@ -163,6 +175,18 @@ const clock = (micros: number) =>
     minute: "2-digit",
   });
 
+/// Weekday AND date, unlike `clock`: a tooltip segment can be the same
+/// weekday a week apart, and "Fri – Fri" only reads as a length once the
+/// date tells the two apart.
+const rangeStamp = (micros: number) =>
+  formatInZone(micros, props.timezone, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
 /** One unbroken stretch of a single cover state. */
 interface Run {
   from: number;
@@ -230,40 +254,41 @@ const holderRuns = computed<HolderRun[]>(() => {
   return out;
 });
 
-const whoLabel = (holder: { primary: string | null; secondary: string | null }): I18nText =>
-  holder.secondary
-    ? t("oncall.coveragePrimaryAndSecondary", {
-        primary: raw(holder.primary ?? ""),
-        secondary: raw(holder.secondary),
-      })
-    : t("oncall.coveragePrimaryOnly", { primary: raw(holder.primary ?? "") });
+/** One row of a band's tooltip. */
+interface TooltipSegment {
+  key: string;
+  /** The stretch this row covers, shown only when the band holds more than one. */
+  range: I18nText | null;
+  primary: I18nText;
+  /** Omitted, not blank, when nobody backs this stretch up. */
+  secondary: I18nText | null;
+}
 
 /// A gap already says "Nobody" on the band itself; a tooltip would repeat it.
-/// Covered/partial bands get one line per handover inside them, so a run that
+/// Covered/partial bands get one row per handover inside them, so a run that
 /// merges several days of "somebody's on call" still names the right somebody
-/// for the stretch under the pointer.
-function tooltipFor(bandKey: string): I18nText | null {
+/// for the stretch under the pointer. Primary and secondary are separate
+/// fields, not one joined sentence, so the template can put them on their own
+/// lines and rule off one handover from the next.
+function tooltipFor(bandKey: string): TooltipSegment[] {
   const run = runs.value.find((r) => `${r.from}` === bandKey);
-  if (!run || run.cover === "none") return null;
+  if (!run || run.cover === "none") return [];
 
   const segments = holderRuns.value.filter((h) => h.from < run.to && h.to > run.from);
-  if (!segments.length) return null;
-  if (segments.length === 1) return whoLabel(segments[0]);
+  const showRange = segments.length > 1;
 
-  return raw(
-    segments
-      .map((segment) =>
-        String(
-          t("oncall.coverageWhoRange", {
-            range: raw(
-              `${clock(Math.max(segment.from, run.from))} – ${clock(Math.min(segment.to, run.to))}`,
-            ),
-            who: whoLabel(segment),
-          }),
-        ),
-      )
-      .join("\n"),
-  );
+  return segments.map((segment) => ({
+    key: `${segment.from}`,
+    range: showRange
+      ? raw(
+          `${rangeStamp(Math.max(segment.from, run.from))} – ${rangeStamp(Math.min(segment.to, run.to))}`,
+        )
+      : null,
+    primary: t("oncall.coveragePrimaryOnly", { primary: raw(segment.primary ?? "") }),
+    secondary: segment.secondary
+      ? t("oncall.coverageSecondaryOnly", { secondary: raw(segment.secondary) })
+      : null,
+  }));
 }
 
 const tracks = computed<ScheduleTrack[]>(() => {
