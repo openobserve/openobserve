@@ -79,10 +79,11 @@ const emit = defineEmits<{
   submit: [];
 }>();
 
-// Controlled by the parent: the "Show all (N)" link lives beside the
-// "Activity" header, not in this card's body, so the on/off state has to be
-// lifted there.
-const showAll = defineModel<boolean>("showAll", { default: false });
+// Controlled by the parent: the "Hide/Show system activity" link lives
+// beside the "Activity" header, not in this card's body, so the on/off
+// state has to be lifted there. Defaults to true — system (engine
+// bookkeeping) events show alongside human ones unless hidden.
+const showAll = defineModel<boolean>("showAll", { default: true });
 
 const { t } = useI18nTyped();
 const store = useStore();

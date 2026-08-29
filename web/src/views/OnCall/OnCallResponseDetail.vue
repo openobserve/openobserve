@@ -289,8 +289,8 @@
                 >
                   {{
                     showAllActivity
-                      ? t("oncall.activityShowPeopleOnly")
-                      : t("oncall.activityShowAllCount", { count: events.length })
+                      ? t("oncall.activityHideSystem")
+                      : t("oncall.activityShowSystemCount", { count: systemActivityCount })
                   }}
                 </OButton>
               </OCardSection>
@@ -634,6 +634,7 @@ import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import {
+  DEFAULT_ACTIVITY_KINDS,
   isEscalating,
   isSnoozed,
   isUnresolved,
@@ -652,6 +653,9 @@ const router = useRouter();
 
 const response = ref<OnCallResponse | null>(null);
 const events = ref<OnCallResponseEvent[]>([]);
+const systemActivityCount = computed(
+  () => events.value.filter((e) => !DEFAULT_ACTIVITY_KINDS.includes(e.kind)).length,
+);
 const teamName = ref("");
 const loading = ref(false);
 const resolving = ref(false);
@@ -763,7 +767,7 @@ const escalatingNow = ref(false);
 // on-call has no business depending on that module for an em dash.
 const ABSENT = raw("—");
 const noteBody = ref("");
-const showAllActivity = ref(false);
+const showAllActivity = ref(true);
 /// Activity, deliveries and prior causes as tabs of one card rather than a
 /// card plus two collapsibles — the toggle-all button in the header only
 /// makes sense while activity is the one showing.
