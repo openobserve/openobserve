@@ -100,6 +100,7 @@ static AGGREGATION_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     files
 });
 
+/// Metas are added under the file's bucket guard; every deletion re-verifies the other side first.
 pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
 
@@ -146,6 +147,12 @@ enum TrashOutcome {
     Moved(String),
     SourceMissing,
     Failed,
+}
+
+enum RemoveOutcome {
+    Removed(Option<String>), // vacated; the payload is the trash file to unlink off-lock
+    NotIndexed,
+    Failed, // the path could not be vacated; the index entry was restored
 }
 
 impl fmt::Display for FileType {
@@ -431,7 +438,7 @@ impl FileData {
     }
 
     /// Returns the trash path the file was vacated to; the caller deletes it off-lock.
-    async fn remove(&mut self, file: &str) -> Result<Option<String>, anyhow::Error> {
+    async fn remove(&mut self, file: &str) -> RemoveOutcome {
         log::debug!(
             "[CacheType:{}] File disk cache remove file {file}",
             self.file_type,
@@ -442,7 +449,7 @@ impl FileData {
                 "[CacheType:{}] File disk cache remove file {file} not in the index",
                 self.file_type,
             );
-            return Ok(None);
+            return RemoveOutcome::NotIndexed;
         };
         let file_path = self.get_file_path(key.as_str());
         let trash_file = match self.move_to_trash(key.as_str(), &file_path) {
@@ -451,7 +458,7 @@ impl FileData {
             TrashOutcome::Failed => {
                 // the file still occupies its path: keep the entry so accounting stays true
                 self.data.insert(key, data_size);
-                return Ok(None);
+                return RemoveOutcome::Failed;
             }
         };
         self.cur_size -= data_size;
@@ -479,7 +486,7 @@ impl FileData {
                 .sub(data_size as i64);
         }
 
-        Ok(trash_file)
+        RemoveOutcome::Removed(trash_file)
     }
 
     fn choose_multi_dir(&self, file: &str) -> String {
@@ -890,9 +897,9 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     } else {
         RESULT_FILES[idx].write().await
     };
-    let trash_file = files.remove(file).await?;
+    let outcome = files.remove(file).await;
     drop(files);
-    if let Some(trash_file) = trash_file
+    if let RemoveOutcome::Removed(Some(trash_file)) = outcome
         && let Err(e) = tokio::fs::remove_file(&trash_file).await
         && e.kind() != std::io::ErrorKind::NotFound
     {
@@ -979,19 +986,25 @@ async fn remove_unowned_result_file(file_key: &str) {
     if owned {
         return;
     }
-    let trash_file = match files.remove(file_key).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::warn!("Remove evicted result cache file {file_key} error: {e}");
-            return;
+    match files.remove(file_key).await {
+        RemoveOutcome::Removed(trash_file) => {
+            drop(files);
+            if let Some(trash_file) = trash_file
+                && let Err(e) = tokio::fs::remove_file(&trash_file).await
+                && e.kind() != std::io::ErrorKind::NotFound
+            {
+                log::error!("File disk cache remove trash file {trash_file} error: {e}");
+            }
         }
-    };
-    drop(files);
-    if let Some(trash_file) = trash_file
-        && let Err(e) = tokio::fs::remove_file(&trash_file).await
-        && e.kind() != std::io::ErrorKind::NotFound
-    {
-        log::error!("File disk cache remove trash file {trash_file} error: {e}");
+        RemoveOutcome::NotIndexed => {}
+        RemoveOutcome::Failed => {
+            // the path could not be vacated: the file stays readable, so restore its meta
+            let mut w = QUERY_RESULT_CACHE.write().await;
+            let metas = w.entry(query_key).or_default();
+            if !metas.contains(&meta) {
+                metas.push(meta);
+            }
+        }
     }
 }
 
@@ -1000,14 +1013,20 @@ async fn remove_unowned_result_file(file_key: &str) {
 pub async fn remove_result_cache_metas(file_keys: &[String]) {
     let parsed = file_keys
         .iter()
-        .filter_map(|file_key| parse_result_cache_key(file_key))
-        .map(|(_, _, query_key, meta)| (query_key, meta))
+        .filter_map(|file_key| {
+            let (_, _, query_key, meta) = parse_result_cache_key(file_key)?;
+            Some((query_key, meta, get_file_path(file_key)?))
+        })
         .collect::<Vec<_>>();
     if parsed.is_empty() {
         return;
     }
     let mut r = QUERY_RESULT_CACHE.write().await;
-    for (query_key, meta) in parsed {
+    for (query_key, meta, abs_path) in parsed {
+        // checked under the lock: a rewrite lands its file before its meta push can take this lock
+        if std::path::Path::new(&abs_path).exists() {
+            continue;
+        }
         if let Some(metas) = r.get_mut(&query_key) {
             metas.retain(|m| m != &meta);
             if metas.is_empty() {
@@ -1629,14 +1648,19 @@ mod tests {
         tokio::fs::write(&file_path, b"x").await.unwrap();
         file_data.set_size(key, 1).await.unwrap();
 
-        let trash_file = file_data.remove(key).await.unwrap().unwrap();
+        let RemoveOutcome::Removed(Some(trash_file)) = file_data.remove(key).await else {
+            panic!("expected the file to be vacated to trash");
+        };
         assert!(!file_data.exist(key).await);
         assert!(!std::path::Path::new(&file_path).exists());
         assert!(std::path::Path::new(&trash_file).exists());
         tokio::fs::remove_file(&trash_file).await.unwrap();
 
         // removing an unknown key vacates nothing
-        assert!(file_data.remove(key).await.unwrap().is_none());
+        assert!(matches!(
+            file_data.remove(key).await,
+            RemoveOutcome::NotIndexed
+        ));
     }
 
     #[tokio::test]
@@ -1660,6 +1684,45 @@ mod tests {
         let on_disk = get_file_path(key).is_some_and(|path| std::path::Path::new(&path).exists());
         assert_eq!(indexed, on_disk);
         assert!(!indexed);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_remove_unowned_restores_meta_on_failed_move() {
+        use std::os::unix::fs::PermissionsExt;
+        let file_key = "results/failmove_org/logs/default/hashkey/1000_2000_0_0.json";
+        let query_key = "failmove_org_logs_default_hashkey";
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        let file_path = get_file_path(file_key).unwrap();
+        let parent = std::path::Path::new(&file_path)
+            .parent()
+            .unwrap()
+            .to_owned();
+        tokio::fs::create_dir_all(&parent).await.unwrap();
+        tokio::fs::write(&file_path, b"x").await.unwrap();
+        set_size(file_key, 1).await.unwrap();
+
+        // a read-only parent makes the trash rename fail, so the eviction must roll back fully
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o555)).unwrap();
+        remove_unowned_result_file(file_key).await;
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(indexed_file_guard(file_key).await.is_some());
+        assert!(
+            QUERY_RESULT_CACHE
+                .read()
+                .await
+                .get(query_key)
+                .is_some_and(|metas| metas.contains(&meta))
+        );
+
+        QUERY_RESULT_CACHE.write().await.remove(query_key);
+        remove(file_key).await.unwrap();
     }
 
     #[tokio::test]
@@ -1988,8 +2051,18 @@ mod tests {
         let metas = QUERY_RESULT_CACHE.read().await.get(query_key).cloned();
         assert_eq!(metas, Some(vec![meta2]));
 
-        // removing the last file drops the query key
+        // a meta whose file was rewritten on disk survives the delayed prune
         let file2 = "results/rm_meta_org/logs/default/hashkey/3000_4000_0_1.json".to_string();
+        let abs_path = get_file_path(&file2).unwrap();
+        tokio::fs::create_dir_all(std::path::Path::new(&abs_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&abs_path, b"x").await.unwrap();
+        remove_result_cache_metas(std::slice::from_ref(&file2)).await;
+        assert!(QUERY_RESULT_CACHE.read().await.contains_key(query_key));
+
+        // removing the last file drops the query key once the file is truly gone
+        tokio::fs::remove_file(&abs_path).await.unwrap();
         remove_result_cache_metas(&[file2]).await;
         assert!(!QUERY_RESULT_CACHE.read().await.contains_key(query_key));
     }
