@@ -237,6 +237,11 @@
           </router-link>
         </OBanner>
 
+        <!-- The four facts a responder reads first, read once rather than
+             assembled from the title tags and a description list further
+             down the page. -->
+        <OStatStrip :items="topStats" class="mb-4" data-test="oncall-response-stats" />
+
         <!-- Two columns rather than three tabs. Everything a responder needs
              to decide is on one screen: the tabs cost a click each for facts
              that were never optional, and the rail's answers — who this is
@@ -337,26 +342,12 @@
               :handover-at="handoverAt"
               :handover-to="handoverTo"
               :closed-at="response.closed_at"
-              :ack-label="ackLabel"
-              :ack-value="ackValue"
               :acked-by="response.acked_by"
-              :resolve-label="resolveLabel"
-              :resolve-value="resolveValue"
-              :reached-rung="reachedRung"
             />
 
-            <OnCallEscalationSkeleton v-if="loading && !escalation" />
-
-            <OnCallEscalation
-              v-else-if="escalation"
-              :progress="escalation"
-              :events="events"
-              :deliveries="deliveries"
-              :deliveries-total="deliveriesTotal"
-              :responder-role="isImpacted ? 'impacted' : 'owner'"
-              :final-action="policy?.final_action ?? null"
-              :team-id="response.team_id"
-              @edit="openPolicy"
+            <OnCallWhatFired
+              v-if="response.subject.subject_type === 'alert' && subjectAlert"
+              :alert="subjectAlert"
             />
 
             <OnCallAboutPage
@@ -594,13 +585,14 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
-import OnCallEscalation from "@/components/oncall/OnCallEscalation.vue";
-import OnCallEscalationSkeleton from "@/components/oncall/OnCallEscalationSkeleton.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
+import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -781,12 +773,17 @@ const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
 const firingHistory = ref<OnCallResponse[]>([]);
 const priorCausesLoading = ref(false);
-/// Only the two fields the page shows; the alert payload is large and the rest
-/// of it belongs on the alert's own screen, which the subject row links to.
+/// Only the fields the page shows — the stream, and the condition that
+/// tripped it; the rest of the payload belongs on the alert's own screen,
+/// which the subject row links to. `query_condition`/`condition` is `any`
+/// because `alertConditionText` (shared with the alert's own config summary)
+/// already treats it that way — the same rule read by two screens.
 const subjectAlert = ref<{
   name?: string;
   stream_name?: string;
   stream_type?: string;
+  query_condition?: any;
+  condition?: any;
 } | null>(null);
 const escalation = ref<EscalationProgress | null>(null);
 /// Who a page to this team reaches right now, and where the pager goes next.
@@ -920,6 +917,47 @@ const reachedRung = computed<I18nText | string>(() => {
   const index = steps?.findIndex((step) => step.after_micros === micros) ?? -1;
   if (index < 0 || !steps) return raw(`+${formatMicrosDuration(micros)}`);
   return t("oncall.statReachedRungOf", { n: index + 1, total: steps.length });
+});
+
+/// The four facts a responder reads first — read once at the top rather than
+/// pieced together from the title tags and the "who is on" card below.
+const topStats = computed<StatItem[]>(() => {
+  const r = response.value;
+  if (!r) return [];
+  return [
+    {
+      key: "ack",
+      label: ackLabel.value,
+      value: ackValue.value,
+      icon: "check-circle",
+      tone: r.acked_at ? "success" : "warning",
+      dataTest: "oncall-response-stat-ack",
+    },
+    {
+      key: "resolve",
+      label: resolveLabel.value,
+      value: resolveValue.value,
+      icon: "check-circle",
+      tone: r.closed_at ? "success" : "warning",
+      dataTest: "oncall-response-stat-resolve",
+    },
+    {
+      key: "rung",
+      label: t("oncall.statReachedRung"),
+      value: reachedRung.value,
+      icon: "trending-up",
+      tone: "warning",
+      dataTest: "oncall-response-stat-rung",
+    },
+    {
+      key: "firing",
+      label: t("oncall.firing"),
+      value: `#${r.subject.firing}`,
+      icon: "format-list-numbered",
+      tone: "neutral",
+      dataTest: "oncall-response-stat-firing",
+    },
+  ];
 });
 
 const routingReason = computed(() => routingReasonOf(events.value));
@@ -1328,15 +1366,6 @@ function openReachability() {
   router.push({
     name: "onCallTeamDetail",
     params: { teamId: response.value.team_id, tab: "members" },
-    query: { org_identifier: orgId.value },
-  });
-}
-
-function openPolicy() {
-  if (!response.value) return;
-  router.push({
-    name: "onCallTeamDetail",
-    params: { teamId: response.value.team_id, tab: "policy" },
     query: { org_identifier: orgId.value },
   });
 }

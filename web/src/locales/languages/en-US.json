@@ -13668,6 +13668,7 @@
     "rungLost": "failed",
     "rungLostTimes": "failed ×{count}",
     "routingDetails": "Routing details",
+    "whatFired": "What fired",
     "history": "History",
     "alertId": "Alert ID",
     "historyFirstPage": "First page from this subject",

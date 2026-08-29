@@ -99,9 +99,14 @@ const stubs = {
     props: ["groups"],
     template: "<div />",
   },
-  OnCallEscalation: {
-    name: "OnCallEscalation",
-    props: ["progress", "events", "responderRole"],
+  OnCallWhatFired: {
+    name: "OnCallWhatFired",
+    props: ["alert"],
+    template: "<div />",
+  },
+  OStatStrip: {
+    name: "OStatStrip",
+    props: ["items"],
     template: "<div />",
   },
   OContent: { name: "OContent", template: "<div><slot /></div>" },
@@ -130,19 +135,7 @@ const stubs = {
   },
   OnCallWhoIsOn: {
     name: "OnCallWhoIsOn",
-    props: [
-      "positions",
-      "deliveries",
-      "handoverAt",
-      "handoverTo",
-      "closedAt",
-      "ackLabel",
-      "ackValue",
-      "ackedBy",
-      "resolveLabel",
-      "resolveValue",
-      "reachedRung",
-    ],
+    props: ["positions", "deliveries", "handoverAt", "handoverTo", "closedAt", "ackedBy"],
     template: "<div />",
   },
   OnCallAboutPage: {
@@ -711,19 +704,6 @@ describe("OnCallResponseDetail", () => {
       expect(tooltip?.textContent).toContain("one chase");
     });
 
-    /// The role is what the ladder is truncated by, so it is what the ladder
-    /// panel is told — not a guess made from the ladder's own shape.
-    it("tells the ladder panel which seat this is", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: { fired: [], next_targets: [], next_at: null, exhausted: true, stopped_because: null },
-      } as any);
-      const wrapper = await renderWith({ responder_role: "impacted" });
-
-      expect(wrapper.findComponent({ name: "OnCallEscalation" }).props("responderRole")).toBe(
-        "impacted",
-      );
-    });
-
     it("leaves an owner record with no liaison language at all", async () => {
       service.escalationProgress.mockResolvedValue({
         data: { fired: [], next_targets: [], next_at: null, exhausted: false, stopped_because: null },
@@ -732,9 +712,6 @@ describe("OnCallResponseDetail", () => {
 
       expect(wrapper.find('[data-test="oncall-response-liaison-banner"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-response-liaison-tag"]').exists()).toBe(false);
-      expect(wrapper.findComponent({ name: "OnCallEscalation" }).props("responderRole")).toBe(
-        "owner",
-      );
     });
   });
 
@@ -903,6 +880,43 @@ describe("OnCallResponseDetail", () => {
     });
   });
 
+  describe("top stats and what fired", () => {
+    it("puts the firing count on the stat strip", async () => {
+      const wrapper = await renderWith({ subject: { subject_type: "alert", source_id: "al_ckt", firing: 2 } });
+      const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
+
+      expect(stats.find((s: any) => s.key === "firing").value).toBe("#2");
+    });
+
+    /// The escalation panel used to live in this rail; the section is gone
+    /// now, not just its data.
+    it("no longer renders a dedicated escalation panel", async () => {
+      const wrapper = await renderWith();
+
+      expect(wrapper.findComponent({ name: "OnCallEscalation" }).exists()).toBe(false);
+    });
+
+    /// The alert fetched for the subject is the same one "what fired" reads
+    /// its condition from.
+    it("hands the fetched alert to the what-fired card", async () => {
+      alerts.get_by_alert_id.mockResolvedValue({
+        data: { name: "checkout_error_ratio", query_condition: { sql: "count(*) > 10" } },
+      } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("alert")).toEqual(
+        expect.objectContaining({ name: "checkout_error_ratio" }),
+      );
+    });
+
+    /// A manually-opened page has no alert rule behind it — nothing "fired".
+    it("has no what-fired card for a non-alert subject", async () => {
+      const wrapper = await renderWith({ subject: { subject_type: "manual", source_id: "m1", firing: 1 } });
+
+      expect(wrapper.findComponent({ name: "OnCallWhatFired" }).exists()).toBe(false);
+    });
+  });
+
   /// The rail's four answers. Each is context: the record has to render when
   /// every one of them fails, which is what these pin.
   describe("team context", () => {
@@ -1004,17 +1018,18 @@ describe("OnCallResponseDetail", () => {
 
   /// The rail read "— —" on exactly the page that needs it: an open record
   /// has no ack or resolve duration yet. Each row now says its own version of
-  /// what is actually true, and both moved off the page's own stat strip into
-  /// the "who is on" rail once the strip went away.
+  /// what is actually true, on the stat strip at the top of the page.
   it("says what the clocks are doing instead of a dash", async () => {
     const wrapper = await renderWith();
-    const who = wrapper.findComponent({ name: "OnCallWhoIsOn" });
+    const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
+    const ack = stats.find((s: any) => s.key === "ack");
+    const resolve = stats.find((s: any) => s.key === "resolve");
 
-    expect(who.props("ackLabel")).toBe("Unacked for");
-    expect(who.props("ackValue")).not.toBe("—");
+    expect(ack.label).toBe("Unacked for");
+    expect(ack.value).not.toBe("—");
 
-    expect(who.props("resolveLabel")).toBe("Open for");
-    expect(who.props("resolveValue")).not.toBe("—");
+    expect(resolve.label).toBe("Open for");
+    expect(resolve.value).not.toBe("—");
   });
 
   /// Once it is answered the reading freezes into the metric it was always
@@ -1025,11 +1040,16 @@ describe("OnCallResponseDetail", () => {
       acked_by: "engineer@example.com",
       acked_at: 1_700_000_000_000_000 + HOUR_MICROS,
     });
-    const who = wrapper.findComponent({ name: "OnCallWhoIsOn" });
+    const ack = wrapper
+      .findComponent({ name: "OStatStrip" })
+      .props("items")
+      .find((s: any) => s.key === "ack");
 
-    expect(who.props("ackLabel")).toBe("Time to ack");
-    expect(who.props("ackValue")).toContain("1h");
-    expect(who.props("ackedBy")).toBe("engineer@example.com");
+    expect(ack.label).toBe("Time to ack");
+    expect(ack.value).toContain("1h");
+    expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("ackedBy")).toBe(
+      "engineer@example.com",
+    );
   });
 });
 
@@ -1053,7 +1073,10 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
   });
 
   const reachedRung = (wrapper: any) =>
-    wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("reachedRung");
+    wrapper
+      .findComponent({ name: "OStatStrip" })
+      .props("items")
+      .find((s: any) => s.key === "rung").value;
 
   /// **`0` is a real and common value** — it means the page never left the
   /// first rung — so `if (micros)` is a bug here. The absent case is the one
