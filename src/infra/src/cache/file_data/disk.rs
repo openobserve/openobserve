@@ -35,7 +35,6 @@ use config::{
         time::{HourFormat, get_ymdh_from_micros, now_micros},
     },
 };
-use hashbrown::HashMap;
 use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
 use tokio::sync::RwLock;
 
@@ -101,10 +100,13 @@ static AGGREGATION_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     files
 });
 
+/// Metas are added under the file's bucket guard; every deletion re-verifies the other side first.
 pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
 
 pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
+
+const RESULT_CACHE_MAX_ENTRIES_PER_KEY: usize = 10;
 
 static METRICS_RESULT_CACHE_EVICT_HOOK: OnceLock<fn(Vec<String>)> = OnceLock::new();
 
@@ -145,6 +147,12 @@ enum TrashOutcome {
     Moved(String),
     SourceMissing,
     Failed,
+}
+
+enum RemoveOutcome {
+    Removed(Option<String>), // vacated; the payload is the trash file to unlink off-lock
+    NotIndexed,
+    Failed, // the path could not be vacated; the index entry was restored
 }
 
 impl fmt::Display for FileType {
@@ -345,7 +353,7 @@ impl FileData {
         );
         let mut release_size = 0;
         let mut move_failures = 0;
-        let mut result_query_keys = Vec::new();
+        let mut remove_result_files = Vec::new();
         let mut cleanup = EvictionCleanup::default();
         loop {
             let item = self.data.remove();
@@ -385,6 +393,7 @@ impl FileData {
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
             let is_metrics_key = columns[0] == "metrics_results";
+            let is_results_key = columns[0] == "results";
             if columns[0] == "files" {
                 metrics::QUERY_DISK_CACHE_FILES
                     .with_label_values(&[columns[1], columns[2]])
@@ -396,10 +405,6 @@ impl FileData {
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                     .with_label_values(&[columns[1], columns[2], "results"])
                     .sub(data_size as i64);
-                result_query_keys.push(format!(
-                    "{}_{}_{}_{}",
-                    columns[1], columns[2], columns[3], columns[4]
-                ));
             } else if columns[0] == "metrics_results" {
                 metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                     .with_label_values(&[columns[1]])
@@ -409,7 +414,9 @@ impl FileData {
                     .with_label_values(&[columns[1], columns[2], "aggregations"])
                     .sub(data_size as i64);
             }
-            if is_metrics_key {
+            if is_results_key {
+                remove_result_files.push(key);
+            } else if is_metrics_key {
                 cleanup.metrics_files.push(key);
             }
 
@@ -421,12 +428,7 @@ impl FileData {
         }
 
         // pruned inline so the prune completes before the caller can insert a new meta
-        if !result_query_keys.is_empty() {
-            let mut r = QUERY_RESULT_CACHE.write().await;
-            for query_key in result_query_keys {
-                r.remove(&query_key);
-            }
-        }
+        remove_result_cache_metas(&remove_result_files).await;
 
         log::info!(
             "[CacheType:{}] File disk cache gc done, released {release_size} bytes, took: {} ms",
@@ -436,7 +438,7 @@ impl FileData {
     }
 
     /// Returns the trash path the file was vacated to; the caller deletes it off-lock.
-    async fn remove(&mut self, file: &str) -> Result<Option<String>, anyhow::Error> {
+    async fn remove(&mut self, file: &str) -> RemoveOutcome {
         log::debug!(
             "[CacheType:{}] File disk cache remove file {file}",
             self.file_type,
@@ -447,7 +449,7 @@ impl FileData {
                 "[CacheType:{}] File disk cache remove file {file} not in the index",
                 self.file_type,
             );
-            return Ok(None);
+            return RemoveOutcome::NotIndexed;
         };
         let file_path = self.get_file_path(key.as_str());
         let trash_file = match self.move_to_trash(key.as_str(), &file_path) {
@@ -456,7 +458,7 @@ impl FileData {
             TrashOutcome::Failed => {
                 // the file still occupies its path: keep the entry so accounting stays true
                 self.data.insert(key, data_size);
-                return Ok(None);
+                return RemoveOutcome::Failed;
             }
         };
         self.cur_size -= data_size;
@@ -484,7 +486,7 @@ impl FileData {
                 .sub(data_size as i64);
         }
 
-        Ok(trash_file)
+        RemoveOutcome::Removed(trash_file)
     }
 
     fn choose_multi_dir(&self, file: &str) -> String {
@@ -895,9 +897,9 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     } else {
         RESULT_FILES[idx].write().await
     };
-    let trash_file = files.remove(file).await?;
+    let outcome = files.remove(file).await;
     drop(files);
-    if let Some(trash_file) = trash_file
+    if let RemoveOutcome::Removed(Some(trash_file)) = outcome
         && let Err(e) = tokio::fs::remove_file(&trash_file).await
         && e.kind() != std::io::ErrorKind::NotFound
     {
@@ -931,10 +933,112 @@ pub fn set_metrics_result_cache_evict_hook(hook: fn(Vec<String>)) {
     }
 }
 
+/// Add the given `results/...` file to the QUERY_RESULT_CACHE index and enforce the per-key
+/// entry limit, removing evicted entries' files from disk.
+pub async fn add_result_cache_meta(file_key: &str) {
+    let Some((_, _, query_key, meta)) = parse_result_cache_key(file_key) else {
+        return;
+    };
+    let Some((dir, _)) = file_key.rsplit_once('/') else {
+        return;
+    };
+    // held across the insert so a concurrent eviction orders around the whole handoff
+    let Some(guard) = indexed_file_guard(file_key).await else {
+        return;
+    };
+    let mut w = QUERY_RESULT_CACHE.write().await;
+    let metas = w.entry(query_key).or_default();
+    // an equal meta can already exist when re-caching after clear_cache
+    if !metas.contains(&meta) {
+        metas.push(meta);
+    }
+    let evicted: Vec<_> = if metas.len() > RESULT_CACHE_MAX_ENTRIES_PER_KEY {
+        // evict the entries whose cached data range ends earliest; on a tie the narrower one
+        metas.sort_unstable_by_key(|m| (m.end_time, std::cmp::Reverse(m.start_time)));
+        metas
+            .drain(..metas.len() - RESULT_CACHE_MAX_ENTRIES_PER_KEY)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    drop(w);
+    drop(guard);
+
+    for meta in evicted {
+        let file = format!("{dir}/{}", result_cache_file_name(&meta));
+        remove_unowned_result_file(&file).await;
+    }
+}
+
+/// Removes the file unless a same-name rewrite re-registered its meta since the eviction.
+async fn remove_unowned_result_file(file_key: &str) {
+    let Some((_, _, query_key, meta)) = parse_result_cache_key(file_key) else {
+        return;
+    };
+    let idx = get_bucket_idx(file_key);
+    let mut files = RESULT_FILES[idx].write().await;
+    // bucket -> QUERY_RESULT_CACHE is the established lock order; writers push under the guard
+    let owned = QUERY_RESULT_CACHE
+        .read()
+        .await
+        .get(&query_key)
+        .is_some_and(|metas| metas.contains(&meta));
+    if owned {
+        return;
+    }
+    match files.remove(file_key).await {
+        RemoveOutcome::Removed(trash_file) => {
+            drop(files);
+            if let Some(trash_file) = trash_file
+                && let Err(e) = tokio::fs::remove_file(&trash_file).await
+                && e.kind() != std::io::ErrorKind::NotFound
+            {
+                log::error!("File disk cache remove trash file {trash_file} error: {e}");
+            }
+        }
+        RemoveOutcome::NotIndexed => {}
+        RemoveOutcome::Failed => {
+            // the path could not be vacated: the file stays readable, so restore its meta
+            let mut w = QUERY_RESULT_CACHE.write().await;
+            let metas = w.entry(query_key).or_default();
+            if !metas.contains(&meta) {
+                metas.push(meta);
+            }
+        }
+    }
+}
+
+/// Remove only the index entries matching the given `results/...` file keys from
+/// QUERY_RESULT_CACHE, dropping a query key only when its entry list becomes empty.
+pub async fn remove_result_cache_metas(file_keys: &[String]) {
+    let parsed = file_keys
+        .iter()
+        .filter_map(|file_key| {
+            let (_, _, query_key, meta) = parse_result_cache_key(file_key)?;
+            Some((query_key, meta, get_file_path(file_key)?))
+        })
+        .collect::<Vec<_>>();
+    if parsed.is_empty() {
+        return;
+    }
+    let mut r = QUERY_RESULT_CACHE.write().await;
+    for (query_key, meta, abs_path) in parsed {
+        // checked under the lock: a rewrite lands its file before its meta push can take this lock
+        if std::path::Path::new(&abs_path).exists() {
+            continue;
+        }
+        if let Some(metas) = r.get_mut(&query_key) {
+            metas.retain(|m| m != &meta);
+            if metas.is_empty() {
+                r.remove(&query_key);
+            }
+        }
+    }
+}
+
 #[async_recursion]
 async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
-    let mut result_cache: HashMap<String, Vec<ResultCacheMeta>> = HashMap::new();
     let mut metrics_cache: Vec<String> = Vec::new();
     loop {
         match entries.next_entry().await {
@@ -1017,8 +1121,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .with_label_values(&[columns[1], columns[2]])
                             .add(data_size as i64);
                     } else if file_key.starts_with("results") {
-                        let Some((org_id, stream_type, query_key, meta)) =
-                            parse_result_cache_key(&file_key)
+                        let Some((org_id, stream_type, ..)) = parse_result_cache_key(&file_key)
                         else {
                             log::error!("parse result cache key error: {file_key}");
                             continue;
@@ -1034,10 +1137,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .with_label_values(&[org_id.as_str(), stream_type.as_str(), "results"])
                             .add(data_size as i64);
 
-                        result_cache
-                            .entry(query_key)
-                            .or_insert_with(Vec::new)
-                            .push(meta);
+                        add_result_cache_meta(&file_key).await;
                     } else if file_key.starts_with("metrics_results") {
                         let mut w = RESULT_FILES[idx].write().await;
                         w.cur_size += data_size;
@@ -1085,8 +1185,6 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
         }
     }
 
-    // write all data from result_cache to QUERY_RESULT_CACHE
-    QUERY_RESULT_CACHE.write().await.extend(result_cache);
     // write all data from metrics_cache to QUERY_METRICS_CACHE
     METRICS_RESULT_CACHE.write().await.extend(metrics_cache);
     Ok(())
@@ -1222,28 +1320,27 @@ fn get_bucket_idx(file: &str) -> usize {
 // results/default/logs/default/16042959487540176184_30_zo_sql_key/
 // 1744081170000000_1744081170000000_1_0.json
 pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, ResultCacheMeta)> {
-    let columns = file.split('/').collect::<Vec<&str>>();
-    if columns.len() < 6 {
+    let (org_id, stream_type, query_key, filename) = split_cache_key(file, "results")?;
+    let meta = filename.split('_').collect::<Vec<&str>>();
+    if meta.len() < 4 {
         return None;
     }
-    let org_id = columns[1].to_string();
-    let stream_type = columns[2].to_string();
-    let query_key = format!(
-        "{}_{}_{}_{}",
-        columns[1], columns[2], columns[3], columns[4]
-    );
-
-    let meta = columns[5].split('_').collect::<Vec<&str>>();
-    let is_aggregate = meta[2] == "1";
-    let is_descending = meta[3] == "1";
     let meta = ResultCacheMeta {
-        start_time: meta[0].parse().unwrap(),
-        end_time: meta[1].parse().unwrap(),
-        is_aggregate,
-        is_descending,
+        start_time: meta[0].parse().ok()?,
+        end_time: meta[1].parse().ok()?,
+        is_aggregate: meta[2] == "1",
+        is_descending: meta[3] == "1",
     };
 
     Some((org_id, stream_type, query_key, meta))
+}
+
+// build the result cache file name from the meta, the inverse of parse_result_cache_key
+pub fn result_cache_file_name(meta: &ResultCacheMeta) -> String {
+    format!(
+        "{}_{}_{}_{}.json",
+        meta.start_time, meta.end_time, meta.is_aggregate as u8, meta.is_descending as u8
+    )
 }
 
 // parse the aggregation cache key from the file name
@@ -1252,38 +1349,42 @@ pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, Res
 pub fn parse_aggregation_cache_key(
     file: &str,
 ) -> Option<(String, String, String, ResultCacheMeta)> {
-    let columns = file.split('/').collect::<Vec<&str>>();
-    if columns.len() < 6 {
-        return None;
-    }
-    let org_id = columns[1].to_string();
-    let stream_type = columns[2].to_string();
-    let query_key = format!(
-        "{}_{}_{}_{}",
-        columns[1], columns[2], columns[3], columns[4]
-    );
-
-    // Remove file extension before parsing
-    let filename = columns[5];
-    let filename_without_ext = if let Some(dot_pos) = filename.rfind('.') {
-        &filename[..dot_pos]
-    } else {
-        filename
-    };
-
-    let meta = filename_without_ext.split('_').collect::<Vec<&str>>();
+    let (org_id, stream_type, query_key, filename) = split_cache_key(file, "aggregations")?;
+    let meta = filename.split('_').collect::<Vec<&str>>();
     if meta.len() < 2 {
         return None;
     }
 
     let meta = ResultCacheMeta {
-        start_time: meta[0].parse().unwrap(),
-        end_time: meta[1].parse().unwrap(),
+        start_time: meta[0].parse().ok()?,
+        end_time: meta[1].parse().ok()?,
         is_aggregate: true,
         // NOTE: aggregate record batches don't honor order by
         is_descending: false,
     };
     Some((org_id, stream_type, query_key, meta))
+}
+
+// split a `{prefix}/{org}/{stream_type}/{stream}/{hash}/{file}` cache key into
+// (org_id, stream_type, query_key, file name without extension)
+fn split_cache_key<'a>(file: &'a str, prefix: &str) -> Option<(String, String, String, &'a str)> {
+    let columns = file.split('/').collect::<Vec<&str>>();
+    if columns.len() < 6 || columns[0] != prefix {
+        return None;
+    }
+    let query_key = format!(
+        "{}_{}_{}_{}",
+        columns[1], columns[2], columns[3], columns[4]
+    );
+    let filename = columns[5]
+        .rsplit_once('.')
+        .map_or(columns[5], |(name, _)| name);
+    Some((
+        columns[1].to_string(),
+        columns[2].to_string(),
+        query_key,
+        filename,
+    ))
 }
 
 fn last_modified(metadata: &std::fs::Metadata) -> chrono::DateTime<chrono::Utc> {
@@ -1547,14 +1648,19 @@ mod tests {
         tokio::fs::write(&file_path, b"x").await.unwrap();
         file_data.set_size(key, 1).await.unwrap();
 
-        let trash_file = file_data.remove(key).await.unwrap().unwrap();
+        let RemoveOutcome::Removed(Some(trash_file)) = file_data.remove(key).await else {
+            panic!("expected the file to be vacated to trash");
+        };
         assert!(!file_data.exist(key).await);
         assert!(!std::path::Path::new(&file_path).exists());
         assert!(std::path::Path::new(&trash_file).exists());
         tokio::fs::remove_file(&trash_file).await.unwrap();
 
         // removing an unknown key vacates nothing
-        assert!(file_data.remove(key).await.unwrap().is_none());
+        assert!(matches!(
+            file_data.remove(key).await,
+            RemoveOutcome::NotIndexed
+        ));
     }
 
     #[tokio::test]
@@ -1578,6 +1684,71 @@ mod tests {
         let on_disk = get_file_path(key).is_some_and(|path| std::path::Path::new(&path).exists());
         assert_eq!(indexed, on_disk);
         assert!(!indexed);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_remove_unowned_restores_meta_on_failed_move() {
+        use std::os::unix::fs::PermissionsExt;
+        let file_key = "results/failmove_org/logs/default/hashkey/1000_2000_0_0.json";
+        let query_key = "failmove_org_logs_default_hashkey";
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        let file_path = get_file_path(file_key).unwrap();
+        let parent = std::path::Path::new(&file_path)
+            .parent()
+            .unwrap()
+            .to_owned();
+        tokio::fs::create_dir_all(&parent).await.unwrap();
+        tokio::fs::write(&file_path, b"x").await.unwrap();
+        set_size(file_key, 1).await.unwrap();
+
+        // a read-only parent makes the trash rename fail, so the eviction must roll back fully
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o555)).unwrap();
+        remove_unowned_result_file(file_key).await;
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(indexed_file_guard(file_key).await.is_some());
+        assert!(
+            QUERY_RESULT_CACHE
+                .read()
+                .await
+                .get(query_key)
+                .is_some_and(|metas| metas.contains(&meta))
+        );
+
+        QUERY_RESULT_CACHE.write().await.remove(query_key);
+        remove(file_key).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_remove_unowned_result_file() {
+        let file_key = "results/unowned_org/logs/default/hashkey/1000_2000_0_0.json";
+        let query_key = "unowned_org_logs_default_hashkey";
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        set_size(file_key, 1).await.unwrap();
+
+        // a rewrite re-registered the meta after the eviction: the file must survive
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.to_string(), vec![meta]);
+        remove_unowned_result_file(file_key).await;
+        assert!(indexed_file_guard(file_key).await.is_some());
+
+        // with no owning meta the file is removed
+        QUERY_RESULT_CACHE.write().await.remove(query_key);
+        remove_unowned_result_file(file_key).await;
+        assert!(indexed_file_guard(file_key).await.is_none());
     }
 
     #[tokio::test]
@@ -1837,12 +2008,103 @@ mod tests {
         assert_eq!(meta.start_time, 1744081170000000);
         assert_eq!(meta.end_time, 1744081180000000);
         assert!(!meta.is_aggregate);
+        assert!(meta.is_descending);
     }
 
     #[test]
     fn test_parse_result_cache_key_too_short_returns_none() {
         assert!(parse_result_cache_key("too/short").is_none());
         assert!(parse_result_cache_key("a/b/c/d/e").is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_result_cache_metas_removes_only_matching_meta() {
+        let query_key = "rm_meta_org_logs_default_hashkey";
+        let meta1 = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        let meta2 = ResultCacheMeta {
+            start_time: 3000,
+            end_time: 4000,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.to_string(), vec![meta1, meta2.clone()]);
+
+        // removing one file only drops its own meta
+        let file1 = "results/rm_meta_org/logs/default/hashkey/1000_2000_0_1.json".to_string();
+        remove_result_cache_metas(&[file1]).await;
+        let metas = QUERY_RESULT_CACHE.read().await.get(query_key).cloned();
+        assert_eq!(metas, Some(vec![meta2.clone()]));
+
+        // non-results keys are ignored
+        remove_result_cache_metas(&[
+            "aggregations/rm_meta_org/logs/default/hashkey/3000_4000.arrow".to_string(),
+        ])
+        .await;
+        let metas = QUERY_RESULT_CACHE.read().await.get(query_key).cloned();
+        assert_eq!(metas, Some(vec![meta2]));
+
+        // a meta whose file was rewritten on disk survives the delayed prune
+        let file2 = "results/rm_meta_org/logs/default/hashkey/3000_4000_0_1.json".to_string();
+        let abs_path = get_file_path(&file2).unwrap();
+        tokio::fs::create_dir_all(std::path::Path::new(&abs_path).parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&abs_path, b"x").await.unwrap();
+        remove_result_cache_metas(std::slice::from_ref(&file2)).await;
+        assert!(QUERY_RESULT_CACHE.read().await.contains_key(query_key));
+
+        // removing the last file drops the query key once the file is truly gone
+        tokio::fs::remove_file(&abs_path).await.unwrap();
+        remove_result_cache_metas(&[file2]).await;
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(query_key));
+    }
+
+    #[tokio::test]
+    async fn test_add_result_cache_meta_enforces_per_key_limit() {
+        let max_entries = RESULT_CACHE_MAX_ENTRIES_PER_KEY;
+        let query_key = "add_meta_org_logs_default_hashkey";
+        for i in 0..(max_entries as i64 + 2) {
+            let file_key = format!(
+                "results/add_meta_org/logs/default/hashkey/{}_{}_0_0.json",
+                i * 1000,
+                i * 1000 + 500
+            );
+            set_size(&file_key, 1).await.unwrap();
+            add_result_cache_meta(&file_key).await;
+        }
+        let metas = QUERY_RESULT_CACHE
+            .read()
+            .await
+            .get(query_key)
+            .cloned()
+            .unwrap();
+        assert_eq!(metas.len(), max_entries);
+        // the two entries with the oldest data ranges were evicted
+        assert!(metas.iter().all(|m| m.start_time >= 2000));
+    }
+
+    #[test]
+    fn test_result_cache_file_name_round_trips_with_parser() {
+        let meta = ResultCacheMeta {
+            start_time: 1744081170000000,
+            end_time: 1744081180000000,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        let file = format!(
+            "results/org/logs/stream/hash/{}",
+            result_cache_file_name(&meta)
+        );
+        let (_, _, _, parsed) = parse_result_cache_key(&file).unwrap();
+        assert_eq!(parsed, meta);
     }
 
     #[test]
