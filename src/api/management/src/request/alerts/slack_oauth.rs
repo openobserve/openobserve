@@ -99,12 +99,15 @@ struct SlackOAuthState {
     nonce: String,
 }
 
+/// Where to send the browser to authorize the app; the signed state is already embedded in the URL.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SlackOAuthStartResponse {
     authorization_url: String,
 }
 
+/// The code Slack handed the callback, plus the state issued by `start`, which must still be
+/// unexpired.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SlackOAuthExchangeRequest {
