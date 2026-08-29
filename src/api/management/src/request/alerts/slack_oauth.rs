@@ -132,6 +132,8 @@ struct SlackIncomingWebhook {
     url: String,
 }
 
+/// Carries only the incoming webhook Slack bound to the chosen channel; the access token never
+/// leaves the server.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SlackOAuthConnection {
@@ -388,6 +390,7 @@ async fn read_slack_response_body(response: reqwest::Response) -> Result<String,
     String::from_utf8(body).map_err(|_| SlackOAuthError::InvalidSlackResponse)
 }
 
+/// Issues a Slack authorize URL whose state is signed and bound to this org and user.
 #[utoipa::path(
     post,
     path = "/{org_id}/alerts/destinations/slack/oauth/start",
@@ -431,6 +434,8 @@ pub async fn start(
     MetaHttpResponse::json(SlackOAuthStartResponse { authorization_url })
 }
 
+/// Verifies the signed state, redeems the code, and returns only the webhook Slack bound to the
+/// chosen channel.
 #[utoipa::path(
     post,
     path = "/{org_id}/alerts/destinations/slack/oauth/exchange",

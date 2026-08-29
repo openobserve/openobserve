@@ -1215,9 +1215,17 @@ pub struct Smtp {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct SlackOAuth {
-    #[env_config(name = "ZO_SLACK_CLIENT_ID", default = "")]
+    #[env_config(
+        name = "ZO_SLACK_CLIENT_ID",
+        default = "",
+        help = "Client ID of the Slack App used for destination OAuth. Empty disables the OAuth flow."
+    )]
     pub client_id: String,
-    #[env_config(name = "ZO_SLACK_CLIENT_SECRET", default = "")]
+    #[env_config(
+        name = "ZO_SLACK_CLIENT_SECRET",
+        default = "",
+        help = "Client secret of the Slack App used for destination OAuth. Empty disables the OAuth flow."
+    )]
     pub client_secret: String,
     #[env_config(
         name = "ZO_SLACK_REDIRECT_URL",
