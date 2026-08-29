@@ -48,11 +48,7 @@ const Host = defineComponent({
         ...addDestinationDefaults(),
         destination_type: "slack",
         name: "slack-alerts",
-        slack_setup_method: props.isCloud
-          ? "oauth"
-          : props.isEnterprise
-            ? "manifest"
-            : "webhook",
+        slack_setup_method: props.isCloud ? "oauth" : props.isEnterprise ? "manifest" : "webhook",
         credentials: { webhookUrl: "", channel: "" },
       },
       schema: makeAddDestinationSchema((key: string) => key, true),
