@@ -329,6 +329,7 @@
               :policy="policy"
               :rotations="teamRotations"
               @saved="onPolicySaved"
+              @open-members="activeTab = 'members'"
             />
           </OContent>
         </OTabPanel>

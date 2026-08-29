@@ -205,7 +205,13 @@
                     </OText>
                   </span>
 
-                  <span v-if="line?.wholeTeam" class="flex items-center gap-2">
+                  <button
+                    v-if="line?.wholeTeam"
+                    type="button"
+                    class="hover:text-text-primary flex items-center gap-2"
+                    :data-test="`oncall-policy-open-members-${current.priority}-${stepIndex}`"
+                    @click="openMembers"
+                  >
                     <span class="flex -space-x-1">
                       <OAvatar
                         v-for="member in teamMembers.slice(0, AVATARS_SHOWN)"
@@ -214,7 +220,7 @@
                         class="ring-surface-base ring-2"
                       />
                     </span>
-                    <OText variant="meta">
+                    <OText variant="meta" class="hover:underline">
                       {{
                         t(
                           "oncall.policyPeopleCount",
@@ -223,7 +229,7 @@
                         )
                       }}
                     </OText>
-                  </span>
+                  </button>
 
                   <OText variant="meta" v-for="pool in line?.pools ?? []" :key="pool">
                     {{ t("oncall.ladderPoolEveryone", { rotation: raw(pool) }) }}
@@ -606,7 +612,11 @@ const props = withDefaults(
   }>(),
   { rotations: () => [] },
 );
-const emit = defineEmits<{ saved: []; "update:open": [boolean] }>();
+const emit = defineEmits<{
+  saved: [];
+  "update:open": [boolean];
+  "open-members": [];
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -1048,6 +1058,13 @@ watch(
 function cancel() {
   reset();
   emit("update:open", false);
+}
+
+/// Steps into the Members tab. The drawer closes first — left open, it would
+/// float over a tab it no longer explains.
+function openMembers() {
+  emit("update:open", false);
+  emit("open-members");
 }
 
 // A failure here leaves the picker empty rather than breaking the editor: the
