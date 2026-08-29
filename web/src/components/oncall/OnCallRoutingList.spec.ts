@@ -201,7 +201,7 @@ describe("OnCallRoutingList", () => {
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-routing-says-r_broad"]').text()).toBe(
-        "Anything from the introspection cluster",
+        "All alerts and incidents from the introspection cluster",
       );
     });
 
