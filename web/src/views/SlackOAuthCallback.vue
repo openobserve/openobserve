@@ -6,7 +6,7 @@ import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { SLACK_OAUTH_MESSAGE_TYPE, type SlackOAuthCallbackMessage } from "@/utils/slackOAuth";
 
 const route = useRoute();
@@ -55,7 +55,9 @@ onMounted(() => {
       </OBanner>
       <div v-else class="text-text-secondary flex items-center gap-3 text-sm">
         <OSpinner size="sm" />
-        <span>{{ t("alert_destinations.slackOAuth.callbackWorking") }}</span>
+        <span>{{
+          t("alert_destinations.slackOAuth.callbackWorking", { product: raw("OpenObserve") })
+        }}</span>
       </div>
     </div>
   </OPageLayout>

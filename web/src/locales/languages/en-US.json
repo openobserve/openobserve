@@ -8026,12 +8026,12 @@
       "recommended": "Recommended",
       "webhookMethodTitle": "Use an existing webhook",
       "webhookMethodDescription": "Connect an incoming webhook you already created in Slack.",
-      "permissionNote": "OpenObserve requests only permission to send notifications to the channel you choose. It cannot read workspace messages.",
+      "permissionNote": "{product} requests only permission to send notifications to the channel you choose. It cannot read workspace messages.",
       "connectSlack": "Connect Slack",
       "reconnectSlack": "Reconnect Slack",
       "connected": "Connected to {workspace} · {channel}",
       "connectionRequired": "Connect Slack before saving this destination.",
-      "popupBlocked": "Your browser blocked the Slack window. Allow popups for OpenObserve and try again.",
+      "popupBlocked": "Your browser blocked the Slack window. Allow popups for {product} and try again.",
       "popupClosed": "The Slack connection window was closed before setup finished.",
       "startFailed": "Slack connection could not be started. Ask an administrator to verify the Slack OAuth configuration.",
       "exchangeFailed": "Slack authorization could not be completed. Please try again.",
@@ -8056,7 +8056,7 @@
       "previewDisclaimer": "Slack supplies the actual app icon and destination channel after installation.",
       "successResponseBody": "Slack response",
       "callbackTitle": "Connecting Slack",
-      "callbackWorking": "Returning to OpenObserve…",
+      "callbackWorking": "Returning to {product}…",
       "callbackError": "This Slack connection cannot be completed. Close this window and try again."
     },
     "prebuilt": {

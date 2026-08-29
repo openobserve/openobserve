@@ -14,7 +14,7 @@ import type { RadioValue } from "@/lib/forms/Radio/ORadio.types";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import destinationService, { type SlackOAuthConnection } from "@/services/alert_destination";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
 import {
   buildSlackManifestUrl,
@@ -208,7 +208,10 @@ const connectSlack = async (): Promise<void> => {
     "popup,width=720,height=760,resizable=yes,scrollbars=yes",
   );
   if (!popup) {
-    toast({ variant: "error", message: t("alert_destinations.slackOAuth.popupBlocked") });
+    toast({
+      variant: "error",
+      message: t("alert_destinations.slackOAuth.popupBlocked", { product: raw("OpenObserve") }),
+    });
     return;
   }
 
@@ -322,7 +325,7 @@ onBeforeUnmount(() => {
 
     <template v-if="setupMethod === 'oauth' && isCloud">
       <OBanner variant="info" dense icon="verified-user" data-test="slack-oauth-permission-note">
-        {{ t("alert_destinations.slackOAuth.permissionNote") }}
+        {{ t("alert_destinations.slackOAuth.permissionNote", { product: raw("OpenObserve") }) }}
       </OBanner>
 
       <OBanner
