@@ -98,6 +98,7 @@ afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
   config.isCloud = "false";
+  config.isEnterprise = "false";
   vi.restoreAllMocks();
 });
 
@@ -570,8 +571,11 @@ describe("AddDestination - Slack setup flow", () => {
     hoisted.mockLastTestResult = null;
   });
 
-  const selectSlack = async (isCloud = true) => {
+  // Pinned, not inherited: web/.env sets VITE_OPENOBSERVE_ENTERPRISE=true, so an
+  // unset flag passes locally and fails in CI, where it is false.
+  const selectSlack = async (isCloud = true, isEnterprise = true) => {
     config.isCloud = isCloud ? "true" : "false";
+    config.isEnterprise = isEnterprise ? "true" : "false";
     wrapper = mountComp({ isAlerts: true });
     wrapper.vm.selectDestinationType("slack");
     await nextTick();
@@ -588,6 +592,16 @@ describe("AddDestination - Slack setup flow", () => {
     expect(wrapper.find('[data-test="destination-preview-button"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="destination-test-button"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(false);
+  });
+
+  it("falls back to the webhook flow on open source, where the manifest is unavailable", async () => {
+    const form = await selectSlack(false, false);
+
+    expect(form.state.values.slack_setup_method).toBe("webhook");
+    expect(wrapper.find('[data-test="slack-setup-method-manifest"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-oauth-connect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-manifest-stepper"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(true);
   });
 
   it("defaults self-hosted Slack to manifest and never renders Connect Slack", async () => {
