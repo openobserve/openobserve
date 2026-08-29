@@ -176,6 +176,8 @@ use crate::{
         openobserve_api_management::request::alerts::destinations::save_destination,
         openobserve_api_management::request::alerts::destinations::update_destination,
         openobserve_api_management::request::alerts::destinations::delete_destination,
+        openobserve_api_management::request::alerts::slack_oauth::start,
+        openobserve_api_management::request::alerts::slack_oauth::exchange,
         kv::get,
         kv::set,
         kv::delete,

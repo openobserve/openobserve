@@ -843,6 +843,7 @@ pub struct Config {
     pub sns: Sns,
     pub prom: Prometheus,
     pub smtp: Smtp,
+    pub slack_oauth: SlackOAuth,
     pub rum: RUM,
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
@@ -1210,6 +1211,20 @@ pub struct Smtp {
     pub smtp_from_email: String,
     #[env_config(name = "ZO_SMTP_ENCRYPTION", default = "")]
     pub smtp_encryption: String,
+}
+
+#[derive(Serialize, EnvConfig, Default)]
+pub struct SlackOAuth {
+    #[env_config(name = "ZO_SLACK_CLIENT_ID", default = "")]
+    pub client_id: String,
+    #[env_config(name = "ZO_SLACK_CLIENT_SECRET", default = "")]
+    pub client_secret: String,
+    #[env_config(
+        name = "ZO_SLACK_REDIRECT_URL",
+        default = "",
+        help = "Slack OAuth callback URL. Defaults to {ZO_WEB_URL}{ZO_BASE_URI}/web/slack/oauth/callback"
+    )]
+    pub redirect_url: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

@@ -68,6 +68,7 @@ db.workspace = true
 enrichment-data.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
+hmac.workspace = true
 http.workspace = true
 infra.workspace = true
 ingester.workspace = true
@@ -96,6 +97,7 @@ search_service.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 stream.workspace = true
 svix-ksuid.workspace = true
 tikv-jemalloc-ctl = { workspace = true, optional = true }

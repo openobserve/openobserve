@@ -93,6 +93,19 @@ pub fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
     resolved
 }
 
+#[cfg(any(feature = "enterprise", test))]
+fn route_permission_path<'a>(method: &str, path_columns: &'a [&str]) -> &'a [&'a str] {
+    if method == "POST"
+        && path_columns.len() == 6
+        && path_columns[1..5] == ["alerts", "destinations", "slack", "oauth"]
+        && matches!(path_columns[5], "start" | "exchange")
+    {
+        &path_columns[..3]
+    } else {
+        path_columns
+    }
+}
+
 // Email validation and OpenFGA name sanitization live in the shared `config` crate so the OSS
 // auth layer, the enterprise domain-management blocklist, and the enterprise OpenFGA route checks
 // all use identical logic. Re-exported here to preserve the existing
@@ -343,8 +356,9 @@ where
 
         // Resolve permission via the declarative route table.
         // Falls back to the legacy if-else for routes not yet in the table.
+        let permission_path = route_permission_path(&method, &path_columns);
         let resolved = match rp::resolve_permission(
-            &path_columns,
+            permission_path,
             &method,
             &org_id,
             &folder,
@@ -1064,6 +1078,43 @@ mod tests {
         // Too short a path should not match
         let path: Vec<&str> = "v2/default/trigger".split('/').collect();
         assert_eq!(resolve_write_method("PATCH", &path), "PUT");
+    }
+
+    #[test]
+    fn slack_oauth_routes_authorize_as_destination_creation() {
+        for operation in ["start", "exchange"] {
+            let path = [
+                "default",
+                "alerts",
+                "destinations",
+                "slack",
+                "oauth",
+                operation,
+            ];
+            assert_eq!(
+                route_permission_path("POST", &path),
+                &["default", "alerts", "destinations"]
+            );
+        }
+    }
+
+    #[test]
+    fn route_permission_path_does_not_rewrite_other_routes_or_methods() {
+        let oauth_path = [
+            "default",
+            "alerts",
+            "destinations",
+            "slack",
+            "oauth",
+            "start",
+        ];
+        let destination_path = ["default", "alerts", "destinations"];
+
+        assert_eq!(route_permission_path("GET", &oauth_path), oauth_path);
+        assert_eq!(
+            route_permission_path("POST", &destination_path),
+            destination_path
+        );
     }
 
     #[test]
