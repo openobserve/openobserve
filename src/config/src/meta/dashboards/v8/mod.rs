@@ -245,10 +245,32 @@ pub struct AxisArg {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
 #[serde(untagged)]
 pub enum AxisArgValueWrapper {
+    /// A nested expression, e.g. `sum(TRY_CAST(col AS DOUBLE))`. MUST stay first:
+    /// every field of `AxisArgValue` is optional, so it matches any object and
+    /// would otherwise swallow this one and silently drop the nesting on save.
+    Function(Box<AxisArgFunction>),
     Object(AxisArgValue),
     String(String),
     #[schema(value_type = f64)]
     Number(OrdF64),
+}
+
+/// The argument of a nested function expression. `args` is required, and is what
+/// separates this variant from a plain field reference during untagged matching.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AxisArgFunction {
+    /// Serialized even when None: the builder writes an explicit null for a
+    /// nested function left unset, and dropping the key renders it blank on
+    /// reload instead of "None".
+    pub function_name: Option<String>,
+    /// Described to OpenAPI as opaque objects on purpose. The Rust type is
+    /// genuinely recursive (AxisArg -> AxisArgValueWrapper -> AxisArgFunction);
+    /// emitting that cycle overflows the schema generator's stack at startup, and
+    /// `no_recursion` leaves behind a circular $ref that MCP tool generation
+    /// rejects. Serde still sees the real `Vec<AxisArg>`.
+    #[schema(value_type = Vec<Object>)]
+    pub args: Vec<AxisArg>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -1063,6 +1085,65 @@ mod tests {
 
         let n: AxisArgValueWrapper = serde_json::from_value(serde_json::json!(3.25)).unwrap();
         assert!(matches!(n, AxisArgValueWrapper::Number(_)));
+
+        let o: AxisArgValueWrapper = serde_json::from_value(serde_json::json!({
+            "field": "usage_amount",
+            "streamAlias": null
+        }))
+        .unwrap();
+        assert!(matches!(o, AxisArgValueWrapper::Object(_)));
+    }
+
+    #[test]
+    fn test_axis_arg_nested_function_survives_round_trip() {
+        // sum(TRY_CAST(usage_amount AS DOUBLE)) as the builder writes it. Saving a
+        // panel re-serializes this struct, so anything the model cannot represent
+        // is lost: the y column then vanishes from the generated query.
+        let original = serde_json::json!({
+            "type": "function",
+            "value": {
+                "functionName": "try_cast",
+                "args": [
+                    { "type": "field", "value": { "field": "usage_amount", "streamAlias": null } },
+                    { "type": "castType", "value": "DOUBLE" }
+                ]
+            }
+        });
+
+        let arg: AxisArg = serde_json::from_value(original.clone()).unwrap();
+        assert!(matches!(arg.value, Some(AxisArgValueWrapper::Function(_))));
+
+        let round_tripped = serde_json::to_value(&arg).unwrap();
+        assert_eq!(round_tripped, original);
+    }
+
+    #[test]
+    fn test_axis_arg_nested_function_keeps_an_unset_name() {
+        let original = serde_json::json!({
+            "type": "function",
+            "value": { "functionName": null, "args": [] }
+        });
+        let arg: AxisArg = serde_json::from_value(original.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&arg).unwrap(), original);
+    }
+
+    #[test]
+    fn test_axis_arg_field_still_wins_over_function() {
+        // A plain field reference has no `args`, so it must not be read as a
+        // nested expression now that the function variant is matched first.
+        let arg: AxisArg = serde_json::from_value(serde_json::json!({
+            "type": "field",
+            "value": { "field": "usage_amount", "streamAlias": "a" }
+        }))
+        .unwrap();
+
+        match arg.value {
+            Some(AxisArgValueWrapper::Object(v)) => {
+                assert_eq!(v.field, Some("usage_amount".to_string()));
+                assert_eq!(v.stream_alias, Some("a".to_string()));
+            }
+            other => panic!("expected an object field reference, got {other:?}"),
+        }
     }
 
     #[test]
