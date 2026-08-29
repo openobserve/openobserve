@@ -670,8 +670,7 @@ export default defineComponent({
         store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
     }));
 
-    // Isolates keep the digits, the parentheses, and the translated label in
-    // order once the page is RTL — see locales/bidi.ts.
+    // Bidi isolates keep the mixed numeric and translated runs ordered in RTL.
     const maxSeriesPlaceholder = computed(() => {
       const numberLocale = APP_LOCALE_TO_BCP47[locale.value] ?? "en-US";
       const value = new Intl.NumberFormat(numberLocale, { useGrouping: false }).format(40000);

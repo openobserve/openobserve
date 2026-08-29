@@ -358,8 +358,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OIcon size="xs" name="chevron-right" />
 
-                <!-- Submenu — absolutely positioned outside the parent dropdown's
-                     start edge, which flips with the writing direction. -->
                 <div
                   v-if="showLanguageSubmenu"
                   class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"

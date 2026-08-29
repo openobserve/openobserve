@@ -293,12 +293,9 @@ async function positionFlyout() {
   const rect = wrapper.getBoundingClientRect();
   // Small breathing gap between the rail and the flyout so they don't touch.
   const GAP = 4;
-  // Read the direction off the document rather than the i18n module: setupTests
-  // preloads @/locales, so importing it here would leak into every spec's mocks.
+  // Reading document direction avoids leaking the preloaded locale module into spec mocks.
   const isRtl = document.documentElement.dir === "rtl";
-  // clientWidth, not innerWidth — innerWidth counts the vertical scrollbar while
-  // getBoundingClientRect() does not, so mixing them offsets the flyout by the
-  // scrollbar width on any scrollable page.
+  // clientWidth matches getBoundingClientRect() because both exclude the scrollbar.
   const horizontalPosition: Record<string, string> = isRtl
     ? { right: `${document.documentElement.clientWidth - rect.left + GAP}px` }
     : { left: `${rect.right + GAP}px` };

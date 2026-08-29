@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getLanguage } from "@/utils/cookies";
@@ -53,9 +53,23 @@ describe("locale registry stays in sync", () => {
     expect(Object.keys(APP_LOCALE_TO_BCP47).sort()).toEqual(Object.keys(localeFileMap).sort());
   });
 
-  // applyDocumentLocale writes these straight into <html lang>. They are file
-  // names, so nothing but this guard stops a rename from putting a bogus tag on
-  // the document — which silently breaks screen readers and hyphenation.
+  it("registers every translated locale with the translation pipeline", () => {
+    const config = readFileSync(
+      resolve(languagesDir, "../../../../scripts/translations/translator.py"),
+      "utf8",
+    );
+    const languageNames = config.match(/LANGUAGE_NAMES = \{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const supported = [...languageNames.matchAll(/^\s*"([^"]+)":\s*"[^"]+",?\s*$/gm)]
+      .map((match) => `${match[1]}.json`)
+      .sort();
+    const translated = readdirSync(languagesDir)
+      .filter((file) => file.endsWith(".json") && file !== "en-US.json")
+      .sort();
+
+    expect(supported).toEqual(translated);
+  });
+
+  // File stems become html lang values, so each must be a canonical BCP-47 tag.
   it("names every language file after a canonical BCP-47 tag", () => {
     for (const tag of Object.values(localeFileMap)) {
       expect(Intl.getCanonicalLocales(tag)).toEqual([tag]);
@@ -122,10 +136,7 @@ describe("getNumberLocale (locale format unit)", () => {
 });
 
 describe("navigator language detection", () => {
-  // Both resolvers used to substring-match, which let a REGION subtag stand in
-  // for a language: `es-AR` contains "ar", and `ar` is registered ahead of `es`,
-  // so Argentinian Spanish resolved to an Arabic right-to-left UI. Every case
-  // below is a real navigator.language value.
+  // Subtag matching prevents a region such as es-AR from being treated as Arabic.
   const withNavigatorLanguage = (tag: string, assert: () => void) => {
     const descriptor = Object.getOwnPropertyDescriptor(navigator, "language");
     Object.defineProperty(navigator, "language", { value: tag, configurable: true });

@@ -59,10 +59,7 @@ function toggle() {
 // ── Track sizes ────────────────────────────────────────────────────────────
 // border-2 (2px each side) + p-0.5 (2px each side) = 4px eaten from each dimension
 // thumb = track_height - 4(border) - 4(padding), translate = track_width - 4 - 4 - thumb
-// The thumb travels toward the reading end, so RTL mirrors the offset. The
-// rtl: variant compiles to :where(:dir(rtl), [dir="rtl"], [dir="rtl"] *) and
-// sorts after its base utility, so it wins without specificity tricks — and the
-// offsets stay on the spacing scale instead of being restated in rem.
+// RTL mirrors the checked thumb's reading-end offset through Tailwind's direction variant.
 type TrackSize = {
   track: string;
   thumb: string;

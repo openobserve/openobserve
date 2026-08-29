@@ -32,8 +32,7 @@ describe("bidi isolates", () => {
     expect(isolateLtr(42)).toBe(isolateLtr("42"));
   });
 
-  // The marks are zero-width, so a caller that logs or compares the value has to
-  // strip them deliberately — they must never leak into a stored setting.
+  // Callers must strip the zero-width marks before storing or comparing the value.
   it("adds no visible characters", () => {
     expect(isolateAuto("abc").replace(/[⁦-⁩]/g, "")).toBe("abc");
   });

@@ -15,21 +15,12 @@
 
 import { raw, type I18nText } from "@/types/i18n";
 
-/**
- * The language selector's options, in the order they are offered.
- *
- * Labels are endonyms — each language names itself, so the entry is legible to
- * the person looking for it rather than to whoever is currently reading the UI.
- * That is why they are raw() and never translated.
- *
- * Lives outside MainLayout so the registry-agreement guard can import it: a
- * locale added to localeFileMap but not here ships as a chunk no one can pick.
- */
 export interface LanguageOption {
   label: I18nText;
   code: string;
 }
 
+// Endonyms remain raw so every language stays recognizable under any active locale.
 export const languageOptions: LanguageOption[] = [
   { label: raw("English"), code: "en-us" },
   { label: raw("العربية"), code: "ar" },

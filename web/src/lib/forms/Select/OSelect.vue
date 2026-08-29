@@ -1173,7 +1173,7 @@ const fieldWidthClass = computed(() => {
                 </template>
                 <span
                   v-else
-                  :dir="valueDirection"
+                  :dir="hasSelection ? valueDirection : undefined"
                   :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
                   :class="[
                     'text-start',
@@ -1298,7 +1298,7 @@ const fieldWidthClass = computed(() => {
                 <ListboxFilter
                   v-if="inputEnabled"
                   v-model="searchTerm"
-                  :dir="valueDirection"
+                  :dir="searchTerm ? valueDirection : undefined"
                   auto-focus
                   :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
                   :class="[
@@ -1745,7 +1745,7 @@ const fieldWidthClass = computed(() => {
           >
             <SelectValue
               :placeholder="placeholder"
-              :dir="valueDirection"
+              :dir="hasSelection ? valueDirection : undefined"
               :class="[
                 'text-start',
                 isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',

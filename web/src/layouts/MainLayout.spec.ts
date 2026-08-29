@@ -723,15 +723,12 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Language Configuration", () => {
-    // MainLayout feeds this straight to Header's lang-list prop. Asserting a
-    // copy of the array proves nothing, so both checks read the shipped module.
+    // Read the shipped registry instead of asserting against a duplicate array.
     it("offers English first", () => {
       expect(languageOptions[0]).toEqual({ code: "en-us", label: "English" });
     });
 
-    // The two registries drift silently in both directions: a locale in
-    // localeFileMap but not here builds a chunk nothing can select, and an
-    // option with no file quietly renders English when picked.
+    // Registry drift otherwise creates unreachable chunks or silent English fallbacks.
     it("offers exactly the locales the app can load", () => {
       expect(languageOptions.map((l) => l.code).sort()).toEqual(Object.keys(localeFileMap).sort());
     });

@@ -5,8 +5,7 @@
 -->
 
 <template>
-  <!-- No dir="ltr" here: CodeQueryEditor isolates the editor itself, and forcing
-       it on the root would drag the AI status line — streamed model prose — with it. -->
+  <!-- CodeQueryEditor isolates the editor; the AI status line must retain its prose direction. -->
   <div class="relative flex w-full flex-col outline-transparent" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
     <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->

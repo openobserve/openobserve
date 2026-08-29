@@ -17,7 +17,6 @@ const imgSrc = computed<string>(() => (props.name?.startsWith("img:") ? props.na
 
 const iconComponent = computed(() => iconRegistry[props.name as keyof typeof iconRegistry]);
 
-/** Icons whose meaning follows the reading direction. */
 const RTL_MIRRORED_ICONS = new Set([
   "arrow-back",
   "arrow-back-ios",

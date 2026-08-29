@@ -136,9 +136,7 @@ describe("ONavGroup", () => {
   });
 
   it("positions the flyout before the right-hand rail in RTL", async () => {
-    // The offset is measured against the CLIENT area. innerWidth counts the
-    // vertical scrollbar and getBoundingClientRect() does not, so the two must
-    // not be mixed — jsdom reports clientWidth as 0, hence the explicit stub.
+    // Stub clientWidth because viewport and element geometry must use the same client area.
     const VIEWPORT = 1024;
     vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(VIEWPORT);
     document.documentElement.dir = "rtl";

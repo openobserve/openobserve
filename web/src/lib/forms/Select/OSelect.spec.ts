@@ -62,6 +62,34 @@ describe("OSelect", () => {
     expect(wrapper.get('button[role="combobox"] span[dir="ltr"]').text()).toBe("arabic_demo");
   });
 
+  it("inherits direction for translated placeholders while isolating typed technical values", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: {
+        modelValue: "",
+        placeholder: "اختر تدفقًا",
+        options: [{ label: "logs_stream", value: "logs_stream" }],
+        valueDirection: "ltr",
+      },
+    });
+
+    const placeholder = wrapper.get('button[role="combobox"] span.text-start');
+    expect(placeholder.attributes("dir")).toBeUndefined();
+
+    await wrapper.get('button[role="combobox"]').trigger("click");
+    await flushPromises();
+
+    const search = document.body.querySelector(
+      'input[placeholder="Search..."]',
+    ) as HTMLInputElement;
+    expect(search.getAttribute("dir")).toBeNull();
+
+    search.value = "logs";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushPromises();
+    expect(search.getAttribute("dir")).toBe("ltr");
+  });
+
   it("shows placeholder text when no value is selected", () => {
     // searchable: false forces the native SelectRoot branch where reka-ui's
     // SelectValue renders the placeholder prop correctly in JSDOM. The listbox

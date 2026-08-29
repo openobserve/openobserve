@@ -1,15 +1,9 @@
-/* Direction-sensitive primitives shared by every right-to-left locale. */
-
 /* Mirror only the SVG so wrapper transforms continue to compose. */
 [dir="rtl"] [data-rtl-mirror="true"] > svg {
   transform: scaleX(-1);
 }
 
-/* Machine-readable content remains isolated LTR inside RTL pages. Note the
-   editor selector carries no descendant part: direction and text-align already
-   inherit, so a `*` would add only unicode-bidi: isolate — and isolating every
-   token span resolves each one alone, which reverses an Arabic string literal
-   the tokenizer split across spans. */
+/* Isolate machine-readable containers, not individual editor tokens that may split Arabic literals. */
 [dir="rtl"] pre,
 [dir="rtl"] code,
 [dir="rtl"] kbd,
@@ -20,17 +14,13 @@
   unicode-bidi: isolate;
 }
 
-/* ECharts builds its tooltip with appendToBody, so the node lands under <body>
-   and never inherits the chart container's direction. Style it where it lives —
-   that also covers every chart, not just the ones with a wrapper. */
+/* ECharts appends tooltips to body, outside the chart container's direction. */
 [dir="rtl"] .o2-echarts-tooltip {
   direction: ltr;
   text-align: left;
 }
 
-/* Only the VALUE is machine-readable. While the field is empty its placeholder
-   is translated prose, and forcing that to LTR drags it to the opposite edge
-   from every neighbouring field's placeholder. */
+/* Keep translated placeholders inherited while isolating populated technical values. */
 [dir="rtl"] input[type="email"]:not(:placeholder-shown),
 [dir="rtl"] input[type="url"]:not(:placeholder-shown),
 [dir="rtl"] input[type="tel"]:not(:placeholder-shown) {

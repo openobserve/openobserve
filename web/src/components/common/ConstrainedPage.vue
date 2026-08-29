@@ -66,8 +66,5 @@ const SIZE_CLASS = {
 
 const maxWidthClass = computed(() => SIZE_CLASS[props.size]);
 
-// `center` keeps the column centered (mx-auto); `start` pins it to the reading
-// edge so form pages read from the margin instead of floating in the middle of
-// wide screens.
 const alignClass = computed(() => (props.align === "start" ? "me-auto" : "mx-auto"));
 </script>

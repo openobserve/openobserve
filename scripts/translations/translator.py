@@ -56,6 +56,7 @@ SOURCE_LOCALE = "en-US"
 # Human-readable target names used in the translation prompt, keyed by the target
 # locale's filename stem (BCP-47 style, matching web/src/locales/languages/*.json).
 LANGUAGE_NAMES = {
+    "ar-SA": "Arabic",
     "tr-TR": "Turkish",
     "zh-CN": "Simplified Chinese",
     "fr-FR": "French",
@@ -70,11 +71,6 @@ LANGUAGE_NAMES = {
     "ru-RU": "Russian",
     "pl-PL": "Polish",
     "vi-VN": "Vietnamese",
-    # NOTE: RTL languages (ar Arabic, fa Persian) are intentionally NOT listed
-    # yet — the web app has no dir="rtl" support, and the locale registry's
-    # strict on-disk/localeFileMap sync would force them to be user-selectable
-    # (and auto-served to ar/fa browsers) the moment their files are generated.
-    # Add them here together with RTL layout support and their web wiring.
 }
 
 # The term table injected into every prompt. Strings reach the model as isolated
