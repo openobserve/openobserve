@@ -43,6 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :now-offset="0"
       :now-label="t('oncall.calendarToday')"
     >
+      <!-- Bands stay merged into the three calm blocks; hovering one is how a
+           reader gets to WHO without the strip fragmenting into a name per
+           shift. -->
+      <template #band="{ band }">
+        <OTooltip
+          v-if="tooltipFor(band.key)"
+          :content="tooltipFor(band.key)!"
+          side="top"
+          content-class="whitespace-pre-line"
+        >
+          <OScheduleBand :band="band" />
+        </OTooltip>
+        <OScheduleBand v-else :band="band" />
+      </template>
+
       <template #legend>
         <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span
@@ -62,12 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OScheduleBand from "@/lib/data/ScheduleTimeline/OScheduleBand.vue";
 import OScheduleTimeline from "@/lib/data/ScheduleTimeline/OScheduleTimeline.vue";
 import type {
   ScheduleAxisTick,
   ScheduleBand,
   ScheduleTrack,
 } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
@@ -102,19 +119,29 @@ const span = computed(() => end.value - start.value);
 
 type Cover = "both" | "primary" | "none";
 
+interface Sample {
+  cover: Cover;
+  /** First staffed rotation's holder, in rotation order. */
+  primary: string | null;
+  /** Second staffed rotation's holder, if any — the "behind them" of `coverAt`. */
+  secondary: string | null;
+}
+
 /// Three states rather than a person per band: at a fortnight's zoom the
-/// question is "is anybody on, and is anybody behind them", not "who".
+/// question is "is anybody on, and is anybody behind them", not "who". The
+/// holders are still resolved here so a hovered band can answer "who" without
+/// a second pass over the rotations.
 ///
 /// "Behind them" counts a SECOND STAFFED ROTATION. It used to count the next
 /// person in the same rotation, which is nobody's backup — they are not on call
 /// until the handover, and reading them as cover is how a team with one
 /// rotation looked doubly covered while a single gap would page no one.
-function coverAt(at: number): Cover {
-  const staffed = props.rotations.filter(
-    (rotation) => resolveHolder(rotation, at, props.timezone).member,
-  ).length;
-  if (staffed === 0) return "none";
-  return staffed > 1 ? "both" : "primary";
+function sampleAt(at: number): Sample {
+  const staffed = props.rotations
+    .map((rotation) => resolveHolder(rotation, at, props.timezone).member)
+    .filter((member): member is string => Boolean(member));
+  const cover: Cover = staffed.length === 0 ? "none" : staffed.length > 1 ? "both" : "primary";
+  return { cover, primary: staffed[0] ?? null, secondary: staffed[1] ?? null };
 }
 
 const TONE: Record<Cover, ScheduleBand["tone"]> = {
@@ -150,10 +177,10 @@ const runs = computed<Run[]>(() => {
 
   const out: Run[] = [];
   let runStart = start.value;
-  let runCover = coverAt(start.value);
+  let runCover = sampleAt(start.value).cover;
 
   for (let at = start.value + STEP_MICROS; at < end.value; at += STEP_MICROS) {
-    const cover = coverAt(at);
+    const cover = sampleAt(at).cover;
     if (cover === runCover) continue;
     out.push({ from: runStart, to: at, cover: runCover });
     runStart = at;
@@ -162,6 +189,82 @@ const runs = computed<Run[]>(() => {
   out.push({ from: runStart, to: end.value, cover: runCover });
   return out;
 });
+
+/** One unbroken stretch of a single primary/secondary pairing. */
+interface HolderRun {
+  from: number;
+  to: number;
+  primary: string | null;
+  secondary: string | null;
+}
+
+const holderKey = (s: Sample) => `${s.primary ?? ""}|${s.secondary ?? ""}`;
+
+/// Merged on WHO is on call rather than on cover state — finer-grained than
+/// `runs`, and used only to answer a hovered band's tooltip. The strip itself
+/// stays three calm blocks; a run spanning a rotation handover still needs
+/// this to avoid crediting the whole stretch to whoever started it.
+const holderRuns = computed<HolderRun[]>(() => {
+  if (span.value <= 0) return [];
+
+  const out: HolderRun[] = [];
+  let runStart = start.value;
+  let runSample = sampleAt(start.value);
+  let runKey = holderKey(runSample);
+
+  for (let at = start.value + STEP_MICROS; at < end.value; at += STEP_MICROS) {
+    const sample = sampleAt(at);
+    const key = holderKey(sample);
+    if (key === runKey) continue;
+    out.push({
+      from: runStart,
+      to: at,
+      primary: runSample.primary,
+      secondary: runSample.secondary,
+    });
+    runStart = at;
+    runSample = sample;
+    runKey = key;
+  }
+  out.push({ from: runStart, to: end.value, primary: runSample.primary, secondary: runSample.secondary });
+  return out;
+});
+
+const whoLabel = (holder: { primary: string | null; secondary: string | null }): I18nText =>
+  holder.secondary
+    ? t("oncall.coveragePrimaryAndSecondary", {
+        primary: raw(holder.primary ?? ""),
+        secondary: raw(holder.secondary),
+      })
+    : t("oncall.coveragePrimaryOnly", { primary: raw(holder.primary ?? "") });
+
+/// A gap already says "Nobody" on the band itself; a tooltip would repeat it.
+/// Covered/partial bands get one line per handover inside them, so a run that
+/// merges several days of "somebody's on call" still names the right somebody
+/// for the stretch under the pointer.
+function tooltipFor(bandKey: string): I18nText | null {
+  const run = runs.value.find((r) => `${r.from}` === bandKey);
+  if (!run || run.cover === "none") return null;
+
+  const segments = holderRuns.value.filter((h) => h.from < run.to && h.to > run.from);
+  if (!segments.length) return null;
+  if (segments.length === 1) return whoLabel(segments[0]);
+
+  return raw(
+    segments
+      .map((segment) =>
+        String(
+          t("oncall.coverageWhoRange", {
+            range: raw(
+              `${clock(Math.max(segment.from, run.from))} – ${clock(Math.min(segment.to, run.to))}`,
+            ),
+            who: whoLabel(segment),
+          }),
+        ),
+      )
+      .join("\n"),
+  );
+}
 
 const tracks = computed<ScheduleTrack[]>(() => {
   if (!runs.value.length) return [];
