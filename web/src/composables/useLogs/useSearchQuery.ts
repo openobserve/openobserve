@@ -258,7 +258,12 @@ export const useSearchQuery = (t: TranslateFn) => {
       // Pre-flight SQL syntax check — runs only in SQL mode, before firing the query.
       // Skipped past SQL_PARSE_MAX_DEPTH: astify() is exponential in paren nesting
       // depth and would freeze the tab for seconds; the server still validates.
-      if (!readOnly && searchObj.meta.sqlMode && query && maxParenDepth(query) <= SQL_PARSE_MAX_DEPTH) {
+      if (
+        !readOnly &&
+        searchObj.meta.sqlMode &&
+        query &&
+        maxParenDepth(query) <= SQL_PARSE_MAX_DEPTH
+      ) {
         try {
           const _sqlParser = new SqlParser();
           _sqlParser.astify(query);
