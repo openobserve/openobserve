@@ -257,7 +257,7 @@ describe("OnCallRoutingList", () => {
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
-        "Everything else pages nobody",
+        "All other alerts and incidents page nobody",
       );
       expect(wrapper.find('[data-test="oncall-routing-catch-all-set"]').text()).toContain(
         "Set a team",
@@ -268,7 +268,7 @@ describe("OnCallRoutingList", () => {
       const wrapper = render({ defaultTeamId: "team_2" });
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
-        "Everything else goes to Payments",
+        "All other alerts and incidents go to Payments",
       );
     });
 
