@@ -336,6 +336,26 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     }
   });
 
+  // Every panel that groups by model must exclude spans with no model.
+  // `gen_ai_operation_name IS NOT NULL` alone also matches `execute_tool`
+  // and evaluator spans, which carry no model by design — bucketing them
+  // as "unknown" made that synthetic bucket outrank the real models on
+  // both the span-count and the (always-zero) token panels.
+  it("model-grouped panels filter out spans with no model", () => {
+    const modelPanels = ["cost-trend", "token-trend", "latency-by-model", "spans-by-model", "tokens-by-model"];
+    for (const id of modelPanels) {
+      const panel = LLM_INSIGHTS_PANELS.find((p: LLMPanelDef) => p.id === id);
+      expect(panel, `panel ${id} not found`).toBeTruthy();
+      const sql = compactSql(panel!.query.sql);
+      expect(sql, `panel ${id} must scope to spans that have a model`).toContain(
+        "gen_ai_response_model IS NOT NULL",
+      );
+      expect(sql, `panel ${id} must not invent an "unknown" model bucket`).not.toContain(
+        "'unknown'",
+      );
+    }
+  });
+
   // The "Recent errors" table renders an Operation column and a Trace ID
   // (View) link. Both are required for the panel's UX to be useful.
   it("recent-errors panel exposes operation + trace_id columns", () => {

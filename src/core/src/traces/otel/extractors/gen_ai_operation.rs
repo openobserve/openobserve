@@ -44,6 +44,14 @@ const KNOWN_GEN_AI_OPERATION_NAME_VALUES: &[&str] = &[
     "execute_tool",
     "invoke_workflow",
     "retrieval",
+    // Not an OTEL spec value, but the classification the UI already renders
+    // (see `getObservationTypeColor`) and the target of OpenInference's
+    // "EVALUATOR" span kind below. Without it, an evaluator span that also
+    // carries `gen_ai.request.model` (the model whose output is being
+    // scored) falls through to the model-key fallback and is mislabelled a
+    // "chat" generation — inflating generation counts with spans that have
+    // no tokens and no cost.
+    "evaluator",
 ];
 
 /// Map span attributes to a `gen_ai.operation.name` value using a priority-based system.
@@ -341,6 +349,23 @@ mod tests {
             map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
             "create_agent"
         );
+    }
+
+    // An evaluator span typically carries `gen_ai.request.model` too — the
+    // model whose output it is scoring. The declared operation name must win
+    // over the model-key fallback, or the span is counted as a generation.
+    #[test]
+    fn test_gen_ai_operation_evaluator_wins_over_model_fallback() {
+        let attrs = make_attributes(vec![
+            ("gen_ai.operation.name", "evaluator"),
+            ("gen_ai.request.model", "deepseek-v4-pro"),
+        ]);
+        let resource_attrs = HashMap::new();
+        assert_eq!(
+            map_to_gen_ai_operation_name(&attrs, &resource_attrs, None),
+            "evaluator"
+        );
+        assert!(!is_generation_or_embedding("evaluator"));
     }
 
     #[test]
