@@ -32,6 +32,7 @@ type FormState = { values: AddDestinationForm };
 const props = defineProps<{
   orgIdentifier: string;
   isCloud: boolean;
+  isEnterprise: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -92,6 +93,12 @@ const canContinueManifest = computed(() => {
   );
 });
 
+// Null in OSS: the manifest flow is enterprise-only, so webhook is all that is left.
+const guidedMethod = computed<"oauth" | "manifest" | null>(() => {
+  if (props.isCloud) return "oauth";
+  return props.isEnterprise ? "manifest" : null;
+});
+
 const manifestCode = computed(() => slackManifestJson(slackAppName.value));
 const manifestUrl = computed(() => buildSlackManifestUrl(slackAppName.value));
 
@@ -127,8 +134,7 @@ const setManifestStep = (step: number): void => {
 };
 
 const setMethod = (value: RadioValue): void => {
-  const guidedMethod = props.isCloud ? "oauth" : "manifest";
-  if (value !== guidedMethod && value !== "webhook") return;
+  if (value !== guidedMethod.value && value !== "webhook") return;
   if (value === setupMethod.value) return;
   releasePopup(true);
   clearSlackConnection();
@@ -230,9 +236,8 @@ const advanceToWebhook = (): void => setManifestStep(3);
 const goBackManifest = (): void => setManifestStep(Math.max(1, manifestStep.value - 1));
 
 onMounted(() => {
-  const guidedMethod = props.isCloud ? "oauth" : "manifest";
-  if (setupMethod.value !== guidedMethod && setupMethod.value !== "webhook") {
-    form.setFieldValue("slack_setup_method", guidedMethod);
+  if (setupMethod.value !== guidedMethod.value && setupMethod.value !== "webhook") {
+    form.setFieldValue("slack_setup_method", guidedMethod.value ?? "webhook");
   }
   emit("readinessChange", false);
   window.addEventListener("message", handleOAuthMessage);
@@ -272,7 +277,12 @@ onBeforeUnmount(() => {
             </span>
           </template>
         </ORadio>
-        <ORadio v-else value="manifest" variant="card" data-test="slack-setup-method-manifest">
+        <ORadio
+          v-else-if="isEnterprise"
+          value="manifest"
+          variant="card"
+          data-test="slack-setup-method-manifest"
+        >
           <template #label>
             <span class="flex flex-col gap-1">
               <span class="flex flex-wrap items-center gap-2">
@@ -356,7 +366,7 @@ onBeforeUnmount(() => {
     </template>
 
     <OStepper
-      v-else-if="setupMethod === 'manifest' && !isCloud"
+      v-else-if="setupMethod === 'manifest' && !isCloud && isEnterprise"
       :model-value="manifestStep"
       :animated="false"
       orientation="horizontal"

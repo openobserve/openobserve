@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isNewSlackDestination"
               :org-identifier="store.state.selectedOrganization.identifier"
               :is-cloud="isCloudDeployment"
+              :is-enterprise="isEnterpriseDeployment"
               @flow-change="handleSlackFlowChange"
               @readiness-change="handleSlackReadinessChange"
             />
@@ -546,6 +547,13 @@ const currentUserRole = ref("admin");
 
 const orgUserOptions = computed(() => orgUsers.value);
 const isCloudDeployment = computed(() => config.isCloud === "true");
+const isEnterpriseDeployment = computed(() => config.isEnterprise === "true");
+
+// OSS has neither the OAuth backend nor the enterprise manifest flow, so webhook is the only option.
+const defaultSlackSetupMethod = (): "oauth" | "manifest" | "webhook" => {
+  if (isCloudDeployment.value) return "oauth";
+  return isEnterpriseDeployment.value ? "manifest" : "webhook";
+};
 
 const fetchOrgUsers = async () => {
   isLoadingOrgUsers.value = true;
@@ -1168,7 +1176,7 @@ const selectDestinationType = (type: string) => {
     form.setFieldValue("type", type === "email" ? "email" : "http");
     form.setFieldValue("template", templateNameFor(type));
     if (type === "slack") {
-      form.setFieldValue("slack_setup_method", isCloudDeployment.value ? "oauth" : "manifest");
+      form.setFieldValue("slack_setup_method", defaultSlackSetupMethod());
       form.setFieldValue("slack_app_name", DEFAULT_SLACK_APP_NAME);
       form.setFieldValue("slack_team_id", "");
       form.setFieldValue("slack_team_name", "");

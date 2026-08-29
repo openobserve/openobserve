@@ -37,6 +37,10 @@ const Host = defineComponent({
       type: Boolean,
       default: true,
     },
+    isEnterprise: {
+      type: Boolean,
+      default: true,
+    },
   },
   setup(props) {
     const form = useOForm({
@@ -44,7 +48,11 @@ const Host = defineComponent({
         ...addDestinationDefaults(),
         destination_type: "slack",
         name: "slack-alerts",
-        slack_setup_method: props.isCloud ? "oauth" : "manifest",
+        slack_setup_method: props.isCloud
+          ? "oauth"
+          : props.isEnterprise
+            ? "manifest"
+            : "webhook",
         credentials: { webhookUrl: "", channel: "" },
       },
       schema: makeAddDestinationSchema((key: string) => key, true),
@@ -55,7 +63,11 @@ const Host = defineComponent({
   },
   template: `
     <OForm :form="form">
-      <SlackDestinationSetup org-identifier="acme" :is-cloud="isCloud" />
+      <SlackDestinationSetup
+        org-identifier="acme"
+        :is-cloud="isCloud"
+        :is-enterprise="isEnterprise"
+      />
     </OForm>
   `,
 });
@@ -68,9 +80,9 @@ const makePopup = (): Window =>
     location: { href: "about:blank" },
   }) as unknown as Window;
 
-const mountSetup = (isCloud = true) =>
+const mountSetup = (isCloud = true, isEnterprise = true) =>
   mount(Host, {
-    props: { isCloud },
+    props: { isCloud, isEnterprise },
     attachTo: document.body,
     global: { plugins: [i18n] },
   });
@@ -480,5 +492,27 @@ describe("SlackDestinationSetup self-hosted manifest flow", () => {
     expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(false);
     expect(destinationService.startSlackOAuth).not.toHaveBeenCalled();
     expect(destinationService.exchangeSlackOAuth).not.toHaveBeenCalled();
+  });
+});
+
+describe("SlackDestinationSetup open source", () => {
+  it("hides the enterprise-only manifest flow and leaves webhook as the only method", () => {
+    wrapper = mountSetup(false, false);
+
+    expect(wrapper.vm.form.state.values.slack_setup_method).toBe("webhook");
+    expect(wrapper.find('[data-test="slack-setup-method-manifest"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-setup-method-oauth"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-setup-method-webhook"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="slack-manifest-stepper"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(true);
+  });
+
+  it("ignores an attempt to select the manifest flow", async () => {
+    wrapper = mountSetup(false, false);
+
+    wrapper.vm.form.setFieldValue("slack_setup_method", "manifest");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="slack-manifest-stepper"]').exists()).toBe(false);
   });
 });
