@@ -126,7 +126,7 @@
          instead of a column of wrapped paragraphs. -->
     <ODrawer
       v-model:open="editing"
-      size="xl"
+      :width="60"
       :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
       :subtitle="t('oncall.rotationDrawerHint')"
       data-test="oncall-rotation-drawer"
