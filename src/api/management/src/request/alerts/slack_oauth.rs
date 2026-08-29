@@ -406,6 +406,7 @@ async fn read_slack_response_body(response: reqwest::Response) -> Result<String,
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
         (status = 200, description = "Slack authorization URL", body = SlackOAuthStartResponse),
+        (status = 500, description = "Internal server error"),
         (status = 503, description = "Slack OAuth is not configured")
     )
 )]
