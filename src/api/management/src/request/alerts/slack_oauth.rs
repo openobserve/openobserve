@@ -96,6 +96,8 @@ struct SlackOAuthState {
     version: u8,
     context_binding: String,
     issued_at: i64,
+    // Makes concurrent flows for one user distinct; it is NOT single-use — replay
+    // inside the TTL is bounded by Slack's own one-time code, not by this field.
     nonce: String,
 }
 
