@@ -74,8 +74,6 @@ const Quota = () => import("@/components/iam/quota/Quota.vue");
 
 const Organizations = () => import("@/components/iam/organizations/AppOrganizations.vue");
 
-const ActionScripts = () => import("@/components/actionScripts/ActionScripts.vue");
-
 const Invitations = () => import("@/views/Invitations.vue");
 
 import Users from "@/views/User.vue";
@@ -274,15 +272,6 @@ const useEnterpriseRoutes = () => {
         },
       },
     );
-
-    routes.push({
-      path: "actions",
-      name: "actionScripts",
-      component: ActionScripts,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
 
     // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
     // renders in its <router-view> for add/edit.

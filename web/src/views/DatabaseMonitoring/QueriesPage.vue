@@ -48,15 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sort and didn't would be a lie the UI tells by omission.
 -->
 <template>
-  <DbmPageChrome
-    :title="t('dbm.queries.title')"
-    :subtitle="t(serverListShown ? 'dbm.queries.subtitleServer' : 'dbm.queries.subtitle')"
-    title-data-test="dbm-queries-title"
-    date-time-data-test="dbm-queries-date-time"
-    :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
-  >
+  <DbmPageChrome title-data-test="dbm-queries-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Blocked queries emit no span until they finish, so a lock storm makes
            QPS FALL — and a falling line reads as recovery at the worst possible
@@ -88,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 items-center gap-2 pb-1.5">
+      <div class="px-page-edge flex shrink-0 items-center gap-2 py-1.5">
         <div class="w-64 shrink-0">
           <OSearchInput
             :model-value="search"
@@ -106,24 +98,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @clear="clearScope"
           @clear-insight="activeInsightId = null"
         />
-        <OToggleGroup
-          :model-value="stmtClass"
-          class="shrink-0"
+        <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
+        <span
+          class="border-border-default rounded-default inline-flex shrink-0 items-center border px-2.5 py-2"
           data-test="dbm-queries-stmt-class"
-          @update:model-value="onStmtClassChange"
         >
-          <!-- The second option names what it ADDS rather than restating the
-               whole: two halves that both read as "everything" ("Queries" /
-               "All statements") make the distinction invisible. -->
-          <OToggleGroupItem value="query" size="sm">
-            {{ t("dbm.queries.stmtClass.query") }}
-            <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.queryHint')" />
-          </OToggleGroupItem>
-          <OToggleGroupItem value="all" size="sm">
-            {{ t("dbm.queries.stmtClass.all") }}
-            <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
-          </OToggleGroupItem>
-        </OToggleGroup>
+          <OCheckbox
+            :model-value="stmtClass"
+            true-value="all"
+            false-value="query"
+            size="sm"
+            :label="t('dbm.queries.stmtClass.overheadLabel')"
+            @update:model-value="onStmtClassChange"
+          />
+          <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
+        </span>
 
         <!-- What every Δ and every insight is measured AGAINST (W5). Each rule
              line names the choice, so a number can always be traced to the
@@ -145,8 +134,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
 
         <DbmRefreshButton
+          mode="status"
           :loading="loading"
           :last-run-at="lastRunAt"
+          data-test="dbm-queries-refresh"
+        />
+        <DateTime
+          auto-apply
+          menu-align="end"
+          :default-type="range.type"
+          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+          :default-relative-time="range.relativeTimePeriod ?? undefined"
+          data-test-name="dbm-queries-date-time"
+          class="h-8"
+          @on:date-change="onDateChange"
+        />
+        <DbmRefreshButton
+          mode="button"
+          :loading="loading"
           data-test="dbm-queries-refresh"
           @refresh="onRefresh"
         />
@@ -165,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="rowKey"
         :loading="loading"
         :frame="false"
+        :toolbar-bordered="false"
         :error="error"
         sorting="server"
         :sort-by="sortBy"
@@ -228,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body text-xs font-medium">
               {{ t("dbm.queries.foldRowText", { count: row.foldCount ?? 0 }) }}
             </span>
-            <span class="text-text-label text-3xs truncate">
+            <span class="text-text-secondary text-3xs truncate">
               {{
                 tailExpanded
                   ? t("dbm.queries.foldRowDetailOpen", { share: formatPercent(row.share, 0) })
@@ -243,13 +249,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 row.isOther ? 'text-text-secondary italic' : 'text-text-code',
                 row.isTail ? 'pl-4' : '',
               ]"
-              :title="row.queryText"
             >
+              <OTooltip v-if="row.queryText" :content="raw(row.queryText)" />
               {{ row.queryPreview }}
             </span>
             <div
               v-if="!row.isOther"
-              class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate"
+              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate"
               :class="row.isTail ? 'pl-4' : ''"
             >
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
@@ -264,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Every remainder states its own call count; only the first
                  explains what a remainder is, because three copies of the same
                  sentence is what made this block unreadable. -->
-            <span v-else class="text-text-label text-3xs">
+            <span v-else class="text-text-secondary text-3xs">
               {{
                 row.otherRowExplained
                   ? t("dbm.queries.otherRowDetail", { calls: formatCount(row.calls) })
@@ -285,25 +291,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              server figure it would qualify a number drawn from a different
              population. -->
         <template #cell-calls="{ row }">
-          <div class="flex flex-col items-end leading-tight">
-            <!-- The fold's own numbers are muted: it is a control, and a bold
-                 call count on it competes with the queries either side for the
-                 same "how big is this?" read. The share it carries is stated in
-                 words on the row itself. -->
-            <DbmOverlapValue
-              :value="row.overlapCalls.value === null ? null : formatCount(row.overlapCalls.value)"
-              :source="row.overlapCalls.source"
-              :qualifier-key="row.overlapCalls.qualifierKey"
-              :engine="row.db_system"
-              data-test="dbm-queries-calls"
-            />
-            <DbmDeltaCell
-              v-if="!row.isOther && !row.isFold && row.overlapCalls.source === 'client'"
-              :delta="row.callsDelta"
-              variant="words"
-              data-test="dbm-queries-calls-delta"
-            />
-          </div>
+          <DbmOverlapValue
+            :value="row.overlapCalls.value === null ? null : formatCount(row.overlapCalls.value)"
+            :source="row.overlapCalls.source"
+            :qualifier-key="row.overlapCalls.qualifierKey"
+            :engine="row.db_system"
+            data-test="dbm-queries-calls"
+          >
+            <template #trailing>
+              <DbmDeltaCell
+                v-if="!row.isOther && !row.isFold && row.overlapCalls.source === 'client'"
+                :delta="row.callsDelta"
+                variant="words"
+                data-test="dbm-queries-calls-delta"
+              />
+            </template>
+          </DbmOverlapValue>
         </template>
 
         <!-- The slow tail, and what it was before. p95 is NOT the typical
@@ -448,15 +451,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h2 class="text-text-heading text-sm font-semibold">
             {{ t("dbm.queries.serverList.title") }}
           </h2>
-          <p class="text-text-label text-xs">
+          <p class="text-text-secondary text-xs">
             {{ t("dbm.queries.serverList.subtitle") }}
           </p>
         </div>
         <OTable
+          :enable-column-resize="true"
           :data="filteredServerRows"
           :columns="serverColumns"
           row-key="fingerprint"
           :frame="false"
+          :toolbar-bordered="false"
           sorting="client"
           :show-global-filter="false"
           table-id="dbm-server-queries"
@@ -536,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #bottom>
-            <div v-if="serverTruncated" class="text-text-label px-page-edge py-1.5 text-xs">
+            <div v-if="serverTruncated" class="text-text-secondary px-page-edge py-1.5 text-xs">
               {{ t("dbm.queries.serverList.truncated", { count: serverRows.length }) }}
             </div>
           </template>
@@ -564,6 +569,7 @@ import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
@@ -579,6 +585,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -1874,7 +1881,7 @@ const errorLabel = (row: QueryRow): I18nText =>
     : raw(formatCount(row.errors));
 
 const errorClass = (row: QueryRow) => {
-  if ((row.errors ?? 0) <= 0) return "text-text-muted";
+  if ((row.errors ?? 0) <= 0) return "text-text-secondary";
   return row.critical ? "text-status-error-text font-bold" : "text-status-error-text";
 };
 
@@ -2069,10 +2076,10 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
-    size: 104,
+    header: t("dbm.common.actions"),
+    isAction: true,
     sortable: false,
-    meta: { align: "right" },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 5 },
   },
   {
     id: "p99_ns",

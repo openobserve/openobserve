@@ -161,8 +161,16 @@ mod m20260803_000001_add_destinations_to_incident_integrations;
 mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
 mod m20260804_000001_create_workflow_drafts_table;
 mod m20260809_000001_create_alert_eval_intervals_table;
+mod m20260811_000001_create_llm_experiments;
+mod m20260812_000001_add_provider_rate_limits;
 mod m20260812_000001_create_composite_alerts;
+mod m20260818_000001_create_llm_idempotency_records;
+mod m20260818_000002_create_llm_remote_tasks;
 mod m20260820_000001_add_icon_to_folders;
+mod m20260820_000003_create_llm_secrets;
+mod m20260824_000001_create_llm_playground_snapshots;
+mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
+mod m20260827_000001_drop_table_action_scripts;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -398,8 +406,16 @@ impl MigratorTrait for Migrator {
             Box::new(m20260803_000001_add_destinations_to_incident_integrations::Migration),
             Box::new(m20260804_000001_create_workflow_drafts_table::Migration),
             Box::new(m20260809_000001_create_alert_eval_intervals_table::Migration),
+            Box::new(m20260811_000001_create_llm_experiments::Migration),
+            Box::new(m20260812_000001_add_provider_rate_limits::Migration),
             Box::new(m20260812_000001_create_composite_alerts::Migration),
+            Box::new(m20260818_000001_create_llm_idempotency_records::Migration),
+            Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
             Box::new(m20260820_000001_add_icon_to_folders::Migration),
+            Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
+            Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
+            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
         ]
     }
 }

@@ -57,6 +57,20 @@ function resizeTextarea() {
   el.style.height = `${el.scrollHeight}px`;
 }
 
+// `maxRows` caps the grown height in CSS rather than in the resize handler:
+// `lh` is one line box, and the `1rem` is this field's own `py-2`, which
+// border-box sizing counts inside max-height. Overflow only becomes scrollable
+// when a cap exists — an uncapped field keeps `hidden`, so sub-pixel rounding
+// can never flash a scrollbar on the callsites that predate this prop.
+const autogrowStyle = computed(() => {
+  if (!props.autogrow) return undefined;
+  const capped = !!props.maxRows && props.maxRows > 0;
+  return {
+    overflow: capped ? "auto" : "hidden",
+    maxHeight: capped ? `calc(${props.maxRows}lh + 1rem)` : undefined,
+  };
+});
+
 onMounted(() => {
   if (props.autogrow) nextTick(resizeTextarea);
 });
@@ -149,13 +163,13 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
-        :style="autogrow ? { overflow: 'hidden' } : undefined"
+        :style="autogrowStyle"
         :class="[
           'min-w-0 flex-1 bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
           'disabled:cursor-not-allowed',
           'px-3 py-2 text-sm',
-          fill ? 'h-full min-h-0 resize-none' : 'min-h-20',
+          fill ? 'h-full min-h-0 resize-none' : autogrow && maxRows ? 'min-h-0' : 'min-h-20',
           !fill && (autogrow ? 'resize-none' : 'resize-y'),
         ]"
         @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"

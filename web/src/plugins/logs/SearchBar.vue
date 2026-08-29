@@ -569,15 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
-          <TransformSelector
-            v-if="isActionsEnabled"
-            :function-options="functionOptions"
-            :hide-toggle="true"
-            @select:function="populateFunctionImplementation"
-            @save:function="fnSavedFunctionDialog"
-          />
           <FunctionSelector
-            v-else
             :function-options="functionOptions"
             :hide-toggle="true"
             @select:function="populateFunctionImplementation"
@@ -1443,17 +1435,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </template>
-              <template v-else-if="searchObj.data.transformType === 'action'">
-                <CodeQueryEditor
-                  v-if="router.currentRoute.value.name === 'logs'"
-                  data-test="logs-vrl-function-editor"
-                  ref="fnEditorRef"
-                  editor-id="fnEditor"
-                  :query="actionEditorQuery"
-                  read-only
-                  language="markdown"
-                />
-              </template>
             </div>
           </template>
         </OSplitter>
@@ -1935,8 +1916,6 @@ import searchService from "@/services/search";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-// Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
-const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
@@ -1960,12 +1939,13 @@ import { debounce } from "lodash-es";
 import savedviewsService from "@/services/saved_views";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import useDashboardPanelData, {
+  getPanelDataForPageKey,
+} from "@/composables/dashboard/useDashboardPanel";
 import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
@@ -1980,6 +1960,8 @@ import { searchState } from "@/composables/useLogs/searchState";
 import {
   getVisualizationConfig,
   encodeVisualizationConfig,
+  getBuildConfig,
+  encodeBuildConfig,
 } from "@/composables/useLogs/logsVisualization";
 
 import useSearchBar from "@/composables/useLogs/useSearchBar";
@@ -2088,9 +2070,7 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
-    TransformSelector,
     FunctionSelector,
-    CodeQueryEditor,
     UnifiedQueryEditor,
     QueryPlanDialog,
     OIcon,
@@ -2260,7 +2240,6 @@ export default defineComponent({
       updatedLocalLogFilterField,
       updateUrlQueryParams,
       generateURLQuery,
-      isActionsEnabled,
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
@@ -2309,7 +2288,6 @@ export default defineComponent({
     const { closeSocketWithError } = useSearchWebSocket();
 
     const transformsExpandState = ref({
-      actions: false,
       functions: false,
     });
 
@@ -2465,19 +2443,7 @@ export default defineComponent({
       );
     });
 
-    const filteredActionOptions = computed(() => {
-      if (searchObj.data.transformType !== "action") return [];
-      if (!searchTerm.value) return searchObj.data.actions;
-      return searchObj.data.actions.filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
-      );
-    });
-
     const filteredTransformOptions = computed(() => {
-      if (!searchObj.data.transformType) return [];
-
-      if (searchObj.data.transformType === "action") return filteredActionOptions.value;
-
       if (searchObj.data.transformType === "function") return filteredFunctionOptions.value;
 
       return [];
@@ -2636,18 +2602,10 @@ export default defineComponent({
     const updateViewObj = ref({});
 
     const transformTypes = computed(() => {
-      return [
-        { label: t("logs.searchBar.transformTypeFunction"), value: "function" },
-        { label: t("logs.searchBar.transformTypeAction"), value: "action" },
-      ];
+      return [{ label: t("logs.searchBar.transformTypeFunction"), value: "function" }];
     });
 
-    const showFunctionEditor = computed(() => {
-      // When actions are disabled, fall back to the transform-editor toggle
-      if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
-
-      return searchObj.data.transformType === "function";
-    });
+    const showFunctionEditor = computed(() => searchObj.meta.showTransformEditor);
 
     // Check if VRL editor should be disabled (in visualize mode with non-table chart)
     const isVrlEditorDisabled = computed(() => {
@@ -2760,25 +2718,7 @@ export default defineComponent({
         return searchObj.data.selectedTransform.name;
       }
 
-      return searchObj.data.transformType === "action"
-        ? "Action"
-        : searchObj.data.transformType === "function"
-          ? "Function"
-          : "Transform";
-    });
-
-    const actionEditorQuery = computed(() => {
-      if (
-        searchObj.data.transformType === "action" &&
-        searchObj.data.selectedTransform?.type === "action" &&
-        searchObj.data.selectedTransform?.name
-      ) {
-        return t("logs.searchBar.actionAppliedRunQuery", {
-          name: searchObj.data.selectedTransform?.name,
-        });
-      }
-
-      return t("logs.searchBar.selectActionToApply");
+      return searchObj.data.transformType === "function" ? "Function" : "Transform";
     });
 
     const updateAutoComplete = (value) => {
@@ -2796,8 +2736,6 @@ export default defineComponent({
     const transformIcon = computed(() => {
       if (searchObj.data.transformType === "function")
         return "img:" + getImageURL("images/common/function.svg");
-
-      if (searchObj.data.transformType === "action") return "code";
 
       if (!searchObj.data.transformType) return "img:" + getImageURL("images/common/transform.svg");
 
@@ -3426,10 +3364,6 @@ export default defineComponent({
       }, 100);
     };
 
-    const applyAction = (actionId) => {
-      searchObj.data.actionId = actionId.id;
-    };
-
     const populateFunctionImplementation = (fnValue, flag = false, openEditor = true) => {
       if (flag) {
         toast({
@@ -3577,6 +3511,24 @@ export default defineComponent({
       }
     };
 
+    // Point build_data at the view being applied. Without this the URL keeps the
+    // build_data of whatever was open before, which a later toggle back to the
+    // build tab would restore instead of the view the user opened.
+    const restoreBuildData = async (buildData) => {
+      const currentQuery = { ...router.currentRoute.value.query };
+      const encoded = buildData ? encodeBuildConfig(buildData) : null;
+      if (encoded) {
+        currentQuery.build_data = encoded;
+      } else {
+        delete currentQuery.build_data;
+      }
+
+      await router.replace({
+        name: router.currentRoute.value.name,
+        query: currentQuery,
+      });
+    };
+
     const applySavedView = async (item) => {
       savedViewDropdownModel.value = false;
       await cancelQuery();
@@ -3675,10 +3627,17 @@ export default defineComponent({
               mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
 
+              // Hand the saved builder chart to BuildQueryPage. Must be set
+              // synchronously after the merge: the merge flips
+              // logsVisualizeToggle to "build", and the first await below lets
+              // Vue mount BuildQueryPage, which reads this on mount.
+              searchObj.meta.savedBuildConfig = extractedObj.data.buildData ?? null;
+
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
                 await restoreVisualizationData(extractedObj.data.visualizationData);
               }
+              await restoreBuildData(extractedObj.data.buildData ?? null);
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -3858,10 +3817,17 @@ export default defineComponent({
               mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
 
+              // Hand the saved builder chart to BuildQueryPage. Must be set
+              // synchronously after the merge: the merge flips
+              // logsVisualizeToggle to "build", and the first await below lets
+              // Vue mount BuildQueryPage, which reads this on mount.
+              searchObj.meta.savedBuildConfig = extractedObj.data.buildData ?? null;
+
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
                 await restoreVisualizationData(extractedObj.data.visualizationData);
               }
+              await restoreBuildData(extractedObj.data.buildData ?? null);
 
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
               searchObj.data.streamResults = streamData;
@@ -4087,6 +4053,19 @@ export default defineComponent({
             savedSearchObj.data.visualizationData = visualizationData;
           }
         }
+
+        // Include the builder chart (stream, fields, joins, chart type, config) when
+        // in build mode — without it the builder is re-derived from the logs query on
+        // restore and loses everything the user configured.
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          const buildData = getBuildConfig(getPanelDataForPageKey("build"));
+          if (buildData) {
+            savedSearchObj.data.buildData = buildData;
+          }
+        }
+
+        // Transient hand-off to BuildQueryPage, never part of a saved view.
+        delete savedSearchObj.meta.savedBuildConfig;
 
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
@@ -4869,23 +4848,11 @@ export default defineComponent({
         populateFunctionImplementation(item, isSelected);
       }
 
-      // If action is selected notify the user
-      if (searchObj.data.transformType === "action") {
-        updateActionSelection(item);
-      }
-
       if (typeof item === "object")
         searchObj.data.selectedTransform = {
           ...item,
           type: searchObj.data.transformType,
         };
-    };
-
-    const updateActionSelection = (item: any) => {
-      toast({
-        message: t("logs.searchBar.actionAppliedSuccess", { name: item?.name }),
-        variant: "success",
-      });
     };
 
     const updateEditorWidth = () => {
@@ -5121,7 +5088,6 @@ export default defineComponent({
       openSearchInspectDialog,
       navigateToSearchInspect,
       searchTerm,
-      filteredActionOptions,
       filteredFunctionOptions,
       confirmUpdate,
       updateViewObj,
@@ -5135,8 +5101,6 @@ export default defineComponent({
       filteredTransformOptions,
       updateTransforms,
       selectTransform,
-      actionEditorQuery,
-      isActionsEnabled,
       showFunctionEditor,
       isVrlEditorDisabled,
       closeSocketWithError,
@@ -5161,10 +5125,8 @@ export default defineComponent({
       // Expose additional functions for testing
       updateAutoComplete,
       handleEscKey,
-      applyAction,
       getFieldList,
       buildStreamQuery,
-      updateActionSelection,
       updateEditorWidth,
       showExplainDialog,
       openExplainDialog,
@@ -5475,9 +5437,9 @@ export default defineComponent({
   border-radius: var(--radius-default);
 }
 
-/* keep(lib-override:o2): .saved-view-item is rendered by the Function/Transform
-   selector child components, so it needs :deep(). The !important outranks the
-   px-3/py-2 utilities TransformSelector puts on the same node. */
+/* keep(lib-override:o2): .saved-view-item is rendered by the FunctionSelector
+   child component, so it needs :deep(). The !important outranks the
+   px-3/py-2 utilities FunctionSelector puts on the same node. */
 .logs-search-bar-component :deep(.saved-view-item) {
   padding: 0.125rem 0.25rem !important;
 }

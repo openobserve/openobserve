@@ -122,12 +122,6 @@ describe("buildPrefillFromLogs", () => {
       expect(p.vrlFunction).toBe(".foo = 1");
       expect(keys(p)).toContain("savedFunctionCopied");
     });
-
-    it("drops an action, which alerts cannot represent", () => {
-      const p = buildPrefillFromLogs(logs({ transformType: "action", vrl: "whatever" }));
-      expect(p.vrlFunction).toBeNull();
-      expect(keys(p)).toContain("actionsDropped");
-    });
   });
 
   describe("time range", () => {

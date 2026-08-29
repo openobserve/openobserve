@@ -40,6 +40,13 @@ vi.mock("@/services/search", () => ({
   },
 }));
 
+// Stream discovery: defaults to the constant so existing tests keep their
+// `from "default"` shape; individual tests override to a custom stream.
+const mockResolveTracesStream = vi.fn().mockResolvedValue("default");
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTracesStream: mockResolveTracesStream }),
+}));
+
 // Mock vuex store
 const mockStore = {
   state: {
@@ -229,6 +236,66 @@ describe("useTraceCorrelation", () => {
       // carrying only the legacy namespace — so the query targets _oo_trace_id. A stream
       // holding both spellings yields `_o2_trace_id = .. OR _oo_trace_id = ..`.
       expect(sql).toContain("_oo_trace_id = 'trace-abc-999'");
+    });
+
+    it("matches both padded and legacy zero-stripped ids in the RUM query", async () => {
+      // Legacy 31-char id as SDK 0.4.x stored it on the RUM event
+      const traceId = ref("1a034c1aabc72f78880daf6c9755cff");
+
+      mockSuccessfulSearch([], []);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      expect(sql).toContain("= '01a034c1aabc72f78880daf6c9755cff'");
+      expect(sql).toContain("= '1a034c1aabc72f78880daf6c9755cff'");
+    });
+
+    it("queries the default traces stream with the zero-padded id as page_type traces", async () => {
+      const traceId = ref("1a034c1aabc72f78880daf6c9755cff");
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      const apmCall = vi.mocked(searchService.search).mock.calls[1];
+      expect(apmCall[1]).toBe("APM");
+      expect(apmCall[0].page_type).toBe("traces");
+      const sql: string = apmCall[0].query.query.sql;
+      expect(sql).toContain('from "default"');
+      expect(sql).toContain("trace_id = '01a034c1aabc72f78880daf6c9755cff'");
+    });
+
+    it("queries the discovered stream when the trace lives outside default", async () => {
+      const traceId = ref("01a034c1aabc72f78880daf6c9755cff");
+      mockResolveTracesStream.mockResolvedValueOnce("payments_traces");
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      expect(mockResolveTracesStream).toHaveBeenCalledWith(
+        "01a034c1aabc72f78880daf6c9755cff",
+        expect.any(Number),
+        expect.any(Number),
+      );
+      const apmCall = vi.mocked(searchService.search).mock.calls[1];
+      const sql: string = apmCall[0].query.query.sql;
+      expect(sql).toContain('from "payments_traces"');
+    });
+
+    it("reports the canonical padded id in correlationData", async () => {
+      const traceId = ref("1a034c1aabc72f78880daf6c9755cff");
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation, correlationData } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      expect(correlationData.value?.trace_id).toBe("01a034c1aabc72f78880daf6c9755cff");
     });
 
     it("should fetch trace data after RUM data", async () => {

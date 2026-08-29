@@ -22,18 +22,15 @@
 
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, sea_query::Expr};
 
-use super::{
-    entity::{
-        incident_integration_senders::{
-            ActiveModel as SenderActiveModel, Column as SenderColumn, Entity as SenderEntity,
-            Model as SenderModel,
-        },
-        incident_integrations::{ActiveModel, Column, Entity, Model},
+use super::entity::{
+    incident_integration_senders::{
+        ActiveModel as SenderActiveModel, Column as SenderColumn, Entity as SenderEntity,
+        Model as SenderModel,
     },
-    get_lock,
+    incident_integrations::{ActiveModel, Column, Entity, Model},
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -136,7 +133,6 @@ pub fn generate_token() -> String {
 /// Insert a new integration row. Fails with a clear message if the token is
 /// already in use (the unique constraint).
 pub async fn add(record: &IncidentIntegrationRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
     let model = ActiveModel {
         id: Set(record.id.clone()),
@@ -155,7 +151,7 @@ pub async fn add(record: &IncidentIntegrationRecord) -> Result<(), errors::Error
         created_at: Set(now),
         updated_at: Set(now),
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(model).exec(client).await {
         Ok(_) => Ok(()),
         Err(e) => match e.sql_err() {
@@ -175,7 +171,7 @@ pub async fn add(record: &IncidentIntegrationRecord) -> Result<(), errors::Error
 pub async fn find_by_token(
     token: &str,
 ) -> Result<Option<IncidentIntegrationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Token.eq(token))
         .filter(Column::Enabled.eq(true))
@@ -187,7 +183,7 @@ pub async fn find_by_token(
 
 /// List all integrations for an org (enabled + disabled).
 pub async fn list_by_org(org_id: &str) -> Result<Vec<IncidentIntegrationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .all(client)
@@ -204,7 +200,7 @@ pub async fn ensure_default_for_org(
     org_id: &str,
     created_by: &str,
 ) -> Result<IncidentIntegrationRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let existing = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Name.eq(DEFAULT_INTEGRATION_NAME))
@@ -233,7 +229,7 @@ pub async fn ensure_default_for_org(
         Ok(_) => Ok(record),
         Err(_) => {
             // Concurrent create raced us — re-fetch and return the winner.
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let client = get_orm_client_ro().await;
             let winner = Entity::find()
                 .filter(Column::OrgId.eq(org_id))
                 .filter(Column::Name.eq(DEFAULT_INTEGRATION_NAME))
@@ -252,9 +248,8 @@ pub async fn ensure_default_for_org(
 
 /// Enable or disable an integration by `(org_id, id)`.
 pub async fn set_enabled(org_id: &str, id: &str, enabled: bool) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::Enabled, Expr::value(enabled))
         .col_expr(Column::UpdatedAt, Expr::value(now))
@@ -277,7 +272,6 @@ pub async fn update(
     name: Option<&str>,
     destinations: Option<&[String]>,
 ) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
     let mut q = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
     if let Some(name) = name {
@@ -295,7 +289,7 @@ pub async fn update(
         };
         q = q.col_expr(Column::Destinations, Expr::value(encoded));
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     q.filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(client)
@@ -306,10 +300,9 @@ pub async fn update(
 
 /// Rotate an integration's token to a new random value, returning it.
 pub async fn rotate_token(org_id: &str, id: &str) -> Result<String, errors::Error> {
-    let _lock = get_lock().await;
     let new_token = generate_token();
     let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::Token, Expr::value(new_token.clone()))
         .col_expr(Column::UpdatedAt, Expr::value(now))
@@ -347,8 +340,7 @@ pub async fn touch_sender(params: TouchSenderParams<'_>) -> Result<(), errors::E
         saw_resolved,
     } = params;
 
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let mut existing_query = SenderEntity::find()
         .filter(SenderColumn::IntegrationId.eq(integration_id))
         .filter(SenderColumn::DetectedSource.eq(detected_source));
@@ -448,8 +440,7 @@ async fn update_sender(
 /// Returns `Ok(false)` if no matching row was found (already deleted / wrong
 /// org), `Ok(true)` on success.
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let existing = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -479,7 +470,7 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 
 /// List all observed senders for an integration.
 pub async fn list_senders(integration_id: &str) -> Result<Vec<SenderRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = SenderEntity::find()
         .filter(SenderColumn::IntegrationId.eq(integration_id))
         .all(client)

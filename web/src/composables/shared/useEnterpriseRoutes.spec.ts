@@ -83,10 +83,6 @@ vi.mock("@/components/iam/organizations/AppOrganizations.vue", () => ({
   default: vi.fn(() => ({ name: "AppOrganizations" })),
 }));
 
-vi.mock("@/components/actionScripts/ActionScripts.vue", () => ({
-  default: vi.fn(() => ({ name: "ActionScripts" })),
-}));
-
 vi.mock("@/views/User.vue", () => ({
   default: vi.fn(() => ({ name: "Users" })),
 }));
@@ -293,34 +289,6 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "false";
     });
 
-    // Test 21: Should add actions route when isCloud is true
-    it("should add actions route when isCloud is true", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute).toBeDefined();
-    });
-
-    // Test 22: Should have correct actions route path
-    it("should have correct actions route path", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute.path).toBe("actions");
-    });
-
-    // Test 23: Should have actions route component
-    it("should have actions route component", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute.component).toBeDefined();
-    });
-
-    // Test 24: Should have actions route beforeEnter guard
-    it("should have actions route beforeEnter guard", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(typeof actionsRoute.beforeEnter).toBe("function");
-    });
-
     // Test 25: Should add groups child route
     it("should add groups child route", () => {
       const routes = useEnterpriseRoutes();
@@ -392,10 +360,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(12);
     });
 
-    // Test 34: iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11
-    it("should have 11 routes in cloud configuration", () => {
+    // Test 34: iam + synthetics + 5 synthetics sub-routes + 2 incidents + workflows = 10
+    it("should have 10 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(11);
+      expect(routes.length).toBe(10);
     });
   });
 
@@ -406,13 +374,6 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 35: Should add actions route when isEnterprise is true
-    it("should add actions route when isEnterprise is true", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute).toBeDefined();
-    });
-
     // Test 36: Should add enterprise IAM routes
     it("should add enterprise IAM routes", () => {
       const routes = useEnterpriseRoutes();
@@ -420,10 +381,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(11);
     });
 
-    // Test 37: iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11
+    // Test 37: iam + synthetics + 5 synthetics sub-routes + 2 incidents + workflows = 10
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(11);
+      expect(routes.length).toBe(10);
     });
   });
 
@@ -434,10 +395,10 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11)
+    // Test 38: Should add all routes when both flags are true (iam + synthetics + 5 synthetics sub-routes + 2 incidents + workflows = 10)
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(11);
+      expect(routes.length).toBe(10);
     });
 
     // Test 39: Should have all IAM children when both flags are true
@@ -518,20 +479,6 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "false";
-    });
-
-    // Test 44: Should call routeGuard for actions route
-    it("should call routeGuard for actions route", async () => {
-      const { routeGuard } = await import("@/utils/zincutils");
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-
-      const mockTo = {};
-      const mockFrom = {};
-      const mockNext = vi.fn();
-
-      actionsRoute.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
     // Test 45: Should call routeGuard for groups route
@@ -683,13 +630,6 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "false";
-    });
-
-    // Test 56: Should have component for actions route
-    it("should have component for actions route", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(typeof actionsRoute.component).toBe("function");
     });
 
     // Test 57: Should have component for groups route

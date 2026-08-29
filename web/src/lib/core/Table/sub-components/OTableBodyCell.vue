@@ -526,6 +526,13 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
         >
           <OIcon :name="copied ? 'check' : 'content-copy'" size="sm" />
         </OButton>
+        <!-- Inline actions right of the copy button -->
+        <slot
+          name="copy-actions"
+          :column-id="cell.column.id"
+          :row="row.original"
+          :value="rawValue"
+        />
       </div>
       <!-- Custom cell render via TanStack FlexRender -->
       <FlexRender

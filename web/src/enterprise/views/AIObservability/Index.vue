@@ -77,6 +77,11 @@ const activeSection = computed<string>(() => {
   )
     return "queues";
   if (route.name === "aiDatasets") return "datasets";
+  // The create form is a route of its own, so the rail must stay lit while it
+  // is open — same shape as the queue sub-routes above.
+  if (route.name === "aiPlayground") return "playground";
+  if (route.name === "aiExperiments" || route.name === "aiExperimentCreate") return "experiments";
+  if (typeof route.name === "string" && route.name.startsWith("aiRemoteTask")) return "remoteTasks";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;
@@ -144,6 +149,30 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     group: "Annotate",
   },
   {
+    key: "playground",
+    label: t("aiObservability.nav.playground"),
+    icon: "play-circle",
+    to: { name: "aiPlayground", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-playground",
+    group: "Experiment",
+  },
+  {
+    key: "experiments",
+    label: t("aiObservability.nav.experiments"),
+    icon: "science",
+    to: { name: "aiExperiments", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-experiments",
+    group: "Experiment",
+  },
+  {
+    key: "remoteTasks",
+    label: t("aiObservability.nav.remoteTasks"),
+    icon: "cloud-upload",
+    to: { name: "aiRemoteTasks", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-remote-tasks",
+    group: "Experiment",
+  },
+  {
     key: "quality",
     label: t("aiObservability.nav.quality"),
     icon: "star-rate",
@@ -181,13 +210,16 @@ const activeSectionItem = computed(() =>
   sectionItems.value.find((i) => i.key === activeSection.value),
 );
 
-// Group order: Monitor, then Evaluate, then Annotate at the bottom.
-const sectionGroupOrder = ["Monitor", "Evaluate", "Annotate"];
+// Group order: Monitor, then Evaluate, then Experiment, then Annotate at the
+// bottom. Experiment is its own section (not an Evaluate sub-item) because an
+// experiment is a run you author, not a scoring config you maintain.
+const sectionGroupOrder = ["Monitor", "Evaluate", "Experiment", "Annotate"];
 
 const groupLabels = computed<Record<string, I18nText>>(() => ({
   Monitor: t("aiObservability.sections.monitor"),
   Annotate: t("aiObservability.sections.annotate"),
   Evaluate: t("aiObservability.sections.evaluate"),
+  Experiment: t("aiObservability.sections.experiment"),
 }));
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {

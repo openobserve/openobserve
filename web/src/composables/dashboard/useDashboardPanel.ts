@@ -48,6 +48,10 @@ let parser: any;
 
 const dashboardPanelDataObj: any = {};
 
+// Read-only handle on a page's shared panel state for callers that must not
+// register this composable's watchers (SearchBar reading the build page).
+export const getPanelDataForPageKey = (pageKey: string) => dashboardPanelDataObj[pageKey] ?? null;
+
 const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
@@ -303,9 +307,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
           (field: any) => field?.name,
         );
       } else {
-        const currentStream =
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-            .stream;
+        const activeFields =
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
+        const currentStream = activeFields?.stream;
         if (!currentStream) return;
 
         // Collect streams (main + joins)
@@ -956,8 +960,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   // based on chart type it will create auto sql query
   const makeAutoSQLQuery = async () => {
+    // Bail if the current query index is transiently out of range (e.g. mid org-switch/reset).
+    const activeQuery =
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex];
+    if (!activeQuery) return;
     // only continue if current mode is auto query generation
-    if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
+    if (!activeQuery?.customQuery) {
       if (!dashboardPanelData?.meta?.streamFields?.groupedFields?.length) {
         return;
       }
@@ -1067,10 +1075,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     // dashboardPanelData.meta.editorValue = value;
     // dashboardPanelData.data.query = value;
 
+    // Current query can be transiently absent (org-switch / panel reset).
+    const activeQuery =
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex];
+    if (!activeQuery) return;
+
     if (
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+      activeQuery.customQuery &&
       dashboardPanelData.data.queryType != "promql" &&
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query
+      activeQuery.query
     ) {
       // empty the errors
       dashboardPanelData.meta.errors.queryErrors = [];
@@ -1218,8 +1231,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   watch(
     () => [
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query,
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, // Only watch for custom query mode changes
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query,
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
       dashboardPanelData.layout.currentQueryIndex,
     ],
@@ -1234,7 +1247,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
       // Only continue if the current mode is "show custom query"
       if (
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery &&
         dashboardPanelData.data.queryType == "sql"
       ) {
         // Call the updateQueryValue function

@@ -164,7 +164,7 @@ import WorkflowExecutionTimeline from "@/components/alerts/AlertHistoryTimeline.
 import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import workflowService from "@/services/workflows";
+import { workflowObj, loadRunsHistory } from "@/plugins/workflows/useWorkflowCanvas";
 
 const props = defineProps<{
   orgId: string;
@@ -180,11 +180,12 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const store = useStore();
 
-const loading = ref(false);
+// Loading + the runs list live in SHARED state (workflowObj.runsHistory) so the
+// NDV run switcher reuses the same fetch instead of re-hitting /history.
+const loading = computed(() => workflowObj.runsHistory.loading);
 // Distinguishes "the fetch failed" from "there are no runs" — the table's empty
 // slot renders a retryable error state for the former.
 const loadError = ref(false);
-const runs = ref<any[]>([]);
 
 // Default range: last 24 hours (user can widen it via the picker). Same shape as
 // AlertHistory — startTime/endTime are microseconds.
@@ -235,7 +236,7 @@ const getStatusVariant = (status: string) => {
   }
 };
 
-const rows = computed(() => runs.value);
+const rows = computed(() => workflowObj.runsHistory.list);
 
 // Highlight the run currently loaded on the canvas. `!` (important) so the tint
 // wins over OTable's default/hover row background — keeping the list and canvas
@@ -245,7 +246,7 @@ const rowClass = (row: any) =>
 
 // Feed the shared timeline: one bar per run, coloured by success/error.
 const timelineHistory = computed(() =>
-  runs.value.map((r: any) => ({
+  workflowObj.runsHistory.list.map((r: any) => ({
     status: r.error ? "error" : "success",
     timestamp: r.start_time,
   })),
@@ -303,26 +304,21 @@ const columns = computed<OTableColumnDef[]>(() => [
 
 const fetchHistory = async () => {
   if (!props.workflowId) return;
-  loading.value = true;
-  try {
-    const res = await workflowService.getWorkflowHistory({
-      org_identifier: props.orgId,
-      id: props.workflowId,
-      start_time: dateTimeValues.value.startTime,
-      end_time: dateTimeValues.value.endTime,
-    });
-    runs.value = Array.isArray(res.data) ? res.data : [];
+  const res = await loadRunsHistory({
+    orgId: props.orgId,
+    workflowId: props.workflowId,
+    start: dateTimeValues.value.startTime,
+    end: dateTimeValues.value.endTime,
+  });
+  if (res.ok) {
     loadError.value = false;
-  } catch (e: any) {
-    // 403 is "no permission", not a failure to load — keep the plain empty
-    // state for it rather than offering a retry that cannot succeed.
-    loadError.value = e?.response?.status !== 403;
-    if (loadError.value) {
-      toast({ variant: "error", message: t("workflow.history.loadError") });
-    }
-    runs.value = [];
-  } finally {
-    loading.value = false;
+    return;
+  }
+  // 403 is "no permission", not a failure to load — keep the plain empty state
+  // for it rather than offering a retry that cannot succeed.
+  loadError.value = res.status !== 403;
+  if (loadError.value) {
+    toast({ variant: "error", message: t("workflow.history.loadError") });
   }
 };
 

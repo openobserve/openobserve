@@ -27,11 +27,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   can put a table, a tile grid or a state note under the heading without this
   component knowing which. `#hint` follows the title inside the header row;
   `#actions` closes it.
+
+  The shell is the shared LLM-Insights panel chrome (glass card, `rounded-default`,
+  a header bar closed by a bottom divider) so every section on the page — these,
+  the trend charts, the summary — reads as one family of panels.
 -->
 <template>
-  <section class="card-container border-border-default rounded-surface flex flex-col border">
+  <section
+    class="bg-card-glass-bg border-border-default rounded-default flex flex-col overflow-hidden border"
+  >
     <div :class="headerClass">
-      <h3 class="text-text-heading text-sm font-medium">{{ title }}</h3>
+      <h3 class="text-compact text-text-heading font-medium">{{ title }}</h3>
       <slot name="hint" />
       <slot name="actions" />
     </div>
@@ -61,9 +67,9 @@ const props = withDefaults(
 const headerClass = computed(
   () =>
     ({
-      baseline: "flex flex-wrap items-baseline gap-2 p-3 pb-1",
-      center: "flex flex-wrap items-center gap-2 p-3 pb-1",
-      between: "flex items-center justify-between gap-2 p-3 pb-1",
+      baseline: "border-border-default flex flex-wrap items-baseline gap-2 border-b px-3 py-2",
+      center: "border-border-default flex flex-wrap items-center gap-2 border-b px-3 py-2",
+      between: "border-border-default flex items-center justify-between gap-2 border-b px-3 py-2",
     })[props.headerAlign],
 );
 </script>

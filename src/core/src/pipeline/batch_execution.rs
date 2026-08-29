@@ -71,6 +71,7 @@ pub struct WorkflowResult {
     pub stream_details: HashMap<StreamParams, Vec<(usize, Value)>>,
     pub errors: HashMap<String, NodeErrors>,
     pub inputs: HashMap<String, Vec<Value>>,
+    pub outputs: HashMap<String, Vec<Value>>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -214,34 +215,26 @@ impl PipelineExt for Workflow {
         for node in &self.nodes {
             if let NodeData::Function(func_params) = &node.data {
                 // this can be the case where there is dummy node for fn in draft stage
-                if func_params.name.is_empty() {
-                    continue;
-                }
-
-                let transform = get_transforms(&self.org_id, &func_params.name).await?;
-
-                // Check if function is JS or VRL
-                let compiled_runtime = if transform.is_js() {
-                    // Compile JS function
-                    let js_config = compile_js_function(&transform.function, &self.org_id)?;
-                    CompiledFunctionRuntime::JS(js_config, transform.is_result_array_js())
+                let (func, res_array) = if func_params.name.is_empty() {
+                    // if there is a raw fn provided, then we use that as the fn
+                    if let Some(raw) = func_params.raw_fn.as_ref() {
+                        (
+                            raw.to_owned(),
+                            config::meta::function::RESULT_ARRAY.is_match(raw),
+                        )
+                    } else {
+                        // if no fn name and no raw fn, then we cannot do anything, just skip
+                        continue;
+                    }
                 } else {
-                    // Compile VRL function (default)
-                    let vrl_runtime_config =
-                        compile_vrl_function(&transform.function, &self.org_id)?;
-                    let registry = vrl_runtime_config
-                        .config
-                        .get_custom::<vector_enrichment::TableRegistry>()
-                        .unwrap();
-                    registry.finish_load();
-                    CompiledFunctionRuntime::VRL(
-                        Box::new(VRLResultResolver {
-                            program: vrl_runtime_config.program,
-                            fields: vrl_runtime_config.fields,
-                        }),
-                        transform.is_result_array_vrl(),
-                    )
+                    // there is a fn name, so ue that fn
+                    let transform = get_transforms(&self.org_id, &func_params.name).await?;
+                    let res_arr = transform.is_result_array_js();
+                    (transform.function, res_arr)
                 };
+
+                let js_config = compile_js_function(&func, &self.org_id)?;
+                let compiled_runtime = CompiledFunctionRuntime::JS(js_config, res_array);
 
                 function_map.insert(node.get_node_id(), compiled_runtime);
             }
@@ -581,7 +574,8 @@ impl ExecutablePipeline {
                 child_senders,
                 result_sender: result_sender_cp,
                 error_sender: error_sender_cp,
-                inputs_sender: None, // not applicable for pipelines
+                inputs_sender: None,  // not applicable for pipelines
+                outputs_sender: None, // not applicable for pipelines
             };
             let task = tokio::spawn(process_node(metadata, node, function_runtime, channels));
             node_tasks.push(task);
@@ -795,6 +789,7 @@ impl ExecutablePipeline {
 
         // inputs_channel
         let (inputs_sender, mut inputs_receiver) = channel::<(String, Value)>(batch_size);
+        let (outputs_sender, mut outputs_receiver) = channel::<(String, Value)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -820,6 +815,7 @@ impl ExecutablePipeline {
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
             let error_sender_cp = error_sender.clone();
             let inputs_sender_cp = inputs_sender.clone();
+            let outputs_sender_cp = outputs_sender.clone();
             let function_runtime: Option<CompiledFunctionRuntime> =
                 self.function_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
@@ -860,6 +856,7 @@ impl ExecutablePipeline {
                 result_sender: result_sender_cp,
                 error_sender: error_sender_cp,
                 inputs_sender: Some(inputs_sender_cp),
+                outputs_sender: Some(outputs_sender_cp),
             };
             let task = tokio::spawn(process_node(metadata, node, function_runtime, channels));
             node_tasks.push(task);
@@ -915,6 +912,14 @@ impl ExecutablePipeline {
             input_map
         });
 
+        let outputs_task = tokio::spawn(async move {
+            let mut outputs_map = HashMap::new();
+            while let Some((node_id, val)) = outputs_receiver.recv().await {
+                outputs_map.entry(node_id).or_insert(vec![]).push(val);
+            }
+            outputs_map
+        });
+
         // Send records to the source node to begin processing
         let flattened = {
             let source_node = self.node_map.get(&self.source_node_id).unwrap();
@@ -947,6 +952,7 @@ impl ExecutablePipeline {
         drop(error_sender);
         drop(node_senders);
         drop(inputs_sender);
+        drop(outputs_sender);
         log::debug!(
             "[Workflow] {pipeline_name} [inv={inv_id}]: All records send into pipeline for processing"
         );
@@ -976,6 +982,12 @@ impl ExecutablePipeline {
                 "[Workflow] {pipeline_name} [inv={inv_id}]: input collecting job failed: {e}"
             );
             anyhow!("[Workflow] input collecting job failed: {}", e)
+        })?;
+        let outputs = outputs_task.await.map_err(|e| {
+            log::error!(
+                "[Workflow] {pipeline_name} [inv={inv_id}]: output collecting job failed: {e}"
+            );
+            anyhow!("[Workflow] output collecting job failed: {}", e)
         })?;
 
         let node_errors = errors
@@ -1045,6 +1057,7 @@ impl ExecutablePipeline {
             stream_details: results,
             errors: node_errors,
             inputs,
+            outputs,
         })
     }
 
@@ -1193,6 +1206,7 @@ struct ProcessChannels {
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
     error_sender: Sender<(String, String, String, Option<String>, Option<Value>)>,
     inputs_sender: Option<Sender<(String, Value)>>,
+    outputs_sender: Option<Sender<(String, Value)>>,
 }
 
 impl ProcessChannels {
@@ -1205,6 +1219,17 @@ impl ProcessChannels {
         {
             log::error!(
                 "[Pipeline] {} [inv={}] error sending input via input channel for node {id} : {e}",
+                metadata.pipeline_name,
+                metadata.inv_id
+            );
+        }
+    }
+    async fn send_output(&mut self, metadata: &ProcessMetadata, id: &str, value: &Value) {
+        if let Some(ref mut channel) = self.outputs_sender
+            && let Err(e) = channel.send((id.to_string(), value.clone())).await
+        {
+            log::error!(
+                "[Pipeline] {} [inv={}] error sending output via output channel for node {id} : {e}",
                 metadata.pipeline_name,
                 metadata.inv_id
             );
@@ -1238,6 +1263,9 @@ async fn process_node(
     if node.is_disabled && !matches!(node.node_data, NodeData::WorkflowTrigger) {
         let mut count: usize = 0;
         while let Some(item) = channels.receiver.recv().await {
+            channels
+                .send_output(&metadata, &node.id, &item.record)
+                .await;
             send_to_children(&mut channels.child_senders, item, &node.to_string()).await;
             count += 1;
         }
@@ -1253,6 +1281,9 @@ async fn process_node(
             let mut count: usize = 0;
             while let Some(item) = channels.receiver.recv().await {
                 channels.send_input(&metadata, &node.id, &item.record).await;
+                channels
+                    .send_output(&metadata, &node.id, &item.record)
+                    .await;
                 send_to_children(&mut channels.child_senders, item, "WorkflowTrigger").await;
                 count += 1;
             }
@@ -1613,7 +1644,7 @@ async fn process_remote_stream_node(
             };
         }
         if !record.is_null() && record.is_object() {
-            if let Err(e) = crate::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts) {
+            if let Err(e) = crate::logs::handle_timestamp_for_value(&mut record, min_ts, max_ts) {
                 let err_msg = format!("DestinationNode error handling timestamp: {e}");
                 if let Err(send_err) = channels
                     .error_sender
@@ -1790,11 +1821,17 @@ async fn process_function_node(
         metadata.node_idx
     );
 
-    if func_params.name.is_empty() {
+    if func_params.name.is_empty()
+        && (func_params.raw_fn.is_none()
+            || func_params.raw_fn.as_ref().is_some_and(|v| v.is_empty()))
+    {
         let mut count = 0;
         while let Some(pipeline_item) = channels.receiver.recv().await {
             channels
                 .send_input(&metadata, &node.id, &pipeline_item.record)
+                .await;
+            channels
+                .send_output(&metadata, &node.id, &pipeline_item.record)
                 .await;
             send_to_children(&mut channels.child_senders, pipeline_item, "FunctionNode").await;
             count += 1;
@@ -1907,6 +1944,7 @@ async fn process_function_node(
                             }
                         };
                         flattened = false; // since apply_vrl_fn can produce unflattened data
+                        channels.send_output(&metadata, &node.id, &record).await;
                         send_to_children(
                             &mut channels.child_senders,
                             PipelineItem {
@@ -1961,6 +1999,7 @@ async fn process_function_node(
                             }
                         };
                         flattened = false; // since JS functions can produce unflattened data
+                        channels.send_output(&metadata, &node.id, &record).await;
                         send_to_children(
                             &mut channels.child_senders,
                             PipelineItem {
@@ -2030,6 +2069,7 @@ async fn process_function_node(
                 // since apply_vrl_fn can produce unflattened data
                 for record in result.as_array().unwrap().iter() {
                     // use usize::MAX as a flag to disregard original_value
+                    channels.send_output(&metadata, &node.id, record).await;
                     send_to_children(
                         &mut channels.child_senders,
                         PipelineItem {
@@ -2083,6 +2123,7 @@ async fn process_function_node(
                 if let Some(result_arr) = result.as_array() {
                     for record in result_arr.iter() {
                         // use usize::MAX as a flag to disregard original_value
+                        channels.send_output(&metadata, &node.id, record).await;
                         send_to_children(
                             &mut channels.child_senders,
                             PipelineItem {
@@ -2202,6 +2243,7 @@ async fn process_condition_node(
 
         // only send to children when passing all condition evaluations
         if passes {
+            channels.send_output(&metadata, &node.id, &record).await;
             send_to_children(
                 &mut channels.child_senders,
                 PipelineItem {
@@ -2571,6 +2613,10 @@ async fn process_destination_node(
                     );
                 }
                 return Ok(0);
+            } else {
+                channels
+                    .send_output(&metadata, &node.id, &body.into())
+                    .await;
             }
         }
     }
@@ -2909,6 +2955,7 @@ mod tests {
                 result_sender: None,
                 error_sender: error_tx,
                 inputs_sender: None,
+                outputs_sender: None,
             },
         )
         .await;
@@ -3056,6 +3103,7 @@ mod tests {
                 name: "test_function".to_string(),
                 after_flatten: true,
                 num_args: 1,
+                raw_fn: None,
             }),
             children: vec![],
             is_disabled: false,
@@ -3088,6 +3136,7 @@ mod tests {
                     name: "func1".to_string(),
                     after_flatten: false,
                     num_args: 0,
+                    raw_fn: None,
                 }),
                 children: vec!["C".to_string()],
                 is_disabled: false,
@@ -3548,6 +3597,7 @@ mod tests {
             result_sender: None,
             error_sender: error_tx,
             inputs_sender,
+            outputs_sender: None,
         };
 
         (input_tx, child_receivers, inputs_rx, channels)
@@ -3578,6 +3628,7 @@ mod tests {
                 name: "should-not-run".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
             children: vec!["child-1".to_string()],
             is_disabled: true,

@@ -23,11 +23,10 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 // Re-export the entity for convenience
 pub use crate::table::entity::enrichment_tables::{ActiveModel, Column, Entity, Model, Relation};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm, get_db},
+    db::{get_db, get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -98,10 +97,7 @@ pub async fn add(
         ..Default::default()
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record).exec(client).await?;
 
     Ok(())
@@ -116,10 +112,7 @@ pub async fn add(
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete(org: &str, table_name: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -141,7 +134,7 @@ pub async fn get_by_org_and_name(
     org: &str,
     table_name: &str,
 ) -> Result<Vec<EnrichmentTableRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -178,7 +171,7 @@ pub async fn get_by_org_and_name_with_end_time(
     table_name: &str,
     end_time_exclusive: Option<i64>,
 ) -> Result<Vec<EnrichmentTableRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -252,7 +245,7 @@ pub async fn get_meta_stats(org: &str, table_name: &str) -> Option<EnrichmentTab
 /// # Returns
 /// * `Result<Vec<EnrichmentTableRecord>, errors::Error>` - List of records or error
 pub async fn get_by_org(org: &str) -> Result<Vec<EnrichmentTableRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -277,7 +270,7 @@ pub async fn get_by_org(org: &str) -> Result<Vec<EnrichmentTableRecord>, errors:
 /// # Returns
 /// * `Result<bool, errors::Error>` - True if records exist, false otherwise
 pub async fn contains(org: &str, table_name: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -297,7 +290,7 @@ pub async fn contains(org: &str, table_name: &str) -> Result<bool, errors::Error
 /// # Returns
 /// * `Result<usize, errors::Error>` - Count of records
 pub async fn count_by_org_and_name(org: &str, table_name: &str) -> Result<usize, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let count = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -312,7 +305,7 @@ pub async fn count_by_org_and_name(org: &str, table_name: &str) -> Result<usize,
 /// # Returns
 /// * `Result<usize, errors::Error>` - Total count of records
 pub async fn count() -> Result<usize, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let count = Entity::find().count(client).await?;
 
     Ok(count as usize)
@@ -323,10 +316,7 @@ pub async fn count() -> Result<usize, errors::Error> {
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
@@ -346,7 +336,7 @@ pub async fn is_empty() -> Result<bool, errors::Error> {
 /// # Returns
 /// * `Result<Vec<(String, String)>, errors::Error>` - List of (org_id, table_name) pairs
 pub async fn list() -> Result<Vec<(String, String)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -363,8 +353,7 @@ pub async fn list() -> Result<Vec<(String, String)>, errors::Error> {
 
 /// Deletes all enrichment table entries belonging to the given org.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .exec(client)

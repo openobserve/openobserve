@@ -227,11 +227,12 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
   }, async ({ page }) => {
     await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_validation${streamSuffix}`);
 
-    // Test 1: Verify guidelines are displayed
+    // Test 1: Verify guidelines are displayed (the null/empty value hints are
+    // gone — dedicated is_null/is_empty operators replaced them)
     await pageManager.pipelinesPage.verifyNoteContainer();
     const noteInfo = pageManager.pipelinesPage.noteInfo;
-    await expect(noteInfo).toContainText('""');
-    await expect(noteInfo).toContainText('null');
+    await expect(noteInfo).toContainText("custom column");
+    await expect(noteInfo).toContainText("If conditions are not met");
 
     // Test 2: Try to save without any valid conditions
     await pageManager.pipelinesPage.tryToSaveWithoutValidConditions();

@@ -39,14 +39,26 @@ test.describe("dashboard share URL button testcases", () => {
   });
 
   test.afterEach(async ({ page }) => {
-    if (currentDashboardName) {
+    if (!currentDashboardName) return;
+    try {
+      const pm = new PageManager(page);
+      // A test can finish on an origin that has no in-app back button — a share
+      // URL pointing at another host bounces to the SSO login screen. Fall back to
+      // loading the dashboards list directly so the dashboard is still removed
+      // instead of being leaked.
       try {
-        const pm = new PageManager(page);
         await pm.dashboardCreate.backToDashboardList();
-        await deleteDashboard(page, currentDashboardName);
-      } catch (e) {
-        testLogger.warn("Cleanup failed (non-fatal):", { error: e.message });
+      } catch (navError) {
+        testLogger.warn("backToDashboardList failed, loading the list directly", {
+          error: navError.message,
+        });
+        await page.goto(
+          `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
+        );
       }
+      await deleteDashboard(page, currentDashboardName);
+    } catch (e) {
+      testLogger.warn("Cleanup failed (non-fatal):", { error: e.message });
     }
   });
 
@@ -152,8 +164,9 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be saved
-    await page.waitForTimeout(2000);
+    // savePanel() already waits for the URL to leave /add_panel; wait for the
+    // dashboard view itself rather than sleeping a flat 2s.
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Get current URL to check time parameters
     const currentURL = page.url();
@@ -234,8 +247,9 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be saved
-    await page.waitForTimeout(2000);
+    // savePanel() already waits for the URL to leave /add_panel; wait for the
+    // dashboard view itself rather than sleeping a flat 2s.
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Get current URL to check time parameters
     const currentURL = page.url();
@@ -671,8 +685,7 @@ test.describe("dashboard share URL button testcases", () => {
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
-
-    await page.waitForTimeout(2000);
+    await pm.dashboardShareExport.waitForDashboardViewLoaded();
 
     // Get the current full URL
     const fullURL = page.url();

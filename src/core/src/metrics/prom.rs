@@ -79,8 +79,8 @@ pub async fn remote_write(
     let started_at = Utc::now().timestamp_micros();
 
     let cfg = get_config();
-    let dedup_enabled = cfg.common.metrics_dedup_enabled;
-    let election_interval = cfg.limit.metrics_leader_election_interval * 1000000;
+    let dedup_enabled = cfg.prom.dedup_enabled;
+    let election_interval = cfg.prom.leader_election_interval * 1000000;
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
