@@ -799,7 +799,7 @@ pub fn select_cache_meta(
 }
 
 /// Drops the stale meta unless a concurrent writer already recreated its file on disk.
-async fn remove_stale_cache_meta(
+pub(crate) async fn remove_stale_cache_meta(
     file_path: &str,
     file_name: &str,
     query_key: &str,

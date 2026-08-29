@@ -935,6 +935,10 @@ pub async fn add_result_cache_meta(file_key: &str) {
     let Some((dir, _)) = file_key.rsplit_once('/') else {
         return;
     };
+    // held across the insert so a concurrent eviction orders around the whole handoff
+    let Some(guard) = indexed_file_guard(file_key).await else {
+        return;
+    };
     let mut w = QUERY_RESULT_CACHE.write().await;
     let metas = w.entry(query_key).or_default();
     // an equal meta can already exist when re-caching after clear_cache
@@ -951,12 +955,43 @@ pub async fn add_result_cache_meta(file_key: &str) {
         Vec::new()
     };
     drop(w);
+    drop(guard);
 
     for meta in evicted {
         let file = format!("{dir}/{}", result_cache_file_name(&meta));
-        if let Err(e) = remove(&file).await {
-            log::warn!("Remove evicted result cache file {file} error: {e}");
+        remove_unowned_result_file(&file).await;
+    }
+}
+
+/// Removes the file unless a same-name rewrite re-registered its meta since the eviction.
+async fn remove_unowned_result_file(file_key: &str) {
+    let Some((_, _, query_key, meta)) = parse_result_cache_key(file_key) else {
+        return;
+    };
+    let idx = get_bucket_idx(file_key);
+    let mut files = RESULT_FILES[idx].write().await;
+    // bucket -> QUERY_RESULT_CACHE is the established lock order; writers push under the guard
+    let owned = QUERY_RESULT_CACHE
+        .read()
+        .await
+        .get(&query_key)
+        .is_some_and(|metas| metas.contains(&meta));
+    if owned {
+        return;
+    }
+    let trash_file = match files.remove(file_key).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!("Remove evicted result cache file {file_key} error: {e}");
+            return;
         }
+    };
+    drop(files);
+    if let Some(trash_file) = trash_file
+        && let Err(e) = tokio::fs::remove_file(&trash_file).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        log::error!("File disk cache remove trash file {trash_file} error: {e}");
     }
 }
 
@@ -1628,6 +1663,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_remove_unowned_result_file() {
+        let file_key = "results/unowned_org/logs/default/hashkey/1000_2000_0_0.json";
+        let query_key = "unowned_org_logs_default_hashkey";
+        let meta = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        set_size(file_key, 1).await.unwrap();
+
+        // a rewrite re-registered the meta after the eviction: the file must survive
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.to_string(), vec![meta]);
+        remove_unowned_result_file(file_key).await;
+        assert!(indexed_file_guard(file_key).await.is_some());
+
+        // with no owning meta the file is removed
+        QUERY_RESULT_CACHE.write().await.remove(query_key);
+        remove_unowned_result_file(file_key).await;
+        assert!(indexed_file_guard(file_key).await.is_none());
+    }
+
+    #[tokio::test]
     async fn test_indexed_file_guard() {
         let indexed_key = "metrics_results/guard_org/2024/01/01/00/aaa_1_2_3.pb";
         let evicted_key = "metrics_results/guard_org/2024/01/01/00/bbb_1_2_3.pb";
@@ -1943,6 +2004,7 @@ mod tests {
                 i * 1000,
                 i * 1000 + 500
             );
+            set_size(&file_key, 1).await.unwrap();
             add_result_cache_meta(&file_key).await;
         }
         let metas = QUERY_RESULT_CACHE

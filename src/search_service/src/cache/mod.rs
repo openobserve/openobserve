@@ -981,7 +981,7 @@ pub async fn write_results(
     // 5. skip the write when an existing entry already fully covers this range;
     // checked before the deep copy and serialization below so a covered write costs nothing
     let query_key = file_path.replace('/', "_");
-    if !clear_cache && is_range_already_cached(&query_key, &meta).await {
+    if !clear_cache && is_range_already_cached(&query_key, &file_path, &meta).await {
         log::debug!(
             "[trace_id {trace_id}] Result cache already covers {accept_start_time} - {cache_end_time}, skip caching"
         );
@@ -1044,16 +1044,34 @@ pub async fn write_results(
     });
 }
 
-async fn is_range_already_cached(query_key: &str, meta: &ResultCacheMeta) -> bool {
-    let r = QUERY_RESULT_CACHE.read().await;
-    r.get(query_key).is_some_and(|metas| {
-        metas.iter().any(|m| {
-            m.is_aggregate == meta.is_aggregate
-                && m.is_descending == meta.is_descending
-                && m.start_time <= meta.start_time
-                && m.end_time >= meta.end_time
+async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &ResultCacheMeta) -> bool {
+    let covering = {
+        let r = QUERY_RESULT_CACHE.read().await;
+        r.get(query_key).map_or(Vec::new(), |metas| {
+            metas
+                .iter()
+                .filter(|m| {
+                    m.is_aggregate == meta.is_aggregate
+                        && m.is_descending == meta.is_descending
+                        && m.start_time <= meta.start_time
+                        && m.end_time >= meta.end_time
+                })
+                .cloned()
+                .collect()
         })
-    })
+    };
+    for m in covering {
+        let file_name = disk::result_cache_file_name(&m);
+        // a covering meta only counts while its file is still indexed on disk
+        if disk::indexed_file_guard(&format!("results/{file_path}/{file_name}"))
+            .await
+            .is_some()
+        {
+            return true;
+        }
+        cacher::remove_stale_cache_meta(file_path, &file_name, query_key, &m).await;
+    }
+    false
 }
 
 pub fn apply_vrl_to_response(
@@ -1300,7 +1318,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_range_already_cached() {
-        let query_key = "test_org_covered_logs_test_stream_hash_covered".to_string();
+        let file_path = "test_org_covered/logs/test_stream/hash_covered";
+        let query_key = file_path.replace('/', "_");
         let cached = ResultCacheMeta {
             start_time: 1000,
             end_time: 5000,
@@ -1311,24 +1330,38 @@ mod tests {
             .write()
             .await
             .insert(query_key.clone(), vec![cached.clone()]);
+        let covering_file = format!(
+            "results/{file_path}/{}",
+            infra::cache::file_data::disk::result_cache_file_name(&cached)
+        );
+        infra::cache::file_data::disk::set_size(&covering_file, 1)
+            .await
+            .unwrap();
 
         let inner = ResultCacheMeta {
             start_time: 2000,
             end_time: 4000,
             ..cached.clone()
         };
-        assert!(is_range_already_cached(&query_key, &inner).await);
+        assert!(is_range_already_cached(&query_key, file_path, &inner).await);
 
         let wider = ResultCacheMeta {
             end_time: 6000,
             ..inner.clone()
         };
-        assert!(!is_range_already_cached(&query_key, &wider).await);
+        assert!(!is_range_already_cached(&query_key, file_path, &wider).await);
 
         let ascending = ResultCacheMeta {
             is_descending: false,
-            ..inner
+            ..inner.clone()
         };
-        assert!(!is_range_already_cached(&query_key, &ascending).await);
+        assert!(!is_range_already_cached(&query_key, file_path, &ascending).await);
+
+        // a covering meta whose file left the disk index no longer counts and is pruned
+        infra::cache::file_data::disk::remove(&covering_file)
+            .await
+            .unwrap();
+        assert!(!is_range_already_cached(&query_key, file_path, &inner).await);
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
     }
 }
