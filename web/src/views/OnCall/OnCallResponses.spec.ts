@@ -132,6 +132,16 @@ const stubs = {
   // Stubbed like the rest of the family: unstubbed they pull reka-ui into every
   // row's action cell, which pushed several mounts past the 5s test timeout.
   ODropdownGroup: { name: "ODropdownGroup", props: ["label"], template: "<div><slot /></div>" },
+  // Also reka-ui underneath. A bare div/button pair is enough: tests drive a
+  // tab change by emitting `update:modelValue` on the group directly, the
+  // same way they drive OSelect below.
+  OToggleGroup: {
+    name: "OToggleGroup",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<div><slot /></div>",
+  },
+  OToggleGroupItem: { name: "OToggleGroupItem", props: ["value"], template: "<button><slot /></button>" },
   ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OEmptyState: {
@@ -404,11 +414,13 @@ describe("OnCallResponses", () => {
     /// the whole toolbar into three full-width rows.
     it("sizes the filters with the width prop, not a class", async () => {
       const wrapper = await withPages([page()]);
-      const widths = wrapper
-        .findAllComponents({ name: "OSelect" })
-        .map((select) => select.props("width"));
+      const byTest = (test: string) =>
+        wrapper
+          .findAllComponents({ name: "OSelect" })
+          .find((s) => s.attributes("data-test") === test);
 
-      expect(widths).toEqual(["sm", "xs"]);
+      expect(byTest("oncall-responses-team-filter")?.props("width")).toBe("sm");
+      expect(byTest("oncall-responses-priority-filter")?.props("width")).toBe("xs");
     });
 
     /// Claiming is only offered while something is still escalating; a page
@@ -1265,19 +1277,6 @@ describe("OnCallResponses — filtering by cause", () => {
     service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
   });
 
-  /// OCheckbox is not in the shared stub set, and the real one does not put
-  /// the `data-test` where a test can drive it from. Stubbed locally rather
-  /// than globally, so nothing else in this file changes shape.
-  const localStubs = {
-    ...stubs,
-    OCheckbox: {
-      name: "OCheckbox",
-      props: ["modelValue", "label"],
-      emits: ["update:modelValue"],
-      template: `<button @click="$emit('update:modelValue', !modelValue)">{{ label }}</button>`,
-    },
-  };
-
   /// The `data-test` lands as an ATTRIBUTE on the rendered root rather than on
   /// the component, which a CSS selector passed to `findComponent` does not
   /// match.
@@ -1287,8 +1286,8 @@ describe("OnCallResponses — filtering by cause", () => {
       .find((c: any) => c.attributes("data-test") === test);
 
   const cause = (wrapper: any) => byTest(wrapper, "OSelect", "oncall-responses-cause-filter");
-  const resolved = (wrapper: any) =>
-    byTest(wrapper, "OCheckbox", "oncall-responses-resolved-toggle");
+  const filterTabs = (wrapper: any) =>
+    byTest(wrapper, "OToggleGroup", "oncall-responses-filter-tabs");
 
   /// With no pages the setup checklist owns the screen and the toolbar is not
   /// rendered at all, so these tests need something in the list before there
@@ -1310,26 +1309,32 @@ describe("OnCallResponses — filtering by cause", () => {
       ],
     } as any);
     const wrapper = mount(OnCallResponses, {
-      global: { plugins: [i18n, store], stubs: localStubs },
+      global: { plugins: [i18n, store], stubs },
     });
     await flushPromises();
     return wrapper;
   }
 
+  /// `"all"` (the default tab) includes resolved pages; every other tab but
+  /// `"resolved"` itself excludes them.
   async function showResolved(wrapper: any, on = true) {
-    resolved(wrapper)!.vm.$emit("update:modelValue", on);
+    filterTabs(wrapper)!.vm.$emit("update:modelValue", on ? "all" : "ringing");
     await flushPromises();
   }
 
   /// A cause is written at resolve, so filtering an OPEN list by one can only
   /// ever empty it — the control would read as "there is nothing here" rather
-  /// than "this filter cannot apply".
-  it("is offered only once resolved pages are in the list", async () => {
+  /// than "this filter cannot apply". `"all"` is the default tab and already
+  /// includes resolved pages, so the filter starts out offered and disappears
+  /// only once a tab that excludes them is picked.
+  it("is offered only while the tab includes resolved pages", async () => {
     const wrapper = await open();
+    expect(cause(wrapper)).toBeDefined();
+
+    await showResolved(wrapper, false);
     expect(cause(wrapper)).toBeUndefined();
 
-    await showResolved(wrapper);
-
+    await showResolved(wrapper, true);
     expect(cause(wrapper)).toBeDefined();
   });
 
@@ -1362,7 +1367,11 @@ describe("OnCallResponses — filtering by cause", () => {
 
   /// Left behind when resolved pages go, it would narrow an open list to
   /// nothing and read as an empty inbox.
-  it("clears itself when resolved pages leave the list", async () => {
+  /// Narrowing away from resolved is client-side only now — `responses`
+  /// already has everything, so there is nothing to refetch — but the value
+  /// left behind still has to go, or a later fetch (team filter, refresh)
+  /// would carry a cause across to a request it cannot apply to.
+  it("clears itself when resolved pages leave the list, without a round trip", async () => {
     const wrapper = await open();
     await showResolved(wrapper);
     cause(wrapper)!.vm.$emit("update:modelValue", "noisy_threshold");
@@ -1372,6 +1381,12 @@ describe("OnCallResponses — filtering by cause", () => {
     await showResolved(wrapper, false);
     await flushPromises();
 
-    expect(service.listResponses.mock.calls.at(-1)![0]).not.toHaveProperty("cause");
+    expect(service.listResponses).not.toHaveBeenCalled();
+    expect(cause(wrapper)).toBeUndefined();
+
+    await showResolved(wrapper, true);
+    // `model-value` is not a declared prop on the OSelect stub, so it lands
+    // as a plain attribute rather than something `.props()` can see.
+    expect(cause(wrapper)!.attributes("model-value")).toBe("");
   });
 });

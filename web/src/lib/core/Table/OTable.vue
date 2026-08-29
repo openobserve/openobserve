@@ -1023,8 +1023,16 @@ useTableRowShortcuts(scrollContainerRef);
 // with a "Loading…" banner over them (that pattern lets consumers'
 // progressive data mutations leak through visually). Consumers that want
 // refetch-without-replacing-content should use the `streaming` prop.
+// Sectioned tables render `bodyRows`, not `displayRows` — a `rowSection` that
+// filters every loaded row to null (every row belongs to a hidden section)
+// left the body blank with neither a row nor the empty state, since the page
+// itself was not empty.
 const showEmpty = computed(
-  () => !heldLoading.value && !props.streaming && !props.error && displayRows.value.length === 0,
+  () =>
+    !heldLoading.value &&
+    !props.streaming &&
+    !props.error &&
+    (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
 const showLoadingOverlay = computed(() => heldLoading.value);

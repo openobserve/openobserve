@@ -2080,6 +2080,20 @@ describe("OTable body sections", () => {
     expect(wrapper.find("[data-test='hdr-kept']").text()).toBe("kept:3");
   });
 
+  /// Every row's section is hidden (a caller filtering to a section nothing
+  /// currently matches) — the page has data, so `data.length` alone cannot
+  /// say the table is empty. It has to fall back to what the body actually
+  /// has left, or the reader sees neither rows nor an empty state.
+  it("shows the empty state when every row's section is filtered out", () => {
+    wrapper = mountSectioned({
+      rowSection: () => null,
+      sectionOrder: ["odd", "even"],
+    });
+
+    expect(wrapper.findAll("[data-test^='hdr-']")).toHaveLength(0);
+    expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(true);
+  });
+
   /// Without the prop nothing changes — the plain body is the same one every
   /// other table in the app renders.
   it("renders no headings when no section resolver is given", () => {

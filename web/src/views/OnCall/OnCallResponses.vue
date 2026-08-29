@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       row-key="rowKey"
       :loading="loading || !setupLoaded"
+      :streaming="backgroundLoading"
       :error="loadError"
       pagination="client"
       :page-size="20"
@@ -123,68 +124,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            one at a time to claim them is not triage. -->
       <template #toolbar>
         <div class="flex w-full flex-wrap items-center gap-2">
-          <ODropdown align="start" side="bottom" :side-offset="4">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="icon-sm"
-                :aria-label="t('oncall.filters')"
-                data-test="oncall-responses-filters-btn"
-              >
-                <template #icon-left>
-                  <OIcon name="filter-list" size="sm" />
-                </template>
-                <OTooltip :content="t('oncall.filters')" side="bottom" />
-              </OButton>
-            </template>
-
-            <div class="min-w-48 py-1" data-test="oncall-responses-filters-panel">
-              <p class="text-text-secondary px-3 py-1 text-xs font-medium">
-                {{ t("oncall.filters") }}
-              </p>
-              <ul role="listbox" :aria-label="t('oncall.filters')" aria-multiselectable="true">
-                <!-- A resolved page is the only record of what happened, and it
-                     was reachable from nowhere. Off by default so the live
-                     list stays about what still needs somebody. -->
-                <li
-                  class="rounded-default hover:bg-surface-panel flex cursor-pointer items-center gap-2 px-3 py-1.5 transition-colors"
-                  @click.stop="toggleResolved"
-                >
-                  <OCheckbox
-                    :model-value="includeResolved"
-                    size="sm"
-                    data-test="oncall-responses-resolved-toggle"
-                    @update:model-value="toggleResolved"
-                    @click.stop
-                  />
-                  <span class="text-text-body flex-1 text-sm select-none">
-                    {{ t("oncall.showResolved") }}
-                  </span>
-                </li>
-                <ODropdownSeparator class="my-1" />
-                <li
-                  v-for="section in SECTION_ORDER"
-                  :key="section"
-                  class="rounded-default hover:bg-surface-panel flex cursor-pointer items-center gap-2 px-3 py-1.5 transition-colors"
-                  @click.stop="toggleSectionVisible(section)"
-                >
-                  <OCheckbox
-                    :model-value="sectionVisibility[section]"
-                    size="sm"
-                    :data-test="`oncall-responses-section-toggle-${section}`"
-                    @update:model-value="toggleSectionVisible(section)"
-                    @click.stop
-                  />
-                  <span class="text-text-body flex-1 text-sm select-none">
-                    {{ t(`oncall.section_${section}`) }}
-                  </span>
-                  <OTag variant="default-soft" size="sm">
-                    {{ raw(String(sectionCounts[section] ?? 0)) }}
-                  </OTag>
-                </li>
-              </ul>
-            </div>
-          </ODropdown>
+          <!-- One tab, one section — spread out rather than tucked behind a
+               filter icon, the way Alerts' type tabs are: what the list is
+               currently narrowed to should be visible at a glance, not a
+               state hidden inside a dropdown. -->
+          <OToggleGroup
+            :model-value="activeFilter"
+            data-test="oncall-responses-filter-tabs"
+            @update:model-value="(v) => selectFilterTab(v as 'all' | SectionKey)"
+          >
+            <OToggleGroupItem value="all" size="sm" data-test="oncall-responses-tab-all">
+              {{ t("oncall.all") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="ringing" size="sm" data-test="oncall-responses-tab-ringing">
+              {{ t("oncall.section_ringing") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="handled" size="sm" data-test="oncall-responses-tab-handled">
+              {{ t("oncall.section_handled") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="resolved" size="sm" data-test="oncall-responses-tab-resolved">
+              {{ t("oncall.section_resolved") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="snoozed" size="sm" data-test="oncall-responses-tab-snoozed">
+              {{ t("oncall.section_snoozed") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
           <!-- `width` is a PROP, not a class: OSelect merges an incoming class
                with its own width class, so a `w-56` here lost to the default
                `w-full` and stacked the whole toolbar into three rows. -->
@@ -222,12 +186,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('oncall.groupByAlert')"
             data-test="oncall-responses-group-toggle"
           />
-          <!-- Only with resolved pages in the list: a cause is written at
+          <!-- Only on a tab showing resolved pages: a cause is written at
                resolve, so filtering an open list by one can only ever empty
                it. Server-side, like the team filter — the cause somebody wants
-               is usually months back, past any page cap. -->
+               is usually months back, past any page cap. Keyed off the tab
+               rather than `includeResolved`, which stays true once fetched
+               even after the reader narrows away from resolved rows. -->
           <OSelect
-            v-if="includeResolved"
+            v-if="sectionVisibility.resolved"
             :model-value="causeFilter"
             :options="causeOptions"
             :placeholder="t('oncall.causeFilterAny')"
@@ -734,6 +700,8 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -805,17 +773,22 @@ const MAX_PAGES = 3;
 const ESCALATION_DETAIL_LIMIT = 25;
 
 /**
- * The three states a reader triages by, in the order they matter.
+ * The states a reader triages by, in the order they matter.
  *
- * These are not the wire's `ResponseState`: "ringing" is an escalating record
- * that nobody has claimed, nothing is snoozing, and the ladder has not already
- * exhausted — four fields rather than one, and it is the only distinction that
- * changes what somebody does next. The last of those matters because a ladder
- * with nobody behind it (a priority with no channels) exhausts the instant it
- * opens, yet the wire state stays `triggered` forever — there is no backend
- * state for "gave up" — so `state` alone cannot answer "is this still paging".
+ * The first three are not the wire's `ResponseState`: "ringing" is an
+ * escalating record that nobody has claimed, nothing is snoozing, and the
+ * ladder has not already exhausted — four fields rather than one, and it is
+ * the only distinction that changes what somebody does next. The last of
+ * those matters because a ladder with nobody behind it (a priority with no
+ * channels) exhausts the instant it opens, yet the wire state stays
+ * `triggered` forever — there is no backend state for "gave up" — so `state`
+ * alone cannot answer "is this still paging". "resolved" IS the wire state:
+ * once a page is resolved there is nothing left to triage, only the record of
+ * what happened — the reader has to ask for it (`includeResolved`) by picking
+ * the "all" or "resolved" tab, rather than it always riding along with the
+ * open ones.
  */
-const SECTION_ORDER = ["ringing", "snoozed", "handled"] as const;
+const SECTION_ORDER = ["ringing", "snoozed", "handled", "resolved"] as const;
 
 type SectionKey = (typeof SECTION_ORDER)[number];
 
@@ -834,6 +807,11 @@ const expandedLoading = ref(false);
 const teamsAvailable = ref(true);
 const truncated = ref(false);
 const loading = ref(false);
+/// Set only while a tab switch is quietly fetching resolved pages the reader
+/// cannot see are missing. Drives `OTable`'s `streaming` bar rather than
+/// `loading` so the rows already on screen never disappear behind a skeleton
+/// for a fetch nothing visible was waiting on.
+const backgroundLoading = ref(false);
 const loadError = ref<string | null>(null);
 /// §G.8.1: 404 or 403 "Not Supported" from the entry fetch — on-call is not
 /// available on this deployment. A fact about the build, never an error.
@@ -847,13 +825,22 @@ const priorityFilter = ref("all");
 const mineOnly = ref(false);
 const selectedIds = ref<string[]>([]);
 const grouped = ref(true);
-const includeResolved = ref(false);
-/// All three on by default: nothing is hidden until the reader asks for it.
+/// `"all"` is the default tab, and "all" means all — resolved included —
+/// so the very first fetch already asks for resolved pages too.
+const includeResolved = ref(true);
+/// All four sections start visible, matching the default `"all"` tab.
 const sectionVisibility = ref<Record<SectionKey, boolean>>({
   ringing: true,
   snoozed: true,
   handled: true,
+  resolved: true,
 });
+/// The tab the toolbar shows as pressed. `"all"` is every section at once
+/// (open and resolved alike) and has no `SectionKey` of its own; picking any
+/// other tab narrows `sectionVisibility` to just that one section — and, for
+/// every tab but `"all"` and `"resolved"`, drops resolved pages out of the
+/// fetch entirely.
+const activeFilter = ref<"all" | SectionKey>("all");
 /// Empty means every cause. Cleared whenever resolved pages leave the list,
 /// because a cause filter over open records matches nothing and would read as
 /// "there is nothing here" rather than "this filter cannot apply".
@@ -905,7 +892,8 @@ const isFiltered = computed(
     !!search.value ||
     teamFilter.value !== "all" ||
     priorityFilter.value !== "all" ||
-    mineScope.value,
+    mineScope.value ||
+    activeFilter.value !== "all",
 );
 
 const showChecklist = computed(
@@ -1124,21 +1112,32 @@ function onCauseFilter(value: unknown) {
   void fetchResponses();
 }
 
-/// Turning resolved pages off takes the cause filter with it — left behind it
-/// would narrow an open list to nothing and read as an empty inbox.
-function toggleResolved() {
-  includeResolved.value = !includeResolved.value;
-  if (!includeResolved.value) causeFilter.value = "";
-  void fetchResponses();
-}
-
-/// Client-side only: the section is already in `rows`, this just decides
-/// whether `visibleRowSection` lets it into the table.
-function toggleSectionVisible(section: SectionKey) {
+/// One tab, one section — except `"all"`, which is every section at once,
+/// resolved included. Narrowing away from resolved is never a round trip:
+/// `responses` already holds whatever was last fetched, so hiding a section
+/// is exactly that, hiding it. The only real fetch is the first crossing INTO
+/// a resolved-showing tab, because that is the only direction that can be
+/// missing rows — and it goes quietly, behind whatever the reader is already
+/// looking at, rather than blocking the rows already on screen.
+function selectFilterTab(tab: "all" | SectionKey) {
+  activeFilter.value = tab;
+  const showsResolved = tab === "all" || tab === "resolved";
   sectionVisibility.value = {
-    ...sectionVisibility.value,
-    [section]: !sectionVisibility.value[section],
+    ringing: tab === "all" || tab === "ringing",
+    snoozed: tab === "all" || tab === "snoozed",
+    handled: tab === "all" || tab === "handled",
+    resolved: showsResolved,
   };
+  if (!showsResolved) {
+    // Left with the tab: over an open list a cause matches nothing, and
+    // would read as "there is nothing here" rather than "this filter cannot
+    // apply". `responses` itself is untouched — nothing to refetch.
+    causeFilter.value = "";
+    return;
+  }
+  if (includeResolved.value) return;
+  includeResolved.value = true;
+  void fetchResponses({ background: true });
 }
 
 const youLabel = computed(() => String(t("oncall.onCallYou")));
@@ -1425,6 +1424,7 @@ async function acknowledgeAllRinging() {
 /// group standing for ninety-five firings lands where its live ones do: a group
 /// with anything still ringing is ringing, whatever its latest firing says.
 function rowSection(row: PageRow): SectionKey {
+  if (row.latest.state === "resolved") return "resolved";
   if (row.escalating.some((r) => !r.acked_by && !isSnoozed(r) && isStillRinging(r))) {
     return "ringing";
   }
@@ -1444,13 +1444,14 @@ function visibleRowSection(row: PageRow): SectionKey | null {
 /// Counted over the filtered set, not the page: a heading reading "3" on page
 /// one of five would be describing the pagination rather than the state.
 const sectionCounts = computed<Record<string, number>>(() => {
-  const counts: Record<string, number> = { ringing: 0, snoozed: 0, handled: 0 };
+  const counts: Record<string, number> = { ringing: 0, snoozed: 0, handled: 0, resolved: 0 };
   for (const row of rows.value) counts[rowSection(row)] += 1;
   return counts;
 });
 
-/// Only the run that needs somebody gets colour. Snoozed is deliberately inert
-/// and handled is finished, so both stay in the calm tone.
+/// Only the run that needs somebody gets colour. Snoozed is deliberately
+/// inert and handled and resolved are both finished, so all three stay in the
+/// calm tone.
 function sectionTone(key: string): string {
   if (key === "ringing") return "text-status-error-text";
   if (key === "snoozed") return "text-status-warning-text";
@@ -1518,8 +1519,14 @@ async function fetchAllPages(): Promise<OnCallResponse[]> {
 /// Every fetch is now a deliberate one — first load, an explicit refresh, or a
 /// row action — so every fetch shows the spinner. The silent variant existed
 /// only for the background poll.
-async function fetchResponses() {
-  loading.value = true;
+/// `background: true` is for a fetch that is filling in data the reader
+/// cannot see is missing — picking up resolved pages behind a tab that was
+/// already showing rows. `loading` would swap those rows for a skeleton over
+/// something that, from the reader's side, was not loading at all; `streaming`
+/// leaves them on screen with a quiet bottom bar instead.
+async function fetchResponses(opts: { background?: boolean } = {}) {
+  const busy = opts.background ? backgroundLoading : loading;
+  busy.value = true;
   try {
     responses.value = await fetchAllPages();
     loadError.value = null;
@@ -1537,7 +1544,7 @@ async function fetchResponses() {
     }
     loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
-    loading.value = false;
+    busy.value = false;
   }
 }
 
@@ -1729,6 +1736,7 @@ function onEmptyAction(id?: string) {
     teamFilter.value = "all";
     priorityFilter.value = "all";
     mineOnly.value = false;
+    selectFilterTab("all");
   }
 }
 
