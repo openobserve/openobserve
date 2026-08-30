@@ -144,6 +144,15 @@ impl ServiceRecord {
     }
 }
 
+/// Outcome of a [`put`]; a named struct so call sites cannot positionally confuse the two facts.
+#[derive(Debug, Clone)]
+pub struct PutOutcome {
+    /// `disambiguation` JSON of each orphaned lower-specificity row this put deleted (F19).
+    pub orphans: Vec<serde_json::Value>,
+    /// True iff the call mutated a row (insert, data-column change, or orphan deletion).
+    pub changed: bool,
+}
+
 pub async fn create_table() -> Result<(), errors::Error> {
     let client = get_orm_client_ddl().await;
     let builder = client.get_database_backend();
@@ -177,16 +186,12 @@ fn normalize_json_object(v: serde_json::Value) -> serde_json::Value {
     }
 }
 
-/// Upsert a service record.
-///
-/// Returns the `disambiguation` JSON of every orphaned (lower-specificity) row that was
-/// deleted as part of this put, so callers can evict the matching cache keys (F19).
-/// Empty on a plain insert.
+/// Upsert a service record; callers gate cache-invalidation events on `PutOutcome::changed`.
 pub async fn put(
     org_id: &str,
     record: ServiceRecord,
     max_streams_per_type: usize,
-) -> Result<Vec<serde_json::Value>, errors::Error> {
+) -> Result<PutOutcome, errors::Error> {
     let client = get_orm_client_rw().await;
     put_with(client, org_id, record, max_streams_per_type).await
 }
@@ -197,7 +202,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
     org_id: &str,
     mut record: ServiceRecord,
     max_streams_per_type: usize,
-) -> Result<Vec<serde_json::Value>, errors::Error> {
+) -> Result<PutOutcome, errors::Error> {
     // Normalize disambiguation to sorted-key JSON so that text comparisons in SQLite
     // are stable regardless of insertion order of the original object.
     record.disambiguation = normalize_json_object(record.disambiguation);
@@ -266,7 +271,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         // Delete any orphaned rows that are strict subsets of the row we just updated.
         // These accumulate when a record with fewer disambiguation fields was written before
         // the richer variant existed.
-        delete_subset_orphans(
+        let orphans = delete_subset_orphans(
             client,
             org_id,
             &record.service_name,
@@ -274,7 +279,12 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             &incoming_map,
             &kept_id,
         )
-        .await
+        .await?;
+        // Stub derivation: every call above still issues an UPDATE, so always-true is honest.
+        Ok(PutOutcome {
+            orphans,
+            changed: true,
+        })
     } else {
         // No exact match. Check if an existing row can be upgraded:
         // A row is upgradeable if its disambiguation is a subset of the incoming one
@@ -372,7 +382,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
             // Clean up any other orphaned subset rows for this service (same set_id)
-            delete_subset_orphans(
+            let orphans = delete_subset_orphans(
                 client,
                 org_id,
                 &record.service_name,
@@ -380,7 +390,11 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
                 richer_map,
                 &kept_id,
             )
-            .await
+            .await?;
+            Ok(PutOutcome {
+                orphans,
+                changed: true,
+            })
         } else {
             let active_model = ActiveModel {
                 id: Set(record.id),
@@ -401,8 +415,11 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
                 .await
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-            // Plain insert: nothing was orphaned.
-            Ok(Vec::new())
+            // Plain insert: nothing was orphaned, and a new row is always a mutation.
+            Ok(PutOutcome {
+                orphans: Vec::new(),
+                changed: true,
+            })
         }
     }
 }
@@ -1195,11 +1212,11 @@ mod tests {
         let record = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
         let id = record.id.clone();
 
-        let orphans = put_with(&db, "org1", record, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let outcome = put_with(&db, "org1", record, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
-        assert!(orphans.is_empty(), "a plain insert orphans nothing");
+        assert!(outcome.orphans.is_empty(), "a plain insert orphans nothing");
         assert_eq!(
             total_set_clause_hits(&db, &id).await,
             0,
@@ -1350,6 +1367,208 @@ mod tests {
             row.all_dimensions,
             serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
             "stored values win over conflicting incoming values"
+        );
+    }
+
+    // If a pure no-op reported changed, every flush would still invalidate cluster caches.
+    #[tokio::test]
+    async fn exact_repeat_noop_reports_changed_false() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        put_with(
+            &db,
+            "org1",
+            service_record(disambiguation.clone(), 1_000),
+            DEFAULT_MAX_STREAMS_PER_TYPE,
+        )
+        .await
+        .unwrap();
+
+        let outcome = put_with(
+            &db,
+            "org1",
+            service_record(disambiguation, 1_000),
+            DEFAULT_MAX_STREAMS_PER_TYPE,
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            outcome.orphans.is_empty(),
+            "an exact repeat orphans nothing"
+        );
+        assert!(
+            !outcome.changed,
+            "no data column changed, so the call must not report changed"
+        );
+    }
+
+    // last_seen-only writes must NOT count as changed, else every call still invalidates.
+    #[tokio::test]
+    async fn subset_incoming_noop_reports_changed_false() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let mut first = service_record(disambiguation.clone(), 1_000);
+        first.logs_streams =
+            serde_json::json!(["checkout-service-logs", "checkout-service-logs-v2"]);
+        first.traces_streams =
+            serde_json::json!(["checkout-service-traces", "checkout-service-traces-v2"]);
+        first.metrics_streams =
+            serde_json::json!(["checkout-service-metrics", "checkout-service-metrics-v2"]);
+        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        // Every incoming field merges back to the stored value; only last_seen differs.
+        let mut second = service_record(disambiguation, 2_000);
+        second.all_dimensions = serde_json::json!({"k8s-cluster": "prod"});
+        let outcome = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(outcome.orphans.is_empty(), "a subset put orphans nothing");
+        assert!(
+            !outcome.changed,
+            "only last_seen was written, which must not count as changed"
+        );
+    }
+
+    #[tokio::test]
+    async fn partial_change_reports_changed_true() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        put_with(
+            &db,
+            "org1",
+            service_record(disambiguation.clone(), 1_000),
+            DEFAULT_MAX_STREAMS_PER_TYPE,
+        )
+        .await
+        .unwrap();
+
+        let mut second = service_record(disambiguation, 1_000);
+        second.traces_streams =
+            serde_json::json!(["checkout-service-traces", "checkout-service-traces-v2"]);
+        let outcome = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.changed,
+            "traces_streams genuinely grew, so the call must report changed"
+        );
+    }
+
+    #[tokio::test]
+    async fn plain_insert_reports_changed_true() {
+        let db = db().await;
+        let record = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+
+        let outcome = put_with(&db, "org1", record, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(outcome.orphans.is_empty(), "a plain insert orphans nothing");
+        assert!(outcome.changed, "a new row is always a mutation");
+    }
+
+    // Subset incoming resolves every field to the stored value in the upgrade branch too.
+    #[tokio::test]
+    async fn upgrade_branch_identical_resolution_reports_changed_false() {
+        let db = db().await;
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            1_000,
+        );
+        put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        let outcome = put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.orphans.is_empty(),
+            "the only row is the kept one, so nothing is orphaned"
+        );
+        assert!(
+            !outcome.changed,
+            "every field resolved to the stored value, so the upgrade branch must not report changed"
+        );
+    }
+
+    #[tokio::test]
+    async fn upgrade_branch_richer_incoming_reports_changed_true() {
+        let db = db().await;
+        let sparse = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        put_with(&db, "org1", sparse, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            2_000,
+        );
+        let outcome = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.changed,
+            "disambiguation was upgraded to the richer incoming value, so the call must report changed"
+        );
+    }
+
+    // Orphan deletion is a mutation: only the caller's put event makes nodes drop the dead key.
+    #[tokio::test]
+    async fn orphan_deletion_on_noop_update_reports_changed_true() {
+        let db = db().await;
+        let richer_disambiguation =
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"});
+        put_with(
+            &db,
+            "org1",
+            service_record(richer_disambiguation.clone(), 1_000),
+            DEFAULT_MAX_STREAMS_PER_TYPE,
+        )
+        .await
+        .unwrap();
+
+        // Seeded directly: put() upgrade-merges subsets, so legacy orphans can only pre-exist.
+        let orphan = ActiveModel {
+            id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+            org_id: Set("org1".to_owned()),
+            service_name: Set("checkout-service".to_owned()),
+            set_id: Set("k8s".to_owned()),
+            disambiguation: Set(serde_json::json!({"k8s-cluster": "prod"})),
+            all_dimensions: Set(serde_json::json!({})),
+            logs_streams: Set(serde_json::json!([])),
+            traces_streams: Set(serde_json::json!([])),
+            metrics_streams: Set(serde_json::json!([])),
+            field_name_mapping: Set(None),
+            last_seen: Set(500),
+        };
+        Entity::insert(orphan).exec(&db).await.unwrap();
+
+        let outcome = put_with(
+            &db,
+            "org1",
+            service_record(richer_disambiguation, 1_000),
+            DEFAULT_MAX_STREAMS_PER_TYPE,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            outcome.orphans,
+            vec![serde_json::json!({"k8s-cluster": "prod"})],
+            "the seeded subset row must be deleted as an orphan"
+        );
+        assert!(
+            outcome.changed,
+            "a row was deleted, so caches must evict its key even though the kept row was a no-op"
         );
     }
 }
