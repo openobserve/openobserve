@@ -1395,6 +1395,18 @@ export class AlertsPage {
         await this.page.getByText(folderName).click();
     }
 
+    // The rail's ONavGroup flyout is anchored over the folder sidebar and only closes on mouseleave, so park the pointer clear of it.
+    async dismissNavFlyout() {
+        const flyout = this.page.locator('[data-test^="nav-group-flyout-"]').first();
+        if (!(await flyout.isVisible().catch(() => false))) return;
+        const viewport = this.page.viewportSize();
+        await this.page.mouse.move(
+            Math.floor((viewport?.width ?? 1280) * 0.75),
+            Math.floor((viewport?.height ?? 720) / 2)
+        );
+        await flyout.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    }
+
     async navigateToFolder(folderName) {
         // Always navigate to the Alerts section first — createFolder (called by ensureFolderExists)
         // may leave the browser on the Dashboards page since folders are shared across modules.
@@ -1426,6 +1438,7 @@ export class AlertsPage {
             attempt += 1;
             if ((await folderTab.getAttribute('data-state')) !== 'active') {
                 await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                await this.dismissNavFlyout();
                 // Only the first click triggers the folder-scoped refetch; re-arming this wait later burns 8s of the retry budget on a request that never comes.
                 const scopedListSettled = (folderName === 'default' || attempt > 1)
                     ? Promise.resolve()
@@ -1436,10 +1449,14 @@ export class AlertsPage {
                             && !/[?&]folder=default(?:&|$)/.test(resp.url()),
                         { timeout: 8000 }
                       ).catch(() => {});
-                // `force` skips Playwright's stability check, the very mid-reflow landing we need to wait out, so keep it as the obscured-tab fallback only.
-                await folderTab.click({ timeout: 5000 }).catch(async () => {
-                    await folderTab.click({ force: true, timeout: 3000 });
-                });
+                // `force` only for a tab still moving under the folder-list reflow: with the flyout up it would dispatch the click into the overlay, so an occluded tab must still fail loudly naming its occluder.
+                try {
+                    await folderTab.click({ timeout: 5000 });
+                } catch (clickError) {
+                    const flyoutUp = await this.page.locator('[data-test^="nav-group-flyout-"]').first().isVisible().catch(() => false);
+                    if (flyoutUp) throw clickError;
+                    await folderTab.click({ force: true, timeout: 5000 });
+                }
                 await scopedListSettled;
             }
             await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
