@@ -255,14 +255,15 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         );
 
         let mut active: ActiveModel = existing_model.into();
-        active.logs_streams = Set(logs);
-        active.traces_streams = Set(traces);
-        active.metrics_streams = Set(metrics);
-        active.all_dimensions = Set(merged_dims);
-        active.last_seen = Set(record.last_seen);
+        let mut dirty = false;
+        set_if_dirty(&mut active.logs_streams, logs, &mut dirty);
+        set_if_dirty(&mut active.traces_streams, traces, &mut dirty);
+        set_if_dirty(&mut active.metrics_streams, metrics, &mut dirty);
+        set_if_dirty(&mut active.all_dimensions, merged_dims, &mut dirty);
         if let Some(fnm) = record.field_name_mapping {
-            active.field_name_mapping = Set(Some(fnm));
+            set_if_dirty(&mut active.field_name_mapping, Some(fnm), &mut dirty);
         }
+        active.last_seen = Set(record.last_seen);
 
         active
             .update(client)
@@ -281,11 +282,8 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             &kept_id,
         )
         .await?;
-        // Stub derivation: every call above still issues an UPDATE, so always-true is honest.
-        Ok(PutOutcome {
-            orphans,
-            changed: true,
-        })
+        let changed = dirty || !orphans.is_empty();
+        Ok(PutOutcome { orphans, changed })
     } else {
         // No exact match. Check if an existing row can be upgraded:
         // A row is upgradeable if its disambiguation is a subset of the incoming one
@@ -367,15 +365,20 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             let merged_dims =
                 union_dimension_objects(&existing_model.all_dimensions, &record.all_dimensions);
             let mut active: ActiveModel = existing_model.into();
-            active.disambiguation = Set(richer_disambiguation);
-            active.logs_streams = Set(logs);
-            active.traces_streams = Set(traces);
-            active.metrics_streams = Set(metrics);
-            active.all_dimensions = Set(merged_dims);
-            active.last_seen = Set(record.last_seen);
+            let mut dirty = false;
+            set_if_dirty(
+                &mut active.disambiguation,
+                richer_disambiguation,
+                &mut dirty,
+            );
+            set_if_dirty(&mut active.logs_streams, logs, &mut dirty);
+            set_if_dirty(&mut active.traces_streams, traces, &mut dirty);
+            set_if_dirty(&mut active.metrics_streams, metrics, &mut dirty);
+            set_if_dirty(&mut active.all_dimensions, merged_dims, &mut dirty);
             if let Some(fnm) = record.field_name_mapping {
-                active.field_name_mapping = Set(Some(fnm));
+                set_if_dirty(&mut active.field_name_mapping, Some(fnm), &mut dirty);
             }
+            active.last_seen = Set(record.last_seen);
 
             active
                 .update(client)
@@ -392,10 +395,8 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
                 &kept_id,
             )
             .await?;
-            Ok(PutOutcome {
-                orphans,
-                changed: true,
-            })
+            let changed = dirty || !orphans.is_empty();
+            Ok(PutOutcome { orphans, changed })
         } else {
             let active_model = ActiveModel {
                 id: Set(record.id),
@@ -479,6 +480,19 @@ async fn delete_subset_orphans<C: sea_orm::ConnectionTrait>(
 /// Default cap on streams tracked per telemetry type, matching the enterprise
 /// `StreamMergePolicy` default. Used by callers that have no config access.
 pub const DEFAULT_MAX_STREAMS_PER_TYPE: usize = 50;
+
+/// Compares typed values, never serialized text: preserve_order builds would spuriously differ.
+fn set_if_dirty<T: Into<sea_orm::Value> + PartialEq>(
+    slot: &mut sea_orm::ActiveValue<T>,
+    computed: T,
+    dirty: &mut bool,
+) {
+    if matches!(slot, sea_orm::ActiveValue::Unchanged(stored) if *stored == computed) {
+        return;
+    }
+    *slot = Set(computed);
+    *dirty = true;
+}
 
 /// Union two JSON objects of dimension values; keys already present in `base`
 /// win (same semantics as `ServiceMetadata::merge`), so later ingests can add
