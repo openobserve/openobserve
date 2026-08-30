@@ -1369,8 +1369,7 @@ DO UPDATE SET
         limit: i64,
         fast_mode: bool,
     ) -> Result<Vec<super::MergeJobRecord>> {
-        // quick check without the advisory lock, if there are no pending jobs we can skip the
-        // locked transaction.
+        // quick check on the read pool: no pending jobs means the claim transaction can be skipped.
         let pool = CLIENT_RO.clone();
         let has_pending = sqlx::query("SELECT id FROM file_list_jobs WHERE status = $1 LIMIT 1;")
             .bind(super::FileListJobStatus::Pending)
@@ -1382,31 +1381,31 @@ DO UPDATE SET
 
         let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
-        let lock_id = pending_jobs_lock_key("");
-        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
-        DB_QUERY_NUMS.with_label_values(&["get_lock", ""]).inc();
-        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
-            if let Err(e) = tx.rollback().await {
-                log::error!("[POSTGRES] rollback get_pending_jobs error: {e}");
-            }
-            return Err(e.into());
-        }
 
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
 
-        // get pending jobs group by stream and order by num desc
+        // FOR UPDATE SKIP LOCKED makes the claim self-guarding, so no advisory lock is needed.
         let sql = if fast_mode {
-            r#"SELECT stream, id, 0::BIGINT AS num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
+            r#"SELECT stream, id, 0::BIGINT AS num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2 FOR UPDATE SKIP LOCKED;"#
         } else {
+            // a stream whose max(id) row is lock-skipped is skipped whole: a peer owns it
             r#"
-    SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
-        FROM file_list_jobs
-        WHERE status = $1
-        GROUP BY stream
-        ORDER BY num DESC
-        LIMIT $2;"#
+    WITH candidates AS (
+        SELECT stream, max(id) AS id, COUNT(*)::BIGINT AS num
+            FROM file_list_jobs
+            WHERE status = $1
+            GROUP BY stream
+            ORDER BY num DESC
+            LIMIT $2
+    )
+    SELECT c.stream, c.id, c.num
+        FROM candidates c
+        JOIN file_list_jobs j ON j.id = c.id
+        WHERE j.status = $1
+        ORDER BY c.num DESC
+        FOR UPDATE OF j SKIP LOCKED;"#
         };
         let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(sql)
             .bind(super::FileListJobStatus::Pending)
@@ -1430,8 +1429,9 @@ DO UPDATE SET
             }
             return Ok(Vec::new());
         }
+        // rows are row-locked above; the status re-check is defense-in-depth against double claims
         let sql = format!(
-            "UPDATE file_list_jobs SET status = $1, node = $2, started_at = $3, updated_at = $4 WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = $1, node = $2, started_at = $3, updated_at = $4 WHERE id IN ({}) AND status = $5;",
             ids.join(",")
         );
         let now = config::utils::time::now_micros();
@@ -1443,6 +1443,7 @@ DO UPDATE SET
             .bind(node)
             .bind(now)
             .bind(now)
+            .bind(super::FileListJobStatus::Pending)
             .execute(&mut *tx)
             .await
         {
@@ -2179,18 +2180,6 @@ fn chunked_pruned_delete_statements(
         .chunks(chunk_size.max(1))
         .flat_map(|chunk| build_pruned_delete_statements(table, chunk))
         .collect()
-}
-
-/// Advisory lock key for get_pending_jobs claims; scope is ignored until Fix 4 wires a real one.
-fn pending_jobs_lock_key(_scope: &str) -> i64 {
-    // TODO(fix-4-implementation): callers must pass a real scope once the scoping decision lands.
-    // Shared advisory-id space with scheduler_pull_lock/get_for_update_*; collisions only block.
-    let lock_id = config::utils::hash::gxhash::new().sum64("file_list_jobs:get_pending_jobs");
-    if lock_id > (i64::MAX as u64) {
-        (lock_id >> 1) as i64
-    } else {
-        lock_id as i64
-    }
 }
 
 /// Derive date range for partition pruning from microsecond timestamps.
@@ -5226,7 +5215,6 @@ mod tests {
                 }
             }
 
-            // TODO(fix-4-implementation): fast_mode shares the unguarded UPDATE; guard both paths.
             let (r1, r2) = tokio::join!(
                 postgres_list.get_pending_jobs("fix4-node-1", 100, false),
                 postgres_list.get_pending_jobs("fix4-node-2", 100, false),
@@ -5289,87 +5277,83 @@ mod tests {
                 .execute(&pool)
                 .await;
         }
-    }
 
-    // Fix 4 regression tests: get_pending_jobs serializes ALL nodes on ONE global advisory lock.
-
-    /// Advisory locks match on value, so the key derivation must be deterministic per scope.
-    #[test]
-    fn test_pending_jobs_lock_key_is_deterministic() {
-        assert_eq!(pending_jobs_lock_key("x"), pending_jobs_lock_key("x"));
-    }
-
-    /// Fix spec [RED until Fix 4 lands]: distinct scopes must map to distinct advisory lock keys.
-    #[tokio::test]
-    #[ignore = "Requires test PostgreSQL database setup"]
-    async fn test_fix_different_scopes_do_not_serialize() {
-        // TODO(fix-4-implementation): the advisory lock is the ONLY double-claim guard today.
-        // TODO(fix-4-implementation): claim UPDATE has no status re-check; SELECT no FOR UPDATE.
-        // TODO(fix-4-implementation): per-node scoping is unsafe without self-guarding SQL.
-        // TODO(fix-4-implementation): a narrowed scope needs a scoped claim query or guarded SQL.
-        let pool = connect_partitioned_test_db().await;
-        let key_a = pending_jobs_lock_key("stream-a");
-        let key_b = pending_jobs_lock_key("stream-b");
-
-        let mut tx_a = pool.begin().await.unwrap();
-        sqlx::query(&format!("SELECT pg_advisory_xact_lock({key_a})"))
-            .execute(&mut *tx_a)
+        // ---- Fix 4 [GREEN]: claims must not serialize on the legacy global advisory lock ----
+        let legacy = config::utils::hash::gxhash::new().sum64("file_list_jobs:get_pending_jobs");
+        let legacy_key = if legacy > (i64::MAX as u64) {
+            (legacy >> 1) as i64
+        } else {
+            legacy as i64
+        };
+        let lock_stream = format!("fix4_org/logs/nolock_{pid}");
+        let lock_job_id: i64 = sqlx::query_scalar(
+            "INSERT INTO file_list_jobs (org, stream, offsets, status, node, started_at, \
+             updated_at) VALUES ('fix4_org', $1, 1000, 0, '', 0, 0) RETURNING id",
+        )
+        .bind(&lock_stream)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut lock_tx = pool.begin().await.unwrap();
+        sqlx::query(&format!("SELECT pg_advisory_xact_lock({legacy_key})"))
+            .execute(&mut *lock_tx)
             .await
             .unwrap();
 
-        let mut tx_b = pool.begin().await.unwrap();
-        let acquired: bool =
-            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key_b})"))
-                .fetch_one(&mut *tx_b)
-                .await
-                .unwrap();
-
-        tx_b.rollback().await.unwrap();
-        tx_a.rollback().await.unwrap();
-
+        // Before Fix 4 this blocked forever: the claim waited behind the held global lock key.
+        let claimed = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            postgres_list.get_pending_jobs("fix4-node-3", 100, false),
+        )
+        .await
+        .expect("get_pending_jobs must not block behind any advisory lock")
+        .unwrap();
+        lock_tx.rollback().await.unwrap();
         assert!(
-            acquired,
-            "scope 'stream-b' (key {key_b}) must not block behind scope 'stream-a' (key {key_a}); \
-             equal keys mean the lock key is still the global constant"
-        );
-    }
-
-    /// Invariant guard [GREEN]: claimers in the SAME scope must keep serializing on one lock key.
-    #[tokio::test]
-    #[ignore = "Requires test PostgreSQL database setup"]
-    async fn test_same_scope_still_serializes() {
-        // Until Fix 4 lands every scope shares one key, so run DB tests with --test-threads=1.
-        let pool = connect_partitioned_test_db().await;
-        let key = pending_jobs_lock_key("stream-same");
-
-        let mut tx_a = pool.begin().await.unwrap();
-        sqlx::query(&format!("SELECT pg_advisory_xact_lock({key})"))
-            .execute(&mut *tx_a)
-            .await
-            .unwrap();
-
-        let mut tx_b = pool.begin().await.unwrap();
-        let acquired: bool =
-            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key})"))
-                .fetch_one(&mut *tx_b)
-                .await
-                .unwrap();
-        assert!(
-            !acquired,
-            "same scope must serialize: try-lock on key {key} must fail while tx_a holds it"
+            claimed.iter().any(|j| j.id == lock_job_id),
+            "claim running under a held legacy advisory lock must still claim the seeded job"
         );
 
-        tx_a.rollback().await.unwrap();
-
-        let acquired: bool =
-            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key})"))
-                .fetch_one(&mut *tx_b)
+        // ---- Fix 4 [GREEN]: fast_mode shares the SKIP LOCKED guard; claims stay disjoint ----
+        let mut fast_seeded: HashSet<i64> = HashSet::new();
+        for stream in [&stream_a, &stream_b] {
+            for offsets in [100_000_i64, 200_000] {
+                let id: i64 = sqlx::query_scalar(
+                    "INSERT INTO file_list_jobs (org, stream, offsets, status, node, \
+                     started_at, updated_at) VALUES ('fix4_org', $1, $2, 0, '', 0, 0) \
+                     RETURNING id",
+                )
+                .bind(stream)
+                .bind(offsets)
+                .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert!(
-            acquired,
-            "xact-scoped advisory lock on key {key} must be free once tx_a ends"
+                fast_seeded.insert(id);
+            }
+        }
+        let (r1, r2) = tokio::join!(
+            postgres_list.get_pending_jobs("fix4-node-4", 100, true),
+            postgres_list.get_pending_jobs("fix4-node-5", 100, true),
         );
-        tx_b.rollback().await.unwrap();
+        let (fast1, fast2) = (r1.unwrap(), r2.unwrap());
+        let fast_ids1: HashSet<i64> = fast1
+            .iter()
+            .map(|j| j.id)
+            .filter(|id| fast_seeded.contains(id))
+            .collect();
+        let fast_ids2: HashSet<i64> = fast2
+            .iter()
+            .map(|j| j.id)
+            .filter(|id| fast_seeded.contains(id))
+            .collect();
+        assert!(
+            fast_ids1.is_disjoint(&fast_ids2),
+            "fast_mode: a job was claimed by both callers: {fast_ids1:?} vs {fast_ids2:?}"
+        );
+        assert_eq!(
+            fast_ids1.union(&fast_ids2).count(),
+            fast_seeded.len(),
+            "fast_mode: every seeded pending job must be claimed by exactly one caller"
+        );
     }
 }
