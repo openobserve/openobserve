@@ -5141,11 +5141,20 @@ mod tests {
 
     // Fix 4 regression tests: get_pending_jobs serializes ALL nodes on ONE global advisory lock.
 
+    /// Advisory locks match on value, so the key derivation must be deterministic per scope.
+    #[test]
+    fn test_pending_jobs_lock_key_is_deterministic() {
+        assert_eq!(pending_jobs_lock_key("x"), pending_jobs_lock_key("x"));
+    }
+
     /// Fix spec [RED until Fix 4 lands]: distinct scopes must map to distinct advisory lock keys.
     #[tokio::test]
     #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_fix_different_scopes_do_not_serialize() {
-        // TODO(fix-4-implementation): decide + pin per-node vs per-stream scoping with a test.
+        // TODO(fix-4-implementation): the advisory lock is the ONLY double-claim guard today.
+        // TODO(fix-4-implementation): claim UPDATE has no status re-check; SELECT no FOR UPDATE.
+        // TODO(fix-4-implementation): per-node scoping is unsafe without self-guarding SQL.
+        // TODO(fix-4-implementation): a narrowed scope needs a scoped claim query or guarded SQL.
         let pool = connect_partitioned_test_db().await;
         let key_a = pending_jobs_lock_key("stream-a");
         let key_b = pending_jobs_lock_key("stream-b");
@@ -5220,81 +5229,105 @@ mod tests {
         let pool = setup_test_db().await;
         cleanup_test_data(&pool).await;
 
+        let test_db: String = sqlx::query_scalar("SELECT current_database()")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let client_rw_db: String = sqlx::query_scalar("SELECT current_database()")
+            .fetch_one(&CLIENT_RW.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            client_rw_db, test_db,
+            "ZO_META_POSTGRES_DSN (CLIENT_RW) must target the same DB as TEST_POSTGRES_URL"
+        );
+
         let pid = std::process::id();
         let stream_a = format!("fix4_org/logs/claim_{pid}_a");
         let stream_b = format!("fix4_org/logs/claim_{pid}_b");
-        let mut seeded: Vec<i64> = Vec::new();
-        for stream in [&stream_a, &stream_b] {
-            for offsets in [1_000_i64, 2_000] {
-                let id: i64 = sqlx::query_scalar(
-                    "INSERT INTO file_list_jobs (org, stream, offsets, status, node, started_at, \
-                     updated_at) VALUES ('fix4_org', $1, $2, 0, '', 0, 0) RETURNING id",
-                )
-                .bind(stream)
-                .bind(offsets)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-                seeded.push(id);
-            }
-        }
-
         let postgres_list = PostgresFileList::new();
-        let (r1, r2) = tokio::join!(
-            postgres_list.get_pending_jobs("fix4-node-1", 100, false),
-            postgres_list.get_pending_jobs("fix4-node-2", 100, false),
-        );
-        let (jobs1, jobs2) = (r1.unwrap(), r2.unwrap());
 
-        // Sibling ignored tests share file_list_jobs; assert only on this test's seeded streams.
-        let ids1: HashSet<i64> = jobs1
-            .iter()
-            .filter(|j| j.stream == stream_a || j.stream == stream_b)
-            .map(|j| j.id)
-            .collect();
-        let ids2: HashSet<i64> = jobs2
-            .iter()
-            .filter(|j| j.stream == stream_a || j.stream == stream_b)
-            .map(|j| j.id)
-            .collect();
-        assert!(
-            ids1.is_disjoint(&ids2),
-            "concurrent get_pending_jobs must never claim the same job twice: {ids1:?} vs {ids2:?}"
-        );
+        // 20 seeded races amplify scheduling variance so a broken lock scope cannot pass by luck.
+        for cycle in 0_i64..20 {
+            let mut seeded: Vec<i64> = Vec::new();
+            for stream in [&stream_a, &stream_b] {
+                for offsets in [cycle * 10_000 + 1_000, cycle * 10_000 + 2_000] {
+                    let id: i64 = sqlx::query_scalar(
+                        "INSERT INTO file_list_jobs (org, stream, offsets, status, node, \
+                         started_at, updated_at) VALUES ('fix4_org', $1, $2, 0, '', 0, 0) \
+                         RETURNING id",
+                    )
+                    .bind(stream)
+                    .bind(offsets)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+                    seeded.push(id);
+                }
+            }
 
-        // A single call claims max(id) per stream; the concurrent pair must cover at least that.
-        let union: Vec<i64> = ids1.union(&ids2).copied().collect();
-        for single_call_claim in [seeded[1], seeded[3]] {
-            assert!(
-                union.contains(&single_call_claim),
-                "the union {union:?} must cover what one call alone would claim ({single_call_claim})"
+            // TODO(fix-4-implementation): fast_mode shares the unguarded UPDATE; guard both paths.
+            let (r1, r2) = tokio::join!(
+                postgres_list.get_pending_jobs("fix4-node-1", 100, false),
+                postgres_list.get_pending_jobs("fix4-node-2", 100, false),
             );
-        }
+            let (jobs1, jobs2) = (r1.unwrap(), r2.unwrap());
 
-        let rows = sqlx::query("SELECT id, status, node FROM file_list_jobs WHERE id = ANY($1)")
-            .bind(&union)
-            .fetch_all(&pool)
-            .await
-            .unwrap();
-        assert_eq!(rows.len(), union.len(), "every claimed id must still exist");
-        for row in &rows {
-            let id: i64 = row.get(0);
-            let status: i32 = row.get(1);
-            let node: String = row.get(2);
+            // Sibling ignored tests share file_list_jobs; assert only on this test's streams.
+            let ids1: HashSet<i64> = jobs1
+                .iter()
+                .filter(|j| j.stream == stream_a || j.stream == stream_b)
+                .map(|j| j.id)
+                .collect();
+            let ids2: HashSet<i64> = jobs2
+                .iter()
+                .filter(|j| j.stream == stream_a || j.stream == stream_b)
+                .map(|j| j.id)
+                .collect();
+            assert!(
+                ids1.is_disjoint(&ids2),
+                "cycle {cycle}: a job was claimed by both callers: {ids1:?} vs {ids2:?}"
+            );
+
+            // A single call claims max(id) per stream; the pair's union must cover at least that.
+            let union: Vec<i64> = ids1.union(&ids2).copied().collect();
+            for single_call_claim in [seeded[1], seeded[3]] {
+                assert!(
+                    union.contains(&single_call_claim),
+                    "cycle {cycle}: union {union:?} must cover single-call claim {single_call_claim}"
+                );
+            }
+
+            let rows =
+                sqlx::query("SELECT id, status, node FROM file_list_jobs WHERE id = ANY($1)")
+                    .bind(&union)
+                    .fetch_all(&pool)
+                    .await
+                    .unwrap();
             assert_eq!(
-                status, 1,
-                "claimed job {id} must have transitioned to running"
+                rows.len(),
+                union.len(),
+                "cycle {cycle}: claimed ids must exist"
             );
-            assert!(
-                node.starts_with("fix4-node-"),
-                "claimed job {id} must record the claiming node, got {node:?}"
-            );
-        }
+            for row in &rows {
+                let id: i64 = row.get(0);
+                let status: i32 = row.get(1);
+                let node: String = row.get(2);
+                assert_eq!(
+                    status, 1,
+                    "cycle {cycle}: claimed job {id} must have transitioned to running"
+                );
+                assert!(
+                    node.starts_with("fix4-node-"),
+                    "cycle {cycle}: claimed job {id} must record the claiming node, got {node:?}"
+                );
+            }
 
-        let _ = sqlx::query("DELETE FROM file_list_jobs WHERE stream = $1 OR stream = $2")
-            .bind(&stream_a)
-            .bind(&stream_b)
-            .execute(&pool)
-            .await;
+            let _ = sqlx::query("DELETE FROM file_list_jobs WHERE stream = $1 OR stream = $2")
+                .bind(&stream_a)
+                .bind(&stream_b)
+                .execute(&pool)
+                .await;
+        }
     }
 }
