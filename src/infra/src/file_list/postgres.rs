@@ -2169,20 +2169,43 @@ async fn delete_file_list_by_id_and_date_fixed(
     table: &str,
     ids_with_dates: &[(i64, String)],
 ) -> Result<()> {
+    if ids_with_dates.is_empty() {
+        return Ok(());
+    }
+    for (date, sql) in build_pruned_delete_statements(table, ids_with_dates) {
+        sqlx::query(&sql).bind(&date).execute(&mut **tx).await?;
+    }
+    Ok(())
+}
+
+/// TEST-ONLY today (intended to graduate to Site A/Site B when the production fix lands): the
+/// single source of the pruned-delete SQL shape -- both the executing helper above and the
+/// EXPLAIN-based pruning tests consume this, so the string the tests EXPLAIN is the string the
+/// helper executes, by construction. Groups `(id, date)` pairs by date and returns one
+/// `(bind_date, sql)` pair per date group, sorted by date for determinism.
+#[cfg(test)]
+fn build_pruned_delete_statements(
+    table: &str,
+    ids_with_dates: &[(i64, String)],
+) -> Vec<(String, String)> {
     let mut by_date: stdHashMap<&str, Vec<i64>> = stdHashMap::new();
     for (id, date) in ids_with_dates {
         by_date.entry(date.as_str()).or_default().push(*id);
     }
-    for (date, ids) in by_date {
-        let ids_str = ids
-            .iter()
-            .map(|id| id.to_string())
-            .collect::<Vec<String>>()
-            .join(",");
-        let sql = format!("DELETE FROM {table} WHERE date = $1 AND id IN ({ids_str})");
-        sqlx::query(&sql).bind(date).execute(&mut **tx).await?;
-    }
-    Ok(())
+    let mut stmts: Vec<(String, String)> = by_date
+        .into_iter()
+        .map(|(date, ids)| {
+            let ids_str = ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+            let sql = format!("DELETE FROM {table} WHERE date = $1 AND id IN ({ids_str})");
+            (date.to_string(), sql)
+        })
+        .collect();
+    stmts.sort();
+    stmts
 }
 
 /// TEST-ONLY: reproduces today's buggy (unpruned) delete shape used at both Site A
@@ -4806,9 +4829,11 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// CATEGORY: fix behavior (expected to FAIL until the fix threads `date` through the delete
-    /// path, or in this test's case, until it is confirmed the `date = $1 AND id IN (...)` shape
-    /// prunes correctly -- this proves the SQL shape the fix will use is correct).
+    /// CATEGORY: fix specification -- pins the target query shape. This test is green by
+    /// construction (it asserts what a pruned delete plan looks like, not that Site A/B use
+    /// it yet); its value is that it EXPLAINs the very SQL `build_pruned_delete_statements`
+    /// builds -- the same string `delete_file_list_by_id_and_date_fixed` executes -- so
+    /// dropping the `date` predicate from the shared builder makes this test fail.
     ///
     /// With a `date = $1 AND id IN (...)` predicate, only the ONE partition holding that date is
     /// touched, even though the same ids table has 3 partitions total.
@@ -4822,13 +4847,12 @@ mod tests {
             .await
             .unwrap();
 
-        let plan = explain_delete_lines(
-            &pool,
-            &format!("DELETE FROM {table} WHERE date = $1 AND id IN ({id1})"),
-            Some("2021/01/01/00"),
-        )
-        .await
-        .unwrap();
+        let stmts = build_pruned_delete_statements(&table, &[(id1, "2021/01/01/00".to_string())]);
+        assert_eq!(stmts.len(), 1, "one date group must yield one statement");
+        let (bind_date, sql) = &stmts[0];
+        let plan = explain_delete_lines(&pool, sql, Some(bind_date))
+            .await
+            .unwrap();
 
         assert_eq!(
             count_touched_partitions(&plan),
@@ -4846,10 +4870,11 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// CATEGORY: fix behavior. Ids spanning 2 different date partitions must be handled as 2
-    /// separate pruned single-partition deletes (per `delete_file_list_by_id_and_date_fixed`,
-    /// which groups by date), never a single unpruned multi-partition delete. Also verifies
-    /// actual row deletion correctness: right rows gone, nothing else touched.
+    /// CATEGORY: fix specification. Ids spanning 2 different date partitions must be handled as
+    /// 2 separate pruned single-partition deletes (per `build_pruned_delete_statements`, which
+    /// groups by date and is the same SQL `delete_file_list_by_id_and_date_fixed` executes),
+    /// never a single unpruned multi-partition delete. Also verifies actual row deletion
+    /// correctness: right rows gone, nothing else touched.
     #[tokio::test]
     async fn test_fix_multiple_dates_grouped_into_pruned_deletes() {
         let pool = connect_partitioned_test_db().await;
@@ -4869,44 +4894,41 @@ mod tests {
                 .await
                 .unwrap();
 
-        // Each date group's delete plan, taken individually, must be pruned to 1 partition.
-        for (id, date, expected_partition) in [
-            (id_day1, "2021/01/01/00", "20210101"),
-            (id_day2, "2021/01/02/00", "20210102"),
-        ] {
-            let plan = explain_delete_lines(
-                &pool,
-                &format!("DELETE FROM {table} WHERE date = $1 AND id IN ({id})"),
-                Some(date),
-            )
-            .await
-            .unwrap();
+        let targets = [
+            (id_day1, "2021/01/01/00".to_string()),
+            (id_day2, "2021/01/02/00".to_string()),
+        ];
+
+        // EXPLAIN the exact statements the helper will execute: 1 pruned statement per date.
+        let stmts = build_pruned_delete_statements(&table, &targets);
+        assert_eq!(
+            stmts.len(),
+            2,
+            "two date groups must yield two separate delete statements"
+        );
+        for ((bind_date, sql), expected_partition) in stmts.iter().zip(["20210101", "20210102"]) {
+            let plan = explain_delete_lines(&pool, sql, Some(bind_date))
+                .await
+                .unwrap();
             assert_eq!(
                 count_touched_partitions(&plan),
                 1,
-                "date group {date} must touch exactly 1 partition, plan:\n{}",
+                "date group {bind_date} must touch exactly 1 partition, plan:\n{}",
                 plan.join("\n")
             );
             assert!(
                 plan.iter()
                     .any(|l| l.contains(&format!("{table}_p_{expected_partition}"))),
-                "date group {date} must touch partition {expected_partition}, plan:\n{}",
+                "date group {bind_date} must touch partition {expected_partition}, plan:\n{}",
                 plan.join("\n")
             );
         }
 
         // Now actually run the grouped delete and verify exact row-level correctness.
         let mut tx = pool.begin().await.unwrap();
-        delete_file_list_by_id_and_date_fixed(
-            &mut tx,
-            &table,
-            &[
-                (id_day1, "2021/01/01/00".to_string()),
-                (id_day2, "2021/01/02/00".to_string()),
-            ],
-        )
-        .await
-        .unwrap();
+        delete_file_list_by_id_and_date_fixed(&mut tx, &table, &targets)
+            .await
+            .unwrap();
         tx.commit().await.unwrap();
 
         let remaining_ids: Vec<i64> =
@@ -4983,6 +5005,95 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
+    /// CATEGORY: edge case. A date matching NO live partition must be handled gracefully: the
+    /// planner short-circuits the pruned delete to `Result` with `One-Time Filter: false`
+    /// (verified against real Postgres 17), so the plan has ZERO partition-level `Delete on`
+    /// lines (only the parent ModifyTable line remains) and executing the helper neither errors
+    /// nor deletes anything.
+    #[tokio::test]
+    async fn test_fix_date_matching_no_partition_is_graceful_noop() {
+        let pool = connect_partitioned_test_db().await;
+        let table = unique_partitioned_test_table_name();
+        setup_partitioned_test_table(&pool, &table).await.unwrap();
+
+        let keep =
+            insert_partitioned_test_row(&pool, &table, "2021/01/01/00", "s1", "keep.parquet")
+                .await
+                .unwrap();
+
+        // A date outside every partition's range; the id value is irrelevant to pruning.
+        let no_partition_date = "2099/12/31/00".to_string();
+        let stmts = build_pruned_delete_statements(&table, &[(keep, no_partition_date.clone())]);
+        assert_eq!(stmts.len(), 1, "one date group must yield one statement");
+        let (bind_date, sql) = &stmts[0];
+
+        let plan = explain_delete_lines(&pool, sql, Some(bind_date))
+            .await
+            .unwrap();
+        assert_eq!(
+            count_touched_partitions(&plan),
+            0,
+            "a date with no live partition must prune away every partition, plan:\n{}",
+            plan.join("\n")
+        );
+        assert!(
+            plan.iter().any(|l| l.contains("One-Time Filter: false")),
+            "the plan must short-circuit via `Result / One-Time Filter: false`, plan:\n{}",
+            plan.join("\n")
+        );
+
+        let mut tx = pool.begin().await.unwrap();
+        delete_file_list_by_id_and_date_fixed(&mut tx, &table, &[(keep, no_partition_date)])
+            .await
+            .expect("a no-partition date must not be an execution error");
+        tx.commit().await.unwrap();
+
+        let remaining: Vec<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table}"))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            remaining,
+            vec![keep],
+            "a delete whose date matches no partition must delete nothing"
+        );
+
+        drop_partitioned_test_table(&pool, &table).await;
+    }
+
+    /// CATEGORY: edge case. An empty `(id, date)` list must be a complete no-op: no SQL is
+    /// built (an empty `IN ()` would be a syntax error), no statement executes, no rows change.
+    #[tokio::test]
+    async fn test_fix_empty_id_list_is_noop() {
+        let pool = connect_partitioned_test_db().await;
+        let table = unique_partitioned_test_table_name();
+        setup_partitioned_test_table(&pool, &table).await.unwrap();
+
+        let keep =
+            insert_partitioned_test_row(&pool, &table, "2021/01/01/00", "s1", "keep.parquet")
+                .await
+                .unwrap();
+
+        assert!(
+            build_pruned_delete_statements(&table, &[]).is_empty(),
+            "empty input must build zero statements"
+        );
+
+        let mut tx = pool.begin().await.unwrap();
+        delete_file_list_by_id_and_date_fixed(&mut tx, &table, &[])
+            .await
+            .expect("empty input must not be an error");
+        tx.commit().await.unwrap();
+
+        let remaining: Vec<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table}"))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(remaining, vec![keep], "empty input must delete nothing");
+
+        drop_partitioned_test_table(&pool, &table).await;
+    }
+
     /// Site A (`update_dump_records`, postgres.rs:140) AND Site B (`inner_batch_process`'s
     /// delete path, postgres.rs:2128), exercised end-to-end via the `FileList` trait against
     /// the test DB, in a single test function.
@@ -5002,6 +5113,10 @@ mod tests {
     /// EXPLAIN-based tests above. Also confirms `FileRecord.date` (`file_list/mod.rs:774`, no
     /// `#[sqlx(default)]`, i.e. required on every row) flows through `query_for_dump` correctly
     /// -- that's the data the real Site A fix threads through instead of bare ids.
+    // TODO(fix-3-implementation): when the production fix lands at Site A/Site B, this test
+    // MUST grow pruning assertions against the REAL call sites (not just row correctness) --
+    // the intended mechanism is having those sites build their delete SQL via the shared
+    // `build_pruned_delete_statements` so their EXPLAINed and executed SQL stay one string.
     #[tokio::test]
     async fn test_site_a_and_site_b_delete_paths_remove_correct_rows() {
         let pool = setup_test_db().await;
