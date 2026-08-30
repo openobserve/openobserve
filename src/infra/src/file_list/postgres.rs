@@ -2152,17 +2152,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
     }
 }
 
-/// TEST-ONLY SCAFFOLDING for the compactor write-amplification fix (not yet implemented).
-///
-/// `update_dump_records` (Site A, above) and `inner_batch_process`'s delete path (Site B, above)
-/// both currently issue `DELETE FROM file_list WHERE id IN (...)` with no `date` predicate, which
-/// defeats partition pruning on the range-partitioned `file_list` table (see
-/// `file_list_partition_ddl`). The planned fix threads `date` alongside `id` and groups deletes by
-/// date so each DELETE only touches its own partition.
-///
-/// This helper models that planned shape ahead of the real fix landing at the two call sites.
-/// Once the fix is implemented at Site A/Site B directly, this helper (and its "current buggy
-/// behavior" sibling below) should be removed in favor of calling the real code paths.
+/// TEST-ONLY: models the planned Site A/B fix; remove once the real fix lands there.
 #[cfg(test)]
 async fn delete_file_list_by_id_and_date_fixed(
     tx: &mut sqlx::Transaction<'_, Postgres>,
@@ -2178,11 +2168,7 @@ async fn delete_file_list_by_id_and_date_fixed(
     Ok(())
 }
 
-/// TEST-ONLY today (intended to graduate to Site A/Site B when the production fix lands): the
-/// single source of the pruned-delete SQL shape -- both the executing helper above and the
-/// EXPLAIN-based pruning tests consume this, so the string the tests EXPLAIN is the string the
-/// helper executes, by construction. Groups `(id, date)` pairs by date and returns one
-/// `(bind_date, sql)` pair per date group, sorted by date for determinism.
+/// TEST-ONLY: single SQL source, so tests EXPLAIN the exact string the fixed helper executes.
 #[cfg(test)]
 fn build_pruned_delete_statements(
     table: &str,
@@ -2208,8 +2194,7 @@ fn build_pruned_delete_statements(
     stmts
 }
 
-/// TEST-ONLY: reproduces today's buggy (unpruned) delete shape used at both Site A
-/// (`postgres.rs:199`) and Site B (`postgres.rs:2128`), for bug-reproduction tests.
+/// TEST-ONLY: same unpruned shape (modulo whitespace/semicolon) as today's Site A/B deletes.
 #[cfg(test)]
 async fn delete_file_list_by_id_buggy(
     tx: &mut sqlx::Transaction<'_, Postgres>,
@@ -4601,48 +4586,19 @@ mod tests {
         assert_eq!(maintenance_hour("foo,bar"), 0);
     }
 
-    // ------------------------------------------------------------------------------------------
-    // Partition-pruning regression tests for the compactor write-amplification bug.
-    //
-    // `update_dump_records` (Site A, postgres.rs:199) and `inner_batch_process`'s delete path
-    // (Site B, postgres.rs:2128) issue `DELETE FROM file_list WHERE id IN (...)` with no `date`
-    // predicate. Because `file_list` is RANGE partitioned on `date` (`file_list_partition_ddl`)
-    // and the `id` index (`file_list_partition_index_ddl`) becomes one local index PER
-    // PARTITION rather than a global index, a bare `id IN (...)` delete cannot be pruned and
-    // Postgres must probe every partition's local `id` index.
-    //
-    // Unlike `setup_test_tables` above (a single non-partitioned table, which cannot
-    // distinguish a pruned plan from an unpruned one), these tests build a REAL partitioned
-    // table with 3 distinct date partitions, matching production DDL, so a pruning-vs-full-scan
-    // difference is actually observable via `EXPLAIN`.
-    // ------------------------------------------------------------------------------------------
+    // Partition-pruning regression tests: Sites A/B delete by bare id, defeating pruning.
 
-    /// Process-wide counter used to build a table name unique to each call. A bare counter
-    /// (rather than e.g. a timestamp) keeps the generated name short: Postgres silently
-    /// truncates identifiers over 63 bytes, and the longest derived index name
-    /// (`{table}_stream_file_idx`) leaves little budget after the `file_list_partitioned_test_`
-    /// prefix -- a longer unique suffix would truncate two different table names down to the
-    /// same 63-byte identifier and reintroduce the very collision this exists to prevent. Plain
-    /// `Ordering::Relaxed` is enough: uniqueness only requires each call see a distinct value,
-    /// not any cross-thread ordering guarantee.
+    /// Pid + counter: unique across processes and calls, within Postgres's 63-byte cap.
     static PARTITIONED_TEST_TABLE_COUNTER: std::sync::atomic::AtomicU64 =
         std::sync::atomic::AtomicU64::new(0);
 
-    /// Builds a table name unique to this call, so concurrent tests (the default under
-    /// `cargo test`, which runs `#[tokio::test]` functions in parallel) never `CREATE TABLE` the
-    /// same physical table/sequence and collide on `pg_class_relname_nsp_index`.
+    /// Unique per process AND call, so parallel tests and concurrent runs never share a table.
     fn unique_partitioned_test_table_name() -> String {
         let n = PARTITIONED_TEST_TABLE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        format!("file_list_partitioned_test_{n}")
+        format!("file_list_partitioned_test_{}_{n}", std::process::id())
     }
 
-    /// Opens a dedicated `PgPool` for a single test, instead of reusing the process-wide
-    /// `DB_POOL` (`setup_test_db`). `#[tokio::test]` gives each test its own Tokio runtime by
-    /// default, but `sqlx::Pool`'s background maintenance/reaper task is bound to whichever
-    /// runtime created it; once that first test's runtime shuts down, a `PgPool` cached in a
-    /// `static OnceCell` and reused by a later test (a different runtime) starts failing every
-    /// `acquire()` with `PoolTimedOut`, because Sqlx does not reason about connections it can't
-    /// account for anymore. A fresh pool per test sidesteps this instead of fighting it.
+    /// Per-test pool: a pool outliving its creating runtime fails every acquire (PoolTimedOut).
     async fn connect_partitioned_test_db() -> PgPool {
         let database_url = std::env::var("TEST_POSTGRES_URL").unwrap_or_else(|_| {
             "postgresql://postgres:password@localhost:5432/openobserve_test".to_string()
@@ -4652,11 +4608,7 @@ mod tests {
             .expect("Failed to connect to test PostgreSQL database")
     }
 
-    /// Builds a fresh, REAL partitioned `file_list`-shaped table (same column set and index set
-    /// as `file_list_partition_ddl` / `file_list_partition_index_ddl`) with 3 distinct date
-    /// partitions, so partition pruning is actually observable in `EXPLAIN` output. `table` must
-    /// be unique per call (see `unique_partitioned_test_table_name`) -- concurrent tests sharing
-    /// one hardcoded name race to `CREATE TABLE`/`CREATE SEQUENCE` and collide.
+    /// Production-DDL table, 3 date partitions, so EXPLAIN shows pruning; name unique per call.
     async fn setup_partitioned_test_table(pool: &PgPool, table: &str) -> Result<()> {
         sqlx::query(&format!("DROP TABLE IF EXISTS {table}"))
             .execute(pool)
@@ -4681,14 +4633,7 @@ mod tests {
         Ok(())
     }
 
-    /// Drops a table created by `setup_partitioned_test_table`, including its partitions
-    /// (Postgres cascades a parent `DROP TABLE` onto its declarative partitions automatically).
-    /// Called explicitly at the end of every partitioned test so the shared test database
-    /// doesn't accumulate garbage tables run after run. A test that panics via `unwrap()` skips
-    /// this call and leaves its table behind, but each table's unique name (see
-    /// `unique_partitioned_test_table_name`) means an orphan is only ever cosmetic clutter --
-    /// never a name collision with a later test, which is the actual correctness property this
-    /// suite depends on.
+    /// A panicking test skips this and orphans its table; unique names make that cosmetic only.
     async fn drop_partitioned_test_table(pool: &PgPool, table: &str) {
         let _ = sqlx::query(&format!("DROP TABLE IF EXISTS {table}"))
             .execute(pool)
@@ -4719,10 +4664,7 @@ mod tests {
         Ok(id)
     }
 
-    /// Runs `EXPLAIN (FORMAT TEXT) <delete_sql>` and returns the raw plan lines (one row per
-    /// line of plan text, matching `psql`'s own rendering of `EXPLAIN`). Wrapped in a
-    /// transaction that is always rolled back so EXPLAIN's actual execution of the DELETE
-    /// (needed for accurate row-count estimates) never persists.
+    /// Plain EXPLAIN never executes the DELETE; the rollback wrapper is just defensive redundancy.
     async fn explain_delete_lines(
         pool: &PgPool,
         delete_sql: &str,
@@ -4740,10 +4682,7 @@ mod tests {
         Ok(rows.iter().map(|r| r.get::<String, usize>(0)).collect())
     }
 
-    /// Counts `Delete on <partition>` lines in an EXPLAIN TEXT plan for a partitioned table --
-    /// i.e. how many partitions the planner actually touches. The first line is always
-    /// `Delete on <parent_table> ...` (the ModifyTable node itself, not a partition), so it is
-    /// excluded.
+    /// Counts partition `Delete on` lines; the first line is the parent node, not a partition.
     fn count_touched_partitions(plan_lines: &[String]) -> usize {
         plan_lines
             .iter()
@@ -4752,19 +4691,9 @@ mod tests {
             .count()
     }
 
-    /// CATEGORY: bug reproduction (expected to PASS today; documents the bug).
-    ///
-    /// A bare `DELETE FROM file_list WHERE id IN (...)` against a 3-partition table touches ALL
-    /// 3 partitions in the query plan, even though the target id only exists in 1 partition.
-    /// This is the root cause of the multi-second/23s DELETE latency seen in production.
-    ///
-    /// This test is intentionally kept as a permanent regression guard: if a future change
-    /// removes the `date` predicate from the fixed delete path again, this test's assertion
-    /// (`touched == 3`, i.e. no pruning) still holds and continues to document/prove the
-    /// unpruned shape is what "no date predicate" produces on this schema. It is not meant to
-    /// start failing once the fix lands elsewhere -- it tests the OLD query shape directly, not
-    /// the code at Site A/B.
+    /// Bug repro, permanent guard: a bare `id IN (...)` delete must touch all 3 partitions.
     #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_bug_repro_unpruned_delete_touches_all_partitions() {
         let pool = connect_partitioned_test_db().await;
         let table = unique_partitioned_test_table_name();
@@ -4792,11 +4721,9 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// CATEGORY: bug reproduction. `delete_file_list_by_id_buggy` (the exact query shape
-    /// currently used at Site A/B) is functionally correct today -- it deletes the right row --
-    /// which is precisely why the bug has been latent: nothing about correctness signals the
-    /// missing partition pruning. Only EXPLAIN (see the test above) reveals it.
+    /// Bug repro: Site A/B's shape (modulo whitespace/semicolon) is correct but unpruned.
     #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_bug_repro_buggy_delete_is_functionally_correct_but_unpruned() {
         let pool = connect_partitioned_test_db().await;
         let table = unique_partitioned_test_table_name();
@@ -4829,15 +4756,9 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// CATEGORY: fix specification -- pins the target query shape. This test is green by
-    /// construction (it asserts what a pruned delete plan looks like, not that Site A/B use
-    /// it yet); its value is that it EXPLAINs the very SQL `build_pruned_delete_statements`
-    /// builds -- the same string `delete_file_list_by_id_and_date_fixed` executes -- so
-    /// dropping the `date` predicate from the shared builder makes this test fail.
-    ///
-    /// With a `date = $1 AND id IN (...)` predicate, only the ONE partition holding that date is
-    /// touched, even though the same ids table has 3 partitions total.
+    /// Fix spec: the builder's SQL must prune to exactly 1 partition; dropping date fails this.
     #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_fix_pruned_delete_touches_single_partition() {
         let pool = connect_partitioned_test_db().await;
         let table = unique_partitioned_test_table_name();
@@ -4870,12 +4791,9 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// CATEGORY: fix specification. Ids spanning 2 different date partitions must be handled as
-    /// 2 separate pruned single-partition deletes (per `build_pruned_delete_statements`, which
-    /// groups by date and is the same SQL `delete_file_list_by_id_and_date_fixed` executes),
-    /// never a single unpruned multi-partition delete. Also verifies actual row deletion
-    /// correctness: right rows gone, nothing else touched.
+    /// Fix spec: ids spanning 2 dates become 2 pruned deletes, never one unpruned delete.
     #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_fix_multiple_dates_grouped_into_pruned_deletes() {
         let pool = connect_partitioned_test_db().await;
         let table = unique_partitioned_test_table_name();
@@ -4945,10 +4863,9 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// CATEGORY: correctness regression guard, independent of EXPLAIN. After a grouped
-    /// `(id, date)` delete, exactly the targeted rows are gone and no others, verified via row
-    /// counts and explicit id membership before/after.
+    /// Correctness guard independent of EXPLAIN: exactly the targeted rows are gone, no others.
     #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_correctness_delete_removes_exactly_targeted_rows() {
         let pool = connect_partitioned_test_db().await;
         let table = unique_partitioned_test_table_name();
@@ -5005,12 +4922,9 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// CATEGORY: edge case. A date matching NO live partition must be handled gracefully: the
-    /// planner short-circuits the pruned delete to `Result` with `One-Time Filter: false`
-    /// (verified against real Postgres 17), so the plan has ZERO partition-level `Delete on`
-    /// lines (only the parent ModifyTable line remains) and executing the helper neither errors
-    /// nor deletes anything.
+    /// Edge case: a no-partition date prunes to `One-Time Filter: false` -- no error, no delete.
     #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_fix_date_matching_no_partition_is_graceful_noop() {
         let pool = connect_partitioned_test_db().await;
         let table = unique_partitioned_test_table_name();
@@ -5061,9 +4975,9 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// CATEGORY: edge case. An empty `(id, date)` list must be a complete no-op: no SQL is
-    /// built (an empty `IN ()` would be a syntax error), no statement executes, no rows change.
+    /// Edge case: empty input builds no SQL (empty `IN ()` is a syntax error) and deletes nothing.
     #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_fix_empty_id_list_is_noop() {
         let pool = connect_partitioned_test_db().await;
         let table = unique_partitioned_test_table_name();
@@ -5094,31 +5008,14 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// Site A (`update_dump_records`, postgres.rs:140) AND Site B (`inner_batch_process`'s
-    /// delete path, postgres.rs:2128), exercised end-to-end via the `FileList` trait against
-    /// the test DB, in a single test function.
-    ///
-    /// Both halves are kept in ONE `#[tokio::test]` rather than two, deliberately: both go
-    /// through `PostgresFileList`, which uses the process-wide `static Lazy<Pool<Postgres>>`
-    /// `CLIENT_RW`/`CLIENT_RO` (`db/postgres.rs`), not the per-test pool the partition tests
-    /// above use. `#[tokio::test]` gives every test its own Tokio runtime, but `CLIENT_RW`'s
-    /// pool is created lazily on first use and then bound to whichever test's runtime touched
-    /// it first; once that runtime shuts down, a second `#[tokio::test]` (a new runtime) reusing
-    /// the same `CLIENT_RW` fails every acquire with `PoolTimedOut`. Splitting Site A and Site B
-    /// into separate test functions reproduced exactly that failure. A single test function
-    /// keeps `CLIENT_RW` alive under one runtime for both checks.
-    ///
-    /// Confirms the current (unfixed) code deletes the right ROWS at both sites -- functional
-    /// correctness holds today; what's missing is partition pruning, covered by the
-    /// EXPLAIN-based tests above. Also confirms `FileRecord.date` (`file_list/mod.rs:774`, no
-    /// `#[sqlx(default)]`, i.e. required on every row) flows through `query_for_dump` correctly
-    /// -- that's the data the real Site A fix threads through instead of bare ids.
-    // TODO(fix-3-implementation): when the production fix lands at Site A/Site B, this test
-    // MUST grow pruning assertions against the REAL call sites (not just row correctness) --
-    // the intended mechanism is having those sites build their delete SQL via the shared
-    // `build_pruned_delete_statements` so their EXPLAINed and executed SQL stay one string.
+    /// Sites A+B in ONE test: CLIENT_RW's pool binds to its first runtime; a 2nd test times out.
+    // TODO(fix-3-implementation): assert pruning at real Site A/B via the shared builder.
+    // TODO(fix-3-implementation): compose date-grouping WITH file_list_deleted_batch_size chunking.
+    // TODO(fix-3-implementation): chunk within each date group (or vice versa); pin with a test.
     #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_site_a_and_site_b_delete_paths_remove_correct_rows() {
+        // CLIENT_RW (ZO_META_POSTGRES_DSN) and the TEST_POSTGRES_URL pool must be the same DB.
         let pool = setup_test_db().await;
         cleanup_test_data(&pool).await;
 
@@ -5132,8 +5029,7 @@ mod tests {
         let keep_id = postgres_list.add("acct", &keep_key, &meta).await.unwrap();
         let dump_id = postgres_list.add("acct", &dump_key, &meta).await.unwrap();
 
-        // `query_for_dump` returns FileRecord, whose `date` field is required (non-default) --
-        // this is the data the real Site A fix threads through instead of bare ids.
+        // FileRecord.date is required -- what the real Site A fix threads instead of bare ids.
         let records = postgres_list
             .query_for_dump(
                 "org1",
@@ -5177,11 +5073,7 @@ mod tests {
         );
 
         // ---- Site B: inner_batch_process's delete path (via batch_process) ----
-        // del_items with `id > 0` (the common case once ids are already known, e.g. from a
-        // prior `batch_add`) currently skip date-key extraction entirely in
-        // `inner_batch_process` -- the `parse_file_key_columns` call in that loop only runs on
-        // the `id <= 0` branch. The real fix must extract `date_key` unconditionally for every
-        // del_item, not just the zero-id ones.
+        // del_items with id > 0 skip date-key extraction; the fix must always extract it.
         let batch_stream = "org1/logs/batch_del_stream";
         let batch_keep_key = format!("files/{batch_stream}/2021/01/01/00/keep.parquet");
         let batch_del_key = format!("files/{batch_stream}/2021/01/02/00/del.parquet");
@@ -5212,8 +5104,7 @@ mod tests {
             .map(|(_, id)| *id)
             .expect("keep.parquet must have been inserted with an id");
 
-        // del_items carrying a real (>0) id, as inner_batch_process sorts/dedupes on before
-        // deleting -- this is the branch that currently skips date-key extraction entirely.
+        // del_items carry a real (>0) id -- the branch that currently skips date-key extraction.
         let mut del_file_key = create_test_file_key("acct", &batch_del_key, true);
         del_file_key.id = del_id;
         postgres_list
