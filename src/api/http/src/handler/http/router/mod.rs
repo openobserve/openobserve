@@ -1022,9 +1022,6 @@ pub fn service_routes() -> Router {
         // Alert destinations
         .route("/{org_id}/alerts/destinations", get(alerts::destinations::list_destinations).post(alerts::destinations::save_destination))
         .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
-        // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
-        .route("/{org_id}/alerts/destinations/slack/oauth/start", post(alerts::slack_oauth::start))
-        .route("/{org_id}/alerts/destinations/slack/oauth/exchange", post(alerts::slack_oauth::exchange))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
         .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
@@ -1470,6 +1467,15 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "cloud")]
     {
         router = router
+            // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/start",
+                post(alerts::slack_oauth::start),
+            )
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/exchange",
+                post(alerts::slack_oauth::exchange),
+            )
             .route(
                 "/{org_id}/invites",
                 get(organization::org::get_org_invites)

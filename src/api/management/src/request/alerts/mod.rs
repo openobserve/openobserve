@@ -80,6 +80,7 @@ pub mod external_events;
 pub mod history;
 pub mod incident_integrations;
 pub mod incidents;
+#[cfg(feature = "cloud")]
 pub mod slack_oauth;
 pub mod templates;
 
