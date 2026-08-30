@@ -121,6 +121,17 @@ pub struct ServiceRecord {
     pub last_seen: i64,
 }
 
+/// Outcome of a [`put`]; a named struct so call sites cannot positionally confuse the two facts.
+#[must_use]
+#[derive(Debug, Clone)]
+pub struct PutOutcome {
+    /// `disambiguation` JSON of each orphaned lower-specificity row this put deleted (F19).
+    pub orphans: Vec<serde_json::Value>,
+    /// True iff a data column changed, a row was inserted, or an orphan was deleted;
+    /// last_seen-only writes do not count.
+    pub changed: bool,
+}
+
 impl ServiceRecord {
     pub fn new(
         org_id: &str,
@@ -142,15 +153,6 @@ impl ServiceRecord {
             last_seen: 0,
         }
     }
-}
-
-/// Outcome of a [`put`]; a named struct so call sites cannot positionally confuse the two facts.
-#[derive(Debug, Clone)]
-pub struct PutOutcome {
-    /// `disambiguation` JSON of each orphaned lower-specificity row this put deleted (F19).
-    pub orphans: Vec<serde_json::Value>,
-    /// True iff the call mutated a row (insert, data-column change, or orphan deletion).
-    pub changed: bool,
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
@@ -854,7 +856,7 @@ mod tests {
         let first = service_record(disambiguation.clone(), 1_000);
         let first_id = first.id.clone();
 
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
         assert_eq!(
@@ -864,7 +866,7 @@ mod tests {
         );
 
         let repeat = service_record(disambiguation, 1_000);
-        put_with(&db, "org1", repeat, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", repeat, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -891,14 +893,14 @@ mod tests {
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
         let first = service_record(disambiguation.clone(), 1_000);
         let first_id = first.id.clone();
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
         let mut second = service_record(disambiguation, 1_000);
         second.traces_streams =
             serde_json::json!(["checkout-service-traces", "checkout-service-traces-v2"]);
-        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -957,7 +959,7 @@ mod tests {
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
         let first = service_record(disambiguation.clone(), 1_000);
         let first_id = first.id.clone();
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -969,7 +971,7 @@ mod tests {
         second.metrics_streams = serde_json::json!(["checkout-service-metrics-v2"]);
         second.field_name_mapping =
             Some(serde_json::json!({"service": "kubernetes_labels_app_v2"}));
-        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1020,13 +1022,13 @@ mod tests {
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
         let first = service_record(disambiguation.clone(), 1_000);
         let first_id = first.id.clone();
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
         let mut second = service_record(disambiguation, 1_000);
         second.field_name_mapping = None;
-        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1062,13 +1064,13 @@ mod tests {
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
         let first = service_record(disambiguation.clone(), 1_000);
         let first_id = first.id.clone();
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
         // Identical to service_record()'s default field_name_mapping.
         let second = service_record(disambiguation, 1_000);
-        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1085,13 +1087,13 @@ mod tests {
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
         let first = service_record(disambiguation.clone(), 1_000);
         let first_id = first.id.clone();
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
         let mut second = service_record(disambiguation, 1_000);
         second.field_name_mapping = Some(serde_json::json!({"service": "different_raw_field"}));
-        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1120,12 +1122,12 @@ mod tests {
             1_000,
         );
         let richer_id = richer.id.clone();
-        put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
         let subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
-        put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1159,7 +1161,7 @@ mod tests {
         let db = db().await;
         let sparse = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
         let sparse_id = sparse.id.clone();
-        put_with(&db, "org1", sparse, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", sparse, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1170,7 +1172,7 @@ mod tests {
         );
         richer.traces_streams =
             serde_json::json!(["checkout-service-traces", "checkout-service-traces-v2"]);
-        put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1238,12 +1240,12 @@ mod tests {
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
         let first = service_record(disambiguation.clone(), 1_000);
         let first_id = first.id.clone();
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
         let second = service_record(disambiguation, 2_000);
-        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1287,14 +1289,14 @@ mod tests {
         first.metrics_streams =
             serde_json::json!(["checkout-service-metrics", "checkout-service-metrics-v2"]);
         let first_id = first.id.clone();
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
         // service_record()'s 1-element stream arrays are strict subsets of what is now stored.
         let mut second = service_record(disambiguation, 2_000);
         second.all_dimensions = serde_json::json!({"k8s-cluster": "prod"});
-        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1336,7 +1338,7 @@ mod tests {
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
         let first = service_record(disambiguation.clone(), 1_000);
         let first_id = first.id.clone();
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1344,7 +1346,7 @@ mod tests {
         let mut second = service_record(disambiguation, 1_000);
         second.all_dimensions =
             serde_json::json!({"k8s-cluster": "staging", "k8s-namespace": "legacy"});
-        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1375,7 +1377,7 @@ mod tests {
     async fn exact_repeat_noop_reports_changed_false() {
         let db = db().await;
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
-        put_with(
+        let _ = put_with(
             &db,
             "org1",
             service_record(disambiguation.clone(), 1_000),
@@ -1415,7 +1417,7 @@ mod tests {
             serde_json::json!(["checkout-service-traces", "checkout-service-traces-v2"]);
         first.metrics_streams =
             serde_json::json!(["checkout-service-metrics", "checkout-service-metrics-v2"]);
-        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1437,7 +1439,7 @@ mod tests {
     async fn partial_change_reports_changed_true() {
         let db = db().await;
         let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
-        put_with(
+        let _ = put_with(
             &db,
             "org1",
             service_record(disambiguation.clone(), 1_000),
@@ -1456,6 +1458,62 @@ mod tests {
         assert!(
             outcome.changed,
             "traces_streams genuinely grew, so the call must report changed"
+        );
+    }
+
+    // Kills the mutant whose changed derivation omits field_name_mapping.
+    #[tokio::test]
+    async fn field_name_mapping_only_change_reports_changed_true() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let _ = put_with(
+            &db,
+            "org1",
+            service_record(disambiguation.clone(), 1_000),
+            DEFAULT_MAX_STREAMS_PER_TYPE,
+        )
+        .await
+        .unwrap();
+
+        let mut second = service_record(disambiguation, 1_000);
+        second.field_name_mapping = Some(serde_json::json!({"service": "different_raw_field"}));
+        let outcome = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.changed,
+            "field_name_mapping is the only field that differs and it must count as changed"
+        );
+    }
+
+    // A NEW key survives the base-wins union, so this is a genuine all_dimensions change.
+    #[tokio::test]
+    async fn all_dimensions_only_change_reports_changed_true() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let _ = put_with(
+            &db,
+            "org1",
+            service_record(disambiguation.clone(), 1_000),
+            DEFAULT_MAX_STREAMS_PER_TYPE,
+        )
+        .await
+        .unwrap();
+
+        let mut second = service_record(disambiguation, 1_000);
+        second.all_dimensions = serde_json::json!({
+            "k8s-cluster": "prod",
+            "k8s-namespace": "ecommerce",
+            "k8s-region": "us-east-1"
+        });
+        let outcome = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.changed,
+            "the merged all_dimensions gained a key, so the call must report changed"
         );
     }
 
@@ -1480,11 +1538,12 @@ mod tests {
             serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
             1_000,
         );
-        put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
-        let subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        // last_seen differs so a mutant deriving changed from its delta cannot survive here.
+        let subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 2_000);
         let outcome = put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
@@ -1495,7 +1554,7 @@ mod tests {
         );
         assert!(
             !outcome.changed,
-            "every field resolved to the stored value, so the upgrade branch must not report changed"
+            "every data field resolved to the stored value; last_seen alone must not count as changed"
         );
     }
 
@@ -1503,7 +1562,7 @@ mod tests {
     async fn upgrade_branch_richer_incoming_reports_changed_true() {
         let db = db().await;
         let sparse = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
-        put_with(&db, "org1", sparse, DEFAULT_MAX_STREAMS_PER_TYPE)
+        let _ = put_with(&db, "org1", sparse, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
 
@@ -1521,13 +1580,39 @@ mod tests {
         );
     }
 
+    // Kills the mutant whose upgrade branch derives changed from disambiguation alone.
+    #[tokio::test]
+    async fn upgrade_branch_new_stream_reports_changed_true() {
+        let db = db().await;
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            1_000,
+        );
+        let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        // Case-B upgrade: disambiguation resolves to stored, but logs_streams gains an entry.
+        let mut subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        subset.logs_streams =
+            serde_json::json!(["checkout-service-logs", "checkout-service-logs-v2"]);
+        let outcome = put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.changed,
+            "the stream union gained an entry, so the upgrade branch must report changed"
+        );
+    }
+
     // Orphan deletion is a mutation: only the caller's put event makes nodes drop the dead key.
     #[tokio::test]
     async fn orphan_deletion_on_noop_update_reports_changed_true() {
         let db = db().await;
         let richer_disambiguation =
             serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"});
-        put_with(
+        let _ = put_with(
             &db,
             "org1",
             service_record(richer_disambiguation.clone(), 1_000),
