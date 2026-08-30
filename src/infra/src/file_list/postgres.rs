@@ -1390,7 +1390,7 @@ DO UPDATE SET
         let sql = if fast_mode {
             r#"SELECT stream, id, 0::BIGINT AS num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2 FOR UPDATE SKIP LOCKED;"#
         } else {
-            // a stream whose max(id) row is lock-skipped is skipped whole: a peer owns it
+            // a stream whose max(id) row is lock-skipped is skipped whole until the peer commits
             r#"
     WITH candidates AS (
         SELECT stream, max(id) AS id, COUNT(*)::BIGINT AS num
@@ -1456,11 +1456,13 @@ DO UPDATE SET
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
+        // status filter stands alone: a row the guarded UPDATE skipped must not be returned
         let sql = format!(
-            "SELECT * FROM file_list_jobs WHERE id IN ({});",
+            "SELECT * FROM file_list_jobs WHERE id IN ({}) AND status = $1;",
             ids.join(",")
         );
         let ret = match sqlx::query_as::<_, super::MergeJobRecord>(&sql)
+            .bind(super::FileListJobStatus::Running)
             .fetch_all(&mut *tx)
             .await
         {
@@ -5355,6 +5357,56 @@ mod tests {
             fast_ids1.union(&fast_ids2).count(),
             fast_seeded.len(),
             "fast_mode: every seeded pending job must be claimed by exactly one caller"
+        );
+
+        // ---- Fix 4 [GREEN]: a row-locked max-id row is SKIPPED, never waited on ----
+        let locked_stream = format!("fix4_org/logs/rowlock_{pid}_locked");
+        let free_stream = format!("fix4_org/logs/rowlock_{pid}_free");
+        let mut rowlock_max: stdHashMap<String, i64> = stdHashMap::new();
+        for stream in [&locked_stream, &free_stream] {
+            for offsets in [1_000_i64, 2_000] {
+                let id: i64 = sqlx::query_scalar(
+                    "INSERT INTO file_list_jobs (org, stream, offsets, status, node, \
+                     started_at, updated_at) VALUES ('fix4_org', $1, $2, 0, '', 0, 0) \
+                     RETURNING id",
+                )
+                .bind(stream)
+                .bind(offsets)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+                rowlock_max.insert((*stream).clone(), id);
+            }
+        }
+
+        // A genuine row lock from a separate session, held across the whole claim call.
+        let mut row_tx = pool.begin().await.unwrap();
+        let locked_id: i64 =
+            sqlx::query_scalar("SELECT id FROM file_list_jobs WHERE id = $1 FOR UPDATE")
+                .bind(rowlock_max[&locked_stream])
+                .fetch_one(&mut *row_tx)
+                .await
+                .unwrap();
+
+        // A plain-FOR-UPDATE mutant blocks here until row_tx ends and fails this timeout.
+        let claims = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            postgres_list.get_pending_jobs("fix4-node-6", 100, false),
+        )
+        .await
+        .expect("get_pending_jobs must skip a row-locked max-id row, not block on it")
+        .unwrap();
+        row_tx.rollback().await.unwrap();
+
+        assert!(
+            !claims.iter().any(|j| j.stream == locked_stream),
+            "the stream whose max-id row {locked_id} is row-locked must be skipped whole"
+        );
+        assert!(
+            claims
+                .iter()
+                .any(|j| j.stream == free_stream && j.id == rowlock_max[&free_stream]),
+            "the unlocked stream's max-id job must still be claimed in the same call"
         );
     }
 }
