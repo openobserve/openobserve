@@ -308,16 +308,6 @@ export class MetricsExplorerPage {
         await this.page.keyboard.press('Escape');
     }
 
-    /** getVisualizeQueryText() returns '' when no editor is mounted, so a blank read only means anything once one exists. */
-    async waitForVisualizeQueryEditorMounted(timeout = 15000) {
-        await this.page.locator(this.queryEditorContainer).first().waitFor({ state: 'visible', timeout });
-        await this.page.waitForFunction(
-            () => (window.monaco?.editor?.getEditors?.() ?? []).length > 0,
-            null,
-            { timeout }
-        );
-    }
-
     /** Current editor text — used to assert a shared link rehydrated the chart. */
     async getVisualizeQueryText() {
         return await this.page.evaluate(() => {
