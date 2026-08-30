@@ -1383,13 +1383,7 @@ DO UPDATE SET
 
         let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
-        let lock_key = "file_list_jobs:get_pending_jobs";
-        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
-        let lock_id = if lock_id > (i64::MAX as u64) {
-            (lock_id >> 1) as i64
-        } else {
-            lock_id as i64
-        };
+        let lock_id = pending_jobs_lock_key("");
         let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
         DB_QUERY_NUMS.with_label_values(&["get_lock", ""]).inc();
         if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
@@ -2214,10 +2208,10 @@ async fn delete_file_list_by_id_buggy(
     Ok(())
 }
 
-/// TEST-ONLY: Fix 4 will make production get_pending_jobs derive its lock id from a real scope.
-#[cfg(test)]
+/// Advisory lock key for get_pending_jobs claims; scope is ignored until Fix 4 wires a real one.
 fn pending_jobs_lock_key(_scope: &str) -> i64 {
-    // TODO(fix-4-implementation): production get_pending_jobs must consume this with a real scope.
+    // TODO(fix-4-implementation): callers must pass a real scope once the scoping decision lands.
+    // Shared advisory-id space with scheduler_pull_lock/get_for_update_*; collisions only block.
     let lock_id = config::utils::hash::gxhash::new().sum64("file_list_jobs:get_pending_jobs");
     if lock_id > (i64::MAX as u64) {
         (lock_id >> 1) as i64
@@ -5020,13 +5014,13 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// Sites A+B in ONE test: CLIENT_RW's pool binds to its first runtime; a 2nd test times out.
+    /// Sites A+B + Fix-4 disjointness in ONE test: CLIENT_RW's pool binds to its first runtime.
     // TODO(fix-3-implementation): assert pruning at real Site A/B via the shared builder.
     // TODO(fix-3-implementation): compose date-grouping WITH file_list_deleted_batch_size chunking.
     // TODO(fix-3-implementation): chunk within each date group (or vice versa); pin with a test.
     #[tokio::test]
     #[ignore = "Requires test PostgreSQL database setup"]
-    async fn test_site_a_and_site_b_delete_paths_remove_correct_rows() {
+    async fn test_client_rw_paths_site_ab_deletes_and_pending_jobs_disjointness() {
         // CLIENT_RW (ZO_META_POSTGRES_DSN) and the TEST_POSTGRES_URL pool must be the same DB.
         let pool = setup_test_db().await;
         cleanup_test_data(&pool).await;
@@ -5137,98 +5131,9 @@ mod tests {
             remaining.contains(&batch_keep_id),
             "inner_batch_process must not delete unrelated ids"
         );
-    }
 
-    // Fix 4 regression tests: get_pending_jobs serializes ALL nodes on ONE global advisory lock.
-
-    /// Advisory locks match on value, so the key derivation must be deterministic per scope.
-    #[test]
-    fn test_pending_jobs_lock_key_is_deterministic() {
-        assert_eq!(pending_jobs_lock_key("x"), pending_jobs_lock_key("x"));
-    }
-
-    /// Fix spec [RED until Fix 4 lands]: distinct scopes must map to distinct advisory lock keys.
-    #[tokio::test]
-    #[ignore = "Requires test PostgreSQL database setup"]
-    async fn test_fix_different_scopes_do_not_serialize() {
-        // TODO(fix-4-implementation): the advisory lock is the ONLY double-claim guard today.
-        // TODO(fix-4-implementation): claim UPDATE has no status re-check; SELECT no FOR UPDATE.
-        // TODO(fix-4-implementation): per-node scoping is unsafe without self-guarding SQL.
-        // TODO(fix-4-implementation): a narrowed scope needs a scoped claim query or guarded SQL.
-        let pool = connect_partitioned_test_db().await;
-        let key_a = pending_jobs_lock_key("stream-a");
-        let key_b = pending_jobs_lock_key("stream-b");
-
-        let mut tx_a = pool.begin().await.unwrap();
-        sqlx::query(&format!("SELECT pg_advisory_xact_lock({key_a})"))
-            .execute(&mut *tx_a)
-            .await
-            .unwrap();
-
-        let mut tx_b = pool.begin().await.unwrap();
-        let acquired: bool =
-            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key_b})"))
-                .fetch_one(&mut *tx_b)
-                .await
-                .unwrap();
-
-        tx_b.rollback().await.unwrap();
-        tx_a.rollback().await.unwrap();
-
-        assert!(
-            acquired,
-            "scope 'stream-b' (key {key_b}) must not block behind scope 'stream-a' (key {key_a}); \
-             equal keys mean the lock key is still the global constant"
-        );
-    }
-
-    /// Invariant guard [GREEN]: claimers in the SAME scope must keep serializing on one lock key.
-    #[tokio::test]
-    #[ignore = "Requires test PostgreSQL database setup"]
-    async fn test_same_scope_still_serializes() {
-        // Until Fix 4 lands every scope shares one key, so run DB tests with --test-threads=1.
-        let pool = connect_partitioned_test_db().await;
-        let key = pending_jobs_lock_key("stream-same");
-
-        let mut tx_a = pool.begin().await.unwrap();
-        sqlx::query(&format!("SELECT pg_advisory_xact_lock({key})"))
-            .execute(&mut *tx_a)
-            .await
-            .unwrap();
-
-        let mut tx_b = pool.begin().await.unwrap();
-        let acquired: bool =
-            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key})"))
-                .fetch_one(&mut *tx_b)
-                .await
-                .unwrap();
-        assert!(
-            !acquired,
-            "same scope must serialize: try-lock on key {key} must fail while tx_a holds it"
-        );
-
-        tx_a.rollback().await.unwrap();
-
-        let acquired: bool =
-            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key})"))
-                .fetch_one(&mut *tx_b)
-                .await
-                .unwrap();
-        assert!(
-            acquired,
-            "xact-scoped advisory lock on key {key} must be free once tx_a ends"
-        );
-        tx_b.rollback().await.unwrap();
-    }
-
-    /// Fix-4 invariant [GREEN, must survive the fix]: no job is ever claimed by two callers.
-    #[tokio::test]
-    #[ignore = "Requires test PostgreSQL database setup"]
-    async fn test_concurrent_get_pending_jobs_claims_are_disjoint() {
-        // CLIENT_RW (ZO_META_POSTGRES_DSN) and the TEST_POSTGRES_URL pool must be the same DB.
-        let pool = setup_test_db().await;
-        cleanup_test_data(&pool).await;
-
+        // ---- Fix 4: concurrent get_pending_jobs claims must stay disjoint ----
+        // Fix-4 invariant [GREEN, must survive the fix]: no job is ever claimed by two callers.
         let test_db: String = sqlx::query_scalar("SELECT current_database()")
             .fetch_one(&pool)
             .await
@@ -5245,7 +5150,6 @@ mod tests {
         let pid = std::process::id();
         let stream_a = format!("fix4_org/logs/claim_{pid}_a");
         let stream_b = format!("fix4_org/logs/claim_{pid}_b");
-        let postgres_list = PostgresFileList::new();
 
         // 20 seeded races amplify scheduling variance so a broken lock scope cannot pass by luck.
         for cycle in 0_i64..20 {
@@ -5329,5 +5233,87 @@ mod tests {
                 .execute(&pool)
                 .await;
         }
+    }
+
+    // Fix 4 regression tests: get_pending_jobs serializes ALL nodes on ONE global advisory lock.
+
+    /// Advisory locks match on value, so the key derivation must be deterministic per scope.
+    #[test]
+    fn test_pending_jobs_lock_key_is_deterministic() {
+        assert_eq!(pending_jobs_lock_key("x"), pending_jobs_lock_key("x"));
+    }
+
+    /// Fix spec [RED until Fix 4 lands]: distinct scopes must map to distinct advisory lock keys.
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_fix_different_scopes_do_not_serialize() {
+        // TODO(fix-4-implementation): the advisory lock is the ONLY double-claim guard today.
+        // TODO(fix-4-implementation): claim UPDATE has no status re-check; SELECT no FOR UPDATE.
+        // TODO(fix-4-implementation): per-node scoping is unsafe without self-guarding SQL.
+        // TODO(fix-4-implementation): a narrowed scope needs a scoped claim query or guarded SQL.
+        let pool = connect_partitioned_test_db().await;
+        let key_a = pending_jobs_lock_key("stream-a");
+        let key_b = pending_jobs_lock_key("stream-b");
+
+        let mut tx_a = pool.begin().await.unwrap();
+        sqlx::query(&format!("SELECT pg_advisory_xact_lock({key_a})"))
+            .execute(&mut *tx_a)
+            .await
+            .unwrap();
+
+        let mut tx_b = pool.begin().await.unwrap();
+        let acquired: bool =
+            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key_b})"))
+                .fetch_one(&mut *tx_b)
+                .await
+                .unwrap();
+
+        tx_b.rollback().await.unwrap();
+        tx_a.rollback().await.unwrap();
+
+        assert!(
+            acquired,
+            "scope 'stream-b' (key {key_b}) must not block behind scope 'stream-a' (key {key_a}); \
+             equal keys mean the lock key is still the global constant"
+        );
+    }
+
+    /// Invariant guard [GREEN]: claimers in the SAME scope must keep serializing on one lock key.
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_same_scope_still_serializes() {
+        // Until Fix 4 lands every scope shares one key, so run DB tests with --test-threads=1.
+        let pool = connect_partitioned_test_db().await;
+        let key = pending_jobs_lock_key("stream-same");
+
+        let mut tx_a = pool.begin().await.unwrap();
+        sqlx::query(&format!("SELECT pg_advisory_xact_lock({key})"))
+            .execute(&mut *tx_a)
+            .await
+            .unwrap();
+
+        let mut tx_b = pool.begin().await.unwrap();
+        let acquired: bool =
+            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key})"))
+                .fetch_one(&mut *tx_b)
+                .await
+                .unwrap();
+        assert!(
+            !acquired,
+            "same scope must serialize: try-lock on key {key} must fail while tx_a holds it"
+        );
+
+        tx_a.rollback().await.unwrap();
+
+        let acquired: bool =
+            sqlx::query_scalar(&format!("SELECT pg_try_advisory_xact_lock({key})"))
+                .fetch_one(&mut *tx_b)
+                .await
+                .unwrap();
+        assert!(
+            acquired,
+            "xact-scoped advisory lock on key {key} must be free once tx_a ends"
+        );
+        tx_b.rollback().await.unwrap();
     }
 }
