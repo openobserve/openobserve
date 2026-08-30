@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :title="value.key"
-                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] truncate pr-1"
+                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] whitespace-pre-wrap break-words pr-1"
               >
                 {{ value.label ?? value.key }}
               </div>
