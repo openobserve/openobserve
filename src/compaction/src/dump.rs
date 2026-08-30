@@ -316,7 +316,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
     }
 
     // generate the dump file
-    let dumped_ids: Vec<(i64, String)> = files.iter().map(|r| (r.id, r.date.clone())).collect();
+    let dumped_ids = dump_delete_pairs(&files);
     let dump_file = match generate_dump(
         &job.org_id,
         job.stream_type,
@@ -786,6 +786,11 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
         ],
     )?;
     Ok(batch)
+}
+
+/// Each id must pair with that record's own stored date, or the pruned delete leaks its row.
+fn dump_delete_pairs(files: &[FileRecord]) -> Vec<(i64, String)> {
+    files.iter().map(|r| (r.id, r.date.clone())).collect()
 }
 
 #[cfg(test)]
@@ -1749,5 +1754,47 @@ mod tests {
                 type_str
             );
         }
+    }
+
+    // ---- dump_delete_pairs ----
+
+    fn delete_pairs_record(id: i64, date: &str) -> FileRecord {
+        FileRecord {
+            id,
+            account: "acct".to_string(),
+            org: "org".to_string(),
+            stream: "org/logs/stream".to_string(),
+            date: date.to_string(),
+            file: "f.parquet".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: 1,
+            max_ts: 2,
+            records: 1,
+            original_size: 1,
+            compressed_size: 1,
+            index_size: 0,
+            bloom_ver: 0,
+            updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn test_dump_delete_pairs_uses_each_records_own_id_and_date() {
+        let files = vec![
+            delete_pairs_record(11, "2021/01/01/00"),
+            delete_pairs_record(22, "2021/01/02/07"),
+            delete_pairs_record(33, "2021/01/01/23"),
+        ];
+        assert_eq!(
+            dump_delete_pairs(&files),
+            vec![
+                (11, "2021/01/01/00".to_string()),
+                (22, "2021/01/02/07".to_string()),
+                (33, "2021/01/01/23".to_string()),
+            ],
+            "every pair must carry that record's own stored (id, date), in input order"
+        );
+        assert!(dump_delete_pairs(&[]).is_empty());
     }
 }

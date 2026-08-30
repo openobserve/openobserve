@@ -2115,7 +2115,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                     };
                 }
                 // delete files by ids, one pruned statement per date group
-                for (date, sql) in build_pruned_delete_statements("file_list", &ids) {
+                for (date, sql) in build_pruned_delete_statements(table, &ids) {
                     DB_QUERY_NUMS
                         .with_label_values(&["delete_id", "file_list"])
                         .inc();
@@ -2150,6 +2150,7 @@ fn build_pruned_delete_statements(
     table: &str,
     ids_with_dates: &[(i64, String)],
 ) -> Vec<(String, String)> {
+    // each date MUST be the stored column value byte-for-byte, else the delete silently no-ops
     let mut by_date: stdHashMap<&str, Vec<i64>> = stdHashMap::new();
     for (id, date) in ids_with_dates {
         by_date.entry(date.as_str()).or_default().push(*id);
