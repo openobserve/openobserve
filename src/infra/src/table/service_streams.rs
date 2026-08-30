@@ -184,14 +184,28 @@ fn normalize_json_object(v: serde_json::Value) -> serde_json::Value {
 /// Empty on a plain insert.
 pub async fn put(
     org_id: &str,
+    record: ServiceRecord,
+    max_streams_per_type: usize,
+) -> Result<Vec<serde_json::Value>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    put_with(client, org_id, record, max_streams_per_type).await
+}
+
+/// [`put`] against a caller-supplied connection.
+///
+/// The `_with` variant exists so the no-op/write-amplification behavior can be
+/// exercised against a real schema in tests — the same shape
+/// `alert_states::get`/`get_with` already use. `put` delegates here so a test
+/// cannot accidentally verify a different code path from the one production runs.
+pub async fn put_with<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    org_id: &str,
     mut record: ServiceRecord,
     max_streams_per_type: usize,
 ) -> Result<Vec<serde_json::Value>, errors::Error> {
     // Normalize disambiguation to sorted-key JSON so that text comparisons in SQLite
     // are stable regardless of insertion order of the original object.
     record.disambiguation = normalize_json_object(record.disambiguation);
-
-    let client = get_orm_client_rw().await;
 
     // Look up the exact row via (org_id, service_name, set_id, disambiguation).
     // Scoping by set_id ensures records from different identity sets never merge.
@@ -403,8 +417,8 @@ pub async fn put(
 ///
 /// Returns the `disambiguation` JSON of each deleted row so callers can evict the
 /// corresponding cache entries (F19).
-async fn delete_subset_orphans(
-    client: &sea_orm::DatabaseConnection,
+async fn delete_subset_orphans<C: sea_orm::ConnectionTrait>(
+    client: &C,
     org_id: &str,
     service_name: &str,
     set_id: &str,
@@ -732,5 +746,600 @@ mod tests {
         assert_eq!(record.set_id, "setid1");
         assert_eq!(record.last_seen, 0);
         assert!(!record.id.is_empty());
+    }
+
+    // ── put_with no-op / write-amplification tests ─────────────────────────
+    //
+    // The bug: `put()` always builds every mutable column as `Set(..)`, so
+    // `.update()` issues a full-column UPDATE even when nothing changed
+    // (measured: 251,333 UPDATEs / 12h in production, ~58% of DB time). The
+    // fix marks a column `Unchanged(existing_value)` instead of `Set(value)`
+    // when the computed new value equals what's already stored, so SeaORM's
+    // own `Updater::is_noop()` (sea-orm 1.1.20, `executor/update.rs`) skips
+    // issuing SQL entirely once every column ends up Unchanged/NotSet.
+    //
+    // Proving "no UPDATE was issued" against sqlite in-memory: row content
+    // alone can't distinguish the fix from the bug (both leave the same
+    // final values — one gets there via a wasted UPDATE). Directly
+    // inspecting SeaORM's `Updater::is_noop()` isn't reachable from outside
+    // the crate. So the fixture (`db()` below) attaches a real SQLite
+    // `AFTER UPDATE OF <column>` trigger per mutable column to
+    // `service_streams`, each incrementing its own counter in a sidecar
+    // `update_audit` table every time that column is named in an UPDATE's
+    // SET clause — regardless of whether the assigned value actually
+    // changed. This is driver-level ground truth: `UpdateOne::prepare_values`
+    // (sea-orm `query/update.rs`) only adds a column to the SQL SET clause
+    // when the ActiveModel field is `ActiveValue::Set(_)`; `Unchanged`/
+    // `NotSet` fields never reach the statement. So `set_clause_count(..)`
+    // for one column proves that column was never `Set(_)` on the
+    // ActiveModel for that call — not just that its final value happens to
+    // match. `last_seen` is `Set(_)` unconditionally in both branches (out
+    // of scope for this fix — see test 7), so `total_set_clause_hits(..)`
+    // is only ever 0 for a call that issues no UPDATE at all (an insert);
+    // an update call that is a no-op for every OTHER column still shows
+    // exactly 1 via `last_seen`, which the per-column tests check for
+    // explicitly rather than relying on the whole-row total.
+
+    /// Every mutable column `put`/`put_with` can write, in the exact spelling
+    /// SQLite uses for the column name (snake_case). Drives the per-column
+    /// audit triggers below, so adding a mutable column to the entity is a
+    /// visible one-line change here rather than a silent gap in coverage.
+    const MUTABLE_COLUMNS: [&str; 7] = [
+        "disambiguation",
+        "all_dimensions",
+        "logs_streams",
+        "traces_streams",
+        "metrics_streams",
+        "field_name_mapping",
+        "last_seen",
+    ];
+
+    /// Sidecar table + trigger fixture, matching `alert_states.rs`'s `db()`
+    /// precedent (`Schema::new(backend).create_table_from_entity`) for the
+    /// base schema.
+    ///
+    /// Per-column `AFTER UPDATE OF <col>` triggers are the no-op proof: SQLite
+    /// fires `UPDATE OF <col>` iff `<col>` is named in the UPDATE statement's
+    /// SET clause — independent of whether the assigned value actually
+    /// differs from what was stored (verified directly against sqlite3: a
+    /// same-value `SET a = 10` still fires `AFTER UPDATE OF a`, while an
+    /// UPDATE that never names `a` does not). SeaORM's `UpdateOne::prepare_values`
+    /// (sea-orm `query/update.rs`) only adds a column to the SET clause when
+    /// the ActiveModel field is `ActiveValue::Set(_)` — `Unchanged`/`NotSet`
+    /// fields never reach the statement. So a zero count on a column's audit
+    /// row after a `put_with` call proves that column was never `Set` on the
+    /// ActiveModel for that call — not merely that its final value matches.
+    async fn db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        let create_table_stmt = schema.create_table_from_entity(Entity);
+        db.execute(backend.build(&create_table_stmt)).await.unwrap();
+
+        db.execute_unprepared(
+            "CREATE TABLE update_audit (id TEXT NOT NULL, col TEXT NOT NULL, hit_count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (id, col))",
+        )
+        .await
+        .unwrap();
+        for col in MUTABLE_COLUMNS {
+            let sql = format!(
+                "CREATE TRIGGER service_streams_audit_{col} \
+                 AFTER UPDATE OF {col} ON service_streams \
+                 BEGIN \
+                     INSERT INTO update_audit (id, col, hit_count) VALUES (NEW.id, '{col}', 1) \
+                     ON CONFLICT(id, col) DO UPDATE SET hit_count = hit_count + 1; \
+                 END"
+            );
+            db.execute_unprepared(&sql).await.unwrap();
+        }
+
+        db
+    }
+
+    /// Number of times `col` has appeared in an UPDATE statement's SET
+    /// clause against `id` since the fixture was created — SQL-level ground
+    /// truth for "was this column `Set(_)` on the ActiveModel," independent
+    /// of the row's final stored value. See [`db`] for why this is a real
+    /// proof and not a value-equality check in disguise.
+    async fn set_clause_count(db: &sea_orm::DatabaseConnection, id: &str, col: &str) -> i64 {
+        use sea_orm::{ConnectionTrait, FromQueryResult, Statement};
+
+        #[derive(FromQueryResult)]
+        struct Row {
+            hit_count: i64,
+        }
+
+        let stmt = Statement::from_sql_and_values(
+            db.get_database_backend(),
+            "SELECT hit_count FROM update_audit WHERE id = ? AND col = ?",
+            [id.into(), col.into()],
+        );
+        Row::find_by_statement(stmt)
+            .one(db)
+            .await
+            .unwrap()
+            .map(|r| r.hit_count)
+            .unwrap_or(0)
+    }
+
+    /// Total UPDATE-statement touches across every mutable column — zero iff
+    /// `Updater::is_noop()` (sea-orm `executor/update.rs`) skipped issuing
+    /// SQL for this row entirely, since a no-op SET clause is empty and no
+    /// column-scoped trigger can fire.
+    async fn total_set_clause_hits(db: &sea_orm::DatabaseConnection, id: &str) -> i64 {
+        let mut total = 0;
+        for col in MUTABLE_COLUMNS {
+            total += set_clause_count(db, id, col).await;
+        }
+        total
+    }
+
+    /// A record shaped like real service-registry telemetry: a k8s identity
+    /// set with a cluster/namespace disambiguation, non-trivial stream
+    /// arrays and dimensions — not an empty/degenerate fixture.
+    fn service_record(disambiguation: serde_json::Value, last_seen: i64) -> ServiceRecord {
+        let mut r = ServiceRecord::new("org1", "checkout-service", "k8s", disambiguation);
+        r.all_dimensions = serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"});
+        r.logs_streams = serde_json::json!(["checkout-service-logs"]);
+        r.traces_streams = serde_json::json!(["checkout-service-traces"]);
+        r.metrics_streams = serde_json::json!(["checkout-service-metrics"]);
+        r.field_name_mapping = Some(serde_json::json!({"service": "kubernetes_labels_app"}));
+        r.last_seen = last_seen;
+        r
+    }
+
+    /// 1. Exact-match branch, byte-identical repeat: the second `put_with`
+    /// call must not touch logs/traces/metrics/all_dimensions/field_name_mapping.
+    /// `last_seen` is explicitly OUT of scope for this fix (see [`db`]'s
+    /// sibling test 7): `active.last_seen = Set(record.last_seen)` stays
+    /// unconditional, so it is `Set(_)` on every call regardless of whether
+    /// its value changed, and its own trigger firing once here is expected,
+    /// not a bug — only the other 5 columns' triggers must stay silent.
+    #[tokio::test]
+    async fn exact_repeat_call_issues_no_update() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let first = service_record(disambiguation.clone(), 1_000);
+        let first_id = first.id.clone();
+
+        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+        assert_eq!(
+            total_set_clause_hits(&db, &first_id).await,
+            0,
+            "insert is not an UPDATE"
+        );
+
+        let repeat = service_record(disambiguation, 1_000);
+        put_with(&db, "org1", repeat, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        for col in [
+            "disambiguation",
+            "all_dimensions",
+            "logs_streams",
+            "traces_streams",
+            "metrics_streams",
+            "field_name_mapping",
+        ] {
+            assert_eq!(
+                set_clause_count(&db, &first_id, col).await,
+                0,
+                "{col} is byte-identical between calls and must never have been Set(_)"
+            );
+        }
+    }
+
+    /// 2. Partial change: only `traces_streams` grows between calls. Proves,
+    /// at the SQL SET-clause level (not just final row values, which the old
+    /// buggy code would also get right via a wasted full-column UPDATE):
+    /// `traces_streams` was actually `Set(_)` on the ActiveModel, while
+    /// `disambiguation`/`all_dimensions`/`logs_streams`/`metrics_streams`/
+    /// `field_name_mapping` were not — only `last_seen` (always written,
+    /// out of scope for this fix) and `traces_streams` may appear.
+    #[tokio::test]
+    async fn partial_change_updates_only_when_a_field_actually_differs() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let first = service_record(disambiguation.clone(), 1_000);
+        let first_id = first.id.clone();
+        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let mut second = service_record(disambiguation, 1_000);
+        second.traces_streams =
+            serde_json::json!(["checkout-service-traces", "checkout-service-traces-v2"]);
+        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            set_clause_count(&db, &first_id, "traces_streams").await,
+            1,
+            "traces_streams grew, so it must have been Set(_) on the ActiveModel"
+        );
+        // last_seen is unconditionally Set every call regardless of scope (out of
+        // scope for this fix), so it is expected to appear here even though its
+        // value (1_000) did not change between the two calls.
+        assert_eq!(
+            set_clause_count(&db, &first_id, "last_seen").await,
+            1,
+            "last_seen is always written, in or out of the no-op set"
+        );
+        for col in [
+            "disambiguation",
+            "all_dimensions",
+            "logs_streams",
+            "metrics_streams",
+            "field_name_mapping",
+        ] {
+            assert_eq!(
+                set_clause_count(&db, &first_id, col).await,
+                0,
+                "{col} did not change and must have been Unchanged(_), not Set(_), on the ActiveModel"
+            );
+        }
+
+        let row = Entity::find_by_id(first_id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        let traces: Vec<&str> = row
+            .traces_streams
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert_eq!(
+            traces,
+            vec!["checkout-service-traces", "checkout-service-traces-v2"]
+        );
+        assert_eq!(
+            row.logs_streams,
+            serde_json::json!(["checkout-service-logs"]),
+            "logs_streams did not change and must retain its original value"
+        );
+    }
+
+    /// 3. Full change: every field the exact-match branch can touch differs
+    /// between calls. Proves a real UPDATE happens and every new value is
+    /// actually persisted. `disambiguation` is excluded here on purpose: the
+    /// exact-match branch is reached only when disambiguation is identical
+    /// between calls (that is what makes it an exact match), and the branch
+    /// never assigns `active.disambiguation` at all — only the upgrade
+    /// branch (tests 5a/5b) can rewrite it.
+    #[tokio::test]
+    async fn full_change_updates_and_persists_every_new_value() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let first = service_record(disambiguation.clone(), 1_000);
+        let first_id = first.id.clone();
+        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let mut second = service_record(disambiguation, 2_000);
+        second.all_dimensions =
+            serde_json::json!({"k8s-cluster": "prod", "k8s-region": "us-east-1"});
+        second.logs_streams = serde_json::json!(["checkout-service-logs-v2"]);
+        second.traces_streams = serde_json::json!(["checkout-service-traces-v2"]);
+        second.metrics_streams = serde_json::json!(["checkout-service-metrics-v2"]);
+        second.field_name_mapping =
+            Some(serde_json::json!({"service": "kubernetes_labels_app_v2"}));
+        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        for col in [
+            "all_dimensions",
+            "logs_streams",
+            "traces_streams",
+            "metrics_streams",
+            "field_name_mapping",
+        ] {
+            assert_eq!(
+                set_clause_count(&db, &first_id, col).await,
+                1,
+                "{col} changed and must have been Set(_)"
+            );
+        }
+        assert_eq!(
+            set_clause_count(&db, &first_id, "disambiguation").await,
+            0,
+            "the exact-match branch never assigns disambiguation, no matter what else changed"
+        );
+        let row = Entity::find_by_id(first_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.logs_streams,
+            serde_json::json!(["checkout-service-logs", "checkout-service-logs-v2"]),
+            "logs_streams unions rather than replaces — existing entries are kept"
+        );
+        assert_eq!(row.last_seen, 2_000);
+        assert_eq!(
+            row.field_name_mapping,
+            Some(serde_json::json!({"service": "kubernetes_labels_app_v2"}))
+        );
+    }
+
+    /// 4a. `field_name_mapping: None` on the second call must leave the
+    /// stored mapping untouched — existing behavior, must not regress —
+    /// and must not itself force a rewrite (only `last_seen`, out of scope
+    /// for this fix, is expected to have been `Set(_)`).
+    #[tokio::test]
+    async fn field_name_mapping_none_preserves_existing_value_and_is_a_noop_field() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let first = service_record(disambiguation.clone(), 1_000);
+        let first_id = first.id.clone();
+        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let mut second = service_record(disambiguation, 1_000);
+        second.field_name_mapping = None;
+        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        for col in [
+            "disambiguation",
+            "all_dimensions",
+            "logs_streams",
+            "traces_streams",
+            "metrics_streams",
+            "field_name_mapping",
+        ] {
+            assert_eq!(
+                set_clause_count(&db, &first_id, col).await,
+                0,
+                "{col}: field_name_mapping=None plus otherwise-identical fields must stay Unchanged(_)"
+            );
+        }
+        let row = Entity::find_by_id(first_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.field_name_mapping,
+            Some(serde_json::json!({"service": "kubernetes_labels_app"})),
+            "existing field_name_mapping must be preserved when the incoming record has None"
+        );
+    }
+
+    /// 4b. `field_name_mapping: Some(x)` where `x` is byte-identical to what's
+    /// stored counts as a no-op for this field specifically.
+    #[tokio::test]
+    async fn field_name_mapping_identical_some_is_a_noop_field() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let first = service_record(disambiguation.clone(), 1_000);
+        let first_id = first.id.clone();
+        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        // Identical to service_record()'s default field_name_mapping.
+        let second = service_record(disambiguation, 1_000);
+        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            set_clause_count(&db, &first_id, "field_name_mapping").await,
+            0,
+            "identical Some(..) field_name_mapping must not force a rewrite"
+        );
+    }
+
+    /// 4c. `field_name_mapping: Some(x)` where `x` differs from what's stored
+    /// must produce a real update.
+    #[tokio::test]
+    async fn field_name_mapping_changed_some_updates() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let first = service_record(disambiguation.clone(), 1_000);
+        let first_id = first.id.clone();
+        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let mut second = service_record(disambiguation, 1_000);
+        second.field_name_mapping = Some(serde_json::json!({"service": "different_raw_field"}));
+        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            set_clause_count(&db, &first_id, "field_name_mapping").await,
+            1,
+            "field_name_mapping changed and must have been Set(_)"
+        );
+        let row = Entity::find_by_id(first_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.field_name_mapping,
+            Some(serde_json::json!({"service": "different_raw_field"}))
+        );
+    }
+
+    /// 5a. Upgrade branch: incoming disambiguation is a subset of the
+    /// existing (richer) row's, and the richer_disambiguation therefore
+    /// resolves to byte-identical to what's already stored. `disambiguation`
+    /// (upgrade-branch-only field) must be marked Unchanged, not rewritten —
+    /// combined with identical logs/traces/metrics/all_dimensions/
+    /// field_name_mapping, the whole call must be a no-op.
+    #[tokio::test]
+    async fn upgrade_branch_subset_incoming_leaves_richer_disambiguation_untouched() {
+        let db = db().await;
+        // Existing row already has the richer disambiguation.
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            1_000,
+        );
+        let richer_id = richer.id.clone();
+        put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        // Incoming disambiguation ({"k8s-cluster": "prod"}) is a strict subset
+        // of the stored one, and every other mutable field is identical, so
+        // richer_disambiguation resolves to the existing value verbatim.
+        let subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        for col in [
+            "disambiguation",
+            "all_dimensions",
+            "logs_streams",
+            "traces_streams",
+            "metrics_streams",
+            "field_name_mapping",
+        ] {
+            assert_eq!(
+                set_clause_count(&db, &richer_id, col).await,
+                0,
+                "{col}: the upgrade branch must not rewrite a field whose resolved value is unchanged"
+            );
+        }
+        let row = Entity::find_by_id(richer_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.disambiguation,
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"})
+        );
+    }
+
+    /// 5b. Upgrade branch: incoming disambiguation is richer than the
+    /// existing (subset) row's, so richer_disambiguation genuinely changes —
+    /// this must be a real update, including the disambiguation column.
+    #[tokio::test]
+    async fn upgrade_branch_richer_incoming_updates_disambiguation() {
+        let db = db().await;
+        let sparse = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        let sparse_id = sparse.id.clone();
+        put_with(&db, "org1", sparse, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            1_000,
+        );
+        put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            set_clause_count(&db, &sparse_id, "disambiguation").await,
+            1,
+            "the incoming row is richer, so disambiguation must actually have been Set(_)"
+        );
+        let row = Entity::find_by_id(sparse_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.disambiguation,
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"})
+        );
+    }
+
+    /// 6. Insert path (no existing row, no upgrade candidate) must keep
+    /// working exactly as today — a regression-safety check, not new
+    /// behavior. An insert is not an UPDATE at all, so it must not touch
+    /// any of the update-counting triggers.
+    #[tokio::test]
+    async fn plain_insert_is_unaffected_and_is_not_an_update() {
+        let db = db().await;
+        let record = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        let id = record.id.clone();
+
+        let orphans = put_with(&db, "org1", record, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(orphans.is_empty(), "a plain insert orphans nothing");
+        assert_eq!(
+            total_set_clause_hits(&db, &id).await,
+            0,
+            "an insert must never register as an UPDATE"
+        );
+        let row = Entity::find_by_id(id).one(&db).await.unwrap().unwrap();
+        assert_eq!(row.org_id, "org1");
+        assert_eq!(row.service_name, "checkout-service");
+        assert_eq!(
+            row.logs_streams,
+            serde_json::json!(["checkout-service-logs"])
+        );
+    }
+
+    /// 7. `last_seen` is explicitly out of scope for this fix: it must be
+    /// written on every call, even when every other field is identical.
+    /// Guards against the fix accidentally scope-creeping into also
+    /// skipping `last_seen` (that coarsening is a separate, deferred
+    /// change) — this call SHOULD still issue a real UPDATE of `last_seen`,
+    /// while every other (identical) field stays Unchanged(_).
+    #[tokio::test]
+    async fn last_seen_always_updates_even_when_nothing_else_changed() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let first = service_record(disambiguation.clone(), 1_000);
+        let first_id = first.id.clone();
+        put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        // Only last_seen differs from the first call.
+        let second = service_record(disambiguation, 2_000);
+        put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            set_clause_count(&db, &first_id, "last_seen").await,
+            1,
+            "last_seen changed, so it must actually have been Set(_)"
+        );
+        for col in [
+            "disambiguation",
+            "all_dimensions",
+            "logs_streams",
+            "traces_streams",
+            "metrics_streams",
+            "field_name_mapping",
+        ] {
+            assert_eq!(
+                set_clause_count(&db, &first_id, col).await,
+                0,
+                "{col} did not change and must stay Unchanged(_) even though last_seen updated"
+            );
+        }
+        let row = Entity::find_by_id(first_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.last_seen, 2_000);
     }
 }

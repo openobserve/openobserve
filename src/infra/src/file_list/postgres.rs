@@ -2152,6 +2152,60 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
     }
 }
 
+/// TEST-ONLY SCAFFOLDING for the compactor write-amplification fix (not yet implemented).
+///
+/// `update_dump_records` (Site A, above) and `inner_batch_process`'s delete path (Site B, above)
+/// both currently issue `DELETE FROM file_list WHERE id IN (...)` with no `date` predicate, which
+/// defeats partition pruning on the range-partitioned `file_list` table (see
+/// `file_list_partition_ddl`). The planned fix threads `date` alongside `id` and groups deletes by
+/// date so each DELETE only touches its own partition.
+///
+/// This helper models that planned shape ahead of the real fix landing at the two call sites.
+/// Once the fix is implemented at Site A/Site B directly, this helper (and its "current buggy
+/// behavior" sibling below) should be removed in favor of calling the real code paths.
+#[cfg(test)]
+async fn delete_file_list_by_id_and_date_fixed(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    table: &str,
+    ids_with_dates: &[(i64, String)],
+) -> Result<()> {
+    let mut by_date: stdHashMap<&str, Vec<i64>> = stdHashMap::new();
+    for (id, date) in ids_with_dates {
+        by_date.entry(date.as_str()).or_default().push(*id);
+    }
+    for (date, ids) in by_date {
+        let ids_str = ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+        let sql = format!("DELETE FROM {table} WHERE date = $1 AND id IN ({ids_str})");
+        sqlx::query(&sql).bind(date).execute(&mut **tx).await?;
+    }
+    Ok(())
+}
+
+/// TEST-ONLY: reproduces today's buggy (unpruned) delete shape used at both Site A
+/// (`postgres.rs:199`) and Site B (`postgres.rs:2128`), for bug-reproduction tests.
+#[cfg(test)]
+async fn delete_file_list_by_id_buggy(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    table: &str,
+    ids: &[i64],
+) -> Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let ids_str = ids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<String>>()
+        .join(",");
+    let sql = format!("DELETE FROM {table} WHERE id IN ({ids_str})");
+    sqlx::query(&sql).execute(&mut **tx).await?;
+    Ok(())
+}
+
 /// Derive date range for partition pruning from microsecond timestamps.
 /// Returns (date_from, date_to) in "YYYY/MM/DD/HH" format suitable for `WHERE date >= $from AND
 /// date < $to`.
@@ -4522,5 +4576,548 @@ mod tests {
         // Empty / invalid falls back to midnight UTC.
         assert_eq!(maintenance_hour(""), 0);
         assert_eq!(maintenance_hour("foo,bar"), 0);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Partition-pruning regression tests for the compactor write-amplification bug.
+    //
+    // `update_dump_records` (Site A, postgres.rs:199) and `inner_batch_process`'s delete path
+    // (Site B, postgres.rs:2128) issue `DELETE FROM file_list WHERE id IN (...)` with no `date`
+    // predicate. Because `file_list` is RANGE partitioned on `date` (`file_list_partition_ddl`)
+    // and the `id` index (`file_list_partition_index_ddl`) becomes one local index PER
+    // PARTITION rather than a global index, a bare `id IN (...)` delete cannot be pruned and
+    // Postgres must probe every partition's local `id` index.
+    //
+    // Unlike `setup_test_tables` above (a single non-partitioned table, which cannot
+    // distinguish a pruned plan from an unpruned one), these tests build a REAL partitioned
+    // table with 3 distinct date partitions, matching production DDL, so a pruning-vs-full-scan
+    // difference is actually observable via `EXPLAIN`.
+    // ------------------------------------------------------------------------------------------
+
+    /// Process-wide counter used to build a table name unique to each call. A bare counter
+    /// (rather than e.g. a timestamp) keeps the generated name short: Postgres silently
+    /// truncates identifiers over 63 bytes, and the longest derived index name
+    /// (`{table}_stream_file_idx`) leaves little budget after the `file_list_partitioned_test_`
+    /// prefix -- a longer unique suffix would truncate two different table names down to the
+    /// same 63-byte identifier and reintroduce the very collision this exists to prevent. Plain
+    /// `Ordering::Relaxed` is enough: uniqueness only requires each call see a distinct value,
+    /// not any cross-thread ordering guarantee.
+    static PARTITIONED_TEST_TABLE_COUNTER: std::sync::atomic::AtomicU64 =
+        std::sync::atomic::AtomicU64::new(0);
+
+    /// Builds a table name unique to this call, so concurrent tests (the default under
+    /// `cargo test`, which runs `#[tokio::test]` functions in parallel) never `CREATE TABLE` the
+    /// same physical table/sequence and collide on `pg_class_relname_nsp_index`.
+    fn unique_partitioned_test_table_name() -> String {
+        let n = PARTITIONED_TEST_TABLE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        format!("file_list_partitioned_test_{n}")
+    }
+
+    /// Opens a dedicated `PgPool` for a single test, instead of reusing the process-wide
+    /// `DB_POOL` (`setup_test_db`). `#[tokio::test]` gives each test its own Tokio runtime by
+    /// default, but `sqlx::Pool`'s background maintenance/reaper task is bound to whichever
+    /// runtime created it; once that first test's runtime shuts down, a `PgPool` cached in a
+    /// `static OnceCell` and reused by a later test (a different runtime) starts failing every
+    /// `acquire()` with `PoolTimedOut`, because Sqlx does not reason about connections it can't
+    /// account for anymore. A fresh pool per test sidesteps this instead of fighting it.
+    async fn connect_partitioned_test_db() -> PgPool {
+        let database_url = std::env::var("TEST_POSTGRES_URL").unwrap_or_else(|_| {
+            "postgresql://postgres:password@localhost:5432/openobserve_test".to_string()
+        });
+        PgPool::connect(&database_url)
+            .await
+            .expect("Failed to connect to test PostgreSQL database")
+    }
+
+    /// Builds a fresh, REAL partitioned `file_list`-shaped table (same column set and index set
+    /// as `file_list_partition_ddl` / `file_list_partition_index_ddl`) with 3 distinct date
+    /// partitions, so partition pruning is actually observable in `EXPLAIN` output. `table` must
+    /// be unique per call (see `unique_partitioned_test_table_name`) -- concurrent tests sharing
+    /// one hardcoded name race to `CREATE TABLE`/`CREATE SEQUENCE` and collide.
+    async fn setup_partitioned_test_table(pool: &PgPool, table: &str) -> Result<()> {
+        sqlx::query(&format!("DROP TABLE IF EXISTS {table}"))
+            .execute(pool)
+            .await?;
+        sqlx::query(&file_list_partition_ddl(table))
+            .execute(pool)
+            .await?;
+        for ddl in file_list_partition_index_ddl(table) {
+            sqlx::query(&ddl).execute(pool).await?;
+        }
+        for day in ["01", "02", "03"] {
+            let part_name = format!("{table}_p_202101{day}");
+            let range_from = format!("2021/01/{day}/00");
+            let next_day = format!("{:02}", day.parse::<u32>().unwrap() + 1);
+            let range_to = format!("2021/01/{next_day}/00");
+            sqlx::query(&format!(
+                "CREATE TABLE {part_name} PARTITION OF {table} FOR VALUES FROM ('{range_from}') TO ('{range_to}')"
+            ))
+            .execute(pool)
+            .await?;
+        }
+        Ok(())
+    }
+
+    /// Drops a table created by `setup_partitioned_test_table`, including its partitions
+    /// (Postgres cascades a parent `DROP TABLE` onto its declarative partitions automatically).
+    /// Called explicitly at the end of every partitioned test so the shared test database
+    /// doesn't accumulate garbage tables run after run. A test that panics via `unwrap()` skips
+    /// this call and leaves its table behind, but each table's unique name (see
+    /// `unique_partitioned_test_table_name`) means an orphan is only ever cosmetic clutter --
+    /// never a name collision with a later test, which is the actual correctness property this
+    /// suite depends on.
+    async fn drop_partitioned_test_table(pool: &PgPool, table: &str) {
+        let _ = sqlx::query(&format!("DROP TABLE IF EXISTS {table}"))
+            .execute(pool)
+            .await;
+    }
+
+    async fn insert_partitioned_test_row(
+        pool: &PgPool,
+        table: &str,
+        date: &str,
+        stream: &str,
+        file: &str,
+    ) -> Result<i64> {
+        let now_ts = now_micros();
+        let id: i64 = sqlx::query_scalar(&format!(
+            r#"INSERT INTO {table}
+              (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
+            VALUES
+              ('acct', 'org1', $1, $2, $3, false, 1, 2, 1, 1, 1, 1, 0, false, $4)
+            RETURNING id"#
+        ))
+        .bind(stream)
+        .bind(date)
+        .bind(file)
+        .bind(now_ts)
+        .fetch_one(pool)
+        .await?;
+        Ok(id)
+    }
+
+    /// Runs `EXPLAIN (FORMAT TEXT) <delete_sql>` and returns the raw plan lines (one row per
+    /// line of plan text, matching `psql`'s own rendering of `EXPLAIN`). Wrapped in a
+    /// transaction that is always rolled back so EXPLAIN's actual execution of the DELETE
+    /// (needed for accurate row-count estimates) never persists.
+    async fn explain_delete_lines(
+        pool: &PgPool,
+        delete_sql: &str,
+        bind_date: Option<&str>,
+    ) -> Result<Vec<String>> {
+        let mut tx = pool.begin().await?;
+        let explain_sql = format!("EXPLAIN (FORMAT TEXT) {delete_sql}");
+        let query = if let Some(date) = bind_date {
+            sqlx::query(&explain_sql).bind(date)
+        } else {
+            sqlx::query(&explain_sql)
+        };
+        let rows = query.fetch_all(&mut *tx).await?;
+        tx.rollback().await?;
+        Ok(rows.iter().map(|r| r.get::<String, usize>(0)).collect())
+    }
+
+    /// Counts `Delete on <partition>` lines in an EXPLAIN TEXT plan for a partitioned table --
+    /// i.e. how many partitions the planner actually touches. The first line is always
+    /// `Delete on <parent_table> ...` (the ModifyTable node itself, not a partition), so it is
+    /// excluded.
+    fn count_touched_partitions(plan_lines: &[String]) -> usize {
+        plan_lines
+            .iter()
+            .skip(1)
+            .filter(|line| line.trim_start().starts_with("Delete on "))
+            .count()
+    }
+
+    /// CATEGORY: bug reproduction (expected to PASS today; documents the bug).
+    ///
+    /// A bare `DELETE FROM file_list WHERE id IN (...)` against a 3-partition table touches ALL
+    /// 3 partitions in the query plan, even though the target id only exists in 1 partition.
+    /// This is the root cause of the multi-second/23s DELETE latency seen in production.
+    ///
+    /// This test is intentionally kept as a permanent regression guard: if a future change
+    /// removes the `date` predicate from the fixed delete path again, this test's assertion
+    /// (`touched == 3`, i.e. no pruning) still holds and continues to document/prove the
+    /// unpruned shape is what "no date predicate" produces on this schema. It is not meant to
+    /// start failing once the fix lands elsewhere -- it tests the OLD query shape directly, not
+    /// the code at Site A/B.
+    #[tokio::test]
+    async fn test_bug_repro_unpruned_delete_touches_all_partitions() {
+        let pool = connect_partitioned_test_db().await;
+        let table = unique_partitioned_test_table_name();
+        setup_partitioned_test_table(&pool, &table).await.unwrap();
+
+        let id1 = insert_partitioned_test_row(&pool, &table, "2021/01/01/00", "s1", "f1.parquet")
+            .await
+            .unwrap();
+
+        let plan = explain_delete_lines(
+            &pool,
+            &format!("DELETE FROM {table} WHERE id IN ({id1})"),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            count_touched_partitions(&plan),
+            3,
+            "bug repro: bare `id IN (...)` with no date predicate must touch all 3 partitions, plan:\n{}",
+            plan.join("\n")
+        );
+
+        drop_partitioned_test_table(&pool, &table).await;
+    }
+
+    /// CATEGORY: bug reproduction. `delete_file_list_by_id_buggy` (the exact query shape
+    /// currently used at Site A/B) is functionally correct today -- it deletes the right row --
+    /// which is precisely why the bug has been latent: nothing about correctness signals the
+    /// missing partition pruning. Only EXPLAIN (see the test above) reveals it.
+    #[tokio::test]
+    async fn test_bug_repro_buggy_delete_is_functionally_correct_but_unpruned() {
+        let pool = connect_partitioned_test_db().await;
+        let table = unique_partitioned_test_table_name();
+        setup_partitioned_test_table(&pool, &table).await.unwrap();
+
+        let keep =
+            insert_partitioned_test_row(&pool, &table, "2021/01/01/00", "s1", "keep.parquet")
+                .await
+                .unwrap();
+        let del = insert_partitioned_test_row(&pool, &table, "2021/01/02/00", "s1", "del.parquet")
+            .await
+            .unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        delete_file_list_by_id_buggy(&mut tx, &table, &[del])
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        let remaining: Vec<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table}"))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            remaining,
+            vec![keep],
+            "the buggy shape deletes the correct row -- its problem is unpruned latency, not correctness"
+        );
+
+        drop_partitioned_test_table(&pool, &table).await;
+    }
+
+    /// CATEGORY: fix behavior (expected to FAIL until the fix threads `date` through the delete
+    /// path, or in this test's case, until it is confirmed the `date = $1 AND id IN (...)` shape
+    /// prunes correctly -- this proves the SQL shape the fix will use is correct).
+    ///
+    /// With a `date = $1 AND id IN (...)` predicate, only the ONE partition holding that date is
+    /// touched, even though the same ids table has 3 partitions total.
+    #[tokio::test]
+    async fn test_fix_pruned_delete_touches_single_partition() {
+        let pool = connect_partitioned_test_db().await;
+        let table = unique_partitioned_test_table_name();
+        setup_partitioned_test_table(&pool, &table).await.unwrap();
+
+        let id1 = insert_partitioned_test_row(&pool, &table, "2021/01/01/00", "s1", "f1.parquet")
+            .await
+            .unwrap();
+
+        let plan = explain_delete_lines(
+            &pool,
+            &format!("DELETE FROM {table} WHERE date = $1 AND id IN ({id1})"),
+            Some("2021/01/01/00"),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            count_touched_partitions(&plan),
+            1,
+            "fix: `date = $1 AND id IN (...)` must touch exactly 1 partition, plan:\n{}",
+            plan.join("\n")
+        );
+        assert!(
+            plan.iter()
+                .any(|l| l.contains(&format!("{table}_p_20210101"))),
+            "the single touched partition must be the one actually holding the target id, plan:\n{}",
+            plan.join("\n")
+        );
+
+        drop_partitioned_test_table(&pool, &table).await;
+    }
+
+    /// CATEGORY: fix behavior. Ids spanning 2 different date partitions must be handled as 2
+    /// separate pruned single-partition deletes (per `delete_file_list_by_id_and_date_fixed`,
+    /// which groups by date), never a single unpruned multi-partition delete. Also verifies
+    /// actual row deletion correctness: right rows gone, nothing else touched.
+    #[tokio::test]
+    async fn test_fix_multiple_dates_grouped_into_pruned_deletes() {
+        let pool = connect_partitioned_test_db().await;
+        let table = unique_partitioned_test_table_name();
+        setup_partitioned_test_table(&pool, &table).await.unwrap();
+
+        let id_day1 =
+            insert_partitioned_test_row(&pool, &table, "2021/01/01/00", "s1", "f1.parquet")
+                .await
+                .unwrap();
+        let id_day2 =
+            insert_partitioned_test_row(&pool, &table, "2021/01/02/00", "s1", "f2.parquet")
+                .await
+                .unwrap();
+        let id_day3_untouched =
+            insert_partitioned_test_row(&pool, &table, "2021/01/03/00", "s1", "f3.parquet")
+                .await
+                .unwrap();
+
+        // Each date group's delete plan, taken individually, must be pruned to 1 partition.
+        for (id, date, expected_partition) in [
+            (id_day1, "2021/01/01/00", "20210101"),
+            (id_day2, "2021/01/02/00", "20210102"),
+        ] {
+            let plan = explain_delete_lines(
+                &pool,
+                &format!("DELETE FROM {table} WHERE date = $1 AND id IN ({id})"),
+                Some(date),
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                count_touched_partitions(&plan),
+                1,
+                "date group {date} must touch exactly 1 partition, plan:\n{}",
+                plan.join("\n")
+            );
+            assert!(
+                plan.iter()
+                    .any(|l| l.contains(&format!("{table}_p_{expected_partition}"))),
+                "date group {date} must touch partition {expected_partition}, plan:\n{}",
+                plan.join("\n")
+            );
+        }
+
+        // Now actually run the grouped delete and verify exact row-level correctness.
+        let mut tx = pool.begin().await.unwrap();
+        delete_file_list_by_id_and_date_fixed(
+            &mut tx,
+            &table,
+            &[
+                (id_day1, "2021/01/01/00".to_string()),
+                (id_day2, "2021/01/02/00".to_string()),
+            ],
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        let remaining_ids: Vec<i64> =
+            sqlx::query_scalar(&format!("SELECT id FROM {table} ORDER BY id"))
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            remaining_ids,
+            vec![id_day3_untouched],
+            "only the day-3 row should remain after deleting the day-1 and day-2 ids"
+        );
+
+        drop_partitioned_test_table(&pool, &table).await;
+    }
+
+    /// CATEGORY: correctness regression guard, independent of EXPLAIN. After a grouped
+    /// `(id, date)` delete, exactly the targeted rows are gone and no others, verified via row
+    /// counts and explicit id membership before/after.
+    #[tokio::test]
+    async fn test_correctness_delete_removes_exactly_targeted_rows() {
+        let pool = connect_partitioned_test_db().await;
+        let table = unique_partitioned_test_table_name();
+        setup_partitioned_test_table(&pool, &table).await.unwrap();
+
+        let keep1 =
+            insert_partitioned_test_row(&pool, &table, "2021/01/01/00", "s1", "keep1.parquet")
+                .await
+                .unwrap();
+        let del1 =
+            insert_partitioned_test_row(&pool, &table, "2021/01/01/00", "s1", "del1.parquet")
+                .await
+                .unwrap();
+        let keep2 =
+            insert_partitioned_test_row(&pool, &table, "2021/01/02/00", "s1", "keep2.parquet")
+                .await
+                .unwrap();
+        let del2 =
+            insert_partitioned_test_row(&pool, &table, "2021/01/03/00", "s1", "del2.parquet")
+                .await
+                .unwrap();
+
+        let before_count: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM {table}"))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(before_count, 4);
+
+        let mut tx = pool.begin().await.unwrap();
+        delete_file_list_by_id_and_date_fixed(
+            &mut tx,
+            &table,
+            &[
+                (del1, "2021/01/01/00".to_string()),
+                (del2, "2021/01/03/00".to_string()),
+            ],
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        let mut remaining_ids: Vec<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table}"))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        remaining_ids.sort();
+        let mut expected = vec![keep1, keep2];
+        expected.sort();
+        assert_eq!(
+            remaining_ids, expected,
+            "exactly the deleted ids should be gone; unrelated rows must remain untouched"
+        );
+
+        drop_partitioned_test_table(&pool, &table).await;
+    }
+
+    /// Site A (`update_dump_records`, postgres.rs:140) AND Site B (`inner_batch_process`'s
+    /// delete path, postgres.rs:2128), exercised end-to-end via the `FileList` trait against
+    /// the test DB, in a single test function.
+    ///
+    /// Both halves are kept in ONE `#[tokio::test]` rather than two, deliberately: both go
+    /// through `PostgresFileList`, which uses the process-wide `static Lazy<Pool<Postgres>>`
+    /// `CLIENT_RW`/`CLIENT_RO` (`db/postgres.rs`), not the per-test pool the partition tests
+    /// above use. `#[tokio::test]` gives every test its own Tokio runtime, but `CLIENT_RW`'s
+    /// pool is created lazily on first use and then bound to whichever test's runtime touched
+    /// it first; once that runtime shuts down, a second `#[tokio::test]` (a new runtime) reusing
+    /// the same `CLIENT_RW` fails every acquire with `PoolTimedOut`. Splitting Site A and Site B
+    /// into separate test functions reproduced exactly that failure. A single test function
+    /// keeps `CLIENT_RW` alive under one runtime for both checks.
+    ///
+    /// Confirms the current (unfixed) code deletes the right ROWS at both sites -- functional
+    /// correctness holds today; what's missing is partition pruning, covered by the
+    /// EXPLAIN-based tests above. Also confirms `FileRecord.date` (`file_list/mod.rs:774`, no
+    /// `#[sqlx(default)]`, i.e. required on every row) flows through `query_for_dump` correctly
+    /// -- that's the data the real Site A fix threads through instead of bare ids.
+    #[tokio::test]
+    async fn test_site_a_and_site_b_delete_paths_remove_correct_rows() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let meta = create_test_file_meta();
+
+        // ---- Site A: update_dump_records ----
+        let dump_stream_key = "org1/logs/dump_test_stream";
+        let keep_key = format!("files/{dump_stream_key}/2021/01/01/00/keep.parquet");
+        let dump_key = format!("files/{dump_stream_key}/2021/01/01/00/dumped.parquet");
+        let keep_id = postgres_list.add("acct", &keep_key, &meta).await.unwrap();
+        let dump_id = postgres_list.add("acct", &dump_key, &meta).await.unwrap();
+
+        // `query_for_dump` returns FileRecord, whose `date` field is required (non-default) --
+        // this is the data the real Site A fix threads through instead of bare ids.
+        let records = postgres_list
+            .query_for_dump(
+                "org1",
+                StreamType::Logs,
+                "dump_test_stream",
+                (meta.min_ts - 1000, meta.max_ts + 1000),
+            )
+            .await
+            .unwrap();
+        let dumped_record = records
+            .iter()
+            .find(|r| r.id == dump_id)
+            .expect("dumped file must be present in query_for_dump results");
+        assert_eq!(
+            dumped_record.date, "2021/01/01/00",
+            "FileRecord.date must flow through query_for_dump correctly"
+        );
+
+        let dump_file_key = create_test_file_key(
+            "acct",
+            &format!("files/{dump_stream_key}/2021/01/02/00/dump_summary.parquet"),
+            false,
+        );
+        postgres_list
+            .update_dump_records(&dump_file_key, &[dump_id])
+            .await
+            .unwrap();
+
+        let remaining: Vec<i64> = sqlx::query_scalar("SELECT id FROM file_list WHERE stream = $1")
+            .bind(dump_stream_key)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(
+            !remaining.contains(&dump_id),
+            "update_dump_records must delete the dumped id"
+        );
+        assert!(
+            remaining.contains(&keep_id),
+            "update_dump_records must not delete unrelated ids"
+        );
+
+        // ---- Site B: inner_batch_process's delete path (via batch_process) ----
+        // del_items with `id > 0` (the common case once ids are already known, e.g. from a
+        // prior `batch_add`) currently skip date-key extraction entirely in
+        // `inner_batch_process` -- the `parse_file_key_columns` call in that loop only runs on
+        // the `id <= 0` branch. The real fix must extract `date_key` unconditionally for every
+        // del_item, not just the zero-id ones.
+        let batch_stream = "org1/logs/batch_del_stream";
+        let batch_keep_key = format!("files/{batch_stream}/2021/01/01/00/keep.parquet");
+        let batch_del_key = format!("files/{batch_stream}/2021/01/02/00/del.parquet");
+
+        let add_files = vec![
+            create_test_file_key("acct", &batch_keep_key, false),
+            create_test_file_key("acct", &batch_del_key, false),
+        ];
+        postgres_list.batch_add(&add_files).await.unwrap();
+
+        let ids: Vec<(String, i64)> =
+            sqlx::query("SELECT file, id FROM file_list WHERE stream = $1")
+                .bind(batch_stream)
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|r| (r.get::<String, _>(0), r.get::<i64, _>(1)))
+                .collect();
+        let del_id = ids
+            .iter()
+            .find(|(f, _)| f == "del.parquet")
+            .map(|(_, id)| *id)
+            .expect("del.parquet must have been inserted with an id");
+        let batch_keep_id = ids
+            .iter()
+            .find(|(f, _)| f == "keep.parquet")
+            .map(|(_, id)| *id)
+            .expect("keep.parquet must have been inserted with an id");
+
+        // del_items carrying a real (>0) id, as inner_batch_process sorts/dedupes on before
+        // deleting -- this is the branch that currently skips date-key extraction entirely.
+        let mut del_file_key = create_test_file_key("acct", &batch_del_key, true);
+        del_file_key.id = del_id;
+        postgres_list
+            .batch_process(std::slice::from_ref(&del_file_key))
+            .await
+            .unwrap();
+
+        let remaining: Vec<i64> = sqlx::query_scalar("SELECT id FROM file_list WHERE stream = $1")
+            .bind(batch_stream)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(
+            !remaining.contains(&del_id),
+            "inner_batch_process must delete the targeted (deleted=true) id"
+        );
+        assert!(
+            remaining.contains(&batch_keep_id),
+            "inner_batch_process must not delete unrelated ids"
+        );
     }
 }
