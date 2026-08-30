@@ -127,8 +127,7 @@ pub struct ServiceRecord {
 pub struct PutOutcome {
     /// `disambiguation` JSON of each orphaned lower-specificity row this put deleted (F19).
     pub orphans: Vec<serde_json::Value>,
-    /// True iff a data column changed, a row was inserted, or an orphan was deleted;
-    /// last_seen-only writes do not count.
+    /// True iff a data column changed, a row inserted, or an orphan deleted; not last_seen alone.
     pub changed: bool,
 }
 
@@ -1517,6 +1516,33 @@ mod tests {
         );
     }
 
+    // Metrics varies alone, so a typo'd comparand triplicating logs/traces cannot survive.
+    #[tokio::test]
+    async fn metrics_streams_only_change_reports_changed_true() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let _ = put_with(
+            &db,
+            "org1",
+            service_record(disambiguation.clone(), 1_000),
+            DEFAULT_MAX_STREAMS_PER_TYPE,
+        )
+        .await
+        .unwrap();
+
+        let mut second = service_record(disambiguation, 1_000);
+        second.metrics_streams =
+            serde_json::json!(["checkout-service-metrics", "checkout-service-metrics-v2"]);
+        let outcome = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.changed,
+            "metrics_streams is the only field that grew and it must count as changed"
+        );
+    }
+
     #[tokio::test]
     async fn plain_insert_reports_changed_true() {
         let db = db().await;
@@ -1538,6 +1564,7 @@ mod tests {
             serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
             1_000,
         );
+        let richer_id = richer.id.clone();
         let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
             .await
             .unwrap();
@@ -1551,6 +1578,15 @@ mod tests {
         assert!(
             outcome.orphans.is_empty(),
             "the only row is the kept one, so nothing is orphaned"
+        );
+        let row = Entity::find_by_id(richer_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.last_seen, 2_000,
+            "changed=false must not mean the UPDATE was skipped — last_seen still persists"
         );
         assert!(
             !outcome.changed,
@@ -1603,6 +1639,114 @@ mod tests {
         assert!(
             outcome.changed,
             "the stream union gained an entry, so the upgrade branch must report changed"
+        );
+    }
+
+    // Upgrade twin of the fnm-only case: a copy-paste derivation dropping fnm there must die.
+    #[tokio::test]
+    async fn upgrade_branch_fnm_only_change_reports_changed_true() {
+        let db = db().await;
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            1_000,
+        );
+        let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        // Case-B upgrade: streams, dims, and disambiguation all resolve to stored.
+        let mut subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        subset.field_name_mapping = Some(serde_json::json!({"service": "different_raw_field"}));
+        let outcome = put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.changed,
+            "field_name_mapping is the only field that differs and the upgrade branch must count it"
+        );
+    }
+
+    // Upgrade twin of the dims-only case; a NEW key survives the base-wins union.
+    #[tokio::test]
+    async fn upgrade_branch_all_dimensions_only_change_reports_changed_true() {
+        let db = db().await;
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            1_000,
+        );
+        let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let mut subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        subset.all_dimensions = serde_json::json!({
+            "k8s-cluster": "prod",
+            "k8s-namespace": "ecommerce",
+            "k8s-region": "us-east-1"
+        });
+        let outcome = put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.changed,
+            "the merged all_dimensions gained a key and the upgrade branch must count it"
+        );
+    }
+
+    // Pins orphan→changed in the upgrade branch too, not just the exact-match branch.
+    #[tokio::test]
+    async fn upgrade_branch_orphan_deletion_on_noop_reports_changed_true() {
+        let db = db().await;
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            1_000,
+        );
+        let richer_id = richer.id.clone();
+        let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        // Disjoint from the incoming subset so the put cannot exact-match or upgrade this row.
+        let orphan = ActiveModel {
+            id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+            org_id: Set("org1".to_owned()),
+            service_name: Set("checkout-service".to_owned()),
+            set_id: Set("k8s".to_owned()),
+            disambiguation: Set(serde_json::json!({"k8s-namespace": "ecommerce"})),
+            all_dimensions: Set(serde_json::json!({})),
+            logs_streams: Set(serde_json::json!([])),
+            traces_streams: Set(serde_json::json!([])),
+            metrics_streams: Set(serde_json::json!([])),
+            field_name_mapping: Set(None),
+            last_seen: Set(500),
+        };
+        Entity::insert(orphan).exec(&db).await.unwrap();
+
+        // Case-B upgrade whose kept-row fields all resolve to stored; only the orphan dies.
+        let subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 2_000);
+        let outcome = put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            outcome.orphans,
+            vec![serde_json::json!({"k8s-namespace": "ecommerce"})],
+            "the seeded strict-subset row must be deleted as an orphan"
+        );
+        let row = Entity::find_by_id(richer_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.last_seen, 2_000,
+            "the upgrade-branch no-op must still persist last_seen"
+        );
+        assert!(
+            outcome.changed,
+            "the upgrade branch deleted a row, so caches must evict its key"
         );
     }
 
