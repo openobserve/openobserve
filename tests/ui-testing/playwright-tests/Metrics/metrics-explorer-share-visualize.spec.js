@@ -132,7 +132,6 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.expectShareButtonVisible();
 
     await pm.metricsExplorerPage.switchToVisualize();
-    await pm.metricsExplorerPage.expectModeActive('visualize');
     await pm.metricsExplorerPage.expectShareButtonVisible();
 
     await pm.metricsExplorerPage.switchToWorkspace();
@@ -201,6 +200,15 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.expectExplorerVisible();
     await pm.metricsExplorerPage.switchToVisualize();
     await pm.metricsExplorerPage.waitForVisualizeReady();
+
+    // A card drill-in also reports Visualize active, so the editor must actually be mounted before a blank query proves the panel was not seeded.
+    await pm.metricsExplorerPage.waitForVisualizeQueryEditorMounted();
+    await pm.metricsExplorerPage.waitForVisualizeQuerySettled();
+    const seededQuery = (await pm.metricsExplorerPage.getVisualizeQueryText()).trim();
+    expect(
+      seededQuery,
+      'panel was seeded — Visualize was entered by a metric-card drill-in, not the mode toggle'
+    ).toBe('');
 
     // visualizeBlob short-circuits on an empty queries[0].query, so nothing is
     // encoded. Assert it stays absent rather than merely reading once — the

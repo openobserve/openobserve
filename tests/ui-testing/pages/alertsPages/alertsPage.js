@@ -1399,67 +1399,51 @@ export class AlertsPage {
         // Always navigate to the Alerts section first — createFolder (called by ensureFolderExists)
         // may leave the browser on the Dashboards page since folders are shared across modules.
         // Clicking a folder item without switching to Alerts first opens a Dashboard folder instead.
-        const isOnAlertsPage = await this.page.locator(this.locators.alertListTable).isVisible({ timeout: 3000 }).catch(() => false);
+        const isOnAlertsPage = await this.page.locator(this.locators.alertListTable).isVisible().catch(() => false);
         if (!isOnAlertsPage) {
             await this.navigateToAlertsPage();
         }
 
-        // The folder list is reka OTabs. The clickable element is the [role="tab"] TabsTrigger
-        // that wraps the folder-name cell (data-test="dashboard-folder-tab-name-<name>"); it is
-        // the element that carries data-state="active" AND, via OTabs' v-model, drives
-        // activeFolderId — the folder the "New alert" wizard writes the alert into.
-        //
-        // Two bugs made the old approach silently switch to the wrong folder:
-        //   1. It clicked the inner .folder-item <div>, not the tab. The list is virtualized/
-        //      animated, so a force-click can land mid-reflow and never flip the reka tab.
-        //   2. It then gated only on the alert table OR empty-state being visible. The DEFAULT
-        //      folder's table is already on screen, so that gate is a FALSE success: the method
-        //      returned while still on "default", and any alert created next landed in "default"
-        //      instead of the intended folder (target folder then reads empty at export/move,
-        //      timing out the row wait). Trace confirmed POST /alerts?folder=default here.
-        // Fix: click the tab itself and gate on it actually becoming active before returning.
+        // The [role="tab"] TabsTrigger, not the inner folder-item div, carries data-state and drives the activeFolderId the "New alert" wizard writes into.
         const folderTab = this.page.locator(
             `[role="tab"]:has([data-test="dashboard-folder-tab-name-${folderName}"])`
         ).first();
-        const tabVisible = await folderTab.isVisible({ timeout: 10000 }).catch(() => false);
-        if (tabVisible) {
-            // Force-click past the reflow until data-state="active". But data-state flips
-            // before activeFolderId (AlertList.vue) settles, and the "New alert" route reads
-            // activeFolderId — so a createAlert() right after can create in the stale "default"
-            // folder. Also gate on the folder-scoped list refetch (GET .../alerts?...folder=<id>,
-            // id != "default"), which only fires once activeFolderId has actually flipped.
-            let attempt = 0;
-            await expect(async () => {
-                attempt += 1;
-                if ((await folderTab.getAttribute('data-state')) !== 'active') {
-                    await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
-                    // Only the first click triggers the folder-scoped refetch. Re-arming this
-                    // wait on later attempts blocks 8s on a request that will never come, which
-                    // is most of the retry budget spent learning nothing.
-                    const scopedListSettled = (folderName === 'default' || attempt > 1)
-                        ? Promise.resolve()
-                        : this.page.waitForResponse(
-                            resp => resp.request().method() === 'GET'
-                                && resp.url().includes('/alerts?')
-                                && /[?&]folder=/.test(resp.url())
-                                && !/[?&]folder=default(?:&|$)/.test(resp.url()),
-                            { timeout: 8000 }
-                          ).catch(() => {});
-                    // Actionability includes Playwright's stability check — the same bounding box
-                    // across two animation frames — which is exactly the mid-reflow landing that
-                    // `force` skips past. Keep force only as the fallback for a genuinely
-                    // obscured tab, so the animated case waits instead of racing.
-                    await folderTab.click({ timeout: 5000 }).catch(async () => {
-                        await folderTab.click({ force: true, timeout: 3000 });
-                    });
-                    await scopedListSettled;
-                }
-                await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
-            }).toPass({ timeout: 45000, intervals: [500, 1000, 2000, 3000] });
-        } else {
-            // Fallback to generic text selector for any legacy markup, then still verify below.
-            await this.page.getByText(folderName).first().click({ force: true });
+        // locator.isVisible() ignores its timeout option.
+        const waitForFolderTab = (timeout) =>
+            folderTab.waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+        if (!(await waitForFolderTab(10000))) {
+            // The folder list is fetched once per page load; a newer folder needs a refetch.
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await this.waitForAlertListPageReady().catch(() => {});
+            if (!(await waitForFolderTab(15000))) {
+                testLogger.error('Folder tab never appeared in the alerts folder list', { folderName });
+                throw new Error(`Cannot navigate to folder "${folderName}": its tab is absent from the alerts folder list even after reloading it`);
+            }
         }
+        // data-state flips before AlertList.vue's activeFolderId — which the "New alert" route reads — settles, so also gate on the folder-scoped refetch.
+        let attempt = 0;
+        await expect(async () => {
+            attempt += 1;
+            if ((await folderTab.getAttribute('data-state')) !== 'active') {
+                await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                // Only the first click triggers the folder-scoped refetch; re-arming this wait later burns 8s of the retry budget on a request that never comes.
+                const scopedListSettled = (folderName === 'default' || attempt > 1)
+                    ? Promise.resolve()
+                    : this.page.waitForResponse(
+                        resp => resp.request().method() === 'GET'
+                            && resp.url().includes('/alerts?')
+                            && /[?&]folder=/.test(resp.url())
+                            && !/[?&]folder=default(?:&|$)/.test(resp.url()),
+                        { timeout: 8000 }
+                      ).catch(() => {});
+                // `force` skips Playwright's stability check, the very mid-reflow landing we need to wait out, so keep it as the obscured-tab fallback only.
+                await folderTab.click({ timeout: 5000 }).catch(async () => {
+                    await folderTab.click({ force: true, timeout: 3000 });
+                });
+                await scopedListSettled;
+            }
+            await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
+        }).toPass({ timeout: 45000, intervals: [500, 1000, 2000, 3000] });
         try {
             await Promise.race([
                 this.page.locator(this.locators.alertListTable).waitFor({ state: 'visible', timeout: 30000 }),
