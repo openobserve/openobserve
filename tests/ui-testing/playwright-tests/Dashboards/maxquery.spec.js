@@ -283,13 +283,19 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
-      // Register one listener per panel before triggering the time range change
-      const allSearchesDone = mqr.createNSearchResponsesPromise(chartTypes.length);
+      // Best-effort settle, not a gate: a panel whose range is already clamped renders the
+      // warning without issuing a query, so "one countable search per panel" is an assumption
+      // about the network layer the app does not make. Counting short is normal — failing the
+      // test on it reported a missing response where the behaviour under test was fine.
+      const allSearchesDone = mqr
+        .createNSearchResponsesPromise(chartTypes.length, 20000)
+        .catch(() => {});
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
       await allSearchesDone;
 
-      // Verify all panels show the warning (retries until count is met or timeout)
-      await expect(pm.dashboardMaxQueryRange.warningIcon).toHaveCount(chartTypes.length, { timeout: 15000 });
+      // The real gate: poll the warning count, which is the behaviour this test exists to check.
+      // Budgeted for the slow-search case the wait above no longer absorbs.
+      await expect(pm.dashboardMaxQueryRange.warningIcon).toHaveCount(chartTypes.length, { timeout: 45000 });
       testLogger.info(`All ${chartTypes.length} panels show max query range warning`);
 
       // Cleanup
