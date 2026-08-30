@@ -108,8 +108,7 @@ pub struct SlackOAuthStartResponse {
     authorization_url: String,
 }
 
-/// The code Slack handed the callback, plus the state issued by `start`, which must still be
-/// unexpired.
+/// Slack's callback code plus the still-unexpired state issued by `start`.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SlackOAuthExchangeRequest {
@@ -137,8 +136,7 @@ struct SlackIncomingWebhook {
     url: String,
 }
 
-/// Carries only the incoming webhook Slack bound to the chosen channel; the access token never
-/// leaves the server.
+/// Only the channel-bound incoming webhook; the access token never leaves the server.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SlackOAuthConnection {
@@ -440,8 +438,7 @@ pub async fn start(
     MetaHttpResponse::json(SlackOAuthStartResponse { authorization_url })
 }
 
-/// Verifies the signed state, redeems the code, and returns only the webhook Slack bound to the
-/// chosen channel.
+/// Verifies the signed state, redeems the code, and returns only the channel-bound webhook.
 #[utoipa::path(
     post,
     path = "/{org_id}/alerts/destinations/slack/oauth/exchange",

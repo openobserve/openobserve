@@ -245,9 +245,7 @@ pub struct AxisArg {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
 #[serde(untagged)]
 pub enum AxisArgValueWrapper {
-    /// A nested expression, e.g. `sum(TRY_CAST(col AS DOUBLE))`. MUST stay first:
-    /// every field of `AxisArgValue` is optional, so it matches any object and
-    /// would otherwise swallow this one and silently drop the nesting on save.
+    /// MUST precede Object, whose fields are all optional and would otherwise swallow this.
     Function(Box<AxisArgFunction>),
     Object(AxisArgValue),
     String(String),
@@ -255,20 +253,13 @@ pub enum AxisArgValueWrapper {
     Number(OrdF64),
 }
 
-/// The argument of a nested function expression. `args` is required, and is what
-/// separates this variant from a plain field reference during untagged matching.
+/// A nested function call; its required `args` distinguishes it during untagged matching.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisArgFunction {
-    /// Serialized even when None: the builder writes an explicit null for a
-    /// nested function left unset, and dropping the key renders it blank on
-    /// reload instead of "None".
+    /// Serialized even when None: dropping the key renders an unset function blank, not "None".
     pub function_name: Option<String>,
-    /// Described to OpenAPI as opaque objects on purpose. The Rust type is
-    /// genuinely recursive (AxisArg -> AxisArgValueWrapper -> AxisArgFunction);
-    /// emitting that cycle overflows the schema generator's stack at startup, and
-    /// `no_recursion` leaves behind a circular $ref that MCP tool generation
-    /// rejects. Serde still sees the real `Vec<AxisArg>`.
+    /// Opaque to OpenAPI on purpose: the real recursion overflows the schema generator at startup.
     #[schema(value_type = Vec<Object>)]
     pub args: Vec<AxisArg>,
 }
