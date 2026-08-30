@@ -316,7 +316,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
     }
 
     // generate the dump file
-    let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
+    let dumped_ids: Vec<(i64, String)> = files.iter().map(|r| (r.id, r.date.clone())).collect();
     let dump_file = match generate_dump(
         &job.org_id,
         job.stream_type,
@@ -337,7 +337,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         // update the entries in db
         let records = dump_file.meta.records;
         let file_name = dump_file.key.clone();
-        infra_file_list::update_dump_records(&dump_file, &ids).await?;
+        infra_file_list::update_dump_records(&dump_file, &dumped_ids).await?;
 
         // insert dump stats
         if let Err(e) = infra_file_list::insert_dump_stats(&file_name, &stats).await {

@@ -137,7 +137,11 @@ impl super::FileList for PostgresFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+    async fn update_dump_records(
+        &self,
+        dump_file: &FileKey,
+        dumped_ids: &[(i64, String)],
+    ) -> Result<()> {
         let pool = CLIENT_RW.clone();
 
         // insert the dump file into file_list table
@@ -186,22 +190,17 @@ impl super::FileList for PostgresFileList {
             return Err(e.into());
         }
 
-        // delete the dumped ids from file_list table
-        for chunk in dumped_ids.chunks(get_config().compact.file_list_deleted_batch_size) {
-            if chunk.is_empty() {
-                continue;
-            }
-            let ids = chunk
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<String>>()
-                .join(",");
-            let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
+        // delete the dumped ids from file_list table; date predicate enables partition pruning
+        for (date, query_str) in chunked_pruned_delete_statements(
+            "file_list",
+            dumped_ids,
+            get_config().compact.file_list_deleted_batch_size,
+        ) {
             DB_QUERY_NUMS
                 .with_label_values(&["delete_by_ids", "file_list"])
                 .inc();
             let start = std::time::Instant::now();
-            let res = sqlx::query(&query_str).execute(&mut *tx).await;
+            let res = sqlx::query(&query_str).bind(&date).execute(&mut *tx).await;
             let time = start.elapsed().as_secs_f64();
             DB_QUERY_TIME
                 .with_label_values(&["delete_by_ids", "file_list"])
@@ -2075,15 +2074,15 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
         if !del_items.is_empty() {
             let chunks = del_items.chunks(deleted_batch_size);
             for files in chunks {
-                // get ids of the files
-                let mut ids = Vec::with_capacity(files.len());
+                // get (id, date) of the files; date predicate enables partition pruning
+                let mut ids: Vec<(i64, String)> = Vec::with_capacity(files.len());
                 for file in files {
-                    if file.id > 0 {
-                        ids.push(file.id.to_string());
-                        continue;
-                    }
                     let (stream_key, date_key, file_name) = parse_file_key_columns(&file.key)
                         .map_err(|e| Error::Message(e.to_string()))?;
+                    if file.id > 0 {
+                        ids.push((file.id, date_key));
+                        continue;
+                    }
                     DB_QUERY_NUMS
                         .with_label_values(&["select_id", "file_list"])
                         .inc();
@@ -2092,7 +2091,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                     r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
                     )
                     .bind(stream_key)
-                    .bind(date_key)
+                    .bind(&date_key)
                     .bind(file_name)
                     .fetch_one(&mut *tx)
                     .await;
@@ -2101,7 +2100,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                         .with_label_values(&["select_id", "file_list"])
                         .observe(time);
                     match query_res {
-                        Ok(Some(v)) => ids.push(v.to_string()),
+                        Ok(Some(v)) => ids.push((v, date_key)),
                         Ok(None) => continue,
                         Err(sqlx::Error::RowNotFound) => continue,
                         Err(e) => {
@@ -2114,14 +2113,13 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                         }
                     };
                 }
-                // delete files by ids
-                if !ids.is_empty() {
+                // delete files by ids, one pruned statement per date group
+                for (date, sql) in build_pruned_delete_statements("file_list", &ids) {
                     DB_QUERY_NUMS
                         .with_label_values(&["delete_id", "file_list"])
                         .inc();
-                    let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
                     let start = std::time::Instant::now();
-                    if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {
+                    if let Err(e) = sqlx::query(&sql).bind(&date).execute(&mut *tx).await {
                         if let Err(e) = tx.rollback().await {
                             log::error!(
                                 "[POSTGRES] rollback {table} batch process for delete error: {e}"
@@ -2146,24 +2144,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
     }
 }
 
-/// TEST-ONLY: models the planned Site A/B fix; remove once the real fix lands there.
-#[cfg(test)]
-async fn delete_file_list_by_id_and_date_fixed(
-    tx: &mut sqlx::Transaction<'_, Postgres>,
-    table: &str,
-    ids_with_dates: &[(i64, String)],
-) -> Result<()> {
-    if ids_with_dates.is_empty() {
-        return Ok(());
-    }
-    for (date, sql) in build_pruned_delete_statements(table, ids_with_dates) {
-        sqlx::query(&sql).bind(&date).execute(&mut **tx).await?;
-    }
-    Ok(())
-}
-
-/// TEST-ONLY: single SQL source, so tests EXPLAIN the exact string the fixed helper executes.
-#[cfg(test)]
+/// Groups (id, date) pairs into one `date = $1 AND id IN (...)` delete per date so each prunes.
 fn build_pruned_delete_statements(
     table: &str,
     ids_with_dates: &[(i64, String)],
@@ -2188,24 +2169,16 @@ fn build_pruned_delete_statements(
     stmts
 }
 
-/// TEST-ONLY: same unpruned shape (modulo whitespace/semicolon) as today's Site A/B deletes.
-#[cfg(test)]
-async fn delete_file_list_by_id_buggy(
-    tx: &mut sqlx::Transaction<'_, Postgres>,
+/// Chunks first (bounding per-statement id counts), then prune-groups by date within each chunk.
+fn chunked_pruned_delete_statements(
     table: &str,
-    ids: &[i64],
-) -> Result<()> {
-    if ids.is_empty() {
-        return Ok(());
-    }
-    let ids_str = ids
-        .iter()
-        .map(|id| id.to_string())
-        .collect::<Vec<String>>()
-        .join(",");
-    let sql = format!("DELETE FROM {table} WHERE id IN ({ids_str})");
-    sqlx::query(&sql).execute(&mut **tx).await?;
-    Ok(())
+    ids_with_dates: &[(i64, String)],
+    chunk_size: usize,
+) -> Vec<(String, String)> {
+    ids_with_dates
+        .chunks(chunk_size.max(1))
+        .flat_map(|chunk| build_pruned_delete_statements(table, chunk))
+        .collect()
 }
 
 /// Advisory lock key for get_pending_jobs claims; scope is ignored until Fix 4 wires a real one.
@@ -4727,7 +4700,7 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
-    /// Bug repro: Site A/B's shape (modulo whitespace/semicolon) is correct but unpruned.
+    /// Bug repro: the pre-fix Site A/B shape was correct but unpruned; kept as documentation.
     #[tokio::test]
     #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_bug_repro_buggy_delete_is_functionally_correct_but_unpruned() {
@@ -4743,11 +4716,10 @@ mod tests {
             .await
             .unwrap();
 
-        let mut tx = pool.begin().await.unwrap();
-        delete_file_list_by_id_buggy(&mut tx, &table, &[del])
+        sqlx::query(&format!("DELETE FROM {table} WHERE id IN ({del})"))
+            .execute(&pool)
             .await
             .unwrap();
-        tx.commit().await.unwrap();
 
         let remaining: Vec<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table}"))
             .fetch_all(&pool)
@@ -4850,9 +4822,17 @@ mod tests {
 
         // Now actually run the grouped delete and verify exact row-level correctness.
         let mut tx = pool.begin().await.unwrap();
-        delete_file_list_by_id_and_date_fixed(&mut tx, &table, &targets)
-            .await
-            .unwrap();
+        for (date, sql) in chunked_pruned_delete_statements(
+            &table,
+            &targets,
+            get_config().compact.file_list_deleted_batch_size,
+        ) {
+            sqlx::query(&sql)
+                .bind(&date)
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
         tx.commit().await.unwrap();
 
         let remaining_ids: Vec<i64> =
@@ -4900,17 +4880,22 @@ mod tests {
             .unwrap();
         assert_eq!(before_count, 4);
 
+        let targets = [
+            (del1, "2021/01/01/00".to_string()),
+            (del2, "2021/01/03/00".to_string()),
+        ];
         let mut tx = pool.begin().await.unwrap();
-        delete_file_list_by_id_and_date_fixed(
-            &mut tx,
+        for (date, sql) in chunked_pruned_delete_statements(
             &table,
-            &[
-                (del1, "2021/01/01/00".to_string()),
-                (del2, "2021/01/03/00".to_string()),
-            ],
-        )
-        .await
-        .unwrap();
+            &targets,
+            get_config().compact.file_list_deleted_batch_size,
+        ) {
+            sqlx::query(&sql)
+                .bind(&date)
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
         tx.commit().await.unwrap();
 
         let mut remaining_ids: Vec<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table}"))
@@ -4963,9 +4948,13 @@ mod tests {
         );
 
         let mut tx = pool.begin().await.unwrap();
-        delete_file_list_by_id_and_date_fixed(&mut tx, &table, &[(keep, no_partition_date)])
-            .await
-            .expect("a no-partition date must not be an execution error");
+        for (date, sql) in build_pruned_delete_statements(&table, &[(keep, no_partition_date)]) {
+            sqlx::query(&sql)
+                .bind(&date)
+                .execute(&mut *tx)
+                .await
+                .expect("a no-partition date must not be an execution error");
+        }
         tx.commit().await.unwrap();
 
         let remaining: Vec<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table}"))
@@ -4998,12 +4987,10 @@ mod tests {
             build_pruned_delete_statements(&table, &[]).is_empty(),
             "empty input must build zero statements"
         );
-
-        let mut tx = pool.begin().await.unwrap();
-        delete_file_list_by_id_and_date_fixed(&mut tx, &table, &[])
-            .await
-            .expect("empty input must not be an error");
-        tx.commit().await.unwrap();
+        assert!(
+            chunked_pruned_delete_statements(&table, &[], 1000).is_empty(),
+            "empty input must build zero statements through the chunked composition too"
+        );
 
         let remaining: Vec<i64> = sqlx::query_scalar(&format!("SELECT id FROM {table}"))
             .fetch_all(&pool)
@@ -5014,10 +5001,52 @@ mod tests {
         drop_partitioned_test_table(&pool, &table).await;
     }
 
+    /// Pins Site A's chunk+prune composition: chunk boundaries first, date grouping within each.
+    #[test]
+    fn test_fix_chunked_pruned_delete_statements_composition() {
+        let d1 = "2021/01/01/00".to_string();
+        let d2 = "2021/01/02/00".to_string();
+        let pairs = vec![
+            (1_i64, d1.clone()),
+            (2, d1.clone()),
+            (3, d2.clone()),
+            (4, d1.clone()),
+            (5, d2.clone()),
+        ];
+
+        // chunks of 2 are [1,2] [3,4] [5]; the mixed-date chunk splits into two sorted groups
+        let stmt = |ids: &str| format!("DELETE FROM file_list WHERE date = $1 AND id IN ({ids})");
+        assert_eq!(
+            chunked_pruned_delete_statements("file_list", &pairs, 2),
+            vec![
+                (d1.clone(), stmt("1,2")),
+                (d1.clone(), stmt("4")),
+                (d2.clone(), stmt("3")),
+                (d2.clone(), stmt("5")),
+            ],
+            "every IN-list must stay within the chunk size, grouped by date within each chunk"
+        );
+
+        // a chunk size covering all pairs degenerates to pure date grouping
+        assert_eq!(
+            chunked_pruned_delete_statements("file_list", &pairs, 1000),
+            vec![(d1.clone(), stmt("1,2,4")), (d2.clone(), stmt("3,5"))],
+        );
+        assert_eq!(
+            chunked_pruned_delete_statements("file_list", &pairs, 1000),
+            build_pruned_delete_statements("file_list", &pairs),
+            "one chunk must be exactly the plain builder output"
+        );
+
+        // chunk size 0 must not panic; it is clamped to 1
+        assert_eq!(
+            chunked_pruned_delete_statements("file_list", &pairs, 0).len(),
+            pairs.len()
+        );
+        assert!(chunked_pruned_delete_statements("file_list", &[], 2).is_empty());
+    }
+
     /// Sites A+B + Fix-4 disjointness in ONE test: CLIENT_RW's pool binds to its first runtime.
-    // TODO(fix-3-implementation): assert pruning at real Site A/B via the shared builder.
-    // TODO(fix-3-implementation): compose date-grouping WITH file_list_deleted_batch_size chunking.
-    // TODO(fix-3-implementation): chunk within each date group (or vice versa); pin with a test.
     #[tokio::test]
     #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_client_rw_paths_site_ab_deletes_and_pending_jobs_disjointness() {
@@ -5035,7 +5064,7 @@ mod tests {
         let keep_id = postgres_list.add("acct", &keep_key, &meta).await.unwrap();
         let dump_id = postgres_list.add("acct", &dump_key, &meta).await.unwrap();
 
-        // FileRecord.date is required -- what the real Site A fix threads instead of bare ids.
+        // FileRecord.date is required -- what dump.rs threads to update_dump_records as pairs.
         let records = postgres_list
             .query_for_dump(
                 "org1",
@@ -5059,11 +5088,13 @@ mod tests {
             &format!("files/{dump_stream_key}/2021/01/02/00/dump_summary.parquet"),
             false,
         );
+        let site_a_pairs = [(dump_id, dumped_record.date.clone())];
         postgres_list
-            .update_dump_records(&dump_file_key, &[dump_id])
+            .update_dump_records(&dump_file_key, &site_a_pairs)
             .await
             .unwrap();
 
+        // The date is a real DELETE predicate: a wrong pair would leave the dumped row behind.
         let remaining: Vec<i64> = sqlx::query_scalar("SELECT id FROM file_list WHERE stream = $1")
             .bind(dump_stream_key)
             .fetch_all(&pool)
@@ -5078,8 +5109,22 @@ mod tests {
             "update_dump_records must not delete unrelated ids"
         );
 
+        // Trust chain: Site A executes exactly these statements; EXPLAIN tests pin them as pruned.
+        assert_eq!(
+            chunked_pruned_delete_statements(
+                "file_list",
+                &site_a_pairs,
+                get_config().compact.file_list_deleted_batch_size,
+            ),
+            vec![(
+                "2021/01/01/00".to_string(),
+                format!("DELETE FROM file_list WHERE date = $1 AND id IN ({dump_id})"),
+            )],
+            "Site A inputs must yield a single per-date pruned delete"
+        );
+
         // ---- Site B: inner_batch_process's delete path (via batch_process) ----
-        // del_items with id > 0 skip date-key extraction; the fix must always extract it.
+        // del_items carrying a real (>0) id must still get a date key parsed from the file key.
         let batch_stream = "org1/logs/batch_del_stream";
         let batch_keep_key = format!("files/{batch_stream}/2021/01/01/00/keep.parquet");
         let batch_del_key = format!("files/{batch_stream}/2021/01/02/00/del.parquet");
@@ -5123,6 +5168,7 @@ mod tests {
             .fetch_all(&pool)
             .await
             .unwrap();
+        // The delete succeeding proves the date derived from the key matched the stored row.
         assert!(
             !remaining.contains(&del_id),
             "inner_batch_process must delete the targeted (deleted=true) id"
@@ -5130,6 +5176,16 @@ mod tests {
         assert!(
             remaining.contains(&batch_keep_id),
             "inner_batch_process must not delete unrelated ids"
+        );
+
+        // Trust chain: Site B groups each chunk through the same EXPLAIN-pinned builder.
+        assert_eq!(
+            build_pruned_delete_statements("file_list", &[(del_id, "2021/01/02/00".to_string())]),
+            vec![(
+                "2021/01/02/00".to_string(),
+                format!("DELETE FROM file_list WHERE date = $1 AND id IN ({del_id})"),
+            )],
+            "Site B inputs must yield a single per-date pruned delete"
         );
 
         // ---- Fix 4: concurrent get_pending_jobs claims must stay disjoint ----
