@@ -1469,6 +1469,9 @@ export class AlertsPage {
             testLogger.error('Neither table nor empty state found after clicking folder', { folderName, error: error.message });
             throw new Error(`Failed to load folder content for "${folderName}": Neither table nor empty state appeared`);
         }
+        // Remembered so a later page.reload() can restore it: a reload resets the list to the
+        // default folder, which silently discards the selection callers depend on.
+        this.lastNavigatedFolder = folderName;
     }
 
     async verifyNoDataAvailable() {
@@ -2757,6 +2760,12 @@ export class AlertsPage {
         if (!(await firstRow.isVisible({ timeout: 15000 }).catch(() => false))) {
             await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
             await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+            // The reload just put us back on the default folder. Without re-selecting, the rows
+            // being waited for are in a folder no longer displayed, so this retry could only ever
+            // fail — it destroys the state it is meant to recover.
+            if (this.lastNavigatedFolder && this.lastNavigatedFolder !== 'default') {
+                await this.navigateToFolder(this.lastNavigatedFolder);
+            }
             await firstRow.waitFor({ state: 'visible', timeout: 15000 });
         }
         await headerCheckbox.click();
