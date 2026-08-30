@@ -1126,6 +1126,43 @@ mod tests {
         );
     }
 
+    // Stored NULL is a real comparand: a fix that skips the fnm compare when None must die.
+    #[tokio::test]
+    async fn field_name_mapping_null_to_some_updates_and_reports_changed_true() {
+        let db = db().await;
+        let disambiguation = serde_json::json!({"k8s-cluster": "prod"});
+        let mut first = service_record(disambiguation.clone(), 1_000);
+        first.field_name_mapping = None;
+        let first_id = first.id.clone();
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let second = service_record(disambiguation, 1_000);
+        let outcome = put_with(&db, "org1", second, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            set_clause_count(&db, &first_id, "field_name_mapping").await,
+            1,
+            "stored NULL differs from incoming Some, so field_name_mapping must have been Set(_)"
+        );
+        assert!(
+            outcome.changed,
+            "field_name_mapping went NULL to Some and must count as changed"
+        );
+        let row = Entity::find_by_id(first_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.field_name_mapping,
+            Some(serde_json::json!({"service": "kubernetes_labels_app"}))
+        );
+    }
+
     // Subset incoming resolves richer_disambiguation to the stored value: rewrite nothing.
     #[tokio::test]
     async fn upgrade_branch_subset_incoming_leaves_richer_disambiguation_untouched() {

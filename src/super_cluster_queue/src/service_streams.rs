@@ -50,7 +50,16 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
             .await?;
             // A no-op put must not make every node re-read the org's whole table.
             if outcome.changed {
-                infra::coordinator::service_streams::emit_put_event(&org_id).await?;
+                // Never propagate: a redelivered apply re-derives changed=false, losing the emit.
+                for attempt in 1..=3u8 {
+                    match infra::coordinator::service_streams::emit_put_event(&org_id).await {
+                        Ok(()) => break,
+                        Err(e) if attempt == 3 => log::error!(
+                            "[SUPER_CLUSTER:service_streams] emit_put_event failed after {attempt} attempts: org={org_id} error={e}"
+                        ),
+                        Err(_) => tokio::time::sleep(std::time::Duration::from_millis(500)).await,
+                    }
+                }
             }
         }
         ServiceStreamsMessage::Delete {
