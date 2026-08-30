@@ -1428,10 +1428,15 @@ export class AlertsPage {
             // activeFolderId — so a createAlert() right after can create in the stale "default"
             // folder. Also gate on the folder-scoped list refetch (GET .../alerts?...folder=<id>,
             // id != "default"), which only fires once activeFolderId has actually flipped.
+            let attempt = 0;
             await expect(async () => {
+                attempt += 1;
                 if ((await folderTab.getAttribute('data-state')) !== 'active') {
                     await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
-                    const scopedListSettled = folderName === 'default'
+                    // Only the first click triggers the folder-scoped refetch. Re-arming this
+                    // wait on later attempts blocks 8s on a request that will never come, which
+                    // is most of the retry budget spent learning nothing.
+                    const scopedListSettled = (folderName === 'default' || attempt > 1)
                         ? Promise.resolve()
                         : this.page.waitForResponse(
                             resp => resp.request().method() === 'GET'
@@ -1440,11 +1445,17 @@ export class AlertsPage {
                                 && !/[?&]folder=default(?:&|$)/.test(resp.url()),
                             { timeout: 8000 }
                           ).catch(() => {});
-                    await folderTab.click({ force: true, timeout: 5000 });
+                    // Actionability includes Playwright's stability check — the same bounding box
+                    // across two animation frames — which is exactly the mid-reflow landing that
+                    // `force` skips past. Keep force only as the fallback for a genuinely
+                    // obscured tab, so the animated case waits instead of racing.
+                    await folderTab.click({ timeout: 5000 }).catch(async () => {
+                        await folderTab.click({ force: true, timeout: 3000 });
+                    });
                     await scopedListSettled;
                 }
                 await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
-            }).toPass({ timeout: 30000 });
+            }).toPass({ timeout: 45000, intervals: [500, 1000, 2000, 3000] });
         } else {
             // Fallback to generic text selector for any legacy markup, then still verify below.
             await this.page.getByText(folderName).first().click({ force: true });
