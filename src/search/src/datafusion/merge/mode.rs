@@ -42,25 +42,25 @@ use crate::datafusion::sort_order::FileSortOrder;
 #[derive(Debug, Clone)]
 pub enum MergeMode {
     /// `SELECT * FROM tbl ORDER BY _timestamp DESC` into one file: logs,
-    /// traces, plain metrics — the ingester and the compactor default.
+    /// traces and plain metrics — the default merge.
     Classic,
     /// The trace time-index metadata stream: one row per `trace_id`
     /// (`MIN(_timestamp)`, `MIN(min_ts)`, `MAX(max_ts)`, …), one file.
     TraceTimeIndex,
     /// The file-list stream has no `_timestamp`; order by `min_ts DESC`.
     FileList,
-    /// Metrics downsampling (enterprise): aggregate every series by the rule's
-    /// step, size-split output files. Only for a closed hour, which is merged
-    /// as a whole.
-    #[cfg(feature = "enterprise")]
-    Downsampling(DownsamplingRule),
     /// Metrics index stream, hour still open: the ingester and the incremental
-    /// compactor merges write one `hash-sorted-v1-*` Parquet file
+    /// compactor merges write one `hash-sorted-v1-*` file
     /// ordered by `(__hash__, _timestamp)`.
     MetricsHashSorted,
     /// Metrics index stream, closed hour: the whole hour merges into
     /// size-split `indexed-v1-*` files in the same order.
     MetricsIndexed,
+    /// Metrics downsampling (enterprise): aggregate every series by the rule's
+    /// step, size-split output files. Only for a closed hour, which is merged
+    /// as a whole.
+    #[cfg(feature = "enterprise")]
+    Downsampling(DownsamplingRule),
 }
 
 impl MergeMode {
@@ -134,12 +134,12 @@ impl MergeMode {
         }
     }
 
-    /// Layout of the file(s) the merge writes.
-    pub fn file_layout(&self) -> MetricsFileLayout {
+    /// Metrics-specific layout of the file(s) the merge writes.
+    pub fn metrics_file_layout(&self) -> Option<MetricsFileLayout> {
         match self {
-            Self::MetricsHashSorted => MetricsFileLayout::HashSorted,
-            Self::MetricsIndexed => MetricsFileLayout::Indexed,
-            _ => MetricsFileLayout::Legacy,
+            Self::MetricsHashSorted => Some(MetricsFileLayout::HashSorted),
+            Self::MetricsIndexed => Some(MetricsFileLayout::Indexed),
+            _ => None,
         }
     }
 
@@ -152,14 +152,19 @@ impl MergeMode {
     pub fn input_sort_order(&self, files: &[FileKey]) -> FileSortOrder {
         let hash_ordered = files
             .iter()
-            .filter(|f| MetricsFileLayout::of(&f.key).is_hash_ordered())
+            .filter(|f| MetricsFileLayout::of(&f.key).is_some())
             .count();
         match self {
-            Self::MetricsHashSorted | Self::MetricsIndexed if hash_ordered == files.len() => {
-                FileSortOrder::HashTimestampAsc
+            Self::MetricsHashSorted | Self::MetricsIndexed => {
+                if hash_ordered == files.len() {
+                    FileSortOrder::HashTimestampAsc
+                } else {
+                    FileSortOrder::None
+                }
             }
+            // hash-ordered files under any other mode: declare no order so
+            // the merge re-sorts instead of trusting `_timestamp DESC`
             _ if hash_ordered > 0 => FileSortOrder::None,
-            Self::MetricsHashSorted | Self::MetricsIndexed => FileSortOrder::None,
             _ => FileSortOrder::TimestampDesc,
         }
     }
@@ -272,6 +277,10 @@ mod tests {
             MergeMode::Classic
         ));
         assert!(matches!(
+            MergeMode::for_ingester(StreamType::Metrics, "cpu", &schema),
+            MergeMode::Classic
+        ));
+        assert!(matches!(
             MergeMode::for_compactor(StreamType::Filelist, "x", &schema, 0, false),
             MergeMode::FileList
         ));
@@ -282,10 +291,10 @@ mod tests {
             MergeMode::Classic.input_sort_order(&[]),
             FileSortOrder::TimestampDesc
         );
-        assert_eq!(MergeMode::Classic.file_layout(), MetricsFileLayout::Legacy);
+        assert_eq!(MergeMode::Classic.metrics_file_layout(), None);
         assert_eq!(
-            MergeMode::MetricsHashSorted.file_layout(),
-            MetricsFileLayout::HashSorted
+            MergeMode::MetricsHashSorted.metrics_file_layout(),
+            Some(MetricsFileLayout::HashSorted)
         );
         assert_eq!(
             MergeMode::MetricsIndexed.output_sort_order(),
@@ -318,6 +327,10 @@ mod tests {
         // classic merge over hash-ordered files (layout switched off): no order
         assert_eq!(
             MergeMode::Classic.input_sort_order(&[legacy.clone(), sorted.clone()]),
+            FileSortOrder::None
+        );
+        assert_eq!(
+            MergeMode::Classic.input_sort_order(std::slice::from_ref(&sorted)),
             FileSortOrder::None
         );
         assert_eq!(

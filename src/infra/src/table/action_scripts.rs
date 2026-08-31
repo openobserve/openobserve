@@ -22,12 +22,9 @@ use sea_orm::{
     QuerySelect, Schema, Set, Unchanged,
 };
 
-use super::{
-    entity::action_scripts::{ActiveModel, Model},
-    get_lock,
-};
+use super::entity::action_scripts::{ActiveModel, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
     table::entity::action_scripts::{Column, Entity},
 };
@@ -67,7 +64,7 @@ impl TryFrom<Model> for Action {
     }
 }
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -105,10 +102,7 @@ pub async fn add(action: &Action) -> Result<String, errors::Error> {
         service_account: Set(action.service_account.clone()),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let uuid = Entity::insert(record).exec(client).await?.last_insert_id;
 
     Ok(uuid)
@@ -139,19 +133,13 @@ pub async fn update(action: &Action) -> Result<String, errors::Error> {
         service_account: Set(action.service_account.clone()),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let action = Entity::update(record).exec(client).await?;
 
     Ok(action.id)
 }
 pub async fn remove(org_id: &str, id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let _ = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
@@ -162,7 +150,7 @@ pub async fn remove(org_id: &str, id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(id: &str, org_id: &str) -> Result<Action, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find_by_id(id)
         .filter(Column::OrgId.eq(org_id))
         .one(client)
@@ -176,7 +164,7 @@ pub async fn get(id: &str, org_id: &str) -> Result<Action, errors::Error> {
 
 pub async fn list(org_id: &str, limit: Option<i64>) -> Result<Vec<Action>, errors::Error> {
     let limit = limit.unwrap_or(100);
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .limit(limit as u64)
@@ -193,7 +181,7 @@ pub async fn list(org_id: &str, limit: Option<i64>) -> Result<Vec<Action>, error
 }
 
 pub async fn contains(id: &str, org_id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Id.eq(id))
         .filter(Column::OrgId.eq(org_id))
@@ -204,16 +192,13 @@ pub async fn contains(id: &str, org_id: &str) -> Result<bool, errors::Error> {
 }
 
 pub async fn len() -> Result<usize, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await?;
     Ok(len as usize)
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
@@ -225,8 +210,7 @@ pub async fn is_empty() -> Result<bool, errors::Error> {
 
 /// Deletes all action scripts belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)

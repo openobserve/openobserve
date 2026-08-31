@@ -19,17 +19,14 @@ use sea_orm::{
     sea_query::{Func, SimpleExpr},
 };
 
-use super::{
-    entity::user_password_history::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::user_password_history::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -54,10 +51,7 @@ pub async fn add(email: &str, password_hash: &str) -> Result<(), errors::Error> 
         created_at: Set(chrono::Utc::now().timestamp_micros()),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record)
         .exec(client)
         .await
@@ -71,7 +65,7 @@ pub async fn list_recent(email: &str, limit: u64) -> Result<Vec<Model>, errors::
     if limit == 0 {
         return Ok(vec![]);
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Entity::find()
         .filter(email_eq(email))
         .order_by(Column::CreatedAt, Order::Desc)
@@ -93,10 +87,7 @@ pub async fn prune(email: &str, retain: u64) -> Result<u64, errors::Error> {
         return delete_all_for_user(email).await;
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let result = Entity::delete_many()
         .filter(email_eq(email))
         .filter(Column::Id.lt(oldest_kept.id))
@@ -110,10 +101,7 @@ pub async fn prune(email: &str, retain: u64) -> Result<u64, errors::Error> {
 /// Called when a user is deleted. The schema declares `ON DELETE CASCADE`, but SQLite ships with
 /// `PRAGMA foreign_keys` off, so the cleanup cannot be left to the database.
 pub async fn delete_all_for_user(email: &str) -> Result<u64, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let result = Entity::delete_many()
         .filter(email_eq(email))
         .exec(client)

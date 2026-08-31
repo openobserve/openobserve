@@ -55,6 +55,7 @@ serde_json.workspace = true
 sqlparser.workspace = true
 tantivy.workspace = true
 tantivy_utils.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
@@ -66,6 +67,3 @@ utoipa.workspace = true
 vortex = { workspace = true }
 vortex-btrblocks = { workspace = true }
 vortex-datafusion = { workspace = true }
-
-[dev-dependencies]
-tempfile.workspace = true

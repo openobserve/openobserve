@@ -36,3 +36,4 @@ export { createAlertsContextProvider } from "./alertsContextProvider";
 export { createDashboardsContextProvider } from "./dashboardsContextProvider";
 export { createIncidentsContextProvider } from "./incidentsContextProvider";
 export { createTracesContextProvider } from "./tracesContextProvider";
+export { createDbmContextProvider, DBM_CONTEXT_KEY } from "./dbmContextProvider";

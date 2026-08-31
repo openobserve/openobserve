@@ -38,6 +38,10 @@ const graph: DepGraph = buildGraph(
 );
 
 const loadGraph = vi.fn();
+const deleteAlert = vi.fn(() => Promise.resolve({ data: {} }));
+vi.mock("@/services/alerts", () => ({
+  default: { delete_by_alert_id: (...args: unknown[]) => deleteAlert(...args) },
+}));
 // Replace only the composable's fetch; keep the real graph-building helpers
 // (buildFocusChain / focusSummary / kind helpers) so behaviour stays honest.
 vi.mock("@/composables/alerts/useDependencyGraph", async (importOriginal) => {
@@ -72,7 +76,10 @@ const mountDialog = (focus: any) => {
 };
 
 describe("DependencyImpactDialog", () => {
-  beforeEach(() => loadGraph.mockClear());
+  beforeEach(() => {
+    loadGraph.mockClear();
+    deleteAlert.mockClear();
+  });
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
@@ -214,5 +221,74 @@ describe("DependencyImpactDialog", () => {
     await flushPromises();
     (document.querySelector('[data-test="dependency-impact-close"]') as HTMLElement).click();
     expect(w.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
+  const confirmDelete = async (name: string) => {
+    (
+      document.querySelector(`[data-test="dependency-impact-delete-${name}"]`) as HTMLElement
+    ).click();
+    await flushPromises();
+    (
+      document.querySelector(
+        '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+      ) as HTMLElement
+    ).click();
+    await flushPromises();
+  };
+
+  it("closes when the row deleted IS the entity the dialog is focused on", async () => {
+    const w = mountDialog({ kind: "alert", alertId: "a1" });
+    await flushPromises();
+
+    await confirmDelete("cpu");
+
+    // The focus id has to be read before the prune: afterwards the focused entity
+    // is out of the graph, so re-deriving it finds nothing to match on.
+    expect(w.emitted("update:open")).toEqual([[false]]);
+  });
+
+  it("holds each in-flight row disabled when a second delete starts", async () => {
+    let finishFirst!: (value: unknown) => void;
+    deleteAlert.mockImplementationOnce(
+      () => new Promise((resolve) => (finishFirst = resolve)) as Promise<{ data: object }>,
+    );
+    mountDialog({ kind: "destination", name: "slack" });
+    await flushPromises();
+
+    await confirmDelete("cpu");
+    await confirmDelete("mem");
+
+    // mem's delete has landed; cpu's has not, so cpu must not offer its button
+    // again — a second DELETE would 404 and error-toast a delete that worked.
+    expect(rowNames()).not.toContain("dependency-impact-row-mem");
+    expect(document.querySelector('[data-test="dependency-impact-delete-cpu"]')).toBeFalsy();
+
+    finishFirst({ data: {} });
+    await flushPromises();
+    expect(rowNames()).not.toContain("dependency-impact-row-cpu");
+  });
+
+  it("deleting an alert prunes it in place — no refetch, no reload of the lanes", async () => {
+    const w = mountDialog({ kind: "destination", name: "slack" });
+    await flushPromises();
+    loadGraph.mockClear();
+
+    (document.querySelector('[data-test="dependency-impact-delete-cpu"]') as HTMLElement).click();
+    await flushPromises();
+    (
+      document.querySelector(
+        '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+      ) as HTMLElement
+    ).click();
+    await flushPromises();
+
+    expect(deleteAlert).toHaveBeenCalled();
+    // The row leaves the lane without the graph being fetched again.
+    expect(loadGraph).not.toHaveBeenCalled();
+    expect(rowNames()).not.toContain("dependency-impact-row-cpu");
+    expect(rowNames()).toContain("dependency-impact-row-mem");
+    // The host is told what went, so a list only reloads when its own kind did.
+    expect(w.emitted("deleted")).toEqual([["alert"]]);
+    expect(w.emitted("update:open")).toBeUndefined();
   });
 });

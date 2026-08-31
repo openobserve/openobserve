@@ -32,7 +32,10 @@ use config::{
         window::{align_down, align_up},
     },
 };
-use infra::table::{slo as slo_table, slo_backfill_jobs as jobs};
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::{slo as slo_table, slo_backfill_jobs as jobs},
+};
 
 /// Whether the job has more work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,9 +75,7 @@ pub fn next_chunk(
 /// Fill one chunk for `slo`.
 pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
     let cfg = get_config();
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let Some(job) = jobs::get(db, &slo.id, slo.definition_generation).await? else {
         return Ok(ChunkOutcome::Done);
@@ -168,9 +169,7 @@ pub fn clamp_backfill_start(
 
 /// Whether a status row still needs its history filled.
 pub async fn is_needed(slo: &Slo) -> Result<bool, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let status = slo_table::load_status(db, &slo.id, "").await?;
     Ok(status.is_some_and(|s| s.definition_generation == slo.definition_generation))
 }

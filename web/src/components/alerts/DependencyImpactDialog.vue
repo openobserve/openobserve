@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <DependencyEntityRow
                     :node="d"
                     :count="d.usageCount || undefined"
+                    :deleting="deletingIds.has(d.id)"
                     no-hover
                     @open="openInNewTab"
                     @delete="requestDelete"
@@ -160,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="a in flatAlerts"
                   :key="a.id"
                   :node="a"
+                  :deleting="deletingIds.has(a.id)"
                   @open="openInNewTab"
                   @delete="requestDelete"
                 />
@@ -193,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="a in g.alerts"
                     :key="a.id"
                     :node="a"
+                    :deleting="deletingIds.has(a.id)"
                     @mouseenter="hoveredAlert = a.id"
                     @mouseleave="hoveredAlert = null"
                     @open="openInNewTab"
@@ -215,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="a in directAlerts"
                     :key="a.id"
                     :node="a"
+                    :deleting="deletingIds.has(a.id)"
                     @open="openInNewTab"
                     @delete="requestDelete"
                   />
@@ -270,16 +274,16 @@ import templateService from "@/services/alert_templates";
 import alertsService from "@/services/alerts";
 import useDependencyGraph, {
   buildFocusChain,
-  invalidateDependencyGraphCache,
+  applyDependencyDeletion,
   depKindIcon,
   depKindColor,
 } from "@/composables/alerts/useDependencyGraph";
-import type { DepFocus, DepNode } from "@/composables/alerts/useDependencyGraph";
+import type { DepFocus, DepNode, DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 
 const props = defineProps<{ open: boolean; focus: DepFocus }>();
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void;
-  (e: "deleted"): void;
+  (e: "deleted", kind: DepNodeKind): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -291,6 +295,7 @@ const search = ref("");
 const hoveredDest = ref<string | null>(null);
 const hoveredAlert = ref<string | null>(null);
 const confirm = ref<{ visible: boolean; node: DepNode | null }>({ visible: false, node: null });
+const deletingIds = ref(new Set<string>());
 
 const org = () => store.state.selectedOrganization.identifier;
 
@@ -301,6 +306,7 @@ watch(
     search.value = "";
     hoveredDest.value = null;
     hoveredAlert.value = null;
+    deletingIds.value.clear();
     loadGraph(org());
   },
   { immediate: true },
@@ -434,6 +440,10 @@ const performDelete = async () => {
   confirm.value = { visible: false, node: null };
   if (!n) return;
   const org_identifier = org();
+  // Read before the prune below: focusNode re-derives from the graph, so once the
+  // focused entity is out of it there is nothing left to compare against.
+  const deletingFocus = n.id === focusNode.value?.id;
+  deletingIds.value.add(n.id);
   try {
     if (n.kind === "destination") {
       await destinationService.delete({ org_identifier, destination_name: n.name });
@@ -444,13 +454,14 @@ const performDelete = async () => {
     } else {
       return;
     }
-    invalidateDependencyGraphCache();
+    // Fold the delete into the graph in place. Refetching instead would blank the
+    // whole dialog behind its loading spinner and re-run three list calls, which
+    // reads as a page reload for what is one row leaving a lane.
+    graph.value = applyDependencyDeletion(org_identifier, n.id, graph.value);
     toast({ variant: "success", message: t("alert_dependencies.deletedToast", { name: n.name }) });
-    emit("deleted");
-    // Deleting the focused entity leaves nothing to show; close. Otherwise the
-    // reference just left the chain — refetch so the list is current.
-    if (n.id === focusNode.value?.id) emit("update:open", false);
-    else await loadGraph(org_identifier);
+    emit("deleted", n.kind);
+    // Deleting the focused entity leaves nothing to show; close.
+    if (deletingFocus) emit("update:open", false);
   } catch (err: any) {
     toast({
       variant: "error",
@@ -458,6 +469,8 @@ const performDelete = async () => {
         raw(err?.response?.data?.message) ||
         t("alert_dependencies.deleteFailedToast", { name: n.name }),
     });
+  } finally {
+    deletingIds.value.delete(n.id);
   }
 };
 </script>

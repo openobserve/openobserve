@@ -32,12 +32,15 @@ pub mod cloud;
 pub mod dashboards;
 #[cfg(feature = "enterprise")]
 pub mod datasets;
+pub mod db_monitoring;
 #[cfg(feature = "enterprise")]
 pub mod discovery;
 #[cfg(feature = "enterprise")]
 pub mod domain_management;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
+#[cfg(feature = "enterprise")]
+pub mod experiments;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
@@ -51,6 +54,8 @@ pub mod organization;
 pub mod profiling;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+#[cfg(feature = "enterprise")]
+pub mod remote_tasks;
 #[cfg(feature = "enterprise")]
 pub mod score_configs;
 #[cfg(feature = "enterprise")]

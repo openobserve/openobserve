@@ -1367,7 +1367,7 @@ mod tests {
     use common::{infra::config::USERS, meta::user::get_default_user_role};
     use config::meta::user::{UserRole, UserType};
     use infra::{
-        db::{self as infra_db, ORM_CLIENT, connect_to_orm},
+        db::{self as infra_db, get_orm_client_rw},
         table as infra_table,
     };
     use tokio::sync::Mutex;
@@ -1437,14 +1437,16 @@ mod tests {
         assert_eq!(org.name, "org2");
     }
 
-    async fn set_up() {
-        // Acquire lock to serialize database setup across concurrent tests
+    /// Returned guard must be held for the whole test: `set_up` truncates the
+    /// shared user tables, so a concurrent test's setup would clear rows out
+    /// from under a test body that only serialized the setup itself.
+    async fn set_up() -> tokio::sync::MutexGuard<'static, ()> {
         let lock = TEST_SETUP_LOCK
             .get_or_init(|| async { Mutex::new(()) })
             .await;
-        let _guard = lock.lock().await;
+        let guard = lock.lock().await;
 
-        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let _ = get_orm_client_rw().await;
         // clear the table here as previous tests could have written to it
         let _ = infra::table::org_users::clear().await;
         let _ = infra::table::users::clear().await;
@@ -1507,29 +1509,31 @@ mod tests {
                 password_ext: Some("root_password_ext_hash".to_string()),
             },
         );
+
+        guard
     }
 
     #[tokio::test]
     async fn test_list_users() {
-        set_up().await;
+        let _guard = set_up().await;
         assert!(list_users("", "dummy", None, None, false).await.is_ok())
     }
 
     #[tokio::test]
     async fn test_root_user_exists() {
-        set_up().await;
+        let _guard = set_up().await;
         assert!(!root_user_exists().await);
     }
 
     #[tokio::test]
     async fn test_get_user() {
-        set_up().await;
+        let _guard = set_up().await;
         assert!(get_user(Some("dummy"), "admin@zo.dev").await.is_some())
     }
 
     #[tokio::test]
     async fn test_post_user() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = post_user(
             "dummy",
@@ -1553,7 +1557,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_user() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = update_user(
             "dummy",
@@ -1619,7 +1623,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_new_user() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let db_user = DBUser {
             email: "newuser@example.com".to_string(),
@@ -1668,7 +1672,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_user() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = delete_user("nonexistent@example.com").await;
         assert!(resp.is_ok());
@@ -1679,7 +1683,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_root_user_exists_edge_cases() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let exists = root_user_exists().await;
         assert!(!exists);
@@ -1707,7 +1711,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_root_user_if_not_exists() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let user_req = UserRequest {
             email: "root@example.com".to_string(),
@@ -1751,7 +1755,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_post_user_validation() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let invalid_email_req = UserRequest {
             email: "invalid-email".to_string(),
@@ -1810,7 +1814,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_user_validation() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = update_user(
             "dummy",
@@ -1857,7 +1861,7 @@ mod tests {
     /// that blocks the user and the rotation clock that expires them.
     #[tokio::test]
     async fn test_password_change_clears_the_flag_and_restarts_the_rotation_clock() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let email = "rotating@zo.dev";
         let resp = post_user(
@@ -1913,7 +1917,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_user_to_org_validation() {
-        set_up().await;
+        let _guard = set_up().await;
 
         let resp = add_user_to_org(
             "dummy",

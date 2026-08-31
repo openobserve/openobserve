@@ -45,7 +45,6 @@ impl Default for SqlitePipelineTable {
 impl super::PipelineTable for SqlitePipelineTable {
     async fn create_table(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(
             r#"
 CREATE TABLE IF NOT EXISTS pipeline
@@ -66,7 +65,7 @@ CREATE TABLE IF NOT EXISTS pipeline
 );
             "#,
         )
-        .execute(&*client)
+        .execute(&client)
         .await?;
 
         // drop created_at column for old version <= 0.40.0
@@ -77,30 +76,27 @@ CREATE TABLE IF NOT EXISTS pipeline
 
     async fn create_table_index(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let queries = vec![
             "CREATE INDEX IF NOT EXISTS pipeline_org_idx ON pipeline (org);",
             "CREATE INDEX IF NOT EXISTS pipeline_org_src_type_stream_params_idx ON pipeline (org, source_type, stream_org, stream_name, stream_type);",
         ];
 
         for query in queries {
-            sqlx::query(query).execute(&*client).await?;
+            sqlx::query(query).execute(&client).await?;
         }
         Ok(())
     }
 
     async fn drop_table(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query("DROP TABLE IF EXISTS pipeline;")
-            .execute(&*client)
+            .execute(&client)
             .await?;
         Ok(())
     }
 
     async fn put(&self, pipeline: &Pipeline) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
 
         if let Err(e) = match &pipeline.source {
@@ -188,7 +184,6 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
 
     async fn update(&self, pipeline: &Pipeline) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
 
         if let Err(e) = match &pipeline.source {
@@ -379,7 +374,6 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
 
     async fn delete(&self, pipeline_id: &str) -> Result<Pipeline> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
 
         let pipeline = sqlx::query_as::<_, Pipeline>("SELECT * FROM pipeline WHERE id = $1;")

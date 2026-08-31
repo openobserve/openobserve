@@ -266,6 +266,33 @@ jobs:
             echo "No translation changes detected"
           fi
 
+      - name: Set up Node.js
+        if: '!cancelled() && steps.check_changes.outputs.changes == ''true'''
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Format the generated locale files
+        working-directory: web
+        if: '!cancelled() && steps.check_changes.outputs.changes == ''true'''
+        # `json.dumps(indent=2)` and prettier disagree about where a short array
+        # wraps, so any locale file the script rewrites can land unformatted and
+        # fail the `format:check` gate in unit-tests.yml — a failure the PR author
+        # cannot see coming and did not cause. Formatting here, with the repo's
+        # own pinned prettier and .prettierrc.json, means what gets committed is
+        # already what that gate demands. Files the script left alone are already
+        # formatted, so this adds nothing to the diff.
+        #
+        # `--ignore-scripts` because prettier and its plugins are pure JS: none of
+        # the package install hooks (cypress, esbuild, @parcel/watcher) are needed
+        # to format JSON, and skipping them keeps this step from running yet more
+        # third-party code fetched on behalf of the PR.
+        run: |
+          npm ci --ignore-scripts
+          npx prettier --write "src/locales/languages/*.json"
+
       - name: Commit translations onto the PR branch
         id: commit
         if: '!cancelled() && steps.check_changes.outputs.changes == ''true'''

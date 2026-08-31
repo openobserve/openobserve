@@ -959,7 +959,8 @@ onMounted(() => {
 
 const refreshConfig = async () => {
   try {
-    const res: any = await configService.get_config();
+    if (!orgId.value) return;
+    const res: any = await configService.get_config_full(orgId.value);
     store.dispatch("setConfig", res.data);
   } catch (error) {
     console.log(error);

@@ -1,0 +1,60 @@
+[
+  {
+    "id": "mongo-find-doc-args-stripped-new-semconv",
+    "dialect": "mongodb",
+    "input": {
+      "attrs": {
+        "db.system.name": "mongodb",
+        "db.namespace": "shop",
+        "db.collection.name": "users",
+        "db.operation.name": "find",
+        "db.query.text": "{\"find\":\"users\",\"filter\":{\"email\":\"bob@example.com\"},\"limit\":50}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"find\":\"users\",\"filter\":{\"email\":\"?\"},\"limit\":\"?\"}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "shop",
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongo_find_users_by_email",
+    "literals": ["bob@example.com"],
+    "source": "authored"
+  },
+  {
+    "id": "mongo-find-doc-args-stripped-old-semconv",
+    "dialect": "mongodb",
+    "input": {
+      "attrs": {
+        "db.system": "mongodb",
+        "db.name": "shop",
+        "db.mongodb.collection": "users",
+        "db.operation": "find",
+        "db.statement": "{\"find\":\"users\",\"filter\":{\"email\":\"eve.attacker@example.org\"},\"limit\":250}"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "{\"find\":\"users\",\"filter\":{\"email\":\"?\"},\"limit\":\"?\"}",
+      "operation": "find",
+      "stmt_class": "query",
+      "system": "mongodb",
+      "namespace": "shop",
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mongo_find_users_by_email",
+    "literals": ["eve.attacker@example.org"],
+    "source": "authored"
+  }
+]

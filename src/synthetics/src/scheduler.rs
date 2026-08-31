@@ -31,7 +31,7 @@ use config::{
     utils::hash::{Sum64, fnv},
 };
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     table::{synthetics_checks, synthetics_jobs, synthetics_locations, synthetics_runs},
 };
 use serde::Serialize;
@@ -55,7 +55,7 @@ pub async fn run() {
     loop {
         tokio::time::sleep(TICK).await;
 
-        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let db = get_orm_client_rw().await;
 
         let now_us = config::utils::time::now_micros();
 

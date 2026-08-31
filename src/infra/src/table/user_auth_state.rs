@@ -19,17 +19,14 @@ use sea_orm::{
     sea_query::{Func, SimpleExpr},
 };
 
-use super::{
-    entity::user_auth_state::{Column, Entity, Model},
-    get_lock,
-};
+use super::entity::user_auth_state::{Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -49,7 +46,7 @@ pub async fn create_table() -> Result<(), errors::Error> {
 /// `None` means the user has never failed a login — the common case, since rows are only written
 /// on failure.
 pub async fn get(email: &str) -> Result<Option<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Entity::find()
         .filter(email_eq(email))
         .one(client)
@@ -60,10 +57,7 @@ pub async fn get(email: &str) -> Result<Option<Model>, errors::Error> {
 /// Called when a user is deleted. See `user_password_history::delete_all_for_user` for why the
 /// declared cascade is not enough.
 pub async fn delete(email: &str) -> Result<u64, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let result = Entity::delete_many()
         .filter(email_eq(email))
         .exec(client)

@@ -29,6 +29,10 @@ import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertP
 import { buildPrefillFromPanel } from "./fromPanel";
 import { buildPrefillFromLogs } from "./fromLogs";
 import { buildPrefillFromPatterns } from "./fromPatterns";
+import { buildPrefillFromLibrary } from "./fromLibrary";
+import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
+import { buildDbmPrefill } from "./fromDbm";
+import { buildDbmLockPrefill } from "./fromDbmLocks";
 
 interface AdapterCase {
   /** Registered source id. */
@@ -37,6 +41,16 @@ interface AdapterCase {
   healthy: () => AlertPrefill;
   /** The most degenerate input the surface could realistically hand over. */
   degenerate: () => AlertPrefill;
+  /**
+   * Whether degenerate input MUST produce a blocking prefill. Default true.
+   *
+   * False for surfaces whose stream and query shape are constants of the
+   * feature rather than user input — those can always build something that
+   * runs, so demanding a block would force an adapter to fail where degrading
+   * is the better answer. Such an adapter must still WARN about what it
+   * changed, which is asserted separately below.
+   */
+  blocks?: boolean;
 }
 
 const ADAPTERS: AdapterCase[] = [
@@ -91,6 +105,74 @@ const ADAPTERS: AdapterCase[] = [
       }),
     degenerate: () => buildPrefillFromPatterns({ streamName: "", templates: [] }),
   },
+  {
+    name: "library",
+    healthy: () =>
+      buildPrefillFromLibrary({
+        entry: {
+          id: "k8s/go_gc_pause_high",
+          name: "go_gc_pause_high",
+          title: "Go GC Pause High",
+          pack: "k8s",
+          severity: "warning",
+          stream: "go_gc_duration_seconds_sum",
+          stream_type: "metrics",
+          query_type: "promql",
+        } as AlertLibraryEntry,
+        file: {
+          stream_name: "go_gc_duration_seconds_sum",
+          stream_type: "metrics",
+          query_condition: {
+            type: "promql",
+            promql: "rate(go_gc_duration_seconds_sum[5m])",
+            promql_condition: { column: "value", operator: ">", value: 100 },
+          },
+          trigger_condition: { period: 5, frequency: 5, threshold: 1, timezone: "UTC" },
+        },
+      }),
+    // The library's own degenerate case is a file that failed to parse into
+    // anything — there is no partial state between "fetched" and "unusable".
+    degenerate: () =>
+      buildPrefillFromLibrary({ entry: {} as AlertLibraryEntry, file: {} as AlertLibraryFile }),
+  },
+  {
+    name: "dbm",
+    healthy: () =>
+      buildDbmPrefill({
+        scope: "query",
+        kind: "latency",
+        fingerprint: "a1b2c3d4e5f60718",
+        queryNorm: "SELECT * FROM orders WHERE customer_id = ?",
+        fpVersion: 1,
+        dbSystem: "postgresql",
+        dbInstance: "orders-db",
+        p95Ns: 380_000_000,
+        rollupIntervalSecs: 900,
+      }),
+    // DBM's degenerate case is NOT a blocked prefill, and that is deliberate:
+    // the stream and the aggregate query are known constants of the feature, so
+    // even a row with no fingerprint still yields a working database-scoped
+    // alert. It degrades scope instead of failing — see `blocks: false`.
+    degenerate: () => buildDbmPrefill({ scope: "query", kind: "latency" }),
+    blocks: false,
+  },
+  {
+    name: "dbmlocks",
+    healthy: () =>
+      buildDbmLockPrefill({
+        kind: "blocking",
+        dbSystem: "postgresql",
+        dbInstance: "orders-db",
+        observedWaitSeconds: 40,
+        periodMinutes: 15,
+      }),
+    // Like `dbm`, and for the same reason: the stream and the shape of the
+    // aggregate are constants of the feature, so a row carrying no identity at
+    // all still yields an alert that runs — a fleet-wide one. It degrades scope
+    // rather than failing, and says so via `dbmNoInstance`.
+    degenerate: () => buildDbmLockPrefill({ kind: "blocking" }),
+    blocks: false,
+  },
 ];
 
 describe.each(ADAPTERS)("contract conformance — $name adapter", (adapterCase) => {
@@ -104,6 +186,15 @@ describe.each(ADAPTERS)("contract conformance — $name adapter", (adapterCase) 
 
   it("reports a blocking warning rather than a broken prefill on degenerate input", () => {
     const result = normalizePrefill(adapterCase.degenerate());
+
+    // An adapter that legitimately degrades instead of blocking still owes the
+    // user an explanation of what it changed — silence would be the actual bug.
+    if (adapterCase.blocks === false) {
+      expect(isPrefillBlocked(result)).toBe(false);
+      expect(result.warnings.length).toBeGreaterThan(0);
+      return;
+    }
+
     expect(isPrefillBlocked(result)).toBe(true);
     // A block must be explained — an empty warnings list would leave the UI
     // with nothing to tell the user.

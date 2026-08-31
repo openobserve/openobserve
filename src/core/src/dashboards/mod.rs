@@ -367,6 +367,7 @@ pub async fn create_dashboard(
             folder_id: DEFAULT_FOLDER.to_string(),
             name: DEFAULT_FOLDER.to_string(),
             description: DEFAULT_FOLDER.to_string(),
+            icon: None,
         };
         folders::save_folder(org_id, folder, FolderType::Dashboards, true)
             .await

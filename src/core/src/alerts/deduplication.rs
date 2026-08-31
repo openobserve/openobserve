@@ -25,7 +25,7 @@ use config::{
     },
     utils::json::{Map, Value},
 };
-use infra::table::{entity::alert_dedup_state, get_lock};
+use infra::table::entity::alert_dedup_state;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 /// Append the evaluated level to a fingerprint for MULTI-LEVEL alerts.
@@ -161,8 +161,6 @@ pub async fn confirm_notification_sent(
     if fingerprints.is_empty() {
         return Ok(());
     }
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
     alert_dedup_state::Entity::update_many()
         .col_expr(
             alert_dedup_state::Column::NotificationSent,
@@ -199,8 +197,6 @@ pub async fn save_dedup_state(
     db: &DatabaseConnection,
     params: DedupStateParams<'_>,
 ) -> Result<alert_dedup_state::Model, sea_orm::DbErr> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
     // Try to find existing record
     if let Some(existing) = get_dedup_state(db, params.fingerprint).await? {
         // Update existing
@@ -241,8 +237,6 @@ pub async fn cleanup_expired_state(
     let cutoff_time = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros()
         - (older_than_minutes * 60 * 1_000_000);
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
     let query = alert_dedup_state::Entity::delete_many()
         .filter(alert_dedup_state::Column::LastSeenAt.lt(cutoff_time));
 

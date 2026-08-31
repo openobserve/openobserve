@@ -59,12 +59,24 @@ export interface SubnavChild {
   icon: string;
   /** Route name — used for navigation, active-state, and hasRoute gating. */
   name: string;
-  /** Section header this item sits under (mirrors the sub-page nav grouping). */
-  category?: string;
+  /**
+   * i18n key for a section header this item sits under. Consecutive children
+   * sharing a key render beneath one header, mirroring the sub-page grouping.
+   * A KEY, not a literal: the rail ships in 15 locales.
+   */
+  categoryKey?: I18nKey;
   /** Query `tab` for routes that switch sub-views via a query param. */
   tab?: string;
   /** Use this child as the active fallback when its route has no `tab` query. */
   defaultForRoute?: boolean;
+  /**
+   * Also mark this child active on these route names. For a section whose
+   * sub-views are IN-PAGE TABS on sibling routes rather than query params:
+   * Databases owns `dbmQueries` and `dbmQueryDetail`, which have no flyout
+   * entry of their own, so without this the entry unlights the moment the
+   * user switches tab.
+   */
+  activeOnRoutes?: string[];
   /** Group children only: include only when this top-level item is present. */
   requires?: string;
   /**
@@ -87,6 +99,8 @@ export interface NavGateContext {
   modelPricing: boolean;
   serviceStreams: boolean;
   onlineEvals: boolean;
+  /** `zoConfig.database_monitoring_enabled`. OSS feature — no build gate. */
+  databaseMonitoring: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
   hiddenMenus: Set<string>;
 }

@@ -716,32 +716,58 @@ describe("TraceTree", () => {
     });
   });
 
-  // Hover uses CSS-only (:hover pseudo-class), no JS state tracking.
-  // jsdom does not apply CSS pseudo-class styles so these tests are skipped.
-  describe.skip("Hover functionality", () => {
-    it("should show view logs button on hover", async () => {
-      const operationContainer = wrapper.find(
-        '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
-      );
-      await operationContainer.trigger("mouseover");
+  // The old suite here was skipped for jsdom (no pseudo-class application) AND
+  // asserted a `show` class that existed nowhere in the markup — dead twice over,
+  // and pointed at an element that no longer exists. What is testable without a
+  // layout engine is the arrangement, which is what the overlay got wrong.
+  describe("row action cluster", () => {
+    const SPAN = "d9603ec7f76eb499";
 
-      const viewLogsContainer = wrapper.find(
-        '[data-test="trace-tree-span-view-logs-container-d9603ec7f76eb499"]',
-      );
-      expect(viewLogsContainer.classes()).toContain("show");
+    // The button used to be an absolute overlay pinned to the same right edge as
+    // the badges, so hovering a row painted it over the HTTP status and the event
+    // count. Order within the cluster is the assertion that keeps it out from on
+    // top of them.
+    it("orders the cluster search, then status, then event count", () => {
+      // The default fixture carries neither a status code nor events, so the
+      // cluster would hold only the button and the assertion would pass on an
+      // empty ordering. Give this span both.
+      const populated = mountTraceTree({
+        spanMap: {
+          [SPAN]: {
+            span_id: SPAN,
+            http_status_code: 200,
+            events: JSON.stringify([{ name: "boom", _timestamp: 1 }]),
+          },
+        },
+      });
+
+      const cluster = populated.find(`[data-test="trace-tree-span-view-logs-container-${SPAN}"]`)
+        .element.parentElement as HTMLElement;
+
+      const order = [...cluster.children].map((child) => {
+        const test = child.getAttribute("data-test") ?? "";
+        if (test.startsWith("trace-tree-span-view-logs-container")) return "search";
+        if (test.startsWith("trace-tree-span-http-status")) return "status";
+        if (test === "span-event-count-badge") return "events";
+        return test;
+      });
+
+      expect(order.filter((n) => ["search", "status", "events"].includes(n))).toEqual([
+        "search",
+        "status",
+        "events",
+      ]);
     });
 
-    it("should hide view logs button when not hovered", async () => {
-      const operationContainer = wrapper.find(
-        '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
-      );
-      await operationContainer.trigger("mouseover");
-      await operationContainer.trigger("mouseout");
+    // `hidden` (display:none) rather than `invisible` (visibility:hidden) is the
+    // load-bearing detail: `invisible` keeps the box in layout and would reserve a
+    // permanent gutter beside the badges, which is exactly what the arrangement
+    // removes. The reveal itself is CSS-only and cannot be exercised in jsdom.
+    it("keeps the action out of layout until the row is hovered", () => {
+      const action = wrapper.find(`[data-test="trace-tree-span-view-logs-container-${SPAN}"]`);
 
-      const viewLogsContainer = wrapper.find(
-        '[data-test="trace-tree-span-view-logs-container-d9603ec7f76eb499"]',
-      );
-      expect(viewLogsContainer.classes()).not.toContain("show");
+      expect(action.classes()).toContain("hidden");
+      expect(action.classes()).not.toContain("invisible");
     });
   });
 
@@ -1602,5 +1628,93 @@ describe("TraceTree", () => {
         expect(entWrapper.emitted("view-correlated-logs")[0][0]).toEqual(orphanSpan);
       });
     });
+  });
+});
+
+describe("TraceTree span event count badge", () => {
+  const spanIdWithEvents = "d9603ec7f76eb499";
+
+  const mountWithEvents = (events: unknown[]) =>
+    mountTraceTree({
+      spanMap: {
+        [spanIdWithEvents]: { span_id: spanIdWithEvents, events: JSON.stringify(events) },
+      },
+    });
+
+  const badges = (wrapper: ReturnType<typeof mountTraceTree>) =>
+    wrapper.findAll('[data-test="span-event-count-badge"]');
+
+  it("shows no badge for a span with no events", () => {
+    expect(badges(mountWithEvents([]))).toHaveLength(0);
+  });
+
+  it("shows the event count for a span with events", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", _timestamp: 1752490492900000000 },
+      { name: "b", _timestamp: 1752490492950000000 },
+    ]);
+
+    expect(badges(wrapper)[0].text()).toContain("2");
+  });
+
+  // The error glyph and its accessible name are the non-colour channels for
+  // severity. A red tint alone would be colour-only, which is the defect the
+  // badge exists to fix.
+  it("tallies errors under their own icon, not by colour alone", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", level: "INFO", _timestamp: 1752490492900000000 },
+      { name: "b", level: "ERROR", _timestamp: 1752490492950000000 },
+    ]);
+
+    const errorTally = badges(wrapper)[0].find('[data-test="span-event-error-count"]');
+    expect(errorTally.exists()).toBe(true);
+    expect(errorTally.text()).toBe("1");
+    expect(errorTally.find('[role="img"]').attributes("aria-label")).toBe("1 error");
+  });
+
+  it("shows the total beside the error tally, not the error count alone", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", level: "INFO", _timestamp: 1752490492900000000 },
+      { name: "b", level: "ERROR", _timestamp: 1752490492950000000 },
+      { name: "c", level: "ERROR", _timestamp: 1752490492960000000 },
+    ]);
+
+    const badge = badges(wrapper)[0];
+    expect(badge.find('[data-test="span-event-error-count"]').text()).toBe("2");
+    expect(badge.text()).toContain("3");
+  });
+
+  it("shows a plain count when no event is an error", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", level: "INFO", _timestamp: 1752490492900000000 },
+    ]);
+
+    const badge = badges(wrapper)[0];
+    expect(badge.find('[data-test="span-event-error-count"]').exists()).toBe(false);
+    expect(badge.text()).not.toMatch(/error/i);
+  });
+
+  // The badge is the honest fallback for the 10.3% of default-stream spans that
+  // render narrower than one pixel, where no positioned marker can describe them.
+  it("counts an event whose timestamp no window could position", () => {
+    const wrapper = mountWithEvents([{ name: "orphan", _timestamp: 1 }]);
+
+    expect(badges(wrapper)[0].text()).toContain("1");
+  });
+
+  // The badge's title is its accessible description; "1 events" reads as broken.
+  it("titles a single event in the singular", () => {
+    const wrapper = mountWithEvents([{ name: "a", _timestamp: 1752490492900000000 }]);
+
+    expect(badges(wrapper)[0].attributes("title")).toBe("1 event");
+  });
+
+  it("titles multiple events in the plural", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", _timestamp: 1752490492900000000 },
+      { name: "b", _timestamp: 1752490492950000000 },
+    ]);
+
+    expect(badges(wrapper)[0].attributes("title")).toBe("2 events");
   });
 });
