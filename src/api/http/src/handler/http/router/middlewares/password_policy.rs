@@ -550,6 +550,21 @@ mod tests {
     }
 
     #[test]
+    fn a_window_as_long_as_the_period_warns_on_every_request() {
+        let u = unflagged("a@b.com", 1);
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/default/streams"),
+                &Method::GET,
+                &rotating(90, 90),
+                now()
+            ),
+            PolicyDecision::Warn { days_remaining: 89 }
+        );
+    }
+
+    #[test]
     fn root_is_exempt_from_rotation() {
         let mut u = unflagged("root@b.com", 10_000);
         u.is_root = true;

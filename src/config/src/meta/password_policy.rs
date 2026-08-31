@@ -102,7 +102,8 @@ pub struct PasswordPolicy {
     pub special_char_set: String,
     /// `0` disables rotation enforcement.
     pub rotation_days: u32,
-    /// Days before expiry to start warning. `0` = never warn.
+    /// Days before expiry to start warning. `0` = never warn; equal to `rotation_days` = warn on
+    /// every request, since no live password is then outside the window.
     pub rotation_warning_days: u32,
     /// `0` disables reuse prevention.
     pub history_count: u32,
@@ -331,6 +332,8 @@ impl PasswordPolicy {
         } else {
             whole_days
         };
+        // A window as long as the rotation period leaves no password outside it, which is how an
+        // admin asks for the countdown on every response rather than only near the deadline.
         if days_remaining <= i64::from(self.rotation_warning_days) {
             RotationStatus::Warning { days_remaining }
         } else {
@@ -359,11 +362,11 @@ impl PasswordPolicy {
                 self.max_length, self.min_length
             ));
         }
-        // Otherwise every password sits inside the warning window from the moment it is set, so the
-        // warning is permanent and stops carrying information.
-        if self.rotation_days != 0 && self.rotation_warning_days >= self.rotation_days {
+        // Equal is allowed and is what an unset window resolves to: the countdown then rides on
+        // every response. Beyond the rotation period it would only describe days that never exist.
+        if self.rotation_days != 0 && self.rotation_warning_days > self.rotation_days {
             return Err(format!(
-                "rotation_warning_days ({}) must be less than rotation_days ({})",
+                "rotation_warning_days ({}) must not exceed rotation_days ({})",
                 self.rotation_warning_days, self.rotation_days
             ));
         }
@@ -609,6 +612,20 @@ mod tests {
     }
 
     #[test]
+    fn test_warning_window_equal_to_the_period_warns_from_the_first_day() {
+        let p = rotating(90, 90);
+        assert!(p.validate().is_ok());
+        assert_eq!(
+            p.rotation_status(days_ago(0), now()),
+            RotationStatus::Warning { days_remaining: 90 }
+        );
+        assert_eq!(
+            p.rotation_status(days_ago(45), now()),
+            RotationStatus::Warning { days_remaining: 45 }
+        );
+    }
+
+    #[test]
     fn test_rotation_treats_missing_timestamp_as_current() {
         // The alternative reading — None as the epoch — expires every user at once.
         assert_eq!(
@@ -676,14 +693,18 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_rejects_warning_window_covering_whole_rotation() {
+    fn test_validate_rejects_warning_window_longer_than_the_rotation_period() {
         let mut p = base();
         p.rotation_days = 5;
-        // default warning is 7, so enabling a shorter rotation is a self-contradiction
+        p.rotation_warning_days = 6;
+        // The extra day describes a deadline that never exists.
         assert!(p.validate().unwrap_err().contains("rotation_warning_days"));
 
         p.rotation_warning_days = 5;
-        assert!(p.validate().is_err(), "equal is still a permanent warning");
+        assert!(
+            p.validate().is_ok(),
+            "warning for the whole period is valid"
+        );
 
         p.rotation_warning_days = 4;
         assert!(p.validate().is_ok());
