@@ -196,9 +196,9 @@
         <div v-if="canScrollLeft" class="absolute start-1.5 top-1/2 z-1 -translate-y-1/2">
           <OButton
             variant="outline"
-            size="icon-circle-sm"
+            size="icon-circle"
             icon-left="chevron-left"
-            class="bg-surface-base shadow-md"
+            class="bg-surface-panel! text-accent! border-border-strong! hover:bg-accent/12! hover:border-accent! shadow-lg"
             :aria-label="t('aiObservability.playground.scrollLeft')"
             data-test="ai-playground-scroll-left"
             @click="scrollByStep(-1)"
@@ -207,9 +207,9 @@
         <div v-if="canScrollRight" class="absolute end-1.5 top-1/2 z-1 -translate-y-1/2">
           <OButton
             variant="outline"
-            size="icon-circle-sm"
+            size="icon-circle"
             icon-left="chevron-right"
-            class="bg-surface-base shadow-md"
+            class="bg-surface-panel! text-accent! border-border-strong! hover:bg-accent/12! hover:border-accent! shadow-lg"
             :aria-label="t('aiObservability.playground.scrollRight')"
             data-test="ai-playground-scroll-right"
             @click="scrollByStep(1)"
