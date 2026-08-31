@@ -313,6 +313,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OUserCell :value="row.owner" />
               </template>
 
+              <template #cell-frequency="{ row }">
+                {{
+                  row.frequency
+                    ? row.frequency_type == "cron"
+                      ? row.frequency
+                      : t("pipeline.frequencyMins", { count: row.frequency })
+                    : "--"
+                }}
+              </template>
+
               <template #cell-last_triggered_at="{ row }">
                 <span class="inline-flex min-w-0 items-center gap-1.5">
                   <span
@@ -1508,6 +1518,22 @@ export default defineComponent({
           size: COL.owner,
           meta: { align: "left" },
         },
+        // "frequency" (Check every) — all tabs except realTime
+        ...(activeTab.value !== "realTime"
+          ? [
+              {
+                id: "frequency",
+                accessorKey: "frequency",
+                header: t("alerts.frequency"),
+                cell: " ",
+                sortable: true,
+                resizable: true,
+                hideable: true,
+                size: COL.frequency,
+                meta: { align: "left" },
+              } as OTableColumnDef,
+            ]
+          : []),
         {
           id: "last_triggered_at",
           accessorKey: "last_triggered_at",
