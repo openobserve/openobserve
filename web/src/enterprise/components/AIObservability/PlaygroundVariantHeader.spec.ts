@@ -42,7 +42,15 @@ describe("PlaygroundVariantHeader", () => {
   it("labels each row with the connection name and its model", () => {
     const wrapper = mount(PlaygroundVariantHeader, {
       props: { variant: emptyVariant("openai", "gpt-4o-mini"), providers, label: "A" },
-      global: { stubs: { OSelect, OButton: true, OInput: true, ODropdown: true } },
+      global: {
+        stubs: {
+          OSelect,
+          OButton: true,
+          OInput: true,
+          ODropdown: true,
+          PlaygroundSchemaDialog: true,
+        },
+      },
     });
 
     expect(wrapper.findComponent(OSelect).props("options")).toContainEqual({
@@ -73,7 +81,15 @@ describe("PlaygroundVariantHeader", () => {
         ] as Provider[],
         label: "A",
       },
-      global: { stubs: { OSelect, OButton: true, OInput: true, ODropdown: true } },
+      global: {
+        stubs: {
+          OSelect,
+          OButton: true,
+          OInput: true,
+          ODropdown: true,
+          PlaygroundSchemaDialog: true,
+        },
+      },
     });
 
     const options = wrapper.findComponent(OSelect).props("options");
@@ -95,7 +111,15 @@ describe("PlaygroundVariantHeader", () => {
         ] as Provider[],
         label: "A",
       },
-      global: { stubs: { OSelect, OButton: true, OInput: true, ODropdown: true } },
+      global: {
+        stubs: {
+          OSelect,
+          OButton: true,
+          OInput: true,
+          ODropdown: true,
+          PlaygroundSchemaDialog: true,
+        },
+      },
     });
 
     const options = wrapper.findComponent(OSelect).props("options");
@@ -112,7 +136,15 @@ describe("PlaygroundVariantHeader", () => {
   it("attributes a hand-typed model to the provider it was typed against", () => {
     const wrapper = mount(PlaygroundVariantHeader, {
       props: { variant: emptyVariant("anthropic", "claude-opus-typed"), providers, label: "A" },
-      global: { stubs: { OSelect, OButton: true, OInput: true, ODropdown: true } },
+      global: {
+        stubs: {
+          OSelect,
+          OButton: true,
+          OInput: true,
+          ODropdown: true,
+          PlaygroundSchemaDialog: true,
+        },
+      },
     });
 
     expect(wrapper.findComponent(OSelect).props("options")).toContainEqual({
@@ -142,5 +174,45 @@ describe("PlaygroundVariantHeader", () => {
       providerId: "anthropic",
       model: "claude-sonnet",
     });
+  });
+});
+
+// Icon-only next to the gear, so the tint is the only thing that can say a
+// schema is in force.
+describe("PlaygroundVariantHeader — schema", () => {
+  // The REAL OButton, not a stub: a stub proves the class was passed, which is
+  // exactly what an earlier version of this test proved while the tint lost a
+  // specificity fight with the variant's own `bg-transparent` on screen.
+  const stubs = {
+    OSelect,
+    OInput: true,
+    ODropdown: true,
+    PlaygroundSchemaDialog: true,
+  };
+
+  function schemaBtn(responseSchema: string | null) {
+    const wrapper = mount(PlaygroundVariantHeader, {
+      props: {
+        variant: { ...emptyVariant("openai", "gpt-4o-mini"), responseSchema },
+        providers,
+        label: "A",
+      },
+      global: { stubs },
+    });
+    return wrapper.get('[data-test^="ai-playground-schema-btn-"]');
+  }
+
+  it("reads as inactive with no schema set", () => {
+    const button = schemaBtn(null);
+    expect(button.classes()).toContain("bg-transparent");
+    expect(button.classes()).not.toContain("bg-accent/12!");
+    expect(button.attributes("title")).toBe("aiObservability.playground.schema");
+  });
+
+  // Icon-only, so the tint is the ONLY thing that can say a schema is in force.
+  it("tints itself once a schema is in force", () => {
+    const button = schemaBtn('{"type":"object"}');
+    expect(button.classes()).toContain("bg-accent/12!");
+    expect(button.attributes("title")).toBe("aiObservability.playground.schemaOn");
   });
 });

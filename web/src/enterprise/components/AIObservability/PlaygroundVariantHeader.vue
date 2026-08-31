@@ -39,7 +39,9 @@
 
       <!-- Parameters live behind the gear, not in the column: they are set once
            and read never, while the messages below are edited constantly. -->
-      <ODropdown align="end">
+      <!-- Down and to the RIGHT of the gear: aligned to its end it grew leftward
+           over the messages, covering the prompt the parameter is being set for. -->
+      <ODropdown align="start" side="bottom">
         <template #trigger>
           <OButton
             variant="ghost-muted"
@@ -68,6 +70,29 @@
         </div>
       </ODropdown>
     </div>
+
+    <!-- Icon only, and next to the gear rather than above the messages: like the
+         parameters behind it, a response schema is set once and read never. The
+         tinted background is the only thing that says one is in force, since
+         there is no label left to qualify. -->
+    <!-- The VARIANT carries the icon colour and the `!` carries the tint: every
+         ghost variant hardcodes `bg-transparent`, and two utilities for one
+         property resolve by stylesheet order, so an unmarked background loses
+         to it silently. -->
+    <OButton
+      :variant="variant.responseSchema ? 'ghost-primary' : 'ghost-muted'"
+      size="icon-xs"
+      icon-left="data-object"
+      class="shrink-0"
+      :class="variant.responseSchema ? 'bg-accent/12!' : ''"
+      :title="
+        variant.responseSchema
+          ? t('aiObservability.playground.schemaOn')
+          : t('aiObservability.playground.schema')
+      "
+      :data-test="`ai-playground-schema-btn-${variant.id}`"
+      @click="schemaOpen = true"
+    />
 
     <!-- One button, not two: a blank column is almost never what someone wants
          next to a variant they have just tuned, so plus clones this one. -->
@@ -104,16 +129,23 @@
       :data-test="`ai-playground-variant-close-${label}`"
       @click="canRemove && emit('remove')"
     />
+
+    <PlaygroundSchemaDialog
+      v-model:open="schemaOpen"
+      :schema="variant.responseSchema"
+      @apply="(responseSchema) => patch({ responseSchema })"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import PlaygroundSchemaDialog from "./PlaygroundSchemaDialog.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
   MAX_VARIANTS,
@@ -150,6 +182,8 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const maxVariants = MAX_VARIANTS;
+
+const schemaOpen = ref(false);
 
 /** Both halves or nothing: a key with an empty model matches no option, and an
  *  unmatched value is rendered by the select as the raw key — which reads as an

@@ -46,9 +46,7 @@
         <div class="h-full overflow-y-auto px-2.5 py-2.5">
           <PlaygroundVariantConfig
             :variant="variant"
-            :providers="providers"
             :var-names="varNames"
-            :vars="vars"
             @change="(next) => emit('change', next)"
           />
         </div>
