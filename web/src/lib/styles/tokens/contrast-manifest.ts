@@ -862,8 +862,9 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   },
   {
     fg: "--color-status-info-text",
-    category: "non-text",
-    why: "every real consumer paints it as a fill/border/dot (handle dots, row spines, borders); no plain-text-on-page use found in an app-wide sweep, so it is judged at 3:1 like the other shape foregrounds it groups with",
+    bg: "--color-status-info-bg",
+    category: "text",
+    why: "a chip/badge label painted on its own -bg sibling (AlertInsights.vue filter chips, TraceTree.vue HTTP-status legend), not the page — the real backdrop is darker than --color-surface-base, so it is the pair that must clear 4.5:1",
   },
   {
     fg: "--color-stepper-indicator-default",

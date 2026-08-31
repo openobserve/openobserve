@@ -394,8 +394,9 @@
   --color-status-positive: #208a3c;
   --color-status-error-text: #cc3645;
   --color-status-error-bg: #fff7f7;
-  /* Nudged from #208a3c (4.41:1) to clear 4.5:1 for the one genuine plain-text
-     use (QualityRunsTable.vue row text) — imperceptibly darker. */
+  /* Nudged from #208a3c (4.41:1) to clear 4.5:1 for its several genuine
+     plain-text uses (QualityRunsTable.vue, AppSessions.vue, MonitorRuns.vue
+     KPI values) — imperceptibly darker. */
   --color-status-success-text: #20883b;
   --color-status-success-bg: #f2fcf3;
 }

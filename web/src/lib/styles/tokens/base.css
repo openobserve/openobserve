@@ -258,7 +258,7 @@
 
   /* --- Chart grid line (dashed split-line) — light value; dark in dark.css.
      1.4.11 exempt (object required to understand content), raised for
-     perceptibility rather than to hit 3:1 — see wcag-plan.md item 1.6. --- */
+     perceptibility rather than to hit 3:1. --- */
   --color-chart-gridline: rgba(0, 0, 0, 0.2);
 
   /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
@@ -590,7 +590,10 @@
   /* Darkened from #fb8c00 to clear 4.5:1 on white — same chart-label-text case. */
   --color-severity-warning-color: #b16300;
   --color-status-info-bg: #edf3ff;
-  --color-status-info-text: #588cf3;
+  /* Darkened from #588cf3 (2.92:1 on its own -bg sibling) to clear 4.5:1 for
+     genuine text uses painted on --color-status-info-bg — filter chips
+     (AlertInsights.vue) and the HTTP-status legend (TraceTree.vue). */
+  --color-status-info-text: #2065ef;
   --color-status-neutral-text: #6c707e;
   --color-status-warning-bg: #fff4eb;
   /* Darkened from #e56d17 to clear 4.5:1 on white for genuine text uses
