@@ -343,19 +343,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The team is a destination, not a label: "who else is on this
              rotation" is the question after "who owns this page", and it lives
              one click away on the team. `.stop` because the row itself opens
-             the page — a cell that navigates somewhere else must not do both. -->
-        <OButton
+             the page — a cell that navigates somewhere else must not do both.
+             An anchor rather than a button: it goes somewhere, it doesn't act. -->
+        <router-link
           v-else
-          variant="ghost-primary"
-          size="xs"
-          class="max-w-full"
+          :to="{
+            name: 'onCallTeamDetail',
+            params: { teamId: row.latest.team_id },
+            query: { org_identifier: orgId },
+          }"
+          class="text-text-body inline-block max-w-full truncate text-sm underline"
           :data-test="`oncall-row-team-${row.rowKey}`"
-          @click.stop="openTeam(row.latest.team_id)"
+          @click.stop
         >
-          <span class="truncate">
-            {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
-          </span>
-        </OButton>
+          {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
+          <OTooltip :content="raw(teamNameById[row.latest.team_id] ?? row.latest.team_id)" />
+        </router-link>
       </template>
 
       <!-- The name plus what the page is about: how often it has fired, and the
@@ -363,8 +366,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-subject="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="flex items-center gap-1.5">
-            <span class="text-text-heading truncate text-sm font-medium">
+            <span class="text-text-heading truncate text-sm">
               {{ raw(row.latest.title || row.latest.subject.source_id) }}
+              <OTooltip :content="raw(row.latest.title || row.latest.subject.source_id)" />
             </span>
             <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
               {{ raw(`×${row.firings.length}`) }}
@@ -424,18 +428,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <!-- Who owns it, or — while nobody does — that nobody does. How far the
-           ladder has climbed is the escalation column's job, so this one says
-           the one thing it is asked for. -->
+      <!-- Who owns it, or — while nobody does — that nobody does, plus who
+           the rotation would actually ring right now, so the reader has
+           someone to reach out to instead of just the fact that no one has
+           answered. An icon rather than a text badge for that second line:
+           "On call now" competed with the escalation column's own words for
+           the reader's attention; a glyph doesn't. -->
       <template #cell-responder="{ row }">
         <OUserCell
           v-if="row.latest.acked_by"
+          class="text-sm"
           :value="row.latest.acked_by"
           :name="row.latest.acked_by === viewerEmail ? youLabel : undefined"
         />
-        <OText v-else variant="body" as="span" data-test="oncall-responder-nobody">
-          {{ t("oncall.nobodyYet") }}
-        </OText>
+        <span v-else class="flex min-w-0 flex-col gap-0.5">
+          <!-- Same text color as the P2 priority tag, so an unanswered page
+               reads as the same order of urgency the priority column already
+               establishes. -->
+          <OText
+            variant="body"
+            as="span"
+            class="text-badge-orange-soft-text"
+            data-test="oncall-responder-nobody"
+          >
+            {{ t("oncall.nobodyYet") }}
+          </OText>
+          <!-- Not in the map yet vs. fetched-and-empty are different facts —
+               see positionsByTeam's loading contract in OnCallTeams.vue. Say
+               nothing while it's still loading rather than flash a name or a
+               gap in and out. -->
+          <span
+            v-if="positionsByTeam[row.latest.team_id ?? '']?.[0]"
+            class="flex min-w-0 items-center gap-1"
+          >
+            <OIcon name="notifications-active" size="xs" class="text-text-secondary shrink-0" />
+            <span
+              class="text-text-secondary truncate text-xs"
+              :data-test="`oncall-responder-oncall-now-${row.rowKey}`"
+            >
+              {{ positionsByTeam[row.latest.team_id ?? '']![0].user_email }}
+              <OTooltip :content="raw(positionsByTeam[row.latest.team_id ?? '']![0].user_email)" />
+            </span>
+            <!-- A bare button, sized to the icon rather than to a control: the
+                 same compact copy affordance OCodeCell uses, so it sits on
+                 this line instead of stretching the row to a button's height. -->
+            <button
+              type="button"
+              class="text-text-secondary hover:text-text-body shrink-0 cursor-pointer leading-none"
+              :title="String(t('common.copy'))"
+              :data-test="`oncall-responder-copy-${row.rowKey}`"
+              @click.stop="
+                copyToClipboard(positionsByTeam[row.latest.team_id ?? '']![0].user_email, t)
+              "
+            >
+              <OIcon name="content-copy" size="xs" />
+            </button>
+          </span>
+          <!-- Fetched, and genuinely nobody: as true of the "who would this
+               page ring" question as "Nobody yet" is of "who answered it". -->
+          <OText
+            v-else-if="row.latest.team_id && positionsByTeam[row.latest.team_id] !== undefined"
+            variant="meta"
+            class="text-status-warning-text"
+            data-test="oncall-responder-gap"
+          >
+            {{ t("oncall.coverage_gap") }}
+          </OText>
+        </span>
       </template>
 
       <!-- The same cell as the Incident list's "Last Alert", down to the hover
@@ -734,6 +793,7 @@ import type {
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { copyToClipboard } from "@/utils/clipboard";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import {
@@ -1709,16 +1769,6 @@ function createTeam() {
   router.push({
     name: "onCallTeams",
     query: { org_identifier: orgId.value, action: "add" },
-  });
-}
-
-/// A rotation in the on-call menu is worth a click: whoever is reading "nobody on
-/// call for Search" wants Search's schedule, not the teams list.
-function openTeam(teamId: string) {
-  router.push({
-    name: "onCallTeamDetail",
-    params: { teamId },
-    query: { org_identifier: orgId.value },
   });
 }
 

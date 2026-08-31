@@ -30,23 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex min-w-0 flex-col gap-0.5" :data-test="`oncall-escalation-cell-${responseId}`">
     <!-- Tone alone, no icon and no bar. Both restated what the headline already
          says in words, and three severity signals on one cell competed with the
-         row's own priority rail for the same glance. -->
+         row's own priority rail for the same glance. One line, not two: the
+         detail sentence is the "why" behind the headline, not a second fact —
+         it lives in the hover, not stacked under it. -->
     <span class="truncate text-sm" :class="toneClass" data-test="oncall-escalation-cell-level">
       {{ headline }}
-    </span>
-
-    <span
-      v-if="detail"
-      class="text-text-secondary truncate text-xs"
-      data-test="oncall-escalation-cell-detail"
-    >
-      {{ detail }}
+      <OTooltip :content="tooltipContent" />
     </span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import type { EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
@@ -79,7 +76,7 @@ const nowMicros = useOnCallClock();
 const toneClass = computed(() => {
   if (props.state === "resolved") return "text-text-secondary";
   if (props.progress?.stopped_because === "snoozed") return "text-status-warning-text";
-  if (props.state === "acknowledged") return "text-status-success-text";
+  if (props.state === "acknowledged") return "text-text-body";
   return "text-status-error-text";
 });
 
@@ -153,4 +150,10 @@ const detail = computed<I18nText | "">(() => {
   // on-call"), so they pass through verbatim rather than being re-derived here.
   return t("oncall.escalationTo", { who: raw(progress.next_targets.join(", ")), when });
 });
+
+/// What the hover says: the headline alone, or the headline plus the "why"
+/// that used to sit under it as a second line.
+const tooltipContent = computed<I18nText>(() =>
+  detail.value ? raw(`${headline.value} — ${detail.value}`) : headline.value,
+);
 </script>

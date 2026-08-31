@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { mount, type VueWrapper } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import type { EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
 
@@ -24,6 +25,13 @@ const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
   OProgressBar: { name: "OProgressBar", props: ["value", "variant"], template: "<div />" },
 };
+
+/// The detail sentence lives in the tooltip's `content` prop now, not a
+/// second visible line — reading the prop avoids needing a real hover to
+/// mount the (lazy, portalled) tooltip content.
+function tooltipText(wrapper: VueWrapper) {
+  return String(wrapper.findComponent(OTooltip).props("content"));
+}
 
 function firedRungs(count: number) {
   return Array.from({ length: count }, (_, i) => ({
@@ -78,11 +86,11 @@ describe("OnCallEscalationCell", () => {
       next_at: (Date.now() + 4 * 60_000) * 1000,
     });
 
-    const detail = wrapper.find('[data-test="oncall-escalation-cell-detail"]');
-    expect(detail.text()).toContain("the next on-call");
+    const tooltip = tooltipText(wrapper);
+    expect(tooltip).toContain("the next on-call");
     // Not exact: the countdown runs against the real clock, so seconds have
     // already elapsed by the time it renders.
-    expect(detail.text()).toMatch(/[34]m/);
+    expect(tooltip).toMatch(/[34]m/);
   });
 
   /// One or two words, not a sentence. The full copy ("Escalation stopped —
@@ -119,9 +127,7 @@ describe("OnCallEscalationCell", () => {
       },
       global: { plugins: [i18n], stubs },
     });
-    expect(wrapper.find('[data-test="oncall-escalation-cell-detail"]').text()).toBe(
-      "acked in 42s",
-    );
+    expect(tooltipText(wrapper)).toContain("acked in 42s");
   });
 
   it("says nothing has been paged when the ladder position is unknown", () => {
@@ -145,7 +151,7 @@ describe("OnCallEscalationCell", () => {
   it.each([
     ["triggered" as const, { fired: firedRungs(3), exhausted: true }, "text-status-error-text"],
     ["triggered" as const, { fired: firedRungs(1) }, "text-status-error-text"],
-    ["acknowledged" as const, { fired: firedRungs(1) }, "text-status-success-text"],
+    ["acknowledged" as const, { fired: firedRungs(1) }, "text-text-body"],
     ["triggered" as const, { stopped_because: "snoozed" }, "text-status-warning-text"],
     ["resolved" as const, { fired: firedRungs(1) }, "text-text-secondary"],
   ])("tones %s/%o as %s", (state, progress, expected) => {
@@ -182,9 +188,7 @@ describe("OnCallEscalationCell", () => {
     );
 
     // Two distinct people over two rungs — the repeat is not a second pair of hands.
-    expect(wrapper.find("[data-test='oncall-escalation-cell-detail']").text()).toBe(
-      "rung 2 people over 6 levels, no ack",
-    );
+    expect(tooltipText(wrapper)).toContain("rung 2 people over 6 levels, no ack");
   });
 
   /// The name being woken right now is what a responder checks against their

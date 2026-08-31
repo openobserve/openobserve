@@ -123,6 +123,18 @@ const stubs = {
     emits: ["update:ok", "update:cancel"],
     template: "<div />",
   },
+  // "vue-router" is mocked wholesale above, so the real RouterLink (which
+  // navigates via the router injected by its plugin) never resolves — this
+  // mirrors just enough of it to make a click call the same `push` mock a
+  // programmatic navigation would.
+  RouterLink: {
+    name: "RouterLink",
+    props: ["to"],
+    template: "<a @click.stop=\"push(to)\"><slot /></a>",
+    setup() {
+      return { push };
+    },
+  },
   ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
   ODropdownItem: {
     name: "ODropdownItem",
