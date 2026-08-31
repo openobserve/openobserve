@@ -619,6 +619,7 @@ pub async fn process_search_stream_request(
         accumulated_records += hits;
     }
     let trace_id_clone = trace_id.clone();
+    let org_id_clone = org_id.clone();
     async move {
         log::info!(
             "{}",
@@ -629,6 +630,7 @@ pub async fn process_search_stream_request(
                 ),
                 SearchInspectorFieldsBuilder::new()
                     .trace_id(trace_id_clone.to_string())
+                    .org_id(org_id_clone)
                     .node_name(LOCAL_NODE.name.clone())
                     .component("stream_summary".to_string())
                     .search_role(search_role)
