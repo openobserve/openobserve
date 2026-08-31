@@ -97,16 +97,25 @@ jobs:
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          # Only the trusted merge-group/main-ward build may update this cache.
-          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
+          # Keep one cache identity for the canonical debug+mimalloc recipe instead
+          # of splitting it by job id. Include workspace crates for this measured
+          # warm-cache experiment; the default dependency-only cache restored a
+          # full 1.1 GB entry but still rebuilt 1,008 crates.
+          shared-key: backend-debug-mimalloc-workspace-v1
+          add-job-id-key: false
+          cache-workspace-crates: true
+          # PR #14030 is the isolated cache-writer experiment. Remove this PR-only
+          # clause after the cold-save/warm-restore comparison; other PRs stay read-only.
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' || github.event.pull_request.number == 14030 }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
 
       - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc
+
+      - name: Report Cargo target size
+        run: du -sh target target/debug || true
 
       # The consumers only execute this binary, so remove debug symbols from the
       # distribution copy before compressing and uploading it once.
