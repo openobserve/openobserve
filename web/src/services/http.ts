@@ -19,6 +19,9 @@ import axios from "axios";
 import config from "../aws-exports";
 import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
 import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
+import { usePasswordReset } from "@/composables/usePasswordReset";
+
+const { open: openPasswordReset, isPasswordResetError } = usePasswordReset();
 
 // Shared refresh state — ensures only one dex_refresh request is in-flight
 // at a time across all axios instances and streaming fetch requests. All
@@ -107,6 +110,14 @@ const http = ({ headers } = {} as any) => {
       return response;
     },
     function (error) {
+      // Ahead of the status switch: a reset-required 403 is a policy state, not an authorization
+      // failure, so it must not reach the unauthorized-error grouper below. Swallowed rather than
+      // re-rejected because a page firing several requests would otherwise stack one error toast
+      // per rejection behind a dialog the user cannot dismiss.
+      if (isPasswordResetError(error)) {
+        openPasswordReset(error.response.data.reason);
+        return new Promise(() => {});
+      }
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:

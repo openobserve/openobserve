@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OToastProvider />
   <ConfirmDialogProvider />
   <CreateAlertDialogProvider />
+  <UpdatePasswordDialog />
 </template>
 
 <script lang="ts">
@@ -29,9 +30,15 @@ import { applyCurrentTheme } from "@/utils/themeManager";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
+import UpdatePasswordDialog from "@/components/common/UpdatePasswordDialog.vue";
 
 export default {
-  components: { OToastProvider, ConfirmDialogProvider, CreateAlertDialogProvider },
+  components: {
+    OToastProvider,
+    ConfirmDialogProvider,
+    CreateAlertDialogProvider,
+    UpdatePasswordDialog,
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
