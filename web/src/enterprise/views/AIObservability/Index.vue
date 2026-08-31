@@ -21,12 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   picks the route the rail/breadcrumb highlight.
 -->
 <template>
-  <OPageLayout bleed :sidebar-width="230">
+  <OPageLayout bleed :sidebar-width="railCollapsed ? RAIL_COLLAPSED_WIDTH : RAIL_WIDTH">
     <template #sidebar>
       <SectionRail
+        v-model:collapsed="railCollapsed"
         :groups="sectionGroups"
         :active-key="activeSection"
         :title="t('aiObservability.title')"
+        :icon="AI_ICON"
+        collapsible
       />
     </template>
 
@@ -37,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
@@ -45,6 +48,38 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
 import { navSection } from "./navSection";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+/** The same mark the primary nav uses for this module, so the collapsed rail
+ *  still says which module it belongs to. */
+const AI_ICON: IconName = "auto-awesome";
+
+// Wide enough for one icon plus the pill's own inset; the expanded width is
+// unchanged from before the toggle existed.
+const RAIL_WIDTH = 230;
+const RAIL_COLLAPSED_WIDTH = 52;
+const RAIL_STORAGE_KEY = "o2-ai-rail-collapsed";
+
+// Remembered per browser: a rail you collapsed should not reopen every time you
+// leave the module. Storage can throw (private mode), and the rail opening
+// expanded is a fine outcome when it does.
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(RAIL_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+const railCollapsed = ref(readCollapsed());
+
+watch(railCollapsed, (value) => {
+  try {
+    window.localStorage.setItem(RAIL_STORAGE_KEY, String(value));
+  } catch {
+    // Unavailable storage keeps the toggle working for this session only.
+  }
+});
 
 defineOptions({ name: "AIObservabilityShell" });
 
