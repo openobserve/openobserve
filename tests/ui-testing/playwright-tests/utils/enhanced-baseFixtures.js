@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { test: baseTest } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
 const { waitUtils } = require('./wait-helpers.js');
+const { gotoWithRetry } = require('./navigation.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
@@ -135,7 +136,7 @@ async function verifyAuthentication(page) {
 
 /**
  * Utility function to navigate to base URL with authentication check
- * @param {import('@playwright/test').Page} page 
+ * @param {import('@playwright/test').Page} page
  */
 async function navigateToBase(page) {
   // Must include the /web/ SPA path. Navigating to the bare domain
@@ -149,7 +150,7 @@ async function navigateToBase(page) {
 
   // Use 60s navigation timeout for all environments (dev/staging can be slow to load)
   const navTimeout = 60000;
-  await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+  await gotoWithRetry(page, baseUrlWithOrg, navTimeout);
   await page.waitForLoadState('domcontentloaded');
   // Cloud needs full hydration before sidebar clicks — without this, clicks trigger Dex redirect
   if (isCloudEnvironment()) {
@@ -168,7 +169,7 @@ async function navigateToBase(page) {
     const { reauthenticateAlpha1 } = require('./reauth-alpha1.js');
     const recovered = await reauthenticateAlpha1(page);
     if (recovered) {
-      await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+      await gotoWithRetry(page, baseUrlWithOrg, navTimeout);
       await page.waitForLoadState('domcontentloaded');
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
       isAuthenticated = await verifyAuthentication(page);

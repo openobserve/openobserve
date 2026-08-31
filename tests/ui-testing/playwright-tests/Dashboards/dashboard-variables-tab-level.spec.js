@@ -195,18 +195,13 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     // Wait for variable to appear on the dashboard after tab switch
     await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
-    const varTrigger1 = scopedVars.getVariableTriggerLocator(variableName);
-    await varTrigger1.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     // Opening mid-load shows the popover but never fetches options (see waitForVariableIdle)
     await waitForVariableIdle(page, variableName);
-    await varTrigger1.click();
-    // Wait for dropdown menu to open
-    const popover1 = scopedVars.getVariablePopoverLocator(variableName);
-    await popover1.waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.openVariableDropdown(variableName);
 
+    const popover1 = scopedVars.getVariablePopoverLocator(variableName);
     const option1 = popover1.locator(`[data-test="variable-selector-${variableName}-inner-option"]`).nth(0);
-    await option1.waitFor({ state: "visible", timeout: 10000 });
     const value1 = await option1.textContent();
     await option1.click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
@@ -219,23 +214,13 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     // Wait for variable to appear on the dashboard after tab switch
     await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
-    const varTrigger2 = scopedVars.getVariableTriggerLocator(variableName);
-    await varTrigger2.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     // Opening mid-load shows the popover but never fetches options (see waitForVariableIdle)
     await waitForVariableIdle(page, variableName);
-    await varTrigger2.click();
-    // Wait for dropdown menu to open
-    const popover2 = scopedVars.getVariablePopoverLocator(variableName);
-    await popover2.waitFor({ state: "visible", timeout: 5000 });
+    // This tab needs a SECOND option so its value can differ from Tab1's.
+    await scopedVars.openVariableDropdown(variableName, { minOptions: 2 });
 
-    // Wait for at least 2 options to load in the dropdown
-    const optionSelector2 = `[data-test="variable-selector-${variableName}-inner-option"]`;
-    await page.waitForFunction(
-      sel => document.querySelectorAll(sel).length >= 2,
-      optionSelector2,
-      { timeout: 15000 }
-    );
+    const popover2 = scopedVars.getVariablePopoverLocator(variableName);
     const option2 = popover2.locator(`[data-test="variable-selector-${variableName}-inner-option"]`).nth(1);
     const value2 = await option2.textContent();
     await option2.click();

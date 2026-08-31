@@ -1,6 +1,7 @@
 //Methods: Duplicate dashboard, Delete duplicate dashboard, Move dashboard, Menu Items(dashboards)
 
 import { expect } from "@playwright/test";
+const { gotoWithRetry } = require("../../playwright-tests/utils/navigation.js");
 // import { deleteDashboard } from "../../playwright-tests/Dashboards/utils/dashCreation.js";
 
 export default class DashboardListPage {
@@ -100,7 +101,11 @@ export default class DashboardListPage {
       // Dashboards.vue expects a `folder` query param (goBackToDashboardList
       // in ViewDashboard.vue always sends one) — without it the list can
       // fail to render. Harmless extra param for other sidebar sections.
-      await this.page.goto(`${process.env['ZO_BASE_URL']}/web/${targetPath}?org_identifier=${orgId}&folder=default`);
+      await gotoWithRetry(
+        this.page,
+        `${process.env['ZO_BASE_URL']}/web/${targetPath}?org_identifier=${orgId}&folder=default`,
+        60000
+      );
     }
     await this.page.waitForLoadState('domcontentloaded');
   }

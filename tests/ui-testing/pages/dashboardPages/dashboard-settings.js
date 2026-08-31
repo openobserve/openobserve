@@ -408,9 +408,11 @@ export default class DashboardSetting {
       .locator('[data-test="dashboard-variable-type-select"]')
       .click();
     await this.page.locator(`[data-test="dashboard-variable-type-select-popover"]`).waitFor({ state: "visible", timeout: 10000 });
-    await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`).click();
-    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(variableName);
-    await this.page.locator('[data-test="dashboard-variable-constant-value-field"]').fill(value);
+    await this.#pickVariableType(type);
+    await this.#fillVariableName(variableName);
+    const constantValue = this.page.locator('[data-test="dashboard-variable-constant-value-field"]');
+    await constantValue.waitFor({ state: "visible", timeout: 10000 });
+    await constantValue.fill(value);
   }
 
   //select Textbox type
@@ -426,8 +428,8 @@ export default class DashboardSetting {
       .locator('[data-test="dashboard-variable-type-select"]')
       .click();
     await this.page.locator(`[data-test="dashboard-variable-type-select-popover"]`).waitFor({ state: "visible", timeout: 10000 });
-    await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`).click();
-    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(variableName);
+    await this.#pickVariableType(type);
+    await this.#fillVariableName(variableName);
   }
 
   //select Custom type
@@ -443,8 +445,8 @@ export default class DashboardSetting {
       .locator('[data-test="dashboard-variable-type-select"]')
       .click();
     await this.page.locator(`[data-test="dashboard-variable-type-select-popover"]`).waitFor({ state: "visible", timeout: 10000 });
-    await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`).click();
-    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(variableName);
+    await this.#pickVariableType(type);
+    await this.#fillVariableName(variableName);
     // Selecting "Custom" type auto-creates the first option row (index 0).
     // Do NOT click "Add Option" — that would add a second empty row and fail validation.
     await this.page
@@ -455,35 +457,50 @@ export default class DashboardSetting {
   }
   //add max record size
   async addMaxRecord(value) {
-    await this.page
-      .locator('[data-test="dashboard-variable-max-record-size-field"]')
-      .fill(value);
+    const maxRecord = this.page.locator(
+      '[data-test="dashboard-variable-max-record-size-field"]'
+    );
+    // Rendered only for query_values, and only once the type select has settled.
+    await maxRecord.waitFor({ state: "visible", timeout: 10000 });
+    await maxRecord.fill(value);
   }
 
   //enable multi select
   async enableMultiSelect() {
-    await this.page
-      .locator('[data-test="dashboard-query_values-show_multiple_values"]')
-      .click();
+    const toggle = this.page.locator(
+      '[data-test="dashboard-query_values-show_multiple_values"]'
+    );
+    await toggle.waitFor({ state: "visible", timeout: 10000 });
+    await toggle.click();
   }
 
   //enable default value
   async addCustomValue(value) {
-    await this.page
-      .locator(
-        '[data-test="dashboard-multi-select-default-value-toggle-custom"]'
-      )
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-variable-custom-value-0-field"]')
-      .fill(value);
+    const customToggle = this.page.locator(
+      '[data-test="dashboard-multi-select-default-value-toggle-custom"]'
+    );
+    await customToggle.waitFor({ state: "visible", timeout: 10000 });
+    await customToggle.click();
+    const customValue = this.page.locator(
+      '[data-test="dashboard-variable-custom-value-0-field"]'
+    );
+    // v-if'd on selectAllValueForMultiSelect === "custom", so it mounts only after the click above.
+    await customValue.waitFor({ state: "visible", timeout: 10000 });
+    await customValue.fill(value);
   }
 
   //save variable
   async saveVariable() {
-    await this.page
-      .locator('[data-test="dashboard-variable-save-btn"]')
-      .click();
+    const saveBtn = this.page.locator(
+      '[data-test="dashboard-variable-save-btn"]'
+    );
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
+    // The form swaps back to the list only once the save lands; without this a caller
+    // can close the settings drawer mid-request and lose the variable.
+    await this.addVariableBtn
+      .waitFor({ state: "visible", timeout: 15000 })
+      .catch(() => {});
   }
 
   // Wait for the "Add Variable" button to be visible (variables list view)
@@ -493,14 +510,22 @@ export default class DashboardSetting {
 
   //Cancel variable
   async cancelVariable() {
-    await this.page
-      .locator('[data-test="dashboard-variable-cancel-btn"]')
-      .click();
+    const cancelBtn = this.page.locator(
+      '[data-test="dashboard-variable-cancel-btn"]'
+    );
+    await cancelBtn.waitFor({ state: "visible", timeout: 10000 });
+    await cancelBtn.click();
+    await this.addVariableBtn
+      .waitFor({ state: "visible", timeout: 10000 })
+      .catch(() => {});
   }
 
   //hide variable
   async hideVariable() {
     const toggle = this.page.locator('[data-test="dashboard-variable-hide_on_dashboard"]');
+    // force:true skips actionability, so without this the click can land on a switch
+    // that is still mounting and be swallowed.
+    await toggle.waitFor({ state: "visible", timeout: 10000 });
     await toggle.scrollIntoViewIfNeeded();
     await toggle.click({ force: true });
   }
@@ -621,5 +646,28 @@ export default class DashboardSetting {
       .locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]')
       .waitFor({ state: "visible" });
     await page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]').click();
+  }
+
+  // The popover being visible does not mean its items have rendered, so clicking an
+  // option in the same tick as the popover check lands on a node that is not there yet.
+  async #pickVariableType(type) {
+    const typeOption = this.page.locator(
+      `[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`
+    );
+    await typeOption.waitFor({ state: "visible", timeout: 10000 });
+    await typeOption.click();
+  }
+
+  // The name field is re-rendered by the type switch above, so a fill issued
+  // immediately after it can be discarded by that re-render.
+  async #fillVariableName(variableName) {
+    const nameField = this.page.locator(
+      '[data-test="dashboard-variable-name-field"]'
+    );
+    await nameField.waitFor({ state: "visible", timeout: 10000 });
+    await nameField.fill(variableName);
+    if ((await nameField.inputValue().catch(() => "")) !== variableName) {
+      await nameField.fill(variableName);
+    }
   }
 }

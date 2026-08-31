@@ -3,7 +3,9 @@ import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 const testLogger = require("../utils/test-logger.js");
-const dashboardName = `Dashboard_${Date.now()}`;
+// These tests run in parallel and delete by name, so a shared name deletes another test's dashboard.
+const newDashboardName = () =>
+  `Dashboard_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 test.describe.configure({ mode: "parallel" });
 
@@ -18,6 +20,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
 
     // Get the variable name
     const variableName = pm.dashboardSetting.variableName();
@@ -56,6 +59,7 @@ test.describe("dashboard variables settings", () => {
   test("should add query_values to dashboard and save it", async ({ page }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
     // const dashboardName = generateDashboardName();
 
     const variableName = pm.dashboardSetting.variableName();
@@ -96,6 +100,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
     const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to dashboards page
@@ -134,6 +139,7 @@ test.describe("dashboard variables settings", () => {
   test("should verify that by default select is working", async ({ page }) => {
     // Initialize page manager
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
     const variableName = pm.dashboardSetting.variableName();
     const defaultValue = "ingress-nginx";
 
@@ -176,6 +182,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
     const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboard page
@@ -223,6 +230,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
 
     const variableName = pm.dashboardSetting.variableName();
 
@@ -262,6 +270,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page manager
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
     const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to dashboards page
@@ -294,6 +303,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
 
     const variableName = pm.dashboardSetting.variableName();
 
@@ -332,6 +342,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
     const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboards page
@@ -367,6 +378,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
     const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboards page
@@ -404,6 +416,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
 
     const variableName = pm.dashboardSetting.variableName();
 
@@ -445,6 +458,7 @@ test.describe("dashboard variables settings", () => {
   }) => {
     // Initialize page objects
     const pm = new PageManager(page);
+    const dashboardName = newDashboardName();
     const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboards page

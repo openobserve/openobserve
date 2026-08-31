@@ -22,6 +22,7 @@ import {
   verifyFieldDropdownEmptyOrVariablesOnly as _verifyFieldDropdownEmpty,
   hasErrorNotification,
 } from "./dashboard-stream-field-utils.js";
+const testLogger = require("../../playwright-tests/utils/test-logger.js");
 
 export default class DashboardVariablesScoped {
   constructor(page) {
@@ -2642,5 +2643,59 @@ export default class DashboardVariablesScoped {
     await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
     await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${typeValue}"]`).click();
     await this.page.locator('[data-test="dashboard-variable-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /**
+   * Open a variable's dropdown and guarantee its options have rendered.
+   *
+   * loadVariableOptions() in VariablesValueSelector.vue early-returns while
+   * variableItem.isLoading is true, and onPopupShow (@open) is the ONLY thing that
+   * calls it. So a popover opened mid-load shows an empty list that nothing ever
+   * refills — waiting longer cannot help, and the spinner is no guard either
+   * (`:loading="isLoading && !isOpen"` hides it while the popover is open).
+   * Closing and reopening re-fires @open, which does fetch once the load has
+   * settled. That reopen is the only reliable recovery.
+   *
+   * @param {string} variableName - Variable name
+   * @param {Object} options
+   * @param {number} options.minOptions - Options required before returning (default: 1)
+   * @param {number} options.attempts - Open attempts before failing (default: 3)
+   * @param {number} options.optionTimeout - Per-attempt wait for options in ms (default: 8000)
+   */
+  async openVariableDropdown(variableName, options = {}) {
+    const { minOptions = 1, attempts = 3, optionTimeout = 8000 } = options;
+    const trigger = this.getVariableTriggerLocator(variableName);
+    const popover = this.getVariablePopoverLocator(variableName);
+    const option = this.getVariableInnerOption(variableName);
+
+    await trigger.waitFor({ state: "visible", timeout: 10000 });
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      await trigger.click();
+      await popover.waitFor({ state: "visible", timeout: 5000 });
+
+      const ready = await option
+        .nth(minOptions - 1)
+        .waitFor({ state: "visible", timeout: optionTimeout })
+        .then(() => true)
+        .catch(() => false);
+      if (ready) return;
+
+      testLogger.warn("Variable dropdown opened with no options, reopening", {
+        variableName,
+        attempt,
+        minOptions,
+        seen: await option.count(),
+      });
+
+      await this.page.keyboard.press("Escape");
+      await popover.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    }
+
+    throw new Error(
+      `openVariableDropdown("${variableName}"): fewer than ${minOptions} option(s) rendered ` +
+        `after ${attempts} open attempts (last count: ${await option.count()}). The variable's ` +
+        `load was still in flight each time the popover opened.`
+    );
   }
 }
