@@ -48,6 +48,7 @@ pub mod org_cleanup;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
+pub mod password_history;
 pub mod pipeline;
 #[cfg(feature = "enterprise")]
 pub mod providers;

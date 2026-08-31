@@ -55,7 +55,7 @@ use crate::{
             },
         },
     },
-    organization,
+    organization, password_history,
 };
 
 fn redact_token(token: &str) -> String {
@@ -372,13 +372,23 @@ pub async fn update_user(
                         // Validated here, not only at the HTTP layer: this is the single funnel
                         // every password change passes through, and clearing the reset flag below
                         // must never happen for a password the current policy would reject.
-                        if let Err(msg) = validate_password_strength_with_policy(
-                            new_pass,
-                            &db::password_policy::get_effective_policy().await,
-                        ) {
+                        let policy = db::password_policy::get_effective_policy().await;
+                        if let Err(msg) = validate_password_strength_with_policy(new_pass, &policy)
+                        {
                             return Ok(MetaHttpResponse::bad_request(msg));
                         }
-                        new_user.password = get_hash(new_pass, &local_user.salt);
+                        match password_history::check_reuse_and_record(
+                            email,
+                            &local_user.salt,
+                            new_pass,
+                            &local_user.password,
+                            &policy,
+                        )
+                        .await
+                        {
+                            Ok(hash) => new_user.password = hash,
+                            Err(msg) => return Ok(MetaHttpResponse::bad_request(msg)),
+                        }
                         new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
                         log::info!("Password self updated for user: {email}");
                         is_updated = true;
@@ -397,13 +407,22 @@ pub async fn update_user(
                     && !local_user.is_external
                     && let Some(new_pass) = user.new_password
                 {
-                    if let Err(msg) = validate_password_strength_with_policy(
-                        &new_pass,
-                        &db::password_policy::get_effective_policy().await,
-                    ) {
+                    let policy = db::password_policy::get_effective_policy().await;
+                    if let Err(msg) = validate_password_strength_with_policy(&new_pass, &policy) {
                         return Ok(MetaHttpResponse::bad_request(msg));
                     }
-                    new_user.password = get_hash(&new_pass, &local_user.salt);
+                    match password_history::check_reuse_and_record(
+                        email,
+                        &local_user.salt,
+                        &new_pass,
+                        &local_user.password,
+                        &policy,
+                    )
+                    .await
+                    {
+                        Ok(hash) => new_user.password = hash,
+                        Err(msg) => return Ok(MetaHttpResponse::bad_request(msg)),
+                    }
                     new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
                     log::info!("Password by root updated for user: {email}");
 
@@ -1365,7 +1384,10 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
 #[cfg(test)]
 mod tests {
     use common::{infra::config::USERS, meta::user::get_default_user_role};
-    use config::meta::user::{UserRole, UserType};
+    use config::meta::{
+        password_policy::PasswordPolicy,
+        user::{UserRole, UserType},
+    };
     use infra::{
         db::{self as infra_db, get_orm_client_rw},
         table as infra_table,
@@ -1913,6 +1935,103 @@ mod tests {
         assert!(after.password_reset_reason.is_none());
         assert!(after.flagged_at.is_none());
         assert!(after.password_updated_at > before.password_updated_at);
+    }
+
+    /// The reuse check belongs to `update_user`, not to the HTTP layer: the handlers validate
+    /// strength only, so a change routed through the CLI or any other caller would otherwise skip
+    /// it entirely.
+    #[tokio::test]
+    async fn test_password_change_is_rejected_when_it_repeats_a_recent_password() {
+        let _guard = set_up().await;
+
+        let email = "reusing@zo.dev";
+        // `set_up` truncates the user tables but not the history a previous run left behind.
+        infra_table::user_password_history::delete_all_for_user(email)
+            .await
+            .unwrap();
+        create_system_settings_table().await;
+        db::password_policy::set_policy(&PasswordPolicy {
+            history_count: 2,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        let resp = post_user(
+            "dummy",
+            UserRequest {
+                email: email.to_string(),
+                password: "Pass#1234".to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: UserRole::Admin,
+                    custom_role: None,
+                },
+                first_name: "reuse".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+
+        assert_eq!(
+            self_change_password(email, "Pass#1234", "Newpass#1234")
+                .await
+                .status(),
+            200
+        );
+        assert_eq!(
+            self_change_password(email, "Newpass#1234", "Pass#1234")
+                .await
+                .status(),
+            400
+        );
+        assert_eq!(
+            self_change_password(email, "Newpass#1234", "Third#12345")
+                .await
+                .status(),
+            200
+        );
+
+        db::password_policy::set_policy(&PasswordPolicy::default())
+            .await
+            .unwrap();
+    }
+
+    /// The policy row lives in `system_settings`, whose table only a migration creates — and the
+    /// fixture above builds its tables from the entities instead of migrating.
+    async fn create_system_settings_table() {
+        use sea_orm::{ConnectionTrait, Schema};
+
+        let client = get_orm_client_rw().await;
+        let builder = client.get_database_backend();
+        let stmt = Schema::new(builder)
+            .create_table_from_entity(infra::table::entity::system_settings::Entity)
+            .if_not_exists()
+            .take();
+        let _ = client.execute(builder.build(&stmt)).await;
+    }
+
+    async fn self_change_password(email: &str, old: &str, new: &str) -> Response {
+        update_user(
+            "dummy",
+            email,
+            UserUpdateMode::SelfUpdate,
+            email,
+            UpdateUser {
+                token: None,
+                first_name: None,
+                last_name: None,
+                old_password: Some(old.to_string()),
+                new_password: Some(new.to_string()),
+                role: None,
+                change_password: true,
+            },
+        )
+        .await
+        .unwrap()
     }
 
     #[tokio::test]

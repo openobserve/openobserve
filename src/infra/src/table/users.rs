@@ -268,6 +268,8 @@ pub async fn remove(email: &str) -> Result<(), errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
+    drop_password_history(&[email.to_string()]).await;
+
     Ok(())
 }
 
@@ -348,7 +350,23 @@ pub async fn batch_remove(emails: Vec<String>) -> Result<(), errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
+    drop_password_history(&emails).await;
+
     Ok(())
+}
+
+/// Delete the password-history rows a removed user leaves behind.
+///
+/// The relation declares `ON DELETE CASCADE`, but SQLite ships with `PRAGMA foreign_keys` off, so
+/// the cleanup cannot be left to the database: an orphaned row would otherwise be inherited by
+/// whoever is created next under the same address. Failure is logged, never returned — the user is
+/// already gone, and reporting the deletion as failed would be the bigger lie.
+async fn drop_password_history(emails: &[String]) {
+    for email in emails {
+        if let Err(e) = super::user_password_history::delete_all_for_user(email).await {
+            log::error!("Error deleting password history for {email}: {e}");
+        }
+    }
 }
 
 /// Matches users that hold no service-account role in any organization. The role lives on
