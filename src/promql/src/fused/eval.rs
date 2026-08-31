@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use config::meta::promql::{
     NAME_LABEL,
-    value::{CounterSeries, EvalContext, RangeValue, Value},
+    value::{CounterSeries, EvalContext, ExtrapolationKind, RangeValue, Sample, Value},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
@@ -94,37 +96,15 @@ pub(crate) fn fused_range_agg(
                         .as_ref()
                         .expect("range function input must have a time window")
                         .range;
-                    let range_micros = micros(range);
-                    let mut start_index = 0;
-                    let mut end_index = 0;
-                    let counter = CounterSeries::try_new(
+                    fold_series(
+                        &mut acc,
                         &metric.samples,
+                        range,
+                        func,
                         counter_kind,
                         eval_ctx,
-                        range_micros,
+                        &timestamps,
                     );
-
-                    for (slot, &eval_ts) in timestamps.iter().enumerate() {
-                        let window_samples = advance_sample_window(
-                            &metric.samples,
-                            eval_ts - range_micros,
-                            eval_ts,
-                            &mut start_index,
-                            &mut end_index,
-                        );
-                        if window_samples.is_empty() {
-                            continue;
-                        }
-                        let value = match &counter {
-                            Some(counter) => {
-                                counter.extrapolate(start_index, end_index, eval_ts, range)
-                            }
-                            None => func.exec(window_samples, eval_ts, &range),
-                        };
-                        if let Some(value) = value {
-                            acc.push(slot, value);
-                        }
-                    }
                 }
                 acc
             };
@@ -172,6 +152,43 @@ pub(crate) fn fused_range_agg(
         return Ok(Value::None);
     }
     Ok(Value::Matrix(results))
+}
+
+/// Evaluates `func` over one series' time-ordered samples and pushes each
+/// produced value into `acc` at its evaluation slot.
+pub(super) fn fold_series(
+    acc: &mut FusedAccumulator,
+    samples: &[Sample],
+    range: Duration,
+    func: &dyn RangeFunc,
+    counter_kind: Option<ExtrapolationKind>,
+    eval_ctx: &EvalContext,
+    timestamps: &[i64],
+) {
+    let range_micros = micros(range);
+    let mut start_index = 0;
+    let mut end_index = 0;
+    let counter = CounterSeries::try_new(samples, counter_kind, eval_ctx, range_micros);
+
+    for (slot, &eval_ts) in timestamps.iter().enumerate() {
+        let window_samples = advance_sample_window(
+            samples,
+            eval_ts - range_micros,
+            eval_ts,
+            &mut start_index,
+            &mut end_index,
+        );
+        if window_samples.is_empty() {
+            continue;
+        }
+        let value = match &counter {
+            Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
+            None => func.exec(window_samples, eval_ts, &range),
+        };
+        if let Some(value) = value {
+            acc.push(slot, value);
+        }
+    }
 }
 
 #[cfg(test)]
