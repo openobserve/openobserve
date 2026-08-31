@@ -108,10 +108,12 @@ jobs:
       - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc
 
-      # Pre-compress the debug binary once. Uploading the raw binary made every
-      # consumer download a ~750 MiB artifact; gzip reduces it to roughly 100 MiB.
+      # The consumers only execute this binary, so remove debug symbols from the
+      # distribution copy before compressing and uploading it once.
       - name: Package OpenObserve debug binary
-        run: tar -C target/debug -czf openobserve-api-debug.tar.gz openobserve
+        run: |
+          strip target/debug/openobserve
+          tar -C target/debug -czf openobserve-api-debug.tar.gz openobserve
 
       - name: Upload OpenObserve debug binary
         uses: actions/upload-artifact@v4
