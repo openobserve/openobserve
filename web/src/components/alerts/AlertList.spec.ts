@@ -529,7 +529,12 @@ describe("AlertList - data fetching and columns", () => {
       makeAlert(2, {
         is_real_time: false,
         name: "Cron Alert",
-        trigger_condition: { period: 0, frequency: 0, frequency_type: "cron", cron: "*/10 * * * *" },
+        trigger_condition: {
+          period: 0,
+          frequency: 0,
+          frequency_type: "cron",
+          cron: "*/10 * * * *",
+        },
       }),
       makeAlert(3, { is_real_time: true, name: "RealTime Alert" }),
     ];

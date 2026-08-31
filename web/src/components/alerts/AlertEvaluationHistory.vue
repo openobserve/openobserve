@@ -109,10 +109,7 @@
     </template>
 
     <template #cell-retries="{ row }">
-      <span
-        class="text-compact tabular-nums"
-        data-test="alerts-alertevaluationhistory-retries"
-      >
+      <span class="text-compact tabular-nums" data-test="alerts-alertevaluationhistory-retries">
         {{ row.retries != null ? row.retries : "—" }}
       </span>
     </template>

@@ -100,8 +100,6 @@ describe("AlertSectionTabs", () => {
   it("keeps the Library tab when the flag lists other menus", () => {
     store.state.zoConfig.custom_hide_menus = "openapi,reports";
     const wrapper = mountTabs();
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain(
-      "Alert Library",
-    );
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain("Alert Library");
   });
 });
