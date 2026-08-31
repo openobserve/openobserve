@@ -730,7 +730,7 @@
     },
     "copied": "Copied",
     "copiedExclaim": "Copied!",
-    "clearAll": "Clear all",
+    "clearAll": "Clear All",
     "unknown": "Unknown",
     "totalFields": "Total Fields: {count}",
     "providerLogo": "{name} logo",
@@ -11828,12 +11828,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "Search Score Configs...",
-      "scoreConfigsLabel": "{count} score config | {count} score configs"
+      "scoreConfigsLabel": "{count} score config | {count} score configs",
+      "selectedOfTotal": "{selected} of {total} selected"
     },
     "scorerLibrary": {
       "noProvidersMessage": "Create a Provider first before importing LLM Judge scorers.",
       "searchPlaceholder": "Search Scorers...",
-      "scorerCountSuffix": "{count} scorer | {count} scorers"
+      "scorerCountSuffix": "{count} scorer | {count} scorers",
+      "selectedOfTotal": "{selected} of {total} selected"
     },
     "title": "Evaluations",
     "loadError": "Failed to load online evals",
