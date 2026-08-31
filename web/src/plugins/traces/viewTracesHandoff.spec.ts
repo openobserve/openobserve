@@ -32,6 +32,30 @@ describe("buildViewTracesFilter", () => {
     );
   });
 
+  it("uses the complete inferred identity when a catalog system is provided", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "sso",
+        serviceType: "database",
+        serviceSystem: "mysql",
+      }),
+    ).toBe(
+      "infer_service_name = 'sso' AND infer_service_type = 'database' AND infer_service_system = 'mysql'",
+    );
+  });
+
+  it("matches normalized empty systems for catalog dependencies", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "sso",
+        serviceType: "external",
+        serviceSystem: null,
+      }),
+    ).toBe(
+      "infer_service_name = 'sso' AND infer_service_type = 'external' AND (infer_service_system IS NULL OR infer_service_system = '')",
+    );
+  });
+
   it("escapes single quotes in the service name", () => {
     // escapeSingleQuotes uses SQL-style escaping: ' → ''
     expect(buildViewTracesFilter({ serviceName: "it's" })).toBe("service_name = 'it''s'");
