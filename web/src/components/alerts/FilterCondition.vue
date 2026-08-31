@@ -50,7 +50,7 @@
         width="xs"
         :placeholder="t('alerts.column')"
         :creatable="props.allowCustomColumns"
-        :class="[columnInputWidth || inputWidth || '']"
+        :class="[inputWidth ? inputWidth : '']"
         data-test="alert-conditions-select-column"
         @search="filterColumns"
         @create="onColumnCreate"
@@ -123,11 +123,6 @@ const props = defineProps({
     required: true,
   },
   inputWidth: {
-    type: String,
-    default: "",
-    required: false,
-  },
-  columnInputWidth: {
     type: String,
     default: "",
     required: false,

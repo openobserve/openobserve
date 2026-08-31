@@ -61,7 +61,6 @@
           @remove-group="emit('remove-group', $event)"
           :stream-fields="props.streamFields"
           :condition-input-width="props.conditionInputWidth"
-          :column-input-width="props.columnInputWidth"
           :allow-custom-columns="props.allowCustomColumns"
           :module="props.module"
           :indent-rem="props.indentRem"
@@ -81,7 +80,6 @@
             :label="group.logicalOperator?.toLowerCase() || t('common.and')"
             :depth="depth"
             :input-width="props.conditionInputWidth"
-            :column-input-width="props.columnInputWidth"
             :is-first-in-group="index === 0"
             :allow-custom-columns="props.allowCustomColumns"
             :module="props.module"
@@ -198,11 +196,6 @@ const props = defineProps({
     default: null,
   },
   conditionInputWidth: {
-    type: String,
-    default: "",
-    required: false,
-  },
-  columnInputWidth: {
     type: String,
     default: "",
     required: false,
