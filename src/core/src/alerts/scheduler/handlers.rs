@@ -2018,20 +2018,50 @@ async fn handle_alert_triggers(
                     &alert.query_condition,
                     first_row,
                 );
+                // A multi-alert's groups are separate things broken, and the
+                // notification path already treats them that way — one send per
+                // group, with per-group state. Paging read `data.first()`, so
+                // whichever group came back first decided who was woken and the
+                // other teams heard nothing about their own outage.
+                //
+                // One representative row per group key, the same reduction
+                // `dispatch_per_group` performs, so the two halves of a firing
+                // cannot disagree about what its groups are.
+                let group_dimensions: Vec<std::collections::HashMap<String, String>> =
+                    if alert.query_condition.multi_alert_enabled() {
+                        let group_by = alert
+                            .query_condition
+                            .aggregation
+                            .as_ref()
+                            .and_then(|a| a.group_by.clone())
+                            .unwrap_or_default();
+                        config::meta::alerts::dispatch::rows_by_group_key(&data, &group_by)
+                            .values()
+                            .map(|row| {
+                                o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+                                    &semantic_groups,
+                                    &alert.query_condition,
+                                    row,
+                                )
+                            })
+                            .collect()
+                    } else {
+                        vec![dimensions.clone()]
+                    };
                 // Single-sourced with the incident path: the same alert must
                 // not page at a different severity depending on whether it
                 // creates an incident.
                 let priority = alert
                     .priority
                     .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
-                match o2_enterprise::enterprise::oncall::escalation::start_for_alert(
+                match o2_enterprise::enterprise::oncall::escalation::start_for_alert_groups(
                     &alert.org_id,
                     &alert_id.to_string(),
                     &alert.name,
                     priority,
                     alert.oncall_team.as_deref(),
                     alert.context_team(),
-                    &dimensions,
+                    &group_dimensions,
                 )
                 .await
                 {
@@ -2039,26 +2069,34 @@ async fn handle_alert_triggers(
                     // impacted and has containment work of their own. The
                     // service-graph query lives here rather than in the engine
                     // because o2_enterprise cannot depend on this crate.
-                    Ok(Some(origin)) => {
-                        let impacted = impacted_services(&alert.org_id, &dimensions).await;
-                        if !impacted.is_empty()
-                            && let Err(e) =
-                                o2_enterprise::enterprise::oncall::escalation::page_impacted(
-                                    &alert.org_id,
-                                    &origin,
-                                    &impacted,
-                                    now_micros(),
-                                )
-                                .await
-                        {
-                            log::error!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] impacted paging failed for {}/{}: {e}",
-                                alert.org_id,
-                                alert.name
-                            );
+                    //
+                    // Per record, against ITS OWN dimensions. A firing that
+                    // woke two teams has two origins, and running the graph
+                    // query once for whichever came first would leave the other
+                    // team's downstream neighbours unwarned — the same silence
+                    // one level further out.
+                    Ok(opened) => {
+                        for paged in &opened {
+                            let impacted =
+                                impacted_services(&alert.org_id, &paged.dimensions).await;
+                            if !impacted.is_empty()
+                                && let Err(e) =
+                                    o2_enterprise::enterprise::oncall::escalation::page_impacted(
+                                        &alert.org_id,
+                                        &paged.response,
+                                        &impacted,
+                                        now_micros(),
+                                    )
+                                    .await
+                            {
+                                log::error!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] impacted paging failed for {}/{}: {e}",
+                                    alert.org_id,
+                                    alert.name
+                                );
+                            }
                         }
                     }
-                    Ok(None) => {}
                     Err(e) => {
                         log::error!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] on-call paging failed for {}/{}: {e}",
