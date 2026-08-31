@@ -58,7 +58,8 @@
         :data="visibleRows"
         :columns="comparisonColumns"
         row-key="logicalId"
-        pagination="none"
+        pagination="client"
+        :page-size="20"
         :default-columns="false"
         :show-global-filter="false"
         data-test="ai-experiment-comparison-rows"
@@ -124,7 +125,7 @@
               size="sm"
               icon=""
               :variant="deltaVariant(rowDimension(row, dimension)!)"
-              :label="signed(rowDimension(row, dimension)!.delta)"
+              :label="deltaLabel(rowDimension(row, dimension)!)"
             />
           </div>
         </template>
@@ -148,7 +149,13 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { dimensionIdentity, dimensionLabel } from "./experimentRowContent";
+import {
+  dimensionIdentity,
+  dimensionLabel,
+  dimensionSideValue,
+  durationUnit,
+  formatDuration,
+} from "./experimentRowContent";
 import type {
   ExperimentComparison,
   ExperimentComparisonBucket,
@@ -298,45 +305,20 @@ function money(value: number) {
   return `$${format(value)}`;
 }
 
-/**
- * The unit BOTH sides of a latency pair are rendered in.
- *
- * Chosen once from the larger side, never per value: `1.2 s → 800 ms` would put
- * two scales inside one comparison and make the smaller number look bigger.
- */
-const SECOND_MS = 1000;
-
-function latencyUnit(dimension: ExperimentComparisonDimension): "ms" | "s" {
-  const largest = Math.max(Math.abs(dimension.baseline ?? 0), Math.abs(dimension.candidate ?? 0));
-  return largest >= SECOND_MS ? "s" : "ms";
-}
-
-/**
- * A mean latency to four decimal places ("10449.4821") is noise that costs the
- * reader the magnitude, and three of them overflow the tile. Whole milliseconds
- * below a second; seconds above it, where the digits that matter are the first
- * two or three.
- */
-function duration(value: number, unit: "ms" | "s") {
-  if (unit === "ms") return Math.round(value).toLocaleString();
-  const seconds = value / SECOND_MS;
-  return seconds.toFixed(seconds >= 10 ? 1 : 2);
-}
-
 function intrinsicTile(kind: "cost" | "latency", label: I18nText, dataTest: string): Tile {
   const icon = INTRINSIC_ICONS[kind];
   const dimension = props.comparison.dimensions.find((entry) => entry.kind === kind);
   if (!dimension) {
     return { key: kind, label, icon, primary: raw("—"), dataTest };
   }
-  const unit = latencyUnit(dimension);
+  const unit = durationUnit(dimension.baseline, dimension.candidate);
   const show = (value: number | null) =>
-    value === null ? raw("—") : raw(kind === "cost" ? money(value) : duration(value, unit));
+    value === null ? raw("—") : raw(kind === "cost" ? money(value) : formatDuration(value, unit));
   const showDelta = (value: number) =>
     raw(
       kind === "cost"
         ? `${value > 0 ? "+" : "-"}${money(Math.abs(value))}`
-        : `${value > 0 ? "+" : "-"}${duration(Math.abs(value), unit)}`,
+        : `${value > 0 ? "+" : "-"}${formatDuration(Math.abs(value), unit)}`,
     );
   return {
     key: kind,
@@ -455,7 +437,7 @@ function selectBucket(key: string) {
 const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>(() => [
   {
     id: "input",
-    header: t("aiObservability.experiments.comparePage.panel.datasetRow"),
+    header: t("aiObservability.experiments.comparePage.panel.input"),
     accessorFn: (row) => displayRowInput(row.input),
     sortable: true,
   },
@@ -509,7 +491,15 @@ function rowDimensionValue(row: ExperimentComparisonRow, dimension: ExperimentCo
   const found = rowDimension(row, dimension);
   if (!found) return raw("—");
   if (found.delta === null) return t("aiObservability.experiments.comparePage.panel.oneSided");
-  return raw(`${format(found.baseline ?? 0)} → ${format(found.candidate ?? 0)}`);
+  return raw(
+    `${dimensionSideValue(found, "baseline")} → ${dimensionSideValue(found, "candidate")}`,
+  );
+}
+
+/** A delta smaller than the trial noise on both sides is a `~`, not a claim. */
+function deltaLabel(dimension: ExperimentComparisonDimension) {
+  const value = signed(dimension.delta);
+  return dimension.withinNoise ? raw(`~${value}`) : value;
 }
 
 // Colour follows orientedDelta, never the raw delta: a latency rising by +31 is

@@ -51,6 +51,19 @@
             @select="openTool(index)"
           >
             {{ raw(tool.name) || t("aiObservability.playground.toolUnnamed") }}
+            <!-- `.stop` keeps the row's own select from firing and opening the
+                 dialog for the tool that is being deleted. -->
+            <template #icon-right>
+              <OButton
+                variant="ghost-destructive"
+                size="icon-xs"
+                icon-left="delete"
+                class="ms-auto"
+                :aria-label="t('aiObservability.playground.removeTool')"
+                :data-test="`ai-playground-tool-remove-${index}`"
+                @click.stop="removeTool(index)"
+              />
+            </template>
           </ODropdownItem>
           <ODropdownItem
             v-if="!variant.tools.length"
@@ -100,7 +113,7 @@
       v-model:open="toolsOpen"
       :tools="variant.tools"
       :index="toolIndex"
-      @apply="(tools) => patch({ tools })"
+      @apply="(tools) => emit('set-tools', tools)"
     />
     <PlaygroundSchemaDialog
       v-model:open="schemaOpen"
@@ -127,6 +140,7 @@ import {
   playgroundId,
   withRole,
   type PlaygroundRole,
+  type PlaygroundTool,
   type PlaygroundVariant,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 import type { Provider } from "@/services/online-evals.service";
@@ -141,6 +155,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   change: [variant: PlaygroundVariant];
+  "set-tools": [tools: PlaygroundTool[]];
   "set-var": [name: string, value: string];
   "remove-var": [name: string];
 }>();
@@ -154,6 +169,13 @@ const toolIndex = ref<number | null>(null);
 function openTool(index: number | null) {
   toolIndex.value = index;
   toolsOpen.value = true;
+}
+
+function removeTool(index: number) {
+  emit(
+    "set-tools",
+    props.variant.tools.filter((_, at) => at !== index),
+  );
 }
 const schemaOpen = ref(false);
 

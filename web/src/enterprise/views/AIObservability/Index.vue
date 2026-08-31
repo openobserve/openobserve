@@ -44,6 +44,7 @@ import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
+import { navSection } from "./navSection";
 
 defineOptions({ name: "AIObservabilityShell" });
 
@@ -61,33 +62,7 @@ function evalLink(tab: EvalTab) {
   return { name: "aiEvaluations", query: { ...orgQuery.value, tab } };
 }
 
-// Section key for the rail's `active-key`. Evaluations sub-pages share the
-// route name `aiEvaluations`; `?tab=` distinguishes them so we map it down
-// to the rail's per-item keys.
-const activeSection = computed<string>(() => {
-  if (route.name === "aiLLMInsights") return "llmInsights";
-  if (route.name === "aiSessions") return "sessions";
-  if (route.name === "aiAgentGraph") return "agentGraph";
-  if (route.name === "aiAgentBehavior") return "agentBehavior";
-  if (route.name === "aiDiscovery") return "discovery";
-  if (
-    route.name === "aiQueues" ||
-    route.name === "aiQueueDetail" ||
-    route.name === "aiQueueWorkbench"
-  )
-    return "queues";
-  if (route.name === "aiDatasets") return "datasets";
-  // The create form is a route of its own, so the rail must stay lit while it
-  // is open — same shape as the queue sub-routes above.
-  if (route.name === "aiPlayground") return "playground";
-  if (route.name === "aiExperiments" || route.name === "aiExperimentCreate") return "experiments";
-  if (typeof route.name === "string" && route.name.startsWith("aiRemoteTask")) return "remoteTasks";
-  if (route.name === "aiEvaluations") {
-    const tab = (route.query.tab as string) || "quality";
-    return tab;
-  }
-  return "";
-});
+const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
 
 // Single source of truth for the rail items (groups) AND the breadcrumb
 // switcher. Order here is the order shown in the rail.

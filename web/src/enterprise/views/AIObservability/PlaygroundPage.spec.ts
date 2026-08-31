@@ -117,6 +117,7 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     removeRow: (id: string) => void;
     createExperiment: (id: string) => void;
     updateVariant: (variant: import("./playgroundDraft").PlaygroundVariant) => void;
+    setTools: (tools: import("./playgroundDraft").PlaygroundTool[]) => void;
     scoreAll: () => Promise<void>;
     totalCells: number;
   };
@@ -249,6 +250,31 @@ describe("PlaygroundPage", () => {
 
     page.removeVariant(doomed);
     expect(page.results[doomed]).toBeUndefined();
+  });
+
+  // A comparison only says something when the prompt or model is the one thing
+  // that differs, so the tool harness is shared rather than per column.
+  it("gives every bench the same tools", async () => {
+    const page = vm(await mountPage());
+    page.duplicate(page.draft.variants[0].id);
+    page.duplicate(page.draft.variants[0].id);
+
+    page.setTools([{ name: "search", description: "", parameters: "{}" }]);
+
+    expect(page.draft.variants).toHaveLength(3);
+    for (const variant of page.draft.variants) {
+      expect(variant.tools.map((tool) => tool.name)).toEqual(["search"]);
+    }
+  });
+
+  it("gives each bench its own copy, so editing one never mutates another", async () => {
+    const page = vm(await mountPage());
+    page.duplicate(page.draft.variants[0].id);
+
+    page.setTools([{ name: "search", description: "", parameters: "{}" }]);
+    page.draft.variants[0].tools[0].name = "changed";
+
+    expect(page.draft.variants[1].tools[0].name).toBe("search");
   });
 
   it("inserts a duplicate directly after its source, with an id of its own", async () => {

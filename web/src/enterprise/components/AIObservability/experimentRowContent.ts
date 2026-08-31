@@ -71,6 +71,42 @@ export function dimensionLabel(
   return raw(version ? `${dimension.scoreConfigName} · v${version}` : dimension.scoreConfigName);
 }
 
+/**
+ * What a side actually reads as. A categorical score is a policy-derived rank on
+ * the wire and a boolean is 0/1, so rendering the raw scalar makes `0 → 1` mean
+ * three different things with no way to tell them apart.
+ */
+export function dimensionSideValue(
+  dimension: Pick<
+    ExperimentComparisonDimension,
+    "dataType" | "baseline" | "candidate" | "baselineLabel" | "candidateLabel"
+  >,
+  side: "baseline" | "candidate",
+): I18nText {
+  const label = side === "baseline" ? dimension.baselineLabel : dimension.candidateLabel;
+  if (label) return raw(label);
+  const value = side === "baseline" ? dimension.baseline : dimension.candidate;
+  if (value === null || value === undefined) return raw("—");
+  if (dimension.dataType === "boolean") return raw(value ? "true" : "false");
+  return raw(formatNumber(value));
+}
+
+/** Null for cost and latency, which are units rather than a score type. */
+export function dataTypeLabel(
+  dimension: Pick<ExperimentComparisonDimension, "dataType">,
+): I18nText | null {
+  switch (dimension.dataType) {
+    case "numeric":
+      return gt("aiObservability.experiments.comparePage.panel.typeNumeric");
+    case "categorical":
+      return gt("aiObservability.experiments.comparePage.panel.typeCategorical");
+    case "boolean":
+      return gt("aiObservability.experiments.comparePage.panel.typeBoolean");
+    default:
+      return null;
+  }
+}
+
 export function dimensionIdentity(
   dimension: Pick<
     ExperimentComparisonDimension,
@@ -90,4 +126,34 @@ export function formatNumber(value: number): string {
 export function signedNumber(value: number | null): I18nText {
   if (value === null) return raw("—");
   return raw(`${value > 0 ? "+" : ""}${formatNumber(value)}`);
+}
+
+const SECOND_MS = 1000;
+
+/**
+ * The unit a set of latencies SHARE. Chosen once from the largest, never per
+ * value: `1.2 s → 800 ms` puts two scales inside one comparison and makes the
+ * smaller number look bigger.
+ */
+export function durationUnit(...values: Array<number | null | undefined>): "ms" | "s" {
+  const largest = Math.max(0, ...values.map((value) => Math.abs(value ?? 0)));
+  return largest >= SECOND_MS ? "s" : "ms";
+}
+
+/**
+ * A mean latency to four decimal places ("10449.4821") is noise that costs the
+ * reader the magnitude. Whole milliseconds below a second; seconds above it,
+ * where the digits that matter are the first two or three.
+ */
+export function formatDuration(value: number, unit: "ms" | "s"): string {
+  if (unit === "ms") return Math.round(value).toLocaleString();
+  const seconds = value / SECOND_MS;
+  return seconds.toFixed(seconds >= 10 ? 1 : 2);
+}
+
+/** A lone latency with its own unit — nothing to share a scale with. */
+export function durationLabel(value: number | null | undefined): string {
+  if (value == null) return "—";
+  const unit = durationUnit(value);
+  return `${formatDuration(value, unit)} ${unit}`;
 }

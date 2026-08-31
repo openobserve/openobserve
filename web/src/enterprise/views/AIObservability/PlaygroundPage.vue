@@ -11,11 +11,14 @@
   variants across. Sampling switches modes; removing the last row switches back.
 -->
 <template>
-  <OPageLayout bleed title-overflow="visible">
-    <template #title>
-      <span data-test="ai-playground-title">{{ t("aiObservability.playground.title") }}</span>
-    </template>
-
+  <OPageLayout
+    data-test="ai-playground-page"
+    :title="t('aiObservability.nav.playground')"
+    :subtitle="t('aiObservability.subtitle.playground')"
+    icon="play-circle"
+    title-data-test="ai-playground-title"
+    bleed
+  >
     <template #actions>
       <ODropdown v-if="recentDrafts.length" align="end" content-class="w-100">
         <template #trigger>
@@ -227,6 +230,7 @@
             :can-remove="draft.variants.length > 1"
             :can-duplicate="draft.variants.length < MAX_VARIANTS"
             @change="updateVariant"
+            @set-tools="setTools"
             @set-var="setVar"
             @remove-var="removeVar"
             @run="runVariant(variant.id)"
@@ -305,6 +309,7 @@ import {
   type PlaygroundCell,
   type PlaygroundDraft,
   type PlaygroundResults,
+  type PlaygroundTool,
   type PlaygroundVariant,
 } from "./playgroundDraft";
 import { aiExperimentCreateRoute } from "./experimentRoutes";
@@ -714,6 +719,14 @@ function updateVariant(next: PlaygroundVariant) {
   const index = draft.variants.findIndex((variant) => variant.id === next.id);
   if (index === -1) return;
   draft.variants[index] = next;
+}
+
+// Tools are the harness every bench shares: a comparison only says something
+// when the prompt or the model is the ONE thing that differs between columns.
+function setTools(tools: PlaygroundTool[]) {
+  for (const variant of draft.variants) {
+    variant.tools = tools.map((tool) => ({ ...tool }));
+  }
 }
 
 function duplicate(variantId: string) {

@@ -20,6 +20,9 @@
       <!-- Flexible with a ceiling, not a fixed width: four benches share the
            strip, and a rigid 12.5rem plus the actions overflows a column at its
            min-width. It grows to the same size when there is room. -->
+      <!-- `<connection> : <model>` on one line. `option-tooltip` gives the row and
+           the trigger a native tooltip carrying the untruncated pair, which is
+           what a narrow bench column needs. -->
       <OSelect
         class="max-w-50 min-w-0 flex-1"
         :model-value="selectedKey"
@@ -28,6 +31,7 @@
         size="sm"
         searchable
         creatable
+        option-tooltip
         :data-test="`ai-playground-model-${variant.id}`"
         @update:model-value="onPick"
         @create="onCreate"
@@ -156,29 +160,50 @@ const selectedKey = computed(() =>
     : "",
 );
 
+/** A provider with no list still offers its default, or it cannot be picked. */
+function modelsOf(provider: Provider): string[] {
+  const listed = provider.availableModels ?? provider.available_models ?? [];
+  if (listed.length) return listed;
+  const fallback = provider.defaultModel ?? provider.default_model ?? "";
+  return fallback ? [fallback] : [];
+}
+
 const modelOptions = computed<SelectOption[]>(() => {
+  const typed = props.variant.model;
   const options: SelectOption[] = [];
   for (const provider of props.providers) {
-    const models = provider.availableModels ?? provider.available_models ?? [];
+    const models = modelsOf(provider);
+    // A hand-typed model belongs to the provider it was typed against.
+    if (typed && provider.id === props.variant.providerId && !models.includes(typed)) {
+      models.unshift(typed);
+    }
+    if (!models.length) {
+      options.push({
+        label: raw(provider.name),
+        value: keyFor(provider.id, ""),
+        disabled: true,
+      });
+      continue;
+    }
     for (const model of models) {
       options.push({
-        label: raw(`${provider.name}: ${model}`),
+        label: raw(`${provider.name} : ${model}`),
         value: keyFor(provider.id, model),
       });
     }
   }
-  // A hand-typed model is not in any provider's list, so the trigger would fall
-  // back to the placeholder and read as "nothing selected".
-  if (props.variant.model && !options.some((option) => option.value === selectedKey.value)) {
-    options.unshift({ label: raw(currentLabel.value), value: selectedKey.value });
+  // A model whose provider is gone — deleted, or a draft restored from another
+  // org — still has to render, or the trigger reads as "nothing selected".
+  if (typed && !options.some((option) => option.value === selectedKey.value)) {
+    const name = providerName.value || t("aiObservability.playground.providerUnknown");
+    options.unshift({ label: raw(`${name} : ${typed}`), value: selectedKey.value });
   }
   return options;
 });
 
-const currentLabel = computed(() => {
-  const provider = props.providers.find((candidate) => candidate.id === props.variant.providerId);
-  return provider ? `${provider.name}: ${props.variant.model}` : props.variant.model;
-});
+const providerName = computed(
+  () => props.providers.find((candidate) => candidate.id === props.variant.providerId)?.name ?? "",
+);
 
 function keyFor(providerId: string, model: string): string {
   return `${providerId}${KEY_SEPARATOR}${model}`;
