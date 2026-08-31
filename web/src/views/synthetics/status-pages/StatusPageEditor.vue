@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-full"
       >
         <template #before>
-          <div class="flex h-full min-h-0 flex-col overflow-y-auto px-6 py-5">
+          <div ref="configPaneRef" class="flex h-full min-h-0 flex-col overflow-y-auto px-6 py-5">
             <!-- Public URL -->
             <div class="rounded-surface bg-surface-subtle mb-6 flex flex-col gap-2 p-3">
               <span class="text-text-label text-xs font-medium">{{
@@ -113,75 +113,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OFormInput name="brand_name" :label="t('statusPages.fields.brandName')" />
 
-                  <!-- Logo — mirrors the field-level lock pattern used for
-                       Notices/Custom Domains dropdown items in StatusPagesList,
-                       adapted to an input: a disabled control plus a lock icon
-                       and tooltip rather than a disabled menu item. -->
-                  <div class="flex flex-col gap-1.5">
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-text-label text-sm font-medium">{{
-                        t("statusPages.fields.logo")
-                      }}</span>
-                      <template v-if="!logoUploadEnabled">
-                        <OIcon
-                          name="lock"
-                          size="xs"
-                          aria-hidden="true"
-                          data-test="status-page-logo-lock"
-                        />
-                        <OTooltip side="right" :content="t('statusPages.fields.logoLocked')" />
-                      </template>
-                    </div>
+                  <!-- Logo and accent colour are one branding decision, so they
+                       share a row; grid-cols-1 keeps them stacked until the
+                       config pane is wide enough for two readable columns. -->
+                  <div
+                    class="grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2"
+                    data-test="status-page-branding-row"
+                  >
+                    <!-- Logo — mirrors the field-level lock pattern used for
+                         Notices/Custom Domains dropdown items in StatusPagesList,
+                         adapted to an input: a disabled control plus a lock icon
+                         and tooltip rather than a disabled menu item. -->
+                    <div class="flex min-w-0 flex-col gap-1.5" data-test="status-page-logo-field">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-text-label text-sm font-medium">{{
+                          t("statusPages.fields.logo")
+                        }}</span>
+                        <template v-if="!logoUploadEnabled">
+                          <OIcon
+                            name="lock"
+                            size="xs"
+                            aria-hidden="true"
+                            data-test="status-page-logo-lock"
+                          />
+                          <OTooltip side="right" :content="t('statusPages.fields.logoLocked')" />
+                        </template>
+                      </div>
 
-                    <p
-                      v-if="orgLogoOverrideEnabled && usingOrgLogoDefault"
-                      class="text-text-secondary text-xs"
-                    >
-                      {{ t("statusPages.fields.logoUsingOrgDefault") }}
-                    </p>
-
-                    <div v-if="logoPreview" class="flex items-center gap-2">
-                      <img
-                        :src="logoPreview"
-                        :alt="t('statusPages.fields.logo')"
-                        data-test="status-page-logo-preview"
-                        class="max-h-9 max-w-37.5 object-contain"
-                      />
-                      <OButton
-                        v-if="logoUploadEnabled"
-                        type="button"
-                        variant="ghost-destructive"
-                        size="icon-xs-sq"
-                        icon-left="close"
-                        data-test="status-page-logo-clear"
-                        @click="clearLogo"
+                      <p
+                        v-if="orgLogoOverrideEnabled && usingOrgLogoDefault"
+                        class="text-text-secondary text-xs"
                       >
-                        <OTooltip
-                          side="bottom"
-                          :content="
-                            usingOrgLogoDefault
-                              ? t('statusPages.fields.logoRevertToOrg')
-                              : t('statusPages.fields.logoRemove')
-                          "
+                        {{ t("statusPages.fields.logoUsingOrgDefault") }}
+                      </p>
+
+                      <div v-if="logoPreview" class="flex min-w-0 items-center gap-2">
+                        <img
+                          :src="logoPreview"
+                          :alt="t('statusPages.fields.logo')"
+                          data-test="status-page-logo-preview"
+                          class="max-h-9 max-w-37.5 object-contain"
                         />
-                      </OButton>
+                        <OButton
+                          v-if="logoUploadEnabled"
+                          type="button"
+                          variant="ghost-destructive"
+                          size="icon-xs-sq"
+                          icon-left="close"
+                          data-test="status-page-logo-clear"
+                          @click="clearLogo"
+                        >
+                          <OTooltip
+                            side="bottom"
+                            :content="
+                              usingOrgLogoDefault
+                                ? t('statusPages.fields.logoRevertToOrg')
+                                : t('statusPages.fields.logoRemove')
+                            "
+                          />
+                        </OButton>
+                      </div>
+                      <OFile
+                        v-else
+                        class="min-w-0"
+                        :disabled="!logoUploadEnabled"
+                        :model-value="null"
+                        :placeholder="t('statusPages.fields.logoUpload')"
+                        accept=".png, .jpg, .jpeg, .gif, .svg, image/*"
+                        data-test="status-page-logo-upload"
+                        @update:model-value="onLogoFileSelected"
+                      />
                     </div>
-                    <OFile
-                      v-else
-                      :disabled="!logoUploadEnabled"
-                      :model-value="null"
-                      :placeholder="t('statusPages.fields.logoUpload')"
-                      accept=".png, .jpg, .jpeg, .gif, .svg, image/*"
-                      data-test="status-page-logo-upload"
-                      @update:model-value="onLogoFileSelected"
+
+                    <OFormColor
+                      name="accent_color"
+                      class="min-w-0"
+                      :label="t('statusPages.fields.accentColor')"
+                      :placeholder="raw('#2563EB')"
+                      data-test="status-page-accent-color"
                     />
                   </div>
-
-                  <OFormColor
-                    name="accent_color"
-                    :label="t('statusPages.fields.accentColor')"
-                    :placeholder="raw('#2563EB')"
-                  />
                 </div>
               </OFormSection>
 
@@ -295,6 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(comp, idx) in components"
                     :key="comp._uid"
                     class="rounded-surface border-border-default flex flex-col gap-3 border p-3"
+                    :data-uid="comp._uid"
                     :data-test="`status-page-component-row-${idx}`"
                   >
                     <div class="flex items-start gap-2">
@@ -356,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -441,6 +453,7 @@ const pageName = ref("");
 const rotating = ref(false);
 const currentSlug = ref("");
 const splitPct = ref(58);
+const configPaneRef = ref<HTMLElement | null>(null);
 // True while the form's logo_img still IS the org default (no page-specific
 // override saved yet) — drives the "Using org logo" note and whether Clear
 // means "remove" or "revert to org default".
@@ -585,8 +598,15 @@ async function loadChecks() {
   }
 }
 
-function addComponent() {
-  components.value.push({ _uid: uidSeq++, name: "", description: "", check_ids: [] });
+async function addComponent() {
+  // Resolve the new row by its _uid, never by index: rows are keyed on _uid
+  // precisely because index identity is unstable across an add.
+  const uid = uidSeq++;
+  components.value.push({ _uid: uid, name: "", description: "", check_ids: [] });
+  await nextTick();
+  const input = configPaneRef.value?.querySelector<HTMLInputElement>(`[data-uid="${uid}"] input`);
+  input?.focus();
+  input?.scrollIntoView({ block: "nearest" });
 }
 
 function removeComponent(idx: number) {
