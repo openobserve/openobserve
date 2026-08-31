@@ -111,6 +111,67 @@ describe("normalizeExperimentComparison()", () => {
       tags: ["release", "api"],
     });
   });
+
+  // Without these the page renders `1 → 2` for a rank move, a boolean flip and a
+  // numeric change alike, with nothing to tell them apart.
+  it("keeps the score type, category names and the within-noise flag", () => {
+    const normalized = normalizeExperimentComparison({
+      counts: {},
+      dimensions: [],
+      rows: [
+        {
+          logical_id: "row-1",
+          bucket: "improved",
+          dimensions: [
+            {
+              name: "health · v1",
+              kind: "score",
+              data_type: "categorical",
+              baseline: 1,
+              candidate: 2,
+              baseline_label: "poor",
+              candidate_label: "good",
+              delta: 1,
+              oriented_delta: 1,
+              within_noise: true,
+              baseline_dispersion: 0.1,
+              candidate_dispersion: 0.2,
+              assignment: "improved",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(normalized.rows[0].dimensions[0]).toMatchObject({
+      dataType: "categorical",
+      baselineLabel: "poor",
+      candidateLabel: "good",
+      withinNoise: true,
+      baselineDispersion: 0.1,
+      candidateDispersion: 0.2,
+    });
+  });
+
+  it("defaults the new fields when the server omits them", () => {
+    const normalized = normalizeExperimentComparison({
+      counts: {},
+      dimensions: [],
+      rows: [
+        {
+          logical_id: "row-1",
+          bucket: "unchanged",
+          dimensions: [{ name: "cost", kind: "cost", assignment: "unchanged" }],
+        },
+      ],
+    });
+
+    expect(normalized.rows[0].dimensions[0]).toMatchObject({
+      dataType: null,
+      baselineLabel: null,
+      withinNoise: false,
+    });
+  });
 });
 
 describe("normalizeExperimentRowDetail()", () => {

@@ -1,0 +1,29 @@
+# Merge a dependabot PR the moment a maintainer approves it; branch protection
+# (1 approval + required checks) still decides whether the merge is allowed.
+name: Dependabot Auto Merge
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions: {}
+
+jobs:
+  merge:
+    if: >-
+      github.event.review.state == 'approved' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.draft == false &&
+      contains(fromJSON('["MEMBER", "OWNER", "COLLABORATOR"]'), github.event.review.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Merge approved dependabot PR
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr merge "$NUMBER" --squash \
+            && echo "Merged dependabot PR #$NUMBER" \
+            || echo "::warning::PR #$NUMBER not merged — required checks or reviews not yet satisfied"

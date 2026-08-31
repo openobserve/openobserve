@@ -566,7 +566,7 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-default);
+  --color-input-border: var(--color-border-control);
   --color-input-border-hover: var(--color-primary-300);
   --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
@@ -591,7 +591,7 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-default);
+  --color-select-border: var(--color-border-control);
   --color-select-disabled-border: var(--color-border-default);
   --color-select-border-hover: var(--color-primary-300);
   --color-select-border-focus: var(--color-primary-300);
@@ -924,7 +924,10 @@
   /* Synthetics run status: "flaky" — a warning that is deliberately NOT the
      amber error tone used next to it, so the two read as different states. */
   --color-status-flaky: var(--color-orange-500);
-  --color-status-flaky-text: var(--color-orange-600);
+  /* Darkened off --color-orange-600 to clear 4.5:1 on white as the sole
+     genuine text use (RunRowExpansion.vue); dark.css keeps orange-600 itself,
+     which already passes there. */
+  --color-status-flaky-text: #cd4d0b;
 
   /* User chat bubble in the trace thread view — border paired with the
      --color-chat-bubble-user gradient fill. */

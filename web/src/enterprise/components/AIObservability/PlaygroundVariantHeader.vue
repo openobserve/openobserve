@@ -20,6 +20,9 @@
       <!-- Flexible with a ceiling, not a fixed width: four benches share the
            strip, and a rigid 12.5rem plus the actions overflows a column at its
            min-width. It grows to the same size when there is room. -->
+      <!-- `<connection> : <model>` on one line. `option-tooltip` gives the row and
+           the trigger a native tooltip carrying the untruncated pair, which is
+           what a narrow bench column needs. -->
       <OSelect
         class="max-w-50 min-w-0 flex-1"
         :model-value="selectedKey"
@@ -28,6 +31,7 @@
         size="sm"
         searchable
         creatable
+        option-tooltip
         :data-test="`ai-playground-model-${variant.id}`"
         @update:model-value="onPick"
         @create="onCreate"
@@ -35,7 +39,9 @@
 
       <!-- Parameters live behind the gear, not in the column: they are set once
            and read never, while the messages below are edited constantly. -->
-      <ODropdown align="end">
+      <!-- Down and to the RIGHT of the gear: aligned to its end it grew leftward
+           over the messages, covering the prompt the parameter is being set for. -->
+      <ODropdown align="start" side="bottom">
         <template #trigger>
           <OButton
             variant="ghost-muted"
@@ -64,6 +70,29 @@
         </div>
       </ODropdown>
     </div>
+
+    <!-- Icon only, and next to the gear rather than above the messages: like the
+         parameters behind it, a response schema is set once and read never. The
+         tinted background is the only thing that says one is in force, since
+         there is no label left to qualify. -->
+    <!-- The VARIANT carries the icon colour and the `!` carries the tint: every
+         ghost variant hardcodes `bg-transparent`, and two utilities for one
+         property resolve by stylesheet order, so an unmarked background loses
+         to it silently. -->
+    <OButton
+      :variant="variant.responseSchema ? 'ghost-primary' : 'ghost-muted'"
+      size="icon-xs"
+      icon-left="data-object"
+      class="shrink-0"
+      :class="variant.responseSchema ? 'bg-accent/12!' : ''"
+      :title="
+        variant.responseSchema
+          ? t('aiObservability.playground.schemaOn')
+          : t('aiObservability.playground.schema')
+      "
+      :data-test="`ai-playground-schema-btn-${variant.id}`"
+      @click="schemaOpen = true"
+    />
 
     <!-- One button, not two: a blank column is almost never what someone wants
          next to a variant they have just tuned, so plus clones this one. -->
@@ -100,16 +129,23 @@
       :data-test="`ai-playground-variant-close-${label}`"
       @click="canRemove && emit('remove')"
     />
+
+    <PlaygroundSchemaDialog
+      v-model:open="schemaOpen"
+      :schema="variant.responseSchema"
+      @apply="(responseSchema) => patch({ responseSchema })"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import PlaygroundSchemaDialog from "./PlaygroundSchemaDialog.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
   MAX_VARIANTS,
@@ -147,6 +183,8 @@ const { t } = useI18nTyped();
 
 const maxVariants = MAX_VARIANTS;
 
+const schemaOpen = ref(false);
+
 /** Both halves or nothing: a key with an empty model matches no option, and an
  *  unmatched value is rendered by the select as the raw key — which reads as an
  *  id where a model name belongs. Empty shows the placeholder instead. */
@@ -156,29 +194,50 @@ const selectedKey = computed(() =>
     : "",
 );
 
+/** A provider with no list still offers its default, or it cannot be picked. */
+function modelsOf(provider: Provider): string[] {
+  const listed = provider.availableModels ?? provider.available_models ?? [];
+  if (listed.length) return listed;
+  const fallback = provider.defaultModel ?? provider.default_model ?? "";
+  return fallback ? [fallback] : [];
+}
+
 const modelOptions = computed<SelectOption[]>(() => {
+  const typed = props.variant.model;
   const options: SelectOption[] = [];
   for (const provider of props.providers) {
-    const models = provider.availableModels ?? provider.available_models ?? [];
+    const models = modelsOf(provider);
+    // A hand-typed model belongs to the provider it was typed against.
+    if (typed && provider.id === props.variant.providerId && !models.includes(typed)) {
+      models.unshift(typed);
+    }
+    if (!models.length) {
+      options.push({
+        label: raw(provider.name),
+        value: keyFor(provider.id, ""),
+        disabled: true,
+      });
+      continue;
+    }
     for (const model of models) {
       options.push({
-        label: raw(`${provider.name}: ${model}`),
+        label: raw(`${provider.name} : ${model}`),
         value: keyFor(provider.id, model),
       });
     }
   }
-  // A hand-typed model is not in any provider's list, so the trigger would fall
-  // back to the placeholder and read as "nothing selected".
-  if (props.variant.model && !options.some((option) => option.value === selectedKey.value)) {
-    options.unshift({ label: raw(currentLabel.value), value: selectedKey.value });
+  // A model whose provider is gone — deleted, or a draft restored from another
+  // org — still has to render, or the trigger reads as "nothing selected".
+  if (typed && !options.some((option) => option.value === selectedKey.value)) {
+    const name = providerName.value || t("aiObservability.playground.providerUnknown");
+    options.unshift({ label: raw(`${name} : ${typed}`), value: selectedKey.value });
   }
   return options;
 });
 
-const currentLabel = computed(() => {
-  const provider = props.providers.find((candidate) => candidate.id === props.variant.providerId);
-  return provider ? `${provider.name}: ${props.variant.model}` : props.variant.model;
-});
+const providerName = computed(
+  () => props.providers.find((candidate) => candidate.id === props.variant.providerId)?.name ?? "",
+);
 
 function keyFor(providerId: string, model: string): string {
   return `${providerId}${KEY_SEPARATOR}${model}`;
