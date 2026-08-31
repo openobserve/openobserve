@@ -30,12 +30,19 @@ const ALLOW_EXACT = new Set([
   // bindings — dynamic values with no static `--x:` definition.
   "--node-color", // plugins/pipelines/CustomNode.vue  :style={ '--node-color': ... }
   "--chip-color",
+  // components/flow/StepPickerDialog.vue:52  :style="{ '--sp-x': …, '--sp-y': … }".
+  // Previously masked: the walk counted an assertion string in that component's spec
+  // ("--sp-x: 300px") as a definition. Specs are excluded now, so they need a real entry.
+  "--sp-x",
+  "--sp-y",
 ]);
 
 // Guard against accidental re-introduction of an --o2-* exemption above.
 for (const name of [...ALLOW_EXACT, ...ALLOW_PREFIXES.map((re) => re.source)]) {
   if (String(name).includes("--o2-")) {
-    console.error(`check-css-tokens: '${name}' — --o2-* tokens must never be allowlisted. Remove it.`);
+    console.error(
+      `check-css-tokens: '${name}' — --o2-* tokens must never be allowlisted. Remove it.`,
+    );
     process.exit(2);
   }
 }
@@ -45,13 +52,19 @@ function isAllowed(name) {
   return ALLOW_PREFIXES.some((re) => re.test(name));
 }
 
+// Specs name fake properties on purpose — a CSS-resolver test has to feed the parser
+// `var(--a)` with no `--a` anywhere to assert it returns null. Those are fixtures, not
+// shipped CSS, so they cannot "void a declaration in browsers". Same exclusion as
+// check-design-consistency.mjs and the local/no-hardcoded-* ESLint rules.
+const isSpec = (name) => /\.spec\.|\.test\./.test(name);
+
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {
     if (entry === "node_modules" || entry === "dist") continue;
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) walk(full, files);
-    else if (EXTS.has(extname(entry))) files.push(full);
+    else if (EXTS.has(extname(entry)) && !isSpec(entry)) files.push(full);
   }
   return files;
 }
@@ -137,16 +150,22 @@ let failed = false;
 // 1) Banned --o2-* vocabulary — zero tolerance, fallback or not.
 if (bannedO2.size > 0) {
   const total = [...bannedO2.values()].reduce((n, s) => n + s.length, 0);
-  console.error(`\nFound ${total} banned --o2-* token reference${total === 1 ? "" : "s"} (${bannedO2.size} distinct name${bannedO2.size === 1 ? "" : "s"}):\n`);
+  console.error(
+    `\nFound ${total} banned --o2-* token reference${total === 1 ? "" : "s"} (${bannedO2.size} distinct name${bannedO2.size === 1 ? "" : "s"}):\n`,
+  );
   printGroup(bannedO2);
-  console.error("\nThe entire --o2-* vocabulary is banned. Migrate each to its --color-* equivalent");
+  console.error(
+    "\nThe entire --o2-* vocabulary is banned. Migrate each to its --color-* equivalent",
+  );
   console.error("(see scripts/o2-token-map.json) or a Tailwind utility. There is no allowlist.\n");
   failed = true;
 }
 
 // 2) Undefined non-o2 references with no fallback (voids the whole declaration).
 if (undefinedRefs.length > 0) {
-  console.error(`\nFound ${undefinedRefs.length} undefined CSS custom propert${undefinedRefs.length === 1 ? "y" : "ies"} referenced with no fallback:\n`);
+  console.error(
+    `\nFound ${undefinedRefs.length} undefined CSS custom propert${undefinedRefs.length === 1 ? "y" : "ies"} referenced with no fallback:\n`,
+  );
   printGroup(new Map(undefinedRefs.map((r) => [r.name, r.sites])));
   console.error("\nEach of these voids its whole declaration in browsers (invalid var() = unset).");
   console.error("Either define the token or add a var(--x, fallback).\n");
@@ -156,5 +175,7 @@ if (undefinedRefs.length > 0) {
 if (failed) {
   process.exit(1);
 } else {
-  console.log(`OK — no --o2-* tokens and no undefined CSS custom property references (${defined.size} tokens defined, ${referenced.size} distinct refs checked).`);
+  console.log(
+    `OK — no --o2-* tokens and no undefined CSS custom property references (${defined.size} tokens defined, ${referenced.size} distinct refs checked).`,
+  );
 }

@@ -33,12 +33,14 @@ const cache = new Map<string, string>();
 // (jsdom unit tests / SSR). Keeps charts from rendering with empty color strings.
 // These are the light-theme resolutions of the corresponding tokens.
 const FALLBACKS: Record<string, string> = {
-  "--color-text-heading": "#171717",
+  "--color-text-heading": "#262626",
+  "--color-text-body": "#404040",
   "--color-text-secondary": "#737373",
-  "--color-border-default": "#e5e5e5",
+  "--color-border-default": "#d4d4d4",
   "--color-border-subtle": "#ededed",
   "--color-surface-base": "#ffffff",
-  "--color-tooltip-text": "#171717",
+  "--color-white": "#ffffff",
+  "--color-tooltip-text": "#262626",
   "--color-tooltip-bg": "#ffffff",
   "--color-tooltip-border": "#ededed",
   "--color-service-health-critical": "#f5222d",
@@ -87,6 +89,8 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-table-23": "#FFE6E6",
   "--color-chart-table-24": "#E8F4FD",
   "--color-chart-gridline": "rgba(0, 0, 0, 0.08)",
+  // --color-chart-crosshair-bg is deliberately absent: it is dark-only, and the empty
+  // string light returns is what makes ECharts use its own auto default (base.css:262).
   // Trace span palette (HEX/canvas variant), light values.
   "--color-trace-span-1": "#84CC16",
   "--color-trace-span-2": "#7C3AED",
@@ -113,6 +117,18 @@ const FALLBACKS: Record<string, string> = {
   "--color-status-warning-text": "#e56d17",
   // Error series in canvas charts (light value from base.css).
   "--color-severity-error-color": "#ef5350",
+  // Status accents used by SLO / health charts (light values from semantic.css, base.css).
+  "--color-status-negative": "#db3b4b",
+  "--color-status-success-bg": "#f2fcf3",
+  "--color-status-success-text": "#208a3c",
+  "--color-success-200": "#bbf7d0",
+  // JSON syntax highlighting in dashboard field renderers (light values from base.css).
+  "--color-json-boolean": "#6d28d9",
+  "--color-json-key": "#b71c1c",
+  "--color-json-null": "#6b7280",
+  "--color-json-number": "#2563eb",
+  "--color-json-object": "#4b5563",
+  "--color-json-string": "#047857",
 };
 
 /**
