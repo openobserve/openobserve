@@ -616,6 +616,57 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(sql).toContain("service_name as caller_service");
       expect(sql).not.toContain("LEFT JOIN");
     });
+
+    it("filters catalog-origin inferred dependencies by type and system", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as any);
+      wrapper = mountPanel({
+        streamFilter: "default",
+        selectedNode: {
+          ...baseNode,
+          id: '["sso","sso","database","mysql"]',
+          name: "sso",
+          service_type: "database",
+          service_system: "mysql",
+        },
+      });
+      await flushPromises();
+
+      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      expect(sql).toContain("infer_service_name = 'sso'");
+      expect(sql).toContain("infer_service_type = 'database'");
+      expect(sql).toContain("infer_service_system = 'mysql'");
+    });
+
+    it("does not add a catalog system to graph-origin navigation", async () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, name: "postgres", service_type: "database" },
+      });
+
+      await wrapper.vm.viewRelatedTraces();
+
+      const payload = wrapper.emitted("view-traces")?.[0]?.[0] as Record<string, any>;
+      expect(payload).not.toHaveProperty("serviceSystem");
+    });
+
+    it("adds the catalog system to catalog-origin navigation", async () => {
+      wrapper = mountPanel({
+        selectedNode: {
+          ...baseNode,
+          name: "sso",
+          service_type: "database",
+          service_system: "mysql",
+        },
+      });
+
+      await wrapper.vm.viewRelatedTraces();
+
+      expect(wrapper.emitted("view-traces")?.[0]?.[0]).toMatchObject({
+        serviceName: "sso",
+        serviceType: "database",
+        serviceSystem: "mysql",
+      });
+    });
   });
 
   // -------------------------------------------------------------------------
