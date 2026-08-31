@@ -17,7 +17,10 @@
 // same whether it is opened from a single run or from a comparison.
 
 import { gt, raw, type I18nText } from "@/types/i18n";
-import type { ExperimentComparisonDimension } from "@/services/llm-experiments.service";
+import type {
+  ExperimentComparisonDimension,
+  ExperimentComparisonRow,
+} from "@/services/llm-experiments.service";
 
 /** Treats blank strings, the literal "null", and empty containers as absent. */
 export function hasContent(content: unknown): boolean {
@@ -116,6 +119,39 @@ export function dimensionIdentity(
   return [dimension.kind, dimension.name, dimension.scoreConfigId, dimension.scoreConfigVersion]
     .map((part) => part ?? "")
     .join(":");
+}
+
+export interface DimensionMovementCounts {
+  improved: number;
+  unchanged: number;
+  regressed: number;
+}
+
+/**
+ * How many rows moved each way ON THIS DIMENSION.
+ *
+ * Read from the server's own per-row `assignment`, never re-derived from the
+ * deltas: the threshold and comparison policy that decided each assignment live
+ * server-side, so recomputing here would let a column header disagree with the
+ * bucket the same row is filed under. Rows measured on one side only count
+ * toward nothing — there is no movement to attribute.
+ */
+export function dimensionMovementCounts(
+  rows: ExperimentComparisonRow[],
+  dimension: Pick<
+    ExperimentComparisonDimension,
+    "name" | "kind" | "scoreConfigId" | "scoreConfigVersion"
+  >,
+): DimensionMovementCounts {
+  const identity = dimensionIdentity(dimension);
+  const counts: DimensionMovementCounts = { improved: 0, unchanged: 0, regressed: 0 };
+  for (const row of rows) {
+    const found = row.dimensions.find((entry) => dimensionIdentity(entry) === identity);
+    if (found?.assignment === "improved") counts.improved += 1;
+    else if (found?.assignment === "regressed") counts.regressed += 1;
+    else if (found?.assignment === "unchanged") counts.unchanged += 1;
+  }
+  return counts;
 }
 
 /** Trailing zeros carry no information — `34.0000` is just `34`. */

@@ -11066,7 +11066,14 @@
           "typeCategorical": "Categorical",
           "typeBoolean": "Boolean",
           "threshold": "Threshold",
-          "measurePerRow": "Mean per row, over trials"
+          "measurePerRow": "Mean per row, over trials",
+          "dimensionImproved": "{count} row improved | {count} rows improved",
+          "dimensionUnchanged": "{count} row unchanged | {count} rows unchanged",
+          "dimensionRegressed": "{count} row regressed | {count} rows regressed",
+          "dimensionNotCounted": "Not counted",
+          "dimensionNotCountedHint": "This scorer has no comparison policy on its Score Config, so its values are reported but never judged improved or regressed — and it cannot affect the outcome. Give it a direction and a threshold to have it counted.",
+          "dimensionNoneCompared": "Nothing compared",
+          "dimensionNoneComparedHint": "No row was measured on both sides. A row that ran in only one experiment has nothing to move from, so it counts toward no direction."
         },
         "rowDrawer": {
           "fallbackTitle": "Comparison Row",
