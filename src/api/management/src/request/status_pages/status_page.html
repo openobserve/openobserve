@@ -1,0 +1,1033 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Status</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3E%3Ccircle%20cx='8'%20cy='8'%20r='7'%20fill='%233f7994'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg:#f4f6f8; --card:#ffffff; --ink:#1b2b33; --ink2:#5b6e77; --line:#dde4e8;
+    --accent:#3f7994; --accent-ink:#33637a;
+    --ok:#187a4b;   --ok-bg:#e4f4ea;
+    --warn:#8f6400; --warn-bg:#fdf3d9;
+    --down:#b3352f; --down-bg:#fbe7e5;
+    --maint:#2c6cb5; --maint-bg:#e6eefb;
+    --na:#5f7078;   --na-bg:#eceff1;
+    --g-ok:#1e9d5f; --g-minor:#d5b70a; --g-major:#d97e14; --g-severe:#d23f39;
+    --g-maint:#3b82d1; --g-nd:#cfd8dc;
+    --shadow:0 1px 2px rgba(24,42,50,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0e1519; --card:#151f25; --ink:#e2ebef; --ink2:#8fa3ad; --line:#26343c;
+      --accent:#6ea9c2; --accent-ink:#8dbcd1;
+      --ok:#4ecb8c;   --ok-bg:#11301f;
+      --warn:#e5b45a; --warn-bg:#33270f;
+      --down:#f2938d; --down-bg:#3b1c19;
+      --maint:#85b4ee; --maint-bg:#14293f;
+      --na:#8fa0a9;   --na-bg:#1d272d;
+      --g-ok:#3fc586; --g-severe:#e46862; --g-maint:#5f97dd; --g-nd:#33424a;
+      --shadow:0 1px 2px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+         -webkit-font-smoothing:antialiased; }
+  main { max-width:64rem; margin:0 auto; padding:2.5rem 1rem 3rem; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0;
+             clip:rect(0 0 0 0); clip-path:inset(50%); overflow:hidden; white-space:nowrap; }
+  .skip { position:absolute; left:1rem; top:-3rem; background:var(--card); color:var(--ink);
+          padding:.4rem .8rem; border-radius:.4rem; box-shadow:var(--shadow); z-index:10; }
+  .skip:focus { top:1rem; }
+
+  .eyebrow { margin:0; font-size:.72rem; font-weight:700; letter-spacing:.12em;
+             text-transform:uppercase; color:var(--accent-ink); }
+  h1 { margin:.15rem 0 .3rem; font-size:1.65rem; line-height:1.2; letter-spacing:-.01em; }
+  #page-logo { max-height:2.25rem; max-width:12rem; margin:.3rem 0; display:block; }
+  .stamp { margin:0 0 .3rem; color:var(--ink2); font-size:.82rem; }
+  .stamp.stale { color:var(--warn); font-weight:600; }
+  .latest-down { margin:0 0 1.6rem; font-size:.82rem; color:var(--ink2); }
+  .latest-down button { border:0; background:none; padding:0; font:inherit; font-size:inherit;
+                         color:var(--accent-ink); text-decoration:underline; cursor:pointer; }
+
+  .banner { display:flex; align-items:flex-start; gap:.85rem; border-radius:.75rem;
+            padding:1.1rem 1.25rem; margin-bottom:1.6rem; }
+  .banner .dot { flex:none; width:.8rem; height:.8rem; border-radius:50%;
+                 background:currentColor; margin-top:.4rem; }
+  .banner h2 { margin:0; font-size:1.08rem; line-height:1.35; }
+  .banner p { margin:.15rem 0 0; font-size:.88rem; color:var(--ink); opacity:.85; }
+  .banner.t-ok    { background:var(--ok-bg);    color:var(--ok); }
+  .banner.t-warn  { background:var(--warn-bg);  color:var(--warn); }
+  .banner.t-down  { background:var(--down-bg);  color:var(--down); }
+  .banner.t-maint { background:var(--maint-bg); color:var(--maint); }
+  .banner.t-na    { background:var(--na-bg);    color:var(--na); }
+
+  .notice { background:var(--card); border:1px solid var(--line); border-left-width:4px;
+            border-radius:.6rem; padding:.9rem 1.1rem; margin:0 0 .8rem; box-shadow:var(--shadow); }
+  .notice.t-down  { border-left-color:var(--down); }
+  .notice.t-warn  { border-left-color:var(--warn); }
+  .notice.t-maint { border-left-color:var(--maint); }
+  .notice.t-na    { border-left-color:var(--na); }
+  .notice .eyebrow.t-down  { color:var(--down); }
+  .notice .eyebrow.t-warn  { color:var(--warn); }
+  .notice .eyebrow.t-maint { color:var(--maint); }
+  .notice .eyebrow.t-na    { color:var(--na); }
+  .notice h3 { margin:.25rem 0 .2rem; font-size:1rem; }
+  .notice .body { margin:0; font-size:.88rem; color:var(--ink2); white-space:pre-line; }
+  .notice .meta { margin:.45rem 0 0; font-size:.78rem; color:var(--ink2); }
+  .notice .updates { list-style:none; margin:.6rem 0 0; padding:.6rem 0 0 0;
+    border-top:1px solid var(--line); display:flex; flex-direction:column; gap:.5rem; }
+  .notice .updates li .body { white-space:pre-line; }
+  .notice .updates li .meta { margin:.15rem 0 0; }
+
+  h2.sect { font-size:.95rem; margin:1.8rem 0 .6rem; letter-spacing:.01em; }
+  .legend { list-style:none; display:flex; flex-wrap:wrap; gap:.35rem 1rem; margin:0 0 .8rem;
+            padding:0; font-size:.75rem; color:var(--ink2); }
+  .legend li { display:flex; align-items:center; gap:.35rem; }
+  .legend .sw { width:.7rem; height:.7rem; border-radius:2px; flex:none; }
+  .sw.g-ok{background:var(--g-ok)} .sw.g-minor{background:var(--g-minor)}
+  .sw.g-major{background:var(--g-major)} .sw.g-severe{background:var(--g-severe)}
+  .sw.g-maint{background:var(--g-maint)} .sw.g-no_data{background:var(--g-nd)}
+
+  .comp { background:var(--card); border:1px solid var(--line); border-radius:.75rem;
+          padding:1rem 1.15rem 1.05rem; margin:0 0 .9rem; box-shadow:var(--shadow); }
+  .crow { display:flex; justify-content:space-between; align-items:center; gap:.8rem;
+          flex-wrap:wrap; margin-bottom:.15rem; }
+  .crow h3 { margin:0; font-size:1rem; font-weight:600; }
+  .chip { display:inline-flex; align-items:center; gap:.4rem; font-size:.74rem; font-weight:700;
+          padding:.15rem .65rem; border-radius:1rem; white-space:nowrap; }
+  .chip::before { content:""; width:.5rem; height:.5rem; border-radius:50%; background:currentColor; }
+  .chip.t-ok{color:var(--ok);background:var(--ok-bg)} .chip.t-warn{color:var(--warn);background:var(--warn-bg)}
+  .chip.t-down{color:var(--down);background:var(--down-bg)} .chip.t-maint{color:var(--maint);background:var(--maint-bg)}
+  .chip.t-na{color:var(--na);background:var(--na-bg)}
+
+  .bars { display:flex; gap:2px; margin:.7rem 0 .35rem; }
+  .cell { flex:1 1 0; min-width:3px; height:2rem; padding:0; border:0; border-radius:2px;
+          cursor:pointer; background:var(--g-nd); }
+  .cell.g-ok{background:var(--g-ok)} .cell.g-minor{background:var(--g-minor)}
+  .cell.g-major{background:var(--g-major)} .cell.g-severe{background:var(--g-severe)}
+  .cell.g-maint{background:var(--g-maint)} .cell.g-no_data{background:var(--g-nd)}
+  .cell.sel { outline:2px solid var(--ink); outline-offset:1px; }
+  .cell.old { display:none; }
+  .axis { display:flex; justify-content:space-between; font-size:.72rem; color:var(--ink2); }
+  .ax90 { display:none; }
+  @media (min-width:40rem) {
+    .cell.old { display:block; }
+    .ax90 { display:inline; }
+    .ax30 { display:none; }
+  }
+
+  .daydetail { display:flex; justify-content:space-between; align-items:baseline; gap:.8rem;
+               margin:.6rem 0 0; padding:.55rem .8rem; font-size:.84rem;
+               background:var(--bg); border:1px solid var(--line); border-radius:.5rem; }
+  .daydetail p { margin:0; }
+  .daydetail strong { font-weight:650; }
+
+  .cardfoot { display:flex; justify-content:space-between; align-items:center; gap:.8rem;
+              flex-wrap:wrap; margin-top:.8rem; }
+  .uptime { display:flex; gap:1.4rem; }
+  .met { display:flex; flex-direction:column; }
+  .met .v { font-weight:650; font-size:.92rem; font-variant-numeric:tabular-nums; }
+  .met .l { font-size:.7rem; color:var(--ink2); text-transform:uppercase; letter-spacing:.06em; }
+
+  .linkbtn { border:0; background:none; padding:.15rem .1rem; font:inherit; font-size:.8rem;
+             color:var(--accent-ink); text-decoration:underline; cursor:pointer; }
+  .closebtn { border:0; background:none; padding:0 .2rem; font:inherit; font-size:.8rem;
+              color:var(--ink2); cursor:pointer; text-decoration:underline; flex:none; }
+
+  .tblwrap { max-height:22rem; overflow:auto; margin:.7rem 0 0; border:1px solid var(--line);
+             border-radius:.5rem; }
+  table { border-collapse:collapse; width:100%; font-size:.82rem; }
+  thead th { position:sticky; top:0; background:var(--card); text-align:left; font-weight:650;
+             padding:.5rem .8rem; border-bottom:1px solid var(--line); }
+  tbody th, tbody td { padding:.4rem .8rem; border-bottom:1px solid var(--line);
+                       text-align:left; font-weight:400; }
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom:0; }
+  td.num { font-variant-numeric:tabular-nums; }
+
+  details.past { margin-top:1.8rem; }
+  details.past summary { cursor:pointer; font-size:.95rem; font-weight:650; padding:.3rem 0; }
+  .pastitem { padding:.7rem 0; border-bottom:1px solid var(--line); }
+  .pastitem:last-child { border-bottom:0; }
+  .pastitem h3 { margin:.15rem 0 .1rem; font-size:.92rem; font-weight:600; }
+  .pastitem .meta { margin:0; font-size:.78rem; color:var(--ink2); }
+  .pastitem .body { margin:.2rem 0 0; font-size:.84rem; color:var(--ink2); white-space:pre-line; }
+
+  header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+  .header-side { flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem;
+                 margin-top:.15rem; }
+  .tzpicker select { font:inherit; font-size:.78rem; color:var(--ink2); background:var(--card);
+                     border:1px solid var(--line); border-radius:.4rem; padding:.25rem .5rem;
+                     max-width:11rem; }
+
+  footer { margin-top:2.5rem; border-top:1px solid var(--line); padding-top:1.1rem;
+           color:var(--ink2); font-size:.82rem; }
+  .foot-row { display:flex; justify-content:space-between; align-items:center; gap:1rem;
+              flex-wrap:wrap; }
+  footer strong { color:var(--ink); font-weight:650; }
+  .brand { display:inline-flex; align-items:center; gap:.4rem; color:var(--ink2); }
+  /* The mark's central glyph inherits currentColor so it reads on both themes;
+     the four petals keep their fixed brand colors. */
+  .brand svg { width:1.05rem; height:1.05rem; flex:none; color:var(--ink); }
+  .brand strong { color:var(--ink); font-weight:650; }
+  .explainer { margin-top:.9rem; background:var(--card); border:1px solid var(--line);
+               border-radius:.6rem; padding:.9rem 1.1rem; }
+  .explainer h2 { margin:0 0 .4rem; font-size:.9rem; }
+  .explainer ul { margin:0; padding-left:1.1rem; }
+  .explainer li { margin:.25rem 0; font-size:.84rem; }
+
+  .unlock { background:var(--card); border:1px solid var(--line); border-radius:.75rem;
+            padding:1.25rem 1.25rem 1.1rem; margin:0 0 1.6rem; max-width:26rem; box-shadow:var(--shadow); }
+  .unlock h2 { margin:0 0 .3rem; font-size:1.08rem; line-height:1.35; }
+  .unlock p { margin:0 0 .9rem; font-size:.88rem; color:var(--ink2); }
+  .unlock label { display:block; font-size:.78rem; font-weight:650; color:var(--ink2);
+                  margin-bottom:.3rem; }
+  .unlock .row { display:flex; gap:.5rem; flex-wrap:wrap; }
+  .unlock input { flex:1 1 10rem; font:inherit; color:var(--ink); background:var(--card);
+                  border:1px solid var(--line); border-radius:.4rem; padding:.45rem .6rem; min-width:0; }
+  .unlock button { border:0; font:inherit; font-weight:650; color:var(--card);
+                   background:var(--accent); border-radius:.4rem; padding:.45rem .9rem; cursor:pointer; }
+  .unlock button[disabled] { opacity:.6; cursor:default; }
+  .unlock .err { margin:0; font-size:.84rem; color:var(--down); font-weight:600; }
+  .unlock .err:not(:empty) { margin-top:.6rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cell, .linkbtn, .closebtn { transition:opacity .12s ease, transform .12s ease; }
+    .cell:hover { transform:scaleY(1.12); }
+    .banner, .notice, .comp { transition:background-color .2s ease; }
+  }
+  .comp.flash { animation:flash 1.6s ease; }
+  @keyframes flash {
+    0%, 100% { background:var(--card); }
+    20% { background:var(--warn-bg); }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<main id="main">
+  <header>
+    <div>
+      <p class="eyebrow">Service status</p>
+      <img id="page-logo" hidden alt="">
+      <h1 id="page-name">Loading&hellip;</h1>
+      <p class="stamp" id="stamp">Fetching current status&hellip;</p>
+      <p class="latest-down" id="latest-down" hidden></p>
+    </div>
+    <div class="header-side">
+      <span class="brand header-brand">Powered by
+        <svg viewBox="0 0 60 84" role="img" aria-label="OpenObserve" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M47.3676 25.2808C45.6634 27.959 42.0935 28.799 39.3381 27.1963C39.3237 27.1893 39.3094 27.1787 39.295 27.1717C39.2484 27.1436 39.2017 27.1155 39.1551 27.0873C30.8386 22.1036 19.9604 24.5955 14.7653 32.6897C16.3905 29.9939 15.533 26.5039 12.8027 24.838C10.0437 23.1509 6.41643 23.9663 4.67993 26.655C4.68711 26.641 4.69787 26.6304 4.70505 26.6164C13.3552 13.0358 31.5812 8.87796 45.4624 17.299C45.4696 17.299 45.4732 17.3061 45.4804 17.3096C45.4804 17.3096 45.484 17.3096 45.4876 17.3131C48.2502 19.0072 49.0933 22.5745 47.3676 25.2843V25.2808Z" fill="#6B76E3"/>
+          <path d="M12.3502 58.6929C10.6281 61.3957 11.4604 64.949 14.2051 66.6501C14.1907 66.6431 14.18 66.6325 14.1656 66.6255C0.359754 58.1868 -3.90974 40.4344 4.5539 26.8608C4.58978 26.8011 4.62565 26.7413 4.66512 26.6816C4.67229 26.671 4.67588 26.6605 4.68306 26.6499C6.41956 23.9612 10.0468 23.1458 12.8059 24.8329C15.5326 26.4988 16.3937 29.9888 14.7684 32.6846C14.7684 32.6881 14.7684 32.6916 14.7612 32.6951C14.754 32.7092 14.7433 32.7232 14.7361 32.7373C14.7074 32.783 14.6787 32.8287 14.65 32.8744C14.65 32.8814 14.6428 32.8849 14.6392 32.8919C9.56965 41.0424 12.117 51.6883 20.3833 56.7704C17.6314 55.1678 14.0616 56.0113 12.3574 58.6859L12.3502 58.6929Z" fill="#F45B49"/>
+          <path d="M55.0521 57.2985C55.0377 57.3196 55.027 57.3407 55.0126 57.3618C46.3983 70.8861 28.2763 75.0686 14.4203 66.7775C14.3594 66.7424 14.2984 66.7072 14.2374 66.6686C14.2266 66.6615 14.2158 66.658 14.2051 66.651C11.4604 64.9499 10.628 61.3966 12.3502 58.6938C14.0544 56.0192 17.6243 55.1757 20.3761 56.7783C20.3905 56.7854 20.4048 56.7959 20.4192 56.8029C20.4658 56.8311 20.5124 56.8592 20.5591 56.8873C20.5591 56.8873 20.5663 56.8873 20.5663 56.8943C28.8862 61.8711 39.7645 59.3757 44.956 51.2744C43.32 53.9701 44.1775 57.4707 46.9078 59.1402C49.674 60.8307 53.3192 60.0083 55.0485 57.2985H55.0521Z" fill="#5ACA7A"/>
+          <path d="M55.0632 57.2746C55.0632 57.2746 55.056 57.2851 55.0524 57.2922C55.0524 57.2922 55.0524 57.2957 55.0488 57.2992C53.3195 60.0055 49.6779 60.8314 46.9081 59.1409C44.1778 57.4714 43.3203 53.9743 44.9563 51.2751C44.9635 51.261 44.9743 51.247 44.9814 51.2329C45.0101 51.1872 45.0388 51.1415 45.0675 51.0959C50.155 42.9419 47.6113 32.282 39.3342 27.1963C42.0861 28.7989 45.6595 27.9589 47.3637 25.2808C49.0895 22.571 48.2499 19.0036 45.4837 17.3096C45.5053 17.3236 45.5268 17.3342 45.5483 17.3482C59.4116 25.822 63.656 43.6764 55.0596 57.2746H55.0632Z" fill="#45A4F3"/>
+          <path d="M32.1478 54.937L26.9204 38.5587L23.7452 50.2133L20.4767 43.5917C20.4229 43.4792 20.3045 43.4089 20.179 43.4089H13.8572C13.215 43.4089 12.6804 42.9134 12.6661 42.2842C12.6661 42.2702 12.6661 42.2526 12.6661 42.2385C12.6589 41.5989 13.2043 41.0857 13.8572 41.0857H20.179C21.2158 41.0857 22.1594 41.6657 22.6115 42.5795L23.103 43.5741L26.741 30.2148L32.1442 47.1415L36.1948 34.3938L38.8821 40.5621C38.9503 40.7202 39.1117 40.8257 39.2875 40.8257H46.0398C46.682 40.8257 47.2202 41.3283 47.2166 41.9574C47.2166 41.9785 47.2166 41.9995 47.2166 42.0206C47.2094 42.6462 46.6784 43.1488 46.0362 43.1488H38.8319C37.978 43.1488 37.2102 42.6498 36.8729 41.8836L36.5357 41.1139L32.1406 54.937H32.1478Z" fill="currentColor"/>
+        </svg>
+        <strong>OpenObserve</strong></span>
+      <label class="tzpicker" for="tz-select">
+        <span class="sr-only">Display timezone</span>
+        <select id="tz-select" data-test="status-page-timezone-select"></select>
+      </label>
+    </div>
+  </header>
+  <p id="live" class="sr-only" aria-live="polite"></p>
+  <section id="unlock" class="unlock" aria-labelledby="unlock-title" hidden>
+    <h2 id="unlock-title">This status page is protected</h2>
+    <p>Enter the password to view it.</p>
+    <form id="unlock-form" novalidate>
+      <label for="unlock-pw">Password</label>
+      <div class="row">
+        <input id="unlock-pw" type="password" autocomplete="current-password" required
+               aria-describedby="unlock-err" data-test="status-page-unlock-password">
+        <button type="submit" id="unlock-btn" data-test="status-page-unlock-submit">Unlock</button>
+      </div>
+    </form>
+    <p id="unlock-err" class="err" role="alert"></p>
+  </section>
+  <section id="banner-host" aria-label="Overall status"></section>
+  <section id="notice-host" aria-label="Current notices"></section>
+  <section id="components-host" aria-label="Components"></section>
+  <section id="past-host" aria-label="Past notices"></section>
+  <footer>
+    <div class="foot-row">
+      <span class="brand">Powered by
+        <svg viewBox="0 0 60 84" role="img" aria-label="OpenObserve" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M47.3676 25.2808C45.6634 27.959 42.0935 28.799 39.3381 27.1963C39.3237 27.1893 39.3094 27.1787 39.295 27.1717C39.2484 27.1436 39.2017 27.1155 39.1551 27.0873C30.8386 22.1036 19.9604 24.5955 14.7653 32.6897C16.3905 29.9939 15.533 26.5039 12.8027 24.838C10.0437 23.1509 6.41643 23.9663 4.67993 26.655C4.68711 26.641 4.69787 26.6304 4.70505 26.6164C13.3552 13.0358 31.5812 8.87796 45.4624 17.299C45.4696 17.299 45.4732 17.3061 45.4804 17.3096C45.4804 17.3096 45.484 17.3096 45.4876 17.3131C48.2502 19.0072 49.0933 22.5745 47.3676 25.2843V25.2808Z" fill="#6B76E3"/>
+          <path d="M12.3502 58.6929C10.6281 61.3957 11.4604 64.949 14.2051 66.6501C14.1907 66.6431 14.18 66.6325 14.1656 66.6255C0.359754 58.1868 -3.90974 40.4344 4.5539 26.8608C4.58978 26.8011 4.62565 26.7413 4.66512 26.6816C4.67229 26.671 4.67588 26.6605 4.68306 26.6499C6.41956 23.9612 10.0468 23.1458 12.8059 24.8329C15.5326 26.4988 16.3937 29.9888 14.7684 32.6846C14.7684 32.6881 14.7684 32.6916 14.7612 32.6951C14.754 32.7092 14.7433 32.7232 14.7361 32.7373C14.7074 32.783 14.6787 32.8287 14.65 32.8744C14.65 32.8814 14.6428 32.8849 14.6392 32.8919C9.56965 41.0424 12.117 51.6883 20.3833 56.7704C17.6314 55.1678 14.0616 56.0113 12.3574 58.6859L12.3502 58.6929Z" fill="#F45B49"/>
+          <path d="M55.0521 57.2985C55.0377 57.3196 55.027 57.3407 55.0126 57.3618C46.3983 70.8861 28.2763 75.0686 14.4203 66.7775C14.3594 66.7424 14.2984 66.7072 14.2374 66.6686C14.2266 66.6615 14.2158 66.658 14.2051 66.651C11.4604 64.9499 10.628 61.3966 12.3502 58.6938C14.0544 56.0192 17.6243 55.1757 20.3761 56.7783C20.3905 56.7854 20.4048 56.7959 20.4192 56.8029C20.4658 56.8311 20.5124 56.8592 20.5591 56.8873C20.5591 56.8873 20.5663 56.8873 20.5663 56.8943C28.8862 61.8711 39.7645 59.3757 44.956 51.2744C43.32 53.9701 44.1775 57.4707 46.9078 59.1402C49.674 60.8307 53.3192 60.0083 55.0485 57.2985H55.0521Z" fill="#5ACA7A"/>
+          <path d="M55.0632 57.2746C55.0632 57.2746 55.056 57.2851 55.0524 57.2922C55.0524 57.2922 55.0524 57.2957 55.0488 57.2992C53.3195 60.0055 49.6779 60.8314 46.9081 59.1409C44.1778 57.4714 43.3203 53.9743 44.9563 51.2751C44.9635 51.261 44.9743 51.247 44.9814 51.2329C45.0101 51.1872 45.0388 51.1415 45.0675 51.0959C50.155 42.9419 47.6113 32.282 39.3342 27.1963C42.0861 28.7989 45.6595 27.9589 47.3637 25.2808C49.0895 22.571 48.2499 19.0036 45.4837 17.3096C45.5053 17.3236 45.5268 17.3342 45.5483 17.3482C59.4116 25.822 63.656 43.6764 55.0596 57.2746H55.0632Z" fill="#45A4F3"/>
+          <path d="M32.1478 54.937L26.9204 38.5587L23.7452 50.2133L20.4767 43.5917C20.4229 43.4792 20.3045 43.4089 20.179 43.4089H13.8572C13.215 43.4089 12.6804 42.9134 12.6661 42.2842C12.6661 42.2702 12.6661 42.2526 12.6661 42.2385C12.6589 41.5989 13.2043 41.0857 13.8572 41.0857H20.179C21.2158 41.0857 22.1594 41.6657 22.6115 42.5795L23.103 43.5741L26.741 30.2148L32.1442 47.1415L36.1948 34.3938L38.8821 40.5621C38.9503 40.7202 39.1117 40.8257 39.2875 40.8257H46.0398C46.682 40.8257 47.2202 41.3283 47.2166 41.9574C47.2166 41.9785 47.2166 41.9995 47.2166 42.0206C47.2094 42.6462 46.6784 43.1488 46.0362 43.1488H38.8319C37.978 43.1488 37.2102 42.6498 36.8729 41.8836L36.5357 41.1139L32.1406 54.937H32.1478Z" fill="currentColor"/>
+        </svg>
+        <strong>OpenObserve</strong></span>
+      <button type="button" class="linkbtn" id="explain-btn"
+              aria-expanded="false" aria-controls="explainer">How uptime is measured</button>
+    </div>
+    <div class="explainer" id="explainer" hidden>
+      <h2>How uptime is measured</h2>
+      <ul>
+        <li>A day only loses uptime while a <strong>confirmed incident</strong> was open for that
+            component &mdash; brief blips that never became an incident do not count against it.</li>
+        <li><strong>Degraded performance</strong> is shown on the timeline but does not reduce the
+            uptime percentage.</li>
+        <li><strong>Scheduled maintenance</strong> appears in blue and is excluded from uptime.</li>
+        <li>Days filled in from historical records (backfilled) are <strong>estimates</strong> and
+            are marked as such.</li>
+      </ul>
+    </div>
+  </footer>
+</main>
+<script>
+(function () {
+  "use strict";
+  // A custom domain serves this same static page at whatever path the
+  // visitor typed (host_route_middleware ignores the path entirely once the
+  // Host matches a verified claim) — there is no real slug in the URL to
+  // read. Only the app's own "/status/{slug}" route carries one; anything
+  // else fetches by Host instead, which the backend already resolves to the
+  // claim's page (host_route_middleware -> resolve_host_route -> snapshot()).
+  // Checked as the last two segments, not the whole path, so a configured
+  // ZO_BASE_URI prefix (the route is nested under it, not replaced by it)
+  // doesn't defeat the check.
+  var pathParts = location.pathname.split("/").filter(Boolean);
+  var slug = (pathParts.length >= 2 && pathParts[pathParts.length - 2] === "status")
+    ? pathParts[pathParts.length - 1]
+    : null;
+  var POLL_MS = 60000, STALE_MS = 150000;
+  // A page answers 202 until its first rebuilder tick (up to a minute); poll faster only until then.
+  var BUILDING_POLL_MS = 15000;
+
+  var STATUS = {
+    operational:    { label: "Operational",    tone: "ok",    head: "All systems operational" },
+    no_data:        { label: "No recent data", tone: "na",    head: "Awaiting first checks" },
+    maintenance:    { label: "Maintenance",    tone: "maint", head: "Scheduled maintenance in progress" },
+    degraded:       { label: "Degraded",       tone: "warn",  head: "Degraded performance" },
+    partial_outage: { label: "Partial outage", tone: "down",  head: "Partial outage" },
+    major_outage:   { label: "Major outage",   tone: "down",  head: "Major outage" }
+  };
+  var GRADE = {
+    ok:      { label: "Operational" },
+    minor:   { label: "Minor disruption" },
+    major:   { label: "Major disruption" },
+    severe:  { label: "Severe outage" },
+    maint:   { label: "Maintenance" },
+    no_data: { label: "No data" }
+  };
+  var KIND = {
+    incident:    { label: "Incident",    tone: "down" },
+    maintenance: { label: "Maintenance", tone: "maint" },
+    info:        { label: "Info",        tone: "na" }
+  };
+  // `none` is deliberately absent: an impact-less notice must add no eyebrow segment.
+  var IMPACT = {
+    degraded:       { label: "Degraded" },
+    partial_outage: { label: "Partial outage" },
+    major_outage:   { label: "Major outage" }
+  };
+  var AFFECTED = { maintenance: 1, degraded: 1, partial_outage: 1, major_outage: 1 };
+  /* Curated fallback when Intl.supportedValuesOf("timeZone") is unavailable
+     (older Safari/Firefox) — one representative zone per major UTC offset. */
+  var COMMON_TZS = [
+    "UTC", "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York",
+    "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Athens",
+    "Europe/Moscow", "Africa/Cairo", "Africa/Johannesburg", "Asia/Dubai", "Asia/Karachi",
+    "Asia/Kolkata", "Asia/Dhaka", "Asia/Bangkok", "Asia/Singapore", "Asia/Shanghai",
+    "Asia/Tokyo", "Asia/Seoul", "Australia/Perth", "Australia/Sydney", "Pacific/Auckland"
+  ];
+  var TZ_STORAGE_KEY = "op_status_page_tz:" + location.pathname.split("/").pop();
+
+  var ui = { table: {}, day: {}, pastOpen: false };
+  var last = { data: null, curGen: 0, histGen: 0, failed: false, fetchedAt: 0,
+               locked: false, unlocked: false, building: false };
+  var unlockTimer = null;
+  var pollTimer = null;
+  var cardEls = {};
+  var browserTz = "UTC";
+  try { browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch (e) { /* keep UTC */ }
+  var tzState = { current: readStoredTz() || browserTz };
+
+  /* All dynamic content goes through textContent — nothing from the API is parsed as HTML. */
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = text;
+    return n;
+  }
+  function readStoredTz() {
+    try { return sessionStorage.getItem(TZ_STORAGE_KEY) || ""; } catch (e) { return ""; }
+  }
+  function writeStoredTz(tz) {
+    try { sessionStorage.setItem(TZ_STORAGE_KEY, tz); } catch (e) { /* private mode etc. */ }
+  }
+  function grade(g) { return GRADE[g] || GRADE.no_data; }
+  function status(s) { return STATUS[s] || STATUS.no_data; }
+  function pct(v) {
+    if (v === null || v === undefined) return "—";
+    var n = Number(v);
+    return (n >= 99.995 ? "100" : n.toFixed(2)) + "%";
+  }
+  function fmtMin(m) {
+    m = Math.round(Number(m) || 0);
+    if (m < 60) return m + " min";
+    var r = m % 60;
+    return Math.floor(m / 60) + " h" + (r ? " " + r + " min" : "");
+  }
+  function fmtTime(us) {
+    if (!us) return "";
+    return new Date(us / 1000).toLocaleString(undefined,
+      { dateStyle: "medium", timeStyle: "short", timeZone: tzState.current });
+  }
+  function fmtDay(iso) {
+    var p = String(iso || "").split("-");
+    if (p.length !== 3) return String(iso || "");
+    // A day bucket is already a specific calendar date, not an instant — anchor
+    // it at UTC noon and render in UTC so the selected timezone never rolls it
+    // over to the adjacent day.
+    var d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12));
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  }
+  function relTime(iso) {
+    var p = String(iso || "").split("-");
+    if (p.length !== 3) return "";
+    var d = Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12);
+    var days = Math.max(0, Math.round((Date.now() - d) / 86400000));
+    if (days === 0) return "today";
+    if (days === 1) return "1 day ago";
+    if (days < 7) return days + " days ago";
+    var weeks = Math.round(days / 7);
+    if (weeks < 5) return weeks === 1 ? "1 week ago" : weeks + " weeks ago";
+    var months = Math.round(days / 30);
+    if (months < 12) return months === 1 ? "1 month ago" : months + " months ago";
+    var years = Math.round(days / 365);
+    return years === 1 ? "1 year ago" : years + " years ago";
+  }
+
+  function chip(st) {
+    return el("span", "chip t-" + status(st).tone, status(st).label);
+  }
+
+  function renderBanner(cur) {
+    var s = status(cur.overall);
+    var names = (cur.components || [])
+      .filter(function (c) { return AFFECTED[c.status]; })
+      .map(function (c) { return c.name; });
+    var banner = el("div", "banner t-" + s.tone);
+    banner.appendChild(el("span", "dot")).setAttribute("aria-hidden", "true");
+    var txt = el("div");
+    txt.appendChild(el("h2", null, s.head));
+    var sub;
+    if (cur.overall === "operational") sub = "All components are running normally.";
+    else if (cur.overall === "no_data") sub = "No checks have reported yet.";
+    else if (names.length) sub = "Affected: " + names.join(", ");
+    banner.appendChild(txt);
+    if (sub) txt.appendChild(el("p", null, sub));
+    document.getElementById("banner-host").replaceChildren(banner);
+
+    var msg = s.head + (names.length && cur.overall !== "operational"
+      ? " — affected: " + names.join(", ") : "");
+    var live = document.getElementById("live");
+    if (live.textContent !== msg) live.textContent = msg;
+  }
+
+  function renderUnavailable() {
+    var banner = el("div", "banner t-na");
+    banner.appendChild(el("span", "dot")).setAttribute("aria-hidden", "true");
+    var txt = el("div");
+    txt.appendChild(el("h2", null, "Status temporarily unavailable"));
+    txt.appendChild(el("p", null,
+      "We could not load status data. This page retries automatically every minute."));
+    banner.appendChild(txt);
+    document.getElementById("banner-host").replaceChildren(banner);
+    document.getElementById("page-name").textContent = "Status";
+  }
+
+  function renderBuilding() {
+    var banner = el("div", "banner t-na");
+    banner.appendChild(el("span", "dot")).setAttribute("aria-hidden", "true");
+    var txt = el("div");
+    txt.appendChild(el("h2", null, "Collecting first data"));
+    txt.appendChild(el("p", null,
+      "This page was just published. Status appears once the first checks are recorded — usually within a minute."));
+    banner.appendChild(txt);
+    document.getElementById("banner-host").replaceChildren(banner);
+    document.getElementById("page-name").textContent = "Status";
+  }
+
+  // The opening post (n.body @ n.starts_at) is itself the first entry in the
+  // thread, not a header sitting above it — merged with real updates and
+  // sorted so the newest post is always on top, whether that's a follow-up
+  // update or (with none yet) the opening post itself.
+  function noticeThread(n) {
+    var openingLabel = n.state === "scheduled" ? "Scheduled for " : "Started ";
+    var entries = [];
+    if (n.body || n.starts_at) {
+      entries.push({
+        body: n.body || "",
+        meta: n.starts_at ? openingLabel + fmtTime(n.starts_at) : "",
+        at: n.starts_at || 0,
+      });
+    }
+    (n.updates || []).forEach(function (u) {
+      entries.push({ body: u.body, meta: fmtTime(u.at), at: u.at || 0 });
+    });
+    entries.sort(function (a, b) { return b.at - a.at; });
+    var ul = el("ul", "updates");
+    entries.forEach(function (e) {
+      var li = el("li");
+      li.appendChild(el("p", "body", e.body));
+      li.appendChild(el("p", "meta", e.meta));
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+
+  function noticeCard(n) {
+    var k = KIND[n.kind] || KIND.info;
+    var box = el("article", "notice t-" + k.tone);
+    var eyebrow = [k.label];
+    var impact = IMPACT[n.impact];
+    if (impact) eyebrow.push(impact.label);
+    if (n.state === "scheduled") eyebrow.push("Scheduled");
+    box.appendChild(el("p", "eyebrow t-" + k.tone, eyebrow.join(" · ")));
+    box.appendChild(el("h3", null, n.title || "Notice"));
+    box.appendChild(noticeThread(n));
+    return box;
+  }
+
+  function renderNotices(notices) {
+    var open = notices.filter(function (n) { return n.state === "active" || n.state === "scheduled"; })
+      .sort(function (a, b) {
+        if (a.state !== b.state) return a.state === "active" ? -1 : 1;
+        return (b.starts_at || 0) - (a.starts_at || 0);
+      });
+    var host = document.getElementById("notice-host");
+    host.replaceChildren();
+    open.forEach(function (n) { host.appendChild(noticeCard(n)); });
+
+    var past = notices.filter(function (n) { return n.state === "resolved"; })
+      .sort(function (a, b) { return (b.resolved_at || 0) - (a.resolved_at || 0); });
+    var phost = document.getElementById("past-host");
+    phost.replaceChildren();
+    if (!past.length) return;
+    var det = el("details", "past");
+    det.open = ui.pastOpen;
+    det.addEventListener("toggle", function () { ui.pastOpen = det.open; });
+    det.appendChild(el("summary", null, "Past notices (" + past.length + ")"));
+    past.forEach(function (n) {
+      var k = KIND[n.kind] || KIND.info;
+      var item = el("div", "pastitem");
+      item.appendChild(el("p", "eyebrow t-" + k.tone, k.label));
+      item.appendChild(el("h3", null, n.title || "Notice"));
+      // "Started" is already the opening entry inside noticeThread(n) below —
+      // only the facts unique to a resolved notice go in this summary line.
+      var meta = [];
+      if (n.resolved_at) meta.push("Resolved " + fmtTime(n.resolved_at));
+      if (n.excluded_from_uptime) meta.push("Excluded from uptime");
+      if (meta.length) item.appendChild(el("p", "meta", meta.join(" · ")));
+      item.appendChild(noticeThread(n));
+      det.appendChild(item);
+    });
+    phost.appendChild(det);
+  }
+
+  function dayLabel(d) {
+    var g = grade(d.grade);
+    var parts = [fmtDay(d.date), g.label];
+    if (d.grade !== "no_data") {
+      parts.push("downtime " + fmtMin(d.downtime_min));
+      parts.push("maintenance " + fmtMin(d.maint_min));
+    }
+    return parts.join(", ");
+  }
+
+  function barsView(c, h) {
+    var frag = document.createDocumentFragment();
+    var bars = el("div", "bars");
+    bars.setAttribute("role", "group");
+    bars.setAttribute("aria-label", "Daily status for " + c.name + ", one cell per day");
+    var daily = h.daily, hideBefore = daily.length - 30;
+    daily.forEach(function (d, i) {
+      var g = (GRADE[d.grade] ? d.grade : "no_data");
+      var cls = "cell g-" + g + (i < hideBefore ? " old" : "");
+      if (ui.day[c.id] === d.date) cls += " sel";
+      var b = el("button", cls);
+      b.type = "button";
+      b.setAttribute("aria-label", dayLabel(d));
+      b.setAttribute("data-fk", "d:" + d.date);
+      b.setAttribute("aria-pressed", ui.day[c.id] === d.date ? "true" : "false");
+      b.addEventListener("click", function () {
+        ui.day[c.id] = (ui.day[c.id] === d.date) ? null : d.date;
+        updateCard(c.id, "d:" + d.date);
+      });
+      bars.appendChild(b);
+    });
+    frag.appendChild(bars);
+    var axis = el("div", "axis");
+    var left = el("span");
+    left.appendChild(el("span", "ax90", "90 days ago"));
+    left.appendChild(el("span", "ax30", "30 days ago"));
+    axis.appendChild(left);
+    axis.appendChild(el("span", null, "today"));
+    frag.appendChild(axis);
+
+    var selDate = ui.day[c.id];
+    if (selDate) {
+      var d = null;
+      daily.forEach(function (x) { if (x.date === selDate) d = x; });
+      if (d) {
+        var panel = el("div", "daydetail");
+        var p = el("p");
+        p.appendChild(el("strong", null, fmtDay(d.date)));
+        var text = " — " + grade(d.grade).label;
+        if (d.grade !== "no_data") {
+          text += " · downtime " + fmtMin(d.downtime_min) +
+                  " · maintenance " + fmtMin(d.maint_min);
+        }
+        p.appendChild(document.createTextNode(text));
+        panel.appendChild(p);
+        var close = el("button", "closebtn", "Close");
+        close.type = "button";
+        close.setAttribute("aria-label", "Close day details");
+        close.addEventListener("click", function () {
+          ui.day[c.id] = null;
+          updateCard(c.id, "d:" + selDate);
+        });
+        panel.appendChild(close);
+        frag.appendChild(panel);
+      }
+    }
+    return frag;
+  }
+
+  function tableView(c, h) {
+    var wrap = el("div", "tblwrap");
+    var table = el("table");
+    table.appendChild(el("caption", "sr-only",
+      "Daily status for " + c.name + ", most recent day first"));
+    var thead = el("thead"), hr = el("tr");
+    ["Date", "Status", "Downtime", "Maintenance"].forEach(function (t) {
+      var th = el("th", null, t);
+      th.setAttribute("scope", "col");
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = el("tbody");
+    h.daily.slice().reverse().forEach(function (d) {
+      var tr = el("tr");
+      var th = el("th", null, fmtDay(d.date));
+      th.setAttribute("scope", "row");
+      tr.appendChild(th);
+      tr.appendChild(el("td", null, grade(d.grade).label));
+      tr.appendChild(el("td", "num", d.grade === "no_data" ? "—" : fmtMin(d.downtime_min)));
+      tr.appendChild(el("td", "num", d.grade === "no_data" ? "—" : fmtMin(d.maint_min)));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  function componentCard(c, h) {
+    var card = el("article", "comp");
+    var row = el("div", "crow");
+    row.appendChild(el("h3", null, c.name));
+    row.appendChild(chip(c.status));
+    card.appendChild(row);
+    if (!h || !h.daily || !h.daily.length) return card;
+
+    card.appendChild(ui.table[c.id] ? tableView(c, h) : barsView(c, h));
+
+    var foot = el("div", "cardfoot");
+    var up = el("div", "uptime");
+    [["24 h", h.uptime && h.uptime.d1], ["7 d", h.uptime && h.uptime.d7],
+     ["30 d", h.uptime && h.uptime.d30], ["90 d", h.uptime && h.uptime.d90]]
+      .forEach(function (m) {
+        var met = el("div", "met");
+        met.appendChild(el("span", "v", pct(m[1])));
+        met.appendChild(el("span", "l", m[0]));
+        up.appendChild(met);
+      });
+    foot.appendChild(up);
+    var toggle = el("button", "linkbtn", ui.table[c.id] ? "View as bars" : "View as table");
+    toggle.type = "button";
+    toggle.setAttribute("data-fk", "toggle");
+    toggle.setAttribute("aria-pressed", ui.table[c.id] ? "true" : "false");
+    toggle.addEventListener("click", function () {
+      ui.table[c.id] = !ui.table[c.id];
+      updateCard(c.id, "toggle");
+    });
+    foot.appendChild(toggle);
+    card.appendChild(foot);
+    return card;
+  }
+
+  function findComp(id) {
+    var cur = null, hist = null;
+    ((last.data.current || {}).components || []).forEach(function (c) {
+      if (c.id === id) cur = c;
+    });
+    ((last.data.history || {}).components || []).forEach(function (c) {
+      if (c.id === id) hist = c;
+    });
+    return { cur: cur, hist: hist };
+  }
+
+  function updateCard(id, focusKey) {
+    var found = findComp(id);
+    var old = cardEls[id];
+    if (!found.cur || !old || !old.parentNode) return;
+    var next = componentCard(found.cur, found.hist);
+    old.parentNode.replaceChild(next, old);
+    cardEls[id] = next;
+    if (focusKey) {
+      var nodes = next.querySelectorAll("[data-fk]");
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].getAttribute("data-fk") === focusKey) { nodes[i].focus(); break; }
+      }
+    }
+  }
+
+  function latestDowntime(histComps) {
+    var best = null;
+    (histComps || []).forEach(function (c) {
+      (c.daily || []).forEach(function (d) {
+        if (d.grade !== "minor" && d.grade !== "major" && d.grade !== "severe") return;
+        if (!best || d.date > best.date) best = { compId: c.id, compName: c.name, date: d.date };
+      });
+    });
+    return best;
+  }
+
+  function renderLatestDowntime(histComps) {
+    var host = document.getElementById("latest-down");
+    var d = latestDowntime(histComps);
+    if (!d) { host.hidden = true; host.replaceChildren(); return; }
+    host.hidden = false;
+    host.replaceChildren();
+    var btn = el("button", null, "Latest downtime");
+    btn.type = "button";
+    btn.addEventListener("click", function () { jumpToDowntime(d); });
+    host.appendChild(btn);
+    host.appendChild(document.createTextNode(
+      " on " + d.compName + " detected " + relTime(d.date) + "."));
+  }
+
+  function jumpToDowntime(d) {
+    ui.day[d.compId] = d.date;
+    var found = findComp(d.compId);
+    var old = cardEls[d.compId];
+    if (found.cur && old && old.parentNode) {
+      var next = componentCard(found.cur, found.hist);
+      old.parentNode.replaceChild(next, old);
+      cardEls[d.compId] = next;
+      next.classList.add("flash");
+      next.addEventListener("animationend", function () { next.classList.remove("flash"); }, { once: true });
+      next.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function renderComponents(comps, histComps) {
+    var byId = {};
+    histComps.forEach(function (c) { byId[c.id] = c; });
+    var host = document.getElementById("components-host");
+    host.replaceChildren();
+    cardEls = {};
+    if (!comps.length) return;
+    host.appendChild(el("h2", "sect", "Components"));
+    var legend = el("ul", "legend");
+    [["g-ok", "Operational"], ["g-minor", "Minor"], ["g-major", "Major"],
+     ["g-severe", "Severe"], ["g-maint", "Maintenance"], ["g-no_data", "No data"]]
+      .forEach(function (g) {
+        var li = el("li");
+        li.appendChild(el("span", "sw " + g[0])).setAttribute("aria-hidden", "true");
+        li.appendChild(document.createTextNode(g[1]));
+        legend.appendChild(li);
+      });
+    host.appendChild(legend);
+    comps.forEach(function (c) {
+      var card = componentCard(c, byId[c.id]);
+      cardEls[c.id] = card;
+      host.appendChild(card);
+    });
+  }
+
+  function updateStamp() {
+    var s = document.getElementById("stamp");
+    if (!last.data) {
+      s.textContent = last.locked
+        ? "Password required."
+        : (last.building
+          ? "Collecting first data… checking again every 15 seconds."
+          : (last.failed
+            ? "Could not load status data — retrying every minute."
+            : "Fetching current status…"));
+      s.classList.toggle("stale", last.failed);
+      return;
+    }
+    var gen = (last.data.current || {}).generated_at || 0;
+    var age = Date.now() - gen / 1000;
+    var mins = Math.floor(age / 60000);
+    var agoTxt = mins < 1 ? "just now" : mins + " min ago";
+    var text;
+    if (last.failed) {
+      text = "Could not refresh — showing status from " +
+        (mins < 1 ? "under a minute" : mins + " min") + " ago · retrying";
+    } else {
+      var untilNext = Math.max(0, Math.ceil((POLL_MS - (Date.now() - last.fetchedAt)) / 1000));
+      text = "Updated " + agoTxt + " · next update in " + untilNext + "s";
+      if (age > STALE_MS) text += " · data may be out of date";
+    }
+    s.classList.toggle("stale", last.failed || age > STALE_MS);
+    s.textContent = text;
+  }
+
+  function tzOptionList() {
+    var zones;
+    try {
+      zones = (typeof Intl.supportedValuesOf === "function")
+        ? Intl.supportedValuesOf("timeZone")
+        : COMMON_TZS.slice();
+    } catch (e) {
+      zones = COMMON_TZS.slice();
+    }
+    if (zones.indexOf(browserTz) === -1) zones = [browserTz].concat(zones);
+    return zones;
+  }
+
+  function initTzPicker() {
+    var sel = document.getElementById("tz-select");
+    tzOptionList().forEach(function (tz) {
+      var opt = el("option", null, tz === browserTz ? tz + " (your local time)" : tz);
+      opt.value = tz;
+      sel.appendChild(opt);
+    });
+    sel.value = tzState.current;
+    // A stored zone the browser no longer resolves (list changed) falls back
+    // to the browser default rather than leaving the select on nothing.
+    if (sel.value !== tzState.current) {
+      tzState.current = browserTz;
+      sel.value = browserTz;
+    }
+    sel.addEventListener("change", function () {
+      tzState.current = sel.value;
+      writeStoredTz(sel.value);
+      if (last.data) render(last.data);
+    });
+  }
+
+  // logo_img is stored as bare base64 with no MIME type, so sniff it from the magic bytes.
+  function imageMediaType(b64) {
+    if (b64.indexOf("iVBORw0KGgo") === 0) return "image/png";
+    if (b64.indexOf("/9j/") === 0) return "image/jpeg";
+    if (b64.indexOf("R0lGOD") === 0) return "image/gif";
+    if (b64.indexOf("UklGR") === 0) return "image/webp";
+    if (b64.indexOf("PHN2Zy") === 0 || b64.indexOf("PD94bW") === 0) return "image/svg+xml";
+    return "image/png";
+  }
+
+  function imageDataUrl(b64) {
+    return "data:" + imageMediaType(b64) + ";base64," + b64;
+  }
+
+  // CSP is `img-src 'self' data:`, so the no-logo fallback must be inline, never fetched.
+  function faviconFrom(data) {
+    if (data.logo_img) return imageDataUrl(data.logo_img);
+    var accent = /^#[0-9a-fA-F]{3,8}$/.test(data.accent_color || "") ? data.accent_color : "#3f7994";
+    return "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="' + accent + '"/></svg>');
+  }
+
+  function setFavicon(href) {
+    var link = document.querySelector('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = href;
+  }
+
+  function render(data) {
+    last.data = data;
+    var cur = data.current || {}, hist = data.history || {};
+    // The API ships an opaque per-page "key" (never an internal id); the rest
+    // of this view joins/keys on "id", so mirror it once at ingest.
+    (cur.components || []).forEach(function (c) { c.id = c.key; });
+    (hist.components || []).forEach(function (c) { c.id = c.key; });
+    var name = data.brand_name || data.name || "Status";
+    document.getElementById("page-name").textContent = name;
+    document.title = name + " — Status";
+    var logo = document.getElementById("page-logo");
+    if (data.logo_img) {
+      logo.src = imageDataUrl(data.logo_img);
+      logo.alt = name;
+      logo.hidden = false;
+    } else {
+      logo.hidden = true;
+    }
+    if (data.accent_color) {
+      document.documentElement.style.setProperty("--accent", data.accent_color);
+      document.documentElement.style.setProperty("--accent-ink", data.accent_color);
+    }
+    setFavicon(faviconFrom(data));
+    renderBanner(cur);
+    renderNotices(cur.notices || []);
+    renderComponents(cur.components || [], hist.components || []);
+    renderLatestDowntime(hist.components || []);
+    updateStamp();
+  }
+
+  // A custom domain carries no slug: the by-host endpoint resolves the page from Host, like this shell.
+  function dataUrl() {
+    return slug
+      ? "/api/status_pages_public/" + encodeURIComponent(slug)
+      : "/api/status_pages_public_by_host";
+  }
+  function authUrl() { return dataUrl() + "/auth"; }
+
+  function setUnlockError(msg) {
+    document.getElementById("unlock-err").textContent = msg;
+  }
+  function showUnlock() {
+    var box = document.getElementById("unlock");
+    last.locked = true;
+    last.failed = false;
+    document.getElementById("banner-host").replaceChildren();
+    document.getElementById("page-name").textContent = "Status";
+    updateStamp();
+    if (!box.hidden) return;
+    box.hidden = false;
+    document.getElementById("unlock-pw").focus();
+  }
+  function hideUnlock() {
+    last.locked = false;
+    document.getElementById("unlock").hidden = true;
+    setUnlockError("");
+  }
+  // Server-side the window is per IP+slug; mirroring it here just avoids pointless 429 round-trips.
+  function pauseUnlock(secs) {
+    var btn = document.getElementById("unlock-btn");
+    btn.disabled = true;
+    clearTimeout(unlockTimer);
+    unlockTimer = setTimeout(function () { btn.disabled = false; }, secs * 1000);
+  }
+  function retryAfterSecs(r) {
+    var n = parseInt(r.headers.get("Retry-After") || "", 10);
+    return (isFinite(n) && n > 0) ? n : 60;
+  }
+  function submitUnlock(ev) {
+    ev.preventDefault();
+    var input = document.getElementById("unlock-pw");
+    var btn = document.getElementById("unlock-btn");
+    var password = input.value;
+    if (!password) { setUnlockError("Enter the password."); input.focus(); return; }
+    setUnlockError("");
+    btn.disabled = true;
+    fetch(authUrl(), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: password })
+    })
+      .then(function (r) {
+        input.value = "";
+        if (r.status === 401) {
+          btn.disabled = false;
+          setUnlockError("Wrong password.");
+          input.focus();
+          return;
+        }
+        if (r.status === 429) {
+          pauseUnlock(retryAfterSecs(r));
+          setUnlockError("Too many attempts. Try again in about a minute.");
+          input.focus();
+          return;
+        }
+        if (!r.ok) throw new Error(String(r.status));
+        // A custom domain with no auth route answers this POST with the HTML shell, hence a body check.
+        return r.json().then(function (body) {
+          if (!body || body.ok !== true) throw new Error("unexpected");
+          last.unlocked = true;
+          hideUnlock();
+          load();
+        });
+      })
+      .catch(function () {
+        btn.disabled = false;
+        setUnlockError("Could not unlock right now. Please try again.");
+        input.focus();
+      });
+  }
+
+  function load() {
+    fetch(dataUrl(), { credentials: "same-origin" })
+      .then(function (r) {
+        // 202 = published but the first snapshot isn't built yet: not an error and not locked.
+        if (r.status === 202) return null;
+        if (!r.ok) {
+          var err = new Error(String(r.status));
+          err.status = r.status;
+          throw err;
+        }
+        return r.json();
+      })
+      .then(function (data) {
+        last.failed = false;
+        last.fetchedAt = Date.now();
+        if (last.locked) hideUnlock();
+        if (data === null) {
+          last.building = !last.data;
+          if (last.building) renderBuilding();
+          updateStamp();
+          schedulePoll();
+          return;
+        }
+        last.building = false;
+        schedulePoll();
+        var cg = (data.current || {}).generated_at || 0;
+        var hg = (data.history || {}).generated_at || 0;
+        if (last.data && cg === last.curGen && hg === last.histGen) { updateStamp(); return; }
+        last.curGen = cg;
+        last.histGen = hg;
+        render(data);
+      })
+      .catch(function (err) {
+        // The shell is only served for existing pages and unbuilt ones answer 202, so a 404 before any data means locked.
+        if (err && err.status === 404 && !last.data && !last.unlocked) { showUnlock(); schedulePoll(); return; }
+        last.failed = true;
+        last.building = false;
+        if (!last.data) renderUnavailable();
+        updateStamp();
+        schedulePoll();
+      });
+  }
+
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(function () {
+      if (document.hidden) schedulePoll(); else load();
+    }, last.building ? BUILDING_POLL_MS : POLL_MS);
+  }
+
+  document.getElementById("explain-btn").addEventListener("click", function () {
+    var box = document.getElementById("explainer");
+    var open = box.hidden;
+    box.hidden = !open;
+    this.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
+  document.getElementById("unlock-form").addEventListener("submit", submitUnlock);
+
+  initTzPicker();
+  load();
+  setInterval(updateStamp, 1000);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && Date.now() - last.fetchedAt > POLL_MS - 5000) load();
+  });
+})();
+</script>
+</body>
+</html>
