@@ -256,8 +256,10 @@
   --color-chart-table-23: #ffe6e6;
   --color-chart-table-24: #e8f4fd;
 
-  /* --- Chart grid line (dashed split-line) — light value; dark in dark.css --- */
-  --color-chart-gridline: rgba(0, 0, 0, 0.08);
+  /* --- Chart grid line (dashed split-line) — light value; dark in dark.css.
+     1.4.11 exempt (object required to understand content), raised for
+     perceptibility rather than to hit 3:1 — see wcag-plan.md item 1.6. --- */
+  --color-chart-gridline: rgba(0, 0, 0, 0.2);
 
   /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
      dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
@@ -582,13 +584,18 @@
   --color-service-health-degraded: #faad14;
   --color-service-health-healthy: #52c41a;
   --color-service-health-warning: #fa8c16;
-  --color-severity-error-color: #ef5350;
-  --color-severity-warning-color: #fb8c00;
+  /* Darkened from #ef5350 to clear 4.5:1 on white — also drawn as literal chart
+     label text (SloBurndownChart.vue), not only as a fill/border/dot. */
+  --color-severity-error-color: #ea1a17;
+  /* Darkened from #fb8c00 to clear 4.5:1 on white — same chart-label-text case. */
+  --color-severity-warning-color: #b16300;
   --color-status-info-bg: #edf3ff;
   --color-status-info-text: #588cf3;
   --color-status-neutral-text: #6c707e;
   --color-status-warning-bg: #fff4eb;
-  --color-status-warning-text: #e56d17;
+  /* Darkened from #e56d17 to clear 4.5:1 on white for genuine text uses
+     (MonitorRuns.vue row text, chart label text). */
+  --color-status-warning-text: #be5a13;
   --color-sticky-col-header-bg: #e0e0e0;
   --color-tab-text-color: #19191e;
   --color-trace-border: #e8ecf0;
