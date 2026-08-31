@@ -1467,6 +1467,15 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "cloud")]
     {
         router = router
+            // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/start",
+                post(alerts::slack_oauth::start),
+            )
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/exchange",
+                post(alerts::slack_oauth::exchange),
+            )
             .route(
                 "/{org_id}/invites",
                 get(organization::org::get_org_invites)

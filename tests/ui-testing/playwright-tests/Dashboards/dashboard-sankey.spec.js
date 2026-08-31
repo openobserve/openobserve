@@ -293,7 +293,7 @@ test.describe("Sankey chart testcases", () => {
       // columns (source/target/flow) — a last-writer race. Re-apply until the
       // real field shows up (the default query only fires once on panel open,
       // so re-Apply only fires the custom query).
-      const sourceFieldRow = page.locator('[data-test="o-field-list-row-source"]').first();
+      const sourceFieldRow = pm.chartTypeSelector.getFieldListRow("source").first();
       await expect(async () => {
         if (!(await sourceFieldRow.isVisible().catch(() => false))) {
           await pm.dashboardPanelActions.applyDashboardBtn();

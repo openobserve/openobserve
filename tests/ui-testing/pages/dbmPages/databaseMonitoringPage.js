@@ -114,6 +114,9 @@ export class DatabaseMonitoringPage {
 
     // Query detail — the Callers panel's instructive empty state.
     this.detailCallersEmpty = page.locator('[data-test="dbm-detail-callers-empty"]');
+    // Query detail — the plans tab's section and its rendered plan cards.
+    this.detailPlansSection = page.locator('[data-test="dbm-detail-plans"]');
+    this.detailPlanCards = page.locator('[data-test^="dbm-detail-plan-"]');
 
     // The SHARED empty state (DbmEmptyState), used by the overview, Top
     // queries and Slowest calls. It renders one of two variants depending on
@@ -138,6 +141,7 @@ export class DatabaseMonitoringPage {
     this.prevPageBtn = page.locator('[data-test="o2-table-prev-page-btn"]');
     this.firstPageBtn = page.locator('[data-test="o2-table-first-page-btn"]');
     this.paginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
+    this.paginationBottom = page.locator('[data-test*="pagination"], .q-table__bottom');
   }
 
   /**
@@ -857,6 +861,20 @@ export class DatabaseMonitoringPage {
       await this.page.waitForTimeout(400);
     }
     return false;
+  }
+
+  // =======================================================================
+  // Safety probes (hostile-input tests)
+  // =======================================================================
+
+  /** The page body's text, '' when empty — proves a route rendered SOMETHING. */
+  async getBodyText() {
+    return (await this.page.locator('body').textContent()) || '';
+  }
+
+  /** Count of injected `alert(1)` script tags — must stay 0 (no XSS execution). */
+  async getInjectedScriptCount() {
+    return this.page.locator('script:has-text("alert(1)")').count();
   }
 }
 

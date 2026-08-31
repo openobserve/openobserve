@@ -19,6 +19,7 @@ import { useStore } from "vuex";
 import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import { validatePanel } from "@/utils/dashboard/panelValidation";
 import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
 import useStreams from "../useStreams";
@@ -1111,6 +1112,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
           /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*pipe\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*pipe\s*\}\})/g,
           "1|2",
         );
+
+        // astify() is exponential in paren nesting depth — skip parsing a
+        // pathologically nested query rather than freeze the tab for seconds.
+        // The query still runs fine server-side; only these client-side
+        // custom-fields/errors go unpopulated.
+        if (maxParenDepth(currentQuery) > SQL_PARSE_MAX_DEPTH) {
+          dashboardPanelData.meta.parsedQuery = null;
+          return;
+        }
 
         const variables = extractVariables(currentQuery); // Extract all unique variables
         const validatedQuery = validateQuery(currentQuery, variables);

@@ -147,6 +147,17 @@
         "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
       }
     },
+    // Reads .claude/skills/ui-architect/references/*.md on demand, so `read`/`glob`/`grep`
+    // are load-bearing here rather than incidental — same deny list as the rest.
+    "ai-review-frontend": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-v4-pro",
+      "tools": {
+        "read": true, "glob": true, "grep": true,
+        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
+        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
+      }
+    },
     "ai-review-coordinator": {
       "mode": "primary",
       "model": "deepseek-review/deepseek-v4-pro",
