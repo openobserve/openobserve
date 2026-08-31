@@ -14,7 +14,8 @@
 | **Route-change leak** — each navigation stranded the previous view's component tree | **FIXED** — 650 → **0** nodes/iteration |
 | Leaked IntersectionObservers / IndexedDB connections / `window "load"` listeners | **FIXED** — all **0** |
 | **Dashboard-open leak, "5.71 MB / 2,697 nodes per open"** | **DOES NOT EXIST** — it was a measurement artifact (§7.1) |
-| **`@tanstack/vue-form` leak** — streams 4,051 and logs 1,438 nodes/navigation | **REAL, OPEN** — now the largest leak in the app |
+| **`@tanstack/vue-form` leak** — streams 4,051 nodes/navigation | **FIXED** via patch-package — streams now **0** |
+| **Logs route** — retains 1,438 nodes/navigation | **REAL, OPEN** — cause not yet identified (§4.2) |
 
 The route-change leak was a discarded cleanup function:
 `onMounted(() => { …; return () => cleanup(); })`. Vue **ignores** what
@@ -27,9 +28,10 @@ consecutive opens on a production build: node count pinned at 8,452, live
 IntersectionObservers 0, IndexedDB connections flat at 7, heap growth
 decelerating (0.46 → 0.15 MB per open — caches settling, not linear growth).
 
-The remaining real leak is **not in dashboards**: `@tanstack/vue-form` discards
-the cleanup returned by `FormApi.mount()`, and it costs streams ~6× what the
-dashboard list ever did.
+The largest real leak was **not in dashboards**: `@tanstack/vue-form` discarded
+the cleanup returned by `FormApi.mount()`, costing streams ~6× what the dashboard
+list ever did. It is now patched and streams measures 0. The logs route still
+retains 1,438 nodes per navigation from an unidentified cause.
 
 ---
 
@@ -176,19 +178,48 @@ The same discarded-cleanup bug as §2.1, upstream. Each form mount leaks 3
 `window` listeners (`form-devtools:request-form-state` / `-reset` /
 `-force-submit`) plus a store subscription.
 
-Cannot be wrapped from `useOForm` — the library captures `formApi.mount` by
-value before the instance is returned. Needs `patch-package` or an upstream PR.
+It cannot be wrapped from `useOForm` — the library captures `formApi.mount` by
+value when registering the hook, so a wrapper applied to the returned instance
+is never called. **Fixed via `patch-package`** (`web/patches/@tanstack+vue-form+1.33.3.patch`)
+with a `postinstall` hook so `npm ci` reapplies it:
 
-**Impact (nodes per route-change iteration, after §2 fixes):**
+```js
+let __o2MountCleanup;
+onMounted(() => { __o2MountCleanup = formApi.mount(); });
+onUnmounted(() => { if (typeof __o2MountCleanup === "function") __o2MountCleanup(); });
+```
 
-| Route pair | Before | After | Remaining cause |
+To be raised upstream; the patch is a stopgap until that lands.
+
+**Impact (DOM nodes retained per route-change iteration, production build):**
+
+| Route pair | Before §2 | After §2 | After vue-form patch |
 |---|---|---|---|
-| home ↔ dashboards | 650 | **0** | — |
-| home ↔ streams | 4,701 | 4,051 | `form-devtools` ×3/iter |
-| home ↔ logs | 2,088 | 1,438 | `form-devtools` ×3/iter, `cancelQuery` ×1/iter |
+| home ↔ dashboards | 650 | **0** | **0** |
+| home ↔ **streams** | 4,701 | 4,051 | **0** |
+| home ↔ logs | 2,088 | 1,438 | 1,438 |
 
-Note this makes **streams the worst-affected route in the product**, roughly 6×
-the dashboard list. This is not a dashboards-specific problem.
+Streams was the worst-affected route in the product — roughly 6× the dashboard
+list — and is now clean. All `form-devtools:*` listeners are gone from every
+route. 395 form unit tests pass against the patched library, including the
+reset-on-remount and submit-state suites.
+
+### 4.1 `cancelQuery` listener re-added after unmount — fixed
+
+`web/src/composables/dashboard/usePanelDataLoader.ts`
+
+`window.addEventListener("cancelQuery", …)` was registered inside `loadData()`.
+A late stream callback can invoke `loadData()` after `onUnmounted` has already
+removed the listener, re-adding it permanently. Moved to `onMounted` so the
+add/remove pair is symmetric. `window:cancelQuery` no longer grows.
+
+### 4.2 Still open: logs retains 1,438 nodes per navigation
+
+Not `form-devtools`, not `cancelQuery` — both are now flat while the node count
+still grows. No window/document listener grows on that route any more, so the
+retainer is something else on the logs page. Use `leaked-components.mjs` against
+a logs-cycle snapshot to name the leaked component, as was done for dashboards
+in §3.
 
 ---
 
