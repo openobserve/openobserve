@@ -29,8 +29,13 @@ already says which scope you are in, so there is no Environment column.
       row-key="id"
       pagination="client"
       :page-size="20"
+      :page-size-options="[10, 20, 50, 100]"
       sorting="client"
       filter-mode="client"
+      :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="synthetics-variables"
       :show-global-filter="false"
       :loading="loading"
     >
@@ -43,12 +48,15 @@ already says which scope you are in, so there is no Environment column.
       </template>
       <template #toolbar-trailing>
         <OButton
-          variant="primary"
-          size="sm"
-          data-test="synthetics-variables-add-btn"
-          @click="openCreate"
-          >{{ t("synthetics.variables.add") }}</OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="loading"
+          data-test="synthetics-variables-refresh-btn"
+          @click="$emit('refresh')"
         >
+          <OTooltip side="bottom" :content="t('common.refresh')" />
+        </OButton>
       </template>
 
       <template #cell-name="{ row }">
@@ -223,6 +231,8 @@ export default defineComponent({
         header: t("synthetics.variables.name"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
         minSize: 160,
         meta: { align: "left", flex: true },
@@ -232,15 +242,19 @@ export default defineComponent({
         header: t("synthetics.variables.kind"),
         accessorKey: "kind",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 110,
         meta: { align: "left" },
       },
       {
         id: "value",
         header: t("synthetics.variables.value"),
-        accessorKey: "has_value",
+        accessorKey: "value",
         sortable: false,
-        size: 160,
+        resizable: true,
+        hideable: true,
+        size: 220,
         meta: { align: "left" },
       },
       {
@@ -248,6 +262,8 @@ export default defineComponent({
         header: t("synthetics.variables.usedBy"),
         accessorKey: "used_by_checks",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 140,
         meta: { align: "left" },
       },
@@ -256,6 +272,8 @@ export default defineComponent({
         header: t("synthetics.variables.lastUpdated"),
         accessorKey: "updated_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 140,
         meta: { align: "left" },
       },
