@@ -89,22 +89,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
-      <!-- Mobile nav: the same rail, slid in as an off-canvas drawer (< md). -->
+      <!-- Mobile nav: the same rail, slid in as an off-canvas drawer (< md).
+           Not seamless: the scrim is what makes the 88%-wide panel read as a
+           drawer over the page (and gives tap-outside-to-close a target). -->
       <ODrawer
         v-model:open="mobileNavOpen"
         side="left"
         :width="30"
         bleed
-        seamless
         :show-close="false"
         data-test="main-layout-mobile-nav-drawer"
       >
-        <ONavbar
-          class="h-full"
-          :links-list="navLinks"
-          :visible="true"
-          @menu-hover="handleMenuHover"
-        />
+        <div class="flex h-full min-h-0 flex-col">
+          <div
+            class="border-border-default flex shrink-0 items-center justify-between border-b px-4 py-3"
+          >
+            <img
+              class="h-6 w-auto"
+              :src="
+                getImageURL(
+                  isDark
+                    ? 'images/common/openobserve_latest_dark_2.svg'
+                    : 'images/common/openobserve_latest_light_2.svg',
+                )
+              "
+              :alt="raw('OpenObserve')"
+            />
+            <OButton
+              variant="ghost"
+              size="icon"
+              icon-left="close"
+              data-test="main-layout-mobile-nav-close"
+              @click="mobileNavOpen = false"
+            />
+          </div>
+          <ONavbar
+            class="min-h-0 flex-1 overflow-y-auto"
+            :links-list="navLinks"
+            :visible="true"
+            @menu-hover="handleMenuHover"
+          />
+        </div>
       </ODrawer>
 
       <div class="flex h-full min-h-0 min-w-0 flex-1">
@@ -243,6 +268,7 @@ import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -286,6 +312,7 @@ export default defineComponent({
     CommunitySlackInvite,
     ODialog,
     ODrawer,
+    OButton,
   },
   methods: {
     navigateToDocs() {
@@ -1406,6 +1433,7 @@ export default defineComponent({
     return {
       isDark,
       t,
+      raw,
       router,
       store,
       config,

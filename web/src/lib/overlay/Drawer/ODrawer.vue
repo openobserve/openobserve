@@ -196,14 +196,15 @@ const isContained = computed(() => !!props.portalTarget);
 
 // Explicit width override — vw when full-viewport, % when container-scoped.
 // < md a percent width is meaningless (a "40%" editor drawer would be ~150px
-// on a phone), so any explicit width becomes full-width there.
+// on a phone), so it clamps to 88% — near-full for content, while the visible
+// overlay strip keeps it reading as a drawer rather than a page swap.
 const { isMobile } = useBreakpoint();
 const contentStyle = computed(() => {
   const style: Record<string, string | number> = {
     zIndex: contentZIndex.value,
   };
   if (props.width != null) {
-    const w = isMobile.value ? 100 : props.width;
+    const w = isMobile.value ? Math.min(100, Math.max(88, props.width)) : props.width;
     style.width = isContained.value ? `${w}%` : `${w}vw`;
   }
   return style;
