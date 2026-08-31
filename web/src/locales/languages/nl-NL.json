@@ -7994,6 +7994,7 @@
     "delete": "Verwijderen",
     "method": "Methode",
     "url": "URL",
+    "urlOrRecipients": "URL / Ontvangers",
     "api_header": "Koptekst",
     "api_header_value": "Waarde",
     "skip_tls_verify": "TLS-verificatie overslaan",

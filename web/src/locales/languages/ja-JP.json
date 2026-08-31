@@ -7994,6 +7994,7 @@
     "delete": "削除",
     "method": "送信方法",
     "url": "URL",
+    "urlOrRecipients": "URL / 受信者",
     "api_header": "ヘッダー",
     "api_header_value": "値",
     "skip_tls_verify": "TLS検証をスキップ",

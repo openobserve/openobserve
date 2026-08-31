@@ -7994,6 +7994,7 @@
     "delete": "삭제",
     "method": "메서드",
     "url": "URL",
+    "urlOrRecipients": "URL / 수신자",
     "api_header": "머리글",
     "api_header_value": "값",
     "skip_tls_verify": "TLS 확인 건너뛰기",

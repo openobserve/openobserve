@@ -7994,6 +7994,7 @@
     "delete": "Sil",
     "method": "Yöntemi",
     "url": "URL",
+    "urlOrRecipients": "URL / Alıcılar",
     "api_header": "Başlık",
     "api_header_value": "Değer",
     "skip_tls_verify": "TLS Doğrulamasını Atla",

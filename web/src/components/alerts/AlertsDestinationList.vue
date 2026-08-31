@@ -395,7 +395,7 @@ export default defineComponent({
       },
       {
         id: "url",
-        header: t("alert_destinations.url"),
+        header: t("alert_destinations.urlOrRecipients"),
         accessorFn: destinationUrl,
         resizable: true,
         hideable: true,

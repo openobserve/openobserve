@@ -7994,6 +7994,7 @@
     "delete": "Supprimer",
     "method": "Méthode",
     "url": "URL",
+    "urlOrRecipients": "URL / Destinataires",
     "api_header": "En-tête",
     "api_header_value": "Valeur",
     "skip_tls_verify": "Ignorer la vérification TLS",

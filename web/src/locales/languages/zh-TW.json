@@ -7989,6 +7989,7 @@
     "delete": "刪除",
     "method": "方法",
     "url": "URL",
+    "urlOrRecipients": "URL / 收件人",
     "api_header": "標頭",
     "api_header_value": "值",
     "skip_tls_verify": "略過 TLS 驗證",
