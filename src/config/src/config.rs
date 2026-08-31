@@ -52,7 +52,15 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 71;
+// Bump on every new sea-orm migration: `init_db` returns early when the stored
+// version matches, so an un-bumped migration never runs on an existing
+// deployment. Fresh installs still get it, which hides the omission locally.
+//
+// 74: create llm_playground_snapshots for Phase 3.1 shared Playground
+// snapshots.
+// 75: drop action_scripts, the actions feature is removed.
+// 76: add steps_configured to synthetics_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 76;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1228,8 +1236,6 @@ pub struct Auth {
         help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
     )]
     pub alert_chart_signing_key: String,
-    #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
-    pub action_server_token: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
     pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
@@ -1477,6 +1483,12 @@ pub struct Search {
         help = "Enable pushdown filter for metrics queries"
     )]
     pub feature_metrics_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
+        default = true,
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+    )]
+    pub feature_metrics_fused_agg_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -1727,8 +1739,6 @@ pub struct Common {
         help = "Default theme color for dark mode. If not set, uses application default."
     )]
     pub default_theme_dark_mode_color: String,
-    #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
-    pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
     #[env_config(
@@ -2255,16 +2265,14 @@ pub struct Limit {
     pub traces_query_retention: String,
     #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
-    #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
-    pub metrics_leader_push_interval: u64,
-    #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
-    pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
     pub metrics_max_series_response: usize,
-    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
-    pub metrics_cache_max_entries: usize,
+    // Memory budget in MB for the PromQL result cache index. 0 (default)
+    // means auto: 1% of total memory, clamped to [32, 256] MB.
+    #[env_config(name = "ZO_METRICS_RESULT_CACHE_MAX_SIZE", default = 0)]
+    pub metrics_result_cache_max_size: usize,
     // Memory budget in MB for the PromQL series label cache. 0 (default)
     // means auto: 5% of total memory, clamped to [100, 1024] MB.
     #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
@@ -3004,6 +3012,12 @@ pub struct Sns {
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct Prometheus {
+    #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
+    pub dedup_enabled: bool,
+    #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
+    pub leader_push_interval: u64,
+    #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
+    pub leader_election_interval: i64,
     #[env_config(name = "ZO_PROMETHEUS_HA_CLUSTER", default = "cluster")]
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
@@ -3558,9 +3572,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }
-    if cfg.limit.metrics_cache_max_entries == 0 {
-        cfg.limit.metrics_cache_max_entries = 10_000;
-    }
 
     // check search job retention
     if cfg.limit.search_job_retention == 0 {
@@ -3608,11 +3619,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && !local_node_role.contains(&cluster::Role::Querier)
     {
         cfg.common.tracing_enabled = false;
-    }
-
-    if local_node_role.contains(&cluster::Role::ActionServer) {
-        // action server does not have external dep, so can ignore their config check
-        return Ok(());
     }
 
     // format local_mode_storage
@@ -3984,6 +3990,20 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
+    }
+
+    if cfg.limit.metrics_result_cache_max_size == 0 {
+        // 1% of total mem, clamped to [32, 256] MB; the promql result cache
+        // index holds roughly 200 B per entry at this size.
+        cfg.limit.metrics_result_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+                * (SIZE_IN_MB as usize);
+    } else {
+        if cfg.limit.metrics_result_cache_max_size < 32 {
+            log::warn!("ZO_METRICS_RESULT_CACHE_MAX_SIZE raised to the 32 MB minimum");
+        }
+        cfg.limit.metrics_result_cache_max_size =
+            cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
     Ok(())
 }

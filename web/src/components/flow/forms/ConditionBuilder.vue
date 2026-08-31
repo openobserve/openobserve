@@ -120,6 +120,7 @@ const props = withDefaults(
     allowCustomColumns?: boolean;
     normalizeOperators?: boolean;
     normalizeColumnNames?: boolean;
+    optional?: boolean;
   }>(),
   {
     fields: () => [],
@@ -128,6 +129,7 @@ const props = withDefaults(
     allowCustomColumns: true,
     normalizeOperators: false,
     normalizeColumnNames: false,
+    optional: false,
   },
 );
 
@@ -269,16 +271,24 @@ const normalizeConditionColumns = (node: any): void => {
   if (Array.isArray(node.conditions)) node.conditions.forEach(normalizeConditionColumns);
 };
 
-// Host bridge: validate through the schema and return { version, conditions },
-// or null when invalid (the error renders inline under the FilterGroup).
+// Host bridge: validate through the schema and return { version, conditions }.
 // Detach from the readonly form read-view before handing the tree to the host.
+//
+// `optional` splits the two callers:
+//  - Pipelines (default): an incomplete rule BLOCKS — return null, error shown
+//    inline under the FilterGroup.
+//  - Workflows (optional=true, dummy-node model): never block. Return the rule
+//    anyway with a `complete` flag so the host can save an incomplete rule as a
+//    placeholder (and flag the node incomplete). The `complete` field is only added
+//    in optional mode, so the pipeline payload shape is unchanged.
 const submit = async () => {
   validated.value = null;
   await form.handleSubmit();
-  if (!validated.value) return null;
+  const complete = !!validated.value;
+  if (!complete && !props.optional) return null;
   const conditions = cloneDeep((form.state.values as any).conditions);
   if (props.normalizeColumnNames) normalizeConditionColumns(conditions);
-  return { version: 2, conditions };
+  return props.optional ? { version: 2, conditions, complete } : { version: 2, conditions };
 };
 
 defineExpose({ submit, conditionGroup, form });

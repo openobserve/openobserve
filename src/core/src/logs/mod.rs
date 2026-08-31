@@ -97,7 +97,7 @@ pub fn cast_to_type(
             continue;
         }
         match field.data_type() {
-            DataType::Utf8 | DataType::LargeUtf8 => {
+            DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
                 if val.is_string() {
                     continue;
                 }
@@ -660,6 +660,15 @@ mod tests {
         let delta = vec![Field::new("test", DataType::Utf8, true)];
         let ret_val = cast_to_type(&mut local_val, delta);
         assert!(ret_val.is_ok());
+    }
+
+    #[test]
+    fn test_cast_to_type_utf8view_casts_to_string() {
+        let mut local_val = Map::new();
+        local_val.insert("test".to_string(), Value::from(42));
+        let delta = vec![Field::new("test", DataType::Utf8View, true)];
+        assert!(cast_to_type(&mut local_val, delta).is_ok());
+        assert_eq!(local_val.get("test"), Some(&Value::from("42")));
     }
 
     #[test]

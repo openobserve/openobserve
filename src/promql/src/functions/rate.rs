@@ -48,6 +48,10 @@ impl RangeFunc for RateFunc {
             ExtrapolationKind::Rate,
         )
     }
+
+    fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
+        Some(ExtrapolationKind::Rate)
+    }
 }
 
 #[cfg(test)]

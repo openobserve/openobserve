@@ -17,12 +17,9 @@ use config::meta::pipeline::components::{Edge, Node};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, prelude::Expr};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    entity::{workflow_drafts, workflow_errors, workflow_run_data, workflows},
-    get_lock,
-};
+use super::entity::{workflow_drafts, workflow_errors, workflow_run_data, workflows};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::workflow_associations,
 };
 
@@ -176,7 +173,7 @@ impl std::fmt::Display for WorkflowTriggerEntity {
 }
 
 pub async fn list_all() -> Result<Vec<Workflow>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let entities = workflows::Entity::find().all(client).await?;
     let mut ret = Vec::with_capacity(entities.len());
     for e in entities {
@@ -186,7 +183,7 @@ pub async fn list_all() -> Result<Vec<Workflow>, anyhow::Error> {
 }
 
 pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let entities = workflows::Entity::find()
         .filter(workflows::Column::OrgId.eq(org_id))
         .all(client)
@@ -202,7 +199,7 @@ pub async fn get_by_org_wid(
     org_id: &str,
     workflow_id: &str,
 ) -> Result<Option<Workflow>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = workflows::Entity::find()
         .filter(workflows::Column::Id.eq(workflow_id))
         .filter(workflows::Column::OrgId.eq(org_id))
@@ -218,7 +215,7 @@ pub async fn get_errors_for_run(
     wid: &str,
     run_id: &str,
 ) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = workflow_errors::Entity::find()
         .filter(workflow_errors::Column::OrgId.eq(org_id))
         .filter(workflow_errors::Column::WorkflowId.eq(wid))
@@ -236,7 +233,7 @@ pub async fn list_errors_for_workflow_run(
     wid: &str,
     run_id: &str,
 ) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = workflow_errors::Entity::find()
         .filter(workflow_errors::Column::OrgId.eq(org_id))
         .filter(workflow_errors::Column::WorkflowId.eq(wid))
@@ -249,8 +246,7 @@ pub async fn list_errors_for_workflow_run(
 }
 
 pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let now = chrono::Utc::now().timestamp_millis();
     let model = workflows::ActiveModel {
@@ -270,8 +266,7 @@ pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let now = chrono::Utc::now().timestamp_millis();
     let model = workflows::ActiveModel {
@@ -292,8 +287,7 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let model = workflow_errors::ActiveModel {
         cluster: Set(errors.cluster),
         org_id: Set(errors.org_id),
@@ -311,8 +305,7 @@ pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyho
 pub async fn update_error_input_file_cluster_data(
     errors: WorkflowRunErrors,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_errors::Entity::update_many()
         .filter(workflow_errors::Column::OrgId.eq(errors.org_id))
@@ -333,8 +326,7 @@ pub async fn update_error_input_file_cluster_data(
 }
 
 pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflows::Entity::delete_many()
         .filter(workflows::Column::Id.eq(id))
@@ -348,8 +340,7 @@ pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
 pub async fn delete_all_errors_older_than(
     ts: i64,
 ) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     // ideally this could be delete returning, but sqlite does not
     // support that with seaorm, so transaction instead, which is still not
@@ -385,8 +376,7 @@ pub async fn delete_all_errors_older_than(
 }
 
 pub async fn delete_all_runs_older_than(ts: i64) -> Result<Vec<WorkflowRunData>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     // ideally this could be delete returning, but sqlite does not
     // support that with seaorm, so transaction instead, which is still not
@@ -428,7 +418,7 @@ pub async fn get_run_data(
     workflow_id: &str,
     run_id: &str,
 ) -> Result<Option<String>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let ret = workflow_run_data::Entity::find()
         .filter(workflow_run_data::Column::OrgId.eq(org_id))
@@ -445,8 +435,7 @@ pub async fn delete_run_data(
     workflow_id: &str,
     run_id: &str,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_run_data::Entity::delete_many()
         .filter(workflow_run_data::Column::OrgId.eq(org_id))
@@ -459,8 +448,7 @@ pub async fn delete_run_data(
 }
 
 pub async fn save_workflow_run_data(entry: WorkflowRunData) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let model = workflow_run_data::ActiveModel {
         org_id: Set(entry.org_id),
@@ -480,7 +468,7 @@ pub async fn get_all_associations_for_workflow(
     org_id: &str,
     workflow_id: &str,
 ) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let ret = workflow_associations::Entity::find()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -496,7 +484,7 @@ pub async fn get_all_associations_for_entity(
     entity_id: &str,
     entity_type: &str,
 ) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let ret = workflow_associations::Entity::find()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -512,7 +500,7 @@ pub async fn get_all_associations_for_trigger_type(
     org_id: &str,
     trigger: &str,
 ) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let ret = workflow_associations::Entity::find()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -524,8 +512,7 @@ pub async fn get_all_associations_for_trigger_type(
 }
 
 pub async fn add_workflow_association(entry: WorkflowAssociation) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let model = workflow_associations::ActiveModel {
         id: Default::default(),
@@ -547,8 +534,7 @@ pub async fn delete_workflow_association(
     workflow_id: &str,
     entity_id: &str,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -560,8 +546,7 @@ pub async fn delete_workflow_association(
 }
 
 pub async fn delete_association_by_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -575,8 +560,7 @@ pub async fn delete_association_by_trigger(
     org_id: &str,
     trigger: &str,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -591,8 +575,7 @@ pub async fn delete_association_by_trigger_workflow(
     trigger: &str,
     workflow_id: &str,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -604,8 +587,7 @@ pub async fn delete_association_by_trigger_workflow(
 }
 
 pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_associations::Entity::delete_many()
         .filter(workflow_associations::Column::OrgId.eq(org_id))
@@ -616,7 +598,7 @@ pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<
 }
 
 pub async fn list_drafts_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let entities = workflow_drafts::Entity::find()
         .filter(workflow_drafts::Column::OrgId.eq(org_id))
         .all(client)
@@ -632,7 +614,7 @@ pub async fn get_draft_by_org_draft_id(
     org_id: &str,
     id: &str,
 ) -> Result<Option<Workflow>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = workflow_drafts::Entity::find()
         .filter(workflow_drafts::Column::Id.eq(id))
         .filter(workflow_drafts::Column::OrgId.eq(org_id))
@@ -644,8 +626,7 @@ pub async fn get_draft_by_org_draft_id(
 }
 
 pub async fn save_draft(draft: Workflow) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let now = chrono::Utc::now().timestamp_millis();
     let model = workflow_drafts::ActiveModel {
@@ -664,8 +645,7 @@ pub async fn save_draft(draft: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn update_draft(draft: Workflow) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let now = chrono::Utc::now().timestamp_millis();
     let model = workflow_drafts::ActiveModel {
@@ -685,8 +665,7 @@ pub async fn update_draft(draft: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn delete_draft(id: &str) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     workflow_drafts::Entity::delete_many()
         .filter(workflow_drafts::Column::Id.eq(id))
@@ -696,8 +675,7 @@ pub async fn delete_draft(id: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let id = draft.id.clone();
 

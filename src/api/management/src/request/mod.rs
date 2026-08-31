@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
-pub mod action_server;
-pub mod actions;
-#[cfg(feature = "enterprise")]
 pub mod ai;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
@@ -39,6 +36,8 @@ pub mod discovery;
 pub mod domain_management;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
+#[cfg(feature = "enterprise")]
+pub mod experiments;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
@@ -48,10 +47,14 @@ pub mod kv;
 pub mod license;
 pub mod model_pricing;
 pub mod organization;
+#[cfg(feature = "enterprise")]
+pub mod playground;
 #[cfg(feature = "profiling")]
 pub mod profiling;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+#[cfg(feature = "enterprise")]
+pub mod remote_tasks;
 #[cfg(feature = "enterprise")]
 pub mod score_configs;
 #[cfg(feature = "enterprise")]

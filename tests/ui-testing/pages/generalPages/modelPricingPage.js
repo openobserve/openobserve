@@ -106,7 +106,7 @@ export class ModelPricingPage {
         // ============================================================
         this.testMatchDialog    = page.locator('[data-test="test-model-match-dialog"]');
         this.testMatchInput     = page.locator('[data-test="test-match-model-input"]');
-        this.testMatchClearBtn  = page.locator('[data-test="test-match-clear-btn"]');
+        this.testMatchClearBtn  = page.locator('[data-test="test-match-model-input-clear"]');
         this.testMatchEmpty     = page.locator('[data-test="test-match-empty"]');
         this.testMatchWaiting   = page.locator('[data-test="test-match-waiting"]');
         this.testMatchNoResult  = page.locator('[data-test="test-match-no-result"]');
@@ -150,8 +150,7 @@ export class ModelPricingPage {
             `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${modelId}&duplicate=true`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
-        const nameInput = this.nameInput.locator('input').first();
-        await expect(nameInput).not.toHaveValue('', { timeout: 10000 });
+        await this.waitForEditorHydrated();
     }
 
     async gotoEditorEdit(modelId) {
@@ -160,9 +159,7 @@ export class ModelPricingPage {
             `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${modelId}`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
-        // Wait for the async fetch to populate the form before the caller reads any field.
-        const nameInput = this.nameInput.locator('input').first();
-        await expect(nameInput).not.toHaveValue('', { timeout: 10000 });
+        await this.waitForEditorHydrated();
     }
 
     // ----------------------------------------------------------------
@@ -324,11 +321,42 @@ export class ModelPricingPage {
     }
 
     async clickSave() {
+        // /llm/models/test and /llm/models/refresh-built-in share the prefix but are not saves, so match only the collection and item paths.
+        const isSaveUrl = (url) => {
+            const match = /\/llm\/models(?:\/([^/?#]+))?(?:\?[^#]*)?$/.exec(url);
+            return !!match && match[1] !== 'test' && match[1] !== 'refresh-built-in';
+        };
+        // Armed before the click so a fast response is not missed, and budgeted to cover the click itself, which can spend seconds retrying actionability.
+        const mutation = this.page
+            .waitForResponse(
+                resp => ['POST', 'PUT'].includes(resp.request().method())
+                    && isSaveUrl(resp.url()),
+                { timeout: 60000 }
+            )
+            .then(
+                resp => ({ method: resp.request().method(), status: resp.status(), ok: resp.ok() }),
+                () => null
+            );
+
         await this.saveBtn.click();
-        await Promise.race([
+
+        // Only the response distinguishes a save from a failure: the error path also raises a toast and stays on the editor.
+        const response = await mutation;
+        if (!response) {
+            throw new Error(
+                'Model pricing save did not complete: Save was clicked but no POST/PUT to /llm/models was issued within 60s'
+            );
+        }
+        if (!response.ok) {
+            throw new Error(
+                `Model pricing save failed: ${response.method} /llm/models returned ${response.status}`
+            );
+        }
+
+        await Promise.any([
             this.listTitle.waitFor({ state: 'visible', timeout: 15000 }),
             this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 }),
-        ]);
+        ]).catch(() => {});
     }
 
     async clickCancel() {
@@ -343,6 +371,12 @@ export class ModelPricingPage {
 
     async verifyEditorOnPage() {
         await expect(this.editorTitle).toBeVisible({ timeout: 10000 });
+    }
+
+    /** The title renders before the form hydrates, and OForm silently blocks submit until it has. */
+    async waitForEditorHydrated(timeout = 10000) {
+        const input = this.nameInput.locator('input').first();
+        await expect(input).not.toHaveValue('', { timeout });
     }
 
     async verifyNameInputValue(expected) {

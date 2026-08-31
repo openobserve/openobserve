@@ -152,7 +152,8 @@
       "dashboard-table-column-formatting.spec.js",
       "dashboard-table-column-filtering.spec.js",
       "dashboard-table-pagination.spec.js",
-      "dashboard-pivot-table.spec.js"
+      "dashboard-pivot-table.spec.js",
+      "interactive-dashboard-table.spec.js"
     ],
     "disabled": []
   },
@@ -194,8 +195,7 @@
       "js-transform-type.spec.js",
       "row-expansion.spec.js",
       "enrichment-table-url.spec.js",
-      "functions-form-validation.spec.js",
-      "action-scripts-form-validation.spec.js"
+      "functions-form-validation.spec.js"
     ],
     "disabled": []
   },

@@ -15,7 +15,6 @@
 
 #![cfg(feature = "enterprise")]
 
-mod action_scripts;
 mod alert_states;
 mod alerts;
 mod anomaly_detection;
@@ -28,7 +27,9 @@ mod domain_management;
 mod enrichment_table;
 mod eval_annotation_queues;
 mod eval_datasets;
+mod eval_experiments;
 mod eval_jobs;
+mod eval_playground_snapshots;
 mod eval_providers;
 mod eval_score_configs;
 mod eval_scorers;
@@ -57,10 +58,11 @@ mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
-    EvalDatasetsQueue, EvalJobsQueue, EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue,
-    FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
-    SearchJobsQueue, SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
+    AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue, EvalDatasetsQueue,
+    EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue, EvalProvidersQueue,
+    EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue, OrgUsersQueue,
+    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
+    SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(
@@ -144,6 +146,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let eval_datasets_queue = EvalDatasetsQueue {
         on_eval_dataset_msg: eval_datasets::process,
     };
+    let eval_experiments_queue = EvalExperimentsQueue {
+        on_eval_experiment_msg: eval_experiments::process,
+    };
+    let eval_playground_snapshots_queue = EvalPlaygroundSnapshotsQueue {
+        on_eval_playground_snapshot_msg: eval_playground_snapshots::process,
+    };
     let eval_scorers_queue = EvalScorersQueue {
         on_eval_scorer_msg: eval_scorers::process,
     };
@@ -158,9 +166,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     };
     let destinations_queue = DestinationsQueue {
         on_destination_msg: destinations::process,
-    };
-    let action_scripts_queue = ActionScriptsQueue {
-        on_action_script_msg: action_scripts::process,
     };
     // One topic, three modules: the subscriber routes on the key's module
     // segment, and an unmatched module falls through to `Ok(())` — so a handler
@@ -189,12 +194,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(eval_score_configs_queue),
         Box::new(eval_annotation_queues_queue),
         Box::new(eval_datasets_queue),
+        Box::new(eval_experiments_queue),
+        Box::new(eval_playground_snapshots_queue),
         Box::new(eval_scorers_queue),
         Box::new(eval_jobs_queue),
         Box::new(folders_queue),
         Box::new(templates_queue),
         Box::new(destinations_queue),
-        Box::new(action_scripts_queue),
         Box::new(scheduler_queue),
         Box::new(synthetics_queue),
         Box::new(org_users_queue),

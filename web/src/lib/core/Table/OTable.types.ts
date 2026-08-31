@@ -294,6 +294,16 @@ export interface OTableProps<TData = any> {
 
   // ── Virtual Scroll ──
   virtualScroll?: boolean;
+  /**
+   * Build the TanStack row model only for the virtualizer's visible window
+   * instead of every data row. TanStack materializes a Row object per data row
+   * regardless of virtual scroll (which only bounds DOM nodes), so very large
+   * datasets (100k+ rows) freeze or OOM the tab without this. Applies only
+   * while no client-side row transform needs the full model: requires
+   * virtualScroll, pagination "none", non-client sorting, expansion "none",
+   * no wrap, no tree, and deactivates while a column/global filter is set.
+   */
+  windowRowModel?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
   /**
@@ -315,6 +325,13 @@ export interface OTableProps<TData = any> {
    * a column with id `"#"`.
    */
   showIndex?: boolean;
+  /**
+   * Render the header's select-all checkbox. Set false when selection is
+   * bounded (e.g. a comparison that accepts exactly two rows), where
+   * "select all" cannot mean anything. The header cell itself is still
+   * rendered so the body's selection gutter stays aligned.
+   */
+  showSelectAll?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   /**
@@ -356,6 +373,8 @@ export interface OTableProps<TData = any> {
    * (e.g. a page card) so it renders flush without a double border.
    */
   frame?: boolean;
+  /** Draws the hairline divider under the toolbar row (default true); set false when a subheader below would read as a double line. */
+  toolbarBordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
@@ -501,6 +520,8 @@ export interface OTableSlots<TData = any> {
     value: any;
     active?: boolean;
   }) => any;
+  /** Inline actions right of the built-in copy button (requires `enable-cell-copy`). */
+  "copy-actions"?: (props: { columnId: string; row: TData; value: any }) => any;
   /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
    *  (`row.original`) + row index. `active` is only ever passed to the reserved
    *  `cell-hover-actions` key, which this signature has to admit. */

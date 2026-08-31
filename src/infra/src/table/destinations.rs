@@ -22,14 +22,11 @@ use sea_orm::{
 };
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{DestinationError, Error},
-    table::{
-        entity::{
-            destinations::{ActiveModel, Column, Entity, Model},
-            templates,
-        },
-        get_lock,
+    table::entity::{
+        destinations::{ActiveModel, Column, Entity, Model},
+        templates,
     },
 };
 
@@ -77,9 +74,7 @@ pub async fn put(
         None
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let (model, template): (Model, Option<String>) =
         match get_model_and_template(client, &destination.org_id, &destination.name).await? {
@@ -144,7 +139,7 @@ pub async fn put(
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<destinations::Destination>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     match get_model_and_template(client, org_id, name).await? {
         Some((model, template)) => Ok(Some(model.try_into(template)?)),
         None => Ok(None),
@@ -155,7 +150,7 @@ pub async fn list(
     org_id: &str,
     module: Option<&str>,
 ) -> Result<Vec<destinations::Destination>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let destinations = list_models(client, Some(org_id), module)
         .await?
         .into_iter()
@@ -165,7 +160,7 @@ pub async fn list(
 }
 
 pub async fn list_all() -> Result<Vec<destinations::Destination>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let destinations = list_models(client, None, None)
         .await?
         .into_iter()
@@ -175,10 +170,7 @@ pub async fn list_all() -> Result<Vec<destinations::Destination>, Error> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = get_model_and_template(client, org_id, name).await?;
 
     if let Some((model, ..)) = model {
@@ -226,8 +218,7 @@ async fn list_models(
 
 /// Deletes all destinations belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org_id))
         .exec(client)

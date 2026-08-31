@@ -19,11 +19,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-#[cfg(feature = "enterprise")]
-use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
-#[cfg(feature = "enterprise")]
-use common::utils::http::get_or_create_trace_id;
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -55,18 +51,12 @@ use db::{
 };
 #[cfg(feature = "enterprise")]
 use infra::table::workflows::WorkflowTriggerEntity;
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    schema::unwrap_stream_settings,
-    table,
-};
+use infra::{db::get_orm_client_ro, schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{
     AsyncTransport, Message,
     message::{Attachment, MultiPart, SinglePart},
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
@@ -79,8 +69,6 @@ use search::{
     sql::{RE_ONLY_SELECT, Sql},
 };
 use svix_ksuid::Ksuid;
-#[cfg(feature = "enterprise")]
-use tracing::{Level, span};
 
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
@@ -1134,7 +1122,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
 }
 
 pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     get_by_id(conn, org_id, alert_id).await.map(|f_a| f_a.1)
 }
 
@@ -1186,11 +1174,11 @@ pub async fn list(
     }
 }
 
-/// Gets a list of alerts from the database `ORM_CLIENT`.
+/// Gets a list of alerts from the database.
 pub async fn list_with_folders_db(
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, AlertError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     db::alerts::alert::list_with_folders(conn, params)
         .await
         .map_err(|e| e.into())
@@ -1867,9 +1855,7 @@ pub async fn delete_by_name(
         .map_err(|_| AlertError::AlertNotFound)?
         .ok_or(AlertError::AlertNotFound)?;
     let alert_id = alert.id.ok_or(AlertError::AlertNotFound)?;
-    let client = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
+    let client = infra::db::get_orm_client_rw().await;
     delete_by_id_user(client, org_id, alert_id).await
 }
 
@@ -2665,10 +2651,8 @@ async fn send_to_destination(
                 (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
                     // Discord with a rendered chart: upload the PNG in the
                     // same webhook POST (the embed references it as
-                    // `attachment://`). Actions destinations keep the plain
-                    // JSON path — their payload is rewritten server-side.
+                    // `attachment://`).
                     if matches!(format, ChannelFormat::Discord)
-                        && endpoint.action_id.is_none()
                         && let Some(png) = ctx.chart_png.clone()
                     {
                         send_discord_with_attachment(endpoint, body, png).await
@@ -2778,37 +2762,6 @@ pub(crate) async fn dispatch_test_message(
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    let msg = if endpoint.action_id.is_some() {
-        let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
-            .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
-        let inputs = if incoming_msg.is_object() {
-            vec![incoming_msg]
-        } else if incoming_msg.is_array() {
-            incoming_msg.as_array().unwrap().to_vec()
-        } else {
-            return Err(anyhow::anyhow!(
-                "Unsupported message format for actions: {}",
-                msg
-            ));
-        };
-
-        let trace_id = get_or_create_trace_id(
-            &HeaderMap::new(),
-            &span!(Level::TRACE, "action_destinations"),
-        );
-
-        let req = TriggerActionRequest {
-            inputs,
-            trigger_source: TriggerSource::Alerts,
-            trace_id,
-        };
-        serde_json::to_string(&req)
-            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
-    } else {
-        msg
-    };
-
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
@@ -3873,8 +3826,8 @@ mod threshold_validation_tests {
     // every one of them green.
     //
     // Closing that needs `prepare_alert` itself, which reaches for folders,
-    // `get_by_id_db` and `infra::schema::get` — all through the global
-    // `ORM_CLIENT` rather than an injectable connection. The infra SQLite
+    // `get_by_id_db` and `infra::schema::get` — all through the global ORM
+    // clients rather than an injectable connection. The infra SQLite
     // harness cannot reach it without first making that global overridable in
     // tests; until then the wiring is verified by review, not by test.
 
@@ -7085,11 +7038,7 @@ async fn validate_slo_alert_wiring(
             .map_err(AlertError::InvalidSloAlert);
     };
 
-    let db = infra::db::ORM_CLIENT.get().ok_or_else(|| {
-        AlertError::InfraError(infra::errors::Error::Message(
-            "database not initialized".into(),
-        ))
-    })?;
+    let db = get_orm_client_ro().await;
 
     let slo = infra::table::slos::get(db, org_id, &cond.slo_id)
         .await

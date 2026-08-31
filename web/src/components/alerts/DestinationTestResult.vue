@@ -43,6 +43,15 @@ limitations under the License. -->
             {{ result.responseTime }}{{ t("alerts.ms") }}
           </span>
         </div>
+        <div v-if="showSuccessResponseBody && result.responseBody" class="mt-2">
+          <div class="text-3xs text-text-secondary mb-1 font-semibold uppercase">
+            {{ t("alert_destinations.slackOAuth.successResponseBody") }}
+          </div>
+          <pre
+            data-test="test-success-response-body"
+            class="rounded-default text-2xs text-text-body border-border-default bg-surface-base m-0 overflow-x-auto border p-2 font-mono whitespace-pre-wrap"
+            >{{ formatResponseBody(result.responseBody) }}</pre>
+        </div>
       </div>
     </div>
 
@@ -102,9 +111,7 @@ limitations under the License. -->
 
           <div data-test="test-failure-details" class="pt-2">
             <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
-              <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
-              >
+              <div class="text-3xs text-text-secondary mb-1 font-semibold">
                 {{ t("alerts.error") }}
               </div>
               <div class="text-2xs text-text-body leading-[1.5] break-words">
@@ -113,9 +120,7 @@ limitations under the License. -->
             </div>
 
             <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
-              <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
-              >
+              <div class="text-3xs text-text-secondary mb-1 font-semibold">
                 {{ t("alerts.httpStatus") }}
               </div>
               <div class="text-2xs text-text-body leading-[1.5] break-words">
@@ -124,9 +129,7 @@ limitations under the License. -->
             </div>
 
             <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
-              <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
-              >
+              <div class="text-3xs text-text-secondary mb-1 font-semibold">
                 {{ t("alerts.responseBody") }}
               </div>
               <pre
@@ -203,11 +206,13 @@ interface Props {
   // Backend test responses also include responseTime (ms); shared TestResult omits it.
   result?: (TestResult & { responseTime?: number }) | null;
   isLoading?: boolean;
+  showSuccessResponseBody?: boolean;
 }
 
 withDefaults(defineProps<Props>(), {
   result: null,
   isLoading: false,
+  showSuccessResponseBody: false,
 });
 
 // Define component emits

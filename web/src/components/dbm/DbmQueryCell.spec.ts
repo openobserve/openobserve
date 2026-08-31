@@ -17,6 +17,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 
@@ -41,7 +42,10 @@ describe("DbmQueryCell", () => {
     expect(line.classes()).toEqual(
       expect.arrayContaining(["text-text-code", "min-w-0", "truncate", "font-mono", "text-xs"]),
     );
-    expect(line.attributes("title")).toBe("SELECT * FROM orders WHERE id = $1");
+    // Full statement rides OTooltip's content, not a native title attr.
+    expect(String(line.findComponent(OTooltip).props("content"))).toBe(
+      "SELECT * FROM orders WHERE id = $1",
+    );
     expect(line.text()).toBe("SELECT * FROM orders");
   });
 

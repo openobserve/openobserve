@@ -71,11 +71,11 @@
         ]"
         :searchable="false"
         data-test="alert-conditions-operator-select"
-        @update:model-value="() => emits('input:update', 'conditions', condition)"
+        @update:model-value="onOperatorChange"
       />
       <OTooltip v-if="condition.operator" :content="condition.operator" />
     </div>
-    <div class="ml-0">
+    <div v-if="!isUnaryOperator(condition.operator)" class="ml-0">
       <OFormInput
         :name="`${namePrefix}.value`"
         :placeholder="t('common.value')"
@@ -160,8 +160,9 @@ import { ref, computed, watch, inject, type PropType } from "vue";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
-var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"]);
 const emits = defineEmits(["input:update"]);
 
 const filteredFields = ref<any[]>(props.streamFields as any[]);
@@ -185,6 +186,31 @@ const { t } = useI18nTyped();
 // The injected OForm — condition values are name-bound to it (form mode is the
 // only mode now); also used to write the AND/OR toggle below.
 const form = inject(FORM_CONTEXT_KEY, null);
+
+// Operator `value`s are the backend wire format (serde renames); labels stay
+// raw English like the rest of the list.
+const triggerOperators: SelectOptionInput[] = [
+  "=",
+  "!=",
+  ">=",
+  "<=",
+  ">",
+  "<",
+  "Contains",
+  "NotContains",
+  { label: raw("Is Null"), value: "is_null" },
+  { label: raw("Is Not Null"), value: "is_not_null" },
+  { label: raw("Is Empty"), value: "is_empty" },
+  { label: raw("Is Not Empty"), value: "is_not_empty" },
+];
+
+// Null checks take no value; drop a stale one so it can't leak into the payload.
+const onOperatorChange = (operator: unknown) => {
+  if (isUnaryOperator(operator)) {
+    form?.setFieldValue(`${props.namePrefix}.value`, "");
+  }
+  emits("input:update", "conditions", props.condition);
+};
 
 const computedLabel = computed(() => {
   // First condition in any group should not show AND/OR operator;

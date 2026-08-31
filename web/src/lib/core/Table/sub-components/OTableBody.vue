@@ -8,6 +8,9 @@ import { VueDraggableNext } from "vue-draggable-next";
 
 const props = defineProps<{
   rows: Row<any>[];
+  /** Global index of rows[0] when the parent windows the row model to the
+   *  virtualizer's range; virtualRow.index stays global. */
+  rowIndexOffset?: number;
   table: Table<any>;
   clickable?: boolean;
   selectionEnabled?: boolean;
@@ -139,7 +142,7 @@ function getVirtualRowKey(virtualRow: { key: number | string | bigint }): string
 const isVirtual = () => !!(props.virtualRows && props.virtualRows.length > 0);
 
 function getRowForIndex(index: number) {
-  return props.rows[index];
+  return props.rows[index - (props.rowIndexOffset ?? 0)];
 }
 
 /** Get the TanStack Row from a draggable model item (plain data). */

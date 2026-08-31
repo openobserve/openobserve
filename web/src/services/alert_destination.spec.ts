@@ -363,6 +363,35 @@ describe("alert_destination service", () => {
     });
   });
 
+  describe("Slack OAuth", () => {
+    it("starts OAuth for the selected organization", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { authorizationUrl: "https://slack.com" } });
+
+      await destination.startSlackOAuth({ org_identifier: "org 123" });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/org%20123/alerts/destinations/slack/oauth/start",
+      );
+    });
+
+    it("exchanges the callback code and state without putting either in the URL", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { channel: "alerts" } });
+
+      await destination.exchangeSlackOAuth({
+        org_identifier: "org123",
+        code: "temporary-code",
+        state: "signed-state",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/org123/alerts/destinations/slack/oauth/exchange",
+        { code: "temporary-code", state: "signed-state" },
+      );
+      expect(mockHttpInstance.post.mock.calls[0][0]).not.toContain("temporary-code");
+      expect(mockHttpInstance.post.mock.calls[0][0]).not.toContain("signed-state");
+    });
+  });
+
   describe("error handling", () => {
     it("should propagate errors from create", async () => {
       const error = new Error("Validation error");
