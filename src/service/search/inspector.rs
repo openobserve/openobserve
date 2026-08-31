@@ -48,6 +48,8 @@ pub struct SearchInspectorFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub org_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
@@ -107,6 +109,11 @@ impl SearchInspectorFieldsBuilder {
 
     pub fn trace_id(mut self, trace_id: String) -> Self {
         self.fields.trace_id = Some(trace_id);
+        self
+    }
+
+    pub fn org_id(mut self, org_id: String) -> Self {
+        self.fields.org_id = Some(org_id);
         self
     }
 
