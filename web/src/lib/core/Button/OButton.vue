@@ -308,8 +308,8 @@ const classes = computed<string[]>(() => [
   // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
   "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
   "outline-none",
-  /* Unified focus glow — identical to OInput/OSelect: a 2px translucent primary
-     ring hugging the control (no ring-offset gap). The trailing `!` overrides
+  /* Unified focus ring — identical to OInput/OSelect: a 2px OPAQUE primary ring
+     hugging the control (no ring-offset gap). The trailing `!` overrides
      each variant's own ring width/color below, so every button focuses identically.
      Reads --color-focus-ring-accent, NOT accent/25: at 25% alpha the ring measured
      1.38:1 in light and 1.50:1 in dark, against the 3:1 SC 1.4.11 floor. Solid, it is
