@@ -457,6 +457,19 @@ export class SloFormPage {
     return { sli: Number(m[1]), good: Number(m[2]), total: Number(m[3]), raw: text };
   }
 
+  // ------------------------------------------------------------ field getters
+
+  getGoodExprField() { return this.page.locator(this.locators.goodExpr); }
+  getAggregateField() { return this.page.locator(this.locators.aggregate); }
+  getComparatorField() { return this.page.locator(this.locators.comparator); }
+  getThresholdField() { return this.page.locator(this.locators.threshold); }
+  getAlertSource() { return this.page.locator(this.locators.alertSource); }
+  getAlertSourceEmpty() { return this.page.locator(this.locators.alertSourceEmpty); }
+  getAlertSourceHint() { return this.page.locator(this.locators.alertSourceHint); }
+  getSliTypeDescription() { return this.page.locator(this.locators.sliTypeDescription); }
+  getSliceNote() { return this.page.locator(this.locators.sliceNote); }
+  getTimeSlicePreviewError() { return this.page.locator(this.locators.tsPreviewError); }
+
   // -------------------------------------------------------------- assertions
 
   async expectError(pattern) {
