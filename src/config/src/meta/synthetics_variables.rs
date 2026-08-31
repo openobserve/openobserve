@@ -67,22 +67,50 @@ pub struct SyntheticsVariableRequest {
     pub tags: Vec<String>,
 }
 
+/// A variable's value as a read path may carry it.
+///
+/// **The `Secret` variant has no value field**, which is the whole point. A
+/// single `value: Option<String>` would serve the list just as well and would
+/// quietly lose the guarantee: `None` for a secret is a convention, and a
+/// convention is something a later call site can forget. This makes a secret's
+/// plaintext on a read path a compile error instead.
+///
+/// Tagged `kind` because that is what it replaces — the wire shape stays
+/// `{"kind": "plain", "value": "…"}` and clients read `kind` unchanged.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum VariableValueView {
+    Plain {
+        value: String,
+    },
+    /// Write-only: presence is all a client ever learns.
+    Secret {
+        has_value: bool,
+    },
+}
+
+impl Default for VariableValueView {
+    fn default() -> Self {
+        Self::Plain {
+            value: String::new(),
+        }
+    }
+}
+
 /// What every read path returns for a shared variable.
 ///
-/// **There is no `value` field, deliberately.** Redacting at each call site is
-/// what leaks check-tier variables through `get_synthetic` today; a type with
-/// nothing to forget makes the same mistake a compile error. `example` stands in
-/// for the value wherever the UI needs to show the shape of one.
+/// A plain value is carried; a secret's cannot be — see [`VariableValueView`].
+/// `example` stands in for the value wherever the UI needs to show the shape of
+/// one it may not read.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct SyntheticsVariableView {
     pub id: String,
     pub name: String,
-    pub kind: SyntheticsVariableKind,
+    #[serde(flatten)]
+    pub value: VariableValueView,
     pub description: String,
     pub example: String,
     pub tags: Vec<String>,
-    /// Whether a value is stored at all — the only thing a client learns about it.
-    pub has_value: bool,
     /// Checks whose definition references `{{NAME}}`.
     ///
     /// Answers "what breaks if I change this?", and is the safety check before
@@ -502,17 +530,34 @@ mod tests {
     }
 
     #[test]
-    fn the_read_view_has_no_value_field() {
-        // The guarantee this whole module rests on: serialising a view cannot
-        // emit a value, because there is no value to forget to redact.
+    fn a_secret_view_has_no_value_field() {
+        // The guarantee this module rests on: serialising a secret cannot emit
+        // a value, because the variant has no value to forget to redact.
         let view = SyntheticsVariableView {
             name: "TOKEN".into(),
-            kind: SyntheticsVariableKind::Secret,
-            has_value: true,
+            value: VariableValueView::Secret { has_value: true },
             ..Default::default()
         };
         let json = serde_json::to_string(&view).unwrap();
         assert!(!json.contains("\"value\""), "{json}");
+        assert!(json.contains("\"kind\":\"secret\""), "{json}");
         assert!(json.contains("\"has_value\":true"), "{json}");
+    }
+
+    #[test]
+    fn a_plain_view_carries_its_value() {
+        // §6 is about secrets. A BASE_URL you cannot read is one you cannot
+        // verify, and hiding it protects nothing.
+        let view = SyntheticsVariableView {
+            name: "BASE_URL".into(),
+            value: VariableValueView::Plain {
+                value: "https://shop.test".into(),
+            },
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&view).unwrap();
+        assert!(json.contains("\"kind\":\"plain\""), "{json}");
+        assert!(json.contains("https://shop.test"), "{json}");
+        assert!(!json.contains("has_value"), "{json}");
     }
 }

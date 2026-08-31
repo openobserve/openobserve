@@ -66,16 +66,24 @@ pub async fn list_environments(org_id: &str) -> anyhow::Result<Vec<SyntheticsEnv
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let usage = placeholder_usage(org_id).await?;
 
+    // Projected once for the whole response: every environment's variables come
+    // out of the same read, so one DEK fetch covers them all.
+    let mut projected: HashMap<&str, Vec<SyntheticsVariableView>> = HashMap::new();
+    for (row, view) in variables
+        .iter()
+        .zip(project_views(org_id, variables.iter()).await?)
+    {
+        if let Some(env_id) = row.env.as_deref() {
+            projected.entry(env_id).or_default().push(view);
+        }
+    }
+
     Ok(envs
         .into_iter()
         .map(|env| SyntheticsEnvironmentView {
             checks_count: counts.get(&env.id).copied().unwrap_or(0),
             variables: with_usage(
-                variables
-                    .iter()
-                    .filter(|v| v.env.as_deref() == Some(env.id.as_str()))
-                    .map(|v| v.to_view())
-                    .collect(),
+                projected.remove(env.id.as_str()).unwrap_or_default(),
                 &usage,
             ),
             id: env.id,
@@ -114,6 +122,95 @@ pub async fn create_environment(
     }
 
     Ok(environment_view(record))
+}
+
+/// Copies an environment's variables into a new environment.
+///
+/// **Plain values are copied; secret values are not.** Copying a secret's
+/// ciphertext would be trivial — both scopes share the org DEK — and it is
+/// exactly the wrong thing. The claim this whole feature rests on is that
+/// sharing is a net gain *because it cuts the copies of a credential from N to
+/// one*; a button that silently doubles them undoes that, and the duplicate is
+/// the one nobody knows to rotate. Secrets arrive named and unset.
+///
+/// Checks are not copied: a check belongs to whatever it targets, and pointing
+/// a second one at a new environment would change what is monitored without
+/// anyone asking.
+pub async fn duplicate_environment(
+    org_id: &str,
+    source: &str,
+    new_name: &str,
+    created_by: &str,
+) -> anyhow::Result<SyntheticsEnvironmentView> {
+    let request = SyntheticsEnvironmentRequest {
+        name: new_name.trim().to_string(),
+        description: String::new(),
+    };
+    validate_environment_request(&request).map_err(|e| anyhow::anyhow!(e))?;
+
+    let conn = get_orm_client_rw().await;
+    let source = synthetics_environments::get_by_name(conn, org_id, source)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("environment '{source}' not found"))?;
+
+    let rows: Vec<_> = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .into_iter()
+        .filter(|v| v.env.as_deref() == Some(source.id.as_str()))
+        .collect();
+
+    let now = config::utils::time::now_micros();
+    let target = SyntheticsEnvironmentRecord {
+        id: config::ider::uuid(),
+        org_id: org_id.to_string(),
+        name: request.name.clone(),
+        description: source.description.clone(),
+        owner: Some(created_by.to_string()),
+        created_at: now,
+        updated_at: now,
+    };
+
+    // One transaction: a half-copied environment is worse than none, because it
+    // looks complete in the rail while missing the values a run needs.
+    let txn = conn.begin().await?;
+    synthetics_environments::add(&txn, &target)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    for row in &rows {
+        let copy = SyntheticsVariableRecord {
+            id: config::ider::uuid(),
+            org_id: org_id.to_string(),
+            env: Some(target.id.clone()),
+            name: row.name.clone(),
+            // The one line that matters: ciphertext for plain, nothing for a
+            // secret. Both scopes share the DEK, so the plain copy needs no
+            // decrypt and no plaintext ever enters this process.
+            value: if row.is_secret() {
+                String::new()
+            } else {
+                row.value.clone()
+            },
+            kind: row.kind.clone(),
+            description: row.description.clone(),
+            example: row.example.clone(),
+            tags: row.tags.clone(),
+            owner: Some(created_by.to_string()),
+            created_at: now,
+            updated_at: now,
+        };
+        synthetics_variables::add(&txn, &copy)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    }
+    txn.commit().await?;
+    synthetics_variables::invalidate_and_publish(org_id).await;
+
+    if ofga_enabled() {
+        set_ownership(org_id, &environment_object(&target.name), "", "").await;
+    }
+    Ok(environment_view(target))
 }
 
 /// Updates an environment's description.
@@ -247,6 +344,63 @@ async fn placeholder_usage(org_id: &str) -> anyhow::Result<HashMap<String, Vec<S
     Ok(usage)
 }
 
+/// Projects records to views, decrypting the plain ones.
+///
+/// **One `get_dek` call for the whole batch**, hoisted above the loop — the same
+/// rule `resolve` follows, and the reason this lives here rather than in the
+/// table layer, which holds no key.
+///
+/// A plain row that will not decrypt becomes an empty value rather than an
+/// error: one corrupt row must not fail the list it appears in. A secret is
+/// never decrypted at all — the view has nowhere to put it.
+async fn project_views(
+    org_id: &str,
+    rows: impl Iterator<Item = &SyntheticsVariableRecord>,
+) -> anyhow::Result<Vec<SyntheticsVariableView>> {
+    let rows: Vec<_> = rows.collect();
+    let needs_dek = rows
+        .iter()
+        .any(|v| !v.is_secret() && v.value.starts_with("AESenc:"));
+    let dek = if needs_dek {
+        Some(synthetics_dek(org_id).await?)
+    } else {
+        None
+    };
+
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let plain = (!row.is_secret()).then(|| {
+                if !row.value.starts_with("AESenc:") {
+                    return row.value.clone();
+                }
+                match dek.as_ref().map(|d| decrypt_secret(d, &row.value)) {
+                    Some(Ok(v)) => v,
+                    _ => {
+                        log::error!(
+                            "[synthetics] variable {} in {org_id} could not be decrypted",
+                            row.name
+                        );
+                        String::new()
+                    }
+                }
+            });
+            row.to_view(plain)
+        })
+        .collect())
+}
+
+/// [`project_views`] for one record.
+async fn project_view(
+    org_id: &str,
+    record: &SyntheticsVariableRecord,
+) -> anyhow::Result<SyntheticsVariableView> {
+    Ok(project_views(org_id, std::iter::once(record))
+        .await?
+        .pop()
+        .unwrap_or_default())
+}
+
 /// Stamps `used_by_checks` onto a batch of views.
 fn with_usage(
     mut views: Vec<SyntheticsVariableView>,
@@ -261,13 +415,10 @@ fn with_usage(
 /// The unscoped tier — variables that apply in every environment.
 pub async fn list_global_variables(org_id: &str) -> anyhow::Result<Vec<SyntheticsVariableView>> {
     let conn = get_orm_client_ro().await;
-    let views: Vec<_> = synthetics_variables::list(conn, org_id)
+    let rows = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .iter()
-        .filter(|v| v.env.is_none())
-        .map(|v| v.to_view())
-        .collect();
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let views = project_views(org_id, rows.iter().filter(|v| v.env.is_none())).await?;
     Ok(with_usage(views, &placeholder_usage(org_id).await?))
 }
 
@@ -283,13 +434,15 @@ pub async fn list_environment_variables(
     else {
         return Ok(None);
     };
-    let views: Vec<_> = synthetics_variables::list(conn, org_id)
+    let rows = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .iter()
-        .filter(|v| v.env.as_deref() == Some(env.id.as_str()))
-        .map(|v| v.to_view())
-        .collect();
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let views = project_views(
+        org_id,
+        rows.iter()
+            .filter(|v| v.env.as_deref() == Some(env.id.as_str())),
+    )
+    .await?;
     Ok(Some(with_usage(views, &placeholder_usage(org_id).await?)))
 }
 
@@ -344,7 +497,7 @@ pub async fn create_variable(
     synthetics_variables::add(conn, &record)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    Ok(record.to_view())
+    project_view(org_id, &record).await
 }
 
 /// Replaces one variable. An omitted `value` keeps the stored one, which is the
@@ -379,7 +532,7 @@ pub async fn update_variable(
     synthetics_variables::update(conn, &record)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    Ok(Some(record.to_view()))
+    Ok(Some(project_view(org_id, &record).await?))
 }
 
 /// Deletes a variable, refusing while checks still reference it.
@@ -622,7 +775,7 @@ pub async fn promote_check_variable(
     synthetics_checks::update(conn, org_id, check_id, check)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    Ok(record.to_view())
+    project_view(org_id, &record).await
 }
 
 /// Moves an environment-scoped variable to the unscoped tier.
@@ -666,7 +819,7 @@ pub async fn promote_to_global(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     record.env = None;
-    Ok(record.to_view())
+    project_view(org_id, &record).await
 }
 
 /// Splits one unscoped variable into per-environment rows.
@@ -735,7 +888,7 @@ pub async fn split_to_environments(
     txn.commit().await?;
     synthetics_variables::invalidate_and_publish(org_id).await;
 
-    Ok(created.iter().map(|r| r.to_view()).collect())
+    project_views(org_id, created.iter()).await
 }
 
 /// The shared tier for one job: every unscoped variable, plus the ones scoped to
