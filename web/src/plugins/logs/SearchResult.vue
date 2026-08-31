@@ -82,10 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="info" data-test="logs-result-time-chip">{{
                 recordsChips.time
               }}</OTag>
+              <!-- max-md:hidden: the fixed-height toolbar can't fit a third chip
+                   there — it wrapped onto the histogram beneath. -->
               <OTag
                 v-if="recordsChips.scan"
                 type="logsResultChip"
                 value="warn"
+                class="max-md:hidden"
                 data-test="logs-result-scan-chip"
                 >{{ recordsChips.scan }}</OTag
               >
