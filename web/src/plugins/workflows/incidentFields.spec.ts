@@ -31,9 +31,9 @@ describe("INCIDENT_PAYLOAD_FIELDS", () => {
     expect(new Set(values).size).toBe(values.length);
   });
 
-  it("keeps label and value in sync and a non-empty type", () => {
+  it("labels each column with its dotted meta path and keeps a non-empty type", () => {
     for (const f of INCIDENT_PAYLOAD_FIELDS) {
-      expect(f.label).toBe(f.value);
+      expect(f.label).toBe(f.value.replace("_", "."));
       expect(f.type).toBeTruthy();
     }
   });

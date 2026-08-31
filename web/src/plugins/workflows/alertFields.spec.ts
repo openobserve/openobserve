@@ -133,9 +133,9 @@ describe("alertFields", () => {
       ]);
     });
 
-    it("uses the column name as its own label (label === value)", () => {
+    it("labels each column with its dotted meta path (value stays the flattened form)", () => {
       ALERT_PAYLOAD_FIELDS.forEach((f) => {
-        expect(f.label).toBe(f.value);
+        expect(f.label).toBe(f.value.replace("_", "."));
       });
     });
 
