@@ -11064,7 +11064,14 @@
           "typeCategorical": "Kategorisch",
           "typeBoolean": "Boolesch",
           "threshold": "Schwellenwert",
-          "measurePerRow": "Mittelwert pro Zeile über alle Versuche"
+          "measurePerRow": "Mittelwert pro Zeile über alle Versuche",
+          "dimensionImproved": "{count} Zeile verbessert | {count} Zeilen verbessert",
+          "dimensionUnchanged": "{count} Zeile unverändert | {count} Zeilen unverändert",
+          "dimensionRegressed": "{count} Zeile verschlechtert | {count} Zeilen verschlechtert",
+          "dimensionNotCounted": "Nicht gezählt",
+          "dimensionNotCountedHint": "Dieser Scorer hat keine Vergleichsrichtlinie in seiner Score-Konfiguration, daher werden seine Werte gemeldet, aber nie als verbessert oder verschlechtert bewertet – und er kann das Ergebnis nicht beeinflussen. Geben Sie ihm eine Richtung und einen Schwellenwert, damit er gezählt wird.",
+          "dimensionNoneCompared": "Nichts verglichen",
+          "dimensionNoneComparedHint": "Keine Zeile wurde auf beiden Seiten gemessen. Eine Zeile, die nur in einem Experiment lief, hat keine Bezugsbasis und zählt daher in keine Richtung."
         },
         "rowDrawer": {
           "fallbackTitle": "Vergleichszeile",
@@ -11429,6 +11436,7 @@
         "republishedSuccess": "Beschreibung aktualisiert. Version {version} ist unverändert.",
         "draftSuccess": "Entwurf gespeichert. Testen Sie die Verbindung, um ihn zu veröffentlichen.",
         "draftError": "Der Entwurf konnte nicht gespeichert werden",
+        "testFailed": "Verbindungstest fehlgeschlagen",
         "publishFailed": "Die Testverbindung ist fehlgeschlagen, daher wurde nichts veröffentlicht. Ihr Entwurf ist gespeichert.",
         "createError": "Die Remote-Aufgabe konnte nicht veröffentlicht werden",
         "validation": {

@@ -11064,7 +11064,14 @@
           "typeCategorical": "Categorisch",
           "typeBoolean": "Booleaans",
           "threshold": "Drempelwaarde",
-          "measurePerRow": "Gemiddelde per rij, over trials"
+          "measurePerRow": "Gemiddelde per rij, over trials",
+          "dimensionImproved": "{count} rij verbeterd | {count} rijen verbeterd",
+          "dimensionUnchanged": "{count} rij ongewijzigd | {count} rijen ongewijzigd",
+          "dimensionRegressed": "{count} rij verslechterd | {count} rijen verslechterd",
+          "dimensionNotCounted": "Niet meegeteld",
+          "dimensionNotCountedHint": "Deze scorer heeft geen vergelijkingsbeleid in zijn Score Config, dus de waarden worden gerapporteerd maar nooit beoordeeld als verbeterd of verslechterd — en het kan de uitkomst niet beïnvloeden. Geef het een richting en een drempelwaarde om het mee te laten tellen.",
+          "dimensionNoneCompared": "Niets vergeleken",
+          "dimensionNoneComparedHint": "Geen enkele rij is aan beide zijden gemeten. Een rij die in slechts één experiment liep, heeft niets om van te vertrekken en telt dus voor geen enkele richting mee."
         },
         "rowDrawer": {
           "fallbackTitle": "Vergelijkingsrij",
@@ -11429,6 +11436,7 @@
         "republishedSuccess": "Beschrijving bijgewerkt. Versie {version} is ongewijzigd.",
         "draftSuccess": "Concept opgeslagen. Test de verbinding om het te publiceren.",
         "draftError": "Kan het concept niet opslaan",
+        "testFailed": "Verbindingstest mislukt",
         "publishFailed": "De testverbinding is mislukt, dus er is niets gepubliceerd. Uw concept is opgeslagen.",
         "createError": "Kan de externe taak niet publiceren",
         "validation": {

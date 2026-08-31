@@ -11064,7 +11064,14 @@
           "typeCategorical": "Categórico",
           "typeBoolean": "Booleano",
           "threshold": "Umbral",
-          "measurePerRow": "Media por fila, entre ensayos"
+          "measurePerRow": "Media por fila, entre ensayos",
+          "dimensionImproved": "{count} fila mejorada | {count} filas mejoradas",
+          "dimensionUnchanged": "{count} fila sin cambios | {count} filas sin cambios",
+          "dimensionRegressed": "{count} fila empeorada | {count} filas empeoradas",
+          "dimensionNotCounted": "No contado",
+          "dimensionNotCountedHint": "Este evaluador no tiene política de comparación en su Configuración de Puntuación, por lo que sus valores se informan pero nunca se juzgan como mejorados o empeorados — y no puede afectar el resultado. Dale una dirección y un umbral para que se tenga en cuenta.",
+          "dimensionNoneCompared": "Nada comparado",
+          "dimensionNoneComparedHint": "Ninguna fila fue medida en ambos lados. Una fila que se ejecutó solo en un experimento no tiene de dónde partir, por lo que no cuenta para ninguna dirección."
         },
         "rowDrawer": {
           "fallbackTitle": "Fila de comparación",
@@ -11429,6 +11436,7 @@
         "republishedSuccess": "Descripción actualizada. La versión {version} no ha cambiado.",
         "draftSuccess": "Borrador guardado. Prueba la conexión para publicarlo.",
         "draftError": "No se pudo guardar el borrador",
+        "testFailed": "La prueba de conexión falló",
         "publishFailed": "La conexión de prueba falló, por lo que no se publicó nada. Tu borrador está guardado.",
         "createError": "No se pudo publicar la tarea remota",
         "validation": {

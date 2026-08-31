@@ -11064,7 +11064,14 @@
           "typeCategorical": "Kategorik",
           "typeBoolean": "Boolean",
           "threshold": "Eşik",
-          "measurePerRow": "Denemeler boyunca satır başına ortalama"
+          "measurePerRow": "Denemeler boyunca satır başına ortalama",
+          "dimensionImproved": "{count} satır iyileşti | {count} satır iyileşti",
+          "dimensionUnchanged": "{count} satır değişmedi | {count} satır değişmedi",
+          "dimensionRegressed": "{count} satır geriledi | {count} satır geriledi",
+          "dimensionNotCounted": "Sayılmadı",
+          "dimensionNotCountedHint": "Bu puanlayıcının Skor Yapılandırmasında karşılaştırma politikası yoktur, bu nedenle değerleri raporlanır ancak asla iyileşti veya geriledi olarak değerlendirilmez — ve sonucu etkileyemez. Sayılması için ona bir yön ve bir eşik değeri verin.",
+          "dimensionNoneCompared": "Hiçbir şey karşılaştırılmadı",
+          "dimensionNoneComparedHint": "Her iki tarafta da ölçülen satır yok. Yalnızca bir deneyde çalışan bir satırın karşılaştırma tabanı yoktur, bu nedenle hiçbir yöne katkı sayılmaz."
         },
         "rowDrawer": {
           "fallbackTitle": "Karşılaştırma Satırı",
@@ -11429,6 +11436,7 @@
         "republishedSuccess": "Açıklama güncellendi. Sürüm {version} değişmedi.",
         "draftSuccess": "Taslak kaydedildi. Yayınlamak için bağlantıyı test edin.",
         "draftError": "Taslak kaydedilemedi",
+        "testFailed": "Bağlantı testi başarısız oldu.",
         "publishFailed": "Test bağlantısı başarısız oldu, bu yüzden hiçbir şey yayınlanmadı. Taslağınız kaydedildi.",
         "createError": "Uzak görev yayınlanamadı",
         "validation": {

@@ -11064,7 +11064,14 @@
           "typeCategorical": "分类",
           "typeBoolean": "布尔",
           "threshold": "阈值",
-          "measurePerRow": "跨试验的每行均值"
+          "measurePerRow": "跨试验的每行均值",
+          "dimensionImproved": "{count} 行改进 | {count} 行改进",
+          "dimensionUnchanged": "{count} 行无变化 | {count} 行无变化",
+          "dimensionRegressed": "{count} 行变差 | {count} 行变差",
+          "dimensionNotCounted": "未计数",
+          "dimensionNotCountedHint": "此评分器在其评分配置中没有比较策略，因此其值会被报告，但永远不会被评为改进或变差——而且它不能影响结果。为其指定方向和阈值即可将其计入。",
+          "dimensionNoneCompared": "无比较项",
+          "dimensionNoneComparedHint": "没有行在两侧均被测量。仅在单个实验中运行的行没有可比较的基准，因此不计入任何方向。"
         },
         "rowDrawer": {
           "fallbackTitle": "比较行",
@@ -11429,6 +11436,7 @@
         "republishedSuccess": "描述已更新。版本 {version} 未更改。",
         "draftSuccess": "草稿已保存。测试连接以发布它。",
         "draftError": "无法保存草稿",
+        "testFailed": "连接测试失败",
         "publishFailed": "测试连接失败，因此未发布任何内容。你的草稿已保存。",
         "createError": "无法发布远程任务",
         "validation": {

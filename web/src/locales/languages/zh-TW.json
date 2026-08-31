@@ -11059,7 +11059,14 @@
           "typeCategorical": "類別",
           "typeBoolean": "布林值",
           "threshold": "閾值",
-          "measurePerRow": "每列平均值（跨試驗）"
+          "measurePerRow": "每列平均值（跨試驗）",
+          "dimensionImproved": "{count} 行已改善 | {count} 行已改善",
+          "dimensionUnchanged": "{count} 行未變更 | {count} 行未變更",
+          "dimensionRegressed": "{count} 行退步 | {count} 行退步",
+          "dimensionNotCounted": "未計入",
+          "dimensionNotCountedHint": "此評分器在其評分配置中沒有比較策略，因此其值會被報告，但不會被判定為改善或退步——也無法影響結果。為其設定方向和閾值，即可將其納入計算。",
+          "dimensionNoneCompared": "無可比對",
+          "dimensionNoneComparedHint": "沒有任何一行在兩側都被測量。只在一個實驗中執行的行沒有可比較的起點，因此不會計入任何方向。"
         },
         "rowDrawer": {
           "fallbackTitle": "比較列",
@@ -11424,6 +11431,7 @@
         "republishedSuccess": "描述已更新。版本 {version} 未變更。",
         "draftSuccess": "草稿已儲存。請測試連線以發布。",
         "draftError": "無法儲存草稿",
+        "testFailed": "連線測試失敗",
         "publishFailed": "測試連線失敗，因此未發布任何內容。您的草稿已儲存。",
         "createError": "無法發布遠端任務",
         "validation": {

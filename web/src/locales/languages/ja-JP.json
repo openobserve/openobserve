@@ -11064,7 +11064,14 @@
           "typeCategorical": "カテゴリ",
           "typeBoolean": "ブール",
           "threshold": "しきい値",
-          "measurePerRow": "試行全体の行ごとの平均"
+          "measurePerRow": "試行全体の行ごとの平均",
+          "dimensionImproved": "{count} 行が改善 | {count} 行が改善",
+          "dimensionUnchanged": "{count} 行は変化なし | {count} 行は変化なし",
+          "dimensionRegressed": "{count} 行が悪化 | {count} 行が悪化",
+          "dimensionNotCounted": "カウント対象外",
+          "dimensionNotCountedHint": "このスコアラーには、スコア設定に比較ポリシーがないため、値は報告されますが、改善または悪化として判定されることはなく、結果に影響を与えることはできません。カウント対象にするには、方向としきい値を指定してください。",
+          "dimensionNoneCompared": "比較対象なし",
+          "dimensionNoneComparedHint": "両側で測定された行はありません。片方の実験でのみ実行された行には、移動元となるものがないため、どの方向にもカウントされません。"
         },
         "rowDrawer": {
           "fallbackTitle": "比較行",
@@ -11429,6 +11436,7 @@
         "republishedSuccess": "説明が更新されました。バージョン {version} は変更されていません。",
         "draftSuccess": "下書きが保存されました。公開するには接続をテストしてください。",
         "draftError": "下書きを保存できませんでした",
+        "testFailed": "接続テストに失敗しました",
         "publishFailed": "テスト接続に失敗したため、何も公開されませんでした。下書きは保存されています。",
         "createError": "リモートタスクを公開できませんでした",
         "validation": {

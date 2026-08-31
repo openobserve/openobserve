@@ -11064,7 +11064,14 @@
           "typeCategorical": "Catégoriel",
           "typeBoolean": "Booléen",
           "threshold": "Seuil",
-          "measurePerRow": "Moyenne par ligne, sur les essais"
+          "measurePerRow": "Moyenne par ligne, sur les essais",
+          "dimensionImproved": "{count} ligne améliorée | {count} lignes améliorées",
+          "dimensionUnchanged": "{count} ligne inchangée | {count} lignes inchangées",
+          "dimensionRegressed": "{count} ligne en régression | {count} lignes en régression",
+          "dimensionNotCounted": "Non compté",
+          "dimensionNotCountedHint": "Cet évaluateur n'a aucune politique de comparaison dans sa configuration de score, donc ses valeurs sont rapportées mais jamais jugées améliorées ou en régression — et il ne peut pas affecter le résultat. Donnez-lui une direction et un seuil pour qu'il soit compté.",
+          "dimensionNoneCompared": "Aucune comparaison",
+          "dimensionNoneComparedHint": "Aucune ligne n'a été mesurée des deux côtés. Une ligne qui n'apparaît que dans une seule expérience n'a pas de point de comparaison, elle ne compte donc dans aucune direction."
         },
         "rowDrawer": {
           "fallbackTitle": "Ligne de comparaison",
@@ -11429,6 +11436,7 @@
         "republishedSuccess": "Description mise à jour. La version {version} est inchangée.",
         "draftSuccess": "Brouillon enregistré. Testez la connexion pour le publier.",
         "draftError": "Impossible d'enregistrer le brouillon",
+        "testFailed": "Le test de connexion a échoué",
         "publishFailed": "La connexion de test a échoué, donc rien n'a été publié. Votre brouillon est enregistré.",
         "createError": "Impossible de publier la tâche distante",
         "validation": {
