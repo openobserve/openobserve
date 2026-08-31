@@ -28,6 +28,7 @@ pub mod nats;
 pub mod postgres;
 pub mod sqlite;
 pub mod tantivy_index;
+pub mod trace_time_index;
 
 pub static NEED_WATCH: bool = true;
 pub static NO_NEED_WATCH: bool = false;
@@ -39,23 +40,44 @@ static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 
 pub const SQLITE_STORE: &str = "sqlite";
 
-pub static ORM_CLIENT: OnceCell<DatabaseConnection> = OnceCell::const_new();
-pub static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
+static ORM_CLIENT_RO: OnceCell<DatabaseConnection> = OnceCell::const_new();
+pub(crate) static ORM_CLIENT_RW: OnceCell<DatabaseConnection> = OnceCell::const_new();
+static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
-pub async fn connect_to_orm() -> DatabaseConnection {
+/// ORM client for reads.
+pub async fn get_orm_client_ro() -> &'static DatabaseConnection {
+    ORM_CLIENT_RO.get_or_init(connect_to_orm_ro).await
+}
+
+/// ORM client for writes. On SQLite they serialize on a single connection.
+pub async fn get_orm_client_rw() -> &'static DatabaseConnection {
+    ORM_CLIENT_RW.get_or_init(connect_to_orm_rw).await
+}
+
+/// ORM client for schema migrations.
+pub async fn get_orm_client_ddl() -> &'static DatabaseConnection {
+    ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await
+}
+
+async fn connect_to_orm_ro() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::PostgreSQL => {
-            let pool = postgres::CLIENT.clone();
-            SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
+            SqlxPostgresConnector::from_sqlx_postgres_pool(postgres::CLIENT_RO.clone())
         }
-        _ => {
-            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
-        }
+        _ => SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RO.clone()),
     }
 }
 
-pub async fn connect_to_orm_ddl() -> DatabaseConnection {
+async fn connect_to_orm_rw() -> DatabaseConnection {
+    match get_config().common.meta_store.as_str().into() {
+        MetaStore::PostgreSQL => {
+            SqlxPostgresConnector::from_sqlx_postgres_pool(postgres::CLIENT_RW.clone())
+        }
+        _ => SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW.clone()),
+    }
+}
+
+async fn connect_to_orm_ddl() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::PostgreSQL => {
             let pool = postgres::CLIENT_DDL.clone();
@@ -63,8 +85,7 @@ pub async fn connect_to_orm_ddl() -> DatabaseConnection {
         }
         _ => {
             // for sqlite, there is no separate ddl client, use the common one
-            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW.clone())
         }
     }
 }
@@ -180,6 +201,18 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
+
+    /// Like `get`, but returns `None` when `key` is missing. Prefer it for
+    /// exact-key lookups expected to miss: `get` falls back to a prefix scan,
+    /// which on NATS costs a full bucket listing per miss.
+    async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
+        match self.get(key).await {
+            Ok(v) => Ok(Some(v)),
+            Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     async fn put(
         &self,
         key: &str,
@@ -438,5 +471,11 @@ mod tests {
         db.put("/foo/del/bar3", hello, false, None).await.unwrap();
         assert_eq!(db.list_keys("/foo/del/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/del/").await.unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn write_pool_is_single_connection_on_sqlite() {
+        // a second write connection reintroduces SQLITE_BUSY_SNAPSHOT (517)
+        assert_eq!(sqlite::CLIENT_RW.options().get_max_connections(), 1);
     }
 }

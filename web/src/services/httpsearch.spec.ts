@@ -184,7 +184,7 @@ describe("httpsearch service", () => {
         await expect(errorHandler(error)).rejects.toEqual(error);
       });
 
-      it("should JSON-stringify the error message for 400", async () => {
+      it("should surface the raw server error message for 400", async () => {
         const error = {
           response: { status: 400, data: { error: "Some bad request detail" } },
         };
@@ -261,7 +261,7 @@ describe("httpsearch service", () => {
     });
 
     describe("500 Internal Server Error", () => {
-      it("should show JSON-stringified error message notification", async () => {
+      it("should show the server error message notification", async () => {
         const error = {
           response: { status: 500, data: { error: "Database connection failed" } },
         };
@@ -275,7 +275,7 @@ describe("httpsearch service", () => {
         await expect(errorHandler(error)).rejects.toEqual(error);
       });
 
-      it("should JSON-stringify the error message for 500", async () => {
+      it("should surface the raw server error message for 500", async () => {
         const error = {
           response: { status: 500, data: { error: "Something went wrong" } },
         };

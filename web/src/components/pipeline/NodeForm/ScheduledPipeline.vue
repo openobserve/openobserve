@@ -432,12 +432,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
-                                  class="w-22! border border-(--color-border-subtle)"
+                                  class="border-border-subtle w-22! border"
                                 />
                               </div>
-                              <div
-                                class="flex items-center border border-l-0 border-(--color-border-subtle)"
-                              >
+                              <div class="border-border-subtle flex items-center border border-l-0">
                                 <div
                                   style="width: 5.5625rem; margin-left: 0 !important"
                                   class="silence-notification-input"
@@ -586,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OFormSelect
                                 data-test="add-report-schedule-start-timezone-select"
                                 name="trigger_condition.timezone"
-                                :options="filteredTimezone"
+                                :options="timezoneSelectOptions"
                                 :placeholder="raw(t('logStream.timezone') + ' *')"
                                 :title="triggerData.timezone"
                                 width="xs"
@@ -709,7 +707,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #separator>
             <div
-              class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+              class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
             ></div>
           </template>
           <template #after>
@@ -1004,6 +1002,7 @@ import { debounce } from "lodash-es";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -1098,8 +1097,8 @@ const getColumns = computed(() => {
           store.state.timezone,
           "yyyy-MM-dd HH:mm:ss.SSS",
         ),
-      label: t("search.timestamp") + ` (${store.state.timezone})`,
-      header: raw(t("search.timestamp") + ` (${store.state.timezone})`),
+      label: raw("timestamp") + ` (${store.state.timezone})`,
+      header: raw(`timestamp (${store.state.timezone})`),
       align: "left",
       sortable: true,
       enableResizing: false,
@@ -1254,7 +1253,7 @@ const {
   fetchFieldValues,
   cancelFieldStream,
   resetFieldValues,
-} = useFieldValuesStream();
+} = useFieldValuesStream(t);
 
 // ─── Query editor typewriter placeholder ─────────────────────────────
 const isSqlMode = computed(() => tab.value === "sql");
@@ -1264,6 +1263,7 @@ const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   fieldValues,
   isSqlMode,
   noStream,
+  t,
   { noStreamText: t("pipeline.queryEditorPlaceholder") },
 );
 
@@ -1279,12 +1279,12 @@ const {
 } = useSqlSuggestions();
 
 const PERCENTILE_LABELS = [
-  { key: "p25", label: "P25" },
-  { key: "p50", label: "P50" },
-  { key: "p75", label: "P75" },
-  { key: "p95", label: "P95" },
-  { key: "p99", label: "P99" },
-  { key: "max", label: "Max" },
+  { key: "p25", label: raw("P25") },
+  { key: "p50", label: raw("P50") },
+  { key: "p75", label: raw("P75") },
+  { key: "p95", label: raw("P95") },
+  { key: "p99", label: raw("P99") },
+  { key: "max", label: t("pipeline.percentileMax") },
 ] as const;
 
 const {
@@ -1293,7 +1293,7 @@ const {
   fetchPercentiles,
   cancelFetch: cancelPercentileFetch,
   errMsg: durationPercentileErrMsg,
-} = useDurationPercentiles();
+} = useDurationPercentiles(t);
 
 const hasDurationPercentiles = computed(() =>
   PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
@@ -1320,7 +1320,7 @@ const tabOptions = computed(() => [
     icon: "code",
   },
   {
-    label: t("alerts.promql"),
+    label: raw("PromQL"),
     value: "promql",
     icon: "bar-chart",
     disabled: selectedStreamType.value !== "metrics",
@@ -1684,13 +1684,28 @@ let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+// Not translated on purpose: utils/timezone.ts resolveBrowserTimezone() parses
+// this exact "Browser Time (<zone>)" shape back to an IANA zone before saving, and
+// existing records hold it verbatim. The LABEL is translated in timezoneSelectOptions.
+const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const browserTime = raw("Browser Time (" + browserTz + ")");
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
 
 filteredTimezone.value = [...timezoneOptions];
+
+// The browser-time entry keeps its English VALUE (resolveBrowserTimezone parses that
+// exact shape and stored pipelines hold it) but renders translated copy. Mapped at
+// display time so `filteredTimezone` stays a plain string list for filtering.
+const timezoneSelectOptions = computed(() =>
+  (filteredTimezone.value as string[]).map((tz: string) =>
+    tz === browserTime
+      ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+      : { label: raw(tz), value: tz },
+  ),
+);
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
 
@@ -1741,6 +1756,10 @@ const updateQueryValue = (value: string) => {
 // "stream changed → regenerate default query" watch.
 const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
   if (!sql || !parser) return;
+  // parse() is exponential in paren nesting depth — skip a pathologically
+  // nested query rather than freeze the tab. Losing this convenience sync
+  // is fine; the user can still pick the stream from the dropdown.
+  if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return;
   try {
     const parsed = parser.parse(sql);
     const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
@@ -2343,11 +2362,11 @@ const runQuery = async () => {
   //check if datetime is present or not
   //else show the error message
   if (!dateTime.value.startTime) {
-    notificationMsgValue.value = "The selected start time is  invalid. Please choose a valid time.";
+    notificationMsgValue.value = t("pipeline.invalidStartTime");
     return null;
   }
   if (!dateTime.value.endTime) {
-    notificationMsgValue.value = "The selected end time is  invalid. Please choose a valid time.";
+    notificationMsgValue.value = t("pipeline.invalidEndTime");
     return null;
   }
   if (tab.value == "sql") {
@@ -2422,11 +2441,6 @@ const focusQueryEditor = () => {
   queryEditorPlaceholderFlag.value = false;
 };
 
-const expandLog = (index: any) => {
-  if (expandedLogs.value.includes(index))
-    expandedLogs.value = expandedLogs.value.filter((item) => item != index);
-  else expandedLogs.value.push(index);
-};
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData, t, {

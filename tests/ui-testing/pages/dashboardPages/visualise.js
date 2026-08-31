@@ -199,8 +199,17 @@ export default class LogsVisualise {
     await this.page
       .locator('[data-test="log-search-index-list-select-stream"]')
       .click({ force: true });
+    const popover = this.page.locator(
+      '[data-test="log-search-index-list-select-stream-popover"]'
+    );
+    await popover.waitFor({ state: "visible", timeout: 10000 });
+    // OSelect virtualises past 50 options, so a target stream further down the
+    // list is not in the DOM at all — filter it in through the popover search.
+    const popoverSearch = popover.locator("input").first();
+    await popoverSearch.click();
+    await popoverSearch.fill(stream);
     // OSelect forwards parent data-test to ListboxItems (`*-option`).
-    await this.page
+    await popover
       .locator('[data-test="log-search-index-list-select-stream-option"]', { hasText: stream })
       .first()
       .click();
@@ -593,12 +602,83 @@ export default class LogsVisualise {
     return toast;
   }
 
+  // Locator for a saved panel's dropdown menu trigger
+  getPanelDropdown(panelName) {
+    return this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+  }
+
+  // ── VRL visualization locator getters (used by visualize-vrl spec) ──────────
+
+  // Utilities menu button in the logs/visualize search bar (hosts the VRL toggle)
+  getUtilitiesMenuBtn() {
+    return this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+  }
+
+  // VRL show-query toggle button rendered inside the utilities dropdown menu
+  getVrlToggleMenuBtn() {
+    return this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn-btn"]');
+  }
+
+  // Rendered dashboard table panel
+  getTablePanel() {
+    return this.page.locator('[data-test="dashboard-panel-table"]');
+  }
+
+  // Data rows inside the rendered dashboard table panel
+  getTableRows() {
+    return this.page.locator('[data-test="dashboard-panel-table"] tbody tr');
+  }
+
+  // Chart-type selector item by type (e.g. "table", "line", "bar", "h-bar")
+  getChartTypeItem(chartType) {
+    return this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+  }
+
+  // "Edit panel" action button (from a panel dropdown menu)
+  getEditPanelBtn() {
+    return this.page.locator('[data-test="dashboard-edit-panel"]');
+  }
+
+  // VRL "only supported for table chart" warning banner
+  getVrlWarningBanner() {
+    return this.page.getByText("VRL function is only supported for table chart");
+  }
+
+  // VRL error notification (present only when VRL functions are active on non-table)
+  getVrlErrorNotification() {
+    return this.page.getByText(
+      "VRL functions are present. Only table chart is supported when using VRL functions."
+    );
+  }
+
+  // Toast message locator scoped to a given text
+  getToastMessageByText(text) {
+    return this.page
+      .locator('[data-test="o-toast-message"]')
+      .filter({ hasText: text });
+  }
+
+  // Dashboard back button locator (for waits; use clickDashboardBackBtn() to click)
+  getDashboardBackBtn() {
+    return this.page.locator('[data-test="dashboard-back-btn"]');
+  }
+
+  // Dialog primary (confirm) button locator
+  getDialogPrimaryBtn() {
+    return this.page.locator('[data-test="o-dialog-primary-btn"]');
+  }
+
+  // Sidebar/table field locator matched by Playwright text engine selector
+  getFieldByTextSelector(textSelector) {
+    return this.page.locator(textSelector);
+  }
+
   // Open query inspector from a panel dropdown
   async openPanelQueryInspector(panelName) {
     // Wait for the dashboard view to fully load after panel save
     await this.page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
-    const dropdown = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    const dropdown = this.getPanelDropdown(panelName);
     await dropdown.waitFor({ state: "visible", timeout: 20000 });
     await dropdown.click();
 
@@ -620,6 +700,17 @@ export default class LogsVisualise {
   // Click the dashboard back button
   async clickDashboardBackBtn() {
     await this.page.locator('[data-test="dashboard-back-btn"]').click();
+
+    // Both the panel-editor and dashboard-view page render an element with
+    // the same data-test="dashboard-back-btn" — a click right after saving
+    // can land on a stale instance mid page-transition and silently no-op.
+    // Verify the URL actually changed and retry once if not.
+    try {
+      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 8000 });
+    } catch (e) {
+      await this.page.locator('[data-test="dashboard-back-btn"]').click();
+      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 15000 });
+    }
   }
 
   // Get chart renderer canvas locator

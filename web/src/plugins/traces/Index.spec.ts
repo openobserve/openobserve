@@ -470,8 +470,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should update URL with tab=traces when searchMode changes to traces", async () => {
-      // Start in service-graph mode so switching to traces is an actual change
-      mockSearchObj.meta.searchMode = "service-graph";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -502,6 +503,115 @@ describe("Index.vue (Main Traces Page)", () => {
           query: expect.objectContaining({ tab: "traces" }),
         }),
       );
+    });
+
+    it("should update URL with tab=spans when searchMode changes to spans", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { tab: "traces", search_mode: "spans" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "spans");
+      await flushPromises();
+
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
+    });
+
+    it("should switch to spans when the tab query changes on the mounted Traces route", async () => {
+      const currentRoute = ref({
+        query: { tab: "traces" },
+        name: "traces",
+        path: "/traces",
+      }) as typeof router.currentRoute;
+      routerCurrentRouteSpy.mockReturnValue(currentRoute);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      currentRoute.value = {
+        ...currentRoute.value,
+        query: { tab: "spans" },
+      };
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(routerReplaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("should restore the spans default when the tab query is removed", async () => {
+      const currentRoute = ref({
+        query: { tab: "spans" },
+        name: "traces",
+        path: "/traces",
+      }) as typeof router.currentRoute;
+      routerCurrentRouteSpy.mockReturnValue(currentRoute);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      currentRoute.value = {
+        ...currentRoute.value,
+        query: {},
+      };
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
     });
 
     it("should switch to service-graph tab from ?tab= on enterprise", async () => {
@@ -556,7 +666,9 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
     it("should render the ServiceGraph stub inline in service-graph mode (enterprise)", async () => {
-      mockSearchObj.meta.searchMode = "service-graph";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
       wrapper = mountIndex();
       await flushPromises();
 
@@ -565,7 +677,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
-      mockSearchObj.meta.searchMode = "services-catalog";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "services-catalog" }, name: "traces", path: "/traces" },
+      } as any);
       wrapper = mountIndex();
       await flushPromises();
 
@@ -574,7 +688,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should apply the built filter and switch mode on view-traces from the graph", async () => {
-      mockSearchObj.meta.searchMode = "service-graph";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
       wrapper = mountIndex();
       await flushPromises();
 
@@ -885,68 +1001,6 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="traces-search-error-20003"]').exists()).toBe(true);
-    });
-  });
-
-  describe("Field List Management", () => {
-    it("should toggle field list visibility", async () => {
-      mockSearchObj.meta.showFields = true;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      // collapseFieldList is exposed directly; there is no collapse button in the
-      // current template, so we call the method rather than triggering a DOM click.
-      await wrapper.vm.collapseFieldList();
-      await flushPromises();
-
-      expect(mockSearchObj.meta.showFields).toBe(false);
-    });
-
-    it("should update splitter model when fields are collapsed", async () => {
-      mockSearchObj.meta.showFields = true;
-      mockSearchObj.config.splitterModel = 20;
-      mockSearchObj.config.lastSplitterPosition = 20;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      // Call collapseFieldList and verify showFields changed
-      await wrapper.vm.collapseFieldList();
-      await flushPromises();
-
-      // The watcher will set splitterModel to 0 when showFields is false
-      expect(mockSearchObj.meta.showFields).toBe(false);
     });
   });
 
@@ -1838,12 +1892,12 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
-    it("should pass only the WHERE-clause portion to parseDurationWhereClause when editorValue contains a pipe prefix", async () => {
+    it("should pass a match_all term containing a pipe to parseDurationWhereClause in full", async () => {
       const parseSpy = vi.mocked(useDurationPercentilesModule.parseDurationWhereClause);
       parseSpy.mockReturnValue("duration >= 1500");
 
-      // editorValue with a query-functions prefix before the pipe
-      mockSearchObj.data.editorValue = "someFunc | duration >= '1.50ms'";
+      // A pipe inside a quoted search term is part of the term, not a separator.
+      mockSearchObj.data.editorValue = "match_all('text | error') and duration >= '1.50ms'";
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -1866,15 +1920,14 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
-      // parseDurationWhereClause must be called with only the part after the pipe,
-      // NOT with the full "someFunc | duration >= '1.50ms'" string.
+      // The whole editor value is the where clause — the match_all term must reach
+      // parseDurationWhereClause intact rather than truncated at the pipe.
       const calls = parseSpy.mock.calls.filter(
         ([clause]) => typeof clause === "string" && clause.trim() !== "",
       );
       expect(calls.length).toBeGreaterThan(0);
       for (const [clause] of calls) {
-        expect(clause).not.toContain("|");
-        expect(clause).not.toContain("someFunc");
+        expect(clause).toContain("match_all('text | error')");
       }
     });
 
@@ -2041,8 +2094,8 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
-    it("should pass only the WHERE-clause portion to parseSpanKindWhereClause when editorValue contains a pipe prefix", async () => {
-      mockSearchObj.data.editorValue = "someFunc | span_kind='Consumer'";
+    it("should pass a match_all term containing a pipe to parseSpanKindWhereClause in full", async () => {
+      mockSearchObj.data.editorValue = "match_all('text | error') and span_kind='Consumer'";
 
       wrapper = mountIndexStubbed();
       await flushPromises();
@@ -2055,9 +2108,8 @@ describe("Index.vue (Main Traces Page)", () => {
       );
       expect(nonEmptyCalls.length).toBeGreaterThan(0);
       for (const [clause] of nonEmptyCalls) {
-        // The pipe-prefix (function expression) must not be forwarded.
-        expect(clause).not.toContain("|");
-        expect(clause).not.toContain("someFunc");
+        // The quoted term is forwarded intact rather than truncated at the pipe.
+        expect(clause).toContain("match_all('text | error')");
       }
     });
   });

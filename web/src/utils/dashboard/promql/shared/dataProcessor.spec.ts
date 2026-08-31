@@ -23,16 +23,9 @@ import {
 import type { PromQLResponse } from "./types";
 
 // Mock the legendBuilder module
-vi.mock("./legendBuilder", () => ({
-  getPromqlLegendName: vi.fn((metric, template) => {
-    if (template) {
-      return template.replace(/\{\{(\w+)\}\}/g, (_, key) => metric[key] || "");
-    }
-    return Object.entries(metric)
-      .map(([k, v]) => `${k}="${v}"`)
-      .join(",");
-  }),
-}));
+// The REAL namer, so this path cannot drift from the one the line/bar charts
+// use — the two disagreeing is exactly the bug this spec now guards.
+vi.unmock("./legendBuilder");
 
 describe("dataProcessor", () => {
   describe("processPromQLData", () => {
@@ -53,7 +46,7 @@ describe("dataProcessor", () => {
         queries: [
           {
             config: {
-              promql_legend: "{{job}}",
+              promql_legend: "{job}",
             },
           },
         ],
@@ -87,6 +80,27 @@ describe("dataProcessor", () => {
       expect(result[0].series[0].values).toHaveLength(2);
       expect(result[0].timestamps).toHaveLength(2);
       expect(result[0].queryIndex).toBe(0);
+    });
+
+    // Line/bar go through convertPromQLData; pie, table, heatmap and the rest come
+    // here. Naming them differently means flipping a panel's type silently
+    // rewrites its legend, its tooltip and its per-series colour keys.
+    it("names series the same way the line and bar path does", async () => {
+      const searchQueryData: PromQLResponse[] = [
+        {
+          status: "success",
+          resultType: "matrix",
+          result: [
+            { metric: { __name__: "up", pod: "api-1", job: "k8s" }, values: [[1609459200, "1"]] },
+            { metric: { __name__: "up", pod: "api-2", job: "k8s" }, values: [[1609459200, "1"]] },
+          ],
+        },
+      ] as any;
+      const noTemplate = { ...mockPanelSchema, queries: [{ config: {} }] };
+
+      const result = await processPromQLData(searchQueryData, noTemplate, mockStore);
+
+      expect(result[0].series.map((entry: any) => entry.name)).toEqual(["api-1", "api-2"]);
     });
 
     it("should process OpenObserve format (direct result)", async () => {

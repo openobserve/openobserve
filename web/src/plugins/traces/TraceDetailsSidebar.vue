@@ -184,16 +184,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
 
-          <OButton
-            v-if="showEvaluateButton && canPreviewSpan"
-            variant="primary"
-            size="xs"
-            class="ml-1"
-            data-test="trace-details-sidebar-evaluate-span-btn"
-            @click.stop="evaluateSpan"
-          >
-            {{ t("onlineEvals.manualEvaluation.titles.span") }}
-          </OButton>
+          <!-- LLM workflow actions — icon-only, matching the trace header. The
+               row itself has no gap (its children carry their own margins), so
+               these three are grouped and spaced on the header's rhythm. -->
+          <div class="ml-2 flex items-center gap-2">
+            <OButton
+              v-if="showEvaluateButton && canPreviewSpan"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('onlineEvals.manualEvaluation.titles.span')"
+              data-test="trace-details-sidebar-evaluate-span-btn"
+              @click.stop="evaluateSpan"
+            >
+              <OIcon name="rule" size="sm" />
+              <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.span')" />
+            </OButton>
+
+            <TraceAnnotateMenu
+              v-if="showAnnotateButtons"
+              ref-type="span"
+              :ref-id="String(span.span_id ?? '')"
+              :ref-trace-id="String(span.trace_id ?? '')"
+              :ref-trace-start-time="spanStartTimeUs"
+              :source-stream="spanSourceStream"
+              compact
+              data-test="trace-details-sidebar-annotate-span-btn"
+            />
+
+            <OButton
+              v-if="showAnnotateButtons"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.dataset.button')"
+              data-test="trace-details-sidebar-dataset-span-btn"
+              @click.stop="addSpanToDataset"
+            >
+              <OIcon name="table-chart" size="sm" />
+              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
+            </OButton>
+          </div>
         </div>
       </div>
 
@@ -272,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="px-page-edge span_details_tabs">
       <OTabs
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         dense
         align="left"
@@ -348,13 +377,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden"
       :class="
-        activeTab === 'correlated-logs' || activeTab === 'correlated-metrics'
+        activeTabModel === 'correlated-logs' || activeTabModel === 'correlated-metrics'
           ? ''
           : 'px-page-edge py-2'
       "
     >
       <OTabPanels
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         grow
         class="h-full overflow-y-auto"
@@ -363,13 +392,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel v-if="canPreviewSpan" name="preview" class="llm-preview-panel p-3">
           <div class="llm-preview-container h-full! w-full overflow-hidden overflow-x-auto">
             <!-- Input and Output Side by Side -->
-            <div class="io-container flex h-full! w-full!" ref="ioContainerRef">
+            <div
+              class="io-container flex h-full! w-full!"
+              :class="isFullscreen ? 'bg-surface-panel' : ''"
+              ref="ioContainerRef"
+            >
               <!-- Input Section -->
               <div
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pr-2"
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
                   <div class="flex items-center gap-1">
@@ -442,6 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
                   <div class="flex items-center gap-1">
@@ -616,6 +651,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
         <OTabPanel name="events" class="flex h-[30.6rem]! flex-col p-0">
           <template v-if="spanDetails.events.length">
+            <!-- Mini-timeline: the same events as the table, plotted against
+                 this span's own duration so "when within the span" is a glance
+                 rather than a subtraction. -->
+            <div
+              class="shrink-0 pr-1 pb-[0.325rem] pl-1"
+              data-test="trace-details-sidebar-events-timeline"
+            >
+              <div class="text-3xs text-text-muted flex items-center justify-between pb-1">
+                <span>{{ t("traces.spanEventTimeline") }}</span>
+                <span>{{ getDuration }}</span>
+              </div>
+              <div
+                ref="eventTimelineRef"
+                class="bg-surface-panel border-card-glass-border rounded-default relative h-5 w-full border border-solid"
+              >
+                <button
+                  v-for="cluster in spanEventClusters"
+                  :key="cluster.key"
+                  type="button"
+                  class="absolute top-1/2 h-3 w-0.75 -translate-x-1/2 -translate-y-1/2 cursor-pointer p-0 before:absolute before:top-1/2 before:left-1/2 before:h-5 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+                  :class="SEVERITY_MARKER_CLASS[cluster.severity]"
+                  :style="{ left: cluster.left + '%' }"
+                  :title="clusterLabel(cluster)"
+                  :aria-label="clusterAriaLabel(cluster)"
+                  :data-event-severity="cluster.severity"
+                  :data-event-count="cluster.events.length"
+                  data-test="span-event-timeline-marker"
+                  @click="onEventMarkerClick(cluster.events[0])"
+                />
+              </div>
+            </div>
             <!-- Wrap toggle toolbar -->
             <div class="flex items-center gap-1 pb-[0.325rem] pl-1">
               <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
@@ -633,6 +699,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- eslint-enable local/no-hardcoded-px -->
               <OTable
+                ref="eventsTableRef"
                 :data="eventsRowsWithKey"
                 :columns="eventsTableColumns"
                 row-key="__rowId"
@@ -646,6 +713,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :enable-column-resize="true"
                 persist-columns
                 table-id="trace-details-events"
+                :expanded-ids="expandedEventIds"
+                @update:expanded-ids="expandedEventIds = $event"
               >
                 <template #expansion="{ row }">
                   <JsonPreview
@@ -678,7 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <OTabPanel name="database" class="h-full p-0">
-          <DbSpanDetails :span="span" />
+          <DbSpanDetails :span="span" :stream="streamName" />
         </OTabPanel>
 
         <OTabPanel name="links">
@@ -693,6 +762,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(col, index) in linkColumns"
                     :key="'result_' + index"
                     :data-test="`trace-events-table-th-${col.label}`"
+                    class="bg-border-default"
                   >
                     {{ col.label }}
                   </th>
@@ -831,12 +901,20 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import {
+  useSpanEventMarkers,
+  clusterSpanEventMarkers,
+  truncateEventName,
+  SEVERITY_MARKER_CLASS,
+  type SpanEventMarker,
+  type SpanEventCluster,
+} from "@/composables/traces/useSpanEvents";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
@@ -917,6 +995,15 @@ export default defineComponent({
       type: String,
       default: "standalone",
     },
+    /**
+     * Index of the span event to focus, set when a waterfall or flame-graph
+     * marker is clicked. Selecting a span hides the timeline those markers live
+     * on, so the click lands here instead.
+     */
+    focusEventIndex: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
     activeTab: {
       type: String,
       default: "attributes",
@@ -930,6 +1017,10 @@ export default defineComponent({
       default: false,
     },
     showEvaluateButton: {
+      type: Boolean,
+      default: false,
+    },
+    showAnnotateButtons: {
       type: Boolean,
       default: false,
     },
@@ -955,6 +1046,9 @@ export default defineComponent({
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
     ),
+    TraceAnnotateMenu: defineAsyncComponent(
+      () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+    ),
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
@@ -975,6 +1069,7 @@ export default defineComponent({
     "apply-filter-immediately",
     "add-field-to-table",
     "evaluate",
+    "add-to-dataset",
     "update:activeTab",
   ],
   setup(props, { emit }) {
@@ -997,7 +1092,10 @@ export default defineComponent({
       events: [],
     });
 
-    const { hasSpanError, hasExceptionEvents } = useTraceDetails(computed(() => props.span));
+    const { hasSpanError, hasExceptionEvents } = useTraceDetails(
+      computed(() => props.span),
+      t,
+    );
 
     const spanHttpResendCount = computed(() => {
       const attrs = props.span;
@@ -1008,13 +1106,13 @@ export default defineComponent({
       return !isNaN(num) && num > 0 ? num : null;
     });
 
-    const activeTab = computed({
+    const activeTabModel = computed({
       get: () => props.activeTab,
       set: (value: string) => emit("update:activeTab", value),
     });
 
     const navigateToError = () => {
-      activeTab.value = "error";
+      activeTabModel.value = "error";
     };
     const tags: Ref<{ [key: string]: string }> = ref({});
 
@@ -1168,14 +1266,14 @@ export default defineComponent({
     const tagColumns = [
       {
         name: "field",
-        label: "Field",
+        label: t("traces.traceDetailsSidebar.field"),
         field: "field",
         align: "left" as const,
         headerClasses: "text-left!",
       },
       {
         name: "value",
-        label: "Value",
+        label: t("traces.traceDetailsSidebar.value"),
         field: "value",
         align: "left" as const,
         headerClasses: "text-left!",
@@ -1256,7 +1354,7 @@ export default defineComponent({
             store.state.timezone,
             HUMAN_TZ_FORMAT,
           ),
-        label: "Timestamp",
+        label: t("traces.traceDetailsSidebar.timestamp"),
         align: "left" as const,
         sortable: true,
       },
@@ -1271,6 +1369,116 @@ export default defineComponent({
     ]);
 
     const eventsWrap = ref(false);
+
+    const eventsTableRef = ref<any>(null);
+
+    /**
+     * Row keys expanded in the events table.
+     *
+     * OTable drives expansion from this prop through `useTableExpansion`, which
+     * keeps its own Set — it does not read TanStack's expansion state, so
+     * `row.toggleExpanded()` on the table instance has no visible effect. Rows
+     * are keyed by `__rowId` (the array index, see `eventsRowsWithKey`), and a
+     * normalized event keeps that index, so a marker maps straight onto its row.
+     */
+    const expandedEventIds = ref<string[]>([]);
+
+    // Mini-timeline window is this span, not the trace: start_time is
+    // nanoseconds (see getTTFT above) and duration is already microseconds.
+    const spanEventMarkers = useSpanEventMarkers(
+      () => props.span?.events,
+      () => ({
+        startUs: Number(props.span?.start_time) / 1000,
+        durationUs: Number(props.span?.duration),
+      }),
+      () => store.state.zoConfig?.timestamp_column,
+    );
+
+    const eventMarkerLabel = (marker: SpanEventMarker) =>
+      marker.severity === "error"
+        ? t("traces.exceptionMarkerTooltip", { type: truncateEventName(marker.exceptionType) })
+        : t("traces.eventMarkerTooltip", {
+            name: truncateEventName(marker.name) || t("traces.spanEventFallback"),
+          });
+
+    // The mini-timeline resizes with the sidebar, so the cluster bucket is
+    // derived from the track's measured width rather than a fixed percentage.
+    const eventTimelineRef = ref<HTMLElement | null>(null);
+    const eventTimelineWidth = ref(0);
+
+    const onEventTimelineResize = () => {
+      eventTimelineWidth.value = eventTimelineRef.value?.clientWidth ?? 0;
+    };
+
+    /**
+     * The track is not in the DOM at mount: it lives inside the Events tab
+     * panel, which renders `v-if="isActive"` with no keep-alive, and is further
+     * gated on the span having events. Observing in `onMounted` therefore found
+     * nothing and never retried, leaving the width at 0 — where the cluster
+     * threshold is 0 and every event renders as its own overlapping marker.
+     * Watching the template ref attaches whenever the track appears and
+     * re-attaches after the user leaves the tab and comes back.
+     */
+    watch(
+      eventTimelineRef,
+      (element, _previous, onCleanup) => {
+        if (!element || typeof ResizeObserver === "undefined") return;
+
+        onEventTimelineResize();
+
+        const observer = new ResizeObserver(onEventTimelineResize);
+        observer.observe(element);
+        onCleanup(() => observer.disconnect());
+      },
+      { flush: "post" },
+    );
+
+    const spanEventClusters = computed(() =>
+      clusterSpanEventMarkers(spanEventMarkers.value, eventTimelineWidth.value),
+    );
+
+    const clusterLabel = (cluster: SpanEventCluster) =>
+      cluster.events.length > 1
+        ? t("traces.eventClusterTooltip", { count: cluster.events.length })
+        : eventMarkerLabel(cluster.events[0]);
+
+    const clusterAriaLabel = (cluster: SpanEventCluster) => {
+      if (cluster.events.length === 1) return eventMarkerLabel(cluster.events[0]);
+      const errors = cluster.events.filter((event) => event.severity === "error").length;
+      const count = cluster.events.length;
+      return errors === 1
+        ? t("traces.eventClusterAriaLabel", { count, errors })
+        : t("traces.eventClusterAriaLabelPlural", { count, errors });
+    };
+
+    // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
+    // events keep that index, so a marker maps straight onto its table row.
+    const focusEvent = (index: number) => {
+      expandedEventIds.value = [String(index)];
+    };
+
+    const onEventMarkerClick = (marker: SpanEventMarker) => {
+      focusEvent(marker.index);
+    };
+
+    // The expansion names a row of *this* span's events table. Carrying it to
+    // the next span expands an unrelated row that happens to share the index.
+    // `focusEventIndex` arrives a tick later (see TraceDetails.onSelectSpanEvent),
+    // so a marker-driven span change still lands on its event.
+    watch(
+      () => props.span?.span_id,
+      () => {
+        expandedEventIds.value = [];
+      },
+    );
+
+    watch(
+      () => props.focusEventIndex,
+      (index) => {
+        if (index === null || index === undefined) return;
+        focusEvent(index);
+      },
+    );
 
     // Keyed by a non-enumerable `__rowId` (the array index): span events can
     // share, or lack, `_timestamp`, so keying expansion on it would expand
@@ -1348,14 +1556,14 @@ export default defineComponent({
       {
         name: "traceId",
         prop: (row: any) => (row.context ? row?.context?.traceId : ""),
-        label: "TraceId",
+        label: raw("TraceId"),
         align: "left",
         sortable: true,
       },
       {
         name: "spanId",
         prop: (row: any) => (row.context ? row?.context?.spanId : ""),
-        label: "spanId",
+        label: raw("spanId"),
         align: "left",
         sortable: true,
       },
@@ -1469,6 +1677,25 @@ export default defineComponent({
 
     const evaluateSpan = () => {
       emit("evaluate", props.span);
+    };
+
+    /** The trace stream this span was read from — the annotation API needs it. */
+    const spanSourceStream = computed(() => String(props.span?._stream ?? props.streamName ?? ""));
+
+    /** Span start in MICROSECONDS (`start_time` is nanoseconds), widened by 1µs
+     *  so an inclusive lower-bound search can't exclude the span itself. A span
+     *  with no usable start falls back to the trace's own start: the APIs take
+     *  this as a POSITIVE lower bound, so 0 would be rejected. */
+    const spanStartTimeUs = computed(() => {
+      const startNs = Number(props.span?.start_time);
+      if (Number.isFinite(startNs)) return Math.max(1, Math.floor(startNs / 1_000) - 1);
+      return Number(props.baseTracePosition?.startTimeUs) || 1;
+    });
+
+    // The enterprise drawers live in the parent (same shape as evaluate), so the
+    // sidebar only reports which span was acted on.
+    const addSpanToDataset = () => {
+      emit("add-to-dataset", props.span);
     };
 
     const getStartTime = computed(() => {
@@ -1809,7 +2036,7 @@ export default defineComponent({
     );
 
     // Load correlation data when user clicks on correlation tabs
-    watch(activeTab, (newTab) => {
+    watch(activeTabModel, (newTab) => {
       if (newTab === "correlated-logs" || newTab === "correlated-metrics") {
         loadCorrelation();
       }
@@ -1950,7 +2177,7 @@ export default defineComponent({
 
     // Format model parameters for display
     const formatModelParams = (params: any) => {
-      return formatModelParameters(params);
+      return formatModelParameters(params, t);
     };
 
     const serviceIconUrl = computed(() =>
@@ -1970,13 +2197,25 @@ export default defineComponent({
 
     return {
       t,
-      activeTab,
+      activeTabModel,
       filterActions,
       closeSidebar,
       eventColumns,
       eventsWrap,
       eventsTableColumns,
       eventsRowsWithKey,
+      eventsTableRef,
+      focusEvent,
+      expandedEventIds,
+      spanEventMarkers,
+      eventMarkerLabel,
+      onEventMarkerClick,
+      eventTimelineRef,
+      onEventTimelineResize,
+      spanEventClusters,
+      clusterLabel,
+      clusterAriaLabel,
+      SEVERITY_MARKER_CLASS,
       pagination,
       spanDetails,
       store,
@@ -1989,6 +2228,9 @@ export default defineComponent({
       getTTFT,
       viewSpanLogs,
       evaluateSpan,
+      addSpanToDataset,
+      spanStartTimeUs,
+      spanSourceStream,
       getStartTime,
       copySpanId,
       copyAttributesToClipboard,
@@ -2103,7 +2345,6 @@ export default defineComponent({
   }
 
   th {
-    background-color: var(--color-surface-panel);
   }
 
   th:first-child,
@@ -2179,7 +2420,6 @@ export default defineComponent({
 /* complex-state — :fullscreen chains on the LLM input/output panes */
 .llm-preview-container {
   .io-container:fullscreen {
-    background-color: var(--color-surface-panel);
     padding: 0.75rem;
     height: 100vh;
     max-height: 100vh;
@@ -2193,7 +2433,6 @@ export default defineComponent({
       flex-direction: column;
 
       .section-label {
-        background: var(--color-surface-panel);
         border-radius: var(--radius-default);
       }
 
@@ -2245,7 +2484,6 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: var(--color-grey-200);
 }
 
 .thead-sticky tr:last-child > * {

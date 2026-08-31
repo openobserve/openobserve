@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import searchService from "@/services/search";
 
 export interface ValueDistribution {
@@ -68,7 +69,7 @@ export interface LatencyInsightsConfig {
   percentile?: string; // Latency percentile value (e.g., "0.95" for P95)
 }
 
-export function useLatencyInsightsAnalysis() {
+export function useLatencyInsightsAnalysis(t: TranslateFn) {
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -455,7 +456,7 @@ export function useLatencyInsightsAnalysis() {
       return analyses;
     } catch (err: any) {
       loading.value = false;
-      error.value = err.message || "Failed to analyze dimensions";
+      error.value = err.message || t("traces.failedToAnalyzeDimensions");
       throw err;
     }
   };

@@ -70,6 +70,7 @@ export class AlertsFormValidationPage {
 
     // ── AddTemplate — action buttons ─────────────────────────────────────────
     this.templateSubmitBtn = '[data-test="add-template-submit-btn"]';
+    this.alertSubmitBtn = '[data-test="add-alert-submit-btn"]';
     this.templateCancelBtn = '[data-test="add-template-cancel-btn"]';
 
     // ── ImportAlert ───────────────────────────────────────────────────────────
@@ -219,6 +220,13 @@ export class AlertsFormValidationPage {
     await selector.waitFor({ state: 'visible', timeout: 10000 });
     // Prebuilt cards expose data-type="<type.id>" (slack/custom/…) — pick by id.
     await selector.locator('[data-test="destination-type-card"][data-type="slack"]').click();
+    // Slack opens on the guided flow — OAuth on Cloud, the manifest stepper on enterprise —
+    // and neither renders a webhook field. This spec validates the webhook URL, so pick that
+    // method rather than depending on which deployment's default is showing.
+    const webhookMethod = this.page.locator('[data-test="slack-setup-method-webhook"]').first();
+    if (await webhookMethod.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await webhookMethod.click({ timeout: 10000 }).catch(() => {});
+    }
     await this.page.locator(this.slackWebhookField).waitFor({ state: 'visible', timeout: 10000 });
   }
 
@@ -394,6 +402,7 @@ export class AlertsFormValidationPage {
   getFilterConditionOperatorErrorLocator()     { return this.page.locator(this.filterConditionOperatorError); }
   getFilterConditionValueFieldLocator()        { return this.page.locator(this.filterConditionValueField); }
   getFilterConditionValueErrorLocator()        { return this.page.locator(this.filterConditionValueError); }
+  async clickAlertSubmit()                     { await this.page.locator(this.alertSubmitBtn).click(); }
 
   // ── FieldsInput locator getters ───────────────────────────────────────────
   getFieldsInputAddBtnLocator()            { return this.page.locator(this.fieldsInputAddBtn); }

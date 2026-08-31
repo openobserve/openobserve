@@ -45,6 +45,11 @@ pub enum AssociationDeleteEvent {
         entity_id: String,
         workflow_id: String,
     },
+    TriggerWorkflow {
+        org_id: String,
+        trigger: String,
+        workflow_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
@@ -103,8 +108,18 @@ pub async fn get_workflow(
     Ok(workflow)
 }
 
+pub async fn get_draft(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
+    let draft = infra::table::workflows::get_draft_by_org_draft_id(org_id, id).await?;
+    Ok(draft)
+}
+
 pub async fn save_workflow_record(workflow: Workflow) -> Result<(), anyhow::Error> {
     infra::table::workflows::save_workflow(workflow).await?;
+    Ok(())
+}
+
+pub async fn save_draft_record(workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::save_draft(workflow).await?;
     Ok(())
 }
 
@@ -113,8 +128,23 @@ pub async fn update_workflow_record(workflow: Workflow) -> Result<(), anyhow::Er
     Ok(())
 }
 
+pub async fn update_draft_record(workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::update_draft(workflow).await?;
+    Ok(())
+}
+
+pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::promote_draft_to_workflow(org_id, workflow).await?;
+    Ok(())
+}
+
 pub async fn delete_workflow_record(id: &str) -> Result<(), anyhow::Error> {
     infra::table::workflows::delete_workflow(id).await?;
+    Ok(())
+}
+
+pub async fn delete_draft_record(id: &str) -> Result<(), anyhow::Error> {
+    infra::table::workflows::delete_draft(id).await?;
     Ok(())
 }
 
@@ -169,6 +199,50 @@ pub async fn notify_workflow_delete(id: &str) -> Result<(), anyhow::Error> {
             Err(e) => {
                 log::error!(
                     "error in sending workflow delete notification to super cluster queue for {id} : {e}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn notify_draft_upsert(workflow: &Workflow) -> Result<(), anyhow::Error> {
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::add_workflow_draft(workflow.clone())
+            .await
+        {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow draft upsert notification to super cluster queue for {}/{}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow draft upsert notification to super cluster queue for {}/{} : {e}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn notify_draft_delete(id: &str) -> Result<(), anyhow::Error> {
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::delete_workflow_draft(id).await {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow draft delete notification to super cluster queue for {id}"
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow draft delete notification to super cluster queue for {id} : {e}"
                 );
             }
         }
@@ -313,6 +387,21 @@ pub async fn delete_workflow_association(
             workflow = workflow_id;
             infra::table::workflows::delete_workflow_association(org_id, workflow_id, entity_id)
                 .await?;
+        }
+        AssociationDeleteEvent::TriggerWorkflow {
+            org_id,
+            trigger,
+            workflow_id,
+        } => {
+            org = org_id;
+            workflow = workflow_id;
+            trigger_type = trigger;
+            infra::table::workflows::delete_association_by_trigger_workflow(
+                org_id,
+                trigger,
+                workflow_id,
+            )
+            .await?;
         }
     }
 

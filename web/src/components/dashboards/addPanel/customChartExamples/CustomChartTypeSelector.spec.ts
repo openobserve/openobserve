@@ -229,7 +229,7 @@ describe("CustomChartTypeSelector", () => {
     const cats = wrapper.vm.chartCategories;
     expect(Array.isArray(cats)).toBe(true);
     expect(cats.length).toBeGreaterThan(0);
-    expect(cats[0]).toHaveProperty("chartLabel");
+    expect(cats[0]).toHaveProperty("chartLabelKey");
     expect(cats[0]).toHaveProperty("type");
   });
 });

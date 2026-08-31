@@ -58,6 +58,7 @@ import {
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 export default defineComponent({
   name: "LoginPage",
@@ -84,7 +85,11 @@ export default defineComponent({
         await configService
           .get_config()
           .then(async (res) => {
-            store.commit("setConfig", res.data);
+            // Never replace an already-loaded full config with the bootstrap
+            // subset (e.g. a logged-in user navigating to /login).
+            if (!store.state.zoConfig?.version) {
+              store.commit("setConfig", res.data);
+            }
           })
           .catch((err) => {
             console.error("Error while fetching config:", err);
@@ -233,11 +238,14 @@ export default defineComponent({
 
       const redirectURI = window.sessionStorage.getItem("redirectURI");
       window.sessionStorage.removeItem("redirectURI");
-      if (redirectURI != null && redirectURI != "") {
-        if (redirectURI.includes("http")) {
-          window.location.href = redirectURI;
-        } else {
+      // Same-origin only: `redirectURI` originates from the `?short_url=`
+      // query param, so an off-origin value here is a post-auth open redirect
+      // (see utils/common.ts redirectUser for the twin of this check).
+      if (redirectURI != null && redirectURI != "" && isSameOriginRedirect(redirectURI)) {
+        if (redirectURI.startsWith("/")) {
           router.push({ path: redirectURI });
+        } else {
+          window.location.href = redirectURI;
         }
       } else {
         router.push({ path: "/" });
@@ -299,7 +307,12 @@ export default defineComponent({
       configService
         .get_config()
         .then(async (res) => {
-          this.store.commit("setZoConfig", res.data);
+          // "setZoConfig" never existed as a mutation, so this fetch stored
+          // nothing; commit through the real mutation, with the same
+          // don't-clobber-the-full-config guard as everywhere else.
+          if (!this.store.state.zoConfig?.version) {
+            this.store.commit("setConfig", res.data);
+          }
           const token = getUserInfo(this.$route.hash);
 
           if (token !== null && token.email != null) {

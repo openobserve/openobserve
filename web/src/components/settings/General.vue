@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Reset Button -->
               <div
-                class="group/resetChip border-border-default hover:border-error-400 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 hover:-translate-y-px hover:rotate-180 hover:border-solid hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:opacity-100"
+                class="group/resetChip border-border-default hover:border-error-400 hover:bg-error-500/10 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 hover:-translate-y-px hover:rotate-180 hover:border-solid hover:opacity-100"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
@@ -379,7 +379,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.customLogoDarkDescription") }}
           </span>
         </div>
+
+        <!-- Authoring banners needs far more room than a settings row, so the
+             row is just the entry point into a drawer. -->
+        <div
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+        >
+          <span class="individual-setting-title text-sm leading-5 font-medium">
+            {{ t("announcements.settings.label") }}
+          </span>
+          <div class="flex items-center">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="settings_ent_announcement_banners_btn"
+              @click="showAnnouncementBanners = true"
+            >
+              {{ t("announcements.settings.configure") }}
+            </OButton>
+          </div>
+          <span class="individual-setting-description text-compact opacity-70">
+            {{ t("announcements.settings.description") }}
+          </span>
+        </div>
       </div>
+
+      <!-- The drawer belongs to the component that fills it — its header toggle
+           and footer actions are part of the same surface. -->
+      <AnnouncementBanners v-model:open="showAnnouncementBanners" />
     </div>
 
     <!-- Danger Zone: delete this organization (owner/admin only).
@@ -579,7 +606,6 @@ import config from "@/aws-exports";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
-import store from "@/test/unit/helpers/store";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
@@ -588,6 +614,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import AnnouncementBanners from "./AnnouncementBanners.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -612,6 +639,7 @@ export default defineComponent({
     },
   },
   components: {
+    AnnouncementBanners,
     GroupHeader,
     OButton,
     ODialog,
@@ -643,6 +671,7 @@ export default defineComponent({
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
+    const showAnnouncementBanners = ref(false);
     const files = ref(null);
     const filesLight = ref(null);
     const filesDark = ref(null);
@@ -992,9 +1021,11 @@ export default defineComponent({
                 }),
               });
 
-              await configService.get_config().then((res: any) => {
-                store.dispatch("setConfig", res.data);
-              });
+              await configService
+                .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
+                .then((res: any) => {
+                  store.dispatch("setConfig", res.data);
+                });
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1051,9 +1082,11 @@ export default defineComponent({
               }),
             });
 
-            await configService.get_config().then((res: any) => {
-              store.dispatch("setConfig", res.data);
-            });
+            await configService
+              .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
+              .then((res: any) => {
+                store.dispatch("setConfig", res.data);
+              });
           } else {
             toast({
               variant: "error",
@@ -1088,6 +1121,7 @@ export default defineComponent({
      */
     const handleThemeChipClick = (mode: "light" | "dark") => {
       // First, switch the theme mode if it's different from current
+      // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
       if (store.state.theme !== mode) {
         toggleThemeMode(mode);
       }
@@ -1307,6 +1341,7 @@ export default defineComponent({
       store,
       config,
       router,
+      showAnnouncementBanners,
       // Form wiring (Options-API: schema + defaults MUST be returned so :schema
       // resolves and validation runs).
       generalSettingsSchema,

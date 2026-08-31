@@ -27,7 +27,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+0.5rem)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-lg transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-lg"
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+0.5rem)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-lg transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-white/12 dark:shadow-lg"
         role="tooltip"
       >
         <div class="mb-2.5 text-sm font-semibold">{{ t("alerts.serviceGraphLegendTitle") }}</div>
@@ -52,9 +52,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
           >
           {{ t("alerts.serviceGraphNormal") }}
         </div>
-        <div
-          class="graph-legend__divider bg-border-default my-2 h-px dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]"
-        />
+        <div class="graph-legend__divider bg-border-default my-2 h-px dark:bg-white/15" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
             class="graph-legend__dot text-badge-purple-ol-text w-3.5 shrink-0 text-center text-sm leading-none"
@@ -100,18 +98,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
-import {
-  forceSimulation,
-  forceManyBody,
-  forceLink,
-  forceCenter,
-  forceCollide,
-  forceX,
-  forceY,
-} from "d3-force";
+import { forceSimulation, forceManyBody, forceLink, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -134,7 +123,6 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
     const { t } = useI18nTyped();
 
     const loading = ref(false);
@@ -548,14 +536,20 @@ export default defineComponent({
 
               let html = `<div style="padding: 0.5rem; font-size: var(--text-xs);">`;
               html += `<strong style="font-size: var(--text-sm);">${originalNode.alert_name}</strong><br/>`;
-              html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
-              html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
-              html += `First Fired: ${firstTime}<br/>`;
+              // The <strong> markup is passed through the interpolation slot so the
+              // message keeps the whole sentence (and its word order) translatable.
+              const serviceName = `<strong>${originalNode.service_name}</strong>`;
+              const alertCount = `<strong>${originalNode.alert_count}</strong>`;
+              html += `${t("alerts.serviceGraphTooltipService", { name: serviceName })}<br/><br/>`;
+              html += `${t("alerts.serviceGraphTooltipAlertCount", { count: alertCount })}<br/>`;
+              html += `${t("alerts.serviceGraphTooltipFirstFired", { time: firstTime })}<br/>`;
               if (lastTime) {
-                html += `Last Fired: ${lastTime}<br/>`;
+                html += `${t("alerts.serviceGraphTooltipLastFired", { time: lastTime })}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span style="color: var(--color-status-negative);">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span style="color: var(--color-status-negative);">${t(
+                  "alerts.serviceGraphTooltipRootCause",
+                )}</span>`;
               }
               html += `</div>`;
               return html;
@@ -611,12 +605,24 @@ export default defineComponent({
                 else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
                 else timeStr = `${seconds}s`;
 
-                html += `<span style="color: var(--color-badge-purple-ol-text);">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
-                html += `From: ${sourceTime.toLocaleString()}<br/>`;
-                html += `To: ${targetTime.toLocaleString()}<br/>`;
-                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">Temporal correlation</span>`;
+                const duration = `<strong>${timeStr}</strong>`;
+                html += `<span style="color: var(--color-badge-purple-ol-text);">${t(
+                  "alerts.serviceGraphTooltipTimeDifference",
+                  { duration },
+                )}</span><br/>`;
+                html += `${t("alerts.serviceGraphTooltipFrom", {
+                  time: sourceTime.toLocaleString(),
+                })}<br/>`;
+                html += `${t("alerts.serviceGraphTooltipTo", {
+                  time: targetTime.toLocaleString(),
+                })}<br/>`;
+                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">${t(
+                  "alerts.serviceGraphTooltipTemporalCorrelation",
+                )}</span>`;
               } else {
-                html += `<span style="color: var(--color-text-muted);">Service dependency</span>`;
+                html += `<span style="color: var(--color-text-muted);">${t(
+                  "alerts.serviceGraphTooltipServiceDependency",
+                )}</span>`;
               }
 
               html += `</div>`;

@@ -113,8 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import useStreams from "@/composables/useStreams";
 import { ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -136,8 +135,6 @@ defineProps({
 });
 
 const emit = defineEmits(["save"]);
-
-const store = useStore();
 
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);

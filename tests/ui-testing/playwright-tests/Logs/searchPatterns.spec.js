@@ -20,8 +20,13 @@ const patternsTestData = require("../../../test-data/patterns_test_data.json");
 const { ingestCustomData, enableLogPatternsExtraction, waitForStreamData } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-// Dedicated stream for pattern tests with proper configuration
-const PATTERNS_STREAM = "e2e_http_patterns";
+// Dedicated stream for pattern tests with proper configuration.
+// Unique per-run suffix so concurrent alpha runs never share the name: on the shared
+// cloud org a fixed name meant one run's pre-test cleanup was deleting the stream while
+// another run's beforeAll ingested into it, returning 400 "stream is being deleted" and
+// leaving the stream absent for selectStream. cleanup.spec.js reclaims these via the
+// `/^e2e_http_patterns/` prefix pattern.
+const PATTERNS_STREAM = `e2e_http_patterns_${Date.now().toString(36)}`;
 
 // Track if data has been ingested (for serial test execution)
 let dataIngested = false;
@@ -98,12 +103,21 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             }));
 
             testLogger.info(`Ingesting ${freshData.length} logs to stream: ${PATTERNS_STREAM}`);
-            const ingestResponse = await ingestCustomData(page, PATTERNS_STREAM, freshData);
+            // Retry on the transient "stream is being deleted" (400) that a concurrent run's
+            // cleanup can trigger — the delete completes, then the POST recreates the stream.
+            let ingestResponse;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                ingestResponse = await ingestCustomData(page, PATTERNS_STREAM, freshData);
+                if (ingestResponse.status === 200) break;
+                const msg = JSON.stringify(ingestResponse.data || {});
+                testLogger.warn(`Pattern data ingestion attempt ${attempt} returned ${ingestResponse.status}`, { data: msg.slice(0, 160) });
+                if (attempt < 3) await page.waitForTimeout(3000);
+            }
 
             if (ingestResponse.status === 200) {
-                testLogger.info('Pattern data ingested successfully', { status: ingestResponse.status });
+                testLogger.info('Pattern data ingested successfully', { status: ingestResponse.status, stream: PATTERNS_STREAM });
             } else {
-                testLogger.error('Pattern data ingestion failed', { status: ingestResponse.status, data: ingestResponse.data });
+                testLogger.error('Pattern data ingestion failed after retries', { status: ingestResponse.status, data: ingestResponse.data });
             }
 
             // Enable log patterns extraction on the stream
@@ -118,7 +132,10 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
                 testLogger.warn('Stream data polling timed out, proceeding anyway...');
             }
 
-            dataIngested = true;
+            // Only latch the "already ingested" guard when the stream actually landed, so a
+            // transient ingest failure doesn't make every test in the serial block run
+            // against a non-existent stream.
+            dataIngested = ingestResponse.status === 200;
         } finally {
             await context.close();
         }
@@ -360,30 +377,25 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             const cardCount = await pm.logsPage.getPatternCardCount();
 
             if (cardCount >= 2) {
-                // Open first pattern details
-                await pm.logsPage.clickPatternDetailsIcon(0);
+                const absoluteIndex = await pm.logsPage.clickPatternDetailsIcon(0);
                 await pm.logsPage.expectPatternDetailsDialogOpen();
 
-                // STRONG ASSERTION: Previous should be disabled on first pattern
-                await pm.logsPage.expectPatternDetailPreviousBtnDisabled();
-
-                // STRONG ASSERTION: Next should be enabled
-                await pm.logsPage.expectPatternDetailNextBtnEnabled();
-
-                // Navigate to next pattern
-                await pm.logsPage.clickPatternDetailNextBtn();
-
-                // Verify we're on pattern 2
-                await pm.logsPage.waitForPatternDetailIndex(2);
-
-                // STRONG ASSERTION: Previous should now be enabled
-                await pm.logsPage.expectPatternDetailPreviousBtnEnabled();
-
-                // Navigate back
-                await pm.logsPage.clickPatternDetailPreviousBtn();
-
-                // Verify we're back on pattern 1
-                await pm.logsPage.waitForPatternDetailIndex(1);
+                if (absoluteIndex === 0) {
+                    await pm.logsPage.expectPatternDetailPreviousBtnDisabled();
+                    await pm.logsPage.expectPatternDetailNextBtnEnabled();
+                    await pm.logsPage.clickPatternDetailNextBtn();
+                    await pm.logsPage.waitForPatternDetailIndex(2);
+                    await pm.logsPage.expectPatternDetailPreviousBtnEnabled();
+                    await pm.logsPage.clickPatternDetailPreviousBtn();
+                    await pm.logsPage.waitForPatternDetailIndex(1);
+                } else {
+                    await pm.logsPage.expectPatternDetailPreviousBtnEnabled();
+                    await pm.logsPage.clickPatternDetailPreviousBtn();
+                    await pm.logsPage.waitForPatternDetailIndex(absoluteIndex);
+                    await pm.logsPage.expectPatternDetailNextBtnEnabled();
+                    await pm.logsPage.clickPatternDetailNextBtn();
+                    await pm.logsPage.waitForPatternDetailIndex(absoluteIndex + 1);
+                }
 
                 await pm.logsPage.closePatternDetailsDialog();
                 testLogger.info('Navigation between patterns works correctly');

@@ -209,6 +209,7 @@ vi.mock("@/utils/telemetryCorrelation", async () => {
 
 // Import after all vi.mock() declarations so the mocks are in place
 import { useSearchQuery } from "./useSearchQuery";
+import { gt } from "@/types/i18n";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -253,7 +254,7 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
   beforeEach(() => {
     mockState = createMockState();
     vi.clearAllMocks();
-    ({ buildSearch } = useSearchQuery());
+    ({ buildSearch } = useSearchQuery(gt));
   });
 
   // ── quick_mode flag ────────────────────────────────────────────────────────
@@ -423,7 +424,7 @@ describe("useSearchQuery › SQL Reserved Keyword Quoting", () => {
   beforeEach(() => {
     mockState = createMockState();
     vi.clearAllMocks();
-    ({ buildSearch } = useSearchQuery());
+    ({ buildSearch } = useSearchQuery(gt));
     mockState.searchObj.meta.sqlMode = false;
     mockState.searchObj.meta.quickMode = true;
     mockState.searchObj.data.stream.selectedStream = ["my-stream"];
@@ -462,7 +463,7 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
     // Reset semantic groups to empty by default
     mockSemanticGroups.value = [];
 
-    const composable = useSearchQuery();
+    const composable = useSearchQuery(gt);
     validateFilterForMultiStream = composable.validateFilterForMultiStream;
   });
 
@@ -708,7 +709,7 @@ describe("useSearchQuery › handleMultiStream WHERE rewrite", () => {
     mockState = createMockState();
     vi.clearAllMocks();
     mockSemanticGroups.value = [];
-    ({ buildSearch } = useSearchQuery());
+    ({ buildSearch } = useSearchQuery(gt));
 
     // Base setup: non-SQL mode, quick mode off
     mockState.searchObj.meta.sqlMode = false;
@@ -820,5 +821,65 @@ describe("useSearchQuery › handleMultiStream WHERE rewrite", () => {
     expect(result).toBeNull();
     expect(mockState.searchObj.data.filterErrMsg).toContain("nonexistent");
     expect(mockState.searchObj.data.filterErrMsg).toContain("does not exist");
+  });
+});
+
+describe("useSearchQuery › buildSearch › LIMIT in filter mode", () => {
+  let buildSearch: ReturnType<typeof useSearchQuery>["buildSearch"];
+
+  beforeEach(() => {
+    mockState = createMockState();
+    vi.clearAllMocks();
+    mockState.searchObj.meta.sqlMode = false;
+    ({ buildSearch } = useSearchQuery());
+  });
+
+  it("should reject a filter carrying a LIMIT clause", () => {
+    mockState.searchObj.data.query = "k8s_namespace_name = 'nginx-ingress' LIMIT 10";
+
+    const result = buildSearch();
+
+    expect(result).toBeNull();
+    expect(mockState.notificationMsg.value).toContain("LIMIT");
+  });
+
+  it("should not splice the LIMIT into a generated statement", () => {
+    mockState.searchObj.data.query = "code = 200 LIMIT 5";
+
+    expect(buildSearch()).toBeNull();
+  });
+
+  it("should still build a payload for a filter without a LIMIT", () => {
+    mockState.searchObj.data.query = "code = 200";
+
+    const result = buildSearch();
+
+    expect(result).not.toBeNull();
+    expect(mockState.notificationMsg.value).toBe("");
+  });
+
+  it("should allow a field named limit", () => {
+    mockState.searchObj.data.query = "limit = 5";
+
+    expect(buildSearch()).not.toBeNull();
+  });
+
+  it("should ignore a LIMIT inside a commented-out line", () => {
+    mockState.searchObj.data.query = "code = 200\n-- LIMIT 10";
+
+    expect(buildSearch()).not.toBeNull();
+  });
+
+  it("should ignore a LIMIT in a trailing comment", () => {
+    mockState.searchObj.data.query = "code = 200 -- limit 10";
+
+    expect(buildSearch()).not.toBeNull();
+  });
+
+  it("should not apply the guard in SQL mode", () => {
+    mockState.searchObj.meta.sqlMode = true;
+    mockState.searchObj.data.query = 'SELECT * FROM "my-stream" LIMIT 10';
+
+    expect(buildSearch()).not.toBeNull();
   });
 });

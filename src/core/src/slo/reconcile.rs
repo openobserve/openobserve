@@ -36,7 +36,7 @@ use config::{
     },
     utils::json,
 };
-use infra::table::slo as slo_table;
+use infra::{db::get_orm_client_rw, table::slo as slo_table};
 
 /// The per-group figures a rebuild produced.
 #[derive(Debug, Clone, PartialEq)]
@@ -49,9 +49,7 @@ pub struct Rebuilt {
 
 /// Rebuild every group's aggregate for one SLO and write the results.
 pub async fn reconcile(slo: &Slo) -> Result<Vec<Rebuilt>, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let Some(status) = slo_table::load_status(db, &slo.id, "").await? else {
         return Ok(Vec::new());

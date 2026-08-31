@@ -215,10 +215,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :error="evidence.error.value"
                 :error-kind="evidence.errorKind.value"
                 :truncated="evidence.truncated.value"
-                :step-filter="evidenceStepFilter"
-                :step-filter-name="evidenceStepFilterName"
+                v-model:step-filter="evidenceStepFilter"
+                :step-options="evidenceStepOptions"
                 :run-passed="currentRun.status === 'pass'"
-                @clear-step-filter="evidenceStepFilter = null"
                 @retry="evidence.load(true)"
               />
             </OTabPanel>
@@ -248,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Lambda execution error (no steps) -->
               <div
                 v-else-if="isErrorRun"
-                class="border-badge-error-ol-border/30 rounded-default m-2 overflow-hidden border bg-[var(--color-badge-error-soft-bg)]"
+                class="border-badge-error-ol-border/30 rounded-default bg-badge-error-soft-bg m-2 overflow-hidden border"
                 role="alert"
                 data-test="synthetics-run-detail-steps-error-banner"
               >
@@ -422,7 +421,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </div>
 
-                          <div class="flex flex-1 flex-col gap-4">
+                          <!-- min-w-0: a flex item defaults to `min-width: auto` and so
+                               refuses to shrink below its content, which lets one long URL
+                               or the evidence table push this column past the expansion. -->
+                          <div class="flex min-w-0 flex-1 flex-col gap-4">
                             <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
                               <dt
                                 class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
@@ -457,9 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default border-badge-error-ol-border/30 overflow-hidden border"
                               :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
                             >
-                              <div
-                                class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
-                              >
+                              <div class="bg-badge-error-soft-bg flex items-center gap-2 px-3 py-2">
                                 <OIcon
                                   name="error"
                                   size="sm"
@@ -513,7 +513,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :detail="row.evidence"
                               :evidence="row.appEvidence"
                               :truncated="evidenceTruncated"
-                              class="mt-3"
                             />
                             <!-- What the PAGE was doing during this step, as
                                  opposed to what the runner experienced.
@@ -530,7 +529,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :error-kind="evidence.errorKind.value"
                               :truncated="evidence.truncated.value"
                               :unattributed-count="evidence.unattributedCount.value"
-                              class="mt-3"
                               @view-all="openEvidenceForStep"
                               @retry="evidence.load(true)"
                             />
@@ -578,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="errorStep" class="flex h-full flex-col overflow-y-auto p-6">
       <div class="rounded-default border-badge-error-ol-border/30 overflow-hidden border">
-        <div class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-4 py-2.5">
+        <div class="bg-badge-error-soft-bg flex items-center gap-2 px-4 py-2.5">
           <OIcon name="error" size="sm" class="text-status-error-text" aria-hidden="true" />
           <span class="text-text-heading flex-1 text-sm font-semibold">{{
             t("synthetics.results.error")
@@ -1136,12 +1134,6 @@ const evidence = useSyntheticEvidence(
 /** Which step the Evidence tab is scoped to. Null shows the whole run. */
 const evidenceStepFilter = ref<string | null>(null);
 
-const evidenceStepFilterName = computed(() =>
-  evidenceStepFilter.value
-    ? (evidenceStepDefs.value.get(evidenceStepFilter.value)?.name ?? evidenceStepFilter.value)
-    : "",
-);
-
 /**
  * The step is a filter over the run log, not a second copy of it — so "view all"
  * scopes the existing panel rather than opening a second list.
@@ -1254,6 +1246,22 @@ const steps = computed<StepRow[]>(() => {
   }
   return [];
 });
+
+/**
+ * Options for the evidence step select, sourced from `steps` — the EXECUTED
+ * steps this attempt actually ran — not from `evidenceStepDefs`
+ * (`recordedSteps`). `StepRow.id` (idx+1 over `steps`) is the number "Failed
+ * at Step N" and the Steps tab badge both use; a journey often records more
+ * steps than a given attempt executes, so numbering from `recordedSteps`
+ * position would disagree with them on any run where the two diverge.
+ */
+const evidenceStepOptions = computed(() =>
+  steps.value.map((row) => ({
+    stepId: row.stepId,
+    number: row.id,
+    name: row.name || row.action || row.stepId,
+  })),
+);
 
 /** Collapsible step error state (show-more / show-less for long Playwright logs). */
 const expandedStepErrors = ref(new Set<number>());
@@ -1386,9 +1394,6 @@ const infoChips = computed<InfoChip[]>(() => [
       ]
     : []),
 ]);
-
-const initMs = computed(() => synthetics.runDetail.value?.initMs ?? 0);
-const queueDelayMs = computed(() => synthetics.runDetail.value?.queueDelayMs ?? null);
 
 // ── Emit status to parent (for drawer header-right badge) ──────────────────
 watch(

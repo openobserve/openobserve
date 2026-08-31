@@ -38,6 +38,10 @@ vi.mock("@/composables/useLogs/searchState", () => ({
           selectedFields: ["_timestamp"],
         },
       },
+      meta: {
+        // The header's traces-stream picker writes the chosen stream back here.
+        selectedTraceStream: "",
+      },
     },
   }),
 }));
@@ -63,6 +67,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
+// The only I/O behind useViewTraceAction is useStreams. Stubbing it here keeps
+// the REAL useViewTraceAction in play, so the View Trace gate under test is the
+// production one rather than a re-implementation.
+const getStreams = vi.hoisted(() => vi.fn());
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStreams }),
+}));
+
 // Mock clipboard utils
 vi.mock("@/utils/clipboard", async () => {
   const actual = await vi.importActual("@/utils/clipboard");
@@ -77,7 +90,12 @@ vi.mock("./JsonPreview.vue", () => ({
   default: {
     name: "JsonPreview",
     template: "<div data-test='json-preview'><slot /></div>",
-    props: ["value", "showCopyButton", "mode"],
+    props: {
+      value: { type: null },
+      showCopyButton: { type: Boolean, default: false },
+      mode: { type: String, default: "" },
+      hideViewTrace: { type: Boolean, default: false },
+    },
     emits: [
       "copy",
       "add-field-to-table",
@@ -135,6 +153,82 @@ describe("DetailTable Component", () => {
     streamType: "logs",
   };
 
+  // Shared mount config so extra mounts inside individual tests get exactly the
+  // same stubs as the default wrapper built in beforeEach.
+  const globalMountOptions = {
+    provide: {
+      store: store,
+    },
+    plugins: [i18n, router],
+    stubs: {
+      OTabs: {
+        template: "<div><slot /></div>",
+        props: ["modelValue"],
+        emits: ["update:modelValue"],
+      },
+      OTab: {
+        template:
+          "<div :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot /></div>",
+        props: ["name", "label"],
+        emits: ["click"],
+      },
+      OTabPanels: {
+        template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
+        props: ["modelValue"],
+      },
+      OTabPanel: {
+        template: "<div><slot /></div>",
+        props: ["name"],
+      },
+      OSwitch: {
+        template: '<div :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
+        props: ["modelValue", "label"],
+        methods: {
+          toggle() {
+            this.$emit("update:modelValue", !this.modelValue);
+          },
+        },
+        emits: ["update:modelValue"],
+      },
+      OButton: {
+        template:
+          '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>',
+        emits: ["click"],
+      },
+      ODropdown: true,
+      ODropdownItem: true,
+      ODropdownSeparator: true,
+      OSelect: {
+        template:
+          '<select class="o-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
+        props: ["modelValue", "options"],
+        methods: {
+          onChange(e: any) {
+            this.$emit("update:modelValue", e.target.value);
+          },
+        },
+        emits: ["update:modelValue"],
+      },
+      OIcon: {
+        template: '<div class="OIcon"><slot /></div>',
+      },
+      OSpinner: true,
+      OSeparator: true,
+      OCardSection: {
+        template: "<div><slot /></div>",
+      },
+      OLogsHighLighting: true,
+      OChunkedContent: true,
+      OTelemetryCorrelationDashboard: true,
+      OCorrelatedLogsTable: true,
+      O2AIContextAddBtn: {
+        template:
+          '<div data-test="o2ai-context-btn" @click="$emit(\'sendToAiChat\')"><slot /></div>',
+        emits: ["sendToAiChat"],
+      },
+    },
+  };
+
   beforeEach(async () => {
     // Clear localStorage before each test
     window.localStorage.clear();
@@ -147,78 +241,7 @@ describe("DetailTable Component", () => {
     wrapper = mount(DetailTable, {
       attachTo: "#app",
       props: defaultProps,
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n, router],
-        stubs: {
-          OTabs: {
-            template: "<div><slot /></div>",
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          OTab: {
-            template:
-              "<div :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot /></div>",
-            props: ["name", "label"],
-            emits: ["click"],
-          },
-          OTabPanels: {
-            template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
-            props: ["modelValue"],
-          },
-          OTabPanel: {
-            template: "<div><slot /></div>",
-            props: ["name"],
-          },
-          OSwitch: {
-            template: '<div :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
-            props: ["modelValue", "label"],
-            methods: {
-              toggle() {
-                this.$emit("update:modelValue", !this.modelValue);
-              },
-            },
-            emits: ["update:modelValue"],
-          },
-          OButton: {
-            template:
-              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>',
-          },
-          ODropdown: true,
-          ODropdownItem: true,
-          ODropdownSeparator: true,
-          OSelect: {
-            template:
-              '<select class="o-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
-            props: ["modelValue", "options"],
-            methods: {
-              onChange(e: any) {
-                this.$emit("update:modelValue", e.target.value);
-              },
-            },
-            emits: ["update:modelValue"],
-          },
-          OIcon: {
-            template: '<div class="OIcon"><slot /></div>',
-          },
-          OSpinner: true,
-          OSeparator: true,
-          OCardSection: {
-            template: "<div><slot /></div>",
-          },
-          OLogsHighLighting: true,
-          OChunkedContent: true,
-          OTelemetryCorrelationDashboard: true,
-          OCorrelatedLogsTable: true,
-          O2AIContextAddBtn: {
-            template:
-              '<div data-test="o2ai-context-btn" @click="$emit(\'sendToAiChat\')"><slot /></div>',
-            emits: ["sendToAiChat"],
-          },
-        },
-      },
+      global: globalMountOptions,
     });
     await flushPromises();
   });
@@ -951,7 +974,33 @@ describe("DetailTable Component", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       wrapper.vm.openCrossLink("https://example.com/trace/123");
 
-      expect(openSpy).toHaveBeenCalledWith("https://example.com/trace/123", "_blank");
+      // `noopener,noreferrer` stops the opened tab reaching back via
+      // window.opener and strips the referrer.
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    // The RESOLVED url is guarded, not just the saved template: links stored
+    // before save-time validation existed are still in the DB, and a field
+    // VALUE substituted into a template can carry a hostile scheme.
+    it("does not open a cross-link whose resolved url is unsafe", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      for (const hostile of [
+        "javascript:alert(document.cookie)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "http://",
+        "not a url",
+      ]) {
+        wrapper.vm.openCrossLink(hostile);
+      }
+
+      expect(openSpy).not.toHaveBeenCalled();
       openSpy.mockRestore();
     });
 
@@ -974,6 +1023,170 @@ describe("DetailTable Component", () => {
       const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
       expect(result).toHaveLength(1);
       expect(result[0].resolvedUrl).toBe("https://example.com/search?q=hello%20world%26foo%3Dbar");
+    });
+  });
+  // The "View Trace" action used to live inside JsonPreview, i.e. inside the JSON
+  // tab. It now sits in this component's header row next to the wrap toggle so it
+  // stays reachable from every tab, and JsonPreview is told to hide its own copy.
+  describe("View Trace action in the header", () => {
+    const TRACE_ID = "8a3f1c2d9b4e7a60";
+    const TRACES_STREAMS = ["default_traces", "otlp_traces"];
+
+    const SELECT = '[data-test="log-detail-view-trace-stream-select"]';
+    const BUTTON = '[data-test="log-detail-view-trace-btn"]';
+    const WRAP_TOGGLE = '[data-test="log-detail-wrap-values-toggle-btn"]';
+
+    // A record that satisfies the gate: it carries the org's trace id field.
+    const recordWithTraceId = { ...defaultProps.modelValue, trace_id: TRACE_ID };
+
+    let traceWrapper: any;
+
+    const mountDetailTable = (props: Record<string, any> = {}) =>
+      mount(DetailTable, {
+        attachTo: "#app",
+        props: { ...defaultProps, modelValue: recordWithTraceId, ...props },
+        global: globalMountOptions,
+      });
+
+    beforeEach(() => {
+      // Open the gate: traces menu visible, service streams off, trace id field known.
+      store.state.zoConfig.service_streams_enabled = false;
+      store.state.hiddenMenus = [];
+      store.state.organizationData.organizationSettings.trace_id_field_name = "trace_id";
+
+      getStreams.mockResolvedValue({
+        list: TRACES_STREAMS.map((name) => ({ name })),
+      });
+    });
+
+    afterEach(() => {
+      if (traceWrapper) {
+        traceWrapper.unmount();
+        traceWrapper = null;
+      }
+    });
+
+    it("renders the stream picker and the button when the gate passes", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      const select = traceWrapper.find(SELECT);
+      expect(select.exists()).toBe(true);
+      expect(select.findAll("option").map((option: any) => option.text())).toEqual(TRACES_STREAMS);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
+    });
+
+    it("writes the picked stream back to searchObj.meta.selectedTraceStream", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      const select = traceWrapper.find(SELECT);
+      select.element.value = "otlp_traces";
+      await select.trigger("change");
+
+      expect(traceWrapper.vm.searchObj.meta.selectedTraceStream).toBe("otlp_traces");
+    });
+
+    it("hides the action when the record carries no trace id", async () => {
+      traceWrapper = mountDetailTable({ modelValue: defaultProps.modelValue });
+      await flushPromises();
+
+      expect(traceWrapper.find(SELECT).exists()).toBe(false);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("hides the action when the traces menu is hidden for the org", async () => {
+      // `hiddenMenus` is seeded as an array by the store helper, not a Set.
+      store.state.hiddenMenus = ["traces"];
+
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("hides the action when service streams are enabled", async () => {
+      store.state.zoConfig.service_streams_enabled = true;
+
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("hides the action when the org has no traces streams to point at", async () => {
+      getStreams.mockResolvedValue({ list: [] });
+
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      // Gate is `showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)`:
+      // once loading settles with an empty list there is nothing to view a trace in.
+      expect(traceWrapper.find(SELECT).exists()).toBe(false);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("emits view-trace when the header button is clicked", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      await traceWrapper.find(BUTTON).trigger("click");
+
+      expect(traceWrapper.emitted()["view-trace"]).toHaveLength(1);
+    });
+
+    it("tells JsonPreview to hide its own copy of the action", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      const jsonPreview = traceWrapper.findComponent({ name: "JsonPreview" });
+      expect(jsonPreview.exists()).toBe(true);
+      expect(jsonPreview.props("hideViewTrace")).toBe(true);
+    });
+
+    // REGRESSION: the gate must read `props.modelValue`, which exists during
+    // setup, and not `rowData`, which the async created() hook only fills a
+    // microtask later. Reading rowData left the button permanently hidden.
+    it("shows the action on the first render, before created() has filled rowData", async () => {
+      traceWrapper = mountDetailTable();
+
+      // Nothing has been awaited: created() has not resolved, so rowData is still empty.
+      expect(Object.keys(traceWrapper.vm.rowData)).toHaveLength(0);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
+
+      await flushPromises();
+
+      // rowData arrives later; the action was already there and stays there.
+      expect(Object.keys(traceWrapper.vm.rowData).length).toBeGreaterThan(0);
+      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
+    });
+
+    it("re-evaluates the gate when modelValue changes to a record without a trace id", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
+
+      await traceWrapper.setProps({ modelValue: defaultProps.modelValue });
+      await flushPromises();
+
+      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
+    });
+
+    it("keeps the action on every tab, unlike the tab-scoped wrap toggle", async () => {
+      traceWrapper = mountDetailTable();
+      await flushPromises();
+
+      expect(traceWrapper.vm.tab).toBe("json");
+      expect(traceWrapper.find(BUTTON).isVisible()).toBe(true);
+      // Contrast: the wrap toggle is `v-show="tab === 'table'"`, so it is rendered
+      // but hidden on the JSON tab.
+      expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(false);
+
+      traceWrapper.vm.tab = "table";
+      await nextTick();
+
+      expect(traceWrapper.find(BUTTON).isVisible()).toBe(true);
+      expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(true);
     });
   });
 });

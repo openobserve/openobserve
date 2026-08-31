@@ -46,11 +46,11 @@ export default defineComponent({
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
 
       if (daysUntilExpiry > 1) {
-        return `${daysUntilExpiry} days remaining until your license expires`;
+        return t("settings.licensePage.daysRemaining", { days: daysUntilExpiry });
       } else if (daysUntilExpiry === 1) {
-        return `1 day remaining until your license expires`;
+        return t("billing.oneDayUntilLicenseExpires");
       } else {
-        return "Your license has expired";
+        return t("billing.licenseHasExpired");
       }
     };
     return {

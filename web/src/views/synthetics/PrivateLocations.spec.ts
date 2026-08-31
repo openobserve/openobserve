@@ -138,6 +138,11 @@ const OTagStub = {
   props: ["size", "shape", "variant"],
 };
 
+const OTooltipStub = {
+  template: '<span class="otooltip-stub" :data-content="content"><slot /></span>',
+  props: ["content"],
+};
+
 const OEmptyStateStub = {
   template: '<div :data-test="$attrs[\'data-test\']" class="oemptystate-stub" />',
   props: ["size", "illustration", "filtered", "title", "description"],
@@ -156,6 +161,7 @@ function makeWrapper(props: { locations?: SyntheticLocation[]; loading?: boolean
         OInput: OInputStub,
         OBadge: OBadgeStub,
         OTag: OTagStub,
+        OTooltip: OTooltipStub,
         OEmptyState: OEmptyStateStub,
       },
     },
@@ -557,6 +563,64 @@ describe("PrivateLocations", () => {
 
       const statusCell = wrapper.find(".otable-cell-status");
       expect(statusCell.text()).toContain("synthetics.privateLocations.status.pending");
+    });
+  });
+
+  /**
+   * Agents register with one region and their rows never replicate, so a
+   * location whose agents live elsewhere reaches this region with none — and
+   * used to render as "Pending, 0/0", telling the customer to install an agent
+   * they already installed.
+   */
+  describe("live status this region cannot see", () => {
+    it("badges the location unknown instead of pending", () => {
+      wrapper = makeWrapper({
+        locations: [makeLocation({ status: "pending", live_status_unknown: true })],
+      });
+
+      const statusCell = wrapper.find(".otable-cell-status");
+      expect(statusCell.text()).toContain("synthetics.privateLocations.status.unknown");
+      expect(statusCell.text()).not.toContain("synthetics.privateLocations.status.pending");
+    });
+
+    it("explains the badge rather than leaving it bare", () => {
+      wrapper = makeWrapper({
+        locations: [makeLocation({ status: "pending", live_status_unknown: true })],
+      });
+
+      const tooltip = wrapper.find(".otable-cell-status .otooltip-stub");
+      expect(tooltip.attributes("data-content")).toBe(
+        "synthetics.privateLocations.status.unknownHint",
+      );
+    });
+
+    it("withholds the agent count instead of reporting zero", () => {
+      wrapper = makeWrapper({
+        locations: [
+          makeLocation({
+            status: "pending",
+            live_status_unknown: true,
+            live_agents: 0,
+            agents_total: 0,
+            agent_names: [],
+          }),
+        ],
+      });
+
+      const agentsCell = wrapper.find(".otable-cell-agents");
+      expect(agentsCell.text()).not.toContain("0/0");
+      expect(agentsCell.text()).toContain("—");
+    });
+
+    /** A server without super cluster never sends the flag. */
+    it("is unchanged when the flag is absent", () => {
+      wrapper = makeWrapper({
+        locations: [makeLocation({ status: "pending", live_agents: 0, agents_total: 0 })],
+      });
+
+      const statusCell = wrapper.find(".otable-cell-status");
+      expect(statusCell.text()).toContain("synthetics.privateLocations.status.pending");
+      expect(wrapper.find(".otable-cell-agents").text()).toContain("0/0");
     });
   });
 

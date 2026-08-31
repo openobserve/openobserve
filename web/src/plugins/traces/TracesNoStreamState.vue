@@ -71,6 +71,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import { restoreTracesStream } from "@/utils/streamPersist";
+import DOMPurify from "dompurify";
 
 const props = defineProps<{
   orgId: string;
@@ -89,7 +90,7 @@ const recentStream = computed<string>(() => {
 });
 
 // Uses v-html — fully i18n-controlled, no user input.
-const description = computed(() => t("traces.noStream.description"));
+const description = computed(() => DOMPurify.sanitize(t("traces.noStream.description")));
 
 const openGuide = () => {
   window.open(

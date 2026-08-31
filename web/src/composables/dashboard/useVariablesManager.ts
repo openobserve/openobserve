@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nText } from "@/types/i18n";
+import type { I18nText, TranslateFn } from "@/types/i18n";
 
 import { ref, computed, reactive } from "vue";
 import {
@@ -177,7 +177,7 @@ const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeS
   return expanded;
 };
 
-export const useVariablesManager = () => {
+export const useVariablesManager = (t: TranslateFn) => {
   // ========== STATE ==========
   // TWO-TIER STATE ARCHITECTURE (like __global mechanism)
 
@@ -420,7 +420,7 @@ export const useVariablesManager = () => {
       migratedConfig.push({
         name: "Dynamic filters",
         type: "dynamic_filters",
-        label: "Dynamic filters",
+        label: t("dashboard.dynamicFilters"),
         scope: "global",
         value: [],
         options: [],

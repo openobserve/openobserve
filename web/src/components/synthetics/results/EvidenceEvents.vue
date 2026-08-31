@@ -18,9 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   EvidenceEvents — Thin OTable wrapper for evidence bundle rows.
 
   Two modes:
-    inline — inside a step expansion: no step column (the step IS the context),
-             no pagination, shrink to content
-    panel  — the run-level Evidence tab: step column, client pagination
+    inline — a step's own evidence, inside its step expansion: no step column
+             (the step IS the context), and a shorter page
+    panel  — the run-level Evidence tab: every step's events, so the step is a
+             column, and a longer page
+
+  Everything else — header, sorting, row expansion, wrap, pagination — is the
+  same on both.
 
   One row definition for both surfaces, so a change to a row is a change to
   both. This component owns the OTable configuration and renders cell content
@@ -35,13 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EvidenceEventDetail from "./EvidenceEventDetail.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   evidenceGroupKind,
@@ -55,7 +60,11 @@ const props = withDefaults(
   defineProps<{
     events: EvidenceEvent[];
     mode: "inline" | "panel";
-    /** Panel only — the list HAS events but the current filter matched none. */
+    /**
+     * The list HAS events but the current filter matched none. Both surfaces
+     * pass it, so the empty state offers to clear the filter rather than
+     * reading as a step that captured nothing.
+     */
     filtered?: boolean;
     /**
      * Epoch ms the elapsed column counts from — normally the attempt's first
@@ -67,8 +76,14 @@ const props = withDefaults(
      * put a 200 at +0ms next to the 503 that preceded it.
      */
     originTs?: number | null;
+    /**
+     * Long URLs and console messages wrap instead of truncating. Available on
+     * both surfaces — the panel and the step card — now that the card renders
+     * this same paged table rather than five short rows.
+     */
+    wrap?: boolean;
   }>(),
-  { filtered: false, originTs: null },
+  { filtered: false, originTs: null, wrap: false },
 );
 
 const emit = defineEmits<{ (e: "clear-filters"): void }>();
@@ -87,13 +102,14 @@ const rows = computed<EvidenceRow[]>(() =>
 const isPanel = computed(() => props.mode === "panel");
 
 /**
- * Headers and sorting are PANEL-only.
- *
- * The panel is one uncapped table where seven unlabelled columns are a puzzle
- * and where sorting is what makes a chronological default recoverable — sort by
- * Type and the old grouped read comes back in place. Inline is five ranked rows
- * inside a card; a header strip there is chrome on a list you can take in whole.
- *
+ * Multiple, not single: the question an expanded row answers is usually
+ * comparative — did the 503 that opened here carry the same step id as the
+ * page error below it — and single-expansion closes the first answer to show
+ * the second.
+ */
+const expandedIds = ref<string[]>([]);
+
+/**
  * `accessorFn` on elapsed/type because neither is a field on the row — without
  * it the sorter reads `row.elapsed`, finds undefined, and silently orders by
  * nothing.
@@ -103,31 +119,49 @@ const columns = computed<OTableColumnDef<EvidenceRow>[]>(() => [
     id: "elapsed",
     header: t("synthetics.evidence.colTime"),
     size: 80,
-    sortable: isPanel.value,
+    sortable: true,
     accessorFn: (row: EvidenceRow) => eventTs(row),
   },
   {
     id: "type",
     header: t("synthetics.evidence.colType"),
     size: 96,
-    sortable: isPanel.value,
+    sortable: true,
     accessorFn: (row: EvidenceRow) => kindLabel(row),
   },
-  { id: "status", header: t("synthetics.evidence.colStatus"), size: 80, sortable: isPanel.value },
+  { id: "status", header: t("synthetics.evidence.colStatus"), size: 80, sortable: true },
   { id: "method", header: t("synthetics.evidence.colMethod"), size: 64 },
   {
     id: "message",
     header: t("synthetics.evidence.colMessage"),
     size: 200,
-    meta: { autoWidth: true },
+    // A filler with no floor collapses to OTable's 3rem default before the
+    // table starts scrolling — set one so it scrolls instead of collapsing.
+    minSize: 200,
+    // Bounded elastic: absorbs the leftover and ellipsises, so the table fits
+    // its container and only the FIXED columns can force a horizontal scroll.
+    meta: { autoWidth: true, fillRemaining: true },
   },
-  ...(isPanel.value ? [{ id: "step", header: t("synthetics.evidence.colStep"), size: 240 }] : []),
+  ...(isPanel.value
+    ? [
+        {
+          id: "step",
+          header: t("synthetics.evidence.colStep"),
+          size: 240,
+          sortable: true,
+          accessorFn: (row: EvidenceRow) => row.stepName ?? "",
+        },
+      ]
+    : []),
   {
     id: "duration",
     header: t("synthetics.evidence.colDuration"),
     size: 80,
-    sortable: isPanel.value,
+    sortable: true,
     accessorKey: "durationMs",
+    // Right-aligned on the COLUMN: a `text-right` class on the cell's inline
+    // span does nothing, which is why these read ragged.
+    meta: { align: "right" },
   },
 ]);
 
@@ -173,18 +207,25 @@ function elapsedTitle(e: EvidenceEvent): string {
 }
 
 /**
- * A 4px rail on rows that deserve one, and none on the rest.
+ * A coloured rail on rows that deserve one, and a transparent reserved slot on
+ * the rest.
  *
  * Drawn from the shared severity ladder rather than a fourth local classifier,
  * so the rail can never disagree with the ordering the fold already applied.
  * Only exceptions get colour — a rail on every row of an all-200 bundle is
  * decoration, and the point is that the two anomalies are findable at a glance.
+ * Every row still reserves the slot: the rail's class is what insets the first
+ * cell, so returning undefined here drops that row's expand chevron half a rem
+ * left of the others.
  */
-function rowStatusColor(row: EvidenceRow): string | undefined {
+function rowStatusColor(row: EvidenceRow): string {
   const rank = evidenceSeverity(row);
   if (rank <= 4) return "var(--color-status-error-text)";
   if (rank === 5) return "var(--color-status-warning-text)";
-  return undefined;
+  // Transparent, not undefined: the rail's presence is what insets the first
+  // cell past it, so a row without one sits half a rem left and its expand
+  // chevron breaks the column's vertical line. Reserve the slot, paint nothing.
+  return "transparent";
 }
 
 /** Truncate from the LEFT: the host repeats on every row, the path is what differs. */
@@ -220,7 +261,11 @@ function statusText(e: EvidenceEvent): string {
 function rowTitle(e: EvidenceEvent): string {
   const label = e.url ?? e.text ?? e.message ?? e.kind;
   return e.initiatedTs != null && e.initiatedTs !== e.ts
-    ? `${label}\ninitiated ${e.initiatedTs} · observed ${e.ts}`
+    ? t("synthetics.evidence.rowTitleWithTimestamps", {
+        label,
+        initiated: e.initiatedTs,
+        observed: e.ts,
+      })
     : label;
 }
 </script>
@@ -230,17 +275,22 @@ function rowTitle(e: EvidenceEvent): string {
     :data="rows"
     :columns="columns"
     row-key="id"
-    :show-header="isPanel"
-    :pagination="isPanel ? 'client' : 'none'"
-    :page-size="20"
-    :sorting="isPanel ? 'client' : 'none'"
+    show-header
+    pagination="client"
+    :page-size="isPanel ? 20 : 10"
+    sorting="client"
     :show-global-filter="false"
     :dense="true"
+    :wrap="wrap"
     :bordered="true"
     :default-columns="false"
     :fill-height="false"
     :frame="false"
     :get-row-status-color="rowStatusColor"
+    expansion="multiple"
+    horizontal-scroll
+    v-model:expanded-ids="expandedIds"
+    :footer-title="t('synthetics.evidence.footerEvents')"
     data-test="synthetics-evidence-events"
   >
     <!-- First column, because it is the axis every other cell is read against:
@@ -294,7 +344,11 @@ function rowTitle(e: EvidenceEvent): string {
           class="text-status-error-text shrink-0"
           aria-hidden="true"
         />
-        <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">
+        <span
+          class="text-text-body min-w-0 flex-1 font-mono text-xs"
+          :class="wrap ? 'break-all whitespace-normal' : 'truncate'"
+          data-test="synthetics-evidence-events-message"
+        >
           {{ shortUrl(row.url) || row.text || row.message || row.kind }}
         </span>
       </div>
@@ -302,7 +356,8 @@ function rowTitle(e: EvidenceEvent): string {
 
     <template v-if="isPanel" #cell-step="{ row }">
       <span
-        class="text-text-secondary truncate text-xs"
+        class="text-text-secondary text-xs"
+        :class="wrap ? 'break-all whitespace-normal' : 'truncate'"
         :title="row.stepName ?? ''"
         data-test="synthetics-evidence-events-step"
       >
@@ -311,9 +366,13 @@ function rowTitle(e: EvidenceEvent): string {
     </template>
 
     <template #cell-duration="{ row }">
-      <span class="text-text-secondary text-right font-mono text-xs">
+      <span class="text-text-secondary font-mono text-xs">
         {{ row.durationMs != null ? `${row.durationMs}ms` : "" }}
       </span>
+    </template>
+
+    <template #expansion="{ row }">
+      <EvidenceEventDetail :event="row" />
     </template>
 
     <template #empty>

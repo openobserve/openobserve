@@ -254,14 +254,9 @@ async function importJson({ jsonStr: jsonString }: any) {
 
   if (successCount === totalCount) {
     toast({
-      message:
-        successCount !== 1
-          ? t("settings.importModelPricing.importedPlural", {
-              count: successCount,
-            })
-          : t("settings.importModelPricing.importedSingular", {
-              count: successCount,
-            }),
+      message: t("settings.importModelPricing.importedSingular", {
+        count: successCount,
+      }),
       variant: "success",
     });
 
@@ -280,7 +275,7 @@ async function importJson({ jsonStr: jsonString }: any) {
   isImporting.value = false;
 
   if (baseImportRef.value) {
-    baseImportRef.value.isImporting = false;
+    baseImportRef.value.isImportingLocal = false;
   }
 }
 

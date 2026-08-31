@@ -51,16 +51,20 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
     }
     custom_details.insert("body".to_string(), Value::String(c.body_markdown.clone()));
 
+    // PagerDuty validates `links[].href` server-side and 400s the whole event
+    // on a malformed one — the same lost-alert failure as #13742 on Slack, so
+    // an undispatchable link is dropped rather than emitted.
     let links: Vec<Value> = c
         .links
         .iter()
+        .filter_map(|(label, url)| super::dispatchable_url(url).map(|url| (label, url)))
         .map(|(label, url)| {
             let text = if label.is_empty() {
                 super::DEFAULT_LINK_LABEL
             } else {
                 label.as_str()
             };
-            json!({"href": super::safe_url(url), "text": text})
+            json!({"href": url, "text": text})
         })
         .collect();
 

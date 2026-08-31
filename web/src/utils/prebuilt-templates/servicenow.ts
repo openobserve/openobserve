@@ -128,6 +128,7 @@ export const servicenowConfig: PrebuiltConfig = {
       type: "text",
       required: false,
       hintKey: "alerts.prebuiltDestinations.servicenowAssignmentGroupHelp",
+      persistInMetadata: true,
     },
   ],
 };
@@ -136,7 +137,7 @@ import servicenowLogo from "@/assets/images/alerts/destinations/servicenow.png";
 
 export const servicenowDestinationType: PrebuiltType = {
   id: "servicenow",
-  name: "ServiceNow",
+  name: raw("ServiceNow"),
   descriptionKey: "alert_destinations.prebuilt.servicenowDescription",
   icon: "servicenow",
   image: servicenowLogo,

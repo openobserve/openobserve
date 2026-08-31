@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="radar" size="sm" />
           <span>{{ t("synthetics.tabs.checks") }}</span>
         </OTab>
-        <OTab name="private">
+        <OTab v-if="privateLocationsEnabled" name="private">
           <OIcon name="location-on" size="sm" />
           <span>{{ t("synthetics.tabs.private") }}</span>
         </OTab>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- ── PRIVATE LOCATIONS TAB ── -->
       <PrivateLocations
-        v-if="activeSection === 'private'"
+        v-if="privateLocationsEnabled && activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
         @refresh="loadPrivateLocations"
@@ -276,8 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
     </ODialog>
 
-    <!-- Agent setup drawer -->
+    <!-- Agent setup drawer — private locations only, so enterprise only -->
     <AgentSetupDrawer
+      v-if="privateLocationsEnabled"
       v-model:open="showSetupDrawer"
       :install="setupInstall"
       :location-name="setupLocationName"
@@ -444,12 +445,12 @@ function formatFrequency(f: ApiMonitorFrequency): string {
 function formatTimeAgo(microseconds: number): string {
   const diffMs = Date.now() - Math.floor(microseconds / 1000);
   const s = Math.floor(diffMs / 1000);
-  if (s < 60) return `${s}s ago`;
+  if (s < 60) return t("synthetics.secondsAgo", { count: s });
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return t("synthetics.minutesAgo", { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return t("synthetics.hoursAgo", { count: h });
+  return t("synthetics.daysAgo", { count: Math.floor(h / 24) });
 }
 
 function mapMonitor(m: ApiMonitor) {
@@ -476,16 +477,6 @@ function mapMonitor(m: ApiMonitor) {
 }
 
 type DisplayMonitor = ReturnType<typeof mapMonitor>;
-
-function dotClass(status: string) {
-  const lower = status.toLowerCase();
-  return {
-    "bg-status-success-text": lower === "passed",
-    "bg-status-warning-text": lower === "warning",
-    "bg-status-error-text": lower === "failed",
-    "bg-text-muted": lower === "unknown",
-  };
-}
 
 // ── Data loading ───────────────────────────────────────────────────────
 // Start in loading state so the table shows the skeleton on first render
@@ -553,11 +544,22 @@ onMounted(() => {
   initPage();
 });
 
+// Private locations are pools served by long-running agents deployed inside the
+// customer's network, and that agent fleet is the one part of synthetics that
+// is enterprise. Gated on its own /config flag rather than on
+// `synthetics_enabled`, so an OSS build shows synthetics without offering a
+// location kind it cannot serve.
+const privateLocationsEnabled = computed(() =>
+  Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
+);
+
 // Defaults to 'checks', but honors ?section=private so links back from the
 // private-location detail page (its own back button, deep links) land on
 // the tab the user actually came from instead of always resetting to Checks.
+// A ?section=private on a build without private locations falls back to
+// Checks rather than landing on a tab that is not rendered.
 const activeSection = ref<"checks" | "private">(
-  route.query.section === "private" ? "private" : "checks",
+  route.query.section === "private" && privateLocationsEnabled.value ? "private" : "checks",
 );
 // Private Locations data is never fetched on initial render (only on manual
 // refresh or after a delete) — load it the first time the tab is actually

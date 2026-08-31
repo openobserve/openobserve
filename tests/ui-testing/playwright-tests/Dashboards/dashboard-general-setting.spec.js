@@ -6,19 +6,16 @@ const {
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { generateDashboardName } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard general setting", () => {
-  test.beforeEach(async ({ page }) => {
-    console.log("running before each");
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
-
-    await page.goto(
-      `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${process.env["ORGNAME"]}`
-    );
   });
 
   test("should verify that adding a default duration time and add tab on dashboard settings", async ({
@@ -26,8 +23,7 @@ test.describe("dashboard general setting", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
-    const randomDashboardName =
-      "Dashboard_" + Math.random().toString(36).slice(2, 11);
+    const randomDashboardName = generateDashboardName();
     const newDashboardName =
       pm.dashboardSetting.generateUniqueDashboardnewName("new-dashboard");
     const newTabName = pm.dashboardSetting.generateUniqueTabnewName("new-tab");
@@ -35,11 +31,7 @@ test.describe("dashboard general setting", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     // Open dashboard settings
 
     await pm.dashboardSetting.openSetting();
@@ -48,7 +40,7 @@ test.describe("dashboard general setting", () => {
     // Fix: Use relativeTimeSelection from pm.dashboardSetting POM
     await pm.dashboardSetting.relativeTimeSelection("3", "h");
     await pm.dashboardSetting.saveSetting();
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Dashboard updated successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });
     // add tab in dashboard
@@ -64,8 +56,7 @@ test.describe("dashboard general setting", () => {
   test("should verify that dynamic toggle is disabled", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
-    const randomDashboardName =
-      "Dashboard_" + Math.random().toString(36).slice(2, 11);
+    const randomDashboardName = generateDashboardName();
     const newDashboardName =
       pm.dashboardSetting.generateUniqueDashboardnewName("new-dashboard");
 
@@ -74,11 +65,7 @@ test.describe("dashboard general setting", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings
     await pm.dashboardSetting.openSetting(); // Ensure settings are opened
@@ -87,7 +74,7 @@ test.describe("dashboard general setting", () => {
     //verify that dynamic toggle is disabled
     await pm.dashboardSetting.showDynamicFilter();
     await pm.dashboardSetting.saveSetting();
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Dashboard updated successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });
     await pm.dashboardSetting.closeSettingDashboard();

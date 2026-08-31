@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               serviceCardClass(svc),
               selectedService?.id === svc.id && servicePanelVisible
-                ? 'outline-accent bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)] outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
+                ? 'outline-accent bg-surface-tint-accent shadow-primary-500/22 shadow-sm outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
                 : 'hover:bg-table-row-hover-bg',
             ]"
             @click="openServicePanel(svc)"
@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showAlertsCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-alerts-card"
           @click="goToAlertList"
         >
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showLogsCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-logs-card"
           @click="goToLogs"
         >
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showTracesCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-traces-card"
           @click="goToTraces"
         >
@@ -766,8 +766,13 @@ const loadAnomalies = async () => {
         if ((h.anomaly_count ?? 0) > 0) {
           found.push({
             id: h.id ?? `anm-${cfg?.id}-${tsMs}`,
-            title: `Anomaly detected — ${cfg?.name ?? cfg?.alert_name ?? h.alert_name ?? "unknown"}`,
-            description: `Stream: ${cfg?.stream_name ?? h.stream_name ?? "unknown"} · ${h.anomaly_count} anomalous point(s)`,
+            title: t("overview.anomalyDetectedTitle", {
+              name: cfg?.name ?? cfg?.alert_name ?? h.alert_name ?? "unknown",
+            }),
+            description: t("overview.anomalyDetectedDescription", {
+              stream: cfg?.stream_name ?? h.stream_name ?? "unknown",
+              count: h.anomaly_count,
+            }),
             severity: "warning",
             alertName: cfg?.name ?? cfg?.alert_name ?? h.alert_name,
             streamName: cfg?.stream_name ?? h.stream_name,
@@ -839,7 +844,9 @@ const loadHistoryAndSplit = async () => {
         if (!existing || h.timestamp > existing.rawTs) {
           failedMap.set(key, {
             id: `fail-${key}`,
-            typeLabel: "Failed",
+            // English for the same reason as formatStatus() — this is the OTag
+            // `eventStatus` lookup value, not free display copy.
+            typeLabel: raw("Failed"),
             service: h.stream_name ?? "—",
             description: h.alert_name ?? "",
             timeAgo: relativeTime_(h.timestamp),
@@ -931,24 +938,28 @@ const loadServiceGraph = async () => {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+// Deliberately English: the result feeds <OTag type="eventStatus" :value>, and
+// OTag normalises that value (lower-cased, separators stripped) to pick the
+// badge variant from the `eventStatus` group in badgeGroups.ts. A translated
+// value would miss `failed`/`firing`/`error` and lose the red/amber colouring.
 const formatStatus = (status: string) => {
-  if (!status) return "Event";
+  if (!status) return raw("Event");
   const map: Record<string, string> = {
     firing: "Firing",
     error: "Error",
     failed: "Failed",
     anomaly: "Anomaly",
   };
-  return map[status.toLowerCase()] ?? status.charAt(0).toUpperCase() + status.slice(1);
+  return raw(map[status.toLowerCase()] ?? status.charAt(0).toUpperCase() + status.slice(1));
 };
 
 const relativeTime_ = (tsMicros: number): string => {
   if (!tsMicros) return "—";
   const diffMs = Date.now() - Math.floor(tsMicros / 1000);
-  if (diffMs < 60_000) return `${Math.round(diffMs / 1000)}s ago`;
-  if (diffMs < 3_600_000) return `${Math.round(diffMs / 60_000)}m ago`;
-  if (diffMs < 86_400_000) return `${Math.round(diffMs / 3_600_000)}h ago`;
-  return `${Math.round(diffMs / 86_400_000)}d ago`;
+  if (diffMs < 60_000) return t("overview.secondsAgo", { count: Math.round(diffMs / 1000) });
+  if (diffMs < 3_600_000) return t("overview.minutesAgo", { count: Math.round(diffMs / 60_000) });
+  if (diffMs < 86_400_000) return t("overview.hoursAgo", { count: Math.round(diffMs / 3_600_000) });
+  return t("overview.daysAgo", { count: Math.round(diffMs / 86_400_000) });
 };
 
 const formatReqRate = (reqs: number) => {
@@ -986,16 +997,6 @@ const incidentIconClass = (severity: string) => {
   if (s === "p1") return "text-error-600";
   if (s === "p2") return "text-warning-600";
   return "text-status-info-text";
-};
-
-const severityBadgeClass = (sev: string): string => {
-  const s = (sev || "p4").toLowerCase();
-  if (s === "p1") return "bg-error-50 text-error-600 border border-[0.0625em] border-error-600";
-  if (s === "p2")
-    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  if (s === "p3")
-    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  return "bg-status-info-bg text-status-info-text border border-[0.0625em] border-status-info-text";
 };
 
 const serviceCardClass = (svc: any) => {

@@ -44,16 +44,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-    <template v-else-if="activeTab === 'traces'">
+    <!-- KeepAlive sits OUTSIDE the tab branch chain so toggling deactivates the
+    traces tab instead of destroying it — a remount used to refire the whole
+    fetch pipeline (rum query + stream resolution + metadata) on every
+    Breadcrumbs↔Traces switch. The sidebar dies with SessionViewer, so nothing
+    leaks across sessions. -->
+    <KeepAlive>
       <PlayerTracesTab
+        v-if="activeTab === 'traces'"
         :session-id="sessionId"
         :current-time="currentTime"
         :start-time="startTime"
         :end-time="endTime"
         @event-emitted="(type, payload) => emit('event-emitted', type, payload)"
       />
-    </template>
-    <template v-else>
+    </KeepAlive>
+    <template v-if="activeTab !== 'tags' && activeTab !== 'traces'">
       <div class="flex w-full items-center justify-between px-1.5 pt-2">
         <div class="w-[60%] pr-1">
           <OInput
@@ -121,7 +127,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
 
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";

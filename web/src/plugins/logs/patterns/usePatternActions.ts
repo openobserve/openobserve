@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import usePatterns from "@/composables/useLogs/usePatterns";
@@ -50,10 +49,9 @@ const visiblePatterns = (all: any[]): any[] => {
 
 export const usePatternActions = () => {
   const store = useStore();
-  const router = useRouter();
   const { t } = useI18nTyped();
   const { searchObj } = searchState();
-  const { patternsState } = usePatterns();
+  const { patternsState } = usePatterns(t);
 
   const selectedPattern = ref<any>(null);
   const showPatternDetails = ref(false);

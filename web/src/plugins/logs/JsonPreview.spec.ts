@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import i18n from "@/locales";
@@ -1130,7 +1130,33 @@ describe("JsonPreview Component", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       wrapper.vm.openCrossLink("https://example.com/trace/123");
 
-      expect(openSpy).toHaveBeenCalledWith("https://example.com/trace/123", "_blank");
+      // `noopener,noreferrer` stops the opened tab reaching back via
+      // window.opener and strips the referrer.
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    // See the DetailTable twin: the RESOLVED url is guarded, because links
+    // saved before validation existed are still in the DB and a substituted
+    // field VALUE can carry a hostile scheme.
+    it("does not open a cross-link whose resolved url is unsafe", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      for (const hostile of [
+        "javascript:alert(document.cookie)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "http://",
+        "not a url",
+      ]) {
+        wrapper.vm.openCrossLink(hostile);
+      }
+
+      expect(openSpy).not.toHaveBeenCalled();
       openSpy.mockRestore();
     });
 
@@ -1189,6 +1215,205 @@ describe("JsonPreview Component", () => {
 
       const result = wrapper.vm.getCrossLinksForField("field1");
       expect(result).toEqual([]);
+    });
+  });
+
+  // The View Trace action is shared with DetailTable's row-detail drawer, which
+  // renders its own copy in the drawer header (hence `hideViewTrace`) and fills
+  // the previewed record in an async created() hook, so the preview mounts with
+  // an empty `value` and only receives the record later (hence the watcher).
+  describe("View Trace action visibility", () => {
+    const streamSelectSelector = '[data-test="log-search-index-list-select-stream"]';
+    const viewTraceBtnSelector = '[data-test="trace-view-logs-btn"]';
+    const recordWithTraceId = { ...mockValue, trace_id: "test-trace-id" };
+
+    let traceWrapper: any = null;
+
+    const mountPreview = (props: Record<string, any> = {}) =>
+      mount(JsonPreview, {
+        props: { value: recordWithTraceId, mode: "sidebar", ...props },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            AppTabs: true,
+            CodeQueryEditor: true,
+            ODialog: ODialogStub,
+            OButton: true,
+            ODropdown: true,
+            ODropdownItem: true,
+            ODropdownSeparator: true,
+            OSelect: true,
+            OIcon: true,
+            OInput: true,
+            OSpinner: true,
+            OTooltip: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+
+    beforeEach(() => {
+      // Everything the gate needs: traces menu visible, service streams off,
+      // and traces streams available for the picker.
+      store.state.hiddenMenus = new Set();
+      store.state.zoConfig.service_streams_enabled = false;
+      mockGetStreams.mockResolvedValue({
+        list: [{ name: "trace-stream1" }, { name: "trace-stream2" }],
+      });
+    });
+
+    afterEach(() => {
+      traceWrapper?.unmount();
+      traceWrapper = null;
+    });
+
+    describe("hideViewTrace prop", () => {
+      it("should default hideViewTrace to false", () => {
+        traceWrapper = mountPreview();
+
+        expect(traceWrapper.props("hideViewTrace")).toBe(false);
+      });
+
+      it("should render the stream picker and the button when the gate passes", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should hide the stream picker and the button when hideViewTrace is true", async () => {
+        traceWrapper = mountPreview({ hideViewTrace: true });
+        await flushPromises();
+
+        // The gate itself still passes — only the prop hides the action.
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.vm.tracesStreams.length).toBeGreaterThan(0);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should stay hidden with hideViewTrace even when value arrives late", async () => {
+        traceWrapper = mountPreview({ value: {}, hideViewTrace: true });
+        await flushPromises();
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+    });
+
+    describe("value watcher", () => {
+      it("should hide the action while value is still empty", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should show the action once value is populated after mount", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await flushPromises();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(mockGetStreams).toHaveBeenCalledWith("traces", false);
+        expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should render the action while the traces streams are still loading", async () => {
+        let resolveStreams: (value: any) => void = () => {};
+        mockGetStreams.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              resolveStreams = resolve;
+            }),
+        );
+
+        traceWrapper = mountPreview({ value: {} });
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await nextTick();
+
+        // No streams have arrived yet: the loading flag alone keeps it rendered.
+        expect(traceWrapper.vm.tracesStreams).toEqual([]);
+        expect(traceWrapper.vm.isTracesStreamsLoading).toBe(true);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+
+        resolveStreams({ list: [{ name: "trace-stream1" }] });
+        await flushPromises();
+
+        expect(traceWrapper.vm.isTracesStreamsLoading).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should hide the action again when value is emptied", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+
+        await traceWrapper.setProps({ value: {} });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should hide the action when the new value carries no trace id", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+
+        await traceWrapper.setProps({ value: { ...mockValue } });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should not refetch the traces streams on every value change", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
+
+        await traceWrapper.setProps({
+          value: { ...recordWithTraceId, trace_id: "another-trace-id" },
+        });
+        await flushPromises();
+
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should keep the action hidden when the traces menu is hidden", async () => {
+        store.state.hiddenMenus = new Set(["traces"]);
+        traceWrapper = mountPreview({ value: {} });
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBe(false);
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
     });
   });
 });

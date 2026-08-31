@@ -15,7 +15,10 @@
 
 use std::sync::Arc;
 
-use config::TIMESTAMP_COL_NAME;
+use config::{
+    TIMESTAMP_COL_NAME,
+    meta::{sql::TableReferenceExt, stream::StreamType},
+};
 use datafusion::{
     common::{
         DFSchema, Result,
@@ -30,7 +33,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::datafusion::table_provider::empty_table::NewEmptyTable;
+use crate::datafusion::{sort_order::FileSortOrder, table_provider::empty_table::NewEmptyTable};
 
 // check if the plan is a complex query that we can't add sort _timestamp
 pub fn is_complex_query(plan: &LogicalPlan) -> bool {
@@ -50,11 +53,16 @@ pub fn is_complex_query(plan: &LogicalPlan) -> bool {
 pub struct AddSortAndLimit {
     pub limit: usize,
     pub offset: usize,
+    pub stream_type: StreamType,
 }
 
 impl AddSortAndLimit {
-    pub fn new(limit: usize, offset: usize) -> Self {
-        Self { limit, offset }
+    pub fn new(limit: usize, offset: usize, stream_type: StreamType) -> Self {
+        Self {
+            limit,
+            offset,
+            stream_type,
+        }
     }
 }
 
@@ -87,7 +95,8 @@ impl TreeNodeRewriter for AddSortAndLimit {
                         // the add sort plan should reflect the limit
                         let fetch = get_int_from_expr(&limit.fetch);
                         let skip = get_int_from_expr(&limit.skip);
-                        let (sort, schema) = generate_sort_plan(limit.input.clone(), fetch + skip);
+                        let (sort, schema) =
+                            generate_sort_plan(limit.input.clone(), fetch + skip, self.stream_type);
                         limit.input = Arc::new(sort);
                         (Transformed::yes(LogicalPlan::Limit(limit)), schema)
                     }
@@ -116,8 +125,12 @@ impl TreeNodeRewriter for AddSortAndLimit {
                         None,
                     )
                 } else {
-                    let (plan, schema) =
-                        generate_limit_and_sort_plan(Arc::new(node), self.limit, self.offset);
+                    let (plan, schema) = generate_limit_and_sort_plan(
+                        Arc::new(node),
+                        self.limit,
+                        self.offset,
+                        self.stream_type,
+                    );
                     (Transformed::yes(plan), schema)
                 }
             }
@@ -152,6 +165,7 @@ fn generate_limit_plan(input: Arc<LogicalPlan>, limit: usize, skip: usize) -> Lo
 fn generate_sort_plan(
     input: Arc<LogicalPlan>,
     limit: usize,
+    stream_type: StreamType,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
     let timestamp = SortExpr {
         expr: col(TIMESTAMP_COL_NAME),
@@ -162,7 +176,7 @@ fn generate_sort_plan(
     if schema.field_with_name(None, TIMESTAMP_COL_NAME).is_err() {
         let mut input = input.as_ref().clone();
         input = input
-            .rewrite(&mut ChangeTableScanSchema::new())
+            .rewrite(&mut ChangeTableScanSchema::new(stream_type))
             .data()
             .unwrap();
         (
@@ -175,7 +189,10 @@ fn generate_sort_plan(
         )
     } else {
         let mut input = input.as_ref().clone();
-        input = input.rewrite(&mut SortByTime::new()).data().unwrap();
+        input = input
+            .rewrite(&mut SortByTime::new(stream_type))
+            .data()
+            .unwrap();
         (
             LogicalPlan::Sort(Sort {
                 expr: vec![timestamp],
@@ -191,8 +208,9 @@ fn generate_limit_and_sort_plan(
     input: Arc<LogicalPlan>,
     limit: usize,
     skip: usize,
+    stream_type: StreamType,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let (sort, schema) = generate_sort_plan(input, limit + skip);
+    let (sort, schema) = generate_sort_plan(input, limit + skip, stream_type);
     (
         LogicalPlan::Limit(Limit {
             skip: Some(Box::new(Expr::Literal(
@@ -219,11 +237,13 @@ fn get_int_from_expr(expr: &Option<Box<Expr>>) -> usize {
     }
 }
 
-struct ChangeTableScanSchema {}
+struct ChangeTableScanSchema {
+    stream_type: StreamType,
+}
 
 impl ChangeTableScanSchema {
-    fn new() -> Self {
-        Self {}
+    fn new(stream_type: StreamType) -> Self {
+        Self { stream_type }
     }
 }
 
@@ -233,6 +253,8 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
     fn f_up(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
         let mut transformed = match node {
             LogicalPlan::TableScan(scan) => {
+                let is_metrics =
+                    scan.table_name.get_stream_type(self.stream_type) == StreamType::Metrics;
                 let schema = scan.source.schema();
                 let timestamp_idx = schema.index_of(TIMESTAMP_COL_NAME)?;
                 let projection = scan.projection.clone().map(|mut p| {
@@ -246,9 +268,11 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
                     scan.filters,
                     scan.fetch,
                 )?;
-                // add sorted by time to the table source
-                let source = generate_table_source_with_sorted_by_time(table_scan.source);
-                table_scan.source = source;
+                if !is_metrics {
+                    // non-metrics files are timestamp-descending.
+                    table_scan.source =
+                        generate_table_source_with_sorted_by_time(table_scan.source);
+                }
                 Transformed::yes(LogicalPlan::TableScan(table_scan))
             }
             _ => Transformed::no(node),
@@ -258,11 +282,13 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
     }
 }
 
-struct SortByTime {}
+struct SortByTime {
+    stream_type: StreamType,
+}
 
 impl SortByTime {
-    fn new() -> Self {
-        Self {}
+    fn new(stream_type: StreamType) -> Self {
+        Self { stream_type }
     }
 }
 
@@ -271,10 +297,10 @@ impl TreeNodeRewriter for SortByTime {
 
     fn f_up(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
         let mut transformed = match node {
-            LogicalPlan::TableScan(mut scan) => {
-                // add sorted by time to the table source
-                let source = generate_table_source_with_sorted_by_time(scan.source);
-                scan.source = source;
+            LogicalPlan::TableScan(mut scan)
+                if scan.table_name.get_stream_type(self.stream_type) != StreamType::Metrics =>
+            {
+                scan.source = generate_table_source_with_sorted_by_time(scan.source);
                 Transformed::yes(LogicalPlan::TableScan(scan))
             }
             _ => Transformed::no(node),
@@ -290,7 +316,7 @@ fn generate_table_source_with_sorted_by_time(
     let source: &DefaultTableSource = table_source.downcast_ref::<DefaultTableSource>().unwrap();
     if let Some(table_provider) = source.table_provider.downcast_ref::<NewEmptyTable>() {
         let mut new_table_provider = (*table_provider).clone();
-        new_table_provider.sorted_by_time = true;
+        new_table_provider.sort_order = FileSortOrder::TimestampDesc;
         let new_source = DefaultTableSource::new(Arc::new(new_table_provider));
         Arc::new(new_source)
     } else {

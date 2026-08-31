@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          button (type="submit"), so it lives INSIDE the <OForm>. The editor +
          TestFunction below stay OUTSIDE the form. Inline form → Enter submits
          natively via the type="submit" Save button (no form-id needed). -->
+    <!-- Embedded (workflow NDV): the whole toolbar is hidden. Naming happens at SAVE
+         time in the host's Update|Create dialog, and After Flattening + Save live at the
+         bottom of the host panel — so the editor is the only thing here. -->
     <OForm
+      v-if="!hideTestPanel"
       id="add-function-form"
       :form="addFunctionForm"
       class="border-border-default shrink-0 border-b px-2"
@@ -31,11 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable-name="beingUpdated"
         :transform-type-options="transformTypeOptions"
         :hide-trans-type="!!forcedLanguage"
+        :hide-chat="hideAiAssist"
         @test="onTestFunction"
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
         @open:chat="openChat"
-        :is-add-function-component="isAddFunctionComponent"
       />
     </OForm>
 
@@ -44,15 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 overflow-hidden"
         :class="[store.state.isAiChatEnabled && !isAddFunctionComponent ? 'w-3/4' : 'w-full']"
       >
+        <!-- Workflows (hideTestPanel): the NDV supplies Input · Output around this
+             pane, so the embedded test panel is redundant — collapse the splitter to
+             an editor-only, full-width surface (no drag handle). -->
         <OSplitter
           v-model="splitterModel"
-          :limits="[30, 100]"
+          :limits="hideTestPanel ? [100, 100] : [30, 100]"
           class="w-full overflow-hidden"
           :horizontal="false"
-          separator-class="w-[0.0625rem] bg-card-glass-border"
+          :separator-class="hideTestPanel ? 'hidden' : 'w-[0.0625rem] bg-card-glass-border'"
         >
           <template v-slot:before>
-            <div class="bg-card-glass-bg flex h-full min-h-0 flex-col px-2 pt-2 pb-3">
+            <!-- Workflows (hideTestPanel): drop the horizontal padding so the editor
+                 sits flush with the panel edges. -->
+            <div
+              class="bg-card-glass-bg flex h-full min-h-0 flex-col pt-2 pb-3"
+              :class="hideTestPanel ? 'px-0' : 'px-2'"
+            >
               <div class="o2-input flex min-h-0 flex-1 flex-col pb-2">
                 <FullViewContainer
                   name="function"
@@ -64,6 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )
                   "
                   min-header-height="2.125rem"
+                  :show-expand-icon="!hideTestPanel"
+                  :label-class="hideTestPanel ? 'pl-2' : ''"
                 />
                 <div v-show="expandState.functions" class="relative mb-1.5 min-h-0 flex-1">
                   <!-- Unified Query Editor (with built-in AI bar) -->
@@ -136,13 +150,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="bg-card-glass-bg h-full overflow-y-auto px-2 pt-2 pb-3">
+            <div
+              v-if="!hideTestPanel"
+              class="bg-card-glass-bg h-full overflow-y-auto px-2 pt-2 pb-3"
+            >
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="vrlFunctionData"
                 @function-error="handleFunctionError"
                 :heightOffset="heightOffset"
                 :sample-events="sampleEvents"
+                :hide-query="hideQuery"
+                :hide-ai-assist="hideAiAssist"
                 @sendToAiChat="sendToAiChat"
               />
             </div>
@@ -234,6 +253,26 @@ export default defineComponent({
       type: Array,
       default: undefined,
     },
+    // Hide the SQL "Query" section of the test panel (workflows run on the trigger
+    // event, not a stream query). Forwarded to TestFunction.
+    hideQuery: {
+      type: Boolean,
+      default: false,
+    },
+    // Hide the chat-panel AI buttons (the toolbar "Ask AI" toggle + the Events
+    // send-to-chat button); the inline editor AI bar stays. Workflows set this.
+    hideAiAssist: {
+      type: Boolean,
+      default: false,
+    },
+    // Drop the embedded test panel (Events input + Output) entirely, leaving only
+    // the code editor at full width. Workflows set this: the NDV already frames the
+    // editor with its own Input · Output panes, so a nested test panel is redundant
+    // (and confusing) inside the Config pane.
+    hideTestPanel: {
+      type: Boolean,
+      default: false,
+    },
     // When set ('vrl' | 'javascript'), the language is locked to this value and
     // the VRL/JS toggle is hidden (workflow function nodes force 'javascript').
     forcedLanguage: {
@@ -258,13 +297,12 @@ export default defineComponent({
     O2AIChat,
   },
   emits: ["update:list", "cancel:hideform", "sendToAiChat"],
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const store: any = useStore();
     const router = useRouter();
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);
     const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
@@ -279,14 +317,15 @@ export default defineComponent({
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
     const { placeholder: jsPlaceholder } = useJsPlaceholder();
     let editorobj: any = null;
-    const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const testFunctionRef = ref<typeof TestFunction>();
-    const splitterModel = ref(50);
+    // Editor-only (workflows) starts full width; the test-panel split is locked out.
+    const splitterModel = ref(props.hideTestPanel ? 100 : 50);
     const aiChatInputContext = ref("");
     const confirmDialogMeta = ref({
-      title: "",
-      message: "",
+      // raw("") is only the empty placeholder — the real values are assigned from t().
+      title: raw(""),
+      message: raw(""),
       show: false,
       onConfirm: () => {},
       data: null,
@@ -321,7 +360,7 @@ export default defineComponent({
       const editingJsFunction = String((props.modelValue as any)?.transType ?? "0") === "1";
 
       if (isJsAllowed.value || editingJsFunction) {
-        options.push({ label: t("function.javascript"), value: "1" });
+        options.push({ label: raw("JavaScript"), value: "1" });
       }
 
       return options;
@@ -455,13 +494,13 @@ export default defineComponent({
         loadingNotification();
         toast({
           variant: "success",
-          message: res.data.message || "Function saved successfully",
+          message: res.data.message || t("functions.functionSaved"),
         });
       } catch (err: any) {
         compilationErr.value = err?.response?.data?.["message"];
         toast({
           variant: "error",
-          message: err.response?.data?.message ?? "Function creation failed",
+          message: err.response?.data?.message ?? t("functions.functionCreationFailed"),
         });
         loadingNotification();
       }
@@ -482,6 +521,10 @@ export default defineComponent({
     const onTestFunction = () => {
       if (testFunctionRef.value) testFunctionRef.value.testFunction();
     };
+
+    // Embedded (workflow): the host's bottom Save reads the live editor code from here,
+    // then drives its own Update|Create dialog. Exposed for the parent ref.
+    expose({ getCode: () => formData.value.function });
 
     const handleFunctionError = (err: string) => {
       vrlFunctionError.value = err;
@@ -526,8 +569,9 @@ export default defineComponent({
 
     const resetConfirmDialog = () => {
       confirmDialogMeta.value.show = false;
-      confirmDialogMeta.value.title = "";
-      confirmDialogMeta.value.message = "";
+      // raw("") clears the fields back to the empty placeholder.
+      confirmDialogMeta.value.title = raw("");
+      confirmDialogMeta.value.message = raw("");
       confirmDialogMeta.value.onConfirm = () => {};
       confirmDialogMeta.value.data = null;
     };
@@ -585,19 +629,8 @@ export default defineComponent({
     /**
      * Handle successful generation from UnifiedQueryEditor
      */
-    const handleGenerationSuccess = (payload: { type: string; message: string }) => {
+    const handleGenerationSuccess = (_payload: { type: string; message: string }) => {
       // Function code is already updated via @update:query handler
-    };
-
-    // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (naturalLanguage: string, language: "vrl" | "javascript") => {
-      // Enable AI chat if not already enabled
-      if (!store.state.isAiChatEnabled) {
-        openChat(true);
-      }
-
-      // The unified component handles AI generation internally
-      // This event is just for parent components that may need to react
     };
 
     return {

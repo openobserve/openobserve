@@ -88,6 +88,7 @@ import { defineComponent, computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only as a param type in a template inline handler, which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 export default defineComponent({
   name: "TablePaginationControls",
@@ -129,14 +130,18 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
-      if (totalRows === 0) return "0 of 0";
+      if (totalRows === 0) return t("dashboard.dashboards.paginationEmpty");
       if (!showPagination || pagination.rowsPerPage === 0) {
-        return `1-${totalRows} of ${totalRows}`;
+        return t("dashboard.dashboards.paginationRange", {
+          start: 1,
+          end: totalRows,
+          total: totalRows,
+        });
       }
 
       const start = (pagination.page - 1) * pagination.rowsPerPage + 1;
       const end = Math.min(pagination.page * pagination.rowsPerPage, totalRows);
-      return `${start}-${end} of ${totalRows}`;
+      return t("dashboard.dashboards.paginationRange", { start, end, total: totalRows });
     });
 
     const formattedPaginationOptions = computed(() => {

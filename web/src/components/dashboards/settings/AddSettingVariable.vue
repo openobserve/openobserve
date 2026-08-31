@@ -223,27 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="`query_data.filter[${index}].operator`"
                       class="operator min-w-0 flex-[1.5]"
                       data-test="dashboard-query-values-filter-operator-selector"
-                      :options="[
-                        '=',
-                        '!=',
-                        '>=',
-                        '<=',
-                        '>',
-                        '<',
-                        'IN',
-                        'NOT IN',
-                        'str_match',
-                        'str_match_ignore_case',
-                        'match_all',
-                        're_match',
-                        're_not_match',
-                        'Contains',
-                        'Not Contains',
-                        'Starts With',
-                        'Ends With',
-                        'Is Null',
-                        'Is Not Null',
-                      ]"
+                      :options="filterOperatorOptions"
                     />
                     <OFormCombobox
                       v-if="!['Is Null', 'Is Not Null'].includes(filter.operator)"
@@ -493,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="border-t-border-default sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3 [box-shadow:var(--color-grey-150)_0_-0.25rem_0.4375rem_0] dark:[box-shadow:var(--color-grey-900)_0_-0.25rem_0.4375rem_0]"
+        class="border-t-border-default shadow-sticky-footer sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3"
       >
         <OButton
           variant="outline"
@@ -526,8 +506,6 @@ import {
   onActivated,
   watch,
   toRef,
-  toRaw,
-  type Ref,
   computed,
   nextTick,
 } from "vue";
@@ -617,6 +595,35 @@ export default defineComponent({
       escapeSingleQuotes: false,
     });
     const { t } = useI18nTyped();
+
+    /**
+     * Filter operators for the variable query builder. The `value` is persisted into
+     * `query_data.filter[].operator` and switched on by identity, so it stays English;
+     * only the label is translated. SQL/regex tokens are the syntax itself and stay
+     * `raw()`. Mirrors views/Dashboards/addPanel/AddCondition.vue.
+     */
+    const filterOperatorOptions = computed(() => [
+      { label: raw("="), value: "=" },
+      { label: raw("!="), value: "!=" },
+      { label: raw(">="), value: ">=" },
+      { label: raw("<="), value: "<=" },
+      { label: raw(">"), value: ">" },
+      { label: raw("<"), value: "<" },
+      { label: raw("IN"), value: "IN" },
+      { label: raw("NOT IN"), value: "NOT IN" },
+      { label: raw("str_match"), value: "str_match" },
+      { label: raw("str_match_ignore_case"), value: "str_match_ignore_case" },
+      { label: raw("match_all"), value: "match_all" },
+      { label: raw("re_match"), value: "re_match" },
+      { label: raw("re_not_match"), value: "re_not_match" },
+      { label: t("dashboard.filterOperators.contains"), value: "Contains" },
+      { label: t("dashboard.filterOperators.notContains"), value: "Not Contains" },
+      { label: t("dashboard.filterOperators.startsWith"), value: "Starts With" },
+      { label: t("dashboard.filterOperators.endsWith"), value: "Ends With" },
+      { label: t("dashboard.filterOperators.isNull"), value: "Is Null" },
+      { label: t("dashboard.filterOperators.isNotNull"), value: "Is Not Null" },
+    ]);
+
     const addSettingVariableSchema = makeAddSettingVariableSchema(t);
     const form = useOForm<AddSettingVariableForm>({
       defaultValues: addSettingVariableDefaults(),
@@ -970,7 +977,7 @@ export default defineComponent({
     // Add a watch for selectedTabs
     watch(
       selectedTabs,
-      (newTabs) => {
+      (_newTabs) => {
         if (variableData.scope === "panels") {
           nextTick(() => {
             updatePanels();
@@ -1139,6 +1146,7 @@ export default defineComponent({
       if (editMode.value) {
         try {
           await updateVariable(
+            t,
             store,
             dashId,
             props.variableName,
@@ -1165,7 +1173,7 @@ export default defineComponent({
         }
       } else {
         try {
-          await addVariable(store, dashId, payload, route.query.folder ?? "default");
+          await addVariable(t, store, dashId, payload, route.query.folder ?? "default");
           emit("save");
         } catch (error: any) {
           if (error?.response?.status === 409) {
@@ -1542,6 +1550,7 @@ export default defineComponent({
       store,
       t,
       raw,
+      filterOperatorOptions,
       data,
       streamsFilterFn,
       fieldsFilterFn,

@@ -23,10 +23,7 @@ use config::{
         synthetics::ListSyntheticsParams,
     },
 };
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    table,
-};
+use infra::{db::get_orm_client_rw, table};
 #[cfg(feature = "enterprise")]
 use o2_openfga::meta::mapping::OFGA_MODELS;
 
@@ -249,7 +246,7 @@ pub async fn delete_folder(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), FolderError> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match folder_type {
         FolderType::Dashboards => {
             let params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
@@ -474,6 +471,7 @@ mod tests {
             folder_id: "test_folder".to_string(),
             name: "Test Folder".to_string(),
             description: "Test description".to_string(),
+            icon: None,
         };
 
         assert_eq!(folder.folder_id, "test_folder");

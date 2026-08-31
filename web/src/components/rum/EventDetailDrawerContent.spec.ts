@@ -88,6 +88,13 @@ function createMockError(overrides: Record<string, any> = {}) {
 // Mock related resources
 const mockRelatedResources = [createMockResource(), createMockError()];
 
+// Stream discovery: defaults to the constant so the padded-navigation tests
+// keep their `stream: "default"` shape; tests override for custom streams.
+const mockResolveTracesStream = vi.fn().mockResolvedValue("default");
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTracesStream: mockResolveTracesStream }),
+}));
+
 // ============================================================================
 // TEST HELPERS
 // ============================================================================
@@ -779,6 +786,80 @@ describe("EventDetailDrawerContent", () => {
         );
         expect(windowOpenSpy).toHaveBeenCalled();
       }
+
+      windowOpenSpy.mockRestore();
+    });
+
+    it("pads a legacy zero-stripped trace_id before navigating to traceDetails", async () => {
+      // Arrange — a resource whose id SDK 0.4.x stored zero-stripped (31 hex chars)
+      const legacyResource = createMockResource({
+        _oo_trace_id: "1a034c1aabc72f78880daf6c9755cff",
+      });
+      if (globalThis.server) {
+        globalThis.server.use(
+          http.post(
+            `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+            async ({ request }) => {
+              const body = (await request.json()) as any;
+              if (body?.query?.sql?.includes("action_id")) {
+                return HttpResponse.json({ took: 0, hits: [legacyResource], total: 1 });
+              }
+              return HttpResponse.json({ took: 0, hits: [], total: 0 });
+            },
+          ),
+        );
+      }
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+      await waitForRelatedResources(wrapper);
+
+      const routerResolveSpy = vi.spyOn(router, "resolve");
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+      expect(traceButtons.length).toBeGreaterThan(0);
+
+      // Act
+      await traceButtons[0].trigger("click");
+      await flushPromises();
+
+      // Assert — route carries the padded 32-char id the traces stream stores
+      expect(routerResolveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traceDetails",
+          query: expect.objectContaining({
+            trace_id: "01a034c1aabc72f78880daf6c9755cff",
+            stream: "default",
+          }),
+        }),
+      );
+
+      windowOpenSpy.mockRestore();
+    });
+
+    it("opens the tab synchronously (popup-safe) and points it at the resolved stream", async () => {
+      // The user-gesture context dies at the first await: window.open must be
+      // called BEFORE the resolver settles, then the window is pointed at the
+      // resolved-stream route.
+      await waitForRelatedResources(wrapper);
+
+      const fakeWin: any = { location: { href: "" } };
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => fakeWin);
+      let openedBeforeResolve = false;
+      mockResolveTracesStream.mockImplementationOnce(async () => {
+        openedBeforeResolve = windowOpenSpy.mock.calls.length > 0;
+        return "payments_traces";
+      });
+
+      const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+      expect(traceButtons.length).toBeGreaterThan(0);
+      await traceButtons[0].trigger("click");
+      await flushPromises();
+
+      expect(windowOpenSpy).toHaveBeenCalledWith("", "_blank");
+      expect(openedBeforeResolve).toBe(true);
+      expect(fakeWin.location.href).toContain("stream=payments_traces");
+      expect(fakeWin.location.href).toContain("trace_id=");
 
       windowOpenSpy.mockRestore();
     });

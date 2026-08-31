@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { gt } from "@/types/i18n";
 import { mount, flushPromises } from "@vue/test-utils";
 import HomeView from "../../views/HomeView.vue";
 import store from "./helpers/store";
@@ -329,7 +330,7 @@ describe("HomeView org home dashboard tab", () => {
     store.state.isAiChatEnabled = false;
     store.state.zoConfig = { ai_enabled: false };
     localStorage.clear();
-    useHomeDashboard().homeDashboard.value = null;
+    useHomeDashboard(gt).homeDashboard.value = null;
   });
 
   afterEach(() => {
@@ -338,7 +339,7 @@ describe("HomeView org home dashboard tab", () => {
     }
     vi.clearAllTimers();
     localStorage.clear();
-    useHomeDashboard().homeDashboard.value = null;
+    useHomeDashboard(gt).homeDashboard.value = null;
   });
 
   const createWrapper = () => {
@@ -385,7 +386,7 @@ describe("HomeView org home dashboard tab", () => {
   };
 
   it("renders one tab for the home dashboard after the static tabs", async () => {
-    useHomeDashboard().homeDashboard.value = {
+    useHomeDashboard(gt).homeDashboard.value = {
       dashboardId: "abc",
       folderId: "default",
       label: "Payments Health",
@@ -396,14 +397,14 @@ describe("HomeView org home dashboard tab", () => {
   });
 
   it("renders no dashboard tab when homeDashboard is null", async () => {
-    useHomeDashboard().homeDashboard.value = null;
+    useHomeDashboard(gt).homeDashboard.value = null;
     wrapper = createWrapper();
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[data-test^="home-tab-dash:"]').exists()).toBe(false);
   });
 
   it("renders PinnedDashboardTab when the dash: tab is active", async () => {
-    useHomeDashboard().homeDashboard.value = {
+    useHomeDashboard(gt).homeDashboard.value = {
       dashboardId: "abc",
       folderId: "default",
       label: "Payments Health",
@@ -415,7 +416,7 @@ describe("HomeView org home dashboard tab", () => {
   });
 
   it("clears the home dashboard and falls back to first tab on unavailable", async () => {
-    const hd = useHomeDashboard();
+    const hd = useHomeDashboard(gt);
     hd.homeDashboard.value = {
       dashboardId: "abc",
       folderId: "default",
@@ -431,7 +432,7 @@ describe("HomeView org home dashboard tab", () => {
   });
 
   it("toasts when the pinned dashboard is reported unavailable", async () => {
-    const hd = useHomeDashboard();
+    const hd = useHomeDashboard(gt);
     hd.homeDashboard.value = {
       dashboardId: "abc",
       folderId: "default",
@@ -451,7 +452,7 @@ describe("HomeView org home dashboard tab", () => {
     (settingsService.getSetting as any).mockResolvedValue({
       data: { setting_value: { dashboardId: "abc", folderId: "A", label: "X" } },
     });
-    useHomeDashboard().homeDashboard.value = {
+    useHomeDashboard(gt).homeDashboard.value = {
       dashboardId: "abc",
       folderId: "B",
       label: "X",
@@ -464,7 +465,7 @@ describe("HomeView org home dashboard tab", () => {
   });
 
   it("does NOT toast when the pin is closed deliberately via the ×", async () => {
-    const hd = useHomeDashboard();
+    const hd = useHomeDashboard(gt);
     hd.homeDashboard.value = {
       dashboardId: "abc",
       folderId: "default",
@@ -485,7 +486,7 @@ describe("HomeView org home dashboard tab", () => {
     // so the × must stop those (not just click) or closing would first activate
     // the tab it's about to remove. Start focused on a DIFFERENT tab so a
     // spurious activation would show up in activeHomeTab.
-    const hd = useHomeDashboard();
+    const hd = useHomeDashboard(gt);
     hd.homeDashboard.value = {
       dashboardId: "abc",
       folderId: "default",

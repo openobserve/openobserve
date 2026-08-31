@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": [
+    "env.d.ts",
+    "src/ts/interfaces/alert.ts",
+    "src/ts/interfaces/alert.composite.spec.ts",
+    "src/components/alerts/composite/**/*.vue",
+    "src/components/alerts/composite/**/*.spec.ts"
+  ],
+  "exclude": ["node_modules", "dist"],
+  "compilerOptions": {
+    "composite": false,
+    "types": ["node", "vitest/globals"]
+  }
+}

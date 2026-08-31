@@ -23,8 +23,9 @@ use std::{
 use ::stream::get_stream;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
+use chrono::Utc;
 use config::{
-    DISTINCT_FIELDS, META_ORG_ID, SIZE_IN_MB, get_config,
+    META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -34,8 +35,7 @@ use config::{
     utils::{
         json::{Map, Value, estimate_json_bytes, get_string_value},
         schema_ext::SchemaExt,
-        time::now_micros,
-        util::DISTINCT_STREAM_PREFIX,
+        time::{now_micros, parse_timestamp_micro_from_value},
     },
 };
 use db;
@@ -44,13 +44,14 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 use ingestion_common::IngestionStatus;
-use schema::{check_for_schema, stream_schema_exists};
+use schema::{
+    check_for_schema, get_future_discard_error, get_upto_discard_error, stream_schema_exists,
+};
 
 use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-    metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
 };
 
 pub mod bulk;
@@ -96,7 +97,7 @@ pub fn cast_to_type(
             continue;
         }
         match field.data_type() {
-            DataType::Utf8 | DataType::LargeUtf8 => {
+            DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
                 if val.is_string() {
                     continue;
                 }
@@ -333,6 +334,37 @@ async fn write_logs(
         partition_keys = stream_settings.partition_keys;
     }
 
+    // DBM read-path pruning: a stream receiving server-vantage DBM records gets
+    // `o2_dbm_kind` seeded as a SECONDARY INDEX (`index_fields`, a raw-tokenized
+    // tantivy column — explicitly not full-text search), so a DBM read filtering
+    // on one kind prunes rows via the index instead of scanning the stream. The
+    // reasoning, the selectivity risk, the migration case and the
+    // `time_index.rs` precedent this follows are all documented on
+    // `ensure_server_stream_index_field`.
+    //
+    // Placed here rather than in the rollup job because the settings must exist
+    // on the node about to write parquet (the index is built per-file at the
+    // WAL→parquet move), and because only the ingest path knows which stream the
+    // recipes actually export to (every DBM read endpoint takes a `stream`
+    // override; the seed is data-driven, not name-driven).
+    //
+    // Gated on the batch actually carrying a canonicalized DBM record, so the
+    // overwhelming majority of log ingests — which carry none — pay one
+    // short-circuiting scan and nothing else. `apply_to_record` has already run
+    // by this point (it is called per record on the way in), so the kind stamp
+    // is present to be seen.
+    //
+    // No settings re-read follows, unlike the partition-key implementation this
+    // replaces: partition keys had to be read back because THIS function
+    // computes the write path from them, whereas the secondary index is
+    // consumed later, by the parquet writer reading stream settings for itself.
+    if config::get_config().db_monitoring.enabled
+        && crate::db_monitoring::server_vantage::batch_has_dbm_records(&json_data)
+    {
+        crate::db_monitoring::server_vantage::ensure_server_stream_index_field(org_id, stream_name)
+            .await;
+    }
+
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     crate::ingestion::get_stream_alerts(
@@ -380,8 +412,6 @@ async fn write_logs(
         Some(schema) => Arc::new(schema.cloned_from(&latest_schema)),
         None => Arc::new(latest_schema),
     };
-
-    let mut distinct_values = Vec::with_capacity(16);
 
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
@@ -490,30 +520,6 @@ async fn write_logs(
         }
         // end check for alert triggers
 
-        // get distinct_value items
-        if stream_settings.enable_distinct_fields {
-            let mut map = Map::new();
-            for field in DISTINCT_FIELDS.iter().chain(
-                stream_settings
-                    .distinct_value_fields
-                    .iter()
-                    .map(|f| &f.name),
-            ) {
-                if let Some(val) = record_val.get(field) {
-                    map.insert(field.clone(), val.clone());
-                }
-            }
-
-            if !map.is_empty() {
-                // add distinct values
-                distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    value: map,
-                }));
-            }
-        }
-
         // get hour key
         let hour_key = get_write_partition_key(
             timestamp,
@@ -565,18 +571,9 @@ async fn write_logs(
     )
     .await?;
 
-    // send distinct_values
-    if !distinct_values.is_empty()
-        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-        && stream_settings.enable_distinct_fields
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
-    {
-        log::error!("Error while writing distinct values: {e}");
-    }
-
     // only one trigger per request
     if !triggers.is_empty() {
-        tokio::spawn(async move { evaluate_trigger(triggers).await });
+        tokio::spawn(evaluate_trigger(triggers));
     }
 
     Ok(req_stats)
@@ -592,6 +589,50 @@ async fn ingestion_log_enabled() -> bool {
         .unwrap_or(false)
 }
 
+pub fn handle_timestamp_for_value(
+    value: &mut Value,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<i64, anyhow::Error> {
+    let local_val = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
+    handle_timestamp_for_map(local_val, min_ts, max_ts)
+}
+
+fn handle_timestamp_for_map(
+    val: &mut Map<String, Value>,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<i64, anyhow::Error> {
+    let (mut timestamp, has_valid_timestamp) = match val.get(TIMESTAMP_COL_NAME) {
+        Some(v) if !v.is_null() => match parse_timestamp_micro_from_value(v) {
+            Ok(t) => t,
+            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
+        },
+        _ => (0, false),
+    };
+    // check ingestion time
+    if timestamp > 0 && timestamp < min_ts {
+        return Err(get_upto_discard_error());
+    }
+    if timestamp > max_ts {
+        return Err(get_future_discard_error());
+    }
+    if !has_valid_timestamp {
+        timestamp = if timestamp > 0 {
+            timestamp
+        } else {
+            Utc::now().timestamp_micros()
+        };
+        val.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            Value::Number(timestamp.into()),
+        );
+    }
+    Ok(timestamp)
+}
+
 fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {
     if !enabled {
         return;
@@ -601,6 +642,8 @@ fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str)
 
 #[cfg(test)]
 mod tests {
+    use config::utils::json::json;
+
     use super::*;
 
     #[test]
@@ -620,8 +663,17 @@ mod tests {
     }
 
     #[test]
+    fn test_cast_to_type_utf8view_casts_to_string() {
+        let mut local_val = Map::new();
+        local_val.insert("test".to_string(), Value::from(42));
+        let delta = vec![Field::new("test", DataType::Utf8View, true)];
+        assert!(cast_to_type(&mut local_val, delta).is_ok());
+        assert_eq!(local_val.get("test"), Some(&Value::from("42")));
+    }
+
+    #[test]
     fn test_parse_bulk_index_index_action() {
-        let v = serde_json::json!({"index": {"_index": "my-stream", "_id": "doc1"}});
+        let v = json!({"index": {"_index": "my-stream", "_id": "doc1"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_some());
         let (action, index, doc_id) = result.unwrap();
@@ -632,7 +684,7 @@ mod tests {
 
     #[test]
     fn test_parse_bulk_index_create_action_no_doc_id() {
-        let v = serde_json::json!({"create": {"_index": "my-stream"}});
+        let v = json!({"create": {"_index": "my-stream"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_some());
         let (action, index, doc_id) = result.unwrap();
@@ -643,15 +695,74 @@ mod tests {
 
     #[test]
     fn test_parse_bulk_index_no_known_action_returns_none() {
-        let v = serde_json::json!({"delete": {"_index": "my-stream"}});
+        let v = json!({"delete": {"_index": "my-stream"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_none());
     }
 
     #[test]
     fn test_parse_bulk_index_missing_index_skips_action() {
-        let v = serde_json::json!({"index": {"_id": "doc1"}});
+        let v = json!({"index": {"_id": "doc1"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_valid_in_range() {
+        // 2024-01-15 in microseconds
+        let ts = 1_705_276_800_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: ts});
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ts);
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_too_old() {
+        let min_ts = 1_705_276_800_000_000i64;
+        let old_ts = 1_000_000_000_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: old_ts});
+        let result = handle_timestamp_for_value(&mut val, min_ts, i64::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_too_future() {
+        let max_ts = 1_705_276_800_000_000i64;
+        let future_ts = 2_000_000_000_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: future_ts});
+        let result = handle_timestamp_for_value(&mut val, 0, max_ts);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_not_object() {
+        let mut val = json!("not an object");
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_null_timestamp_uses_now() {
+        let mut val = json!({TIMESTAMP_COL_NAME: null});
+        let before = chrono::Utc::now().timestamp_micros();
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
+        let after = chrono::Utc::now().timestamp_micros();
+        assert!(result.is_ok());
+        let ts = result.unwrap();
+        assert!(ts >= before && ts <= after);
+    }
+
+    #[test]
+    fn test_handle_timestamp_for_value_missing_field_uses_now() {
+        let mut val = json!({"message": "hello"});
+        let before = chrono::Utc::now().timestamp_micros();
+        let result = handle_timestamp_for_value(&mut val, 0, i64::MAX);
+        let after = chrono::Utc::now().timestamp_micros();
+        assert!(result.is_ok());
+        let ts = result.unwrap();
+        assert!(ts >= before && ts <= after);
+        // field should be inserted
+        assert!(val.get(TIMESTAMP_COL_NAME).is_some());
     }
 }

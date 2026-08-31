@@ -81,9 +81,9 @@ const BaseImportStub = {
   setup(_props: any, { expose }: any) {
     const jsonArrayOfObj = ref<any[]>([]);
     const jsonStr = ref("");
-    const isImporting = ref(false);
-    expose({ jsonArrayOfObj, jsonStr, isImporting });
-    return { jsonArrayOfObj, jsonStr, isImporting };
+    const isImportingLocal = ref(false);
+    expose({ jsonArrayOfObj, jsonStr, isImportingLocal });
+    return { jsonArrayOfObj, jsonStr, isImportingLocal };
   },
 };
 
@@ -387,9 +387,9 @@ describe("ImportTemplate", () => {
     });
 
     it("resets isImporting when jsonStr is empty", async () => {
-      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      wrapper.vm.$refs.baseImportRef.isImportingLocal = true;
       await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
-      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+      expect(wrapper.vm.$refs.baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("calls toast for invalid JSON", async () => {
@@ -398,9 +398,9 @@ describe("ImportTemplate", () => {
     });
 
     it("resets isImporting on parse error", async () => {
-      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      wrapper.vm.$refs.baseImportRef.isImportingLocal = true;
       await wrapper.vm.importJson({ jsonStr: "{ bad json }", jsonArray: [] });
-      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+      expect(wrapper.vm.$refs.baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("resets templateErrorsToDisplay and tempalteCreators before processing", async () => {

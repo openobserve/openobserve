@@ -59,6 +59,7 @@ pub async fn queue(
     if get(db, slo_id, generation).await?.is_some() {
         return Ok(());
     }
+
     slo_backfill_jobs::ActiveModel {
         slo_id: Set(slo_id.to_string()),
         definition_generation: Set(generation),
@@ -87,6 +88,7 @@ pub async fn record_progress(
     let Some(model) = get(db, slo_id, generation).await? else {
         return Ok(());
     };
+
     let previous = model.rows_written;
     let mut active = model.into_active_model();
     active.state = Set(STATE_RUNNING);
@@ -127,6 +129,7 @@ async fn set_state(
     let Some(model) = get(db, slo_id, generation).await? else {
         return Ok(());
     };
+
     let mut active = model.into_active_model();
     active.state = Set(state);
     if let Some(e) = error {
@@ -155,6 +158,7 @@ pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Err
     if slo_ids.is_empty() {
         return Ok(());
     }
+
     slo_backfill_jobs::Entity::delete_many()
         .filter(slo_backfill_jobs::Column::SloId.is_in(slo_ids))
         .exec(db)

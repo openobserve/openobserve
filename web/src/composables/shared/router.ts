@@ -19,7 +19,10 @@ import {
   useLocalCurrentUser,
   invalidateLoginData,
 } from "@/utils/zincutils";
+import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
+import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import store from "@/stores";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import About from "@/views/About.vue";
@@ -39,8 +42,93 @@ const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
-const ServiceGraphView = () => import("@/plugins/traces/views/ServiceGraphView.vue");
-const ServicesCatalogView = () => import("@/plugins/traces/views/ServicesCatalogView.vue");
+
+const supportedTraceTab = (tab: unknown): TraceSearchMode =>
+  resolveTraceSearchMode(tab, config.isEnterprise === "true");
+
+const canonicalTraceQuery = (
+  query: LocationQuery | undefined,
+  tab: TraceSearchMode,
+): LocationQueryRaw => {
+  const canonicalQuery: LocationQueryRaw = { ...(query ?? {}), tab };
+  delete canonicalQuery.search_mode;
+  return canonicalQuery;
+};
+
+const redirectToTraceTab =
+  (tab: "service-graph" | "services-catalog") =>
+  (to: { query: LocationQuery }): RouteLocationRaw => ({
+    name: "traces",
+    query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
+  });
+
+// Eager, not lazy: the shell hosts the keep-alive that every DBM tab lives in,
+// so it is on the critical path for the first DBM route either way, and it is a
+// single `<router-view>`.
+import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
+
+const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
+const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
+const DbmSamplesPage = () => import("@/views/DatabaseMonitoring/SamplesPage.vue");
+const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailPage.vue");
+const DbmActivityPage = () => import("@/views/DatabaseMonitoring/ActivityPage.vue");
+const DbmDeadlocksPage = () => import("@/views/DatabaseMonitoring/DeadlocksPage.vue");
+const DbmBlockedQueriesPage = () => import("@/views/DatabaseMonitoring/BlockedQueriesPage.vue");
+const DbmTableHealthPage = () => import("@/views/DatabaseMonitoring/TableHealthPage.vue");
+
+/**
+ * The SECTION gate. Runtime flag only — no build-type conjunct, because the
+ * Database Monitoring section itself is not enterprise-only. The build-type
+ * gate for its three enterprise tabs is `dbmEnterpriseGuard` below, applied per
+ * route; adding an isEnterprise conjunct here would close the whole section on
+ * OSS instead.
+ *
+ * The store is IMPORTED, not read off `window`: nothing in the app ever assigns
+ * `window.store`, so the old `(window as any).store` read was permanently
+ * `undefined`. On the negative gates elsewhere in this file that fails OPEN and
+ * goes unnoticed, but this gate is positive — it made every Database Monitoring
+ * route redirect to /traces no matter what `/config` returned, i.e. the feature
+ * was unreachable in a browser. `import store from "@/stores"` is the singleton
+ * `useEnterpriseRoutes.ts` already uses for exactly this kind of runtime
+ * `/config` flag, and it works outside a component where `useStore()` cannot.
+ */
+/**
+ * `main.ts` calls `getConfig()` WITHOUT awaiting it and mounts the app from a
+ * `.finally()` on locale loading, so on a cold load (deep link, refresh, or a
+ * Playwright `page.goto`) this guard can run before `/config` has come back and
+ * `zoConfig` is still `{}`. Treating "not loaded yet" as "disabled" bounced a
+ * direct URL to /traces even with the flag on. Only an explicit `false` — a
+ * config that HAS loaded and says off — is a redirect; an unloaded config lets
+ * the route through, and the page's own `dbmEnabled` check renders the disabled
+ * state if it really is off.
+ */
+const dbMonitoringEnabled = (): boolean => {
+  const zoConfig = store?.state?.zoConfig;
+  const configLoaded = !!zoConfig && Object.keys(zoConfig).length > 0;
+  if (!configLoaded) return true;
+  return Boolean(zoConfig.database_monitoring_enabled);
+};
+
+/**
+ * Guard for the three enterprise-only DBM tabs — Deadlocks, Blocked queries and
+ * Table health, whose reads an OSS backend answers 403 on. Disabling the tabs
+ * cannot stop a PASTED or bookmarked URL, so each route needs its own guard.
+ *
+ * It lands on the DBM overview, keeping the reader inside the section they
+ * aimed at, rather than on a page that renders empty because every fetch was
+ * refused. The scope travels so the window and filters survive the bounce.
+ *
+ * `isEnterprise` is a STRING — compared against the literal `"true"`, never
+ * coerced, since `Boolean("false")` is true and would open the gate on OSS.
+ * Same shape as the `serviceGraph` guard below.
+ */
+const dbmEnterpriseGuard = (to: any, from: any, next: any) => {
+  if (config.isEnterprise !== "true") {
+    next({ name: "dbmDatabases", query: to.query });
+    return;
+  }
+  routeGuard(to, from, next);
+};
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -50,6 +138,7 @@ const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
+const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
@@ -86,12 +175,12 @@ const useRoutes = () => {
       path: "/login",
       component: Login,
       meta: {
-        title: "Login",
+        titleKey: "login.login",
       },
     },
     {
       path: "/logout",
-      beforeEnter(to: any, from: any, next: any) {
+      beforeEnter(_to: any, _from: any, _next: any) {
         // Clear backend auth cookies before redirecting to login
         invalidateLoginData();
         useLocalCurrentUser("", true);
@@ -105,7 +194,15 @@ const useRoutes = () => {
       name: "callback",
       component: Login,
       meta: {
-        title: "Login Callback",
+        titleKey: "routeTitles.loginCallback",
+      },
+    },
+    {
+      path: "/slack/oauth/callback",
+      name: "slackOAuthCallback",
+      component: () => import("@/views/SlackOAuthCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackOAuthCallback",
       },
     },
   ];
@@ -117,7 +214,7 @@ const useRoutes = () => {
       component: Home,
       meta: {
         keepAlive: true,
-        title: "Home",
+        titleKey: "menu.home",
       },
     },
     // TEMPORARY: preview route for the OEmptyState design sample. Remove once
@@ -128,7 +225,7 @@ const useRoutes = () => {
       component: () => import("@/views/EmptyStateDemo.vue"),
       meta: {
         keepAlive: false,
-        title: "Empty State Demo",
+        titleKey: "routeTitles.emptyStateDemo",
       },
     },
     {
@@ -137,7 +234,7 @@ const useRoutes = () => {
       component: Search,
       meta: {
         keepAlive: true,
-        title: "Logs",
+        titleKey: "menu.search",
       },
       beforeEnter(to: any, from: any, next: any) {
         // Back-compat: Search History / Scheduler used to be `?action=…` overlays
@@ -160,7 +257,7 @@ const useRoutes = () => {
       component: SearchJobInspector,
       meta: {
         keepAlive: false,
-        title: "Search Job Inspector",
+        titleKey: "logs.searchJobInspector.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -175,7 +272,7 @@ const useRoutes = () => {
       component: SearchHistory,
       meta: {
         keepAlive: false,
-        title: "Search History",
+        titleKey: "search_history.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -190,7 +287,7 @@ const useRoutes = () => {
       component: SearchSchedulersList,
       meta: {
         keepAlive: false,
-        title: "Search Scheduler",
+        titleKey: "routeTitles.searchScheduler",
       },
       beforeEnter(to: any, from: any, next: any) {
         if (config.isEnterprise !== "true") {
@@ -213,7 +310,7 @@ const useRoutes = () => {
       component: AppMetricsExplorer,
       meta: {
         keepAlive: false,
-        title: "Metrics",
+        titleKey: "menu.metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
         if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
@@ -238,7 +335,7 @@ const useRoutes = () => {
       component: AppMetrics,
       meta: {
         keepAlive: true,
-        title: "Metrics",
+        titleKey: "menu.metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -250,7 +347,7 @@ const useRoutes = () => {
       component: PromQLQueryBuilder,
       meta: {
         keepAlive: false,
-        title: "PromQL Query Builder",
+        titleKey: "metrics.queryBuilder.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -262,48 +359,143 @@ const useRoutes = () => {
       component: AppTraces,
       meta: {
         keepAlive: true,
-        title: "Traces",
+        titleKey: "menu.traces",
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
-      path: "traces/service-graph",
-      name: "serviceGraph",
-      component: ServiceGraphView,
-      meta: {
-        keepAlive: true,
-        title: "Service Graph",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        // Enterprise-only, mirroring the nav flyout's `enterprise` gate. An OSS
-        // build lands on Traces rather than an empty page.
-        if (config.isEnterprise !== "true") {
-          next({ name: "traces", query: to.query });
+        const tab = supportedTraceTab(to.query?.tab);
+        if (to.query?.tab !== tab || to.query?.search_mode !== undefined) {
+          next({
+            name: "traces",
+            query: canonicalTraceQuery(to.query, tab),
+            hash: to.hash,
+            replace: true,
+          });
           return;
         }
         routeGuard(to, from, next);
       },
     },
     {
+      path: "traces/service-graph",
+      redirect: redirectToTraceTab("service-graph"),
+    },
+    {
       path: "traces/services",
-      name: "servicesCatalog",
-      component: ServicesCatalogView,
-      meta: {
-        keepAlive: true,
-        title: "Service Catalog",
-      },
+      redirect: redirectToTraceTab("services-catalog"),
+    },
+    {
+      path: "infra/databases",
+      component: DbmShell,
       beforeEnter(to: any, from: any, next: any) {
+        if (!dbMonitoringEnabled()) {
+          next({ name: "traces", query: to.query });
+          return;
+        }
         routeGuard(to, from, next);
       },
+      children: [
+        {
+          path: "",
+          name: "dbmDatabases",
+          component: DbmDatabasesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "queries",
+          name: "dbmQueries",
+          component: DbmQueriesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "samples",
+          name: "dbmSamples",
+          component: DbmSamplesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "activity",
+          name: "dbmActivity",
+          component: DbmActivityPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "deadlocks",
+          name: "dbmDeadlocks",
+          component: DbmDeadlocksPage,
+          beforeEnter: dbmEnterpriseGuard,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          // `blocking` rather than `blocked`: the URL names the phenomenon the
+          // page is about, and both perspectives of it live on this one route.
+          path: "blocking",
+          name: "dbmBlocking",
+          component: DbmBlockedQueriesPage,
+          beforeEnter: dbmEnterpriseGuard,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "table-health",
+          name: "dbmTableHealth",
+          component: DbmTableHealthPage,
+          beforeEnter: dbmEnterpriseGuard,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          // The query id travels as a query param rather than a path segment:
+          // it is opaque, can be long, and the page needs the rest of the scope
+          // (stream, database, window) alongside it for the URL to be shareable
+          // — which is the whole point of the incident-summary permalink.
+          // `keepAlive` is deliberately off: a cached instance would show the
+          // previous query's charts when arriving from a different span.
+          path: "query",
+          name: "dbmQueryDetail",
+          component: DbmQueryDetailPage,
+          meta: {
+            title: "Query detail",
+          },
+        },
+      ],
+    },
+    {
+      // Database Monitoring moved from `traces/databases` to `infra/databases`.
+      // Every old link keeps working: the wildcard carries the tab segment
+      // (`queries`, `deadlocks`, `table-health`, …) and the `query` object is
+      // forwarded, so a permalink's scope filters and time range survive the
+      // hop rather than dumping the reader on an unfiltered Databases tab.
+      path: "traces/databases/:dbmPath(.*)*",
+      redirect: (to: any) => ({
+        path: `/infra/databases${to.params.dbmPath?.length ? `/${[to.params.dbmPath].flat().join("/")}` : ""}`,
+        query: to.query,
+      }),
     },
     {
       path: "traces/trace-details",
       name: "traceDetails",
       component: TraceDetails,
       meta: {
-        title: "Trace Details",
+        titleKey: "routeTitles.traceDetails",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -314,16 +506,16 @@ const useRoutes = () => {
       name: "sessionDetails",
       component: SessionDetails,
       meta: {
-        title: "Session Details",
+        titleKey: "routeTitles.sessionDetails",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
     },
     {
-      // Redirect old service-graph route to traces page
+      // Redirect the oldest Service Graph URL to the canonical in-page tab.
       path: "service-graph",
-      redirect: "/traces",
+      redirect: redirectToTraceTab("service-graph"),
     },
     {
       name: "streamExplorer",
@@ -331,7 +523,7 @@ const useRoutes = () => {
       component: StreamExplorer,
       props: true,
       meta: {
-        title: "Stream Explorer",
+        titleKey: "routeTitles.streamExplorer",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -342,7 +534,7 @@ const useRoutes = () => {
       name: "logstreams",
       component: LogStream,
       meta: {
-        title: "Streams",
+        titleKey: "menu.index",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -354,7 +546,7 @@ const useRoutes = () => {
       component: About,
       meta: {
         keepAlive: true,
-        title: "About",
+        titleKey: "menu.about",
       },
     },
     {
@@ -363,7 +555,7 @@ const useRoutes = () => {
       component: Dashboards,
       meta: {
         keepAlive: false,
-        title: "Dashboards",
+        titleKey: "menu.dashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -375,7 +567,7 @@ const useRoutes = () => {
       component: ViewDashboard,
       props: true,
       meta: {
-        title: "View Dashboard",
+        titleKey: "routeTitles.viewDashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -387,7 +579,7 @@ const useRoutes = () => {
       component: ImportDashboard,
       props: true,
       meta: {
-        title: "Import Dashboard",
+        titleKey: "dashboard.importDashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -399,7 +591,7 @@ const useRoutes = () => {
       component: AddPanel,
       props: true,
       meta: {
-        title: "Add Panel",
+        titleKey: "panel.addPanel",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -411,7 +603,7 @@ const useRoutes = () => {
       component: MemberSubscription,
       meta: {
         keepAlive: true,
-        title: "Member Subscription",
+        titleKey: "billing.memberSubscription.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -423,7 +615,7 @@ const useRoutes = () => {
       name: "pipeline",
       component: Functions,
       meta: {
-        title: "Pipeline",
+        titleKey: "pipeline.pipelineLabel",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -482,7 +674,7 @@ const useRoutes = () => {
               name: "pipelineHistory",
               component: () => import("@/components/pipelines/PipelineHistory.vue"),
               meta: {
-                title: "Pipeline History",
+                titleKey: "pipeline.history",
               },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
@@ -493,7 +685,7 @@ const useRoutes = () => {
               name: "pipelineBackfill",
               component: () => import("@/components/pipelines/BackfillJobsList.vue"),
               meta: {
-                title: "Pipeline Backfill Jobs",
+                titleKey: "routeTitles.pipelineBackfillJobs",
               },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
@@ -508,7 +700,7 @@ const useRoutes = () => {
       name: "sloList",
       component: () => import("@/views/slos/SloList.vue"),
       meta: {
-        title: "SLOs",
+        titleKey: "menu.slos",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -521,7 +713,7 @@ const useRoutes = () => {
       name: "addSlo",
       component: () => import("@/views/slos/AddSlo.vue"),
       meta: {
-        title: "New SLO",
+        titleKey: "slos.newTitle",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -532,7 +724,7 @@ const useRoutes = () => {
       name: "editSlo",
       component: () => import("@/views/slos/AddSlo.vue"),
       meta: {
-        title: "Edit SLO",
+        titleKey: "slos.editTitle",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -543,7 +735,7 @@ const useRoutes = () => {
       name: "sloDetail",
       component: () => import("@/views/slos/SloDetail.vue"),
       meta: {
-        title: "SLO",
+        titleKey: "routeTitles.sloDetail",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -554,7 +746,7 @@ const useRoutes = () => {
       name: "alertList",
       component: AlertList,
       meta: {
-        title: "Alerts",
+        titleKey: "menu.alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -577,7 +769,7 @@ const useRoutes = () => {
       name: "alertDestinations",
       component: AlertsDestinationList,
       meta: {
-        title: "Notification Destinations",
+        titleKey: "alert_destinations.header",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -588,7 +780,22 @@ const useRoutes = () => {
       name: "alertTemplates",
       component: TemplateList,
       meta: {
-        title: "Templates",
+        titleKey: "alert_templates.header",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // The curated alert catalog — a sibling of Alerts for the same reason
+      // Destinations and Templates are: flat, so the rail lights exactly one
+      // entry. The four pages present as peer tabs (AlertSectionTabs), which is
+      // presentation only and does not imply nesting.
+      path: "alert-library",
+      name: "alertLibrary",
+      component: AlertLibrary,
+      meta: {
+        titleKey: "alert_library.header",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -607,7 +814,7 @@ const useRoutes = () => {
       name: "alertSources",
       component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
       meta: {
-        title: "External Alert Sources",
+        titleKey: "alert_sources.header",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -626,7 +833,7 @@ const useRoutes = () => {
       name: "alertDetail",
       component: () => import("@/views/alerts/AlertDetail.vue"),
       meta: {
-        title: "Alert Detail",
+        titleKey: "routeTitles.alertDetail",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -637,7 +844,7 @@ const useRoutes = () => {
       name: "addAlert",
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
-        title: "Add Alert",
+        titleKey: "alerts.addAlertMode",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -653,7 +860,7 @@ const useRoutes = () => {
       name: "editAlert",
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
-        title: "Edit Alert",
+        titleKey: "routeTitles.editAlert",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -664,7 +871,7 @@ const useRoutes = () => {
       name: "addAnomalyDetection",
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
-        title: "Add Anomaly Detection",
+        titleKey: "alerts.addAnomalyMode",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -681,7 +888,7 @@ const useRoutes = () => {
       name: "editAnomalyDetection",
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
-        title: "Edit Anomaly Detection",
+        titleKey: "alerts.editAnomalyMode",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -698,7 +905,7 @@ const useRoutes = () => {
       name: "alertHistory",
       component: () => import("@/components/alerts/AlertHistory.vue"),
       meta: {
-        title: "Alert History",
+        titleKey: "alerts.history",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -709,7 +916,7 @@ const useRoutes = () => {
       name: "alertInsights",
       component: () => import("@/components/alerts/AlertInsights.vue"),
       meta: {
-        title: "Alert Insights",
+        titleKey: "alerts.insights.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -720,7 +927,7 @@ const useRoutes = () => {
       name: "importSemanticGroups",
       component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
       meta: {
-        title: "Import Semantic Groups",
+        titleKey: "correlation.importSemanticGroups.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -740,7 +947,7 @@ const useRoutes = () => {
       name: "RUM",
       component: RealUserMonitoring,
       meta: {
-        title: "Real User Monitoring",
+        titleKey: "rum.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -869,7 +1076,7 @@ const useRoutes = () => {
       component: Error404,
       meta: {
         keepAlive: true,
-        title: "404 - Not Found",
+        titleKey: "routeTitles.notFound",
       },
     },
   ];
@@ -884,7 +1091,7 @@ const useRoutes = () => {
         component: ReportList,
         props: true,
         meta: {
-          title: "Reports",
+          titleKey: "menu.report",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -896,7 +1103,7 @@ const useRoutes = () => {
         component: CreateReport,
         props: true,
         meta: {
-          title: "Create Report",
+          titleKey: "routeTitles.createReport",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);

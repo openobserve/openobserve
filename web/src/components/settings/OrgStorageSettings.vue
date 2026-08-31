@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Cloud: storage not enabled -->
       <div v-else-if="isCloud && !orgStorageEnabled" class="text-text-secondary py-3 text-sm">
-        {{ t("storage_settings.notEnabled") }}
+        {{ t("storage_settings.notEnabled", { product: raw("BYOB") }) }}
       </div>
 
       <!-- ========== NOT CONFIGURED: cloud hero ========== -->
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="feature-card rounded-default border-border-default bg-surface-base flex items-start gap-4 border px-5.5 py-5 shadow-md transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
             >
               <div
-                class="feature-card__icon-box rounded-default flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_8%,transparent)]"
+                class="feature-card__icon-box rounded-default bg-theme-accent/8 flex h-10 w-10 shrink-0 items-center justify-center"
               >
                 <OIcon
                   :name="feature.icon"
@@ -316,7 +316,7 @@ import { ref, computed, onMounted } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";

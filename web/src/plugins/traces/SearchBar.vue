@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
             />
             <OIcon name="bar-chart" size="sm" class="shrink-0" />
-            <OTooltip :content="t('traces.RedMetrics')" />
+            <OTooltip :content="raw('RED Metrics')" />
           </div>
         </template>
 
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 :title="t('search.runQuery')"
-                class="element-box-shadow bg-button-primary! text-button-primary-foreground! h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]"
+                class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:ring-2"
                 :class="
                   store.state.zoConfig.auto_query_enabled
                     ? '![border-radius:0.375rem_0_0_0.375rem]'
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="[
                       config.isEnterprise == 'true' && isLoading
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                        : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
                       '![border-radius:0_0.375rem_0.375rem_0]',
                     ]"
                   >
@@ -362,13 +362,12 @@ import {
   watch,
   nextTick,
   defineAsyncComponent,
-  onBeforeUnmount,
   onActivated,
   computed,
   toRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -736,17 +735,15 @@ export default defineComponent({
     // Remove all conditions for a given field from the editor value.
     // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
     const removeFilterByField = (fieldName: string) => {
-      const value = searchObj.data.editorValue;
-      const parts = value.split("|");
-      const target = parts.length > 1 ? 1 : 0;
-      const replaced = replaceExistingFieldCondition(parts[target] as string, fieldName, "");
-      parts[target] = replaced
+      // The whole editor value is the where clause — never split it on "|", the
+      // split is quote-unaware and would corrupt match_all('text | error').
+      const value = searchObj.data.editorValue as string;
+      const newValue = replaceExistingFieldCondition(value, fieldName, "")
         .replace(/\s*\band\b\s*$/i, "")
         .replace(/^\s*\band\b\s*/i, "")
         .replace(/\s+and\s+and\s+/gi, " and ")
         .trim();
-      const newValue = parts.length > 1 ? parts.join("| ") : parts[0];
-      searchObj.data.editorValue = newValue as string;
+      searchObj.data.editorValue = newValue;
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
       if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
@@ -866,6 +863,7 @@ export default defineComponent({
       _traceFieldValues,
       _traceSqlMode,
       _traceNoStream,
+      t,
       { excludeMatchAll: true },
     );
 
@@ -880,6 +878,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       router,
       store,
       searchObj,

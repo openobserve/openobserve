@@ -33,11 +33,13 @@
 
 
 import { test, expect } from '@playwright/test';
+import testLogger from '../utils/test-logger.js';
 import fs from 'fs/promises';
 import PageManager from '../../pages/page-manager.js';
 
 // The login function
 test('Login', async ({ page }) => {
+  testLogger.info('test started');
     const pageManager = new PageManager(page);
     
     // Navigate to the base URL

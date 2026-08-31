@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap">
+  <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap gap-y-1">
     <div
       v-for="(item, index) in variablesData.values"
       :key="item.name + index"
@@ -854,7 +854,7 @@ export default defineComponent({
         variablesData.values.push({
           name: "Dynamic filters",
           type: "dynamic_filters",
-          label: "Dynamic filters",
+          label: t("dashboard.dashboards.dynamicFilters"),
           value: initialValue,
           isLoading: false,
           isVariableLoadingPending: false,

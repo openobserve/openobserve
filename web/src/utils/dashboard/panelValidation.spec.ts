@@ -18,6 +18,7 @@ import {
   findFirstValidMappedValue,
   validateDashboardJson,
 } from "@/utils/dashboard/panelValidation";
+import { gt } from "@/types/i18n";
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   CURRENT_DASHBOARD_SCHEMA_VERSION: "v3",
@@ -153,47 +154,47 @@ describe("panelValidation", () => {
     };
 
     it("returns no errors for valid dashboard", () => {
-      const errors = validateDashboardJson(validDashboard);
+      const errors = validateDashboardJson(gt, validDashboard);
       expect(errors).toEqual([]);
     });
 
     it("returns error for null dashboard", () => {
-      const errors = validateDashboardJson(null);
+      const errors = validateDashboardJson(gt, null);
       expect(errors).toContain("Dashboard JSON is empty or invalid");
     });
 
     it("returns error for undefined dashboard", () => {
-      const errors = validateDashboardJson(undefined);
+      const errors = validateDashboardJson(gt, undefined);
       expect(errors).toContain("Dashboard JSON is empty or invalid");
     });
 
     it("returns error for missing dashboardId", () => {
-      const errors = validateDashboardJson({ ...validDashboard, dashboardId: undefined });
+      const errors = validateDashboardJson(gt, { ...validDashboard, dashboardId: undefined });
       expect(errors).toContain("Dashboard ID is required");
     });
 
     it("returns error for missing title", () => {
-      const errors = validateDashboardJson({ ...validDashboard, title: undefined });
+      const errors = validateDashboardJson(gt, { ...validDashboard, title: undefined });
       expect(errors).toContain("Dashboard title is required");
     });
 
     it("returns error for missing version", () => {
-      const errors = validateDashboardJson({ ...validDashboard, version: undefined });
+      const errors = validateDashboardJson(gt, { ...validDashboard, version: undefined });
       expect(errors).toContain("Dashboard version is required");
     });
 
     it("returns error for wrong version", () => {
-      const errors = validateDashboardJson({ ...validDashboard, version: "v1" });
+      const errors = validateDashboardJson(gt, { ...validDashboard, version: "v1" });
       expect(errors.some((e) => e.includes("v3"))).toBe(true);
     });
 
     it("returns error for missing tabs", () => {
-      const errors = validateDashboardJson({ ...validDashboard, tabs: undefined });
+      const errors = validateDashboardJson(gt, { ...validDashboard, tabs: undefined });
       expect(errors).toContain("Dashboard must have at least one tab");
     });
 
     it("returns error for empty tabs array", () => {
-      const errors = validateDashboardJson({ ...validDashboard, tabs: [] });
+      const errors = validateDashboardJson(gt, { ...validDashboard, tabs: [] });
       expect(errors).toContain("Dashboard must have at least one tab");
     });
 
@@ -202,7 +203,7 @@ describe("panelValidation", () => {
         ...validDashboard,
         tabs: [{ name: "Tab 1", panels: [] }],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors).toContain("Each tab must have a tabId");
     });
 
@@ -211,7 +212,7 @@ describe("panelValidation", () => {
         ...validDashboard,
         tabs: [{ tabId: "tab-001", panels: [] }],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors.some((e) => e.includes("must have a name"))).toBe(true);
     });
 
@@ -223,7 +224,7 @@ describe("panelValidation", () => {
           { tabId: "tab-001", name: "Tab 2", panels: [] },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors.some((e) => e.includes("Duplicate tab ID"))).toBe(true);
     });
 
@@ -238,7 +239,7 @@ describe("panelValidation", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors.some((e) => e.includes("missing an ID"))).toBe(true);
     });
 
@@ -256,12 +257,12 @@ describe("panelValidation", () => {
           },
         ],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors.some((e) => e.includes("Duplicate panel ID"))).toBe(true);
     });
 
     it("can return multiple errors", () => {
-      const errors = validateDashboardJson({
+      const errors = validateDashboardJson(gt, {
         version: "v3",
         tabs: [{ tabId: "t1", name: "T", panels: [] }],
         // no dashboardId, no title
@@ -274,7 +275,7 @@ describe("panelValidation", () => {
         ...validDashboard,
         tabs: [{ tabId: "tab-001", name: "Tab 1", panels: null }],
       };
-      const errors = validateDashboardJson(dashboard);
+      const errors = validateDashboardJson(gt, dashboard);
       expect(errors.some((e) => e.includes("must have a panels array"))).toBe(true);
     });
   });

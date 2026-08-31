@@ -176,7 +176,6 @@ const search = {
     is_multistream,
     traceparent,
     body,
-    action_id,
   }: {
     org_identifier: string;
     index: string;
@@ -190,7 +189,6 @@ const search = {
     is_multistream: boolean;
     traceparent: string;
     body: any;
-    action_id: string;
   }) => {
     // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     let url: string = "";
@@ -201,10 +199,6 @@ const search = {
     }
     if (query_fn.trim() != "") {
       url = url + `&query_fn=${query_fn}`;
-    }
-
-    if (action_id.trim() != "") {
-      url = url + `&action_id=${action_id}`;
     }
 
     if (regions.trim() != "") {
@@ -317,6 +311,29 @@ const search = {
     stream_name: string;
   }) => {
     const url = `/api/${org_identifier}/${stream_name}/traces/latest?filter=${encodeURIComponent(filter)}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
+    return http().get(url);
+  },
+  get_trace_details: ({
+    org_identifier,
+    stream_name,
+    trace_id,
+    start_time,
+    end_time,
+    hint_ts,
+  }: {
+    org_identifier: string;
+    stream_name: string;
+    trace_id: string;
+    start_time?: number;
+    end_time?: number;
+    hint_ts?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (start_time != null) params.set("start_time", String(start_time));
+    if (end_time != null) params.set("end_time", String(end_time));
+    if (hint_ts != null) params.set("hint_ts", String(hint_ts));
+    const query = params.toString();
+    const url = `/api/${org_identifier}/${stream_name}/traces/${encodeURIComponent(trace_id)}/details${query ? `?${query}` : ""}`;
     return http().get(url);
   },
   getTraceDAG: (

@@ -31,13 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div
           data-test="rum-upload-source-maps-file-dropzone"
-          class="border-card-glass-border rounded-default bg-surface-base hover:border-theme-accent cursor-pointer border-2 border-dashed p-8 text-center transition-all duration-300 dark:border-[color-mix(in_srgb,var(--color-white)_10%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]"
+          class="border-card-glass-border rounded-default bg-surface-base hover:border-theme-accent dark:hover:bg-theme-accent/5 cursor-pointer border-2 border-dashed p-8 text-center transition-all duration-300 dark:border-white/10"
           :class="[
             isDragging
-              ? 'border-theme-accent! border-solid! bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]! dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]!'
+              ? 'border-theme-accent! bg-theme-accent/5! dark:bg-theme-accent/10! border-solid!'
               : '',
             field.state.value
-              ? 'border-status-positive! border-solid! bg-[color-mix(in_srgb,var(--color-status-positive)_2%,transparent)]! p-6! text-left! dark:bg-[color-mix(in_srgb,var(--color-status-positive)_5%,transparent)]!'
+              ? 'border-status-positive! bg-status-positive/2! dark:bg-status-positive/5! border-solid! p-6! text-left!'
               : '',
           ]"
           @dragover.prevent="isDragging = true"
@@ -149,9 +149,11 @@ const removeFile = (field: any) => {
 };
 
 const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return "0 Bytes";
   const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
+  // "KB"/"MB"/"GB" are unit SYMBOLS and read the same everywhere; only the
+  // spelled-out "Bytes" is a word, so only that one is translated.
+  const sizes = [t("dashboard.bytes"), "KB", "MB", "GB"];
+  if (bytes === 0) return `0 ${sizes[0]}`;
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };

@@ -45,6 +45,43 @@ describe("OInput", () => {
     expect(wrapper.text()).toContain("Required field");
   });
 
+  it("points aria-describedby at the error message so it is announced", () => {
+    wrapper = mount(OInput, { props: { error: true, errorMessage: "Required field" } });
+    const input = wrapper.find("input");
+    const describedBy = input.attributes("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(input.attributes("aria-invalid")).toBe("true");
+    // The referenced node must actually exist and carry the message —
+    // a dangling aria-describedby announces nothing.
+    const target = wrapper.find(`#${describedBy}`);
+    expect(target.exists()).toBe(true);
+    expect(target.text()).toContain("Required field");
+  });
+
+  it("sets no aria-describedby when there is no error to describe", () => {
+    wrapper = mount(OInput, { props: { errorMessage: "Required field" } });
+    expect(wrapper.find("input").attributes("aria-describedby")).toBeUndefined();
+  });
+
+  it("sets no dangling aria-describedby when the message is rendered elsewhere", () => {
+    // `error` with no `errorMessage` yields " " — OFormInput's #error slot owns
+    // the text, so this component renders no message node to point at.
+    wrapper = mount(OInput, { props: { error: true } });
+    expect(wrapper.find("input").attributes("aria-describedby")).toBeUndefined();
+    expect(wrapper.find("input").attributes("aria-invalid")).toBe("true");
+  });
+
+  it("describes the textarea variant too", () => {
+    wrapper = mount(OInput, {
+      props: { type: "textarea", error: true, errorMessage: "Too long" },
+    });
+    const ta = wrapper.find("textarea");
+    expect(ta.attributes("aria-invalid")).toBe("true");
+    const describedBy = ta.attributes("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(wrapper.find(`#${describedBy}`).text()).toContain("Too long");
+  });
+
   it("shows helpText when provided", () => {
     wrapper = mount(OInput, { props: { helpText: "Enter your name" } });
     expect(wrapper.text()).toContain("Enter your name");
@@ -121,5 +158,64 @@ describe("OInput", () => {
 
     await wrapper.find("input").setValue("1234");
     expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("12:34");
+  });
+});
+
+describe("OInput — password reveal", () => {
+  const mountPassword = (props: Record<string, unknown> = {}) =>
+    mount(OInput, {
+      props: { type: "password", modelValue: "hunter2", revealable: true, ...props },
+      attrs: { "data-test": "secret" },
+    });
+
+  it("offers no toggle unless asked for", () => {
+    const wrapper = mount(OInput, { props: { type: "password", modelValue: "x" } });
+    expect(wrapper.find("[aria-pressed]").exists()).toBe(false);
+  });
+
+  it("offers no toggle on a field that is not masked to begin with", () => {
+    const wrapper = mount(OInput, {
+      props: { type: "text", modelValue: "x", revealable: true },
+    });
+    expect(wrapper.find("[aria-pressed]").exists()).toBe(false);
+  });
+
+  it("swaps the rendered type without changing what the field IS", async () => {
+    const wrapper = mountPassword();
+    const field = () => wrapper.get('[data-test="secret-field"]');
+    expect(field().attributes("type")).toBe("password");
+
+    await wrapper.get('[data-test="secret-reveal"]').trigger("click");
+    expect(field().attributes("type")).toBe("text");
+    // The prop is untouched, so the form still treats it as a password.
+    expect(wrapper.props("type")).toBe("password");
+
+    await wrapper.get('[data-test="secret-reveal"]').trigger("click");
+    expect(field().attributes("type")).toBe("password");
+  });
+
+  it("announces which way it will move", async () => {
+    const wrapper = mountPassword();
+    const toggle = () => wrapper.get('[data-test="secret-reveal"]');
+    expect(toggle().attributes("aria-pressed")).toBe("false");
+    await toggle().trigger("click");
+    expect(toggle().attributes("aria-pressed")).toBe("true");
+  });
+
+  // A type change must never leave a value on screen that the new type masks.
+  it("re-masks when the field stops being a revealable password", async () => {
+    const wrapper = mountPassword();
+    await wrapper.get('[data-test="secret-reveal"]').trigger("click");
+    expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("text");
+
+    await wrapper.setProps({ revealable: false });
+    expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("password");
+
+    await wrapper.setProps({ revealable: true });
+    expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("password");
+  });
+
+  it("stays out of the tab order, like the clear button", () => {
+    expect(mountPassword().get('[data-test="secret-reveal"]').attributes("tabindex")).toBe("-1");
   });
 });

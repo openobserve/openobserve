@@ -123,7 +123,7 @@ impl SloStatusView {
                 (
                     Some(remaining),
                     Some(b),
-                    time_to_exhaust_secs(window_secs, b),
+                    time_to_exhaust_secs(window_secs, b, remaining),
                 )
             }
             None => (None, None, None),

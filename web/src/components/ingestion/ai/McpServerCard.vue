@@ -318,7 +318,16 @@ const openDocs = () => {
     <!-- Hero -->
     <div class="flex flex-col gap-1">
       <h2 class="text-lg font-semibold">{{ t("ingestion.mcp.name") }}</h2>
-      <p class="text-text-secondary">{{ t("ingestion.mcp.tagline") }}</p>
+      <p class="text-text-secondary">
+        {{
+          t("ingestion.mcp.tagline", {
+            product: raw("Model Context Protocol"),
+            client1: raw("Claude"),
+            client2: raw("Cursor"),
+            client3: raw("VS Code"),
+          })
+        }}
+      </p>
     </div>
 
     <!-- Endpoint -->

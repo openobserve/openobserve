@@ -6,6 +6,9 @@ on:
       - "**.yml"
       - "**.yaml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -15,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: taiki-e/install-action@v2.85.5
+      - uses: taiki-e/install-action@v2.86.5
         with:
           tool: cargo-audit
       - name: run cargo audit

@@ -199,6 +199,7 @@ pub enum SliConfig {
         /// Orderable comparators only — a slice with no value is a *gap*, not
         /// a failure, so `=`/`!=` have no meaning here.
         comparator: Operator,
+        #[serde(deserialize_with = "lenient_f64::deserialize")]
         threshold: f64,
         /// Freshness semantics: a slice the query PROVED empty is **bad**
         /// rather than a gap. For a pipeline-freshness SLO, absence is the
@@ -488,9 +489,17 @@ pub enum QuerySafetyError {
         stream_type: String,
         query_language: QueryLanguage,
     },
-    /// A PromQL source expression is empty. It would save cleanly and then
-    /// measure nothing — permanent no-data discovered much later.
+    /// A required expression is empty. It would save cleanly and then measure
+    /// nothing — permanent no-data discovered much later. Shared by the PromQL
+    /// count sources and by the time-slice aggregate in **both** languages: an
+    /// empty SQL aggregate is spliced in as `SELECT  AS zo_slo_value`, which
+    /// does not parse, so every pass fails and the SLO freezes at ingest.
     EmptyExpression { field: &'static str },
+    /// A `scope` was supplied for a language that has nowhere to put one. It
+    /// is a SQL `WHERE (…)` fragment — that is literally where `time_slice_sql`
+    /// puts it — and a PromQL plan is the bare expression, so the scope would
+    /// narrow nothing, silently and forever (D27).
+    ScopeNotValidForLanguage { query_language: QueryLanguage },
 }
 
 impl std::fmt::Display for QuerySafetyError {
@@ -519,8 +528,13 @@ impl std::fmt::Display for QuerySafetyError {
                 "{query_language:?} cannot be used against a `{stream_type}` stream"
             ),
             Self::EmptyExpression { field } => {
-                write!(f, "{field} must be a non-empty PromQL expression")
+                write!(f, "{field} must be a non-empty expression")
             }
+            Self::ScopeNotValidForLanguage { query_language } => write!(
+                f,
+                "scope is a SQL filter and cannot be applied to a {query_language:?} query; \
+                 put label matchers inside the expression instead"
+            ),
         }
     }
 }
@@ -894,13 +908,18 @@ pub fn interval_literal(slice_interval_secs: i64) -> String {
 }
 
 /// Whether a query language can address a stream type.
+///
+/// SQL addresses every stream, metrics included: a metrics stream is an
+/// ordinary stream with a `value` column, so
+/// `SELECT histogram(_timestamp, '5 minute'), avg(value) FROM cpu_usage` is a
+/// perfectly good SLI. PromQL is the constrained one — it has no logs or
+/// traces stream to address.
 pub fn language_suits_stream(
     stream_type: &str,
     query_language: QueryLanguage,
 ) -> Result<(), QuerySafetyError> {
     let ok = match query_language {
-        // SQL addresses any stream; PromQL only makes sense over metrics.
-        QueryLanguage::Sql => stream_type != "metrics",
+        QueryLanguage::Sql => true,
         QueryLanguage::PromQl => stream_type == "metrics",
     };
     if ok {
@@ -927,6 +946,8 @@ pub fn validate_query_safety(
                 good_expr,
                 ..
             } => {
+                // Accepts everything today — SQL addresses every stream. Kept
+                // as the single place the rule is applied, not as a check.
                 language_suits_stream(stream_type, QueryLanguage::Sql)?;
                 if let Some(scope) = scope {
                     parse_predicate("scope", scope)?;
@@ -959,12 +980,39 @@ pub fn validate_query_safety(
         SliConfig::TimeSlice {
             stream_type,
             query_language,
+            query,
             scope,
             ..
         } => {
             language_suits_stream(stream_type, *query_language)?;
-            if let Some(scope) = scope {
-                parse_predicate("scope", scope)?;
+            match query_language {
+                // A scope reaches the query as a SQL `WHERE (…)` fragment
+                // (`time_slice_sql`), and a PromQL plan is the bare
+                // expression — there is nowhere to put one, so accepting it
+                // would silently narrow nothing. Blank is not a scope, because
+                // the planner already reads it as absent; a form that keeps an
+                // emptied field around must not be refused for it. Note the
+                // asymmetry: SQL still refuses a blank scope, so a PromQL SLO
+                // holding `Some("")` has to clear the field to switch to SQL.
+                QueryLanguage::PromQl => {
+                    if scope.as_deref().is_some_and(|s| !s.trim().is_empty()) {
+                        return Err(QuerySafetyError::ScopeNotValidForLanguage {
+                            query_language: *query_language,
+                        });
+                    }
+                }
+                // Unchanged, blank fragment included: `parse_predicate`
+                // has always refused one.
+                QueryLanguage::Sql => {
+                    if let Some(scope) = scope {
+                        parse_predicate("scope", scope)?;
+                    }
+                }
+            }
+            // Both languages. The aggregate is the whole measurement, so an
+            // empty one is a permanently frozen SLO either way.
+            if query.trim().is_empty() {
+                return Err(QuerySafetyError::EmptyExpression { field: "query" });
             }
             Ok(())
         }
@@ -2102,6 +2150,49 @@ mod tests {
         assert_eq!(serde_json::from_str::<SliConfig>(&json).unwrap(), cfg);
     }
 
+    /// The API flattens `SloDefinition` into `Slo`, which buffers the nested
+    /// threshold once more than deserializing `SliConfig` directly does.
+    #[test]
+    fn a_fractional_threshold_round_trips_through_a_full_slo() {
+        let expected = Slo {
+            id: "slo-1".into(),
+            org: "acme".into(),
+            folder_id: "default".into(),
+            name: "checkout latency".into(),
+            description: String::new(),
+            definition: def(
+                SliConfig::TimeSlice {
+                    stream: "requests".into(),
+                    stream_type: "logs".into(),
+                    query_language: QueryLanguage::Sql,
+                    query: "AVG(duration_ms)".into(),
+                    scope: None,
+                    comparator: Operator::LessThanEquals,
+                    threshold: 232.5,
+                    absent_is_bad: false,
+                },
+                None,
+                SLICE_300_SECS,
+            ),
+            target: 99.9,
+            tags: vec![],
+            enabled: true,
+            owner: None,
+            definition_generation: 1,
+            groups_estimate: None,
+            groups_reserved: 1,
+        };
+
+        let mut get_body = serde_json::to_value(&expected).unwrap();
+        get_body
+            .as_object_mut()
+            .unwrap()
+            .insert("status".into(), serde_json::Value::Null);
+        let put_body: Slo = serde_json::from_value(get_body)
+            .expect("a GET response must be accepted unchanged by PUT");
+        assert_eq!(put_body, expected);
+    }
+
     /// The tags are the discriminants the storage layer denormalizes, so a
     /// rename would silently orphan every stored row.
     #[test]
@@ -2424,6 +2515,13 @@ mod tests {
         assert_eq!(language_suits_stream("logs", QueryLanguage::Sql), Ok(()));
     }
 
+    /// Metrics are ordinary streams with a `value` column, so SQL addresses
+    /// them like any other. Forbidding it was the rule's one mistake.
+    #[test]
+    fn sql_addresses_a_metrics_stream() {
+        assert_eq!(language_suits_stream("metrics", QueryLanguage::Sql), Ok(()));
+    }
+
     #[test]
     fn promql_addresses_a_metrics_stream() {
         assert_eq!(
@@ -2463,13 +2561,35 @@ mod tests {
         assert_eq!(validate_query_safety(&good, &[], 300), Ok(()));
     }
 
+    /// The whole point of the rule change: a metrics stream is queryable in
+    /// SQL, so a SQL time slice over one is a legitimate definition rather
+    /// than a save-time rejection. With a scope, because that is what the form
+    /// now offers for one — a SQL plan has a `WHERE (…)` to put it in whatever
+    /// the stream type is.
     #[test]
-    fn a_time_slice_config_with_a_mismatched_language_is_rejected() {
+    fn a_sql_time_slice_over_metrics_is_accepted() {
         let cfg = SliConfig::TimeSlice {
             stream: "http_metrics".into(),
             stream_type: "metrics".into(),
             query_language: QueryLanguage::Sql,
-            query: "SELECT p95(duration_ms) AS zo_slo_value".into(),
+            query: "avg(value)".into(),
+            scope: Some("job = 'api'".into()),
+            comparator: Operator::LessThan,
+            threshold: 500.0,
+            absent_is_bad: false,
+        };
+        assert_eq!(validate_query_safety(&cfg, &[], 300), Ok(()));
+    }
+
+    /// The other direction is still a mismatch — PromQL has no logs stream to
+    /// address, and that half of the rule is what keeps it a rule.
+    #[test]
+    fn a_time_slice_config_with_a_mismatched_language_is_rejected() {
+        let cfg = SliConfig::TimeSlice {
+            stream: "requests".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::PromQl,
+            query: "up".into(),
             scope: None,
             comparator: Operator::LessThan,
             threshold: 500.0,
@@ -2479,6 +2599,22 @@ mod tests {
             validate_query_safety(&cfg, &[], 300),
             Err(QuerySafetyError::LanguageNotValidForStream { .. })
         ));
+    }
+
+    /// `CountSource::SingleQuery` is validated against SQL, so this is where
+    /// the old rule turned "count SLO over a metrics stream" into a guaranteed
+    /// 400. Nothing else in the arm looks at the stream type.
+    #[test]
+    fn a_sql_count_over_metrics_passes_query_safety() {
+        let cfg = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "cpu_usage".into(),
+                stream_type: "metrics".into(),
+                scope: Some("job = 'api'".into()),
+                good_expr: "value < 0.8".into(),
+            },
+        };
+        assert_eq!(validate_query_safety(&cfg, &[], 300), Ok(()));
     }
 
     /// A create request must not have to invent server-assigned fields.
@@ -2809,5 +2945,256 @@ mod absent_is_bad_tests {
     #[test]
     fn a_grouped_time_slice_without_the_flag_is_still_accepted() {
         assert!(validate_slo(&def(ts(false), Some(vec!["region".into()])), 99.9, None).is_ok());
+    }
+}
+
+/// Tests for the time-slice arm of [`validate_query_safety`] (§6b.7).
+///
+/// Two HAZARDs, one per language, both of the same species — config that saves
+/// cleanly and is then silently ignored or silently measures nothing (D27:
+/// ignored config is invisible config):
+///
+/// * **`scope` under PromQL.** A scope is a SQL `WHERE (…)` fragment — that is literally where
+///   `time_slice_sql` puts it. A PromQL time-slice plan is the bare expression, evaluated by the
+///   metrics engine, with nowhere to put a WHERE clause. So a scope saved against a PromQL
+///   time-slice narrows nothing, forever, and the SLI silently measures a wider population than the
+///   user asked for. Label matchers belong inside the expression.
+/// * **an empty `query`.** For PromQL it saves and then measures nothing — permanent no-data. For
+///   SQL it is spliced in as `SELECT  AS zo_slo_value`, which does not parse, so every pass fails
+///   and the SLO freezes at ingest. The SQL twin was never validated at all before this.
+#[cfg(test)]
+mod time_slice_query_safety_tests {
+    use super::*;
+
+    /// The stream type follows the language, so these fixtures never trip
+    /// [`language_suits_stream`] by accident — that rule has its own test.
+    fn ts(query_language: QueryLanguage, query: &str, scope: Option<&str>) -> SliConfig {
+        let stream_type = match query_language {
+            QueryLanguage::PromQl => "metrics",
+            QueryLanguage::Sql => "logs",
+        };
+        SliConfig::TimeSlice {
+            stream: "http_requests".into(),
+            stream_type: stream_type.into(),
+            query_language,
+            query: query.into(),
+            scope: scope.map(Into::into),
+            comparator: Operator::LessThan,
+            threshold: 500.0,
+            absent_is_bad: false,
+        }
+    }
+
+    const PROMQL_AGG: &str =
+        "histogram_quantile(0.95, sum by (le) (rate(http_duration_bucket[5m])))";
+    const SQL_AGG: &str = "approx_percentile_cont(duration_ms, 0.95)";
+
+    // ── scope is meaningless under PromQL ───────────────────────────────────
+
+    #[test]
+    fn a_promql_time_slice_with_a_scope_is_rejected() {
+        let cfg = ts(
+            QueryLanguage::PromQl,
+            PROMQL_AGG,
+            Some("service = 'checkout'"),
+        );
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                QuerySafetyError::ScopeNotValidForLanguage {
+                    query_language: QueryLanguage::PromQl
+                }
+            ),
+            "got {err:?}"
+        );
+    }
+
+    /// This scope is one `parse_predicate` has its own rejection for (the
+    /// statement separator). Reporting the LANGUAGE rule for it is only
+    /// possible if `parse_predicate` never ran.
+    #[test]
+    fn a_promql_scope_is_never_handed_to_the_sql_predicate_parser() {
+        let cfg = ts(
+            QueryLanguage::PromQl,
+            PROMQL_AGG,
+            Some("a = 1; DROP TABLE users"),
+        );
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(err, QuerySafetyError::ScopeNotValidForLanguage { .. }),
+            "got {err:?}"
+        );
+    }
+
+    /// A blank scope is what a UI leaves behind when the user switches the
+    /// language, and the planner already treats it as absent
+    /// (`scope.filter(|s| !s.trim().is_empty())`). Rejecting it would refuse a
+    /// config that means exactly "no scope".
+    #[test]
+    fn a_blank_scope_is_accepted_under_promql() {
+        for scope in [Some(""), Some("   "), Some("\n\t")] {
+            assert_eq!(
+                validate_query_safety(&ts(QueryLanguage::PromQl, PROMQL_AGG, scope), &[], 300),
+                Ok(()),
+                "scope {scope:?} means `no scope` and must be accepted"
+            );
+        }
+    }
+
+    /// The rule is language-scoped: SQL keeps the full predicate check it
+    /// always had. Which of the two separator rejections fires is left open,
+    /// matching `a_statement_separator_is_rejected` — the point is only that
+    /// the fragment was parsed at all.
+    #[test]
+    fn a_sql_time_slice_still_validates_its_scope() {
+        assert_eq!(
+            validate_query_safety(
+                &ts(QueryLanguage::Sql, SQL_AGG, Some("service = 'checkout'")),
+                &[],
+                300
+            ),
+            Ok(())
+        );
+        let err = validate_query_safety(
+            &ts(QueryLanguage::Sql, SQL_AGG, Some("a = 1; DROP TABLE users")),
+            &[],
+            300,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                QuerySafetyError::ContainsStatementSeparator { field: "scope" }
+                    | QuerySafetyError::NotASingleExpression { field: "scope" }
+            ),
+            "got {err:?}"
+        );
+    }
+
+    /// Pinned because the obvious implementation of the PromQL rule — hoist
+    /// `filter(|s| !s.trim().is_empty())` above the language branch — would
+    /// silently start accepting a blank SQL scope too. `parse_predicate` has
+    /// always refused one, and changing that is not this rule's business.
+    /// The variant is pinned, not just "some error": for a BLANK fragment
+    /// `parse_predicate` is deterministic, and answering a SQL user with the
+    /// PromQL-only rule would be a wrong sentence rather than a wrong outcome.
+    #[test]
+    fn a_blank_sql_scope_is_still_refused() {
+        for scope in ["", "   "] {
+            let err =
+                validate_query_safety(&ts(QueryLanguage::Sql, SQL_AGG, Some(scope)), &[], 300)
+                    .unwrap_err();
+            assert!(
+                matches!(
+                    err,
+                    QuerySafetyError::NotASingleExpression { field: "scope" }
+                ),
+                "blank SQL scope {scope:?}: got {err:?}"
+            );
+        }
+    }
+
+    // ── an empty aggregate is rejected in BOTH languages ────────────────────
+
+    #[test]
+    fn an_empty_time_slice_query_is_rejected_in_both_languages() {
+        for language in [QueryLanguage::Sql, QueryLanguage::PromQl] {
+            for query in ["", "   ", "\n\t"] {
+                let err = validate_query_safety(&ts(language, query, None), &[], 300).unwrap_err();
+                assert!(
+                    matches!(err, QuerySafetyError::EmptyExpression { field: "query" }),
+                    "{language:?} {query:?}: got {err:?}"
+                );
+            }
+        }
+    }
+
+    /// The emptiness rule must not hide behind the scope branch. A SQL
+    /// time-slice with a perfectly good scope and no aggregate still emits
+    /// `SELECT  AS zo_slo_value`, and the SLO freezes at ingest.
+    #[test]
+    fn an_empty_query_is_still_rejected_when_the_scope_is_valid() {
+        let cfg = ts(QueryLanguage::Sql, "", Some("service = 'checkout'"));
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(err, QuerySafetyError::EmptyExpression { field: "query" }),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn a_non_empty_time_slice_query_is_accepted_in_both_languages() {
+        assert_eq!(
+            validate_query_safety(&ts(QueryLanguage::Sql, SQL_AGG, None), &[], 300),
+            Ok(())
+        );
+        assert_eq!(
+            validate_query_safety(&ts(QueryLanguage::PromQl, PROMQL_AGG, None), &[], 300),
+            Ok(())
+        );
+    }
+
+    /// Check order is part of the contract. A PromQL SLO pointed at a `logs`
+    /// stream is wrong about the *stream* first; reporting a scope or an empty
+    /// aggregate instead would send the user to fix the wrong field.
+    #[test]
+    fn the_stream_language_rule_still_reports_first() {
+        let cfg = SliConfig::TimeSlice {
+            stream: "requests".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::PromQl,
+            query: String::new(),
+            scope: Some("service = 'checkout'".into()),
+            comparator: Operator::LessThan,
+            threshold: 500.0,
+            absent_is_bad: false,
+        };
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(err, QuerySafetyError::LanguageNotValidForStream { .. }),
+            "got {err:?}"
+        );
+    }
+
+    /// Both new rules can fire at once, and either order compiles. The scope
+    /// is reported first because it is the language-specific rule, in the same
+    /// position `parse_predicate` occupied before it.
+    #[test]
+    fn the_scope_rule_reports_before_the_empty_query_rule() {
+        let cfg = ts(QueryLanguage::PromQl, "", Some("service = 'checkout'"));
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(err, QuerySafetyError::ScopeNotValidForLanguage { .. }),
+            "got {err:?}"
+        );
+    }
+
+    // ── the messages ────────────────────────────────────────────────────────
+
+    /// The rejection has to say what to do instead, or the user simply retries
+    /// with a different scope.
+    #[test]
+    fn the_scope_rejection_names_the_language_and_the_remedy() {
+        let msg = QuerySafetyError::ScopeNotValidForLanguage {
+            query_language: QueryLanguage::PromQl,
+        }
+        .to_string();
+        // Case-insensitive throughout: the sibling `LanguageNotValidForStream`
+        // renders the language through `{:?}` ("PromQl"), and which spelling
+        // or capitalization wins is not what this test is about.
+        let msg = msg.to_lowercase();
+        assert!(msg.contains("scope"), "{msg}");
+        assert!(msg.contains("promql"), "{msg}");
+        assert!(msg.contains("label"), "{msg}");
+    }
+
+    /// `EmptyExpression` is now shared with the SQL aggregate, so its message
+    /// must not tell someone editing a SQL time-slice SLO about PromQL.
+    #[test]
+    fn the_empty_expression_message_is_language_neutral() {
+        let msg = QuerySafetyError::EmptyExpression { field: "query" }.to_string();
+        assert!(msg.contains("query"), "{msg}");
+        assert!(!msg.to_lowercase().contains("promql"), "{msg}");
     }
 }

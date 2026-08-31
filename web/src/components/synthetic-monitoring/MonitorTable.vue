@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dot="true"
         size="sm"
       >
-        {{ resolveBadge("serviceStatus", (row as any).status).label }}
+        {{ resolveBadgeLabel("serviceStatus", (row as any).status) }}
       </OBadge>
     </template>
 
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Steps count (Browser mode) -->
     <template #cell-steps="{ row }">
       <span class="truncate">{{
-        (row as any).steps ? `${(row as any).steps} ${t("synthetics.table.stepsSuffix")}` : "—"
+        (row as any).steps ? t("synthetics.table.stepsCount", { count: (row as any).steps }) : "—"
       }}</span>
     </template>
 
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #cell-assertions="{ row }">
       <span class="truncate">{{
         (row as any).assertions
-          ? `${(row as any).assertions} ${t("synthetics.table.checksSuffix")}`
+          ? t("synthetics.table.checksCount", { count: (row as any).assertions })
           : "—"
       }}</span>
     </template>
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Type badge (monitors mode) -->
     <template #cell-type="{ row }">
       <OBadge :variant="resolveBadge('syntheticType', (row as any).type).variant" size="sm">
-        {{ resolveBadge("syntheticType", (row as any).type).label }}
+        {{ resolveBadgeLabel("syntheticType", (row as any).type) }}
       </OBadge>
     </template>
 
@@ -492,7 +492,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 
 type Mode = "all" | "browser";
@@ -523,7 +523,7 @@ const monitorRowStyle = (row: any): Record<string, string> => {
         : status === "passed"
           ? "var(--color-success-500)"
           : "var(--color-grey-400)";
-  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+  return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 };
 
 const props = withDefaults(
@@ -637,15 +637,6 @@ const URL_COL: OTableColumnDef = {
   sortable: false,
   hideable: true,
 };
-const ENDPOINT_COL: OTableColumnDef = {
-  id: "url",
-  header: t("synthetics.table.endpoint"),
-  accessorKey: "url",
-  size: COL.url,
-  minSize: 140,
-  sortable: false,
-  hideable: true,
-};
 const TYPE_COL: OTableColumnDef = {
   id: "type",
   header: t("synthetics.table.type"),
@@ -680,16 +671,6 @@ const PAGE_LOAD_COL: OTableColumnDef = {
   accessorKey: "responseTime",
   size: COL.responseTime,
   minSize: 80,
-  sortable: true,
-  meta: { align: "right" },
-  hideable: true,
-};
-const P50_COL: OTableColumnDef = {
-  id: "responseTime",
-  header: t("synthetics.table.p50"),
-  accessorKey: "responseTime",
-  size: COL.responseTime,
-  minSize: 64,
   sortable: true,
   meta: { align: "right" },
   hideable: true,
@@ -746,24 +727,6 @@ const STEPS_COL: OTableColumnDef = {
   accessorKey: "steps",
   size: COL.steps,
   minSize: 60,
-  sortable: false,
-  hideable: true,
-};
-const METHOD_COL: OTableColumnDef = {
-  id: "method",
-  header: t("synthetics.table.method"),
-  accessorKey: "method",
-  size: COL.method,
-  minSize: 56,
-  sortable: false,
-  hideable: true,
-};
-const ASSERTIONS_COL: OTableColumnDef = {
-  id: "assertions",
-  header: t("synthetics.table.assertions"),
-  accessorKey: "assertions",
-  size: COL.assertions,
-  minSize: 72,
   sortable: false,
   hideable: true,
 };

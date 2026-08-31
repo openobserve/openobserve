@@ -21,6 +21,9 @@
  * No Vue imports. No DOM. No vuex. Just data-in / data-out.
  */
 
+import { raw } from "@/types/i18n";
+import type { TurnDetail, TurnMessage } from "./composables/useSessions";
+
 // ---------------------------------------------------------------------------
 // Field resolvers — read OTEL gen_ai_* attributes.
 // ---------------------------------------------------------------------------
@@ -104,6 +107,13 @@ export function hasLLMPayload(span: any): boolean {
  *   - server span with no parent                → root
  *   - everything else                           → other
  */
+/**
+ * Operation names that count as a model call for the per-turn call badges.
+ * Deliberately broader than `classify`'s `llm_turn` set — an `embeddings`
+ * span is a real LLM call even though it carries no chat transcript.
+ */
+const LLM_CALL_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
+
 export function classify(span: any): SpanKind {
   const obs = getOp(span);
   const LLM_TURN_OPS = new Set(["chat", "text_completion", "generate_content"]);
@@ -526,5 +536,98 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
     totalCost,
     totalDurationNs,
     errorCount,
+  };
+}
+
+/**
+ * Per-turn summary — the user question, the final assistant reply, the model
+ * and the call counts — derived from one trace's `gen_ai` spans. Backs the
+ * session-detail turn cards, and shares this module's parsers with
+ * `buildTraceGroup` so a turn card and the transcript can't disagree.
+ *
+ * Tool-execution spans are excluded from message extraction: their
+ * `gen_ai_input_messages` / `gen_ai_output_messages` hold the tool's arguments
+ * and its raw JSON result, not chat messages, and `messagesFromOutput` will
+ * happily stringify such a payload into an `assistant` message. This matters
+ * because an agent's chat span typically *wraps* the tool calls it makes — so
+ * the tool span is the newest span in the trace by `start_time`, and the
+ * newest → oldest walk below would otherwise surface the raw tool JSON where
+ * the assistant's answer belongs.
+ *
+ * Tool spans are filtered by exclusion rather than by an `LLM_CALL_OPS`
+ * allow-list on purpose: an SDK that tags its model calls with a non-standard
+ * operation name should still get its answer rendered.
+ *
+ * @param traceId trace the spans belong to
+ * @param spans   that trace's `gen_ai` spans, in any order
+ */
+export function buildTurnDetail(traceId: string, spans: any[]): TurnDetail {
+  const ordered = (spans || [])
+    .slice()
+    .sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
+
+  let llmCalls = 0;
+  let toolCalls = 0;
+  let otherCalls = 0;
+  const otherOps = new Set<string>();
+  for (const sp of ordered) {
+    const op = getOp(sp).toLowerCase();
+    if (LLM_CALL_OPS.has(op)) llmCalls += 1;
+    else if (op === "execute_tool") toolCalls += 1;
+    else {
+      otherCalls += 1;
+      if (op) otherOps.add(op);
+    }
+  }
+
+  const chatSpans = ordered.filter((sp) => getOp(sp).toLowerCase() !== "execute_tool");
+
+  // user question = last user-role entry of a span's prompt. The prompt carries
+  // the full history (system + every prior turn + the current question), so the
+  // LAST user entry is this turn's question, not turn 1's.
+  // model = the first span that carries one.
+  let userMessage: TurnMessage | null = null;
+  let model: string | null = null;
+  for (const sp of chatSpans) {
+    if (!model) {
+      const m = getModel(sp);
+      if (m) model = m;
+    }
+    if (!userMessage) {
+      const inputMsgs = messagesFromInput(sp.gen_ai_input_messages);
+      for (let i = inputMsgs.length - 1; i >= 0; i--) {
+        if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
+          userMessage = { role: "user", content: raw(inputMsgs[i].content) };
+          break;
+        }
+      }
+    }
+    if (userMessage && model) break;
+  }
+
+  // assistant reply = final non-empty assistant message (walk newest → oldest).
+  // An agent makes several model calls per turn (LLM → tool → LLM → … → answer);
+  // the earlier outputs are planning steps, the last one is the answer.
+  let assistantMessage: TurnMessage | null = null;
+  for (let s = chatSpans.length - 1; s >= 0; s--) {
+    const outputMsgs = messagesFromOutput(chatSpans[s].gen_ai_output_messages);
+    for (let i = outputMsgs.length - 1; i >= 0; i--) {
+      if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
+        assistantMessage = { role: "assistant", content: raw(outputMsgs[i].content) };
+        break;
+      }
+    }
+    if (assistantMessage) break;
+  }
+
+  return {
+    traceId,
+    userMessage,
+    assistantMessage,
+    model,
+    llmCalls,
+    toolCalls,
+    otherCalls,
+    otherOps: [...otherOps].sort(),
   };
 }

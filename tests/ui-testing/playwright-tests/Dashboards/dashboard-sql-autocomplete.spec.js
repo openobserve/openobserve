@@ -73,9 +73,15 @@ async function cleanupDashboard(page, pm, dashboardName) {
     await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
     await pm.dashboardSqlAutocomplete.discardPanelIfVisible();
 
-    await deleteDashboard(page, dashboardName).catch((e) =>
-        testLogger.warn(`cleanupDashboard: delete failed — ${e.message}`)
-    );
+    // Discarding lands on the dashboard VIEW; deleteDashboard() needs the LIST.
+    // Without this hop it waited 20s for a table that was never going to render.
+    await pm.dashboardCreate.backToDashboardList();
+
+    // Deliberately NOT swallowed. The previous .catch() turned a cleanup that
+    // failed on all 8 tests into a warning nobody read, so the leak (confirmed:
+    // 8 stray dashboards on alpha after one run) stayed invisible while the suite
+    // reported green.
+    await deleteDashboard(page, dashboardName);
 }
 
 // ============================================================================
@@ -211,7 +217,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
         // Type FROM " — Monaco may auto-close the quote; the feature handles both cases
         await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete('SELECT * FROM "e2e');
 
-        const isOpen = await pm.dashboardSqlAutocomplete.isAutocompleteOpen();
+        const isOpen = await pm.dashboardSqlAutocomplete.waitForAutocompleteOpen();
 
         if (isOpen) {
             const labels = await pm.dashboardSqlAutocomplete.getSuggestionLabelsAtCursor();
@@ -346,7 +352,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
         // Trigger FROM context via the page object.
         await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete('SELECT * FROM ');
 
-        const isOpen = await pm.dashboardSqlAutocomplete.isAutocompleteOpen();
+        const isOpen = await pm.dashboardSqlAutocomplete.waitForAutocompleteOpen();
 
         if (isOpen) {
             // Accept the first suggestion via Enter and read the model value.

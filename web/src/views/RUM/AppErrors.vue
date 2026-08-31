@@ -86,6 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :column-visibility="columnVisibility"
               @update:column-visibility="setColumnVisibility"
             />
+            <ShareButton
+              ref="shareButtonRef"
+              data-test="rum-app-errors-share-link-btn"
+              :url="shareUrl"
+              variant="outline"
+              size="icon-toolbar"
+              shortcut-id="rumErrorsCopyUrl"
+              class="shrink-0"
+            />
           </div>
           <!-- end controls -->
         </div>
@@ -275,6 +284,8 @@ import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -345,6 +356,7 @@ const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   computed(() => ({})),
   _sqlMode,
   _noStream,
+  t,
 );
 const { errorTrackingState } = useErrorTracking();
 const {
@@ -577,6 +589,9 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
+const { shareUrl } = useRum();
+const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
+
 onBeforeMount(() => {
   restoreUrlQueryParams();
 });
@@ -697,13 +712,6 @@ const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
 };
 
-// Severity spine flush against the row's left edge — same mechanism and
-// colors as the sessions table, for cross-page consistency.
-const getIssueStatusColor = (row: any) => {
-  if (row.error_handling === "handled") return "var(--color-severity-warning-color)";
-  return "var(--color-severity-error-color)";
-};
-
 function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 
@@ -762,6 +770,10 @@ useShortcuts([
     handler: () => {
       if (!isInputFocused()) runQuery();
     },
+  },
+  {
+    id: "rumErrorsCopyUrl",
+    handler: () => shareButtonRef.value?.handleShareClick(),
   },
 ]);
 </script>

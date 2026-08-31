@@ -16,7 +16,7 @@
 // Oracle DB data-source setup card. Follows the OpenObserve doc:
 // https://openobserve.ai/docs/integration/database/oracle/ (oracledb receiver).
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -57,14 +57,14 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function oracleCard(subs: CardSubstitutions): RichCardContent {
+export default function oracleCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Oracle",
-      tagline: gt("ingestion.setupCard.oracleTagline"),
+      name: raw("Oracle"),
+      tagline: t("ingestion.setupCard.oracleTagline"),
       logo: getImageURL("images/ingestion/oracle.svg"),
       tone: "#F80000",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
       {
@@ -75,7 +75,7 @@ export default function oracleCard(subs: CardSubstitutions): RichCardContent {
         completeOn: "copy",
         code: { lang: "sql", filename: "grant.sql", raw: GRANT_SQL },
       },
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -117,15 +117,16 @@ export default function oracleCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // The Oracle data-dictionary views granted above (V$SESSION, V$SYSSTAT,
-        // DBA_TABLESPACE_USAGE_METRICS, DBA_DATA_FILES, V$RESOURCE_LIMIT) — the
-        // names the user sees in their own data, so they stay untranslated.
+        // What the verify step will show, in prose. These are NOT the data-dictionary
+        // view names granted above (those are V$SESSION, V$SYSSTAT,
+        // DBA_TABLESPACE_USAGE_METRICS, DBA_DATA_FILES, V$RESOURCE_LIMIT) — they are a
+        // plain-English summary of them, so they are translated.
         pills: [
-          raw("Sessions"),
-          raw("System Stats"),
-          raw("Tablespace Usage"),
-          raw("Data Files"),
-          raw("Resource Limits"),
+          t("ingestion.setupCard.pillSessions"),
+          t("ingestion.setupCard.pillSystemStats"),
+          t("ingestion.setupCard.pillTablespaceUsage"),
+          t("ingestion.setupCard.pillDataFiles"),
+          t("ingestion.setupCard.pillResourceLimits"),
         ],
       },
     ],

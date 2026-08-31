@@ -22,6 +22,7 @@ use config::{
 };
 use datafusion::{
     arrow::datatypes::Schema,
+    common::TableReference,
     datasource::MemTable,
     error::{DataFusionError, Result},
     physical_plan::visit_execution_plan,
@@ -111,6 +112,26 @@ pub(crate) async fn create_context(
     Ok(resp)
 }
 
+/// Register a placeholder metrics table for a distributed WAL search.
+///
+/// The table name embedded in the physical plan must be a quoted SQL reference;
+/// otherwise DataFusion lowercases mixed-case metric names when the receiving
+/// search node parses the plan.
+fn register_remote_metric_table(
+    ctx: &SessionContext,
+    stream_name: &str,
+    schema: Arc<Schema>,
+) -> Result<TableReference> {
+    let table_ref = TableReference::bare(stream_name);
+    let plan_table_name = table_ref.to_quoted_string();
+    let table = Arc::new(
+        NewEmptyTable::new(&plan_table_name, schema)
+            .with_partitions(ctx.state().config().target_partitions()),
+    );
+    ctx.register_table(table_ref.clone(), table)?;
+    Ok(table_ref)
+}
+
 /// get file list from local cache, no need match_source, each file will be
 /// searched
 #[allow(clippy::too_many_arguments)]
@@ -136,15 +157,11 @@ async fn get_wal_batches(
         .stream_type(StreamType::Metrics)
         .build(cfg.limit.cpu_num)
         .await?;
-    let table = Arc::new(
-        NewEmptyTable::new(stream_name, Arc::clone(&schema))
-            .with_partitions(ctx.state().config().target_partitions()),
-    );
-    ctx.register_table(stream_name, table)?;
+    let table_ref = register_remote_metric_table(&ctx, stream_name, Arc::clone(&schema))?;
 
     // create physical plan
     let (start, end) = time_range;
-    let mut df = match ctx.table(stream_name).await {
+    let mut df = match ctx.table(table_ref).await {
         Ok(df) => df.filter(
             col(TIMESTAMP_COL_NAME)
                 .gt_eq(lit(start))
@@ -155,7 +172,7 @@ async fn get_wal_batches(
         }
     };
 
-    df = apply_matchers(df, &schema, &matchers)?;
+    df = apply_matchers(df, &matchers)?;
 
     match apply_label_selector(df, &schema, &label_selector) {
         Some(dataframe) => df = dataframe,
@@ -226,4 +243,43 @@ async fn get_wal_batches(
         )?);
     }
     Ok((stats, new_batches, schema))
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion::{
+        arrow::datatypes::{DataType, Field},
+        common::tree_node::TreeNode,
+    };
+    use search::datafusion::distributed_plan::NewEmptyExecVisitor;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_remote_metric_table_preserves_stream_name_in_physical_plan() -> Result<()> {
+        for stream_name in [
+            "node_cpu_seconds_total",
+            "node_memory_MemTotal_bytes",
+            "namespace:MixedMetric",
+        ] {
+            let ctx = SessionContext::new();
+            let schema = Arc::new(Schema::new(vec![Field::new(
+                "value",
+                DataType::Float64,
+                false,
+            )]));
+            let table_ref = register_remote_metric_table(&ctx, stream_name, schema)?;
+            let df = ctx.table(table_ref).await?;
+            let physical_plan = ctx.state().create_physical_plan(df.logical_plan()).await?;
+
+            let mut visitor = NewEmptyExecVisitor::default();
+            physical_plan.visit(&mut visitor)?;
+            assert!(visitor.has_empty_exec());
+
+            let plan_table_name = visitor.plan().name();
+            let decoded_table_ref = TableReference::from(plan_table_name);
+            assert_eq!(decoded_table_ref, TableReference::bare(stream_name));
+        }
+        Ok(())
+    }
 }

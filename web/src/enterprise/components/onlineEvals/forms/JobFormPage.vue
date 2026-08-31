@@ -358,6 +358,8 @@ import {
   normalizeJobFilterCondition,
 } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import type { StreamFieldsMap } from "@/utils/alerts/alertQueryBuilder";
+import { DEFAULT_JOB_STREAM_FIELDS } from "../utils/defaultStreamFields";
 import {
   buildJobInputMappingPayload,
   mappingUsesSystemProvidedSpans,
@@ -437,6 +439,19 @@ const showActivateChoice = computed(
   () => props.mode === "create" || (props.mode === "edit" && isDraft.value),
 );
 
+// Field types for the SQL formatter: numeric columns must not be quoted and
+// their empty checks must degrade to null checks, or the query fails. Labels
+// are field names (raw identifiers), never prose.
+const filterFieldsMap = computed<StreamFieldsMap>(() => {
+  const fields = streamFields.value.length ? streamFields.value : DEFAULT_JOB_STREAM_FIELDS;
+  return Object.fromEntries(
+    fields.map((field) => [
+      field.value,
+      { label: raw(String(field.label)), value: field.value, type: field.type },
+    ]),
+  );
+});
+
 // SQL WHERE body built from the filter builder — feeds the live "matched
 // spans" count in the preview panel. Built from the CLEANED group (incomplete
 // conditions stripped) so the SQL is always valid. Same formatter the form's
@@ -447,6 +462,7 @@ const filterWhere = computed<string>(() => {
       sqlMode: true,
       addWherePrefix: false,
       formatValues: true,
+      streamFieldsMap: filterFieldsMap.value,
     });
   } catch {
     return "";
@@ -470,16 +486,16 @@ const samplingValueHelp = computed<string>(() => {
 
 // Completion help echoes the entered window back in readable units, because a
 // bare `1800` in a seconds box says nothing about how long the user will wait.
-// Unit labels come from i18n (same `common.*` keys AutoRefreshInterval uses),
-// so the util hands back numbers and the wording is assembled here.
+// Each part is a whole `{count} unit` message rather than a number glued to a
+// translated unit — the number's position varies by language.
 function humanizeSecs(value: string | number): string | null {
   const parts = durationPartsFromSecs(value);
   if (!parts) return null;
 
   const words: string[] = [];
-  if (parts.hours) words.push(`${parts.hours} ${t("common.hr")}`);
-  if (parts.minutes) words.push(`${parts.minutes} ${t("common.min")}`);
-  if (parts.seconds) words.push(`${parts.seconds} ${t("common.sec")}`);
+  if (parts.hours) words.push(t("common.hrShort", { count: parts.hours }));
+  if (parts.minutes) words.push(t("common.minShort", { count: parts.minutes }));
+  if (parts.seconds) words.push(t("common.secShort", { count: parts.seconds }));
 
   return words.join(" ") || null;
 }

@@ -16,6 +16,8 @@ concurrency:
 env:
   COLUMNS: 150
   ZO_RESULT_CACHE_ENABLED: true
+  # coverage mapping needs no DWARF; dropping debuginfo (test inherits dev) cuts compile and link time
+  CARGO_PROFILE_DEV_DEBUG: "0"
 
 jobs:
   check_changes:
@@ -83,7 +85,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        run: cargo --config net.git-fetch-with-cli=true clippy --workspace --all-targets -- -D warnings
+        run: cargo --config net.git-fetch-with-cli=true clippy --workspace --all-targets -- -W clippy::too_many_lines -W clippy::cognitive_complexity -W clippy::excessive_nesting -D warnings
 
   backend_unit_tests_postgres:
     needs: [check_changes]
@@ -119,7 +121,7 @@ jobs:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2.85.5
+      - uses: taiki-e/install-action@v2.86.5
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -127,7 +129,8 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: unit-tests
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # merge_group so an evicted cache self-heals from the next queue run, not only main pushes
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
@@ -179,7 +182,7 @@ jobs:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2.85.5
+      - uses: taiki-e/install-action@v2.86.5
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -285,6 +288,10 @@ jobs:
 
       - name: Type-check (any error fails)
         working-directory: web
+        env:
+          # vue-tsc peaks around 3GB on this project; the runner's default heap
+          # ceiling is ~4GB, which OOMs (exit 134) instead of reporting errors.
+          NODE_OPTIONS: "--max-old-space-size=8192"
         run: npm run type-check:app
 
   unit_tests_summary:

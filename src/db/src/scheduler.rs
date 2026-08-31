@@ -182,6 +182,7 @@ mod tests {
             next_run_at: Utc::now().timestamp_micros(),
             is_realtime: false,
             is_silenced: false,
+            claim_epoch: 0,
             data: "{}".to_string(),
         };
 

@@ -260,7 +260,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="facet.id"
               size="xs"
               :value="facet.id"
-              :label="raw(`${badgeLabels[facet.id]} (${facet.count})`)"
+              :label="
+                t('metrics.badge.facetWithCount', {
+                  label: badgeLabel(facet.id),
+                  count: facet.count,
+                })
+              "
               :data-test="`metrics-explorer-type-${facet.id}`"
             />
           </OCheckboxGroup>
@@ -584,7 +589,7 @@ import {
   decodeMetricsConfig,
 } from "@/composables/metrics/metricsUrlState";
 import { PANEL_PERCENTILE_WINDOW, PANEL_RATE_WINDOW } from "@/utils/metrics/metricDefaults";
-import { BADGE_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
+import { BADGE_LABEL_KEYS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import {
   EXPLORER_FILTER_PARAM_KEYS,
   explorerFiltersToQuery,
@@ -1029,13 +1034,15 @@ export default defineComponent({
     };
 
     // Type-rail search — narrows the type LIST (mirrors the prefix/suffix rails).
-    // Matches against the human label (BADGE_LABELS), falling back to the id.
+    // Matches the TRANSLATED label, so the rail searches what the user sees.
     const typeSearch = ref("");
     const visibleTypeFacets = computed(() => {
       const term = typeSearch.value.trim().toLowerCase();
       if (!term) return grid.typeFacets.value;
       return grid.typeFacets.value.filter((facet: { id: string }) =>
-        (BADGE_LABELS[facet.id] ?? facet.id).toLowerCase().includes(term),
+        (BADGE_LABEL_KEYS[facet.id] ? t(BADGE_LABEL_KEYS[facet.id]) : facet.id)
+          .toLowerCase()
+          .includes(term),
       );
     });
 
@@ -1590,6 +1597,7 @@ export default defineComponent({
       refreshing.value = true;
       const manual = opts?.manual !== false;
       try {
+        if (manual) await grid.loadStreams(true);
         dateTimePickerRef.value?.refresh?.();
         // Keep the charts up: a refresh re-runs the same queries a few seconds
         // later, so blanking them to skeletons would just make them flicker.
@@ -1674,7 +1682,7 @@ export default defineComponent({
     onMounted(async () => {
       mountedAt = performance.now();
       syncTimeRange();
-      await grid.loadStreams();
+      await grid.loadStreams(true);
 
       track("metrics_explorer_opened", {
         metric_count: grid.cards.value.length,
@@ -1807,7 +1815,7 @@ export default defineComponent({
       noMetricsActions,
       openMetricsIngestion,
       showMoreLabel,
-      badgeLabels: BADGE_LABELS,
+      badgeLabel: (id: string) => t(BADGE_LABEL_KEYS[id] ?? "metrics.badge.other"),
       queriesFor,
       dialogOpen,
       dialogCard,

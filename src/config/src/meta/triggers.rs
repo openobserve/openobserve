@@ -48,6 +48,8 @@ pub enum TriggerModule {
     /// concurrency budget with latency-sensitive incremental passes would
     /// starve them (§6b.9).
     SloBackfill,
+    /// Boolean expression evaluated over durable child-alert rollup states.
+    CompositeAlert,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -61,6 +63,7 @@ impl std::fmt::Display for TriggerModule {
             Self::AnomalyDetection => write!(f, "anomaly_detection"),
             Self::Slo => write!(f, "slo"),
             Self::SloBackfill => write!(f, "slo_backfill"),
+            Self::CompositeAlert => write!(f, "composite_alert"),
         }
     }
 }
@@ -73,6 +76,9 @@ pub struct TriggerId {
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Trigger {
     pub id: i64,
+    /// Monotonic physical-claim generation used to fence reclaimed jobs.
+    #[serde(default)]
+    pub claim_epoch: i64,
     pub org: String,
     pub module: TriggerModule,
     pub module_key: String,
@@ -217,6 +223,7 @@ mod tests {
         );
         assert_eq!(TriggerModule::Slo.to_string(), "slo");
         assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
+        assert_eq!(TriggerModule::CompositeAlert.to_string(), "composite_alert");
     }
 
     /// The discriminant IS the stored value. A variant inserted above an
@@ -232,6 +239,39 @@ mod tests {
         assert_eq!(TriggerModule::AnomalyDetection as i32, 5);
         assert_eq!(TriggerModule::Slo as i32, 6);
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
+        assert_eq!(TriggerModule::CompositeAlert as i32, 8);
+    }
+
+    #[test]
+    fn composite_alert_module_serde_is_append_only_and_round_trips() {
+        let encoded = serde_json::to_string(&TriggerModule::CompositeAlert).unwrap();
+        assert_eq!(encoded, r#""CompositeAlert""#);
+        assert_eq!(
+            serde_json::from_str::<TriggerModule>(&encoded).unwrap(),
+            TriggerModule::CompositeAlert
+        );
+
+        // Pin the pre-composite wire spellings as well as the numeric values:
+        // a rolling upgrade must keep reading jobs serialized by older nodes.
+        for (variant, wire) in [
+            (TriggerModule::Report, "Report"),
+            (TriggerModule::Alert, "Alert"),
+            (TriggerModule::DerivedStream, "DerivedStream"),
+            (TriggerModule::QueryRecommendations, "QueryRecommendations"),
+            (TriggerModule::Backfill, "Backfill"),
+            (TriggerModule::AnomalyDetection, "AnomalyDetection"),
+            (TriggerModule::Slo, "Slo"),
+            (TriggerModule::SloBackfill, "SloBackfill"),
+        ] {
+            assert_eq!(
+                serde_json::to_string(&variant).unwrap(),
+                format!(r#""{wire}""#)
+            );
+            assert_eq!(
+                serde_json::from_str::<TriggerModule>(&format!(r#""{wire}""#)).unwrap(),
+                variant
+            );
+        }
     }
 
     #[test]
@@ -403,6 +443,7 @@ mod tests {
     fn test_trigger_start_end_time_none_absent_from_json() {
         let t = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "org".to_string(),
             module: TriggerModule::Alert,
             module_key: "k".to_string(),
@@ -425,6 +466,7 @@ mod tests {
     fn test_trigger_start_end_time_some_present_in_json() {
         let t = Trigger {
             id: 2,
+            claim_epoch: 0,
             org: "org".to_string(),
             module: TriggerModule::Alert,
             module_key: "k".to_string(),
@@ -446,9 +488,37 @@ mod tests {
     }
 
     #[test]
+    fn trigger_claim_epoch_defaults_for_pre_migration_payloads_and_round_trips() {
+        let old_payload = serde_json::json!({
+            "id": 1,
+            "org": "org",
+            "module": "Alert",
+            "module_key": "key",
+            "next_run_at": 10,
+            "is_realtime": false,
+            "is_silenced": false,
+            "status": "Waiting",
+            "retries": 0,
+            "data": "{}"
+        });
+        let old: Trigger = serde_json::from_value(old_payload).unwrap();
+        assert_eq!(old.claim_epoch, 0);
+
+        let claimed = Trigger {
+            claim_epoch: 42,
+            ..old
+        };
+        let value = serde_json::to_value(&claimed).unwrap();
+        assert_eq!(value["claim_epoch"], 42);
+        let restored: Trigger = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.claim_epoch, 42);
+    }
+
+    #[test]
     fn test_trigger_mem_size_at_least_struct_size() {
         let t = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "myorg".to_string(),
             module: TriggerModule::Alert,
             module_key: "key".to_string(),

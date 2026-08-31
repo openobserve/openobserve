@@ -25,7 +25,6 @@ vi.mock("vue-i18n", () => ({
 }));
 
 import CheckConfigure from "./CheckConfigure.vue";
-import type { BrowserCheck } from "@/types/synthetics";
 
 // ── Child Component Stubs ─────────────────────────────────────────────────
 const CheckDetailsStub = {
@@ -226,8 +225,8 @@ describe("CheckConfigure", () => {
       expect(capture.exists()).toBe(false);
     });
 
-    it("should show CheckAuthNetwork for api check type", () => {
-      wrapper = mountConfigure({ checkType: "api", check: { ...mockMonitorHttp } });
+    it("should show CheckAuthNetwork for http check type", () => {
+      wrapper = mountConfigure({ checkType: "http", check: { ...mockMonitorHttp } });
 
       const authNetwork = wrapper.find('[data-test="synthetics-check-configure-auth-network"]');
       expect(authNetwork.exists()).toBe(true);

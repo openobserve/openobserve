@@ -458,6 +458,7 @@ mod tests {
             node_name: Some("test-node".to_string()),
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         }
     }
 

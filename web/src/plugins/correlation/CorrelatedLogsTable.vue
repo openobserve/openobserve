@@ -402,7 +402,7 @@ const {
   goToPage,
   updateFilters,
   isMatchedDimension,
-} = useCorrelatedLogs(props);
+} = useCorrelatedLogs(props, t);
 
 // Stream name for JSON preview — use first correlated stream, or source stream
 const jsonPreviewStreamName = computed(() => {
@@ -863,8 +863,8 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
         name: field,
         id: field,
         accessorKey: field,
-        label: t("search.timestamp") + ` (${store.state.timezone})`,
-        header: raw(`${t("search.timestamp")} (${store.state.timezone})`),
+        label: raw("timestamp") + ` (${store.state.timezone})`,
+        header: raw(`timestamp (${store.state.timezone})`),
         align: "left",
         sortable: true,
         enableResizing: false,
@@ -922,7 +922,7 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
       id: "source",
       accessorFn: (row: any) => JSON.stringify(row),
       cell: (info: any) => info.getValue(),
-      header: t("search.source"),
+      header: raw("_source"),
       sortable: true,
       enableResizing: false,
       meta: {
@@ -959,10 +959,6 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
 });
 
 // Determine if we're showing default columns (only timestamp + source)
-const showingDefaultColumns = computed(() => {
-  return visibleFields.value.length === 1 && visibleFields.value[0] === "_timestamp";
-});
-
 /**
  * Format timestamp (microsecond precision) to human-readable format
  */
@@ -1152,7 +1148,7 @@ const handleExpandRow = (row: any) => {
 // ── Logs rendering ──
 // Same FTS pipeline as the logs grid: chunked colorized HTML rendered per cell.
 const { processedResults: correlatedProcessed, processHitsInChunks: correlatedProcessChunks } =
-  useLogsHighlighter();
+  useLogsHighlighter(t);
 
 const correlatedTimestampCol = computed(
   () => store.state.zoConfig.timestamp_column || "_timestamp",

@@ -237,6 +237,7 @@ import HelpIcon from "~icons/material-symbols/help-outline";
 import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
 import HomeIcon from "~icons/mdi/home-outline";
 import OrganizationIcon from "~icons/octicon/organization-16";
+import Graph1Icon from "~icons/material-symbols/graph-1";
 import Graph2Icon from "~icons/material-symbols/graph-2";
 import HubIcon from "~icons/material-symbols/hub-outline";
 import ImageIcon from "~icons/material-symbols/image-outline";
@@ -267,6 +268,7 @@ import RunningWithErrorsIcon from "~icons/material-symbols/error-outline";
 import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
+import SensorsOff from "~icons/material-symbols/sensors-off-outline";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
 import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
@@ -285,6 +287,7 @@ import ThumbUpOffAltIcon from "~icons/material-symbols/thumb-up-outline";
 import PersonPinCircleIcon from "~icons/material-symbols/person-pin-circle-outline";
 import ToggleOffIcon from "~icons/material-symbols/toggle-off-outline";
 import TrendingDownIcon from "~icons/material-symbols/trending-down";
+import TrendingFlatIcon from "~icons/material-symbols/trending-flat";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
 import UpdateIcon from "~icons/material-symbols/update";
 import VerifiedIcon from "~icons/material-symbols/verified-outline";
@@ -307,6 +310,7 @@ import PlayCircleFilled from "~icons/material-symbols/play-circle-outline";
 import Pets from "~icons/material-symbols/pets";
 import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
 import Dataset from "~icons/material-symbols/dataset-outline";
+import Science from "~icons/material-symbols/science-outline";
 import FolderOpen from "~icons/material-symbols/folder-open-outline";
 import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
@@ -487,6 +491,7 @@ export const iconRegistry = {
   dns: Dns,
   "fork-right": ForkRight,
   "git-branch": ForkRight,
+  "graph-1": Graph1Icon,
   "graph-2": Graph2Icon,
   flame: Whatshot,
   whatshot: Whatshot,
@@ -655,6 +660,7 @@ export const iconRegistry = {
   // "group-work": GroupWorkIcon,
   "toggle-off": ToggleOffIcon,
   "trending-down": TrendingDownIcon,
+  "trending-flat": TrendingFlatIcon,
   troubleshoot: TroubleshootIcon,
   update: UpdateIcon,
   verified: VerifiedIcon,
@@ -694,6 +700,11 @@ export const iconRegistry = {
   checklist: Checklist,
   "photo-camera": PhotoCamera,
   "smart-display": SmartDisplay,
+
+  // Batch 4: Alert Library (2026-08-20)
+  // "no signal arriving" — the alert library's not-ingesting-this-stream state.
+  "sensors-off": SensorsOff,
+  science: Science,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

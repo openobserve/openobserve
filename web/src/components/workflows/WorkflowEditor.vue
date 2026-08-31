@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="workflow-editor-description"
             :placeholder="t('workflow.descriptionPlaceholder')"
             :aria-label="t('workflow.description')"
+            @update:model-value="markWorkflowDirty"
           />
         </span>
       </template>
@@ -70,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :readonly="workflowObj.isEditWorkflow"
             :error="workflowObj.nameError"
             :error-message="workflowObj.nameError ? t('workflow.nameRequired') : undefined"
-            @update:model-value="workflowObj.nameError = false"
+            @update:model-value="onNameChange"
           />
           <BetaBadge />
         </span>
@@ -81,17 +82,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            it's managed from the list, same as pipelines. -->
 
       <template #actions>
-        <!-- History (Runs) — only meaningful for a saved workflow. Navigates to
-             the dedicated read-only Runs inspection view (separate surface). -->
-        <OButton
-          v-if="workflowObj.isEditWorkflow"
-          variant="outline"
-          size="sm-action"
-          data-test="workflow-editor-history"
-          @click="openRuns"
+        <!-- Past-run chip — shown when a run is loaded onto the canvas (arrived via
+             "Fix This Step" or picked from History). Compact provenance in place of
+             the old full-width banner: the tooltip carries "edit freely — never
+             changed", and ✕ clears the run data. -->
+        <span
+          v-if="runOverlay"
+          data-test="workflow-editor-run-chip"
+          class="border-border-default text-text-secondary rounded-default inline-flex max-w-[16rem] shrink-0 items-center gap-1 border px-1.5 py-0.5 text-xs"
+          :title="t('workflow.runOverlay.banner', { run: runOverlay.runId })"
         >
-          {{ t("workflow.history.open") }}
-        </OButton>
+          <OIcon name="history" size="xs" class="shrink-0" />
+          <span class="truncate">{{ t("workflow.ndv.runLabel") }} · {{ runOverlay.runId }}</span>
+          <button
+            type="button"
+            data-test="workflow-editor-run-chip-clear"
+            class="text-text-secondary hover:text-text-body -mr-0.5 flex shrink-0 items-center"
+            :aria-label="t('workflow.runOverlay.clear')"
+            @click="clearRunOverlay"
+          >
+            <OIcon name="close" size="xs" />
+          </button>
+        </span>
+
+        <!-- History — published, saved workflows only (drafts have no runs). Opens
+             the runs list as a minified dropdown (same as the NDV: a titled header
+             with the refresh + "last refreshed" time built in), with "Open Full Runs
+             View" for the full inspection surface. Picking a run loads it. -->
+        <WorkflowRunSwitcher
+          v-if="showHistory"
+          :current-run-id="runOverlay?.runId || ''"
+          :org-id="orgId()"
+          :workflow-id="workflowObj.currentSelectedWorkflow.id || ''"
+          @select="switchEditorRun"
+        >
+          <template #trigger>
+            <OButton variant="outline" size="sm-action" data-test="workflow-editor-history">
+              {{ t("workflow.history.open") }}
+            </OButton>
+          </template>
+          <template #footer>
+            <button
+              type="button"
+              data-test="workflow-editor-open-runs-view"
+              class="text-accent flex w-full items-center justify-center text-xs font-medium hover:underline"
+              @click="openRuns"
+            >
+              {{ t("workflow.history.openFullView") }}
+            </button>
+          </template>
+        </WorkflowRunSwitcher>
         <OButton
           variant="outline"
           size="sm-action"
@@ -108,7 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.cancel") }}
         </OButton>
+        <!-- An already-published workflow saves as a single validated update.
+             A new or draft workflow gets two actions: Save as Draft (lenient —
+             persists an incomplete graph) and Publish (validates + promotes). -->
         <OButton
+          v-if="isExistingPublished"
           variant="primary"
           size="sm-action"
           data-test="workflow-editor-save"
@@ -118,6 +162,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.save") }}
         </OButton>
+        <template v-else>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="workflow-editor-save-draft"
+            :loading="saving"
+            :disabled="saving"
+            @click="onSaveDraft"
+          >
+            {{ t("workflow.saveDraft") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            data-test="workflow-editor-publish"
+            :loading="saving"
+            :disabled="saving"
+            @click="onPublish"
+          >
+            {{ t("workflow.publish") }}
+          </OButton>
+        </template>
       </template>
     </OPageHeader>
 
@@ -141,6 +207,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            on the lighter `surface-subtle` slab, which is what made the two
            editors read as different shades. -->
       <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
+        <!-- Test results are inspected in the node's NDV (click a node's ✓/✗ badge),
+             so the canvas fills the space — no docked results panel. -->
         <WorkflowCanvas />
       </div>
     </div>
@@ -165,12 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Test input popup — collects the sample payload + run-from and dry-runs the
          current graph (sent whole, no save needed). Results render as ✓ / error
-         badges on the canvas nodes. -->
+         badges on the canvas nodes, and open in the results dock (T4) — clicking a
+         node badge selects that step in the dock rather than opening an overlay. -->
     <WorkflowTestDialog v-if="workflowObj.testRun.show" />
-
-    <!-- Per-step Input/Output result drawer — opened by clicking a node's badge
-         after a run; also hosts the Replay-from-here button. -->
-    <WorkflowStepResultDrawer v-if="workflowObj.testRun.resultDrawer.show" />
 
     <!-- Link-to-alerts prompt — shown once, right after a workflow is created, so
          the user can attach it to existing alerts without leaving for the alert
@@ -193,16 +258,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteNode(workflowObj.deleteConfirm.nodeId)"
       @update:cancel="cancelDeleteNode"
     />
+
+    <!-- Unsaved-changes guard (T8) — blocks a leave with unsaved edits until the
+         user chooses Discard or Keep Editing. -->
+    <ConfirmDialog
+      v-model="unsavedDialog"
+      data-test="workflows-editor-unsaved-dialog"
+      :title="t('workflow.unsaved.title')"
+      :message="t('workflow.unsaved.message')"
+      :ok-label="t('workflow.unsaved.discard')"
+      @update:ok="onDiscardChanges"
+      @update:cancel="onKeepEditing"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
@@ -210,8 +288,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
+import WorkflowRunSwitcher from "./WorkflowRunSwitcher.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
-import WorkflowStepResultDrawer from "./WorkflowStepResultDrawer.vue";
 import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
@@ -226,6 +304,10 @@ import useWorkflowCanvas, {
   triggerTypeForKind,
   currentTriggerKind,
   serializeWorkflow,
+  markWorkflowDirty,
+  reachableFrom,
+  isNodeIncomplete,
+  loadWorkflowRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -246,11 +328,31 @@ const {
   deleteNode,
   cancelDeleteNode,
   addNodeAfter,
+  addNodeOnEdge,
   addTriggerNode,
+  addActionFromStart,
   closeStepPicker,
   onDragStart,
   addNodeToEnd,
+  editNode,
 } = useWorkflowCanvas(t);
+
+// ── Run overlay (arriving from Runs history) ────────────────────────────────
+// A past run is loaded into the SAME `testRun.result` the canvas paints from, so
+// the editor shows the identical badges and per-node Input/Output — except the
+// workflow stays editable. `mode: "history"` is stamped only by loadWorkflowRun;
+// a real Test writes the same key WITHOUT it, so running a test drops the banner
+// on its own and the two data sources can never be confused.
+const runOverlay = computed(() =>
+  workflowObj.testRun.result?.mode === "history" ? workflowObj.testRun.result : null,
+);
+const clearRunOverlay = () => {
+  workflowObj.testRun.result = null;
+};
+// History is only meaningful for a published, saved workflow — drafts have no runs.
+const showHistory = computed(
+  () => workflowObj.isEditWorkflow && !workflowObj.currentSelectedWorkflow.isDraft,
+);
 
 // Docked palette items, grouped into sections (Transform / Destination) to
 // mirror the pipeline sidebar. The trigger is pre-placed and not addable, so
@@ -286,13 +388,17 @@ const paletteClick = (item: any) => addNodeToEnd(item.subtype);
 // In "trigger" mode the picker is the workflow's FIRST node, so it offers the
 // trigger types; otherwise it offers the addable step types.
 const isTriggerStep = computed(() => workflowObj.stepPicker.mode === "trigger");
+// Splicing a step INTO an edge (A→new→B): the new node must be able to connect
+// onward to B, so a terminal (output) node like Destination can't be inserted —
+// exclude those types from the picker in insert mode.
+const isInsertStep = computed(() => workflowObj.stepPicker.mode === "insert");
 
 // Items for the shared step picker. In "trigger" mode it offers the enabled
 // trigger KINDS (Alert Fired, Incident Event) — all the same node_type
 // ("workflow_trigger"), differing only in `trigger_kind`, which the picker keys
 // on. Disabled kinds (schedule/webhook — "coming soon") are omitted since the
-// popover has no disabled-row affordance. In "step" mode it offers the addable
-// node types.
+// popover has no disabled-row affordance. In "step"/"insert" mode it offers the
+// addable node types (insert drops terminal/Destination types — see above).
 const stepItems = computed(() => {
   if (isTriggerStep.value) {
     return enabledTriggers().map((tr) => ({
@@ -305,7 +411,10 @@ const stepItems = computed(() => {
       trigger_kind: tr.kind,
     }));
   }
-  return ADDABLE_NODE_TYPES.map((nt: string) => {
+  const addable = isInsertStep.value
+    ? ADDABLE_NODE_TYPES.filter((nt) => nodeMeta(nt)?.ioType !== "output")
+    : ADDABLE_NODE_TYPES;
+  return addable.map((nt: string) => {
     const m = nodeMeta(nt);
     const img = m?.image;
     return {
@@ -322,11 +431,16 @@ const stepItems = computed(() => {
 });
 
 const onStepPick = (item: any) => {
-  const { source, handle, mode, position } = workflowObj.stepPicker;
+  const { source, handle, mode, position, edgeId } = workflowObj.stepPicker;
   closeStepPicker();
   // The trigger has nothing before it, so it is placed rather than appended.
   if (mode === "trigger")
     addTriggerNode(item.nodeType || "workflow_trigger", item.trigger_kind, position);
+  // Empty-canvas scaffold's Action slot — the workflow's first step (appends after
+  // the trigger when one exists, else placed unconnected at the slot).
+  else if (mode === "action") addActionFromStart(item.key, position);
+  // Insert-between (T7): splice the picked type onto the selected edge.
+  else if (mode === "insert") addNodeOnEdge(edgeId, item.key);
   else addNodeAfter(source, handle, item.key);
 };
 
@@ -363,9 +477,55 @@ const loadWorkflow = async (id: string) => {
   }
 };
 
+// Cancel / back — just navigate. The unsaved-changes guard (onBeforeRouteLeave)
+// intercepts if there are unsaved edits and prompts before the route actually
+// changes; resetWorkflowData runs on unmount, so it must NOT run here (it would
+// clear dirtyFlag and slip the guard). A clean editor navigates straight out.
 const goBack = () => {
-  resetWorkflowData();
   router.push({ name: "workflows", query: { org_identifier: orgId() } });
+};
+
+// ── Unsaved-changes guard (T8) ──────────────────────────────────────────────
+// One prompt catches every exit path: Cancel/back and sidebar/programmatic nav
+// (route-leave) plus tab close / reload (beforeunload). The route-leave guard
+// blocks the pending navigation, opens the confirm dialog, and only proceeds once
+// the user chooses Discard — at which point dirtyFlag is cleared so the retried
+// navigation passes straight through.
+const unsavedDialog = ref(false);
+const pendingRoute = ref<RouteLocationRaw | null>(null);
+
+onBeforeRouteLeave((to) => {
+  if (!workflowObj.dirtyFlag) return true;
+  pendingRoute.value = to.fullPath;
+  unsavedDialog.value = true;
+  return false;
+});
+
+const onDiscardChanges = () => {
+  unsavedDialog.value = false;
+  // Discard: drop the dirty flag so the retried navigation is allowed through.
+  workflowObj.dirtyFlag = false;
+  const to = pendingRoute.value;
+  pendingRoute.value = null;
+  if (to) router.push(to);
+};
+const onKeepEditing = () => {
+  unsavedDialog.value = false;
+  pendingRoute.value = null;
+};
+
+// Native browser prompt for tab close / reload while there are unsaved edits.
+const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+  if (!workflowObj.dirtyFlag) return;
+  e.preventDefault();
+  e.returnValue = "";
+};
+
+// Name / description edits (create mode only — the fields are read-only on edit)
+// must mark the workflow dirty so the guard fires for a rename-only change.
+const onNameChange = () => {
+  workflowObj.nameError = false;
+  markWorkflowDirty();
 };
 
 const saving = ref(false);
@@ -374,7 +534,18 @@ const saving = ref(false);
 // (unconnected) nodes. Mirrors PipelineEditor's checks. Save also requires a name
 // (`requireName`); Test skips it — a draft graph is testable before it's named,
 // it just has to be a connected trigger -> step chain.
-const validate = ({ requireName = true }: { requireName?: boolean } = {}): boolean => {
+const validate = ({
+  requireName = true,
+  requireGraph = true,
+  allowOrphans = false,
+}: {
+  requireName?: boolean;
+  requireGraph?: boolean;
+  // Test only (T5): run the connected chain from the trigger; DON'T reject
+  // unwired/orphan steps — they're simply excluded from the run set. Save/Publish
+  // keep the strict check (allowOrphans stays false).
+  allowOrphans?: boolean;
+} = {}): boolean => {
   const wf = workflowObj.currentSelectedWorkflow;
   if (requireName) {
     const name = (wf.name || "").trim();
@@ -386,12 +557,29 @@ const validate = ({ requireName = true }: { requireName?: boolean } = {}): boole
     workflowObj.nameError = false;
   }
 
+  // A draft may be an incomplete graph (no trigger yet, missing steps, orphan
+  // nodes) — skip the connectivity checks so it can be saved as-is. The backend
+  // re-runs full validation on Publish/promote.
+  if (!requireGraph) return true;
+
   const nodes = wf.nodes || [];
   const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!trigger) {
     toast({ message: t("workflow.triggerRequired"), variant: "warning" });
     return false;
   }
+
+  // Test (allowOrphans): require only a trigger with at least one connected step;
+  // unwired steps stay on the canvas and are skipped on the run.
+  if (allowOrphans) {
+    const reachable = reachableFrom(wf.edges || [], [trigger.id]);
+    if (reachable.size < 2) {
+      toast({ message: t("workflow.addStepRequired"), variant: "warning" });
+      return false;
+    }
+    return true;
+  }
+
   if (nodes.length < 2) {
     toast({ message: t("workflow.addStepRequired"), variant: "warning" });
     return false;
@@ -402,6 +590,25 @@ const validate = ({ requireName = true }: { requireName?: boolean } = {}): boole
   const orphan = nodes.find((n: any) => n.id !== trigger.id && !targets.has(n.id));
   if (orphan) {
     toast({ message: t("workflow.connectAllNodes"), variant: "warning" });
+    return false;
+  }
+
+  // Publish-only (strict path — Test/allowOrphans and Draft/!requireGraph both
+  // return before here): a still-unfinished placeholder node (e.g. a Destination
+  // saved with no destination) can't be published. Draft + Test allow it.
+  const incompleteNodes = nodes.filter((n: any) => isNodeIncomplete(n));
+  if (incompleteNodes.length) {
+    // Show the user EXACTLY which steps block publishing: flash a warning ring on each
+    // (the canvas frames them — see WorkflowCanvas) instead of a vague "fill all steps".
+    workflowObj.incompleteHighlight = incompleteNodes.map((n: any) => n.id);
+    toast({
+      message: t(
+        "workflow.finishStepsBeforePublish",
+        { count: incompleteNodes.length },
+        incompleteNodes.length,
+      ),
+      variant: "warning",
+    });
     return false;
   }
   return true;
@@ -499,12 +706,122 @@ const onLinkAlertsDone = () => {
   goBack();
 };
 
+// A workflow already promoted to the workflows table: shows a single validated
+// Save. New workflows and drafts show Save-as-Draft + Publish instead.
+const isExistingPublished = computed(
+  () => !!workflowObj.currentSelectedWorkflow.id && !workflowObj.currentSelectedWorkflow.isDraft,
+);
+
+// Save-as-Draft: lenient (name only, no graph checks) and always writes to the
+// drafts table. First save creates the draft (backend mints the id); subsequent
+// saves update it. Never validates the graph — that's Publish's job.
+const persistDraft = async (): Promise<boolean> => {
+  if (saving.value || !validate({ requireGraph: false })) return false;
+  saving.value = true;
+  const org = orgId();
+  const data = buildPayload();
+  const wf = workflowObj.currentSelectedWorkflow;
+  try {
+    if (wf.id) {
+      await workflowService.updateWorkflow({
+        org_identifier: org,
+        id: wf.id,
+        data,
+        draft: true,
+      });
+    } else {
+      const res = await workflowService.createWorkflow({
+        org_identifier: org,
+        data,
+        draft: true,
+      });
+      const newId = res.data?.id;
+      if (newId) {
+        wf.id = newId;
+        workflowObj.isEditWorkflow = true;
+      }
+    }
+    wf.isDraft = true;
+    workflowObj.dirtyFlag = false;
+    toast({ message: t("workflow.draftSaveSuccess"), variant: "success" });
+    emit("saved");
+    return true;
+  } catch (e: any) {
+    toast({
+      message: e?.response?.data?.message || t("workflow.saveError"),
+      variant: "error",
+    });
+    return false;
+  } finally {
+    saving.value = false;
+  }
+};
+
+const onSaveDraft = async () => {
+  if (!(await persistDraft())) return;
+  goBack();
+};
+
+// Promote a saved draft into a published workflow. The backend promote reads the
+// draft from the DB (not the request body), so flush the current editor state to
+// the draft row first, then promote. The graph is validated client-side up front
+// (good inline UX) and again on the backend (the 400 safety net).
+const promoteDraft = async (): Promise<void> => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  if (saving.value || !validate()) return;
+  saving.value = true;
+  const org = orgId();
+  try {
+    await workflowService.updateWorkflow({
+      org_identifier: org,
+      id: wf.id,
+      data: buildPayload(),
+      draft: true,
+    });
+    await workflowService.promoteWorkflow({
+      org_identifier: org,
+      id: wf.id,
+      trigger_type: triggerTypeForKind(currentTriggerKind()),
+    });
+    wf.isDraft = false;
+    workflowObj.dirtyFlag = false;
+    toast({ message: t("workflow.publishSuccess"), variant: "success" });
+    emit("saved");
+    // Freshly published — offer the same link-to-alerts prompt as a new create.
+    if (triggerDef(currentTriggerKind()).linksAlerts) {
+      linkAlerts.value = { show: true, id: wf.id, name: wf.name || "" };
+      return;
+    }
+    goBack();
+  } catch (e: any) {
+    toast({
+      message: e?.response?.data?.message || t("workflow.publishError"),
+      variant: "error",
+    });
+  } finally {
+    saving.value = false;
+  }
+};
+
+// Publish: an existing draft is promoted; a brand-new workflow is created
+// directly as a published (validated) workflow — same path as the old Save.
+const onPublish = async () => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  if (wf.id && wf.isDraft) {
+    await promoteDraft();
+  } else {
+    await onSave();
+  }
+};
+
 // Test dry-runs the current in-memory graph — the whole workflow is sent in the
 // request, so there's no need to save first. It must still be a runnable graph
 // though: a trigger plus at least one connected step, no orphan nodes (the same
 // connectivity checks as Save, minus the name requirement).
+// Test dry-runs the current in-memory graph (T5): a trigger with at least one
+// connected step is enough — unwired/orphan steps are skipped, not blockers.
 const onTest = () => {
-  if (!validate({ requireName: false })) return;
+  if (!validate({ requireName: false, allowOrphans: true })) return;
   workflowObj.testRun.show = true;
 };
 
@@ -521,16 +838,69 @@ const openRuns = () => {
 };
 
 onMounted(async () => {
+  window.addEventListener("beforeunload", beforeUnloadHandler);
   const query = router.currentRoute.value.query;
   const id = query.id as string | undefined;
   if (id) {
     // Edit-from-list already hydrated the shared state synchronously; only
     // re-fetch on a cold load (deep link / refresh) where it's missing.
     if (workflowObj.currentSelectedWorkflow?.id !== id) await loadWorkflow(id);
+    // Arrived from a run ("Fix This Step"). Must run AFTER the workflow is
+    // hydrated: loadWorkflowRun diffs the run against the current node list to
+    // find ghost steps, and resetWorkflowData nulls testRun.result.
+    await applyRunOverlay(
+      id,
+      query.run_id as string | undefined,
+      query.node_id as string | undefined,
+    );
   } else {
     startNewWorkflow();
   }
 });
 
-onBeforeUnmount(() => resetWorkflowData());
+// Copy a past run onto the canvas, then open the step the user came to fix.
+// Read-only projection: nothing here writes back to the stored run.
+const applyRunOverlay = async (workflowId: string, runId?: string, nodeId?: string) => {
+  if (!runId) return;
+  const r = await loadWorkflowRun({ orgId: orgId(), workflowId, runId });
+  if (!r.ok) {
+    toast({
+      message: raw(r.error) || t("workflow.history.loadRunError"),
+      variant: "error",
+    });
+    return;
+  }
+  // Steps this run executed that the workflow no longer has: their badges have
+  // nowhere to render, so the run would look cleaner here than it actually was.
+  const ghosts = runOverlay.value?.ghostNodeIds?.length || 0;
+  if (ghosts) {
+    toast({
+      message: t("workflow.runOverlay.ghostNodes", { count: ghosts }, ghosts),
+      variant: "warning",
+    });
+  }
+  if (!nodeId) return;
+  const exists = (workflowObj.currentSelectedWorkflow.nodes || []).some(
+    (n: any) => n.id === nodeId,
+  );
+  if (exists) editNode(nodeId);
+  else toast({ message: t("workflow.runOverlay.missingNode"), variant: "warning" });
+};
+
+// Pick a run from the History dropdown → load it onto the canvas and reflect it in
+// the URL, so a refresh reloads the same run. No node is opened (unlike arriving via
+// "Fix This Step"); the user is switching which run's data the editor overlays.
+const switchEditorRun = async (runId: string) => {
+  const id = workflowObj.currentSelectedWorkflow?.id;
+  if (!id || !runId || runId === (runOverlay.value?.runId || "")) return;
+  await applyRunOverlay(id, runId);
+  router.replace({
+    query: { ...router.currentRoute.value.query, run_id: runId },
+  });
+};
+
+onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", beforeUnloadHandler);
+  resetWorkflowData();
+});
 </script>

@@ -19,7 +19,25 @@ import type { I18nText } from "@/types/i18n";
 // `stopping` is the interval between the user pressing Stop and the extension
 // confirming it: the run is no longer advancing but is not yet torn down, so the
 // UI must neither offer Re-run nor claim the journey has stopped.
-export type ReplayPhase = "idle" | "running" | "stopping" | "passed" | "failed" | "stopped";
+/**
+ * `restoring` is a replay the author did not ask to watch: the journey is being
+ * re-run only to put the browser where recording should begin. It is a distinct
+ * phase from `running` because the copy and the affordances differ — "Restoring
+ * state" invites waiting, "Replaying" invites reading results — and because a
+ * restore that passes is not a result worth reporting.
+ */
+export type ReplayPhase =
+  "idle" | "running" | "restoring" | "stopping" | "passed" | "failed" | "stopped";
+
+/**
+ * Why a restore-then-record session stopped short of the point it was aiming for.
+ *
+ * Only `step-failed` is a fault in the journey. The other two are the author
+ * ending a restore they no longer wanted — by closing the recorder window, which
+ * is the exit that window offers, or by pressing Cancel — and reporting either of
+ * those as a failing step blames the journey for a deliberate act.
+ */
+export type RestoreFailureReason = "window-closed" | "cancelled" | "step-failed";
 
 /** Machine-readable error from the extension's replay pipeline. */
 export interface StructuredError {
@@ -199,6 +217,16 @@ export interface BrowserStep {
   /** Runs even after an earlier step failed (logout, cleanup). */
   alwaysRun?: boolean;
   value?: string;
+  /**
+   * Mouse button and click count for a `click` step, promoted from the wire.
+   *
+   * These lived only on `step.wire` while the v2 schema had nowhere to put them.
+   * It does now, so they travel the normal route like every other stored field:
+   * wire → mapWireStep → here → buildV2Step → storage. Absent means a single
+   * left click, which is what every journey stored before 1.56 meant.
+   */
+  button?: "left" | "middle" | "right";
+  clickCount?: number;
   timeout?: number; // ms; undefined = runner's per-category default
   // Original, untouched extension step (see WireStep). Preserved for replay,
   // which sends the rich step back to the extension verbatim. Absent on
@@ -241,6 +269,18 @@ export interface WireStep {
   files?: string[];
   modifiers?: number;
   button?: "left" | "middle" | "right";
+  /** camelCase here, `click_count` in storage. buildV2Step crosses that boundary. */
+  clickCount?: number;
+  /**
+   * The storage spelling, present only when this "wire" is a stored step being
+   * loaded back (`buildPayload` maps `config.steps` through `mapWireStep`).
+   *
+   * `button` needs no counterpart — it is spelled the same on both sides. This
+   * one is the read side of the boundary `buildV2Step` writes: without it a
+   * saved double click came back as a plain click, because the loader looked for
+   * a camelCase field that only the extension ever sends.
+   */
+  click_count?: number;
   position?: { x: number; y: number };
   code?: string;
   startTime?: number;
@@ -264,6 +304,28 @@ export type RecorderCommand =
       headers?: { key: string; value: string }[];
       cookies?: { name: string; value: string; domain: string }[];
     }
+  | {
+      /**
+       * Replay `prefixSteps`, then record in the SAME session (P2). The extension
+       * keeps the browser context open across the mode flip, which is what makes the
+       * recorded steps start from the state the prefix produced.
+       */
+      action: "startRecordingFrom";
+      prefixSteps: WireStep[];
+      targetUrl?: string;
+      testIdAttr?: string;
+      auth?: { type: "basic"; username: string; password: string };
+      headers?: { key: string; value: string }[];
+      cookies?: { name: string; value: string; domain: string }[];
+    }
+  | {
+      /**
+       * Start capturing on the session a failed prefix left open, from wherever the
+       * failing step stopped. A mode flip on a live context, so it carries nothing —
+       * the state it records against is already in the browser.
+       */
+      action: "recordFromHere";
+    }
   | { action: "stopReplay" };
 
 export interface RecorderCommandEnvelope {
@@ -279,6 +341,18 @@ export interface RecorderStatus {
   mode: string;
   tabId: number | null;
   stepCount: number;
+  /**
+   * The installed extension build. For the "update the extension" message and for
+   * support — never for inferring what the extension can do, which is what
+   * `capabilities` is for.
+   */
+  extVersion?: string;
+  /**
+   * What the installed extension supports. Optional because an extension older than
+   * the handshake reports nothing; see `hasCapability` in useSyntheticsRecorder for
+   * the absent-behaviour, which is defined once and relied on everywhere.
+   */
+  capabilities?: string[];
 }
 
 export interface RecorderStartResponse {
@@ -321,15 +395,49 @@ export type BlockedReason = "incognito" | "in-progress" | "preflight";
 // the web app consumes; `sources`/`elementInfo` are opaque here.
 export type RecorderPushPayload =
   | { method: "setMode"; mode: RecorderMode }
-  | { method: "setActions"; browserSteps: WireStep[]; sources?: unknown[] }
+  // Generated code arrives WITH the actions, not on a push of its own.
+  // playwright-core removed `setSources` entirely — the recorder now hands
+  // sources to the app alongside the action list — so a `setSources` branch
+  // could never fire. Its `generatedCode` field is exactly what an
+  // "eject to Playwright code" feature would reach for, which is why the dead
+  // variant was worth deleting rather than leaving as a trap.
   | {
-      method: "setSources";
-      sources?: unknown[];
-      generatedCode?: string;
-      generatedLanguage?: string;
+      method: "setActions";
+      browserSteps: WireStep[];
+      sources?: { file: string; text: string; language: string }[];
     }
-  | { method: "elementPicked"; elementInfo: unknown; userGesture?: boolean }
-  | { method: "recordingStarted"; tabId: number; url: string }
+  | {
+      method: "elementPicked";
+      elementInfo: { selector: string; ariaSnapshot: string };
+      userGesture?: boolean;
+    }
+  | {
+      method: "recordingStarted";
+      tabId: number;
+      url: string;
+      /** Present only for a restore-then-record session. */
+      mode?: "insert";
+      /**
+       * How many steps the recorder had already logged when recording was enabled —
+       * the openPage/closePage entries the collection accumulates while disabled.
+       * Everything from this index on is what the author actually recorded.
+       */
+      baselineStepCount?: number;
+    }
+  | {
+      /** The restore could not reach the requested point; `stepId` is where it stopped. */
+      method: "prefixFailed";
+      stepId: string;
+      error?: string;
+      structuredError?: StructuredError;
+      /**
+       * Why the restore ended, when the extension is new enough to know.
+       *
+       * Absent from extensions that predate it, which is why O2 still classifies
+       * from the error itself — see `classifyRestoreFailure`.
+       */
+      reason?: RestoreFailureReason;
+    }
   | { method: "recordingStopped"; totalSteps: number }
   | {
       method: "stepReplayResult";
@@ -472,6 +580,9 @@ export interface SyntheticsLocation {
   /** Check types runnable at this location (live agents' capabilities). */
   types?: string[];
   status?: "online" | "offline" | "pending";
+  /** Set only when this region cannot observe the location's agents, which
+   *  makes `status` a guess — see `utils/synthetics/locationLiveStatus`. */
+  live_status_unknown?: boolean;
   /** Live agents' names, most recently seen first (private rows). */
   agent_names?: string[];
   live_agents?: number;
@@ -571,6 +682,10 @@ export interface SyntheticLocation {
   agent_names: string[];
   agents_total: number;
   status: "online" | "offline" | "pending";
+  /** Set only when this region cannot observe the location's agents, which
+   *  makes `status`, `live_agents` and `agents_total` a guess rather than an
+   *  observation — see `utils/synthetics/locationLiveStatus`. */
+  live_status_unknown?: boolean;
   version?: string;
   /** Name of the most recently seen agent, live or stale. */
   last_agent_name?: string;

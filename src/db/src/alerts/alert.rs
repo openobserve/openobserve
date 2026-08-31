@@ -30,7 +30,7 @@ use config::{
 #[cfg(feature = "enterprise")]
 use infra::table::workflows::WorkflowTriggerEntity;
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::alerts as table,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -63,7 +63,7 @@ pub async fn get_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let alert =
         table::get_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
     let value = alert.map(|(_f, a)| a);
@@ -71,7 +71,7 @@ pub async fn get_by_name(
 }
 
 pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
             infra::coordinator::alerts::emit_put_event(org_id, &alert, None).await?;
@@ -154,7 +154,7 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     let Some(alert_id) = alert.id else {
         return Err(anyhow::anyhow!("Alert ID is required"));
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some((_f, _)) = table::get_by_id(client, org_id, alert_id).await? else {
         return Err(anyhow::anyhow!("Alert not found"));
     };
@@ -329,7 +329,7 @@ pub async fn delete_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<(), infra::errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let Some(alert_id) =
         table::get_by_name(client, org_id, "default", stream_type, stream_name, name)
@@ -373,7 +373,7 @@ pub async fn list(
         params
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let alerts = table::list(client, params)
         .await?
         .into_iter()
@@ -394,7 +394,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let mut alerts: Vec<(Folder, Alert)> = Vec::new();
     let r = infra::schema::STREAM_SCHEMAS.read().await;
     let mut orgs = HashSet::new();
@@ -439,7 +439,7 @@ async fn put_into_cache(
     alert_id: String,
     _folder_id: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Ok(alert_id_ksuid) = svix_ksuid::Ksuid::from_str(&alert_id) else {
         log::error!("Error parsing alert id into Ksuid while putting the alert into cache");
         return Ok(());

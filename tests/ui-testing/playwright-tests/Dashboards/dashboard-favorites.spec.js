@@ -7,7 +7,8 @@ const testLogger = require("../utils/test-logger.js");
 
 export const test = base;
 
-test.describe.configure({ mode: "parallel" });
+// Favorites live in ONE per-user, org-wide settings row that every worker rewrites wholesale, so parallel tests lose each other's updates.
+test.describe.configure({ mode: "serial" });
 
 // Favorites are a per-user setting surfaced through a `__favorites__`
 // pseudo-folder in the rail — not a real backend folder. These tests cover the
@@ -17,9 +18,6 @@ test.describe.configure({ mode: "parallel" });
 //   3. bulk-deleting from Favorites left a ghost row in the source folder
 //      (folder navigation is cache-first)
 test.describe("dashboard favorites testcases", () => {
-  // Each test seeds its own folder + dashboard so shards can run in parallel
-  // without contending over shared favorites state (favorites are per-user,
-  // and the suite logs in as the same user).
   let pm;
   let folderName;
   let dashboardName;
@@ -159,6 +157,89 @@ test.describe("dashboard favorites testcases", () => {
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.dashboardFolder.openFolderByName(folderName);
     await pm.dashboardFavorites.verifyDashboardNotPresent(dashboardName);
+  });
+
+  // Regression (#13437): the rows computed short-circuited to the stored
+  // favorites whenever the Favorites pseudo-folder was active, so a
+  // cross-folder search made from inside Favorites returned nothing but the
+  // favorites themselves. The fix makes the favorites branch yield to an
+  // active cross-folder search.
+  test("should surface a non-favorited dashboard in the Favorites folder when searching across folders", async ({
+    page,
+  }) => {
+    // A second, deliberately un-favorited dashboard: it is the only row that
+    // can prove the search reached past the favorites list. Named so neither
+    // dashboard's name is a substring of the other, keeping both the
+    // cross-folder search and the current-folder filter unambiguous.
+    const otherDashboardName = "DashB_" + Date.now();
+    await pm.dashboardCreate.createDashboard(otherDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await waitForDashboardPage(page);
+
+    await pm.dashboardFavorites.searchDashboard(dashboardName);
+    await pm.dashboardFavorites.addToFavorites(dashboardName);
+
+    await pm.dashboardFavorites.openFavoritesFolder();
+    await pm.dashboardFavorites.verifyDashboardVisible(dashboardName);
+    // Baseline: the un-favorited dashboard is absent from the favorites-only
+    // list, so its appearance below is attributable to the search alone.
+    await pm.dashboardFavorites.verifyDashboardNotPresent(otherDashboardName);
+
+    await pm.dashboardFavorites.searchAcrossFolders(otherDashboardName);
+    await pm.dashboardFavorites.verifyDashboardVisible(otherDashboardName);
+  });
+
+  // Companion to the above: clearing the query has to hand the view back to
+  // the favorites list. `clearSearchHistory` now resets both scope models
+  // (searchQuery and filterQuery), so the cross-folder branch deactivates.
+  test("should restore the favorites-only list after clearing a cross-folder search", async ({
+    page,
+  }) => {
+    const otherDashboardName = "DashB_" + Date.now();
+    await pm.dashboardCreate.createDashboard(otherDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await waitForDashboardPage(page);
+
+    await pm.dashboardFavorites.searchDashboard(dashboardName);
+    await pm.dashboardFavorites.addToFavorites(dashboardName);
+
+    await pm.dashboardFavorites.openFavoritesFolder();
+    await pm.dashboardFavorites.searchAcrossFolders(otherDashboardName);
+    await pm.dashboardFavorites.verifyDashboardVisible(otherDashboardName);
+
+    await pm.dashboardFavorites.clearSearch();
+    await pm.dashboardFavorites.verifySearchInputEmpty();
+
+    // Back to favorites-only: the searched-for dashboard drops out and the
+    // favorite returns.
+    await pm.dashboardFavorites.verifyDashboardNotPresent(otherDashboardName);
+    await pm.dashboardFavorites.verifyDashboardVisible(dashboardName);
+  });
+
+  // Regression (#13437): the search field was `:clearable="searchAcrossFolders"`,
+  // so in the default "this folder" scope no clear button rendered at all and
+  // a filter could only be undone by selecting the text by hand.
+  test("should expose a clear button for a current-folder search and restore the full list", async ({
+    page,
+  }) => {
+    const otherDashboardName = "DashB_" + Date.now();
+    await pm.dashboardCreate.createDashboard(otherDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await waitForDashboardPage(page);
+
+    // Default scope is "this folder" — no toggling, that is the mode the
+    // clear button used to be missing from.
+    await pm.dashboardFavorites.searchDashboard(dashboardName);
+    await pm.dashboardFavorites.verifyDashboardVisible(dashboardName);
+    await pm.dashboardFavorites.verifyDashboardNotPresent(otherDashboardName);
+
+    await pm.dashboardFavorites.verifySearchClearButtonVisible();
+    await pm.dashboardFavorites.clearSearch();
+    await pm.dashboardFavorites.verifySearchInputEmpty();
+
+    // Both folder members are listed again once the filter is dropped.
+    await pm.dashboardFavorites.verifyDashboardVisible(dashboardName);
+    await pm.dashboardFavorites.verifyDashboardVisible(otherDashboardName);
   });
 
   test.afterEach(async ({ page }) => {

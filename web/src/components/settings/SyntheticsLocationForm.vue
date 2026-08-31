@@ -62,7 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormInput
           name="label"
           :label="t('synthetics.locations.label')"
-          :placeholder="t('synthetics.locations.labelPlaceholder')"
+          :placeholder="
+            t('synthetics.locations.labelPlaceholder', {
+              product: raw('AWS US East (N. Virginia)'),
+            })
+          "
           required
           data-test="synthetics-location-label-input"
         />
@@ -71,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("synthetics.locations.locationId") }}
           </label>
           <div
-            class="text-text-secondary rounded-default border-input-border bg-surface-subtle border px-3 py-2 text-sm"
+            class="text-text-secondary rounded-default border-border-default bg-surface-subtle border px-3 py-2 text-sm"
           >
             {{ derivedId || "-" }}
           </div>
@@ -253,6 +257,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       locationFormRef,
       locationFormSchema,

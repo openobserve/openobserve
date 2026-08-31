@@ -112,6 +112,11 @@ pub async fn db_init() -> Result<(), anyhow::Error> {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
+    // runs for every node role; db_init() is skipped when migrations are
+    // up-to-date, so this is the call that keeps an unreachable queue
+    // backend from booting
+    queue::init().await?;
+
     if !config::cluster::LOCAL_NODE.is_ingester()
         && !config::cluster::LOCAL_NODE.is_querier()
         && !config::cluster::LOCAL_NODE.is_compactor()

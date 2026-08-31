@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </template>
                           <template v-else>
                             <span
-                              class="text-xl leading-none font-bold text-[var(--color-text-heading)]"
+                              class="text-text-heading text-xl leading-none font-bold"
                               :class="card.valueClass"
                             >
                               {{ card.value }}
@@ -860,7 +860,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div v-for="n in 5" :key="n" class="card-container rounded-default overflow-hidden">
-                  <div class="h-10 bg-[var(--color-border-default)] opacity-20" />
+                  <div class="bg-border-default h-10 opacity-20" />
                 </div>
               </template>
 
@@ -904,9 +904,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- cell-name: Step name -->
                     <template #cell-name="{ row }">
                       <div class="min-w-0">
-                        <div
-                          class="truncate text-xs font-semibold text-[var(--color-text-heading)]"
-                        >
+                        <div class="text-text-heading truncate text-xs font-semibold">
                           {{ row.name }}
                         </div>
                       </div>
@@ -919,14 +917,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="font-mono text-xs font-bold tabular-nums"
                           :style="{ color: row.failColor }"
                         >
-                          {{ row.failRatePct }}%&ensp;<span
-                            class="font-normal text-[var(--color-text-muted)]"
-                            >{{ row.failCount }}</span
-                          >
+                          {{ row.failRatePct }}%&ensp;<span class="text-text-muted font-normal">{{
+                            row.failCount
+                          }}</span>
                         </span>
-                        <div
-                          class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
-                        >
+                        <div class="bg-text-disabled/25! h-1.25 overflow-hidden rounded-full">
                           <div
                             class="h-full rounded-full"
                             :style="{ width: row.failRateBarPct, background: row.failBarColor }"
@@ -941,25 +936,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="font-mono text-xs tabular-nums"
                         :style="{ color: row.flakyColor }"
                       >
-                        {{ row.flakyRatePct }}%&ensp;<span
-                          class="font-normal text-[var(--color-text-muted)]"
-                          >{{ row.flakyCount }}</span
-                        >
+                        {{ row.flakyRatePct }}%&ensp;<span class="text-text-muted font-normal">{{
+                          row.flakyCount
+                        }}</span>
                       </span>
                     </template>
 
                     <!-- cell-avgDuration: Duration + bar -->
                     <template #cell-avgDuration="{ row }">
                       <div class="flex flex-col gap-1">
-                        <span
-                          class="font-mono text-xs text-[var(--color-text-body)] tabular-nums"
-                          >{{ row.avgDuration }}</span
-                        >
-                        <div
-                          class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
-                        >
+                        <span class="text-text-body font-mono text-xs tabular-nums">{{
+                          row.avgDuration
+                        }}</span>
+                        <div class="bg-text-disabled/25! h-1.25 overflow-hidden rounded-full">
                           <div
-                            class="h-full rounded-full bg-[var(--color-primary-400)]"
+                            class="bg-progress-track-fill h-full rounded-full"
                             :style="{ width: row.durationBarPct }"
                           />
                         </div>
@@ -969,15 +960,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- cell-p95Duration: Duration + bar -->
                     <template #cell-p95Duration="{ row }">
                       <div class="flex flex-col gap-1">
-                        <span
-                          class="font-mono text-xs text-[var(--color-text-body)] tabular-nums"
-                          >{{ row.p95Duration }}</span
-                        >
-                        <div
-                          class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
-                        >
+                        <span class="text-text-body font-mono text-xs tabular-nums">{{
+                          row.p95Duration
+                        }}</span>
+                        <div class="bg-text-disabled/25! h-1.25 overflow-hidden rounded-full">
                           <div
-                            class="h-full rounded-full bg-[var(--color-primary-400)]"
+                            class="bg-progress-track-fill h-full rounded-full"
                             :style="{ width: row.p95DurationBarPct }"
                           />
                         </div>
@@ -987,15 +975,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- cell-maxDuration: Duration + bar -->
                     <template #cell-maxDuration="{ row }">
                       <div class="flex flex-col gap-1">
-                        <span
-                          class="font-mono text-xs text-[var(--color-text-body)] tabular-nums"
-                          >{{ row.maxDuration }}</span
-                        >
-                        <div
-                          class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
-                        >
+                        <span class="text-text-body font-mono text-xs tabular-nums">{{
+                          row.maxDuration
+                        }}</span>
+                        <div class="bg-text-disabled/25! h-1.25 overflow-hidden rounded-full">
                           <div
-                            class="h-full rounded-full bg-[var(--color-primary-400)]"
+                            class="bg-progress-track-fill h-full rounded-full"
                             :style="{ width: row.maxDurationBarPct }"
                           />
                         </div>
@@ -1005,7 +990,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Empty -->
                     <template #empty>
                       <div
-                        class="flex items-center justify-center py-12 text-sm text-[var(--color-text-secondary)]"
+                        class="text-text-secondary flex items-center justify-center py-12 text-sm"
                       >
                         {{ t("synthetics.runs.noStepData") }}
                       </div>
@@ -1075,7 +1060,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1399,12 +1383,6 @@ const locationOptions = computed<SelectOption[]>(() => [
     icon: locationIcon(v),
   })),
 ]);
-const durationOptions: SelectOption[] = [
-  { label: t("synthetics.filters.anyDuration"), value: "all" },
-  { label: t("synthetics.filters.durationFast"), value: "fast" },
-  { label: t("synthetics.filters.durationMid"), value: "mid" },
-  { label: t("synthetics.filters.durationSlow"), value: "slow" },
-];
 const actionOptions: SelectOption[] = [
   { label: t("synthetics.filters.anyAction"), value: "all" },
   { label: t("synthetics.filters.actionClick"), value: "click" },
@@ -1979,10 +1957,10 @@ function errorPatterns(): string[] {
   ];
 }
 function fmtAge(min: number): string {
-  if (min < 60) return min + "m ago";
+  if (min < 60) return t("synthetics.minutesAgo", { count: min });
   const h = Math.floor(min / 60);
-  if (h < 24) return h + "h ago";
-  return Math.floor(h / 24) + "d ago";
+  if (h < 24) return t("synthetics.hoursAgo", { count: h });
+  return t("synthetics.daysAgo", { count: Math.floor(h / 24) });
 }
 interface MockRun {
   id: number;
@@ -2074,7 +2052,6 @@ const errorGroups = computed<ErrorGroup[]>(() => {
     .filter((e) => e.count > 0)
     .sort((a, b) => b.count - a.count);
 });
-const errorGroupCount = computed(() => errorGroups.value.length);
 
 const failedStepOptions = computed<SelectOption[]>(() => {
   const meta = stepMeta();

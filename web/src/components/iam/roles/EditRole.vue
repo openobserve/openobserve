@@ -114,7 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div></div>
           <div class="flex items-center gap-2">
             <span data-test="edit-role-permissions-count" class="text-sm font-bold">
-              {{ t("iam.editRole.permissionsCount", { count: selectedPermissionsHash.size }) }}
+              {{
+                t("iam.editRole.permissionCountSingular", { count: selectedPermissionsHash.size })
+              }}
             </span>
             <OToggleGroup
               data-test="edit-role-permissions-ui-type-toggle"
@@ -270,7 +272,6 @@ import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
 import templateService from "@/services/alert_templates";
-import actions from "@/services/action_scripts";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
@@ -287,10 +288,11 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+import llmQueuesService from "@/services/llm-queues.service";
+import llmDatasetsService from "@/services/llm-datasets.service";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -1411,7 +1413,6 @@ const getResourceEntities = (resource: Resource | Entity) => {
     metadata: getMetadataStreams,
     report: getReports,
     service_accounts: getServiceAccounts,
-    action_scripts: getActionScripts,
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
     rfolder: getReportFolders,
@@ -1422,6 +1423,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     score_config: getScoreConfigs,
     scorer: getScorers,
     eval_job: getEvalJobs,
+    annotation_queue: getAnnotationQueues,
+    dataset: getDatasets,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
     logs_cache: getLogsCacheStreams,
@@ -1765,22 +1768,12 @@ const getMetadataStreams = async () => {
   });
 };
 
-const getActionScripts = async () => {
-  const actionScripts = await actions.list(store.state.selectedOrganization.identifier);
-
-  updateResourceEntities("action_scripts", ["id"], [...actionScripts.data], false, "name");
-
-  return new Promise((resolve) => {
-    resolve(true);
-  });
-};
-
 const getStreamsTypes = async () => {
   const streams = [
-    { stream_type: "logs", name: "Logs" },
-    { stream_type: "traces", name: "Traces" },
-    { stream_type: "metrics", name: "Metrics" },
-    { stream_type: "index", name: "Indices" },
+    { stream_type: "logs", name: t("common.logs") },
+    { stream_type: "traces", name: t("common.traces") },
+    { stream_type: "metrics", name: t("common.metrics") },
+    { stream_type: "index", name: t("iam.indices") },
   ];
 
   streams.forEach((stream) => {
@@ -1918,6 +1911,26 @@ const getEvalJobs = async () => {
   const evalJobs = await onlineEvalsService.jobs.list(store.state.selectedOrganization.identifier);
 
   updateResourceEntities("eval_job", ["id"], evalJobs, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getAnnotationQueues = async () => {
+  const queues = await llmQueuesService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("annotation_queue", ["id"], queues, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getDatasets = async () => {
+  const datasets = await llmDatasetsService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("dataset", ["id"], datasets, false, "name");
 
   return new Promise((resolve) => {
     resolve(true);

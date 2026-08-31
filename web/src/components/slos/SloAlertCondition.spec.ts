@@ -98,6 +98,25 @@ describe("SloAlertCondition", () => {
     expect(model.short_window_secs).toBeGreaterThan(0);
   });
 
+  it.each([
+    [7, ["10%", "20%", "40%"]],
+    [30, ["2%", "5%", "10%"]],
+    [90, ["1%", "3%", "5%"]],
+  ])("shows the correct budget fractions for a %d-day SLO", async (days, fractions) => {
+    const wrapper = await mountWith(emptyCondition(), {
+      slo: slo({ window_secs: days * 86400 }),
+    });
+
+    for (const [key, fraction] of ["fast", "mid", "slow"].map((key, index) => [
+      key,
+      fractions[index],
+    ])) {
+      expect(wrapper.find(`[data-test="slos-sloalertcondition-preset-${key}"]`).text()).toContain(
+        fraction,
+      );
+    }
+  });
+
   // SA-8: a window must be an exact multiple of the slice interval and span at
   // least two slices. The published fast-burn row uses a 5-minute short window,
   // which is exactly ONE slice on a 5-minute SLO — unsavable as published.

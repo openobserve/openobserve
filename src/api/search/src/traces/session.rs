@@ -140,43 +140,8 @@ pub async fn get_latest_sessions(
     };
     let user_id = &user_email.user_id;
 
-    // Check permissions on stream
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        use crate::service::{auth::AuthExtractor, users::get_user};
-        if !db::user::is_root_user(user_id) {
-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
-            let stream_type_str = StreamType::Traces.as_str();
-
-            if !openobserve_core::authz::check_permissions(
-                user_id,
-                AuthExtractor {
-                    auth: "".to_string(),
-                    method: "GET".to_string(),
-                    o2_type: format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(stream_type_str)
-                            .map_or(stream_type_str, |model| model.key),
-                        stream_name
-                    ),
-                    org_id: org_id.clone(),
-                    bypass_check: false,
-                    parent_id: "".to_string(),
-                    use_all_org: false,
-                    use_self_context: false,
-                    use_self_parent: true,
-                },
-                user.role,
-                user.is_external,
-            )
-            .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
+    if let Some(response) = super::check_stream_permissions(&org_id, &stream_name, user_id).await {
+        return response;
     }
 
     let filter = match query.get("filter") {
@@ -466,8 +431,9 @@ pub async fn get_latest_sessions(
         ("session_id" = String, Query, description = "Session/conversation id"),
         ("from" = i64, Query, description = "from"),
         ("size" = i64, Query, description = "size"),
-        ("start_time" = i64, Query, description = "start time"),
-        ("end_time" = i64, Query, description = "end time"),
+        ("start_time" = Option<i64>, Query, description = "Caller range start in microseconds; optional, must be supplied together with end_time. The effective range is the union of this range and the indexed session range — it is never narrowed."),
+        ("end_time" = Option<i64>, Query, description = "Caller range end in microseconds; optional, must be supplied together with start_time"),
+        ("hint_ts" = Option<i64>, Query, description = "Optional time hint in microseconds for the session time index lookup"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
@@ -516,62 +482,34 @@ pub async fn get_session_details(
         _ => return MetaHttpResponse::bad_request("session_id is empty"),
     };
 
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        use crate::service::{auth::AuthExtractor, users::get_user};
-        if !db::user::is_root_user(user_id) {
-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
-            let stream_type_str = StreamType::Traces.as_str();
-
-            if !openobserve_core::authz::check_permissions(
-                user_id,
-                AuthExtractor {
-                    auth: "".to_string(),
-                    method: "GET".to_string(),
-                    o2_type: format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(stream_type_str)
-                            .map_or(stream_type_str, |model| model.key),
-                        stream_name
-                    ),
-                    org_id: org_id.clone(),
-                    bypass_check: false,
-                    parent_id: "".to_string(),
-                    use_all_org: false,
-                    use_self_context: false,
-                    use_self_parent: true,
-                },
-                user.role,
-                user.is_external,
-            )
-            .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
+    if let Some(response) = super::check_stream_permissions(&org_id, &stream_name, user_id).await {
+        return response;
     }
 
     let from = query
         .get("from")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+        .max(0);
     let size = query
         .get("size")
-        .map_or(1000, |v| v.parse::<i64>().unwrap_or(1000));
-    let start_time = query
-        .get("start_time")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
-    if start_time == 0 {
-        return MetaHttpResponse::bad_request("start_time is empty");
-    }
-    let end_time = query
-        .get("end_time")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
-    if end_time == 0 {
-        return MetaHttpResponse::bad_request("end_time is empty");
-    }
+        .map_or(1000, |v| v.parse::<i64>().unwrap_or(1000))
+        .max(0);
+    let caller_range = match super::time_index::parse_optional_time_range(&query) {
+        Ok(range) => range,
+        Err(response) => return response,
+    };
+    let hint_ts = match query.get("hint_ts") {
+        Some(value) => match value.parse::<i64>() {
+            Ok(0) => None,
+            Ok(value) => Some(value),
+            Err(_) => return MetaHttpResponse::bad_request("Invalid hint_ts parameter"),
+        },
+        None => caller_range.map(|range| {
+            range
+                .start_time
+                .saturating_add(range.end_time.saturating_sub(range.start_time) / 2)
+        }),
+    };
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -611,16 +549,59 @@ pub async fn get_session_details(
     let use_cache = get_use_cache_from_request(&query);
     let user_id_opt = Some(user_id.to_string());
 
-    let query_sql =
-        traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id, None);
+    // Resolve the session through the time index first: it yields the
+    // session's full range plus its member traces, independent of the
+    // caller's window.
+    let index_result = match super::time_index::query_session(
+        &org_id,
+        &stream_name,
+        &session_id,
+        hint_ts,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] session time index query failed for {org_id}/{stream_name}: {e}"
+            );
+            None
+        }
+    };
+    let effective_range = match super::time_index::union_ranges(
+        caller_range,
+        index_result.as_ref().map(|result| result.range),
+    ) {
+        Some(range) => range,
+        None => {
+            return MetaHttpResponse::bad_request(
+                "A caller time range is required when the session time index has no result",
+            );
+        }
+    };
+
+    // The legacy source-stream scan covers what the index cannot: traces
+    // ingested before index coverage. It is skipped only when the index
+    // resolved the session and the caller range lies entirely inside
+    // coverage — there the index is authoritative.
+    let legacy_needed = match (caller_range, index_result.as_ref()) {
+        (None, _) => false,
+        (Some(_), None) => true,
+        (Some(caller), Some(_)) => {
+            match infra::db::trace_time_index::get_or_create_coverage_start().await {
+                Ok(coverage_start) => caller.start_time < coverage_start,
+                Err(_) => true,
+            }
+        }
+    };
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: query_sql,
-            from,
+            sql: String::new(),
+            from: 0,
             size,
-            start_time,
-            end_time,
+            start_time: effective_range.start_time,
+            end_time: effective_range.end_time,
             ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -629,49 +610,88 @@ pub async fn get_session_details(
         ..Default::default()
     };
 
-    let resp_search = match SearchService::cache::search(
-        &trace_id,
-        &org_id,
-        stream_type,
-        user_id_opt.clone(),
-        &req,
-        "".to_string(),
-        false,
-        None,
-        false,
-    )
-    .instrument(http_span.clone())
-    .await
-    {
-        Ok(res) => res,
-        Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/traces/session/details",
-                    "500",
-                    &org_id,
-                    stream_type.as_str(),
-                    "",
-                    "",
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/traces/session/details",
-                    "500",
-                    &org_id,
-                    stream_type.as_str(),
-                    "",
-                    "",
-                ])
-                .inc();
-            log::error!("get session details trace ids error: {err:?}");
-            return map_error_to_http_response(&err, Some(trace_id));
+    // trace_id → sort timestamp, ordered like the legacy
+    // "ORDER BY zo_sql_timestamp DESC, trace_id ASC". The index timestamp is
+    // the trace's real start; on duplicates it wins over the window-clipped
+    // legacy value because it is inserted first.
+    let mut ordering: HashMap<String, i64> = HashMap::new();
+    if let Some(result) = &index_result {
+        for (tid, range) in &result.traces {
+            ordering.insert(tid.clone(), range.start_time);
         }
-    };
+    }
+    if legacy_needed && let Some(caller) = caller_range {
+        req.query.sql =
+            traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id, None);
+        req.query.from = 0;
+        // Enough rows to build the requested page after merging with the
+        // index-discovered traces.
+        req.query.size = from.saturating_add(size);
+        req.query.start_time = caller.start_time;
+        req.query.end_time = caller.end_time;
 
-    let trace_ids = traces::session::trace_ids_from_hits(&resp_search.hits);
+        let resp_search = match SearchService::cache::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            user_id_opt.clone(),
+            &req,
+            "".to_string(),
+            false,
+            None,
+            false,
+        )
+        .instrument(http_span.clone())
+        .await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/traces/session/details",
+                        "500",
+                        &org_id,
+                        stream_type.as_str(),
+                        "",
+                        "",
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/traces/session/details",
+                        "500",
+                        &org_id,
+                        stream_type.as_str(),
+                        "",
+                        "",
+                    ])
+                    .inc();
+                log::error!("get session details trace ids error: {err:?}");
+                return map_error_to_http_response(&err, Some(trace_id));
+            }
+        };
+
+        for hit in &resp_search.hits {
+            let Some(tid) = hit.get("trace_id").and_then(json::Value::as_str) else {
+                continue;
+            };
+            if tid.trim().is_empty() {
+                continue;
+            }
+            let ts = json::get_int_value(hit.get("zo_sql_timestamp").unwrap_or(&json::Value::Null));
+            ordering.entry(tid.to_string()).or_insert(ts);
+        }
+    }
+
+    let mut ordered: Vec<(String, i64)> = ordering.into_iter().collect();
+    ordered.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let trace_ids: Vec<String> = ordered
+        .into_iter()
+        .skip(from as usize)
+        .take(size as usize)
+        .map(|(tid, _)| tid)
+        .collect();
     if trace_ids.is_empty() {
         return MetaHttpResponse::json(PaginatedResponse {
             took: 0,
@@ -707,8 +727,9 @@ pub async fn get_session_details(
         &validated,
         has_ref_parent_id,
         has_infer,
-        start_time,
-        end_time,
+        effective_range.start_time,
+        // The index range is a closed interval; searches are half-open.
+        effective_range.end_time.saturating_add(1),
     )
     .instrument(http_span.clone())
     .await

@@ -101,38 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
-                        {{ t("pipeline.emptyValueGuideline") }}
-                        <span class="highlight text-text-link font-bold">{{ raw('""') }}</span
-                        >{{ t("pipeline.exampleColon") }}
-                        <span
-                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                          >{{ raw('app_name != ""') }}</span
-                        >
-                      </span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                      <OIcon
-                        name="info"
-                        size="sm"
-                        class="text-status-warning-text mt-0.5 shrink-0"
-                      />
-                      <span>
-                        {{ t("pipeline.nullValueGuideline") }}
-                        <span class="highlight text-text-link font-bold">{{ raw("null") }}</span
-                        >{{ t("pipeline.exampleColon") }}
-                        <span
-                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                          >{{ raw("app_name != null") }}</span
-                        >
-                      </span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                      <OIcon
-                        name="info"
-                        size="sm"
-                        class="text-status-warning-text mt-0.5 shrink-0"
-                      />
-                      <span>
                         {{ t("pipeline.customColumnGuideline") }}
                         <span class="highlight text-text-link font-bold">{{
                           t("pipeline.enterKey")
@@ -178,33 +146,12 @@ import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
-import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
-
-// V1 interfaces (legacy support)
-interface FilterCondition {
-  column: string;
-  operator: string;
-  value: any;
-  ignore_case: boolean;
-  id: string;
-}
-
-interface ConditionGroup {
-  // V2 properties
-  filterType?: "group";
-  logicalOperator?: "AND" | "OR";
-  conditions?: (FilterCondition | ConditionGroup)[];
-  // V1 properties (legacy)
-  groupId?: string;
-  label?: "and" | "or";
-  items?: (FilterCondition | ConditionGroup)[];
-}
 
 const { t } = useI18nTyped();
 
@@ -246,46 +193,11 @@ let parser: any;
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
-
-const getDefaultStreamRoute: any = () => {
-  if (pipelineObj.isEditNode) {
-    return pipelineObj.currentSelectedNodeData.data;
-  }
-  return {
-    name: "",
-    destination: {
-      org_id: "",
-      stream_name: "",
-      stream_type: "logs",
-    },
-    is_real_time: true,
-    query_condition: {
-      sql: "",
-      type: "sql",
-      aggregation: null,
-    },
-    trigger_condition: {
-      period: 15,
-      frequency_type: "minutes",
-      cron: "",
-      frequency: 15,
-      timezone: "UTC",
-    },
-    context_attributes: [
-      {
-        key: "",
-        value: "",
-        id: getUUID(),
-      },
-    ],
-    description: "",
-    enabled: true,
-  };
-};
 
 // The SHARED ConditionBuilder owns V0/V1 -> V2 conversion and the lowercase
 // operator normalization; pipelines just hand it the saved rule.
@@ -454,8 +366,8 @@ const openCancelDialog = () => {
     }
 
     dialog.value.show = true;
-    dialog.value.title = "Discard Changes";
-    dialog.value.message = "Are you sure you want to cancel condition changes?";
+    dialog.value.title = t("common.discardChanges");
+    dialog.value.message = t("pipeline.cancelConditionChangesConfirm");
     dialog.value.okCallback = closeDialog;
   } catch (e) {
     closeDialog();
@@ -512,8 +424,8 @@ const saveCondition = async () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNodeTitle");
+  dialog.value.message = t("pipeline.deleteStreamRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 

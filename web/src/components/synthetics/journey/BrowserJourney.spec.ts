@@ -16,8 +16,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 
+// `t` still returns the bare key — every existing assertion compares against one.
+// It is a spy as well so the interpolation params can be asserted, which is the
+// only place the step NUMBERS in a message are observable.
+const mockT = vi.fn((key: string, ..._args: unknown[]) => key);
 vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({ t: mockT }),
 }));
 
 // Validation raises toasts, so the call has to be observable. The real
@@ -1277,5 +1281,1059 @@ describe("BrowserJourney — incognito preflight failure", () => {
     // Error gone: the card collapses and the raw banner does not take its place.
     expect(wrapper.find('[data-test="synthetics-journey-incognito-warning"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
+  });
+});
+
+// ── Journey suggestions ───────────────────────────────────────────────────
+// The always-on advisory cards are gone; what is left is a derivation handed to
+// one collapsed surface, and a single action coming back.
+
+const JourneySuggestionsStub = {
+  props: ["suggestions"],
+  emits: ["action"],
+  template: `
+    <div
+      class="journey-suggestions-stub"
+      :data-count="suggestions.length"
+      :data-ids="suggestions.map((s) => s.id).join(',')"
+    >
+      <button class="suggestion-action" @click="$emit('action', 'add-assertion')" />
+    </div>`,
+};
+
+describe("BrowserJourney suggestions", () => {
+  let wrapper: VueWrapper;
+
+  const CLICK_STEP = { id: "s1", action: "click", name: "Sign In" };
+  const NAV_STEP = { id: "s0", action: "navigate", name: "Open app", value: "https://app.test" };
+
+  function mountWithSuggestions(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: [NAV_STEP, CLICK_STEP], ...props },
+      global: { stubs: { ...STUBS, JourneySuggestions: JourneySuggestionsStub } },
+    }) as VueWrapper;
+  }
+
+  const suggestionIds = (w: VueWrapper) =>
+    (w.find(".journey-suggestions-stub").attributes("data-ids") ?? "").split(",").filter(Boolean);
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  it("no longer renders the always-on advisory cards", () => {
+    wrapper = mountWithSuggestions();
+
+    expect(wrapper.find('[data-test="synthetics-journey-zero-assertion-notice"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="synthetics-journey-testid-misconfigured"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("hands the derived suggestions to the collapsed surface", () => {
+    wrapper = mountWithSuggestions();
+
+    expect(suggestionIds(wrapper)).toContain("zero-assertion");
+  });
+
+  it("offers nothing on a journey the author cannot change", () => {
+    wrapper = mountWithSuggestions({ readonly: true });
+
+    expect(wrapper.find(".journey-suggestions-stub").exists()).toBe(false);
+  });
+
+  it("appends the offered assertion to the tail, leaving the recording untouched", async () => {
+    wrapper = mountWithSuggestions();
+
+    await wrapper.find(".suggestion-action").trigger("click");
+
+    const emitted = wrapper.emitted("update:modelValue")?.[0]?.[0] as Array<
+      Record<string, unknown>
+    >;
+    expect(emitted).toHaveLength(3);
+    // Order and identity of what was recorded survive the insertion.
+    expect(emitted.slice(0, 2).map((s) => s.id)).toEqual(["s0", "s1"]);
+    expect(emitted[0]).toEqual(NAV_STEP);
+    expect(emitted[1]).toEqual(CLICK_STEP);
+    expect(emitted[2]).toMatchObject({
+      action: "assert",
+      assertion: { kind: "element_visible" },
+    });
+    expect(emitted[2].id).toBeTruthy();
+  });
+
+  it("drops the suggestion once the parent commits the new step", async () => {
+    wrapper = mountWithSuggestions();
+    await wrapper.find(".suggestion-action").trigger("click");
+
+    const emitted = wrapper.emitted("update:modelValue")?.[0]?.[0];
+    await wrapper.setProps({ modelValue: emitted });
+
+    expect(suggestionIds(wrapper)).not.toContain("zero-assertion");
+  });
+});
+
+// ── Variables panel toggle ────────────────────────────────────────────────
+// The toggle used to be a bare chevron square, which read as decoration next to
+// the labelled Add Step / Record / Replay buttons. It now carries the panel's
+// own name, so the label is part of the contract — not just the chevron.
+describe("BrowserJourney variables panel toggle", () => {
+  let wrapper: VueWrapper;
+
+  const TOGGLE = '[data-test="synthetics-journey-toggle-variables-btn"]';
+
+  // The shared OIconStub swallows `name`; this one surfaces it so the chevron
+  // direction can be asserted from the DOM (same shape as JourneySteps.spec.ts).
+  const OIconWithNameStub = {
+    props: ["name"],
+    template: '<i :data-icon-name="name" />',
+  };
+
+  function mountToolbar(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: [], ...props },
+      global: { stubs: { ...STUBS, OIcon: OIconWithNameStub } },
+    }) as VueWrapper;
+  }
+
+  const chevronOf = (w: VueWrapper) =>
+    w.find(`${TOGGLE} [data-icon-name]`).attributes("data-icon-name");
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  // vue-i18n is mocked to return the key, so the key IS the rendered text here.
+  it("should label the toggle with the variables panel's name", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(wrapper.find(TOGGLE).text()).toContain("synthetics.variablesPanel.title");
+  });
+
+  // The host owns the panel; without that prop there is meant to be no panel to
+  // toggle. Skipped because the guard cannot work as written, and this predates
+  // the label change: `variablesPanelOpen?: boolean` is a Boolean-typed prop, so
+  // Vue's boolean casting resolves an omitted value to `false`, never
+  // `undefined` — verified by reading $props on a mount with the prop omitted.
+  // `v-if="variablesPanelOpen !== undefined"` is therefore always true and the
+  // toggle renders for every host. Un-skip once the component distinguishes
+  // "no panel" some other way (e.g. `variablesPanelOpen?: boolean | undefined`
+  // declared with an explicit `default: undefined`, or a separate flag prop).
+  it.skip("should not render the toggle when the host provides no variables panel", () => {
+    wrapper = mountToolbar();
+
+    expect(wrapper.find(TOGGLE).exists()).toBe(false);
+  });
+
+  it("should render the toggle when the host provides a closed variables panel", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(wrapper.find(TOGGLE).exists()).toBe(true);
+  });
+
+  it("should emit toggle-variables-panel when pressed", async () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    await wrapper.find(TOGGLE).trigger("click");
+
+    // OButtonStub both $emits "click" and lets the native event through (it
+    // declares no `emits`), so one press registers twice. That it fires at all,
+    // with no payload, is the contract.
+    const emitted = wrapper.emitted("toggle-variables-panel")!;
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const call of emitted) expect(call).toEqual([]);
+  });
+
+  it("should point the chevron right — collapse — while the panel is open", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: true });
+
+    expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-right");
+  });
+
+  it("should point the chevron left — open — while the panel is closed", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-left");
+  });
+});
+
+// ── Restore-then-record and insertion (P2 / P3 / P4) ────────────────────────
+//
+// The three phases share one mechanism: an ANCHOR decides both what gets replayed to
+// restore state (everything before it) and where the recorded steps land. Record at the
+// end and inserting at step N are the same operation with a different anchor, which is
+// why they are tested together — a regression in one is a regression in both.
+//
+// See docs/synthetics/record-from-step-design.md §7.4-§7.6.
+describe("BrowserJourney restore-then-record", () => {
+  let wrapper: VueWrapper;
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+    { id: "s3", action: "click", name: "Open cart", selector: "#cart" },
+  ] as any[];
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+    // Declared at module scope, so it carries calls in from earlier describes.
+    mockToast.mockClear();
+    mockT.mockClear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  /** The command the composable last put on the bridge. */
+  function lastCommand(): any {
+    const calls = postMessageSpy.mock.calls;
+    for (let i = calls.length - 1; i >= 0; i--) {
+      const data = calls[i]?.[0];
+      if (data?.msg?.type === "synthetics-command") return data.msg.command;
+    }
+    return null;
+  }
+
+  async function clickRecord() {
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+  }
+
+  // P2. The whole point of the phase: appending to a non-empty journey must first put
+  // the browser where the last step left it, or the capture is taken against the start
+  // URL and every recorded locator belongs to the wrong screen.
+  it("should restore the journey before recording when steps already exist", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+
+    await clickRecord();
+
+    expect(lastCommand()?.action).toBe("startRecordingFrom");
+    expect(lastCommand()?.prefixSteps).toHaveLength(3);
+  });
+
+  // An empty journey has nothing to restore, so it must stay on the cheap path — no
+  // replay, no incognito round trip before the author can act.
+  it("should record from scratch when the journey is empty", async () => {
+    wrapper = mountJourney({ modelValue: [], extensionReady: true, canRecordFrom: true });
+
+    await clickRecord();
+
+    expect(lastCommand()?.action).toBe("startRecording");
+  });
+
+  // Graceful degradation: an extension that predates the command must still be able to
+  // record. Sending startRecordingFrom to it would be refused and the button would do
+  // nothing, which is worse than the old, imperfect behaviour.
+  it("should fall back to plain recording when the extension cannot restore", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: false });
+
+    await clickRecord();
+
+    expect(lastCommand()?.action).toBe("startRecording");
+  });
+
+  // The fallback records on a browser that knows nothing about the prefix, so those
+  // steps cannot be filed where a restore would have put them. The row action is
+  // disabled without the capability, which is what the author sees; this is the
+  // guarantee behind it, so a future caller cannot reintroduce the mid-journey splice.
+  it("should append, not insert, when an anchored record falls back to plain recording", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: false });
+
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+
+    expect(lastCommand()?.action).toBe("startRecording");
+
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#consent", name: "Accept cookies" }],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next).toHaveLength(4);
+    expect(next[0].id).toBe("s1");
+    expect(next[1].id).toBe("s2");
+    expect(next[2].id).toBe("s3");
+    expect(next[3].name).toBe("Accept cookies");
+  });
+
+  // P2 commit. Anchored at the end, the recorded steps land after everything.
+  it("should append recorded steps when the anchor is the end of the journey", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await clickRecord();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/cart",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#checkout", name: "Checkout" }],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next.map((s) => s.id)).toEqual(["s1", "s2", "s3", expect.any(String)]);
+  });
+
+  // P3 commit — the same machinery, anchored mid-journey. The recorded step must land
+  // BEFORE the anchor, and the anchor keeps its identity while shifting down.
+  it("should insert recorded steps before the anchor step", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+
+    // Only the steps BEFORE the anchor are replayed: the anchor has not happened yet.
+    expect(lastCommand()?.action).toBe("startRecordingFrom");
+    expect(lastCommand()?.prefixSteps).toHaveLength(2);
+
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#consent", name: "Accept cookies" }],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next).toHaveLength(4);
+    expect(next[0].id).toBe("s1");
+    expect(next[1].id).toBe("s2");
+    expect(next[2].name).toBe("Accept cookies");
+    expect(next[3].id).toBe("s3");
+  });
+
+  // ── "N steps added — steps X–Y" ─────────────────────────────────────────────
+  //
+  // The only feedback a finished recording gives. The author spent it in the
+  // extension's incognito window, so the steps land in a table they were not
+  // looking at — nothing flashes, scrolls or marks the rows. See
+  // docs/synthetics/recorded-steps-toast.md.
+
+  /** The interpolation params the added-steps message was last built with. */
+  function addedToastParams(): Record<string, unknown> | undefined {
+    const calls = mockT.mock.calls as unknown as unknown[][];
+    const call = [...calls].reverse().find((c) => c[0] === "synthetics.journey.recordedStepsAdded");
+    return call?.[1] as Record<string, unknown> | undefined;
+  }
+
+  /** Feed `names` in as captured steps on an already-started recording. */
+  function captureSteps(names: string[]) {
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/cart",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: names.map((name, i) => ({
+        id: `n${i + 1}`,
+        action: "click",
+        selector: `#${i}`,
+        name,
+      })),
+    });
+  }
+
+  // Appended at the end of a 3-step journey, two recorded steps become 4 and 5.
+  it("should announce the numbers an appended recording takes", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await clickRecord();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    captureSteps(["Checkout", "Pay"]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "success",
+      message: "synthetics.journey.recordedStepsAdded",
+    });
+    expect(addedToastParams()).toEqual({ count: 2, first: 4, last: 5 });
+  });
+
+  // Anchored before step 3, a single recorded step IS step 3 — the number the
+  // anchor held a moment ago, which is why the message names the new range and
+  // not the anchor.
+  it("should announce the numbers an anchored recording takes", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    captureSteps(["Accept cookies"]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(addedToastParams()).toEqual({ count: 1, first: 3, last: 3 });
+  });
+
+  // The extension window being closed commits through the same path as the Stop
+  // button. Hung off the button instead, this recording would have been silent.
+  it("should announce steps committed by an external stop", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await clickRecord();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    captureSteps(["Checkout"]);
+    await flushPromises();
+
+    emitStreamEvent({ method: "recordingStopped" });
+    await flushPromises();
+
+    expect(addedToastParams()).toEqual({ count: 1, first: 4, last: 4 });
+  });
+
+  // Nothing was captured, so nothing was added. A message claiming otherwise —
+  // or a "0 steps added" — is worse than the silence.
+  it("should stay silent when a recording captured nothing", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await clickRecord();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    // The session is live — the author just never acted in it.
+    captureSteps([]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+});
+
+// ── When a restore does not reach the recording point ──────────────────────
+//
+// A restore ends early for two quite different reasons, and the surface has to
+// tell them apart. Closing the recorder window is how an author walks away from
+// a restore — reported as "step 9 failed" it blames the journey for a deliberate
+// act, and leaves a banner nobody can act on next to a marker that never lifts.
+
+// Surfaces the marker and the lock in the DOM, so the anchor's lifetime can be
+// asserted without the real table.
+const JourneyStepsStubWithAnchor = {
+  props: ["data", "anchorId", "locked", "disableRowReorder", "selectionEnabled"],
+  template: `
+    <div
+      class="journey-steps-stub"
+      :data-anchor="anchorId ?? ''"
+      :data-locked="String(!!locked)"
+      :data-drag-locked="String(!!(disableRowReorder && disableRowReorder()))"
+      :data-selectable="String(!!selectionEnabled)"
+    >
+      <div v-for="item in data" :key="item.id" class="step-row">{{ item.name }}</div>
+    </div>`,
+};
+
+describe("BrowserJourney — a restore that never reached the recording point", () => {
+  let wrapper: VueWrapper;
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+    { id: "s3", action: "click", name: "Open cart", selector: "#cart" },
+  ] as any[];
+
+  const WINDOW_CLOSED = {
+    method: "prefixFailed",
+    stepId: "s2",
+    error: "crxRecorder.runActions: Target page, context or browser has been closed",
+    structuredError: { message: "…", name: "TargetClosedError" },
+  };
+
+  const STEP_FAILED = {
+    method: "prefixFailed",
+    stepId: "s2",
+    error: "locator.click: Timeout 30000ms exceeded",
+    structuredError: { message: "…", name: "TimeoutError" },
+  };
+
+  function mountAnchored(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: {
+        modelValue: journey,
+        extensionReady: true,
+        canRecordFrom: true,
+        canRecordFromFailure: true,
+        ...props,
+      },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithAnchor } },
+    }) as VueWrapper;
+  }
+
+  /** The command the composable last put on the bridge. */
+  function lastCommand(): any {
+    const calls = postMessageSpy.mock.calls;
+    for (let i = calls.length - 1; i >= 0; i--) {
+      const data = calls[i]?.[0];
+      if (data?.msg?.type === "synthetics-command") return data.msg.command;
+    }
+    return null;
+  }
+
+  /** Anchor on step 3 and get as far as the prefix replaying. */
+  async function startAnchoredRestore(w: VueWrapper) {
+    await w.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+  }
+
+  /** Answer the start command the way the extension does after a prefix failure. */
+  async function failWith(payload: Record<string, unknown>) {
+    emitStreamEvent(payload);
+    respondToLastCommand({ success: false, error: payload.error });
+    await flushPromises();
+  }
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+    mockToast.mockClear();
+    mockT.mockClear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  // The screenshot this work started from: a warning banner blaming a step, a raw
+  // Playwright string under it, and a marker still sitting on the anchor.
+  it("should say the recording was cancelled when the window was closed", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+
+    await failWith(WINDOW_CLOSED);
+
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "info",
+      message: "synthetics.journey.restoreCancelledWindowClosed",
+    });
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
+  });
+
+  /**
+   * The marker is a promise about where the next steps land. Left up after the
+   * session died it becomes a lie — and the toolbar's Record reads the same anchor,
+   * so the next recording would splice itself into the middle of the journey with
+   * nothing on screen saying so.
+   */
+  it("should lift the recording marker when the window was closed", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("s3");
+
+    await failWith(WINDOW_CLOSED);
+
+    expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("");
+  });
+
+  // Nothing was captured, so nothing may be committed — a cancel that quietly
+  // added steps would be worse than the banner it replaces.
+  it("should commit nothing when the window was closed", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+
+    await failWith(WINDOW_CLOSED);
+
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  /**
+   * The contract with the extension build that names the cause itself.
+   *
+   * It watched the window go away, so its word beats anything read out of an
+   * exception — and it is the only side that can tell a closed window from a step
+   * that could not run, since both reach the player as the same rejected action.
+   */
+  it("should take the extension's word for it when the extension names the cause", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+
+    // No TargetClosedError, nothing in the text to go on — only the reason.
+    await failWith({
+      method: "prefixFailed",
+      stepId: "s2",
+      error: "crxRecorder.runActions: Stopped",
+      reason: "window-closed",
+    });
+
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "info",
+      message: "synthetics.journey.restoreCancelledWindowClosed",
+    });
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed"]').exists()).toBe(false);
+  });
+
+  // ── A step that genuinely failed ─────────────────────────────────────────
+  //
+  // This one keeps its banner: something in the journey is broken and the author
+  // has to decide what to do about it. What it gains is the two ways out design
+  // §7.2 specified and the template never grew.
+
+  it("should keep the banner when a step genuinely failed", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+
+    await failWith(STEP_FAILED);
+
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed"]').exists()).toBe(true);
+    // A banner and a toast for one event is the stacking this work exists to stop.
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it("should not repeat the failure as a raw error banner underneath", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+
+    await failWith(STEP_FAILED);
+
+    expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
+  });
+
+  /**
+   * The browser is still sitting where step 2 stopped, so recording can start there
+   * without replaying anything again (design §7.6). The anchor moves to the failing
+   * step, which is where those steps will land.
+   */
+  it("should record from where the failing step stopped", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    await failWith(STEP_FAILED);
+
+    await wrapper
+      .find('[data-test="synthetics-journey-prefix-failed-record-btn"]')
+      .trigger("click");
+    await flushPromises();
+
+    expect(lastCommand()?.action).toBe("recordFromHere");
+    expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("s2");
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed"]').exists()).toBe(false);
+  });
+
+  // The recovery is only worth anything if what it captures lands where the marker
+  // says it will — before the step that could not run.
+  it("should insert the recovered steps before the step that failed", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    await failWith(STEP_FAILED);
+
+    await wrapper
+      .find('[data-test="synthetics-journey-prefix-failed-record-btn"]')
+      .trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#consent", name: "Accept cookies" }],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next.map((s) => s.name)).toEqual(["Open app", "Accept cookies", "Sign in", "Open cart"]);
+  });
+
+  // Cancel is the other half: the author reads the error and goes back to editing.
+  // It must leave nothing behind — no banner, no marker for a dead session.
+  it("should clear the failure and the marker from Cancel", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    await failWith(STEP_FAILED);
+
+    await wrapper
+      .find('[data-test="synthetics-journey-prefix-failed-cancel-btn"]')
+      .trigger("click");
+
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed"]').exists()).toBe(false);
+    expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("");
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  /**
+   * Recording before step 1 would leave the journey starting with something other
+   * than a navigate, which `validateJourneySteps` rejects — the same guardrail the
+   * row button carries. Cancel is still offered; there is simply nowhere to record.
+   */
+  it("should not offer to record before the first step", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+
+    await failWith({ ...STEP_FAILED, stepId: "s1" });
+
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed-record-btn"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed-cancel-btn"]').exists()).toBe(
+      true,
+    );
+  });
+
+  // An extension that cannot record on an open session would answer the command
+  // with a refusal, so the button must not be there to press.
+  it("should not offer the recovery to an extension that cannot do it", async () => {
+    wrapper = mountAnchored({ canRecordFromFailure: false });
+    await startAnchoredRestore(wrapper);
+
+    await failWith(STEP_FAILED);
+
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed-record-btn"]').exists()).toBe(
+      false,
+    );
+  });
+
+  // ── The toolbar's Record means the end of the journey ────────────────────
+  //
+  // The anchor is one piece of state read by both record affordances, so an anchor
+  // outliving its session turns the next plain Record into a silent mid-journey
+  // insert. Nothing on screen would say so.
+
+  it("should record at the end even after an anchored session left a marker", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    await failWith(STEP_FAILED);
+
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#pay", name: "Pay" }],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next.map((s) => s.name)).toEqual(["Open app", "Sign in", "Open cart", "Pay"]);
+  });
+
+  // ── While the restore is running ─────────────────────────────────────────
+
+  /**
+   * The reason authors close the window: it was the only way out. A restore can run
+   * for a minute a step, and until there was a Cancel the recorder window was the
+   * only thing on screen that would end it.
+   */
+  it("should offer a way out while the restore is still running", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="synthetics-journey-restoring-banner"]').exists()).toBe(true);
+    await wrapper.find('[data-test="synthetics-journey-restore-cancel-btn"]').trigger("click");
+
+    expect(lastCommand()?.action).toBe("stopReplay");
+    expect(wrapper.find('[data-test="synthetics-journey-restoring-banner"]').exists()).toBe(false);
+    expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("");
+  });
+
+  /** The interpolation params the restore banner was last built with. */
+  function restoringBannerParams(): Record<string, unknown> | undefined {
+    const calls = mockT.mock.calls as unknown as unknown[][];
+    const call = [...calls].reverse().find((c) => c[0] === "synthetics.journey.restoringState");
+    return call?.[1] as Record<string, unknown> | undefined;
+  }
+
+  /**
+   * The banner is the only account of a restore the author gets — the work itself
+   * happens in a window they are watching instead of this one. Frozen at "step 0 of
+   * N" it reads as a restore that has hung, while the recorder window is visibly
+   * progressing.
+   */
+  it("should count the restore's progress in the banner", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    expect(restoringBannerParams()).toEqual({ done: 0, total: 2 });
+
+    emitStreamEvent({ method: "stepReplayResult", stepId: "s1", passed: true, duration_ms: 10 });
+    await flushPromises();
+
+    expect(restoringBannerParams()).toEqual({ done: 1, total: 2 });
+  });
+
+  /**
+   * The reported bug. Cancel is pressed while the start command is still outstanding
+   * — the only state it can be pressed in — and the session teardown force-resolves
+   * that command, so its continuation reports "Failed to start recording." against
+   * the button the author pressed to stop things.
+   */
+  it("should not claim a failure when the author cancels the restore", async () => {
+    wrapper = mountAnchored();
+    // Deliberately unanswered: the extension replies only when the prefix finishes.
+    await startAnchoredRestore(wrapper);
+
+    await wrapper.find('[data-test="synthetics-journey-restore-cancel-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
+  });
+
+  /**
+   * A cancel O2 asked for comes back as a `prefixFailed`, because stopping the
+   * player makes the in-flight action throw. Rendering that would replace the
+   * banner the author just dismissed with a worse one.
+   */
+  it("should stay quiet when the extension reports the cancel it was asked for", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-restore-cancel-btn"]').trigger("click");
+    emitStreamEvent({ method: "prefixFailed", stepId: "s2", error: "Stopped" });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Delete must be unavailable while anything is running, by whichever route the
+   * table is on screen. The lock is what disables it (JourneySteps disables every row
+   * action on `locked`), so these pin the lock itself for each state — a replay, a
+   * restore, and a recording, which swaps in the live-capture table entirely.
+   */
+  it("should lock the step rows while a replay runs", async () => {
+    wrapper = mountAnchored({ replayPhase: "running" });
+
+    expect(wrapper.find(".journey-steps-stub").attributes("data-locked")).toBe("true");
+  });
+
+  it("should lock the step rows while a recording runs", async () => {
+    wrapper = mountAnchored({ modelValue: [] });
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({ method: "recordingStarted", tabId: 1, url: "https://app.test/" });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#a", name: "Click" }],
+    });
+    await flushPromises();
+
+    // The live-capture table is a different instance of the same component, and it is
+    // locked outright — the journey being captured is not editable mid-capture.
+    expect(wrapper.find(".journey-steps-stub").attributes("data-locked")).toBe("true");
+  });
+
+  /**
+   * Design §7.6's hazard: a second anchor started while a session is live. The row
+   * actions already have a lock — the restore simply was not part of it, because it
+   * runs on this component's own recorder rather than the parent's replay.
+   */
+  it("should lock the step rows while the restore runs", async () => {
+    wrapper = mountAnchored();
+    expect(wrapper.find(".journey-steps-stub").attributes("data-locked")).toBe("false");
+
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(wrapper.find(".journey-steps-stub").attributes("data-locked")).toBe("true");
+  });
+
+  /**
+   * Reordering mid-restore edits the journey the restore is anchored in: the prefix
+   * being replayed is `slice(0, insertAt)` of a list that just changed underneath it,
+   * so the steps that land are spliced against an index that no longer means what it
+   * did when the restore started.
+   */
+  it("should not let rows be dragged while the restore runs", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(wrapper.find(".journey-steps-stub").attributes("data-drag-locked")).toBe("true");
+  });
+
+  /**
+   * A restore is the journey running. Adding a step to it mid-flight edits the list
+   * the restore is anchored in — the same reason the rows are locked — and starting a
+   * replay would ask for a second session while this one holds the incognito slot.
+   *
+   * Disabled rather than hidden, so the toolbar keeps its shape and the author can see
+   * what will be available again when the restore ends.
+   */
+  /**
+   * The row's own Delete is disabled by the lock, but it is not the only way to
+   * delete: ticking rows hands the parent a bulk Delete in its sticky footer, and
+   * that path had no restore guard at all. Deleting mid-restore edits the very list
+   * the restore is anchored in — `insertAt` then points somewhere else by the time
+   * the capture is spliced.
+   *
+   * Recording and a running replay were already excluded here; only the restore was
+   * missed, because it runs on this component's own recorder rather than the
+   * parent's replay phase.
+   */
+  it("should not allow steps to be selected for deletion while the restore runs", async () => {
+    wrapper = mountAnchored();
+    expect(wrapper.find(".journey-steps-stub").attributes("data-selectable")).toBe("true");
+
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(wrapper.find(".journey-steps-stub").attributes("data-selectable")).toBe("false");
+  });
+
+  it("should not offer Add Step while the restore runs", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const addStep = wrapper.find('[data-test="synthetics-journey-add-step-btn"]');
+    expect(addStep.exists(), "Add Step disappeared instead of being disabled").toBe(true);
+    expect(addStep.attributes("disabled")).toBeDefined();
+  });
+
+  it("should not offer Replay while the restore runs", async () => {
+    wrapper = mountAnchored({ replayPhase: "idle" });
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const replay = wrapper.find('[data-test="synthetics-journey-replay-btn"]');
+    expect(replay.exists(), "Replay disappeared instead of being disabled").toBe(true);
+    expect(replay.attributes("disabled")).toBeDefined();
+  });
+
+  /**
+   * The same button, reached through its other branch: a previous replay that has
+   * finished leaves the toolbar showing Re-run, which had no disabled binding at all.
+   */
+  it("should not offer Re-run while the restore runs", async () => {
+    wrapper = mountAnchored({ replayPhase: "passed" });
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(
+      wrapper.find('[data-test="synthetics-journey-replay-btn"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  it("should not offer Record while the restore runs", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(
+      wrapper.find('[data-test="synthetics-journey-record-btn"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  /**
+   * Navigating away used to leave the restore running in a window nothing was
+   * listening to. The route guard asks this component to stop what it is doing;
+   * a restore is one of the things it is doing.
+   */
+  it("should stop a running restore when the route guard asks", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect((wrapper.vm as any).stopActiveReplay()).toBe(true);
+    expect(lastCommand()?.action).toBe("stopReplay");
   });
 });

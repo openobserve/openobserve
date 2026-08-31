@@ -532,13 +532,7 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
       // Second toggle: resumes the pipeline → ResumePipelineDialog opens
       toggleSwitch = await pipelinePage.openPipelineRowMenuAndGetToggle(pipelineName);
       await toggleSwitch.click();
-      const resumeDialog = page.locator('[data-test="resume-pipeline-dialog"]');
-      if (await resumeDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
-        const resumePrimaryBtn = resumeDialog.locator('[data-test="o-dialog-primary-btn"]');
-        await resumePrimaryBtn.click();
-        await page.waitForTimeout(500);
-        testLogger.info('Resume dialog confirmed');
-      }
+      await pipelinePage.confirmResumePipelineDialog();
       testLogger.info('Pipeline toggle functionality verified');
     } catch (e) {
       testLogger.info('Toggle control not reachable via more-options menu', { error: e?.message });

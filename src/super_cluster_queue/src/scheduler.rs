@@ -22,7 +22,7 @@ use config::{
 #[allow(clippy::single_component_path_imports)]
 use db;
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_ro,
     errors::{Error, Result},
     scheduler,
 };
@@ -105,7 +105,7 @@ async fn update(msg: Message) -> Result<()> {
     }
     // First check if the module record exists in this region, to verify that the module record
     // is not deleted.
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     match trigger.module {
         TriggerModule::Alert => {
             let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) else {
@@ -255,6 +255,28 @@ async fn update(msg: Message) -> Result<()> {
             } else {
                 log::warn!(
                     "[SUPER_CLUSTER:sync] Anomaly detection config not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+            }
+        }
+        TriggerModule::CompositeAlert => {
+            // Only sync if the composite alert still exists in this region.
+            if infra::table::alert_composites::get_by_id(conn, &trigger.org, &trigger.module_key)
+                .await
+                .unwrap_or(None)
+                .is_some()
+            {
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
+                    );
+                    log::error!("{error_msg}");
+                    anyhow::anyhow!(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] Composite alert not found for module_key: {}. No need to sync this trigger",
                     trigger.module_key
                 );
             }

@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                    class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 text-xs font-semibold no-underline transition-[background]"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -158,27 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-
-          <!-- Field Mapping Dialog -->
-          <ODialog
-            data-test="service-identity-setup-field-mapping-dialog"
-            v-model:open="showFieldMappingDialog"
-            size="sm"
-            :title="t('settings.correlation.customizeFieldMappings')"
-            :sub-title="t('settings.correlation.fieldMappingDialogHelp')"
-            :secondary-button-label="t('common.cancel')"
-            :primary-button-label="t('common.save')"
-            :primary-button-loading="savingFieldMappings"
-            @click:secondary="showFieldMappingDialog = false"
-            @click:primary="saveFieldMappings"
-          >
-            <OTagInput
-              :model-value="editableServiceFields"
-              @update:model-value="editableServiceFields = $event"
-              :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
-              :label="raw('')"
-            />
-          </ODialog>
 
           <!-- Service Optional toggle -->
           <div data-test="service-identity-service-optional" class="mb-3">
@@ -469,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="mb-3 text-xs" :class="'text-text-secondary'">
                 {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                 <a
-                  class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                  class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background]"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
                   >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</a
                 >
@@ -575,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-xs" :class="'text-text-secondary'">
             {{ t("settings.serviceIdentitySetup.discoveredPatternsHelp") }}
             <a
-              class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+              class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background]"
               @click.prevent="emit('navigate-to-services')"
               >{{ t("settings.serviceIdentitySetup.goToServices") }}</a
             >
@@ -1147,11 +1126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
-import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1173,19 +1150,13 @@ import type {
   FieldAlias,
   ServiceFieldSource,
 } from "@/services/service_streams";
-import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
+import { groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface DetectedEnvironment {
-  environment_type: string;
-  description: I18nText;
-  evidence_groups: string[];
-}
 
 interface SuggestedConfig {
   distinguish_by: string[];
@@ -1201,7 +1172,6 @@ const props = defineProps<{
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
-const store = useStore();
 const { isDark: isDarkTheme } = useTheme();
 const { t } = useI18nTyped();
 
@@ -1258,15 +1228,11 @@ const suggestionAlreadyApplied = computed(() => {
   return suggested.length === current.length && suggested.every((v, i) => v === current[i]);
 });
 
-/** Display label for the active environment tab */
-const activeEnvLabel = computed(() => getIdentitySetLabel(activeEnvironment.value));
-
 /** Field Details Dialog State */
 const detailsDialogVisible = ref(false);
 const selectedField = ref<FoundGroup | null>(null);
 /** When set, the popup right pane highlights this value and scrolls to it */
 const preselectedValue = ref<string>("");
-const valuesScrollContainer = ref<HTMLElement | null>(null);
 /** Selected value per column index in the N-1 hierarchy columns */
 const popupColumnSelections = ref<(string | null)[]>([]);
 /** Selected value for the primary (title-level) dimension */
@@ -1314,20 +1280,6 @@ const trackedAliasIds = ref<string[]>([]);
 
 /** When true, correlation matches streams without requiring the `service` dimension */
 const serviceOptional = ref<boolean>(false);
-
-// Computed value for the right pane based on selected stream
-const activeStreamValues = computed(() => {
-  if (
-    !selectedFieldAnalytics.value?.sample_values ||
-    !activeStreamId.value ||
-    !activeStreamType.value
-  ) {
-    return [];
-  }
-  return (
-    selectedFieldAnalytics.value.sample_values[activeStreamType.value]?.[activeStreamId.value] || []
-  );
-});
 
 /** Active environment tab - auto-selects first detected environment */
 const activeEnvironment = ref<string>("");
@@ -1465,29 +1417,7 @@ const workloadDetectedGroups = computed(() => {
 const emit = defineEmits<{
   (e: "navigate-to-aliases", groupId: string): void;
   (e: "navigate-to-services"): void;
-  (e: "update-service-fields", fields: string[]): void;
 }>();
-
-// ─── Field Mapping Dialog ────────────────────────────────────────────────────
-
-const showFieldMappingDialog = ref(false);
-const editableServiceFields = ref<string[]>([]);
-const savingFieldMappings = ref(false);
-
-function openFieldMappingDialog() {
-  editableServiceFields.value = [...allServiceFieldNames.value];
-  showFieldMappingDialog.value = true;
-}
-
-async function saveFieldMappings() {
-  savingFieldMappings.value = true;
-  try {
-    emit("update-service-fields", editableServiceFields.value);
-    showFieldMappingDialog.value = false;
-  } finally {
-    savingFieldMappings.value = false;
-  }
-}
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 
@@ -1495,8 +1425,6 @@ async function saveFieldMappings() {
 const serviceGroup = computed<FoundGroup | undefined>(() =>
   availableGroups.value.find((g) => g.group_id === "service"),
 );
-const serviceGroupDisplay = computed(() => serviceGroup.value?.display ?? "Service");
-const serviceGroupStreamTypes = computed(() => serviceGroup.value?.stream_types ?? []);
 
 /** Service name banner: expanded/collapsed toggle */
 const serviceNameExpanded = ref(false);
@@ -1656,21 +1584,6 @@ function openInsightDialog(value: string, level: "primary" | "secondary" | "tert
   });
 }
 
-/** When a dimension pill is clicked inside the insight dialog, filter the next column */
-function selectDimValue(dimIdx: number, value: string) {
-  const current = { ...insightSelectedDim.value };
-  if (current[dimIdx] === value) {
-    // Already selected — do nothing (no deselect)
-    return;
-  }
-  current[dimIdx] = value;
-  // Clear downstream selections
-  for (const k of Object.keys(current)) {
-    if (Number(k) > dimIdx) delete current[Number(k)];
-  }
-  insightSelectedDim.value = current;
-}
-
 /** Get filtered values for a dimension column based on upstream selections.
  *  Uses the same approach as getPopupColumnValues — queries dimensionAnalytics directly. */
 function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
@@ -1695,32 +1608,17 @@ function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
   return dim.values;
 }
 
-/** Format a list of labels into proper English: "A", "A or B", "A, B, or C" */
-function formatSelectableLabels(dims: any[]): string {
-  const labels = dims.slice(0, -1).map((d: any) => d.label);
-  if (labels.length === 0) return "";
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} or ${labels[1]}`;
-  return labels.slice(0, -1).join(", ") + ", or " + labels[labels.length - 1];
-}
-
 /** Format all dimension labels into proper English: "A", "A and B", "A, B, and C" */
 function formatDimLabels(dims: any[]): string {
   const labels = dims.map((d: any) => d.label);
   if (labels.length === 0) return "";
   if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
-}
-
-/** Returns inline style for selected dimension pill — subtle primary highlight */
-function getDimSelectedStyle(_color: string): Record<string, string> {
-  return {
-    backgroundColor: isDarkTheme.value ? "rgba(59,130,246,0.15)" : "rgba(59,130,246,0.1)",
-    borderColor: isDarkTheme.value ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.4)",
-    color: isDarkTheme.value ? "#93c5fd" : "#1d4ed8",
-    fontWeight: "600",
-  };
+  if (labels.length === 2)
+    return t("settings.listConjunctionAndTwo", { first: labels[0], last: labels[1] });
+  return t("settings.listConjunctionAnd", {
+    list: labels.slice(0, -1).join(", "),
+    last: labels[labels.length - 1],
+  });
 }
 
 /** Build insight data for the currently open popup */
@@ -1910,7 +1808,9 @@ const insightData = computed(() => {
       count,
       total,
       childLabel: primaryDim.value
-        ? `Found in ${pluralize(primaryDim.value.display).toLowerCase()}`
+        ? t("settings.serviceIdentitySetup.foundIn", {
+            dimension: pluralize(primaryDim.value.display).toLowerCase(),
+          })
         : "",
       childCountLabel: "",
       children: parents.map((p) => ({ name: p, count: 0 })),
@@ -1990,7 +1890,7 @@ const insightData = computed(() => {
     coverage,
     count,
     total,
-    childLabel: "Runs in",
+    childLabel: t("settings.runsIn"),
     childCountLabel: "",
     children: [] as { name: string; count: number }[],
     maxChildCount: 1,
@@ -2019,15 +1919,6 @@ const insightRelatedDimensions = computed<RelatedDimension[]>(() => {
 });
 
 /** Chart data for insight dialog — stream contribution donut */
-/** Dynamic panel width based on number of related dimension columns */
-const insightPanelWidth = computed(() => {
-  const dims = (insightData.value as any)?.relatedDimensions;
-  const colCount = dims?.length ?? 0;
-  if (colCount <= 2) return "30rem";
-  if (colCount === 3) return "40rem";
-  return "50rem"; // 4+
-});
-
 const insightPanelWidthPct = computed(() => {
   const dims = (insightData.value as any)?.relatedDimensions;
   const colCount = dims?.length ?? 0;
@@ -2073,7 +1964,16 @@ const insightChartData = computed(() => {
         extraCssText: "max-height: 15rem; overflow-y: auto;",
         formatter: function (params: any) {
           const names: string[] = params.data?.streamNames ?? [];
-          const header = `${params.marker} ${params.name} : <b>${params.value} streams (${params.percent}%)</b>`;
+          // The marker (echarts' own colour swatch) and the <b> wrapper stay in
+          // code; the messages carry only words and placeholders.
+          const stats = t("settings.serviceIdentitySetup.streamCountStats", {
+            count: params.value,
+            percent: params.percent,
+          });
+          const header = `${params.marker} ${t("settings.serviceIdentitySetup.streamCountTooltip", {
+            name: params.name,
+            stats: `<b>${stats}</b>`,
+          })}`;
           if (!names.length) return header;
           const list = names
             .map(
@@ -2123,7 +2023,7 @@ const insightChartData = computed(() => {
                   textAlign: "center",
                 },
                 subtextStyle: {
-                  text: "streams",
+                  text: t("settings.serviceIdentitySetup.streamsSubtext"),
                   fontSize: 10,
                 },
               },
@@ -2163,14 +2063,6 @@ const allServiceFieldNames = computed<string[]>(() => {
 const unseenServiceFields = computed<string[]>(() => {
   const detectedNames = new Set(detectedServiceFields.value.map((f) => f.name));
   return allServiceFieldNames.value.filter((f) => !detectedNames.has(f));
-});
-
-/** Summary text for collapsed banner: first 2 field names + "+N more" */
-const serviceFieldSummary = computed(() => {
-  const fields = detectedServiceFields.value;
-  const shown = fields.slice(0, 2).map((f) => f.name);
-  const remaining = fields.length - shown.length + unseenServiceFields.value.length;
-  return { shown, remaining };
 });
 
 /** Whether service name field is detected in any stream */
@@ -2248,47 +2140,6 @@ const totalServices = computed(() => {
  * Detect environment and suggest fields based on available data, driven by the
  * active environment tab.
  */
-const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
-  if (!activeEnvironment.value) return null;
-
-  const env = activeEnvironment.value;
-  let envType = "General";
-  let evidenceGroups: string[] = [];
-
-  if (env === "kubernetes" || env === "k8s") {
-    envType = "Kubernetes";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("k8s-"))
-      .map((g) => g.group_id);
-  } else if (env === "aws") {
-    const isEcs = activeEnvGroups.value.some((g) => g.group_id.startsWith("aws-ecs-"));
-    envType = isEcs ? "AWS ECS" : "AWS";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("aws-"))
-      .map((g) => g.group_id);
-  } else if (env === "gcp") {
-    envType = "GCP";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("gcp-"))
-      .map((g) => g.group_id);
-  } else if (env === "azure") {
-    envType = "Azure";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("azure-"))
-      .map((g) => g.group_id);
-  }
-
-  return {
-    environment_type: envType,
-    description: t("settings.serviceIdentitySetup.envFieldsDetected", { env: envType }),
-    evidence_groups: evidenceGroups.slice(0, 3),
-  };
-});
-
-/**
- * Detect environment and suggest fields based on available data, driven by the
- * active environment tab.
- */
 const suggestedConfig = computed<SuggestedConfig | null>(() => {
   if (!activeEnvironment.value || suggestionDismissed.value) return null;
 
@@ -2349,12 +2200,20 @@ const suggestedConfig = computed<SuggestedConfig | null>(() => {
     ),
   ];
 
+  // Each clause is a whole translated phrase; only the "·" list separator is
+  // assembled here, never a sentence built from translated fragments.
   const parts: string[] = [];
-  if (bestCard) parts.push(`${bestCard} cardinality`);
-  if (minCoverage > 0) parts.push(`${minCoverage}% coverage`);
+  if (bestCard)
+    parts.push(t("settings.serviceIdentitySetup.reasonCardinality", { level: bestCard }));
+  if (minCoverage > 0)
+    parts.push(t("settings.serviceIdentitySetup.reasonCoverage", { coverage: minCoverage }));
   if (allStreamTypes.length > 1) {
     parts.push(
-      `across ${allStreamTypes.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(", ")}`,
+      t("settings.serviceIdentitySetup.reasonAcrossStreamTypes", {
+        types: allStreamTypes
+          .map((streamType) => streamType.charAt(0).toUpperCase() + streamType.slice(1))
+          .join(", "),
+      }),
     );
   }
 
@@ -2362,8 +2221,10 @@ const suggestedConfig = computed<SuggestedConfig | null>(() => {
     distinguish_by: suggested,
     reason:
       parts.length > 0
-        ? `${parts.join(" · ")} — ideal for service disambiguation`
-        : "Recommended based on field coverage in your streams.",
+        ? t("settings.serviceIdentitySetup.reasonIdealForDisambiguation", {
+            details: parts.join(" · "),
+          })
+        : t("settings.recommendedByFieldCoverage"),
   };
 });
 
@@ -2408,21 +2269,6 @@ const rankedDims = computed<FoundGroup[]>(() => {
 const primaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[0]);
 const secondaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[1]);
 const tertiaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[2]);
-
-/**
- * Hierarchy label, e.g. "K8S CLUSTER → K8S NAMESPACE → K8S DEPLOYMENT"
- */
-const hierarchyLabel = computed<string | null>(() => {
-  const p = primaryDim.value;
-  const s = secondaryDim.value;
-  const t = tertiaryDim.value;
-  if (!p) return null;
-  const pLabel = p.display.toUpperCase();
-  if (!s) return pLabel;
-  const sLabel = s.display.toUpperCase();
-  if (!t) return `${pLabel} → ${sLabel}`;
-  return `${pLabel} → ${sLabel} → ${t.display.toUpperCase()}`;
-});
 
 /**
  * One entry per unique value of the primary dim.
@@ -2638,36 +2484,6 @@ function deduplicateAndSortGroups(groups: FoundGroup[]): FoundGroup[] {
   });
 }
 
-/**
- * Returns select options for the disambiguation row at `rowIndex`.
- * Excludes: the name_field, and any already-selected disambiguation groups
- * (except the one at the current row, which must remain selectable).
- */
-function getDisambiguationOptions(rowIndex: number) {
-  const alreadyUsed = new Set<string>([
-    nameField,
-    ...distinguishBy.value.filter((_, i) => i !== rowIndex),
-  ]);
-  return availableGroups.value
-    .filter((g) => !alreadyUsed.has(g.group_id))
-    .map((g) => ({
-      label: raw(g.display),
-      value: g.group_id,
-      streamTypes: g.stream_types,
-      recommended: g.recommended,
-    }));
-}
-
-/** Returns a color token for a stream type chip */
-function streamTypeColor(streamType: string): string {
-  const map: Record<string, string> = {
-    logs: "blue",
-    traces: "orange",
-    metrics: "green",
-  };
-  return map[streamType] ?? "grey-7";
-}
-
 /** Simple pluralization helper for display labels */
 function pluralize(val: string): string {
   if (!val) return "";
@@ -2691,16 +2507,6 @@ function cardinalityColor(cardClass: string): BadgeVariant {
     VeryHigh: "error",
   };
   return map[cardClass] ?? "default";
-}
-
-/** Get the best available cardinality class for a group */
-function getEffectiveCardinalityClass(group?: FoundGroup): string {
-  if (!group) return "Unknown";
-  return (
-    dimensionAnalytics.value[group.group_id]?.cardinality_class ||
-    group.cardinality_class ||
-    "Unknown"
-  );
 }
 
 /** Get which stream types a specific value was found in for a dimension group */
@@ -2750,13 +2556,6 @@ function getGroupValues(group: FoundGroup): string[] {
     }
   }
   return Array.from(all).sort();
-}
-
-/** Return coverage % for a group relative to total services, or null if unknown */
-function getGroupCoverage(group: FoundGroup): number | null {
-  const dim = dimensionAnalytics.value[group.group_id];
-  if (!dim || !totalServices.value) return null;
-  return Math.round((dim.service_count / totalServices.value) * 100);
 }
 
 /**
@@ -2846,7 +2645,7 @@ const isAutoSuggested = computed(() => {
 });
 
 /** Options for the inline "add field" select for a specific env */
-function getAddFieldOptionsForEnv(envKey: string) {
+function getAddFieldOptionsForEnv(_envKey: string) {
   // Exclude fields already added in the current env AND all other envs
   const allUsedFields = Object.values(setDistinguishBy.value).flat().filter(Boolean);
   const used = new Set([nameField, ...allUsedFields]);
@@ -2895,78 +2694,6 @@ function applySuggestion() {
 
 function dismissSuggestion() {
   suggestionDismissed.value = true;
-}
-
-function updateDistinguishByField(idx: number, val: string) {
-  const current = [...distinguishBy.value];
-  current[idx] = val;
-  distinguishBy.value = current;
-}
-
-function addDisambiguationField() {
-  if (distinguishBy.value.length < 5) {
-    const current = [...distinguishBy.value, ""];
-    distinguishBy.value = current;
-  }
-}
-
-function removeDisambiguationField(idx: number) {
-  const current = [...distinguishBy.value];
-  current.splice(idx, 1);
-  distinguishBy.value = current;
-}
-
-function openFieldDetails(field: FoundGroup, streamType: string = "", value: string = "") {
-  selectedField.value = field;
-  selectedStreamType.value = streamType;
-  activeStreamId.value = "";
-  activeStreamType.value = streamType;
-  preselectedValue.value = value;
-  popupPrimaryValue.value = "";
-  popupColumnSelections.value = [];
-
-  // Determine clicked field's position in the hierarchy and pre-select accordingly
-  if (value && primaryDim.value) {
-    const fieldIdx = rankedDims.value.findIndex((d) => d.group_id === field.group_id);
-    if (fieldIdx === 0) {
-      // Clicked on primary dim (e.g. cluster) — set as primary value
-      popupPrimaryValue.value = value;
-    } else if (fieldIdx > 0) {
-      // Clicked on secondary/tertiary — pre-select in the matching column (fieldIdx - 1)
-      const selections: (string | null)[] = new Array(rankedDims.value.length - 1).fill(null);
-      selections[fieldIdx - 1] = value;
-      popupColumnSelections.value = selections;
-    }
-  }
-
-  // Auto-select a stream — prefer one that contains the preselected value
-  if (selectedFieldAnalytics.value?.sample_values) {
-    const sampleValues = selectedFieldAnalytics.value.sample_values;
-    const types = Object.keys(sampleValues);
-    const typeToUse = streamType && types.includes(streamType) ? streamType : types[0];
-
-    if (typeToUse) {
-      activeStreamType.value = typeToUse;
-      const streamEntries = Object.entries(sampleValues[typeToUse] ?? {});
-
-      // If a specific value was clicked, prefer the stream that contains it
-      const matchingStream = value ? streamEntries.find(([, vals]) => vals.includes(value)) : null;
-
-      const streamName = matchingStream ? matchingStream[0] : (streamEntries[0]?.[0] ?? "");
-
-      activeStreamId.value = streamName;
-    }
-  }
-
-  detailsDialogVisible.value = true;
-
-  // Scroll the highlighted value into view after the dialog renders
-  if (value) {
-    nextTick(() => {
-      const el = valuesScrollContainer.value?.querySelector(`[data-val="${CSS.escape(value)}"]`);
-      el?.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
-  }
 }
 
 /** True when current setDistinguishBy or trackedAliasIds differ from last saved config */
@@ -3067,24 +2794,6 @@ async function loadData() {
     });
   } finally {
     loading.value = false;
-  }
-}
-
-async function loadAnalytics() {
-  try {
-    const res = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
-    const summary: DimensionAnalyticsSummary = res.data;
-    if (summary.dimensions) {
-      dimensionAnalytics.value = summary.dimensions.reduce(
-        (acc, dim) => {
-          acc[dim.dimension_name] = dim;
-          return acc;
-        },
-        {} as Record<string, DimensionAnalytics>,
-      );
-    }
-  } catch (err) {
-    console.error("Failed to load dimension analytics:", err);
   }
 }
 

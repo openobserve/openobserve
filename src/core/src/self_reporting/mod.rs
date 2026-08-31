@@ -19,7 +19,11 @@ pub mod cloud_events;
 pub mod evaluator_schema;
 mod ingestion;
 #[cfg(feature = "enterprise")]
+pub mod llm_experiment_schema;
+#[cfg(feature = "enterprise")]
 pub mod llm_scores_schema;
+#[cfg(feature = "enterprise")]
+pub mod llm_scores_writer;
 pub(crate) mod persistence;
 pub mod search;
 mod triggers_schema;

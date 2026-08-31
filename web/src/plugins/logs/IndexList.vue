@@ -256,8 +256,6 @@ import {
   type Ref,
   watch,
   computed,
-  onBeforeMount,
-  onBeforeUnmount,
   nextTick,
   defineAsyncComponent,
 } from "vue";
@@ -272,10 +270,8 @@ import {
   formatLargeNumber,
   useLocalInterestingFields,
   generateTraceContext,
-  isStreamingEnabled,
   addSpacesToOperators,
 } from "../../utils/zincutils";
-import streamService from "../../services/stream";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -283,7 +279,6 @@ import searchService from "@/services/search";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
-import { applyCollapseFilter } from "@/utils/fieldCategories";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
@@ -299,11 +294,6 @@ import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-interface Filter {
-  fieldName: string;
-  selectedValues: string[];
-  selectedOperator: string;
-}
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   props: {
@@ -366,7 +356,7 @@ export default defineComponent({
 
     const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } = logsUtils();
 
-    const { fetchQueryDataWithWebSocket, sendSearchMessageBasedOnRequestId } = useSearchWebSocket();
+    const { sendSearchMessageBasedOnRequestId } = useSearchWebSocket();
 
     const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
@@ -698,7 +688,7 @@ export default defineComponent({
 
     watch(
       () => [showUserDefinedSchemaToggle.value, searchObj.meta.useUserDefinedSchemas],
-      (isActive) => {
+      (_isActive) => {
         showOnlyInterestingFields.value =
           searchObj.meta.useUserDefinedSchemas === "interesting_fields";
       },
@@ -889,7 +879,7 @@ export default defineComponent({
      * @param param1
      */
 
-    const openFilterCreator = async (event: any, { name, ftsKey, isSchemaField, streams }: any) => {
+    const openFilterCreator = async (event: any, { name, ftsKey, streams }: any) => {
       if (ftsKey && !showFtsFieldValues.value) {
         event.stopPropagation();
         event.preventDefault();
@@ -968,17 +958,14 @@ export default defineComponent({
             queries = extractValueQuery();
           }
         } else {
-          let parseQuery = query.split("|");
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = parseQuery[1].trim();
-          } else {
-            whereClause = parseQuery[0].trim();
-          }
+          // The whole quick-mode query IS the where clause. Do not split on "|":
+          // the legacy "function | where" syntax was dropped from the search path
+          // (useSearchQuery.handleNonSqlMode), and the split is quote-unaware, so a
+          // pipe inside a term such as match_all('text | error') would push half the
+          // term into the SELECT list and leave the rest as a broken where clause.
+          let whereClause = query.trim();
 
-          query_context = `SELECT *${queryFunctions} FROM "[INDEX_NAME]" [WHERE_CLAUSE]`;
+          query_context = `SELECT * FROM "[INDEX_NAME]" [WHERE_CLAUSE]`;
 
           if (whereClause.trim() != "") {
             whereClause = addSpacesToOperators(whereClause);
@@ -1014,11 +1001,6 @@ export default defineComponent({
           query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
 
-        let action_id = "";
-        if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-          action_id = searchObj.data.selectedTransform.id;
-        }
-
         resetFieldValues(name, true);
 
         if (whereClause.trim() != "") {
@@ -1037,7 +1019,6 @@ export default defineComponent({
           }
         }
 
-        let countTotal = streams.length;
         for (const selectedStream of streams) {
           if (streams.length > 1) {
             query_context = "select * from [INDEX_NAME]";
@@ -1392,11 +1373,6 @@ export default defineComponent({
     };
 
     const addInterestingFieldToSelectedStreamFields = (field: any) => {
-      const defaultFields = [
-        store.state.zoConfig?.timestamp_column,
-        store.state.zoConfig?.all_fields_name,
-      ];
-
       let expandKeys = Object.keys(searchObj.data.stream.expandGroupRows);
 
       let index = 0;
@@ -1557,7 +1533,7 @@ export default defineComponent({
       removeTraceId(payload.queryReq.fields[0], payload.traceId);
     };
 
-    const handleSearchError = (request: any, err: any) => {
+    const handleSearchError = (request: any, _err: any) => {
       if (fieldValues.value[request.queryReq?.fields[0]]) {
         fieldValues.value[request.queryReq.fields[0]].isLoading = false;
         fieldValues.value[request.queryReq.fields[0]].errMsg = t(

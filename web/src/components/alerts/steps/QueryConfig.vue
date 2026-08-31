@@ -838,7 +838,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="inline-block max-w-37.5 min-w-37.5">
                         <OFormSelect
                           name="trigger_condition.timezone"
-                          :options="filteredTimezones"
+                          :options="timezoneSelectOptions"
                           searchable
                           :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
                           class="max-w-37.5 min-w-37.5"
@@ -893,10 +893,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.queryConfig.viewAlertQuery") }}
                         <OTooltip :delay="200" side="bottom">
                           <template #content>
-                            <pre
-                              class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-                              v-html="highlightedSqlQuery"
-                            />
+                            <AlertQueryPreview :query="generatedSqlQuery" />
                           </template>
                         </OTooltip>
                       </span>
@@ -988,10 +985,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("alerts.queryConfig.viewAlertQuery") }}
                     <OTooltip :delay="200" side="bottom">
                       <template #content>
-                        <pre
-                          class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-                          v-html="highlightedSqlQuery"
-                        />
+                        <AlertQueryPreview :query="generatedSqlQuery" />
                       </template>
                     </OTooltip>
                   </span>
@@ -1251,7 +1245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="inline-block max-w-37.5 min-w-37.5">
                         <OFormSelect
                           name="trigger_condition.timezone"
-                          :options="filteredTimezones"
+                          :options="timezoneSelectOptions"
                           searchable
                           :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
                           class="max-w-37.5 min-w-37.5"
@@ -1616,8 +1610,6 @@ import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
-  b64EncodeUnicode,
-  getUUID,
   convertMinutesToCron,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
@@ -1625,11 +1617,6 @@ import {
   getImageURL,
   resolveBrowserTimezone,
 } from "@/utils/zincutils";
-import hljs from "highlight.js/lib/core";
-import sql from "highlight.js/lib/languages/sql";
-
-hljs.registerLanguage("sql", sql);
-
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
@@ -1637,6 +1624,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
+import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
@@ -1663,6 +1651,7 @@ export default defineComponent({
   components: {
     OTag,
     AlertMultiToggle,
+    AlertQueryPreview,
     FilterGroup,
     QueryEditorDialog,
     CustomConfirmDialog,
@@ -1738,6 +1727,18 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /**
+     * True while a prefill is seeding the WHOLE form at once (library alert,
+     * dashboard panel, logs search). Distinguishes "these fields changed
+     * because someone handed us a finished alert" from "the user just changed
+     * this field", which is the only signal that tells the mode-default
+     * watchers to keep their hands off. `beingUpdated` cannot serve: a prefill
+     * is a NEW alert.
+     */
+    isSeeding: {
+      type: Boolean,
+      default: false,
+    },
     promqlCondition: {
       type: Object as PropType<any>,
       default: null,
@@ -1790,8 +1791,6 @@ export default defineComponent({
         : initialFreqRaw >= 60 && initialFreqRaw % 60 === 0
           ? "hours"
           : "minutes";
-    const hasInitialGroupBy =
-      (props.inputData.aggregation?.group_by || []).filter((g: string) => g?.trim()).length > 0;
 
     // Field get/set helpers — the form is the single source of truth for the
     // validated scalars; props.* stay a write-through copy for the SQL-gen path.
@@ -1855,9 +1854,6 @@ export default defineComponent({
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
     // Expandable section toggles — auto-expand filters if editing an alert with existing conditions
-    const hasExistingFilters = props.inputData.conditions?.conditions?.some(
-      (c: any) => c.filterType === "condition" && c.column && c.column.trim() !== "",
-    );
     const showFilters = ref(true);
     const showVrl = ref(!!props.vrlFunction?.trim());
     const filtersSectionRef = ref<HTMLElement | null>(null);
@@ -1967,6 +1963,7 @@ export default defineComponent({
       ref({}),
       isSqlModeForPlaceholder,
       noStreamForPlaceholder,
+      t,
       { noStreamText: t("pipeline.queryEditorPlaceholder") },
     );
 
@@ -2213,6 +2210,22 @@ export default defineComponent({
           // Edit mode: alert was saved with total_events (aggregation: null)
           selectedFunction.value = "total_events";
           localIsAggregationEnabled.value = false;
+        } else if (props.isSeeding || fv("query_condition.type") === "promql") {
+          // NOT a user switching stream type — a prefill is seeding the whole
+          // form and the stream type only "changed" as part of that. The
+          // alert already knows what it is, so defaulting `avg` + `having`
+          // over it invents a measure alert nobody asked for; on a PromQL
+          // alert (which is what most metric prefills are) it invents a SECOND
+          // threshold beside the real `promql_condition` one.
+          //
+          // Both halves of the guard earn their place: `isSeeding` covers the
+          // window where stream_type has landed but the query type has not
+          // yet, and the form read covers a PromQL alert on its own terms.
+          // `localTab` is NOT usable here — this watcher runs ahead of the one
+          // that syncs it on a whole-form seed.
+          selectedFunction.value = "total_events";
+          localIsAggregationEnabled.value = false;
+          emit("update:isAggregationEnabled", false);
         } else {
           // New alert switching to metrics — default to avg + init aggregation
           selectedFunction.value = "avg";
@@ -2551,7 +2564,9 @@ export default defineComponent({
       set: (v) => setFV("trigger_condition.timezone", v ?? ""),
     });
     const cronError = ref("");
-    const cronDescription = computed(() => describeCron(cronExpression.value, cronTimezone.value));
+    const cronDescription = computed(() =>
+      describeCron(t, cronExpression.value, cronTimezone.value),
+    );
     const filteredTimezones = ref<string[]>([]);
 
     // Initialize timezone
@@ -2561,9 +2576,10 @@ export default defineComponent({
     // display ref, leaving the stored value untouched until the user entered cron
     // mode (onFrequencyUnitChange still seeds it there). defaultAlertValue()
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const browserTime = raw("Browser Time (" + browserTz + ")");
     const initTimezones = () => {
       try {
-        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
         // @ts-ignore
         const zones: string[] =
           typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
@@ -2572,12 +2588,20 @@ export default defineComponent({
             : [cronTimezone.value || "UTC"];
         // Convenience shortcuts first (matching the reports picker), then every
         // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
-        filteredTimezones.value = [`Browser Time (${browserTz})`, "UTC", ...zones];
+        filteredTimezones.value = [browserTime, "UTC", ...zones];
       } catch {
         filteredTimezones.value = ["UTC"];
       }
     };
     initTimezones();
+
+    const timezoneSelectOptions = computed(() =>
+      filteredTimezones.value.map((tz: string) =>
+        tz === browserTime
+          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+          : { label: raw(tz), value: tz },
+      ),
+    );
 
     const validateCron = () => {
       cronError.value = "";
@@ -3461,16 +3485,10 @@ export default defineComponent({
     // (empty SQL / SQL error / empty PromQL / aggregate-column toast) are
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
-    const highlightedSqlQuery = computed(() => {
-      if (!props.generatedSqlQuery) return "";
-      return hljs.highlight(props.generatedSqlQuery, { language: "sql" }).value;
-    });
-
     return {
       raw,
       t,
       store,
-      highlightedSqlQuery,
       localTab,
       tabOptions,
       shouldShowTabs,
@@ -3551,6 +3569,7 @@ export default defineComponent({
       checkEveryError,
       havingValueError,
       filteredTimezones,
+      timezoneSelectOptions,
       onFrequencyUnitChange,
       frequencyUnitOptions,
       onCronExpressionChange,

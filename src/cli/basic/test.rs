@@ -38,6 +38,7 @@ pub async fn file_list(
         stream_name,
         hour,
         hour,
+        infra::file_list::merge_max_original_size(),
     )
     .await?;
     println!("get files: {}", file_list.len());

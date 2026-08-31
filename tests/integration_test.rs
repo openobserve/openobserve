@@ -392,6 +392,11 @@ mod tests {
             assert!(e2e_list_dashboards().await.is_empty());
         }
 
+        // A panel whose column is wrapped in a cast must come back with the
+        // nesting intact — the model used to flatten it, which silently dropped
+        // the y column from the query on the next edit.
+        e2e_dashboard_nested_cast_round_trip().await;
+
         // alert
         e2e_post_alert_template().await;
         e2e_get_alert_template().await;
@@ -1227,6 +1232,52 @@ mod tests {
         .await;
 
         json::from_slice(&body).unwrap()
+    }
+
+    async fn e2e_dashboard_nested_cast_round_trip() {
+        let auth = setup();
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+
+        // sum(TRY_CAST(usage_amount AS DOUBLE)) exactly as the panel builder writes it.
+        let body_str = r#"{"version":8,"title":"cast","dashboardId":"","description":"","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","tabs":[{"tabId":"tab1","name":"Main","panels":[{"id":"Panel_cast","type":"bar","title":"cast","description":"","config":{"show_legends":true},"queryType":"sql","queries":[{"query":"SELECT sum(TRY_CAST(usage_amount AS DOUBLE)) as \"y_axis_1\" FROM \"default\"","customQuery":false,"fields":{"stream":"default","stream_type":"logs","filter":{"filterType":"group","logicalOperator":"AND","conditions":[]},"x":[],"y":[{"label":"Usage","alias":"y_axis_1","type":"build","functionName":"sum","args":[{"type":"function","value":{"functionName":"try_cast","args":[{"type":"field","value":{"field":"usage_amount","streamAlias":null}},{"type":"castType","value":"DOUBLE"}]}}]}]},"config":{"promql_legend":""}}],"layout":{"x":0,"y":0,"w":12,"h":13,"i":1}}]}]}"#;
+
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/dashboards", "e2e"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
+        assert!(
+            status.is_success(),
+            "create failed: {}",
+            String::from_utf8_lossy(&body)
+        );
+
+        let created: json::Value = json::from_slice(&body).unwrap();
+        let dashboard_id = created["v8"]["dashboardId"].as_str().unwrap().to_string();
+
+        let (_status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/dashboards/{dashboard_id}", "e2e"),
+            Some(headers),
+            None,
+        )
+        .await;
+        let fetched: json::Value = json::from_slice(&body).unwrap();
+
+        let y = &fetched["v8"]["tabs"][0]["panels"][0]["queries"][0]["fields"]["y"][0];
+        assert_eq!(y["functionName"], "sum");
+
+        let cast = &y["args"][0]["value"];
+        assert_eq!(cast["functionName"], "try_cast");
+        assert_eq!(cast["args"][0]["value"]["field"], "usage_amount");
+        assert_eq!(cast["args"][1]["value"], "DOUBLE");
+
+        e2e_delete_dashboard(&dashboard_id).await;
     }
 
     async fn e2e_delete_dashboard(dashboard_id: &str) {
@@ -2068,6 +2119,7 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),
@@ -2128,6 +2180,7 @@ mod tests {
         let id = id.unwrap();
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),
@@ -2195,6 +2248,7 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),
@@ -2445,6 +2499,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: module_key.clone(),
@@ -2509,6 +2564,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 2,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key,
@@ -2556,6 +2612,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 3,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: module_key.clone(),
@@ -2692,6 +2749,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 4,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: module_key.clone(),
@@ -2820,6 +2878,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: format!("logs/e2e/test_invalid_timerange_pipeline/{}", pipeline.id),
@@ -2995,6 +3054,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 3,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: format!(

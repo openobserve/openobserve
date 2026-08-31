@@ -33,10 +33,10 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 
 use super::{
     exec::PromqlContext,
-    label_usage::labels_dropped_at_root,
-    selector_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
+    load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
+    promql::label_usage::labels_dropped_at_root,
 };
-use crate::{aggregations, binaries, functions, micros, rewrite::remove_filter_all};
+use crate::{aggregations, binaries, functions, fused, micros, promql::rewrite::remove_filter_all};
 
 pub struct Engine {
     trace_id: String,
@@ -373,6 +373,14 @@ impl Engine {
                 }
             };
             selector.name = Some(name);
+            // the matcher is fully consumed by stream selection; leaving it in
+            // would filter on the stored `__name__` column (which may keep the
+            // pre-`format_stream_name` case), leak into partition pruning, and
+            // make the selector's PromQL text unparseable on super-cluster peers
+            selector
+                .matchers
+                .matchers
+                .retain(|mat| mat.name != NAME_LABEL);
         }
 
         let data = self.selector_load_data_owned(&selector, None).await?;
@@ -475,6 +483,11 @@ impl Engine {
                 .clone();
 
             selector.name = Some(name);
+            // see eval_vector_selector: the matcher is consumed by stream selection
+            selector
+                .matchers
+                .matchers
+                .retain(|mat| mat.name != NAME_LABEL);
         }
 
         let data = self
@@ -824,6 +837,29 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
+        // Fold range-function output straight into the aggregation instead of
+        // materializing per-series samples; every other shape stays generic.
+        if config::get_config()
+            .search
+            .feature_metrics_fused_agg_enabled
+            && let Some(agg_op) = fused::FusedAggOp::from_token(op.id())
+            && let PromExpr::Call(Call { func, args }) = expr
+            && args.len() == 1
+            && let Some(range_func) = functions::fusable_range_func(func.name)
+        {
+            let range_arg = args
+                .last()
+                .expect("promql-parser validated the function argument");
+            let range_input = self.exec_expr(&range_arg).await?;
+            return fused::fused_range_agg(
+                modifier,
+                range_input,
+                range_func.as_ref(),
+                agg_op,
+                &self.eval_ctx,
+            );
+        }
+
         let input = self.exec_expr(expr).await?;
 
         let eval_ctx = self.eval_ctx.clone();
@@ -1009,7 +1045,8 @@ impl Engine {
             }
         };
 
-        Ok(match func_name {
+        let start = std::time::Instant::now();
+        let result = match func_name {
             Func::Abs => functions::abs(input)?,
             Func::Absent => functions::absent(input, &self.eval_ctx)?,
             Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
@@ -1240,7 +1277,14 @@ impl Engine {
             Func::Timestamp => functions::timestamp(input)?,
             Func::Vector => functions::vector(input, &self.eval_ctx)?,
             Func::Year => functions::year(input)?,
-        })
+        };
+        log::info!(
+            "[trace_id: {}] [PromQL Timing] call_expr({}) execution took: {:?}",
+            self.trace_id,
+            func.name,
+            start.elapsed()
+        );
+        Ok(result)
     }
 }
 
@@ -2905,6 +2949,82 @@ mod tests {
         > {
             Ok(vec![])
         }
+    }
+
+    /// Mock provider that records the matchers the engine hands to storage.
+    struct MatcherCapturingProvider {
+        captured: Arc<std::sync::Mutex<Option<Matchers>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::TableProvider for MatcherCapturingProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            _stream_name: &str,
+            _time_range: (i64, i64),
+            matchers: promql_parser::label::Matchers,
+            _label_selector: HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+        ) -> datafusion::error::Result<
+            Vec<(
+                datafusion::prelude::SessionContext,
+                std::sync::Arc<datafusion::arrow::datatypes::Schema>,
+                config::meta::search::ScanStats,
+                bool,
+            )>,
+        > {
+            *self.captured.lock().unwrap() = Some(matchers);
+            Ok(vec![])
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_vector_selector_strips_consumed_name_matcher() {
+        let trace_id = "test_trace";
+        let captured = Arc::new(std::sync::Mutex::new(None));
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, "test_org", 30),
+                MatcherCapturingProvider {
+                    captured: captured.clone(),
+                },
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        // `{__name__="test_metric", env="prod"}` form: the name matcher is lifted
+        // into selector.name and must NOT survive as a column filter — the stored
+        // `__name__` column can hold the pre-`format_stream_name` metric name
+        let selector = VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![
+                    promql_parser::label::Matcher {
+                        name: NAME_LABEL.to_string(),
+                        op: MatchOp::Equal,
+                        value: "test_metric".to_string(),
+                    },
+                    promql_parser::label::Matcher {
+                        name: "env".to_string(),
+                        op: MatchOp::Equal,
+                        value: "prod".to_string(),
+                    },
+                ],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+
+        engine.eval_vector_selector(&selector).await.unwrap();
+
+        let matchers = captured.lock().unwrap().take().unwrap();
+        assert!(matchers.matchers.iter().all(|m| m.name != NAME_LABEL));
+        assert_eq!(matchers.matchers.len(), 1);
+        assert_eq!(matchers.matchers[0].name, "env");
     }
 
     #[tokio::test]

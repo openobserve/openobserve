@@ -114,11 +114,26 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
  * from the picker so no new journey can contain one. Stored monitors keep
  * executing them until migrated (spec Q-10).
  */
-export const RETIRED_ACTIONS: readonly StepAction[] = ["hover", "scroll", "wait", "screenshot"];
+// `hover` left this list when Playwright 1.56 added a hover action to the
+// recorder model: it is captured by the action picker, stored in the v2
+// vocabulary and executed by both the probe and the extension player, so it is
+// a supported action rather than one that vanishes at save.
+export const RETIRED_ACTIONS: readonly StepAction[] = ["scroll", "wait", "screenshot"];
 
 export function isRetiredAction(action: StepAction): boolean {
   return RETIRED_ACTIONS.includes(action);
 }
+
+/**
+ * Oldest recorder extension this build of the web app knows how to talk to.
+ *
+ * 0.2.0 is the first build that reports a version in its `getStatus` reply, so
+ * an absent version means "older than this" rather than "unknown". Chrome
+ * updates the extension independently of when O2 deploys, so without this the
+ * two can disagree about the wire with no way to say so — every future wire
+ * change would surface as confusing behaviour instead of a message.
+ */
+export const MIN_EXTENSION_VERSION = "0.2.0";
 
 // ── Assertion kinds (spec P5.1) ──────────────────────────────────────────
 /**
@@ -162,6 +177,73 @@ export const actionOptions = (t: TranslateFn) =>
 // The selector-type picker (CSS / XPath / Text / TestID / Role) is gone with the
 // v1 authoring path: a step names its element with a locator bundle, whose value
 // carries its own engine prefix.
+
+// ── Click type (which button, how many clicks) ───────────────────────────
+/**
+ * The click variants Playwright's action picker offers, as one choice.
+ *
+ * Storage keeps them as two fields — `button` and `click_count`, which is what
+ * `locator.click` takes — but an author thinks "double click", not "one click,
+ * count two". Datadog's browser tests present the same pair as a single click
+ * type for the same reason.
+ */
+export type ClickType = "left" | "right" | "middle" | "double";
+
+export const CLICK_TYPE_LABEL_KEYS: Record<ClickType, I18nKey> = {
+  left: "synthetics.journey.clickTypes.left",
+  right: "synthetics.journey.clickTypes.right",
+  middle: "synthetics.journey.clickTypes.middle",
+  double: "synthetics.journey.clickTypes.double",
+};
+
+/** What each type stores. Left/1 is the absent-field default, so it serialises away. */
+export const CLICK_TYPE_VALUES: Record<
+  ClickType,
+  { button: "left" | "middle" | "right"; clickCount: number }
+> = {
+  left: { button: "left", clickCount: 1 },
+  right: { button: "right", clickCount: 1 },
+  middle: { button: "middle", clickCount: 1 },
+  double: { button: "left", clickCount: 2 },
+};
+
+/**
+ * Which click type a stored pair reads as.
+ *
+ * `button` decides first: a contextmenu event is always one click, so the
+ * recorder cannot produce a right double click and a stored right+2 could only
+ * arrive through the API. Reading it as "Right click" is the closer of the two
+ * approximations — and nothing is rewritten unless the author picks a type.
+ */
+export function clickTypeOf(button?: string, clickCount?: number): ClickType {
+  if (button === "right") return "right";
+  if (button === "middle") return "middle";
+  return (clickCount ?? 1) >= 2 ? "double" : "left";
+}
+
+export const clickTypeOptions = (t: TranslateFn) =>
+  (Object.keys(CLICK_TYPE_LABEL_KEYS) as ClickType[]).map((c) => ({
+    label: t(CLICK_TYPE_LABEL_KEYS[c]),
+    value: c,
+  }));
+
+/**
+ * What a step's action reads as in a row, including which click it is.
+ *
+ * A right or double click is a `click` carrying two extra fields, so keying the
+ * label on the action alone rendered every one of them as a plain "Click": the
+ * fidelity reached storage and the replay, and stopped short of the only place
+ * an author looks.
+ */
+export function stepActionLabelKey(
+  action: StepAction,
+  button?: string,
+  clickCount?: number,
+): I18nKey {
+  if (action !== "click") return ACTION_LABEL_KEYS[action];
+  const type = clickTypeOf(button, clickCount);
+  return type === "left" ? ACTION_LABEL_KEYS.click : CLICK_TYPE_LABEL_KEYS[type];
+}
 
 // ── Value field labels (action-specific) ─────────────────────────────────
 export const VALUE_LABEL_KEYS: Record<string, I18nKey> = {
@@ -295,10 +377,3 @@ export const CHROME_UI_LABELS = {
  * all, and every step silently degraded to role/text/css.
  */
 export const DEFAULT_TEST_ID_ATTR = "data-test";
-
-/**
- * How many evidence events a step expansion shows before deferring to the
- * Evidence tab. A live bundle held 158 events across two steps — uncapped, one
- * expansion would run to 136 rows and break the step timeline's scroll.
- */
-export const INLINE_EVIDENCE_LIMIT = 5;

@@ -23,6 +23,7 @@
 
 use std::sync::LazyLock as Lazy;
 
+use config::meta::model_pricing::{UtcTimeWindow, windows_match};
 use regex::Regex;
 use tiktoken_rs::{get_bpe_from_model, o200k_base};
 
@@ -41,6 +42,9 @@ pub fn calculate_token_count(model_name: &str, prompt: &str) -> i64 {
 /// * `model_name` - Name of the model (e.g., "gpt-4", "claude-sonnet-4-6")
 /// * `input_tokens` - Number of input tokens
 /// * `output_tokens` - Number of output tokens
+/// * `ts_micros` - Span start time in microseconds, used to resolve tiers that are restricted to
+///   recurring UTC time-of-day windows (peak / off-peak pricing). Pass `None` when the time is
+///   unknown — the unrestricted tier is used instead.
 ///
 /// # Returns
 /// * `Some((input_cost, output_cost, total_cost))` if pricing is found
@@ -49,12 +53,13 @@ pub fn calculate_cost(
     model_name: &str,
     input_tokens: i64,
     output_tokens: i64,
+    ts_micros: Option<i64>,
 ) -> Option<(f64, f64, f64)> {
     // Find matching pricing
     let pricing = MODEL_PRICING.iter().find(|p| p.matches(model_name))?;
 
     // Get appropriate tier
-    let tier = pricing.get_tier(input_tokens);
+    let tier = pricing.get_tier(input_tokens, ts_micros);
 
     // Calculate costs (tokens / 1,000,000 * price_per_million)
     let input_cost = (input_tokens as f64 / 1_000_000.0) * tier.input_price_per_million;
@@ -89,14 +94,25 @@ pub fn model_patterns() -> impl Iterator<Item = &'static str> {
 }
 
 /// Pricing tier based on token count or other conditions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PricingTier {
     /// Minimum input tokens for this tier (None means no minimum)
     pub min_input_tokens: Option<i64>,
+    /// Recurring UTC time-of-day windows during which this tier applies.
+    /// Empty means the tier is not time-restricted.
+    pub utc_windows: Vec<UtcTimeWindow>,
     /// Cost per 1M input tokens in USD
     pub input_price_per_million: f64,
     /// Cost per 1M output tokens in USD
     pub output_price_per_million: f64,
+}
+
+impl PricingTier {
+    /// A tier with neither a token threshold nor a time window — the unconditional
+    /// fallback used when no restricted tier applies.
+    fn is_unrestricted(&self) -> bool {
+        self.min_input_tokens.is_none() && self.utc_windows.is_empty()
+    }
 }
 
 /// Model pricing information
@@ -116,9 +132,9 @@ impl ModelPricing {
         Self {
             pattern: pattern.to_string(),
             tiers: vec![PricingTier {
-                min_input_tokens: None,
                 input_price_per_million: input_price,
                 output_price_per_million: output_price,
+                ..Default::default()
             }],
             compiled: Regex::new(pattern).expect("invalid regex in model pricing pattern"),
         }
@@ -133,25 +149,68 @@ impl ModelPricing {
         }
     }
 
-    /// Get the appropriate pricing tier for the given token counts
-    pub fn get_tier(&self, input_tokens: i64) -> &PricingTier {
+    /// Create a model whose rates change with the UTC time of day (e.g. DeepSeek's
+    /// peak / off-peak pricing). Spans inside `peak_windows` are billed at the peak
+    /// rate; everything else falls through to the off-peak rate.
+    pub fn peak_off_peak(
+        pattern: &str,
+        peak_windows: Vec<UtcTimeWindow>,
+        peak_input: f64,
+        peak_output: f64,
+        off_peak_input: f64,
+        off_peak_output: f64,
+    ) -> Self {
+        Self::tiered(
+            pattern,
+            vec![
+                PricingTier {
+                    utc_windows: peak_windows,
+                    input_price_per_million: peak_input,
+                    output_price_per_million: peak_output,
+                    ..Default::default()
+                },
+                PricingTier {
+                    input_price_per_million: off_peak_input,
+                    output_price_per_million: off_peak_output,
+                    ..Default::default()
+                },
+            ],
+        )
+    }
+
+    /// Get the appropriate pricing tier for the given token counts and span time.
+    /// Restricted tiers (token threshold and/or UTC time window) are evaluated in
+    /// order; the first one that applies wins, otherwise the unrestricted tier does.
+    pub fn get_tier(&self, input_tokens: i64, ts_micros: Option<i64>) -> &PricingTier {
         for tier in &self.tiers {
-            if let Some(min) = tier.min_input_tokens {
-                if input_tokens >= min {
-                    return tier;
-                }
-            } else {
-                return tier;
+            if !windows_match(&tier.utc_windows, ts_micros) {
+                continue;
+            }
+            match tier.min_input_tokens {
+                Some(min) if input_tokens < min => continue,
+                _ => return tier,
             }
         }
-        // Fallback to last tier (default)
-        self.tiers.last().unwrap()
+        // Fallback: the unrestricted tier, else the last one defined.
+        self.tiers
+            .iter()
+            .find(|t| t.is_unrestricted())
+            .unwrap_or_else(|| self.tiers.last().unwrap())
     }
 
     /// Check if this pricing matches the given model name
     pub fn matches(&self, model_name: &str) -> bool {
         self.compiled.is_match(model_name)
     }
+}
+
+/// DeepSeek peak-hour windows: 01:00-04:00 and 06:00-10:00 UTC.
+/// Every other hour is off-peak at half the peak rate.
+fn deepseek_peak_windows() -> Vec<UtcTimeWindow> {
+    vec![
+        UtcTimeWindow::from_hm((1, 0), (4, 0)),
+        UtcTimeWindow::from_hm((6, 0), (10, 0)),
+    ]
 }
 
 /// Global model pricing database
@@ -196,11 +255,13 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
+                    utc_windows: Vec::new(),
                     input_price_per_million: 10.00,
                     output_price_per_million: 37.50,
                 },
                 PricingTier {
                     min_input_tokens: None,
+                    utc_windows: Vec::new(),
                     input_price_per_million: 5.00,
                     output_price_per_million: 25.00,
                 },
@@ -211,11 +272,13 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
+                    utc_windows: Vec::new(),
                     input_price_per_million: 6.00,
                     output_price_per_million: 22.50,
                 },
                 PricingTier {
                     min_input_tokens: None,
+                    utc_windows: Vec::new(),
                     input_price_per_million: 3.00,
                     output_price_per_million: 15.00,
                 },
@@ -226,11 +289,13 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
+                    utc_windows: Vec::new(),
                     input_price_per_million: 6.00,
                     output_price_per_million: 22.50,
                 },
                 PricingTier {
                     min_input_tokens: None,
+                    utc_windows: Vec::new(),
                     input_price_per_million: 3.00,
                     output_price_per_million: 15.00,
                 },
@@ -241,11 +306,13 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
+                    utc_windows: Vec::new(),
                     input_price_per_million: 6.00,
                     output_price_per_million: 22.50,
                 },
                 PricingTier {
                     min_input_tokens: None,
+                    utc_windows: Vec::new(),
                     input_price_per_million: 3.00,
                     output_price_per_million: 15.00,
                 },
@@ -269,11 +336,13 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
+                    utc_windows: Vec::new(),
                     input_price_per_million: 4.00,
                     output_price_per_million: 18.00,
                 },
                 PricingTier {
                     min_input_tokens: None,
+                    utc_windows: Vec::new(),
                     input_price_per_million: 2.00,
                     output_price_per_million: 12.00,
                 },
@@ -286,11 +355,13 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
+                    utc_windows: Vec::new(),
                     input_price_per_million: 2.50,
                     output_price_per_million: 15.00,
                 },
                 PricingTier {
                     min_input_tokens: None,
+                    utc_windows: Vec::new(),
                     input_price_per_million: 1.25,
                     output_price_per_million: 10.00,
                 },
@@ -305,9 +376,30 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
         ModelPricing::simple("gemini-pro", 0.50, 1.50),
         ModelPricing::simple("gemini-embedding-001", 0.15, 0.0),
         // DeepSeek Models
-        // Reference: synced llm_pricing.json fallback values, prices per 1M tokens.
-        ModelPricing::simple("(?i)deepseek-v4-flash", 0.14, 0.28),
-        ModelPricing::simple("(?i)deepseek-v4-pro", 0.435, 0.87),
+        // Reference: https://api-docs.deepseek.com/quick_start/pricing
+        //
+        // V4 bills at two rates that alternate with the UTC clock: peak hours are
+        // 01:00-04:00 and 06:00-10:00 UTC, and every other hour is off-peak at half
+        // the peak rate. `input` here is the cache-miss rate; cache-hit input is
+        // priced through user-defined `cache_read_input_tokens` entries.
+        ModelPricing::peak_off_peak(
+            "(?i)deepseek-v4-flash",
+            deepseek_peak_windows(),
+            0.44,
+            1.32,
+            0.22,
+            0.66,
+        ),
+        ModelPricing::peak_off_peak(
+            "(?i)deepseek-v4-pro",
+            deepseek_peak_windows(),
+            1.32,
+            3.96,
+            0.66,
+            1.98,
+        ),
+        // Legacy DeepSeek model names, kept for historical spans — these are no longer
+        // on the published price list and are not peak/off-peak split.
         ModelPricing::simple("(?i)deepseek-(?:v3|chat)(?:$|-)", 0.27, 1.10),
         ModelPricing::simple("(?i)deepseek-(?:r1|reasoner)(?:-\\d[\\d-]*)?$", 0.55, 2.19),
         ModelPricing::simple("(?i)deepseek-r1-distill-llama-8b", 0.04, 0.04),
@@ -366,7 +458,8 @@ mod tests {
 
     #[test]
     fn test_calculate_cost_gpt4() {
-        let (input_cost, output_cost, total_cost) = calculate_cost("gpt-4o", 1000, 500).unwrap();
+        let (input_cost, output_cost, total_cost) =
+            calculate_cost("gpt-4o", 1000, 500, None).unwrap();
         assert_eq!(input_cost, 0.0025); // 1000 / 1M * $2.50
         assert_eq!(output_cost, 0.005); // 500 / 1M * $10.00
         assert_eq!(total_cost, 0.0075);
@@ -376,7 +469,7 @@ mod tests {
     fn test_calculate_cost_claude_sonnet_tiered_default_tier() {
         // Test with < 200k tokens (default tier)
         let (input_cost, output_cost, total_cost) =
-            calculate_cost("claude-sonnet-4-6", 50_000, 10_000).unwrap();
+            calculate_cost("claude-sonnet-4-6", 50_000, 10_000, None).unwrap();
         assert!((input_cost - 0.15).abs() < 1e-10); // 50k / 1M * $3.00
         assert!((output_cost - 0.15).abs() < 1e-10); // 10k / 1M * $15.00
         assert!((total_cost - 0.30).abs() < 1e-10);
@@ -386,7 +479,7 @@ mod tests {
     fn test_calculate_cost_claude_sonnet_tiered_extended_tier() {
         // Test with > 200k tokens (extended context tier)
         let (input_cost, output_cost, total_cost) =
-            calculate_cost("claude-sonnet-4-6", 250_000, 10_000).unwrap();
+            calculate_cost("claude-sonnet-4-6", 250_000, 10_000, None).unwrap();
         assert!((input_cost - 1.5).abs() < 1e-10); // 250k / 1M * $6.00
         assert!((output_cost - 0.225).abs() < 1e-10); // 10k / 1M * $22.50
         assert!((total_cost - 1.725).abs() < 1e-10);
@@ -394,13 +487,13 @@ mod tests {
 
     #[test]
     fn test_calculate_cost_unknown_model() {
-        assert!(calculate_cost("unknown-model-xyz", 1000, 500).is_none());
+        assert!(calculate_cost("unknown-model-xyz", 1000, 500, None).is_none());
     }
 
     #[test]
     fn test_calculate_cost_gemini() {
         let (input_cost, output_cost, total_cost) =
-            calculate_cost("gemini-1.5-flash", 10_000, 5_000).unwrap();
+            calculate_cost("gemini-1.5-flash", 10_000, 5_000, None).unwrap();
         assert!((input_cost - 0.00075).abs() < 1e-10); // 10k / 1M * $0.075
         assert!((output_cost - 0.0015).abs() < 1e-10); // 5k / 1M * $0.30
         assert!((total_cost - 0.00225).abs() < 1e-10);
@@ -416,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_zero_tokens() {
-        let (input_cost, output_cost, total_cost) = calculate_cost("gpt-4o", 0, 0).unwrap();
+        let (input_cost, output_cost, total_cost) = calculate_cost("gpt-4o", 0, 0, None).unwrap();
         assert_eq!(input_cost, 0.0);
         assert_eq!(output_cost, 0.0);
         assert_eq!(total_cost, 0.0);
@@ -454,43 +547,121 @@ mod tests {
     #[test]
     fn test_claude_hyphen_not_dot() {
         // Anthropic model IDs use hyphens, not dots — no \\. needed
-        assert!(calculate_cost("claude-3-5-haiku", 1000, 500).is_some());
-        assert!(calculate_cost("claude-haiku-3-5", 1000, 500).is_some());
-        assert!(calculate_cost("claude-haiku-4-5", 1000, 500).is_some());
-        assert!(calculate_cost("claude-opus-4-6", 1000, 500).is_some());
+        assert!(calculate_cost("claude-3-5-haiku", 1000, 500, None).is_some());
+        assert!(calculate_cost("claude-haiku-3-5", 1000, 500, None).is_some());
+        assert!(calculate_cost("claude-haiku-4-5", 1000, 500, None).is_some());
+        assert!(calculate_cost("claude-opus-4-6", 1000, 500, None).is_some());
     }
 
     #[test]
     fn test_new_openai_models() {
         // Verify new models are matched
-        assert!(calculate_cost("gpt-5.1", 1000, 500).is_some());
-        assert!(calculate_cost("gpt-5-pro", 1000, 500).is_some());
-        assert!(calculate_cost("gpt-5-nano", 1000, 500).is_some());
-        assert!(calculate_cost("o1", 1000, 500).is_some());
-        assert!(calculate_cost("o1-pro", 1000, 500).is_some());
-        assert!(calculate_cost("o3-pro", 1000, 500).is_some());
-        assert!(calculate_cost("o3-mini", 1000, 500).is_some());
+        assert!(calculate_cost("gpt-5.1", 1000, 500, None).is_some());
+        assert!(calculate_cost("gpt-5-pro", 1000, 500, None).is_some());
+        assert!(calculate_cost("gpt-5-nano", 1000, 500, None).is_some());
+        assert!(calculate_cost("o1", 1000, 500, None).is_some());
+        assert!(calculate_cost("o1-pro", 1000, 500, None).is_some());
+        assert!(calculate_cost("o3-pro", 1000, 500, None).is_some());
+        assert!(calculate_cost("o3-mini", 1000, 500, None).is_some());
     }
 
     #[test]
     fn test_new_gemini_models() {
-        assert!(calculate_cost("gemini-3.1-pro-preview", 1000, 500).is_some());
-        assert!(calculate_cost("gemini-3.1-flash-lite-preview", 1000, 500).is_some());
-        assert!(calculate_cost("gemini-3-flash-preview", 1000, 500).is_some());
-        assert!(calculate_cost("gemini-embedding-001", 1000, 500).is_some());
+        assert!(calculate_cost("gemini-3.1-pro-preview", 1000, 500, None).is_some());
+        assert!(calculate_cost("gemini-3.1-flash-lite-preview", 1000, 500, None).is_some());
+        assert!(calculate_cost("gemini-3-flash-preview", 1000, 500, None).is_some());
+        assert!(calculate_cost("gemini-embedding-001", 1000, 500, None).is_some());
+    }
+
+    /// Microseconds since the epoch for a UTC clock time on 1970-01-01.
+    fn micros_at_utc(hour: i64, minute: i64) -> Option<i64> {
+        Some((hour * 3600 + minute * 60) * 1_000_000)
     }
 
     #[test]
     fn test_deepseek_models() {
+        // Off-peak (12:00 UTC): $0.66/$1.98 per 1M for v4-pro.
         let (input_cost, output_cost, total_cost) =
-            calculate_cost("deepseek-v4-pro", 1000, 500).unwrap();
+            calculate_cost("deepseek-v4-pro", 1000, 500, micros_at_utc(12, 0)).unwrap();
 
-        assert!((input_cost - 0.000435).abs() < 1e-12);
-        assert!((output_cost - 0.000435).abs() < 1e-12);
-        assert!((total_cost - 0.00087).abs() < 1e-12);
-        assert!(calculate_cost("deepseek-chat", 1000, 500).is_some());
-        assert!(calculate_cost("deepseek/deepseek-r1-0528", 1000, 500).is_some());
-        assert!(calculate_cost("deepseek-r1-distill-qwen-32b", 1000, 500).is_some());
+        assert!((input_cost - 0.00066).abs() < 1e-12);
+        assert!((output_cost - 0.00099).abs() < 1e-12);
+        assert!((total_cost - 0.00165).abs() < 1e-12);
+        assert!(calculate_cost("deepseek-chat", 1000, 500, None).is_some());
+        assert!(calculate_cost("deepseek/deepseek-r1-0528", 1000, 500, None).is_some());
+        assert!(calculate_cost("deepseek-r1-distill-qwen-32b", 1000, 500, None).is_some());
+    }
+
+    #[test]
+    fn test_deepseek_peak_is_double_off_peak() {
+        for model in ["deepseek-v4-pro", "deepseek-v4-flash"] {
+            let (peak_in, peak_out, _) =
+                calculate_cost(model, 1_000_000, 1_000_000, micros_at_utc(2, 0)).unwrap();
+            let (off_in, off_out, _) =
+                calculate_cost(model, 1_000_000, 1_000_000, micros_at_utc(12, 0)).unwrap();
+            assert!(
+                (peak_in - off_in * 2.0).abs() < 1e-12,
+                "{model} input: peak {peak_in} != 2x off-peak {off_in}"
+            );
+            assert!(
+                (peak_out - off_out * 2.0).abs() < 1e-12,
+                "{model} output: peak {peak_out} != 2x off-peak {off_out}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_deepseek_v4_flash_published_rates() {
+        // https://api-docs.deepseek.com/quick_start/pricing — cache-miss input / output.
+        let (peak_in, peak_out, _) = calculate_cost(
+            "deepseek-v4-flash",
+            1_000_000,
+            1_000_000,
+            micros_at_utc(6, 30),
+        )
+        .unwrap();
+        assert!((peak_in - 0.44).abs() < 1e-12);
+        assert!((peak_out - 1.32).abs() < 1e-12);
+
+        let (off_in, off_out, _) = calculate_cost(
+            "deepseek-v4-flash",
+            1_000_000,
+            1_000_000,
+            micros_at_utc(23, 0),
+        )
+        .unwrap();
+        assert!((off_in - 0.22).abs() < 1e-12);
+        assert!((off_out - 0.66).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_deepseek_unknown_timestamp_falls_back_to_off_peak() {
+        // No span time → the unrestricted (off-peak) tier, never a windowed one.
+        let (input_cost, ..) = calculate_cost("deepseek-v4-pro", 1_000_000, 0, None).unwrap();
+        assert!((input_cost - 0.66).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_time_windows_do_not_affect_unwindowed_models() {
+        // A model with no time-restricted tier prices identically at any hour.
+        let at_peak = calculate_cost("gpt-4o", 1000, 500, micros_at_utc(2, 0)).unwrap();
+        let at_off = calculate_cost("gpt-4o", 1000, 500, micros_at_utc(14, 0)).unwrap();
+        let no_ts = calculate_cost("gpt-4o", 1000, 500, None).unwrap();
+        assert_eq!(at_peak, at_off);
+        assert_eq!(at_peak, no_ts);
+    }
+
+    #[test]
+    fn test_context_length_tier_still_selected_with_timestamp() {
+        // Time windows must not disturb the existing token-threshold tiering.
+        // Below the 200k threshold → base rate ($3/1M), regardless of the hour.
+        let (small_in, ..) =
+            calculate_cost("claude-sonnet-4-6", 100_000, 0, micros_at_utc(2, 0)).unwrap();
+        assert!((small_in - 0.30).abs() < 1e-12);
+        // Above it → extended-context rate ($6/1M).
+        let (large_in, ..) =
+            calculate_cost("claude-sonnet-4-6", 300_000, 0, micros_at_utc(2, 0)).unwrap();
+        assert!((large_in - 1.80).abs() < 1e-12);
     }
 
     #[test]

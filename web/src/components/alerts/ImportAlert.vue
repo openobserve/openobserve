@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSelect
                         data-test="alert-import-timezone-input"
                         :model-value="userSelectedTimezone[index] || ''"
-                        :options="filteredTimezone"
+                        :options="timezoneSelectOptions"
                         :label="t('alerts.timezoneRequiredLabel')"
                         searchable
                         @search="timezoneFilterFn"
@@ -263,10 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="mb-2.5 p-2.5" v-if="alertCreators.length > 0">
-            <div
-              class="text-primary mb-2.5 text-base uppercase"
-              data-test="alert-import-creation-title"
-            >
+            <div class="text-primary mb-2.5 text-base" data-test="alert-import-creation-title">
               {{ t("alerts.alertCreationTitle") }}
             </div>
             <div
@@ -313,7 +310,9 @@ import {
   convertV0ToV2,
   convertV1ToV2,
   convertV1BEToV2,
+  ensureUnaryConditionValues,
 } from "@/utils/alerts/alertDataTransforms";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 export default defineComponent({
   name: "ImportAlert",
@@ -434,11 +433,20 @@ export default defineComponent({
     const filteredTimezone = ref<any>([]);
     filteredTimezone.value = [...timezoneOptions];
 
-    const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const browserTime = raw("Browser Time (" + browserTz + ")");
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
+
+    const timezoneSelectOptions = computed(() =>
+      (filteredTimezone.value as string[]).map((tz: string) =>
+        tz === browserTime
+          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+          : { label: raw(tz), value: tz },
+      ),
+    );
 
     const updateUserSelectedDestinations = (destinations: string[], index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -482,7 +490,7 @@ export default defineComponent({
       try {
         // Check if jsonStr is empty or null
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t("alerts.import.jsonStringEmpty"));
         }
 
         const parsedJson = JSON.parse(jsonString);
@@ -491,11 +499,11 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           variant: "error",
-          message: e.message || "Invalid JSON format",
+          message: e.message || t("alerts.import.invalidJsonFormat"),
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
-          baseImportRef.value.isImporting = false;
+          baseImportRef.value.isImportingLocal = false;
         }
         return;
       }
@@ -536,7 +544,7 @@ export default defineComponent({
 
       // Reset BaseImport's importing flag
       if (baseImportRef.value) {
-        baseImportRef.value.isImporting = false;
+        baseImportRef.value.isImportingLocal = false;
       }
     };
 
@@ -652,7 +660,7 @@ export default defineComponent({
         streamList.value = streamResponse.list.map((stream: any) => stream.name);
       } catch (e) {
         const err: any = {
-          message: `Alert - ${index}: Error fetching stream list. Please try again.`,
+          message: t("alerts.import.streamListFetchFailed", { index }),
           field: "stream_list",
         };
         alertErrors.push(err);
@@ -672,9 +680,7 @@ export default defineComponent({
 
       // 5. Validate 'is_real_time' field
       if (typeof input.is_real_time !== "boolean") {
-        alertErrors.push(
-          `Alert - ${index}: Is Real-Time is mandatory and should be a boolean value.`,
-        );
+        alertErrors.push(t("alerts.import.isRealTimeBoolean", { index }));
       }
 
       // 6. Validate 'query_condition' field
@@ -683,17 +689,19 @@ export default defineComponent({
           if (item.filterType === "group") {
             // V2 group - validate it has conditions array
             if (!Array.isArray(item.conditions)) {
-              alertErrors.push(`Alert - ${index}: V2 group must have a conditions array.`);
+              alertErrors.push(t("alerts.import.v2GroupConditionsArray", { index }));
               return false;
             }
             // Recursively validate nested conditions
             return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
           } else if (item.filterType === "condition") {
             // V2 condition - validate required fields
-            if (!item.column || !item.operator || item.value === undefined) {
-              alertErrors.push(
-                `Alert - ${index}: V2 condition must have column, operator, and value.`,
-              );
+            if (
+              !item.column ||
+              !item.operator ||
+              (item.value === undefined && !isUnaryOperator(item.operator))
+            ) {
+              alertErrors.push(t("alerts.import.v2ConditionFieldsRequired", { index }));
               return false;
             }
             // Validate operator for custom type
@@ -710,10 +718,11 @@ export default defineComponent({
                 "NotContains",
                 "contains",
                 "not_contains",
-              ].includes(item.operator)
+              ].includes(item.operator) &&
+              !isUnaryOperator(item.operator)
             ) {
               alertErrors.push(
-                `Alert - ${index}: Invalid operator '${item.operator}'. Allowed: '=', '!=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
+                t("alerts.import.invalidOperator", { index, operator: item.operator }),
               );
               return false;
             }
@@ -724,7 +733,11 @@ export default defineComponent({
 
         const validateV1Condition = (condition: any) => {
           // Check if it's a simple condition (V0/V1 format)
-          if (condition.column && condition.operator && condition.value !== undefined) {
+          if (
+            condition.column &&
+            condition.operator &&
+            (condition.value !== undefined || isUnaryOperator(condition.operator))
+          ) {
             if (
               input.query_condition.type === "custom" &&
               ![
@@ -738,11 +751,10 @@ export default defineComponent({
                 "NotContains",
                 "contains",
                 "not_contains",
-              ].includes(condition.operator)
+              ].includes(condition.operator) &&
+              !isUnaryOperator(condition.operator)
             ) {
-              alertErrors.push(
-                `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '!=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
-              );
+              alertErrors.push(t("alerts.import.invalidQueryConditionOperator", { index }));
             }
             return;
           }
@@ -751,7 +763,7 @@ export default defineComponent({
           if (condition.and || condition.or) {
             const conditions = condition.and || condition.or;
             if (!Array.isArray(conditions)) {
-              alertErrors.push(`Alert - ${index}: 'and'/'or' conditions must be an array.`);
+              alertErrors.push(t("alerts.import.andOrConditionsArray", { index }));
               return;
             }
             conditions.forEach(validateV1Condition);
@@ -759,9 +771,7 @@ export default defineComponent({
           }
 
           // If neither a simple condition nor a nested condition
-          alertErrors.push(
-            `Alert - ${index}: Invalid condition format. Must have either column/operator/value or and/or operators.`,
-          );
+          alertErrors.push(t("alerts.import.invalidConditionFormat", { index }));
         };
 
         let conditionsToValidate = input.query_condition.conditions;
@@ -776,10 +786,12 @@ export default defineComponent({
         if (Array.isArray(conditionsToValidate)) {
           // V0 format - flat array of conditions
           conditionsToValidate.forEach((condition: any) => {
-            if (!condition.column || !condition.operator || condition.value === undefined) {
-              alertErrors.push(
-                `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
-              );
+            if (
+              !condition.column ||
+              !condition.operator ||
+              (condition.value === undefined && !isUnaryOperator(condition.operator))
+            ) {
+              alertErrors.push(t("alerts.import.queryConditionFieldsRequired", { index }));
             }
           });
         } else if (conditionsToValidate.filterType === "group") {
@@ -790,19 +802,19 @@ export default defineComponent({
           validateV1Condition(conditionsToValidate);
         } else {
           // Unknown format
-          alertErrors.push(`Alert - ${index}: Unrecognized query condition format.`);
+          alertErrors.push(t("alerts.import.unrecognizedQueryConditionFormat", { index }));
         }
       }
       // 7. Validate 'sql' and 'promql'
       if (input.query_condition.type === "sql" && typeof input.query_condition.sql !== "string") {
-        alertErrors.push(`Alert - ${index}: SQL should be provided when the type is 'sql'.`);
+        alertErrors.push(t("alerts.import.sqlRequired", { index }));
       }
 
       if (
         input.query_condition.type === "promql" &&
         typeof input.query_condition.promql !== "string"
       ) {
-        alertErrors.push(`Alert - ${index}: PromQL should be provided when the type is 'promql'.`);
+        alertErrors.push(t("alerts.import.promqlRequired", { index }));
       }
 
       // 8. Validate 'vrl_function'
@@ -810,7 +822,7 @@ export default defineComponent({
         input.query_condition.vrl_function &&
         typeof input.query_condition.vrl_function !== "string"
       ) {
-        alertErrors.push(`Alert - ${index}: VRL function should be a string or null.`);
+        alertErrors.push(t("alerts.import.vrlFunctionString", { index }));
       }
 
       // 9. Validate 'multi_time_range'
@@ -820,29 +832,25 @@ export default defineComponent({
         (!Array.isArray(input.query_condition.multi_time_range) ||
           input.query_condition.multi_time_range.length > 0)
       ) {
-        alertErrors.push(`Alert - ${index}: Multi Time Range should be an empty array or null.`);
+        alertErrors.push(t("alerts.import.multiTimeRangeEmpty", { index }));
       }
 
       // 10. Validate 'trigger_condition'
       const triggerCondition = input.trigger_condition;
       if (!triggerCondition) {
-        alertErrors.push(`Alert - ${index}: Trigger Condition is required.`);
+        alertErrors.push(t("alerts.import.triggerConditionRequired", { index }));
       }
       if (
         isNaN(Number(triggerCondition.period)) ||
         triggerCondition.period < 1 ||
         typeof triggerCondition.period !== "number"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Period should be a positive number greater than 0 and should be a number.`,
-        );
+        alertErrors.push(t("alerts.import.periodPositiveNumber", { index }));
       }
 
       const validOperators = ["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"];
       if (!validOperators.includes(triggerCondition.operator)) {
-        alertErrors.push(
-          `Alert - ${index}: Operator should be one of: '=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'.`,
-        );
+        alertErrors.push(t("alerts.import.triggerOperatorInvalid", { index }));
       }
 
       if (
@@ -850,13 +858,11 @@ export default defineComponent({
         triggerCondition.frequency < 1 ||
         typeof triggerCondition.frequency !== "number"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Frequency should be a positive number greater than 0 and should be a number.`,
-        );
+        alertErrors.push(t("alerts.import.frequencyPositiveNumber", { index }));
       }
 
       if (triggerCondition.cron && typeof triggerCondition.cron !== "string") {
-        alertErrors.push(`Alert - ${index}: Cron expression should be a string.`);
+        alertErrors.push(t("alerts.import.cronExpressionString", { index }));
       }
 
       if (
@@ -864,9 +870,7 @@ export default defineComponent({
         triggerCondition.threshold < 1 ||
         typeof triggerCondition.threshold !== "number"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Threshold should be a positive number greater than 0 and should be a number.`,
-        );
+        alertErrors.push(t("alerts.import.thresholdPositiveNumber", { index }));
       }
 
       if (
@@ -874,9 +878,7 @@ export default defineComponent({
         triggerCondition.silence < 0 ||
         typeof triggerCondition.silence !== "number"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Silence should be a positive number greater than or equal to 0 and should be a number.`,
-        );
+        alertErrors.push(t("alerts.import.silenceNonNegativeNumber", { index }));
       }
 
       if (
@@ -884,16 +886,14 @@ export default defineComponent({
           triggerCondition.frequency_type !== "cron") ||
         typeof triggerCondition.frequency_type !== "string"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Frequency Type must be 'minutes' or 'cron' and should be a string.`,
-        );
+        alertErrors.push(t("alerts.import.frequencyTypeInvalid", { index }));
       }
 
       if (
         triggerCondition.frequency_type === "cron" &&
         (triggerCondition.cron.trim() === "" || typeof triggerCondition.cron !== "string")
       ) {
-        alertErrors.push(`Alert - ${index}: Cron expression should be a valid cron expression.`);
+        alertErrors.push(t("alerts.import.cronExpressionInvalid", { index }));
       }
 
       if (
@@ -1000,7 +1000,7 @@ export default defineComponent({
         // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
         input.query_condition.conditions = {
           version: 2,
-          conditions: convertedConditions,
+          conditions: ensureUnaryConditionValues(convertedConditions),
         };
       }
 
@@ -1172,6 +1172,7 @@ export default defineComponent({
       toggleDestination,
       userSelectedTimezone,
       filteredTimezone,
+      timezoneSelectOptions,
       updateTimezone,
       timezoneFilterFn,
       activeFolderId,

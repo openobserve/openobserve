@@ -139,15 +139,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
+            <!-- LLM workflow actions — icon-only so the header stays legible
+                 with the trace identity chips it already carries. -->
             <OButton
               v-if="canManualEvaluate"
               data-test="trace-details-evaluate-trace-btn"
-              variant="primary"
-              size="xs"
-              icon-left="play-circle"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('onlineEvals.manualEvaluation.titles.trace')"
               @click="openTraceEvaluation"
             >
-              {{ t("onlineEvals.manualEvaluation.titles.trace") }}
+              <OIcon name="rule" size="sm" />
+              <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.trace')" />
+            </OButton>
+
+            <TraceAnnotateMenu
+              v-if="canAnnotate"
+              ref-type="trace"
+              :ref-id="effectiveTraceId"
+              :ref-trace-start-time="traceEvaluationRange.startTime"
+              :source-stream="effectiveStreamName"
+              compact
+              data-test="trace-details-annotate-trace-btn"
+            />
+
+            <OButton
+              v-if="canAnnotate"
+              data-test="trace-details-dataset-trace-btn"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.dataset.button')"
+              @click="openTraceDataset"
+            >
+              <OIcon name="table-chart" size="sm" />
+              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
             </OButton>
 
             <!-- Share button -->
@@ -391,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon :name="tab.icon" :size="tab.iconSize" class="shrink-0" />
                 </template>
-                {{ t(tab.labelKey) }}
+                {{ "label" in tab ? raw(tab.label) : t(tab.labelKey) }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -400,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
-              class="unified-search-group rounded-default mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
+              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -415,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <!-- Search Results Navigation -->
               <div
-                class="rounded-default border-input-border dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
+                class="rounded-default border-border-default dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
               >
                 <div
                   class="flex items-center gap-[0.0625rem] px-1 text-xs font-medium select-none"
@@ -570,6 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
+                        @select-span-event="onSelectSpanEvent"
                         @hover-span="onHoverSpan"
                         @unhover-span="onUnhoverSpan"
                         @update-current-index="handleIndexUpdate"
@@ -597,16 +623,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -658,16 +687,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -735,16 +767,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -766,15 +801,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Map View with Pattern/Span Toggle -->
             <div v-if="activeTab === 'map'" class="flex h-full min-h-0 w-full flex-1 flex-col">
               <!-- Chart Container -->
-              <div class="flex min-h-0 flex-1 items-center justify-center">
-                <div class="h-full w-full p-2.5 text-center">
-                  <ChartRenderer
-                    ref="chartRendererRef"
-                    data-test="trace-details-service-map-chart"
-                    :data="traceServiceMapChartOptions"
-                    class="trace-chart-height h-50! min-h-50! w-full!"
-                  />
-                </div>
+              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
+                <ChartRenderer
+                  ref="chartRendererRef"
+                  data-test="trace-details-service-map-chart"
+                  :data="traceServiceMapChartOptions"
+                  class="h-full"
+                />
               </div>
             </div>
           </div>
@@ -810,6 +843,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CodeQueryEditor v-model:query="localEditorValue" language="sql" class="h-full w-full" />
       </div>
     </ODrawer>
+
+    <AddToDatasetDrawer
+      v-if="datasetTarget"
+      :open="datasetOpen"
+      :org-id="effectiveOrgIdentifier"
+      :ref-type="datasetTarget.refType"
+      :ref-id="datasetTarget.refId"
+      :source-stream="effectiveStreamName"
+      :ref-trace-start-time="datasetTarget.refTraceStartTime"
+      :input-preview="datasetTarget.inputPreview"
+      @update:open="updateDatasetOpen"
+    />
 
     <ManualEvaluationDialog
       v-if="manualEvaluationTarget"
@@ -913,6 +958,23 @@ const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
 const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
 );
+const TraceAnnotateMenu = defineAsyncComponent(
+  () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+);
+const AddToDatasetDrawer = defineAsyncComponent(
+  () => import("@/enterprise/components/AIObservability/AddToDatasetDrawer.vue"),
+);
+
+/** A trace or span being distilled into a dataset golden. */
+interface DatasetTarget {
+  refType: "trace" | "span";
+  refId: string;
+  refTraceId?: string;
+  /** MICROSECONDS — the lower bound the review and dataset APIs search from. */
+  refTraceStartTime: number;
+  /** Read-only view of the input the golden will carry. */
+  inputPreview?: string;
+}
 
 interface ManualEvaluationTarget {
   targetScope: "span" | "trace";
@@ -936,7 +998,9 @@ const TRACE_TAB_DEFS = [
   { value: "waterfall", labelKey: "traces.waterfall", icon: "align-left", iconSize: "sm" },
   { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
   { value: "map", labelKey: "traces.traceGraph", icon: "account-tree", iconSize: "sm" },
-  { value: "dag", labelKey: "traces.dag", icon: "git-branch", iconSize: "sm" },
+  // `label` overrides `labelKey`: DAG is an acronym, and translating it produced
+  // "DÍA"/"JOUR"/"GIORNO" (day) in shipped locales.
+  { value: "dag", label: "DAG", icon: "git-branch", iconSize: "sm" },
   { value: "thread", labelKey: "traces.thread", icon: "chat", iconSize: "xs" },
 ] as const;
 
@@ -1090,6 +1154,8 @@ export default defineComponent({
     OSearchInput,
     OSelect,
     ManualEvaluationDialog,
+    TraceAnnotateMenu,
+    AddToDatasetDrawer,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -1535,6 +1601,7 @@ export default defineComponent({
         Boolean(effectiveStreamName.value) &&
         Boolean(effectiveTraceId.value) &&
         Number.isFinite(range.startTime) &&
+        range.startTime > 0 &&
         Number.isFinite(range.endTime) &&
         range.endTime > range.startTime
       );
@@ -1584,6 +1651,90 @@ export default defineComponent({
     const updateManualEvaluationOpen = (open: boolean) => {
       manualEvaluationOpen.value = open;
       if (!open) manualEvaluationTarget.value = null;
+    };
+
+    // ── Annotate / Dataset (Phase 2.5 Annotate) ──
+    // Same enterprise gate as manual evaluation minus the online-eval flag:
+    // queuing a trace for human review does not require the eval engine.
+    const canAnnotate = computed(() => {
+      const range = traceEvaluationRange.value;
+      return (
+        props.mode === "standalone" &&
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        Boolean(effectiveOrgIdentifier.value) &&
+        Boolean(effectiveStreamName.value) &&
+        Boolean(effectiveTraceId.value) &&
+        Number.isFinite(range.startTime) &&
+        range.startTime > 0
+      );
+    });
+
+    const datasetOpen = ref(false);
+    const datasetTarget = ref<DatasetTarget | null>(null);
+
+    /** Span start in nanoseconds; spans without one sort last. */
+    const startNsOf = (span: Record<string, unknown>): number => {
+      const ns = Number(span?.start_time);
+      return Number.isFinite(ns) ? ns : Number.POSITIVE_INFINITY;
+    };
+
+    /** The trace's input is the EARLIEST previewable LLM call, matching how the
+     *  server hydrates it (first by timestamp) — array order would preview a
+     *  different call's input than the one the golden ends up carrying. */
+    const earliestPreviewableSpan = (): Record<string, unknown> | undefined => {
+      const candidates = (effectiveSpanList.value ?? []).filter((span: Record<string, unknown>) =>
+        hasTracePreview(span),
+      );
+      if (!candidates.length) return undefined;
+      return candidates.reduce(
+        (earliest: Record<string, unknown>, span: Record<string, unknown>) =>
+          startNsOf(span) < startNsOf(earliest) ? span : earliest,
+      );
+    };
+
+    /** The LLM input as text, for the read-only preview in the dataset drawer. */
+    const inputPreviewOf = (span: Record<string, unknown> | undefined): string | undefined => {
+      const value = span?.gen_ai_input_messages;
+      if (value == null) return undefined;
+      return typeof value === "string" ? value : JSON.stringify(value);
+    };
+
+    const traceTarget = (): DatasetTarget => ({
+      refType: "trace",
+      refId: effectiveTraceId.value,
+      refTraceStartTime: traceEvaluationRange.value.startTime,
+      inputPreview: inputPreviewOf(earliestPreviewableSpan()),
+    });
+
+    /** A span's own start time in µs (start_time is ns), widened by 1µs so an
+     *  inclusive lower-bound search can't exclude the span itself. Falls back to
+     *  the trace window when the span carries no usable start. */
+    const spanTarget = (span: Record<string, unknown>): DatasetTarget => {
+      const startNs = Number(span.start_time);
+      return {
+        refType: "span",
+        refId: String(span.span_id ?? ""),
+        refTraceId: String(span.trace_id ?? effectiveTraceId.value),
+        refTraceStartTime: Number.isFinite(startNs)
+          ? Math.max(0, Math.floor(startNs / 1_000) - 1)
+          : traceEvaluationRange.value.startTime,
+        inputPreview: inputPreviewOf(span),
+      };
+    };
+
+    const openTraceDataset = () => {
+      datasetTarget.value = traceTarget();
+      datasetOpen.value = true;
+    };
+
+    const openSpanDataset = (span: Record<string, unknown>) => {
+      datasetTarget.value = spanTarget(span);
+      datasetOpen.value = true;
+    };
+
+    const updateDatasetOpen = (open: boolean) => {
+      datasetOpen.value = open;
+      if (!open) datasetTarget.value = null;
     };
 
     /** Which tabs this trace can show, independent of ordering. */
@@ -1787,12 +1938,6 @@ export default defineComponent({
       }, 300);
     };
 
-    const backgroundStyle = computed(() => {
-      return {
-        background: "var(--color-surface-base)",
-      };
-    });
-
     const resetTraceDetails = () => {
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
@@ -1884,7 +2029,13 @@ export default defineComponent({
 
       // Fetch from API — standalone mode, or embedded with no pre-fetched spans
       await loadLogStreams();
-      await getTraceMeta();
+      const timeRange = effectiveTimeRange.value;
+      await getTraceDetails({
+        stream: effectiveStreamName.value,
+        trace_id: effectiveTraceId.value,
+        from: timeRange.from,
+        to: timeRange.to,
+      });
     };
 
     onMounted(async () => {
@@ -1940,15 +2091,64 @@ export default defineComponent({
     const hoveredSpanId = ref("");
     const effectiveSpanId = computed(() => hoveredSpanId.value || selectedSpanId.value);
 
+    /**
+     * A sidebar tab requested explicitly by an interaction, as opposed to the
+     * default the watcher below picks. Keyed to the span it was requested for
+     * and drained on every watcher fire, so a request that is never consumed
+     * (e.g. re-clicking a marker on the already-selected span, which does not
+     * change `selectedSpanId` and so never reaches this watcher) cannot
+     * outlive the selection it belonged to and hijack a later, unrelated one.
+     *
+     * The watcher runs on the flush after `selectedSpanId` changes, i.e. after
+     * the handler that changed it has returned — so a handler cannot simply
+     * assign `sidebarActiveTab` and expect it to survive. Recording the intent
+     * here removes the ordering question entirely: whichever runs first, the
+     * explicit tab wins and the default is skipped.
+     */
+    const pendingSidebarTab = ref<{ spanId: string; tab: string } | null>(null);
+
+    /**
+     * The span whose Events tab was opened by a marker click.
+     *
+     * A marker-driven Events view belongs to one span — navigating to another
+     * span should fall back to that span's default tab. A manually chosen tab
+     * is different: like every other tab, it persists across span navigation.
+     * Comparing `sidebarActiveTab` to "events" cannot tell the two apart,
+     * because the Events tab is always present and always selectable by hand.
+     */
+    const markerEventsSpanId = ref<string | null>(null);
+
     // Set the default sidebar tab on the first span selection,
     // and re-evaluate when the current tab no longer exists for the new span
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
-      if (newSpanId && spanMap.value[newSpanId]) {
-        const canPreview = hasTracePreview(spanMap.value[newSpanId]);
-        if (!oldSpanId || (sidebarActiveTab.value === "preview" && !canPreview)) {
-          sidebarActiveTab.value = canPreview ? "preview" : "attributes";
-        }
+      // Drain first, always: a request that was never consumed must not
+      // survive to hijack the next selection.
+      const pending = pendingSidebarTab.value;
+      pendingSidebarTab.value = null;
+
+      // A marker-driven Events view is scoped to its own span. Once the
+      // selection moves elsewhere it no longer applies, so retire it and let
+      // the default apply — but only for a view a marker opened, never for a
+      // tab the user chose by hand.
+      const leavingMarkerEvents =
+        markerEventsSpanId.value !== null && markerEventsSpanId.value !== newSpanId;
+      if (leavingMarkerEvents) markerEventsSpanId.value = null;
+
+      if (!newSpanId || !spanMap.value[newSpanId]) return;
+
+      if (pending && pending.spanId === newSpanId) {
+        sidebarActiveTab.value = pending.tab;
+        return;
+      }
+
+      const canPreview = hasTracePreview(spanMap.value[newSpanId]);
+      if (
+        !oldSpanId ||
+        leavingMarkerEvents ||
+        (sidebarActiveTab.value === "preview" && !canPreview)
+      ) {
+        sidebarActiveTab.value = canPreview ? "preview" : "attributes";
       }
     });
 
@@ -1957,77 +2157,6 @@ export default defineComponent({
     };
     const onUnhoverSpan = () => {
       hoveredSpanId.value = "";
-    };
-
-    const getTraceMeta = () => {
-      try {
-        searchObj.data.traceDetails.isLoadingTraceMeta = true;
-
-        let filter = (router.currentRoute.value.query.filter as string) || "";
-
-        if (filter?.length) filter += ` and trace_id='${effectiveTraceId.value}'`;
-        else filter += `trace_id='${effectiveTraceId.value}'`;
-
-        const timeRange = effectiveTimeRange.value;
-
-        searchService
-          .get_traces({
-            org_identifier: effectiveOrgIdentifier.value,
-            start_time: timeRange.from - 10000,
-            end_time: timeRange.to + 10000,
-            filter: filter || "",
-            size: 1,
-            from: 0,
-            stream_name: effectiveStreamName.value,
-          })
-          .then(async (res: any) => {
-            const trace = getTracesMetaData(res.data.hits)[0];
-            if (!trace) {
-              showTraceDetailsError();
-              return;
-            }
-            searchObj.data.traceDetails.selectedTrace = trace;
-
-            let startTime = Number(router.currentRoute.value.query.from);
-            let endTime = Number(router.currentRoute.value.query.to);
-            if (
-              res.data.hits.length === 1 &&
-              res.data.hits[0].start_time &&
-              res.data.hits[0].end_time
-            ) {
-              startTime = Math.floor(res.data.hits[0].start_time / 1000);
-              endTime = Math.ceil(res.data.hits[0].end_time / 1000);
-
-              // If the trace is not in the current time range, update the time range
-              if (!(
-                startTime >= Number(router.currentRoute.value.query.from) &&
-                endTime <= Number(router.currentRoute.value.query.to)
-              )) {
-                updateUrlQueryParams({
-                  from: startTime,
-                  to: endTime,
-                });
-              }
-            }
-
-            getTraceDetails({
-              stream: effectiveStreamName.value,
-              trace_id: trace.trace_id,
-              from: startTime - 10000,
-              to: endTime + 10000,
-            });
-          })
-          .catch(() => {
-            showTraceDetailsError();
-          })
-          .finally(() => {
-            searchObj.data.traceDetails.isLoadingTraceMeta = false;
-          });
-      } catch (error) {
-        console.error("Error fetching trace meta:", error);
-        searchObj.data.traceDetails.isLoadingTraceMeta = false;
-        showTraceDetailsError();
-      }
     };
 
     /**
@@ -2043,36 +2172,6 @@ export default defineComponent({
       });
     };
 
-    const getDefaultRequest = () => {
-      return {
-        query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, min(service_name) as service_name, min(operation_name) as operation_name, count(trace_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
-          start_time: (new Date().getTime() - 900000) * 1000,
-          end_time: new Date().getTime() * 1000,
-          from: 0,
-          size: 0,
-        },
-        encoding: "base64",
-      };
-    };
-
-    const sanitizeTraceId = (id: string): string => String(id).replace(/['"\\]/g, "");
-
-    const buildTraceSearchQuery = (trace: any) => {
-      const req = getDefaultRequest();
-      req.query.from = 0;
-      // TODO : Handle this with _search_stream instead of adding size
-      req.query.size = 50000;
-      req.query.start_time = trace.from;
-      req.query.end_time = trace.to;
-
-      req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}' ORDER BY start_time`,
-      ) as string;
-
-      return req;
-    };
-
     const { fetchRumEventsForTrace, formatRumEventsAsSpans } = useRumSpanBuilder(
       logStreams,
       searchObj,
@@ -2083,84 +2182,60 @@ export default defineComponent({
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
-        const req = buildTraceSearchQuery(data);
+        const traceRes = await searchService.get_trace_details({
+          org_identifier: effectiveOrgIdentifier.value,
+          stream_name: data.stream,
+          trace_id: data.trace_id,
+          start_time: data.from,
+          end_time: data.to,
+          hint_ts: data.from + Math.floor((data.to - data.from) / 2),
+        });
+        if (!traceRes.data?.hits?.length) {
+          showTraceDetailsError();
+          return;
+        }
 
-        const tracePromise = searchService.search(
-          {
-            org_identifier: effectiveOrgIdentifier.value,
-            query: req,
-            page_type: "traces",
-          },
-          "ui",
+        const effectiveStart = traceRes.data.new_start_time ?? data.from;
+        const effectiveEnd = traceRes.data.new_end_time ?? data.to;
+        if (effectiveStart !== data.from || effectiveEnd !== data.to) {
+          updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
+        }
+        const rumData = await fetchRumEventsForTrace(data.trace_id, effectiveStart, effectiveEnd);
+        const traceSpans = traceRes.data.hits;
+        const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
+        const rumSpans = formatRumEventsAsSpans(
+          tracedResources,
+          viewEvents,
+          actionEvents,
+          allViewEvents,
         );
-
-        const rumPromise = fetchRumEventsForTrace(
-          data.trace_id,
-          req.query.start_time,
-          req.query.end_time,
-        );
-
-        Promise.all([tracePromise, rumPromise])
-          .then(([traceRes, rumData]) => {
-            if (!traceRes.data?.hits?.length) {
-              showTraceDetailsError();
-              return;
-            }
-
-            const traceSpans = traceRes.data?.hits || [];
-            const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
-            const rumSpans = formatRumEventsAsSpans(
-              tracedResources,
-              viewEvents,
-              actionEvents,
-              allViewEvents,
-            );
-            // RUM spans take priority over trace spans with the same span_id
-            const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
-            const deduplicatedTraceSpans = traceSpans.filter(
-              (s: any) => !rumSpanIds.has(s.span_id),
-            );
-            // spanList is never[] in useTraces state; widen container to accept spans.
-            (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
-              ...rumSpans,
-              ...deduplicatedTraceSpans,
-            ];
-            updateServiceColors();
-            buildTracesTree();
-          })
-          .catch((error) => {
-            console.error("Error fetching trace details:", error);
-            searchObj.data.traceDetails.isLoadingTraceDetails = false;
-            showTraceDetailsError();
-          })
-          .finally(() => {
-            searchObj.data.traceDetails.isLoadingTraceDetails = false;
-          });
+        // RUM spans take priority over trace spans with the same span_id
+        const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
+        const deduplicatedTraceSpans = traceSpans.filter((s: any) => !rumSpanIds.has(s.span_id));
+        // spanList is never[] in useTraces state; widen container to accept spans.
+        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
+          ...rumSpans,
+          ...deduplicatedTraceSpans,
+        ];
+        updateSelectedTrace(data.trace_id, spanList.value);
+        updateServiceColors();
+        buildTracesTree();
       } catch (error) {
         console.error("Error fetching trace details:", error);
-        searchObj.data.traceDetails.isLoadingTraceDetails = false;
         showTraceDetailsError();
+      } finally {
+        searchObj.data.traceDetails.isLoadingTraceDetails = false;
       }
     };
 
-    const getTracesMetaData = (traces: any[]) => {
-      if (!traces.length) return [];
-
-      return traces.map((trace) => {
-        const _trace = {
-          trace_id: trace.trace_id,
-          trace_start_time: Math.round(trace.start_time / 1000),
-          trace_end_time: Math.round(trace.end_time / 1000),
-          service_name: trace.service_name,
-          operation_name: trace.operation_name,
-          spans: trace.spans[0],
-          errors: trace.spans[1],
-          duration: trace.duration,
-          services: {} as any,
-          zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-        };
-        return _trace;
-      });
+    const updateSelectedTrace = (traceId: string, spans: any[]) => {
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: traceId,
+        trace_start_time: Math.floor(Math.min(...spans.map((span) => span.start_time)) / 1000),
+        trace_end_time: Math.ceil(Math.max(...spans.map((span) => span.end_time)) / 1000),
+        service_name: extractServiceNames(spans),
+        services: {},
+      };
     };
 
     const updateServiceColors = () => {
@@ -2753,6 +2828,38 @@ export default defineComponent({
       });
     };
 
+    const focusedEventIndex = ref<number | null>(null);
+
+    /**
+     * A waterfall marker click. Selecting the span hides the timeline the
+     * marker lived on, so route the event's index into the sidebar and open the
+     * Events tab, which carries its own span-scoped mini-timeline.
+     */
+    const onSelectSpanEvent = (payload: { spanId: string; eventIndex: number }) => {
+      // Record the tab before the selection, so the watcher this triggers sees
+      // the request rather than overwriting it with the default.
+      pendingSidebarTab.value = { spanId: payload.spanId, tab: "events" };
+      markerEventsSpanId.value = payload.spanId;
+      updateSelectedSpan(payload.spanId);
+      sidebarActiveTab.value = "events";
+      // Re-assign through null so clicking the same marker twice re-triggers
+      // the sidebar's watcher.
+      focusedEventIndex.value = null;
+      nextTick(() => {
+        focusedEventIndex.value = payload.eventIndex;
+      });
+    };
+
+    /**
+     * An explicit tab choice from the sidebar. Clears marker provenance: once
+     * the user has picked a tab themselves, it persists across span
+     * navigation like any other.
+     */
+    const onSidebarTabChange = (tab: string) => {
+      sidebarActiveTab.value = tab;
+      markerEventsSpanId.value = null;
+    };
+
     const updateSelectedSpan = (spanId: string, swichToWaterfall: boolean = false) => {
       hoveredSpanId.value = ""; // clear any hover state on click
       showTraceDetails.value = false;
@@ -2892,6 +2999,8 @@ export default defineComponent({
       traceTabs,
       onTabReorder,
       sidebarActiveTab,
+      pendingSidebarTab,
+      markerEventsSpanId,
       traceTree,
       collapseMapping,
       traceRootSpan,
@@ -2946,6 +3055,9 @@ export default defineComponent({
       showTraceDetails,
       traceDetails,
       updateSelectedSpan,
+      onSelectSpanEvent,
+      onSidebarTabChange,
+      focusedEventIndex,
       routeToTracesList,
       handleExpandToFullView,
       openTraceLink,
@@ -3010,6 +3122,13 @@ export default defineComponent({
       canManualEvaluate,
       manualEvaluationOpen,
       manualEvaluationTarget,
+      canAnnotate,
+      traceEvaluationRange,
+      datasetOpen,
+      datasetTarget,
+      openTraceDataset,
+      openSpanDataset,
+      updateDatasetOpen,
       openTraceEvaluation,
       openSpanEvaluation,
       updateManualEvaluationOpen,
@@ -3031,14 +3150,5 @@ export default defineComponent({
 :global(body:has(.trace-details)),
 :global(html:has(.trace-details)) {
   overflow: hidden !important;
-}
-
-.dark .unified-search-group {
-  background-color: var(--color-surface-base);
-}
-
-.dark .unified-search-group:hover,
-.dark .unified-search-group:focus-within {
-  border-color: var(--color-theme-accent);
 }
 </style>

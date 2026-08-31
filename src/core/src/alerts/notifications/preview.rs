@@ -87,6 +87,8 @@ pub enum PreviewError {
     UnknownChannel(String),
     UnknownSeverity(String),
     RenderFailed(String),
+    /// Draft fails the same content validation `templates::save` applies.
+    InvalidContent(String),
 }
 
 impl std::fmt::Display for PreviewError {
@@ -98,6 +100,7 @@ impl std::fmt::Display for PreviewError {
                 "unknown severity: {s} (expected critical, warning, ok, no_data, or single_level)"
             ),
             Self::RenderFailed(e) => write!(f, "preview render failed: {e}"),
+            Self::InvalidContent(e) => write!(f, "{e}"),
         }
     }
 }
@@ -200,6 +203,15 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
 pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
     let format = parse_channel(&req.channel)?;
     let level = parse_severity(&req.severity)?;
+
+    // Hold the draft to the same bar `templates::save` applies. Previewing a
+    // spec that cannot be saved would report it as fine and defer the error
+    // to the save click — and `preview_model.links` echoes the raw authored
+    // URL back to the UI, so it must not carry a hostile scheme either.
+    req.definition
+        .validate()
+        .map_err(PreviewError::InvalidContent)?;
+
     let ctx = synthetic_context(level);
 
     let content = resolve_content(&req.definition, &ctx, format.channel_family());
@@ -271,9 +283,33 @@ fn sample_spec() -> ContentSpec {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::alerts::content_spec::{ContentField, SeverityFilter};
+    use config::meta::alerts::content_spec::{ContentField, ContentLink, SeverityFilter};
 
     use super::*;
+
+    /// A draft whose link scheme `save` would reject must be rejected here
+    /// too. Previewing it cleanly and only failing on save teaches the author
+    /// the template is fine when it is not (#13742).
+    #[test]
+    fn preview_rejects_a_draft_the_save_path_would_reject() {
+        let mut spec = sample_spec();
+        spec.links.push(ContentLink {
+            label: "click".into(),
+            url: "javascript:alert(1)".into(),
+            show_when: None,
+        });
+        let req = PreviewRequest {
+            definition: spec,
+            channel: "slack".into(),
+            severity: Some("critical".into()),
+            sample: None,
+        };
+        let err = preview(&req).expect_err("hostile link previewed cleanly");
+        assert!(
+            err.to_string().contains("click"),
+            "error should name the offending link, got: {err}"
+        );
+    }
 
     #[test]
     fn preview_uses_production_renderer() {

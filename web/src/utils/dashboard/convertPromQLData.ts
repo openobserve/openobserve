@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
 import { formatDate } from "./dateTimeUtils";
@@ -31,9 +33,13 @@ import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legend
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
 import { resolveMetricValueStyle } from "./tableConfigUtils";
-import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
+import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legendBuilder";
+import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
+
+/** Rows a tooltip will list before it collapses the rest into a "+N more". */
+const TOOLTIP_MAX_SERIES = 10;
 
 let moment: any;
 let momentInitialized = false;
@@ -186,13 +192,11 @@ export const convertPromQLData = async (
     // Only show warning if we actually hit the limit (metricsStored >= maxSeries)
     // AND we had to drop some metrics (totalMetricsReceived > metricsStored)
     if (totalMetricsReceived > metricsStored && metricsStored >= maxSeries) {
-      extras.limitNumberOfSeriesWarningMessage =
-        "Limiting the displayed series to ensure optimal performance";
+      extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
     }
   } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
     // Fallback: Series limiting happens here (for non-streaming queries)
-    extras.limitNumberOfSeriesWarningMessage =
-      "Limiting the displayed series to ensure optimal performance";
+    extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
   }
 
   // flag to check if the data is time seriesc
@@ -455,7 +459,15 @@ export const convertPromQLData = async (
           }
         });
 
-        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+        // A query fanning out to dozens of series makes an unreadable wall of
+        // rows; the list is already sorted by value with the hovered series
+        // hoisted first, so the cap keeps what the reader came for.
+        const shown = hoverText.slice(0, TOOLTIP_MAX_SERIES);
+        if (hoverText.length > shown.length) {
+          shown.push(`+${hoverText.length - shown.length} more`);
+        }
+
+        return `${formatDate(date)} <br/> ${shown.join("<br/>")}`;
       },
       axisPointer: {
         show: true,
@@ -641,6 +653,25 @@ export const convertPromQLData = async (
     [chartMin, chartMax] = getMetricMinMaxValue(limitedSearchQueryData);
   }
 
+  // Series names come from the label vocabulary itself, so a chart neither waits
+  // on nor fires a request. The org's semantic groups only REFINE the result and
+  // only if some other view has already loaded them — the endpoint they come
+  // from is enterprise-only, and a chart must render the same on OSS.
+  //
+  // Consequence worth knowing: on enterprise the refinement is therefore
+  // order-dependent. A dashboard opened before anything has fetched the groups
+  // names purely from the static vocabulary; opened after, a group can veto or
+  // promote a label and shift the names. Both are readable; they are not always
+  // identical within one session.
+  const seriesNames = buildPromqlSeriesNames(
+    (limitedSearchQueryData ?? []).map((it: any, index: number) => ({
+      metrics: (it?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
+      template: panelSchema.queries?.[index]?.config?.promql_legend,
+      fallback: panelSchema.queries?.[index]?.config?.promql_legend_fallback,
+    })),
+    getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
+  );
+
   options.series = limitedSearchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -662,11 +693,7 @@ export const convertPromQLData = async (
                 seriesDataObj[value[0]] = value[1];
               });
 
-              const seriesName = getPromqlLegendName(
-                metric.metric,
-                panelSchema.queries[index].config.promql_legend,
-                panelSchema.queries[index].config.promql_legend_fallback,
-              );
+              const seriesName = seriesNames.get(metric.metric) ?? "";
 
               const resolvedSeriesColor = (() => {
                 try {
@@ -730,10 +757,7 @@ export const convertPromQLData = async (
                     color: "#8B5A2B",
                     type: [8, 4],
                     width: 2,
-                    shadowColor:
-                      store.state.theme === "light"
-                        ? "rgba(255, 255, 255, 0.7)"
-                        : "rgba(0, 0, 0, 0.7)",
+                    shadowColor: chartColor("--color-chart-markline-shadow"),
                     shadowBlur: 2,
                   },
                 },
@@ -747,11 +771,7 @@ export const convertPromQLData = async (
             const seriesObj = it?.result?.map((metric: any) => {
               const values = [metric.value];
 
-              const seriesName = getPromqlLegendName(
-                metric.metric,
-                panelSchema.queries[index].config.promql_legend,
-                panelSchema.queries[index].config.promql_legend_fallback,
-              );
+              const seriesName = seriesNames.get(metric.metric) ?? "";
 
               const resolvedVectorColor = (() => {
                 try {
@@ -811,10 +831,7 @@ export const convertPromQLData = async (
                     color: "#8B5A2B",
                     type: [8, 4],
                     width: 2,
-                    shadowColor:
-                      store.state.theme === "light"
-                        ? "rgba(255, 255, 255, 0.7)"
-                        : "rgba(0, 0, 0, 0.7)",
+                    shadowColor: chartColor("--color-chart-markline-shadow"),
                     shadowBlur: 2,
                   },
                 },
@@ -833,11 +850,7 @@ export const convertPromQLData = async (
           const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
 
-          const seriesName = getPromqlLegendName(
-            metric.metric,
-            panelSchema.queries[index].config.promql_legend,
-            panelSchema.queries[index].config.promql_legend_fallback,
-          );
+          const seriesName = seriesNames.get(metric.metric) ?? "";
 
           return {
             ...getPropsByChartTypeForSeries(panelSchema.type),

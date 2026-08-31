@@ -313,7 +313,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -331,6 +331,7 @@ import {
   extractWhereClause,
 } from "@/utils/query/sqlUtils";
 import { buildColumnIdentifierAst, quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { replaceSelectFieldList } from "@/utils/query/quickModeFieldList";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -552,7 +553,7 @@ export default defineComponent({
       useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
-    const { extractPatterns, patternsState } = usePatterns();
+    const { extractPatterns, patternsState } = usePatterns(t);
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1417,15 +1418,21 @@ export default defineComponent({
             return text ? ` Error: ${text}.` : "";
           })()
         : "";
+      // The prompt is model input, not screen copy — it stays English so the
+      // assistant reads the same wording regardless of the user's locale.
       const modeContext = sqlMode
-        ? `I am using SQL mode. Full query: ${queryContext || "(none)"}.`
-        : `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`;
+        ? raw(`I am using SQL mode. Full query: ${queryContext || "(none)"}.`)
+        : raw(
+            `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`,
+          );
       const outcome = errorContext
-        ? `The query produced an error.${errorContext}`
-        : `The query ran successfully but returned no results.`;
+        ? raw(`The query produced an error.${errorContext}`)
+        : raw(`The query ran successfully but returned no results.`);
       emit(
         "sendToAiChat",
-        `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+        raw(
+          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+        ),
         false,
       );
     };
@@ -1554,9 +1561,7 @@ export default defineComponent({
             .join(",");
         }
         if (searchObj.meta.sqlMode == true) {
-          searchObj.data.query = searchObj.data.query.replace(/SELECT\s+(.*?)\s+FROM/gi, () => {
-            return `SELECT ${field_list} FROM`;
-          });
+          searchObj.data.query = replaceSelectFieldList(searchObj.data.query, field_list);
           setQuery(searchObj.meta.quickMode);
           updateUrlQueryParams();
         }

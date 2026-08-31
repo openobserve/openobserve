@@ -44,9 +44,12 @@ use config::{
     },
     utils::time::now_micros,
 };
-use infra::table::{
-    folders, slo_backfill_jobs as backfill_jobs, slo_budget, slos as slos_table,
-    slos::GenerationEffect,
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::{
+        folders, slo_backfill_jobs as backfill_jobs, slo_budget, slos as slos_table,
+        slos::GenerationEffect,
+    },
 };
 use serde::Serialize;
 use svix_ksuid::Ksuid;
@@ -71,13 +74,22 @@ pub enum SloError {
     /// unique index fails the whole statement without naming the loser, so
     /// this carries no name — and nothing moved.
     MoveNameConflict,
+    /// One of the generated alerts is still an operand of a composite. The
+    /// cascade is preflighted, so neither the SLO nor any sibling alert moved.
+    AlertCascadeConflict(String),
+    /// The shared composite graph lock could not be acquired or released.
+    TemporarilyUnavailable(String),
     Db(String),
 }
 
 impl std::fmt::Display for SloError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Validation(m) | Self::Budget(m) | Self::Db(m) => write!(f, "{m}"),
+            Self::Validation(m)
+            | Self::Budget(m)
+            | Self::AlertCascadeConflict(m)
+            | Self::TemporarilyUnavailable(m)
+            | Self::Db(m) => write!(f, "{m}"),
             Self::NotFound => write!(f, "SLO not found"),
             Self::DuplicateName(n) => {
                 write!(f, "an SLO named \"{n}\" already exists in this folder")
@@ -141,7 +153,65 @@ fn validate_with_facts(
         slo.definition.slice_interval_secs,
     )
     .map_err(|e| SloError::Validation(e.to_string()))?;
+    validate_promql_parses(&slo.definition.sli_config)?;
     Ok(())
+}
+
+/// Parse every PromQL expression the SLI carries, so a typo is refused at save
+/// instead of discovered as permanent no-data days later: an expression that
+/// does not parse fails on **every** evaluation, so the SLO writes no slices,
+/// coverage falls to zero, and every alert on it freezes.
+///
+/// It cannot live beside the other query-safety rules. `config` has no PromQL
+/// parser — which is exactly why its count arm can only check non-emptiness —
+/// and `core` already depends on `promql-parser`. So the emptiness rules run
+/// there and the parse runs here, one step later, which is also the order the
+/// messages should come in: "must be a non-empty expression" is more useful
+/// than a parser complaining about empty input.
+///
+/// **Parse-only, deliberately.** There is no grouping or aggregation check.
+/// Requiring the root to be an aggregation whose `by(…)` equals the SLO's
+/// `group_by` rejects expressions that are entirely correct: a
+/// `histogram_quantile` root, whose inner `by` must also carry `le`, and a
+/// binary-op root such as the canonical `increase(a) - increase(b)` count
+/// pair. Grouping comes from the labels the returned series carry, and nothing
+/// about those is knowable at save.
+fn validate_promql_parses(sli_config: &config::meta::slo::SliConfig) -> Result<(), SloError> {
+    use config::meta::slo::{CountSource, QueryLanguage, SliConfig};
+
+    // Exhaustive, like the `validate_query_safety` it follows: the gate is the
+    // VARIANT, never a guess at what the string looks like — plenty of SQL
+    // (`avg(duration_ms)`) is also valid PromQL, and plenty of PromQL is also
+    // valid SQL. A wildcard arm would let the next PromQL-bearing shape save
+    // unparseable and measure nothing; this way it will not compile.
+    match sli_config {
+        SliConfig::Count { source } => match source {
+            CountSource::PromQl { good, total } => {
+                parse_promql("good", good)?;
+                parse_promql("total", total)
+            }
+            CountSource::SingleQuery { .. } | CountSource::DualQuery { .. } => Ok(()),
+        },
+        SliConfig::TimeSlice {
+            query_language: QueryLanguage::PromQl,
+            query,
+            ..
+        } => parse_promql("query", query),
+        SliConfig::TimeSlice {
+            query_language: QueryLanguage::Sql,
+            ..
+        } => Ok(()),
+        // Reads existing alert state, not a user query.
+        SliConfig::Alert { .. } => Ok(()),
+    }
+}
+
+/// One expression, named by its field so a count SLI's rejection says which
+/// half of the pair is wrong.
+fn parse_promql(field: &str, expr: &str) -> Result<(), SloError> {
+    promql_parser::parser::parse(expr)
+        .map(|_| ())
+        .map_err(|e| SloError::Validation(format!("{field} is not a valid PromQL expression: {e}")))
 }
 
 /// Read the source alert an `alert` SLI points at, and reduce it to facts.
@@ -288,9 +358,7 @@ pub fn source_alert_condition_changed(before: &Alert, after: &Alert) -> bool {
 /// SLO, and refusing a save because the ORM was not warm yet would be a new way
 /// for alerts to fail.
 pub async fn slos_sourced_from_alert(org: &str, alert_id: &str) -> Result<Vec<Slo>, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
+    let db = infra::db::get_orm_client_ro().await;
     slos_table::list_by_source_alert(db, org, alert_id)
         .await
         .map_err(Into::into)
@@ -307,9 +375,7 @@ pub async fn redefine_for_source_alert(org: &str, slo_ids: &[String]) {
     // runs on the alert write path, and silently skipping the bump would leave
     // one window mixing two definitions — the one corruption D59 exists to
     // prevent.
-    let db = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
+    let db = infra::db::get_orm_client_rw().await;
     let now = now_micros() / 1_000_000;
     for id in slo_ids {
         let mut slo = match slos_table::get(db, org, id).await {
@@ -402,9 +468,7 @@ pub async fn list_slo_eligible_alerts(
     org: &str,
     user_id: Option<&str>,
 ) -> Result<Vec<SloEligibleAlert>, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_ro().await;
     let params = config::meta::alerts::alert::ListAlertsParams::new(org);
     let alerts = crate::alerts::alert::list_v2(db, user_id, params)
         .await
@@ -647,9 +711,7 @@ pub fn reservation(slo: &Slo) -> (i64, i64) {
 
 pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
     let cfg = get_config();
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
 
     validate(slo).await?;
     // Before the budget charge: a bad folder should cost nothing, and the
@@ -690,9 +752,7 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
 }
 
 pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
 
     validate(slo).await?;
     // An update carries `folder_id` too, so it is also a move.
@@ -778,9 +838,7 @@ pub async fn move_to_folder(
     dst_folder_id: &str,
     editor: Option<&str>,
 ) -> Result<u64, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
 
     ensure_folder(org, dst_folder_id).await?;
 
@@ -796,9 +854,7 @@ pub async fn move_to_folder(
 }
 
 pub async fn delete(org: &str, id: &str) -> Result<bool, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
 
     let Some(slo) = slos_table::get(db, org, id).await? else {
         return Ok(false);
@@ -814,14 +870,28 @@ pub async fn delete(org: &str, id: &str) -> Result<bool, SloError> {
     let dependents = infra::table::alerts::list_alerts_by_slo(db, org, id)
         .await
         .map_err(|e| SloError::Db(e.to_string()))?;
-    for (alert_id, name) in plan_alert_cascade(&dependents) {
-        if let Err(e) = crate::alerts::alert::delete_by_id(db, org, alert_id).await {
-            // Best-effort, matching the rest of this teardown: a stuck alert
-            // must not strand the SLO half-deleted.
-            log::warn!("[slo] could not delete alert \"{name}\" with SLO {id}: {e}");
-        } else {
-            log::info!("[slo] deleted alert \"{name}\" along with SLO {id}");
-        }
+    let cascade = plan_alert_cascade(&dependents);
+    let alert_ids = cascade
+        .iter()
+        .map(|(alert_id, _)| *alert_id)
+        .collect::<Vec<_>>();
+    if let Err(error) = crate::alerts::alert::delete_many_for_cascade(db, org, &alert_ids).await {
+        use crate::alerts::alert::AlertError;
+        return Err(match error {
+            AlertError::AlertReferencedByComposites { parents } => {
+                SloError::AlertCascadeConflict(format!(
+                    "one or more generated alerts are referenced by {} composite alert(s)",
+                    parents.len()
+                ))
+            }
+            AlertError::CompositeGraphLockUnavailable(message) => {
+                SloError::TemporarilyUnavailable(message)
+            }
+            other => SloError::Db(other.to_string()),
+        });
+    }
+    for (_, name) in cascade {
+        log::info!("[slo] deleted alert \"{name}\" along with SLO {id}");
     }
 
     let now = now_micros() / 1_000_000;
@@ -853,9 +923,7 @@ fn plan_alert_cascade(dependents: &[(String, String)]) -> Vec<(Ksuid, String)> {
 }
 
 pub async fn set_enabled(org: &str, id: &str, enabled: bool) -> Result<bool, SloError> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let db = get_orm_client_rw().await;
     let now = now_micros() / 1_000_000;
     let changed = slos_table::set_enabled(db, org, id, enabled, now).await?;
     if changed && let Some(slo) = slos_table::get(db, org, id).await? {
@@ -873,9 +941,7 @@ pub async fn get_with_status(
     org: &str,
     id: &str,
 ) -> Result<Option<(Slo, Option<config::meta::slo::SloStatusView>)>, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let Some(slo) = slos_table::get(db, org, id).await? else {
         return Ok(None);
     };
@@ -888,9 +954,7 @@ pub async fn list_with_status(
     org: &str,
     folder: Option<&str>,
 ) -> Result<Vec<(Slo, Option<config::meta::slo::SloStatusView>)>, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let mut out = Vec::new();
     for slo in slos_table::list(db, org, folder).await? {
         let status = rollup_view(db, &slo).await?;
@@ -908,9 +972,7 @@ pub async fn group_status(
     org: &str,
     id: &str,
 ) -> Result<Vec<config::meta::slo::SloStatusView>, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let Some(slo) = slos_table::get(db, org, id).await? else {
         return Ok(Vec::new());
     };
@@ -1024,10 +1086,7 @@ fn view_of(
 async fn schedule(slo: &Slo, now: i64) {
     sync_ingest_trigger(slo).await;
 
-    let db = match infra::db::ORM_CLIENT.get() {
-        Some(db) => db,
-        None => return,
-    };
+    let db = get_orm_client_rw().await;
     // A new generation has no history, so its window is meaningless until
     // backfill fills it. The range ends where the incremental writer begins,
     // which is what keeps the two writers off each other's slices (§6b.9).
@@ -1303,6 +1362,312 @@ mod tests {
             assert!(validate_with_facts(&slo, None).is_ok());
             // And the underlying rule is unchanged.
             assert_eq!(validate_slo(&slo.definition, slo.target, None), Ok(()));
+        }
+    }
+
+    // ---- PromQL parse validation --------------------------------------------
+
+    /// HAZARD: a PromQL expression that does not parse saves cleanly and then
+    /// fails on every single evaluation. The SLO writes no slices, coverage
+    /// falls to zero, and every alert on it freezes — a silent, permanent
+    /// no-data discovered days later, when the typo was visible at save.
+    ///
+    /// It cannot be caught in `config`, which has no PromQL parser (hence the
+    /// "non-empty only" note on the count arm). `core` already depends on
+    /// `promql-parser`, so the parse check lives here, one step after
+    /// `validate_query_safety`.
+    ///
+    /// **Parse-only, deliberately.** There is no grouping or aggregation
+    /// check: requiring the root to be an aggregation whose `by(…)` equals
+    /// `group_by` rejects legitimate expressions — a `histogram_quantile`
+    /// root (whose inner `by` must carry `le`, a necessary superset) and a
+    /// binary-op root (the repo's own canonical count fixture). Those two
+    /// shapes are pinned below so the idea cannot be reintroduced by accident.
+    mod promql_parse_validation {
+        use config::meta::{
+            alerts::Operator,
+            slo::{
+                CountQuery, CountSource, QueryLanguage, QuerySafetyError, SliConfig, SloDefinition,
+                WINDOW_30D_SECS,
+            },
+        };
+
+        use super::*;
+
+        /// A `histogram_quantile` root whose inner `by(…)` carries `le` on top
+        /// of the group column — the shape an aggregation-root rule would
+        /// wrongly reject.
+        const HISTOGRAM_QUANTILE: &str =
+            "histogram_quantile(0.95, sum by (le, region) (rate(http_duration_bucket[5m])))";
+        /// A binary-op root, the other shape such a rule would wrongly reject.
+        const GOOD_MINUS_BAD: &str =
+            "increase(http_requests_total[5m]) - increase(http_errors_total[5m])";
+        /// Unbalanced parenthesis — a plain typo.
+        const UNPARSEABLE: &str = "increase(http_requests_total[5m]";
+
+        fn slo_with(sli_config: SliConfig, group_by: Option<Vec<String>>) -> Slo {
+            Slo {
+                id: "slo-1".into(),
+                org: "myorg".into(),
+                folder_id: "default".into(),
+                name: "checkout latency".into(),
+                description: String::new(),
+                definition: SloDefinition {
+                    sli_config,
+                    group_by,
+                    window_secs: WINDOW_30D_SECS,
+                    slice_interval_secs: SLICE_300_SECS,
+                },
+                target: 99.9,
+                tags: Vec::new(),
+                enabled: true,
+                owner: None,
+                definition_generation: 1,
+                groups_estimate: None,
+                groups_reserved: 1,
+            }
+        }
+
+        /// The stream type follows the language so these fixtures never trip
+        /// `language_suits_stream` by accident.
+        fn time_slice(
+            query_language: QueryLanguage,
+            query: &str,
+            scope: Option<&str>,
+        ) -> SliConfig {
+            let stream_type = match query_language {
+                QueryLanguage::PromQl => "metrics",
+                QueryLanguage::Sql => "logs",
+            };
+            SliConfig::TimeSlice {
+                stream: "http_requests".into(),
+                stream_type: stream_type.into(),
+                query_language,
+                query: query.into(),
+                scope: scope.map(Into::into),
+                comparator: Operator::LessThan,
+                threshold: 500.0,
+                absent_is_bad: false,
+            }
+        }
+
+        fn count_promql(good: &str, total: &str) -> SliConfig {
+            SliConfig::Count {
+                source: CountSource::PromQl {
+                    good: good.into(),
+                    total: total.into(),
+                },
+            }
+        }
+
+        // ---- time-slice --------------------------------------------------
+
+        #[test]
+        fn a_time_slice_promql_expression_that_does_not_parse_is_rejected() {
+            let slo = slo_with(time_slice(QueryLanguage::PromQl, UNPARSEABLE, None), None);
+            let msg = validate_with_facts(&slo, None).unwrap_err().to_string();
+            // Field-first, matching how every `QuerySafetyError` reads.
+            assert!(msg.starts_with("query"), "must name the field: {msg}");
+            assert!(
+                msg.to_lowercase().contains("promql"),
+                "must name the language: {msg}"
+            );
+        }
+
+        /// A name that is not a PromQL function is a parse error too, and it
+        /// is the mistake a user migrating a SQL aggregate actually makes.
+        #[test]
+        fn an_unknown_promql_function_is_rejected() {
+            let slo = slo_with(
+                time_slice(QueryLanguage::PromQl, "p95(duration_ms)", None),
+                None,
+            );
+            let msg = validate_with_facts(&slo, None).unwrap_err().to_string();
+            assert!(msg.starts_with("query"), "must name the field: {msg}");
+        }
+
+        /// Parse-only means parse-only. A bare instant selector — the natural
+        /// shape of a gauge SLI ("queue depth < 100") — carries no range
+        /// selector, no aggregation and no function call, so it also pins the
+        /// absence of any rule about those.
+        #[test]
+        fn a_valid_time_slice_promql_expression_validates() {
+            for query in [HISTOGRAM_QUANTILE, "queue_depth{job=\"api\"}"] {
+                let slo = slo_with(time_slice(QueryLanguage::PromQl, query, None), None);
+                let err = validate_with_facts(&slo, None).err().map(|e| e.to_string());
+                assert!(err.is_none(), "{query}: {err:?}");
+            }
+        }
+
+        /// The check is gated on the language, not on the SLI type. A SQL
+        /// aggregate is not PromQL and must never be parsed as if it were —
+        /// both of these are parse errors in PromQL.
+        #[test]
+        fn a_sql_time_slice_aggregate_is_never_parsed_as_promql() {
+            for aggregate in ["p95(duration_ms)", "count(*)"] {
+                let slo = slo_with(time_slice(QueryLanguage::Sql, aggregate, None), None);
+                assert!(
+                    validate_with_facts(&slo, None).is_ok(),
+                    "SQL aggregate {aggregate:?} was rejected"
+                );
+            }
+        }
+
+        // ---- count -------------------------------------------------------
+
+        #[test]
+        fn an_unparseable_count_numerator_is_rejected_by_name() {
+            let slo = slo_with(count_promql(UNPARSEABLE, "increase(a[5m])"), None);
+            let msg = validate_with_facts(&slo, None).unwrap_err().to_string();
+            assert!(msg.starts_with("good"), "must name the field: {msg}");
+            assert!(
+                msg.to_lowercase().contains("promql"),
+                "must name the language: {msg}"
+            );
+        }
+
+        #[test]
+        fn an_unparseable_count_denominator_is_rejected_by_name() {
+            let slo = slo_with(count_promql("increase(a[5m])", UNPARSEABLE), None);
+            let msg = validate_with_facts(&slo, None).unwrap_err().to_string();
+            assert!(msg.starts_with("total"), "must name the field: {msg}");
+        }
+
+        /// A single-query scope is a SQL predicate — `=` is not even a PromQL
+        /// operator — so a check gated on anything looser than the variant
+        /// would break every SQL count SLO. The sibling fixture at
+        /// `a_count_slo_still_validates_without_any_facts` cannot catch this:
+        /// its `status_code < 500` happens to be valid PromQL.
+        #[test]
+        fn a_single_query_count_source_is_never_parsed_as_promql() {
+            let slo = slo_with(
+                SliConfig::Count {
+                    source: CountSource::SingleQuery {
+                        stream: "requests".into(),
+                        stream_type: "logs".into(),
+                        scope: Some("service = 'checkout'".into()),
+                        good_expr: "status_code < 500".into(),
+                    },
+                },
+                None,
+            );
+            let err = validate_with_facts(&slo, None).err().map(|e| e.to_string());
+            assert!(err.is_none(), "{err:?}");
+        }
+
+        /// A dual-query member is a whole `SELECT …`, which is emphatically
+        /// not PromQL. A check that asked "does this SLO look PromQL-ish"
+        /// instead of gating on the variant would break every one of them.
+        #[test]
+        fn a_dual_query_count_source_is_never_parsed_as_promql() {
+            let member = || CountQuery {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                sql: "SELECT histogram(_timestamp, '5 minute') AS slice_start, \
+                      count(*) AS zo_slo_value FROM requests GROUP BY slice_start"
+                    .into(),
+            };
+            let slo = slo_with(
+                SliConfig::Count {
+                    source: CountSource::DualQuery {
+                        good: member(),
+                        total: member(),
+                    },
+                },
+                None,
+            );
+            let err = validate_with_facts(&slo, None).err().map(|e| e.to_string());
+            assert!(err.is_none(), "{err:?}");
+        }
+
+        #[test]
+        fn the_canonical_count_promql_pair_validates() {
+            let slo = slo_with(
+                count_promql(GOOD_MINUS_BAD, "increase(http_requests_total[5m])"),
+                None,
+            );
+            assert!(validate_with_facts(&slo, None).is_ok());
+        }
+
+        // ---- no grouping/aggregation rule, in either shape ----------------
+
+        /// The anti-regression for the rejected design. Both roots — a
+        /// function call over a `by (le, region)` superset, and a binary op —
+        /// are legitimate for a `region`-grouped SLO, and both must pass.
+        #[test]
+        fn a_grouped_slo_needs_no_agreement_between_group_by_and_the_expression() {
+            let groups = Some(vec!["region".to_string()]);
+            let sliced = slo_with(
+                time_slice(QueryLanguage::PromQl, HISTOGRAM_QUANTILE, None),
+                groups.clone(),
+            );
+            assert!(
+                validate_with_facts(&sliced, None).is_ok(),
+                "a histogram_quantile root over a `le` superset is legitimate"
+            );
+
+            let counted = slo_with(
+                count_promql(GOOD_MINUS_BAD, "increase(http_requests_total[5m])"),
+                groups.clone(),
+            );
+            assert!(
+                validate_with_facts(&counted, None).is_ok(),
+                "a binary-op root is legitimate"
+            );
+
+            // And an expression naming no group label at all: the labels the
+            // series carries at evaluation time are the group values, and
+            // nothing about them is knowable at save.
+            let unlabelled = slo_with(
+                time_slice(QueryLanguage::PromQl, "avg(rate(http_sum[5m]))", None),
+                groups,
+            );
+            assert!(
+                validate_with_facts(&unlabelled, None).is_ok(),
+                "an expression naming no group label is legitimate"
+            );
+        }
+
+        // ---- ordering against the config-side rules -----------------------
+
+        /// An empty expression is caught by `validate_query_safety` first. It
+        /// would also fail to parse, but "must not be empty" is the useful
+        /// sentence — a parser's complaint about an empty input is not.
+        #[test]
+        fn an_empty_expression_still_reports_the_emptiness_rule() {
+            let sliced = slo_with(time_slice(QueryLanguage::PromQl, "  ", None), None);
+            assert_eq!(
+                validate_with_facts(&sliced, None).unwrap_err().to_string(),
+                QuerySafetyError::EmptyExpression { field: "query" }.to_string()
+            );
+
+            let counted = slo_with(count_promql("", "increase(a[5m])"), None);
+            assert_eq!(
+                validate_with_facts(&counted, None).unwrap_err().to_string(),
+                QuerySafetyError::EmptyExpression { field: "good" }.to_string()
+            );
+        }
+
+        /// The scope rule is a `config` rule, and the expression here is ALSO
+        /// unparseable — so this fails if the parse check is ever placed
+        /// before `validate_query_safety`.
+        #[test]
+        fn a_promql_scope_is_still_rejected_by_the_config_rule() {
+            let slo = slo_with(
+                time_slice(
+                    QueryLanguage::PromQl,
+                    UNPARSEABLE,
+                    Some("service = 'checkout'"),
+                ),
+                None,
+            );
+            assert_eq!(
+                validate_with_facts(&slo, None).unwrap_err().to_string(),
+                QuerySafetyError::ScopeNotValidForLanguage {
+                    query_language: QueryLanguage::PromQl
+                }
+                .to_string()
+            );
         }
     }
 

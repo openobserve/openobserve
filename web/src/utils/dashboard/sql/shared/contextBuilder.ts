@@ -19,6 +19,7 @@ import {
   calculateDynamicNameGap,
   calculateNiceTickValues,
   calculateRotatedLabelBottomSpace,
+  X_AXIS_TICK_LABEL_BAND,
 } from "../../chartDimensionUtils";
 import { ColorModeWithoutMinMax, getSQLMinMaxValue, getGridLineStyle } from "../../colorPalette";
 import { getDataValue } from "../../aliasUtils";
@@ -267,7 +268,13 @@ export function buildSQLContext(
         }
         for (const k in sums) if (sums[k] > hi) hi = sums[k];
       }
-      const lo = Number.isFinite(min) ? Math.min(min, hi) : 0;
+      const cfgMin = panelSchema?.config?.y_axis_min;
+      const cfgMax = panelSchema?.config?.y_axis_max;
+      const hasCfgMin = cfgMin !== null && cfgMin !== undefined;
+      const hasCfgMax = cfgMax !== null && cfgMax !== undefined;
+      const dataMin = Number.isFinite(min) ? min : 0;
+      const lo = hasCfgMin ? Math.min(cfgMin, dataMin) : Math.min(0, dataMin);
+      hi = hasCfgMax ? Math.max(cfgMax, hi) : Math.max(0, hi);
 
       const ticks = calculateNiceTickValues(lo, hi);
       if (!ticks?.length) throw new Error("no ticks");
@@ -386,49 +393,68 @@ export function buildSQLContext(
           dynamicXAxisNameGap,
         );
 
+  const axisWidth = panelSchema.config?.axis_width;
+  const axisWidthSet = axisWidth !== null && axisWidth !== undefined;
+  const reserveYLabelLeft = !isHorizontalChart && !hasYAxisName && !axisWidthSet;
+
+  const horizontalCategoryLabelWidth = isHorizontalChart
+    ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(xAxisKeys?.[0]))), 120)
+    : 0;
+  const reserveHorizontalYName = isHorizontalChart && !!hasXAxisName && !axisWidthSet;
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel: panelSchema.config?.axis_width == null ? true : false,
-      left: hasYAxisName ? (panelSchema.config?.axis_width ?? 30) : 5,
+      containLabel:
+        reserveYLabelLeft || reserveHorizontalYName ? false : axisWidthSet ? false : true,
+      left: reserveYLabelLeft
+        ? widestYAxisTickLabel + 12
+        : reserveHorizontalYName
+          ? horizontalCategoryLabelWidth + 26
+          : isHorizontalChart
+            ? (axisWidth ?? 15)
+            : hasYAxisName
+              ? (axisWidth ?? 30)
+              : 5,
       right: 20,
       top: 12,
-      bottom: hasXAxisName
-        ? (() => {
-            // Reserve enough vertical space below the plot for the tick labels, the
-            // axis name (`nameGap` 35) and — when a horizontal legend is shown — the
-            // legend row beneath it. Measured ideal is roughly `nameGap + 20` for the
-            // containLabel case (labels are reserved inside the grid box, so only the
-            // name needs to clear the bottom-anchored legend); the earlier values left
-            // the name overlapping the legend, and over-padding leaves a visible gap.
-            const baseBottom =
-              legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-                ? panelSchema.config?.axis_width == null
-                  ? 55
-                  : 75
-                : panelSchema.config?.axis_width == null
+      bottom:
+        (hasXAxisName
+          ? (() => {
+              // Reserve enough vertical space below the plot for the tick labels, the
+              // axis name (`nameGap` 35) and — when a horizontal legend is shown — the
+              // legend row beneath it. Measured ideal is roughly `nameGap + 20` for the
+              // containLabel case (labels are reserved inside the grid box, so only the
+              // name needs to clear the bottom-anchored legend); the earlier values left
+              // the name overlapping the legend, and over-padding leaves a visible gap.
+              const baseBottom =
+                legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+                  ? panelSchema.config?.axis_width == null
+                    ? 55
+                    : 75
+                  : panelSchema.config?.axis_width == null
+                    ? 30
+                    : 50;
+              // When an x-axis name is present, `nameGap` already reserves space
+              // between rotated labels and the axis name. Adding `additionalBottomSpace`
+              // here causes double-counting and extra blank space beneath the axis
+              // name. Only return the base bottom in this case.
+              return baseBottom;
+            })()
+          : (() => {
+              // A bottom legend needs its row reserved even without an
+              // x-axis name, or it draws over the plot and tick labels.
+              const baseBottom =
+                legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
                   ? 30
-                  : 50;
-            // When an x-axis name is present, `nameGap` already reserves space
-            // between rotated labels and the axis name. Adding `additionalBottomSpace`
-            // here causes double-counting and extra blank space beneath the axis
-            // name. Only return the base bottom in this case.
-            return baseBottom;
-          })()
-        : (() => {
-            // A bottom legend needs its row reserved even without an
-            // x-axis name, or it draws over the plot and tick labels.
-            const baseBottom =
-              legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-                ? 30
-                : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
-                  ? 0
-                  : breakDownKeys.length > 0
-                    ? 25
-                    : 0;
-            return baseBottom + additionalBottomSpace;
-          })(),
+                  : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
+                    ? 0
+                    : breakDownKeys.length > 0
+                      ? 25
+                      : 0;
+              return baseBottom + additionalBottomSpace;
+            })()) + (reserveYLabelLeft || reserveHorizontalYName ? X_AXIS_TICK_LABEL_BAND : 0),
     },
     tooltip: {
       trigger: "axis",
@@ -600,8 +626,9 @@ export function buildSQLContext(
       // Use 0 for rotation and width if time-based field or horizontal chart
       const labelRotation =
         hasTimestampField || isHorizontalChart ? 0 : panelSchema.config?.axis_label_rotate || 0;
-      const labelWidth =
-        hasTimestampField || isHorizontalChart
+      const labelWidth = isHorizontalChart
+        ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(key))) + 2, 120)
+        : hasTimestampField
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;
       const labelMargin = 10;
@@ -669,10 +696,7 @@ export function buildSQLContext(
       nameLocation: "middle",
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
-      nameGap:
-        (panelSchema?.type == "h-bar" || panelSchema?.type == "h-stacked"
-          ? calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys?.[0])))
-          : widestYAxisTickLabel) + 10,
+      nameGap: (isHorizontalChart ? horizontalCategoryLabelWidth : widestYAxisTickLabel) + 10,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,

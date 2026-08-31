@@ -19,6 +19,8 @@ import { z } from "zod";
 
 const PURE_INT = /^\d+$/;
 const HAS_SPACE = /\s/;
+/** 24-hour clock time, `HH:MM` — the shape `OFormTime` binds. */
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
  * Strip Rust/PCRE inline flag groups that JavaScript RegExp doesn't understand
@@ -40,10 +42,20 @@ export const tierConditionSchema = z.object({
   value: z.coerce.number(),
 });
 
+// One recurring UTC time-of-day window. Bounds are held as `HH:MM` strings in the
+// form (what OFormTime binds) and converted to minutes-past-midnight at submit.
+// A window whose start is later than its end wraps past midnight.
+export const tierWindowSchema = z.object({
+  start: z.string(),
+  end: z.string(),
+});
+
 export const tierSchema = z.object({
   name: z.string(),
   // null for the default (first) tier; an object for conditional tiers.
   condition: tierConditionSchema.nullable().optional(),
+  // Recurring UTC hours this tier is limited to. Empty = always active.
+  utc_windows: z.array(tierWindowSchema).default([]),
   prices: z.array(priceRowSchema).default([]),
   // Staging "add price" row — non-validated form state, auto-committed at submit.
   draftKey: z.string().optional().default(""),
@@ -135,9 +147,42 @@ export const makeModelPricingSchema = (
             });
           }
         }
+
+        // UTC time windows: both bounds must be HH:MM and must differ. Equal
+        // bounds are ambiguous ("never" vs "always"), so the tier must instead
+        // drop the window to be always active.
+        const tierLabel = tier.name || `#${i + 1}`;
+        (tier.utc_windows ?? []).forEach((win, w) => {
+          const start = String(win.start ?? "").trim();
+          const end = String(win.end ?? "").trim();
+          const startOk = HHMM.test(start);
+          const endOk = HHMM.test(end);
+          if (!startOk) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tiers", i, "utc_windows", w, "start"],
+              message: t("modelPricing.timeWindowInvalid", { name: tierLabel }),
+            });
+          }
+          if (!endOk) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tiers", i, "utc_windows", w, "end"],
+              message: t("modelPricing.timeWindowInvalid", { name: tierLabel }),
+            });
+          }
+          if (startOk && endOk && start === end) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tiers", i, "utc_windows", w, "end"],
+              message: t("modelPricing.timeWindowSameBounds", { name: tierLabel }),
+            });
+          }
+        });
       });
     });
 
 export type ModelPricingForm = z.infer<ReturnType<typeof makeModelPricingSchema>>;
 export type ModelPricingTier = z.infer<typeof tierSchema>;
+export type ModelPricingTierWindow = z.infer<typeof tierWindowSchema>;
 export type ModelPricingPriceRow = z.infer<typeof priceRowSchema>;

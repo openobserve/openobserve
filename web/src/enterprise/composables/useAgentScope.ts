@@ -163,7 +163,6 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   // a dimension with exactly one value auto-selects, and changing any level
   // (or agents reloading) re-derives every level beneath it.
   const cascade = opts.cascade ?? false;
-  const versionAgnostic = opts.versionAgnostic ?? false;
   const selectedEnv = ref<string>("");
   const selectedAgentName = ref<string>("");
   const selectedVersion = ref<string>("");

@@ -32,12 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-3! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]! px-2.5! py-0! text-xs!"
-        :title="
-          summary.turnCount === 1
-            ? t('traces.threadView.llmStep', { n: summary.turnCount })
-            : t('traces.threadView.llmSteps', { n: summary.turnCount })
-        "
+        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-warning! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
+        :title="t('traces.threadView.llmStep', { n: summary.turnCount })"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
         <span
@@ -51,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-3! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-info! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="build" size="xs" /></template>
         <span
@@ -65,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-3! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-neutral! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span
@@ -94,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! h-6.5! border border-l-3! px-2.5! py-0! text-xs! dark:border-l-(--color-purple-400)!"
+        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! dark:border-l-thread-accent-strong! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
@@ -150,14 +146,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- System prompt (global — identical across traces in a session). -->
       <div
         v-if="head.systemPrompt"
-        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base mb-4 overflow-hidden border border-l-3 dark:border-l-(--color-purple-400)"
+        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base dark:border-l-thread-accent-strong mb-4 overflow-hidden border border-l-3"
       >
         <div
-          class="thread-system__head flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
+          class="thread-system__head hover:bg-ai-accent/4 dark:hover:bg-ai-accent/8 flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-all duration-120"
           @click="showSystemFull = !showSystemFull"
         >
           <span
-            class="thread-system__badge text-ai-accent rounded-default text-2xs inline-flex shrink-0 items-center bg-[color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] px-2 py-[0.15rem] font-semibold tracking-[0.02rem] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_18%,transparent)] dark:text-(--color-purple-400)"
+            class="thread-system__badge text-ai-accent rounded-default text-2xs bg-ai-accent/10 dark:bg-ai-accent/18 dark:text-thread-accent-strong inline-flex shrink-0 items-center px-2 py-[0.15rem] font-semibold tracking-[0.02rem]"
           >
             <OIcon name="settings" size="xs" class="mr-1" />
             {{ t("traces.threadView.system") }}
@@ -192,21 +188,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span>{{ t("traces.threadView.historicalIcon") }}</span>
           <span>
-            {{
-              group.historicalUserCount === 1
-                ? t("traces.threadView.historicalMessage", { count: group.historicalUserCount })
-                : t("traces.threadView.historicalMessages", { count: group.historicalUserCount })
-            }}
+            {{ t("traces.threadView.historicalMessage", { count: group.historicalUserCount }) }}
           </span>
         </div>
 
         <!-- This group's user query. -->
         <div
           v-if="group.userQuery"
-          class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body mb-4 ml-auto flex w-fit max-w-[40%] items-start gap-2.5 border border-(--color-indigo-100) bg-[image:var(--color-chat-bubble-user)] px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+          class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark mb-4 ml-auto flex w-fit max-w-[40%] items-start gap-2.5 border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs dark:shadow-white/8"
         >
           <div
-            class="thread-user-avatar text-2xs inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full bg-[image:var(--color-gradient-ai)] font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
+            class="thread-user-avatar text-2xs bg-gradient-ai inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
             :title="group.userId || t('traces.threadView.user')"
           >
             <OIcon name="person" size="sm" />
@@ -229,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="thread-turn before:bg-border-default relative flex gap-3.5 pb-4 before:absolute before:top-[1.875rem] before:bottom-0 before:left-3.5 before:w-0.5 before:rounded-full before:content-[''] last:before:hidden"
           >
             <div
-              class="thread-turn__avatar text-ai-accent relative z-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--color-ai-accent)_25%,transparent)] bg-(--color-purple-100) shadow-[0_0_0_0.25rem_var(--color-surface-base)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_40%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_16%,transparent)] dark:text-(--color-purple-400)"
+              class="thread-turn__avatar text-ai-accent border-ai-accent/25 bg-thread-avatar-bg ring-surface-base dark:border-ai-accent/40 dark:bg-ai-accent/16 dark:text-thread-accent-strong relative z-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ring-4"
             >
               <OIcon name="auto-awesome" size="xs" />
             </div>
@@ -238,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(u, uIdx) in turn.followupUsers"
                 :key="`u-${uIdx}`"
-                class="thread-bubble thread-bubble--user thread-bubble--user-followup rounded-default text-text-body max-w-[min(40rem,75%)] border border-(--color-indigo-100) bg-[image:var(--color-chat-bubble-user)] px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+                class="thread-bubble thread-bubble--user thread-bubble--user-followup rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark max-w-[min(40rem,75%)] border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs dark:shadow-white/8"
               >
                 {{ u.content }}
               </div>
@@ -257,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, mIdx) in turn.assistant"
                 :key="`a-${mIdx}`"
-                class="thread-bubble thread-bubble--assistant markdown-body bg-surface-base border-border-default text-text-body rounded-default max-w-full self-start border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-normal shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+                class="thread-bubble thread-bubble--assistant markdown-body bg-surface-base border-border-default text-text-body rounded-default max-w-full self-start border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-normal shadow-xs dark:shadow-white/8"
                 v-html="renderMarkdown(msg.content)"
               />
 
@@ -275,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ formatTime(turn.span.start_time) }}
                 </span>
                 <span
-                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border border-[color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-ai-accent)_6%,transparent)] px-2 py-[0.18rem] leading-none font-medium text-ellipsis whitespace-nowrap dark:border-[color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_12%,transparent)] dark:text-(--color-purple-400)"
+                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs border-ai-accent/20 bg-ai-accent/6 dark:border-ai-accent/30 dark:bg-ai-accent/12 dark:text-thread-accent-strong inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border px-2 py-[0.18rem] leading-none font-medium text-ellipsis whitespace-nowrap"
                   :title="getModel(turn.span)"
                 >
                   <OIcon name="bolt" size="xs" />
@@ -304,13 +296,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span
                   v-if="turn.span.span_status === 'ERROR'"
-                  class="thread-metric thread-metric--error rounded-default text-error-600 dark:text-error-400 text-2xs inline-flex shrink-0 items-center gap-1 border border-[color-mix(in_srgb,var(--color-error-600)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-error-600)_8%,transparent)] px-2 py-[0.18rem] leading-none font-medium whitespace-nowrap dark:border-[color-mix(in_srgb,var(--color-error-400)_30%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-error-400)_12%,transparent)]"
+                  class="thread-metric thread-metric--error rounded-default text-error-600 dark:text-error-400 text-2xs border-error-600/25 bg-error-600/8 dark:border-error-400/30 dark:bg-error-400/12 inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none font-medium whitespace-nowrap"
                 >
                   <OIcon name="error-outline" size="xs" />
                   {{ t("traces.threadView.error") }}
                 </span>
                 <button
-                  class="thread-turn__view-span rounded-default text-theme-accent ml-auto inline-flex shrink-0 cursor-pointer items-center gap-[0.2rem] border border-transparent bg-transparent px-[0.55rem] py-[0.2rem] text-xs font-medium transition-all duration-120 hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)]"
+                  class="thread-turn__view-span rounded-default text-theme-accent hover:border-status-info-text/25 hover:bg-status-info-text/8 dark:hover:border-status-info-text/30 dark:hover:bg-status-info-text/12 ml-auto inline-flex shrink-0 cursor-pointer items-center gap-[0.2rem] border border-transparent bg-transparent px-[0.55rem] py-[0.2rem] text-xs font-medium transition-all duration-120"
                   @click="emit('span-selected', turn.span.span_id)"
                 >
                   {{ t("traces.threadView.viewSpan") }}
@@ -355,7 +347,6 @@ const emit = defineEmits<{
   (e: "span-selected", spanId: string): void;
 }>();
 
-import { useStore } from "vuex";
 import {
   getModel,
   getCost,
@@ -371,7 +362,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
 import { renderMarkdown } from "./markdown";
 
-const store = useStore();
 const { t } = useI18nTyped();
 
 interface ThreadHead {

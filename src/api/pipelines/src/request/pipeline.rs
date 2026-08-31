@@ -80,7 +80,7 @@ CONDITION FORMAT (version 2):
 The conditions field is a group containing a flat array of items. Each item has a logicalOperator field (AND/OR) — this is the boolean connector BEFORE that item. The first item's logicalOperator is ignored but must be present (use AND). AND has higher precedence than OR. Use nested groups for explicit parentheses.
 - Group: { "filterType": "group", "logicalOperator": "AND", "conditions": [...] }
 - Condition: { "filterType": "condition", "column": "field", "operator": "<op>", "value": "val", "logicalOperator": "AND"|"OR" }
-- Operators: =, !=, >, >=, <, <=, contains, not_contains
+- Operators: =, !=, >, >=, <, <=, contains, not_contains, is_null, is_not_null, is_empty, is_not_empty (null/empty checks ignore "value"; pass an empty string. is_empty matches null OR empty string)
 
 EXAMPLE - status = "error" AND (level > 5 OR source = "nginx"):
 { "node_type": "condition", "version": 2, "conditions": { "filterType": "group", "logicalOperator": "AND", "conditions": [{ "filterType": "condition", "column": "status", "operator": "=", "value": "error", "logicalOperator": "AND" }, { "filterType": "group", "logicalOperator": "AND", "conditions": [{ "filterType": "condition", "column": "level", "operator": ">", "value": "5", "logicalOperator": "OR" }, { "filterType": "condition", "column": "source", "operator": "=", "value": "nginx", "logicalOperator": "OR" }] }] } }

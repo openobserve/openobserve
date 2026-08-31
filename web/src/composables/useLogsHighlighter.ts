@@ -20,21 +20,18 @@
  * Provides the core highlighting logic that can be used with caching.
  */
 
+import type { TranslateFn } from "@/types/i18n";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
 import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { searchState } from "@/composables/useLogs/searchState";
 
-export function useLogsHighlighter() {
+export function useLogsHighlighter(t: TranslateFn) {
   const processedResults = ref<Record<string, string>>({});
 
-  const store = useStore();
   const { isDark } = useTheme();
   const currentColors = ref(getThemeColors(isDark.value));
-  const { searchObj } = searchState();
 
   // Track active processing to prevent memory leaks
   let abortController: AbortController | null = null;
@@ -294,7 +291,7 @@ export function useLogsHighlighter() {
   const truncateLargeContent = (data: any, maxSize: number = 50000): string => {
     if (typeof data === "string") {
       if (data.length > maxSize) {
-        return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
+        return data.substring(0, maxSize) + t("search.contentTruncated", { size: data.length });
       }
       return data;
     }
@@ -304,13 +301,12 @@ export function useLogsHighlighter() {
         const jsonStr = JSON.stringify(data);
         if (jsonStr.length > maxSize) {
           return (
-            jsonStr.substring(0, maxSize) +
-            `... [truncated, original size: ${jsonStr.length} chars]`
+            jsonStr.substring(0, maxSize) + t("search.contentTruncated", { size: jsonStr.length })
           );
         }
         return jsonStr;
       } catch (error) {
-        return "[Object too large to display]";
+        return t("search.objectTooLargeToDisplay");
       }
     }
 
@@ -768,12 +764,12 @@ export function useLogsHighlighter() {
         let processedValue = value;
         if (typeof value === "string" && value.length > 100000) {
           processedValue =
-            value.substring(0, 100000) + `... [field truncated, ${value.length} chars]`;
+            value.substring(0, 100000) + t("search.fieldTruncated", { size: value.length });
         } else if (typeof value === "object" && value !== null) {
           const valueStr = JSON.stringify(value);
           if (valueStr.length > 100000) {
             processedValue =
-              valueStr.substring(0, 100000) + `... [field truncated, ${valueStr.length} chars]`;
+              valueStr.substring(0, 100000) + t("search.fieldTruncated", { size: valueStr.length });
           }
         }
 

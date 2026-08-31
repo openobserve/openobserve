@@ -1,0 +1,23 @@
+[package]
+name = "metrics_index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+arrow.workspace = true
+arrow-schema.workspace = true
+bytes.workspace = true
+config.workspace = true
+datafusion.workspace = true
+futures.workspace = true
+hashlink.workspace = true
+infra.workspace = true
+log.workspace = true
+promql.workspace = true
+promql-parser.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+regex.workspace = true

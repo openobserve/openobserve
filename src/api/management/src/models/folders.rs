@@ -25,6 +25,8 @@ use utoipa::ToSchema;
 pub struct CreateFolderRequestBody {
     pub name: String,
     pub description: String,
+    #[serde(default)]
+    pub icon: Option<String>,
 }
 
 /// HTTP response body for `CreateFolder` endpoint.
@@ -63,6 +65,10 @@ pub struct Folder {
     pub folder_id: String,
     pub name: String,
     pub description: String,
+    /// Opaque icon token — a Unicode emoji or an "o2:" registry reference.
+    /// Absent or null means the folder has no icon.
+    #[serde(default)]
+    pub icon: Option<String>,
 }
 
 impl From<CreateFolderRequestBody> for config::meta::folder::Folder {
@@ -71,6 +77,7 @@ impl From<CreateFolderRequestBody> for config::meta::folder::Folder {
             folder_id: String::default(),
             name: value.name,
             description: value.description,
+            icon: value.icon,
         }
     }
 }
@@ -118,6 +125,7 @@ impl From<config::meta::folder::Folder> for Folder {
             folder_id: value.folder_id,
             name: value.name,
             description: value.description,
+            icon: value.icon,
         }
     }
 }
@@ -128,6 +136,7 @@ impl From<Folder> for config::meta::folder::Folder {
             folder_id: value.folder_id,
             name: value.name,
             description: value.description,
+            icon: value.icon,
         }
     }
 }
@@ -158,6 +167,7 @@ mod tests {
             folder_id: "abc".to_string(),
             name: "My Folder".to_string(),
             description: "a description".to_string(),
+            icon: None,
         };
         let f = Folder::from(src);
         assert_eq!(f.folder_id, "abc");
@@ -171,6 +181,7 @@ mod tests {
             folder_id: "xyz".to_string(),
             name: "Test".to_string(),
             description: "d".to_string(),
+            icon: None,
         };
         let f = config::meta::folder::Folder::from(src);
         assert_eq!(f.folder_id, "xyz");
@@ -183,6 +194,7 @@ mod tests {
         let req = CreateFolderRequestBody {
             name: "New Folder".to_string(),
             description: "A description".to_string(),
+            icon: None,
         };
         let f = config::meta::folder::Folder::from(req);
         assert!(f.folder_id.is_empty());
@@ -196,6 +208,7 @@ mod tests {
             folder_id: "resp1".to_string(),
             name: "Response Folder".to_string(),
             description: "desc".to_string(),
+            icon: None,
         };
         let resp = CreateFolderResponseBody::from(src);
         assert_eq!(resp.0.folder_id, "resp1");
@@ -208,6 +221,7 @@ mod tests {
             folder_id: "get1".to_string(),
             name: "Get Folder".to_string(),
             description: "get desc".to_string(),
+            icon: None,
         };
         let resp = GetFolderResponseBody::from(src);
         assert_eq!(resp.0.folder_id, "get1");
@@ -220,6 +234,7 @@ mod tests {
             folder_id: "upd1".to_string(),
             name: "Updated".to_string(),
             description: "new desc".to_string(),
+            icon: None,
         });
         let f = config::meta::folder::Folder::from(req);
         assert_eq!(f.folder_id, "upd1");
@@ -234,11 +249,13 @@ mod tests {
                 folder_id: "1".to_string(),
                 name: "Alpha".to_string(),
                 description: "".to_string(),
+                icon: None,
             },
             config::meta::folder::Folder {
                 folder_id: "2".to_string(),
                 name: "Beta".to_string(),
                 description: "".to_string(),
+                icon: None,
             },
         ];
         let resp = ListFoldersResponseBody::from(folders);
