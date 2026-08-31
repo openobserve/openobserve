@@ -108,14 +108,20 @@ jobs:
       - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc
 
+      # Pre-compress the debug binary once. Uploading the raw binary made every
+      # consumer download a ~750 MiB artifact; gzip reduces it to roughly 100 MiB.
+      - name: Package OpenObserve debug binary
+        run: tar -C target/debug -czf openobserve-api-debug.tar.gz openobserve
+
       - name: Upload OpenObserve debug binary
         uses: actions/upload-artifact@v4
         with:
           name: openobserve-api-debug-${{ github.sha }}
-          path: target/debug/openobserve
+          path: openobserve-api-debug.tar.gz
           if-no-files-found: error
           retention-days: 3
-          compression-level: 1
+          # The payload is already gzip-compressed; avoid a second compression pass.
+          compression-level: 0
 
   api_integration_tests:
     name: api_integration_tests
@@ -149,10 +155,13 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: openobserve-api-debug-${{ github.sha }}
-          path: target/debug
+          path: api-binary-artifact
 
-      - name: Make OpenObserve binary executable
-        run: chmod +x target/debug/openobserve
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -276,10 +285,13 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: openobserve-api-debug-${{ github.sha }}
-          path: target/debug
+          path: api-binary-artifact
 
-      - name: Make OpenObserve binary executable
-        run: chmod +x target/debug/openobserve
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -395,10 +407,13 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: openobserve-api-debug-${{ github.sha }}
-          path: target/debug
+          path: api-binary-artifact
 
-      - name: Make OpenObserve binary executable
-        run: chmod +x target/debug/openobserve
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - uses: actions/setup-python@v7
         id: setup-python
@@ -499,10 +514,13 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: openobserve-api-debug-${{ github.sha }}
-          path: target/debug
+          path: api-binary-artifact
 
-      - name: Make OpenObserve binary executable
-        run: chmod +x target/debug/openobserve
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - name: Setup Python
         uses: actions/setup-python@v7
