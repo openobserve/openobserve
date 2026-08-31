@@ -2647,7 +2647,7 @@ async fn handle_alert_triggers(
                 trigger_data_stream.error = Some(dispatch.errors.join("; "));
             }
 
-            if dispatch.delivered == 0 && dispatch.pending != 0 {
+            if dispatch.delivered == 0 && dispatch.failed == 0 && dispatch.pending != 0 {
                 // this is when no group was fired, but some were pending,
                 // in which case mark the whole alert in pending state
                 trigger_data_stream.status = RunOutcome::Pending;

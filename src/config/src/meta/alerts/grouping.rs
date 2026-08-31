@@ -982,6 +982,7 @@ pub fn plan_group_updates(
 ) -> GroupPlan {
     let mut updates = Vec::with_capacity(classification.groups.len() + 1);
     let mut retained: HashSet<String> = HashSet::with_capacity(classification.groups.len());
+    let mut groups_firing = 0;
 
     for group in &classification.groups {
         let key = group_key(&group.labels);
@@ -996,24 +997,30 @@ pub fn plan_group_updates(
 
         let prev_out = prev.get(&key);
 
+        let base_outcome = group_outcome(group.level);
+        let is_firing = matches!(base_outcome, RunOutcome::Firing);
+
         let outcome = if pending_period_sec > 0 {
             match prev_out {
                 None => RunOutcome::Pending,
                 Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
-                    (None, _) | (Some(RunOutcome::Normal), _) => RunOutcome::Pending,
+                    (None, _) | (Some(RunOutcome::Normal), _) if is_firing => RunOutcome::Pending,
                     (Some(RunOutcome::Pending), Some(last)) => {
-                        if at - last < pending_period_sec * 1_000_000 {
+                        if at - last < pending_period_sec * 1_000_000 && is_firing {
                             RunOutcome::Pending
                         } else {
-                            group_outcome(group.level)
+                            base_outcome
                         }
                     }
-                    _ => group_outcome(group.level),
+                    _ => base_outcome,
                 },
             }
         } else {
-            group_outcome(group.level)
+            base_outcome
         };
+        if matches!(outcome, RunOutcome::Firing) {
+            groups_firing += 1;
+        }
 
         let mut update = apply_outcome(alert_id, &key, prev.get(&key), outcome, Some(level), at);
 
@@ -1040,11 +1047,34 @@ pub fn plan_group_updates(
     // `level_at`, so composite staleness (§6.4) sees the level rotting rather
     // than being made fresh by a run that observed nothing. §7.3 (NoData) owns
     // turning that into a real level.
+
+    let base_outcome = group_outcome(classification.rollup);
+    let is_firing = matches!(base_outcome, RunOutcome::Firing);
+
+    let rollup_outcome = if pending_period_sec > 0 {
+        match prev.get(ROLLUP_GROUP_KEY) {
+            None => RunOutcome::Pending,
+            Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
+                (None, _) | (Some(RunOutcome::Normal), _) if is_firing => RunOutcome::Pending,
+                (Some(RunOutcome::Pending), Some(last)) => {
+                    if at - last < pending_period_sec * 1_000_000 && is_firing {
+                        RunOutcome::Pending
+                    } else {
+                        base_outcome
+                    }
+                }
+                _ => base_outcome,
+            },
+        }
+    } else {
+        base_outcome
+    };
+
     let mut rollup = apply_outcome(
         alert_id,
         ROLLUP_GROUP_KEY,
         prev.get(ROLLUP_GROUP_KEY),
-        group_outcome(classification.rollup),
+        rollup_outcome,
         classification.rollup,
         at,
     );
@@ -1054,7 +1084,7 @@ pub fn plan_group_updates(
         // so an overflowing alert would report "500 of 500" and be
         // indistinguishable from one that never overflowed.
         state.groups_observed = Some(classification.groups.len() + classification.dropped.len());
-        state.groups_firing = Some(classification.firing_observed);
+        state.groups_firing = Some(groups_firing);
         // Exactness travels WITH the counts. Recomputing it later is impossible
         // — the cap is mutable config, so "count == cap" proves nothing after
         // someone raises it.

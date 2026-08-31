@@ -52,7 +52,7 @@ fn get_update_stmt_alerts() -> TableAlterStatement {
         .table(Alerts::Table)
         .add_column_if_not_exists(
             ColumnDef::new(Alerts::PendingPeriodSec)
-                .integer()
+                .big_integer()
                 .not_null()
                 .default(0),
         )
@@ -64,7 +64,7 @@ fn get_update_stmt_composites() -> TableAlterStatement {
         .table(AlertComposites::Table)
         .add_column_if_not_exists(
             ColumnDef::new(AlertComposites::PendingPeriodSec)
-                .integer()
+                .big_integer()
                 .not_null()
                 .default(0),
         )
@@ -93,11 +93,11 @@ mod tests {
     fn postgres() {
         collapsed_eq!(
             &get_update_stmt_alerts().to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "pending_period_sec" integer NOT NULL DEFAULT 0"#
+            r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "pending_period_sec" bigint NOT NULL DEFAULT 0"#
         );
         collapsed_eq!(
             &get_update_stmt_composites().to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "alert_composites" ADD COLUMN IF NOT EXISTS "pending_period_sec" integer NOT NULL DEFAULT 0"#
+            r#"ALTER TABLE "alert_composites" ADD COLUMN IF NOT EXISTS "pending_period_sec" bigint NOT NULL DEFAULT 0"#
         );
     }
 
@@ -107,11 +107,11 @@ mod tests {
         // so add_column_if_not_exists generates the same SQL as add_column
         collapsed_eq!(
             &get_update_stmt_alerts().to_string(SqliteQueryBuilder),
-            r#"ALTER TABLE "alerts" ADD COLUMN "pending_period_sec" integer NOT NULL DEFAULT 0"#
+            r#"ALTER TABLE "alerts" ADD COLUMN "pending_period_sec" bigint NOT NULL DEFAULT 0"#
         );
         collapsed_eq!(
             &get_update_stmt_composites().to_string(SqliteQueryBuilder),
-            r#"ALTER TABLE "alert_composites" ADD COLUMN "pending_period_sec" integer NOT NULL DEFAULT 0"#
+            r#"ALTER TABLE "alert_composites" ADD COLUMN "pending_period_sec" bigint NOT NULL DEFAULT 0"#
         );
     }
 }

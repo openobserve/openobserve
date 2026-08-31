@@ -53,6 +53,7 @@ fn definition(id: &str, org: &str, name: &str) -> alert_composites::ActiveModel 
         last_edited_by: Set(None),
         updated_at: Set(None),
         evaluation_generation: Set(0),
+        pending_period_sec: Set(0),
     }
 }
 
