@@ -57,6 +57,31 @@ mod shell_tests {
         assert!(!SHELL.contains("data:image;base64,"));
     }
 
+    // `none` is a truthy string, so the eyebrow must decode through a map rather than test the raw
+    // value; otherwise visitors read `Incident \u{b7} partial_outage` and `Info \u{b7} none`.
+    #[test]
+    fn shell_decodes_notice_impact_instead_of_printing_the_raw_enum() {
+        assert!(!SHELL.contains("String(n.impact)"));
+        assert!(SHELL.contains("var IMPACT = {"));
+        for label in ["Degraded", "Partial outage", "Major outage"] {
+            assert!(SHELL.contains(label));
+        }
+    }
+
+    // Impact `none` carries no information for a visitor; it must contribute no eyebrow segment.
+    #[test]
+    fn shell_impact_map_has_no_label_for_none() {
+        let map = SHELL
+            .split("var IMPACT = {")
+            .nth(1)
+            .and_then(|s| s.split("};").next())
+            .expect("IMPACT map");
+        assert!(!map.contains("none:"));
+        assert!(map.contains("degraded:"));
+        assert!(map.contains("partial_outage:"));
+        assert!(map.contains("major_outage:"));
+    }
+
     #[test]
     fn shell_sets_the_favicon_from_the_brand_image() {
         assert!(SHELL.contains(r#"rel="icon""#));

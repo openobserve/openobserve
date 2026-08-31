@@ -321,6 +321,12 @@
     maintenance: { label: "Maintenance", tone: "maint" },
     info:        { label: "Info",        tone: "na" }
   };
+  // `none` is deliberately absent: an impact-less notice must add no eyebrow segment.
+  var IMPACT = {
+    degraded:       { label: "Degraded" },
+    partial_outage: { label: "Partial outage" },
+    major_outage:   { label: "Major outage" }
+  };
   var AFFECTED = { maintenance: 1, degraded: 1, partial_outage: 1, major_outage: 1 };
   /* Curated fallback when Intl.supportedValuesOf("timeZone") is unavailable
      (older Safari/Firefox) — one representative zone per major UTC offset. */
@@ -482,7 +488,8 @@
     var k = KIND[n.kind] || KIND.info;
     var box = el("article", "notice t-" + k.tone);
     var eyebrow = [k.label];
-    if (n.impact) eyebrow.push(String(n.impact));
+    var impact = IMPACT[n.impact];
+    if (impact) eyebrow.push(impact.label);
     if (n.state === "scheduled") eyebrow.push("Scheduled");
     box.appendChild(el("p", "eyebrow t-" + k.tone, eyebrow.join(" · ")));
     box.appendChild(el("h3", null, n.title || "Notice"));
