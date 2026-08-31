@@ -59,6 +59,14 @@ pub struct Engine {
     result_type: Option<String>,
 }
 
+/// A recognized `agg(range_func(...))` expression, the shape the fused
+/// evaluator accepts.
+struct FusedAggShape<'a> {
+    op: fused::FusedAggOp,
+    func: Arc<dyn functions::RangeFunc>,
+    range_arg: &'a PromExpr,
+}
+
 impl Engine {
     pub fn new(trace_id: &str, ctx: Arc<PromqlContext>, eval_ctx: EvalContext) -> Self {
         Self {
@@ -596,18 +604,7 @@ impl Engine {
             selector.to_string(),
         );
 
-        let mut filters = selector
-            .matchers
-            .matchers
-            .iter()
-            .filter_map(|mat| {
-                if mat.op == MatchOp::Equal {
-                    Some((mat.name.to_string(), vec![mat.value.to_string()]))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<(_, _)>>();
+        let mut filters = equal_matcher_filters(&selector.matchers);
 
         // check for super cluster
         let trace_id = self.ctx.query_ctx.trace_id.clone();
@@ -837,25 +834,14 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
-        // Fold range-function output straight into the aggregation instead of
-        // materializing per-series samples; every other shape stays generic.
-        if config::get_config()
-            .search
-            .feature_metrics_fused_agg_enabled
-            && let Some(agg_op) = fused::FusedAggOp::from_token(op.id())
-            && let PromExpr::Call(Call { func, args }) = expr
-            && args.len() == 1
-            && let Some(range_func) = functions::fusable_range_func(func.name)
-        {
-            let range_arg = args
-                .last()
-                .expect("promql-parser validated the function argument");
-            let range_input = self.exec_expr(&range_arg).await?;
+        // fused shapes fold the range function into the aggregation; others stay generic
+        if let Some(shape) = fused_agg_shape(op, expr) {
+            let range_input = self.exec_expr(shape.range_arg).await?;
             return fused::fused_range_agg(
                 modifier,
                 range_input,
-                range_func.as_ref(),
-                agg_op,
+                shape.func.as_ref(),
+                shape.op,
                 &self.eval_ctx,
             );
         }
@@ -1316,6 +1302,46 @@ fn collect_loaded_metrics(mut results: Vec<LoadedMetrics>) -> Vec<RangeValue> {
     } else {
         merge_loaded_metrics(results).into_values().collect()
     }
+}
+
+fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<FusedAggShape<'a>> {
+    if !config::get_config()
+        .search
+        .feature_metrics_fused_agg_enabled
+    {
+        return None;
+    }
+    let agg_op = fused::FusedAggOp::from_token(op.id())?;
+    let PromExpr::Call(Call { func, args }) = expr else {
+        return None;
+    };
+    if args.len() != 1 {
+        return None;
+    }
+    let range_func = functions::fusable_range_func(func.name)?;
+    let range_arg: &PromExpr = args
+        .args
+        .last()
+        .expect("promql-parser validated the function argument");
+    Some(FusedAggShape {
+        op: agg_op,
+        func: Arc::from(range_func),
+        range_arg,
+    })
+}
+
+fn equal_matcher_filters(matchers: &Matchers) -> Vec<(String, Vec<String>)> {
+    matchers
+        .matchers
+        .iter()
+        .filter_map(|mat| {
+            if mat.op == MatchOp::Equal {
+                Some((mat.name.to_string(), vec![mat.value.to_string()]))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 /// Merge series that may occur in more than one DataFusion context. Contexts

@@ -28,19 +28,28 @@ use datafusion::{
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
-use promql_parser::label::{MatchOp, Matchers};
+use promql_parser::label::{MatchOp, Matcher, Matchers};
 
 /// Build the DataFusion predicates used for PromQL label matchers.
 ///
 /// Keeping predicate construction separate lets storage-side secondary
 /// indexes evaluate exactly the same matcher semantics as the final scan.
+/// Whether `matcher_predicates` evaluates this matcher on the given schema.
+/// Index pruning may claim exactness only for matchers covered under this rule.
+pub fn matcher_is_residual(schema: &Schema, matcher: &Matcher) -> bool {
+    // `__name__` is consumed by stream selection; the stored column may hold the
+    // pre-`format_stream_name` metric name (e.g. mixed case), so filtering on it
+    // would drop every row of a stream that was already selected by name.
+    matcher.name != TIMESTAMP_COL_NAME
+        && matcher.name != VALUE_LABEL
+        && matcher.name != NAME_LABEL
+        && schema.field_with_name(&matcher.name).is_ok()
+}
+
 pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
     let mut predicates = Vec::new();
     for mat in matchers.matchers.iter() {
-        // `__name__` is consumed by stream selection; the stored column may hold the
-        // pre-`format_stream_name` metric name (e.g. mixed case), so filtering on it
-        // would drop every row of a stream that was already selected by name.
-        if mat.name == TIMESTAMP_COL_NAME || mat.name == VALUE_LABEL || mat.name == NAME_LABEL {
+        if !matcher_is_residual(schema, mat) {
             continue;
         }
         let Ok(field) = schema.field_with_name(&mat.name) else {

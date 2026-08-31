@@ -121,7 +121,21 @@ enum LabelColumn<'a> {
     Utf8View(&'a StringViewArray),
 }
 
-impl LabelColumn<'_> {
+impl<'a> LabelColumn<'a> {
+    fn try_from_array(column: &'a dyn Array) -> Option<Self> {
+        match column.data_type() {
+            DataType::Utf8 => column
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .map(Self::Utf8),
+            DataType::Utf8View => column
+                .as_any()
+                .downcast_ref::<StringViewArray>()
+                .map(Self::Utf8View),
+            _ => None,
+        }
+    }
+
     fn is_null(&self, row: usize) -> bool {
         match self {
             Self::Utf8(values) => values.is_null(row),
@@ -218,18 +232,7 @@ pub(super) async fn load_labels(
                         let column = columns.get(*index).ok_or_else(|| {
                             DataFusionError::Execution(format!("label column {name} is missing"))
                         })?;
-                        match column.data_type() {
-                            DataType::Utf8 => column
-                                .as_any()
-                                .downcast_ref::<StringArray>()
-                                .map(LabelColumn::Utf8),
-                            DataType::Utf8View => column
-                                .as_any()
-                                .downcast_ref::<StringViewArray>()
-                                .map(LabelColumn::Utf8View),
-                            _ => None,
-                        }
-                        .ok_or_else(|| {
+                        LabelColumn::try_from_array(column.as_ref()).ok_or_else(|| {
                             DataFusionError::Execution(format!(
                                 "label column {name} is not Utf8 or Utf8View"
                             ))

@@ -90,6 +90,52 @@ fn with_hash_label(labels: Labels, hash: u64, include_hash_label: bool) -> Label
 const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
 const OPTIMIZATION_MAX_STEPS: i64 = 30;
 
+/// Restricts `df` to the rows the evaluation can observe: per-step lookback
+/// windows when the steps are sparse enough, the contiguous
+/// `[start - lookback, end]` range otherwise.
+pub(crate) fn apply_time_window(
+    df: DataFrame,
+    start: i64,
+    end: i64,
+    step: i64,
+    lookback: i64,
+) -> Result<DataFrame> {
+    // Optimization: When step > lookback, we don't need to load all data in
+    // [start-lookback, end] Instead, we only need to load data windows around
+    // each evaluation point
+    let use_optimization = start != end
+        && step > 0
+        && step >= lookback * OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER
+        && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
+    if use_optimization {
+        let num_steps = ((end - start) / step) + 1;
+        let eval_timestamps: Vec<i64> = (0..num_steps).map(|i| start + (step * i)).collect();
+
+        let mut conditions: Vec<Expr> = Vec::new();
+        for &eval_ts in &eval_timestamps {
+            let window_start = eval_ts - lookback;
+            let window_end = eval_ts;
+
+            conditions.push(
+                col(TIMESTAMP_COL_NAME)
+                    .gt_eq(lit(window_start))
+                    .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(window_end))),
+            );
+        }
+
+        let filters = disjunction(conditions).unwrap();
+        df.filter(filters)
+    } else {
+        // Need to include lookback window before start for the first evaluation point
+        let query_start = start - lookback;
+        df.filter(
+            col(TIMESTAMP_COL_NAME)
+                .gt_eq(lit(query_start))
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
+        )
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn selector_load_data_from_datafusion(
     query_ctx: Arc<QueryContext>,
@@ -107,43 +153,7 @@ pub(super) async fn selector_load_data_from_datafusion(
     let table_name = selector.name.as_ref().unwrap();
 
     let mut df_group = match ctx.table(table_name).await {
-        Ok(v) => {
-            // Optimization: When step > lookback, we don't need to load all data in
-            // [start-lookback, end] Instead, we only need to load data windows around
-            // each evaluation point
-            let use_optimization = start != end
-                && step > 0
-                && step >= lookback * OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER
-                && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
-            if use_optimization {
-                let num_steps = ((end - start) / step) + 1;
-                let eval_timestamps: Vec<i64> =
-                    (0..num_steps).map(|i| start + (step * i)).collect();
-
-                let mut conditions: Vec<Expr> = Vec::new();
-                for &eval_ts in &eval_timestamps {
-                    let window_start = eval_ts - lookback;
-                    let window_end = eval_ts;
-
-                    conditions.push(
-                        col(TIMESTAMP_COL_NAME)
-                            .gt_eq(lit(window_start))
-                            .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(window_end))),
-                    );
-                }
-
-                let filters = disjunction(conditions).unwrap();
-                v.filter(filters)?
-            } else {
-                // Need to include lookback window before start for the first evaluation point
-                let query_start = start - lookback;
-                v.filter(
-                    col(TIMESTAMP_COL_NAME)
-                        .gt_eq(lit(query_start))
-                        .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
-                )?
-            }
-        }
+        Ok(v) => apply_time_window(v, start, end, step, lookback)?,
         Err(_) => {
             return Ok(LoadedMetrics::Partitioned(Vec::new()));
         }
