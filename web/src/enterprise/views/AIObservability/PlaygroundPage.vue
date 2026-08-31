@@ -310,6 +310,7 @@ import {
   cellAt,
   cloneVariant,
   draftFromSnapshot,
+  emptyVariant,
   extractVars,
   hasReference as benchHasReference,
   idleCell,
@@ -327,6 +328,7 @@ import {
   type PlaygroundTool,
   type PlaygroundVariant,
 } from "./playgroundDraft";
+import { takeHandoff } from "./playgroundHandoff";
 import { aiExperimentCreateRoute } from "./experimentRoutes";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useHorizontalOverflow } from "@/composables/useHorizontalOverflow";
@@ -450,6 +452,7 @@ onMounted(async () => {
   // First, and synchronously: the bench is the work, and it must be on screen
   // before anything that can fail or take a round trip.
   restoreSession();
+  applyHandoff();
   await Promise.all([loadProviders(), loadDatasets(), loadScorers()]);
   applyEntryParams();
   loadRecentDrafts();
@@ -508,6 +511,31 @@ function seedDefaultProvider() {
     variant.providerId = preferred.id;
     variant.model = preferred.defaultModel ?? preferred.default_model ?? "";
   }
+}
+
+/**
+ * Loads the conversation Trace Details stashed for us. Everything arrives as
+ * ordinary editable content — the whole point of the entry is to change the
+ * call and re-run it, so nothing is pinned readonly.
+ */
+function applyHandoff() {
+  if (String(route.query.from ?? "") !== "span") return;
+  const handoff = takeHandoff();
+  if (!handoff) return;
+  const variant = emptyVariant();
+  variant.messages = handoff.messages;
+  // Provider and model are left to seedDefaultProvider: the trace's model may
+  // not exist on any provider configured here.
+  variant.temperature = handoff.temperature;
+  // A fresh draft, not a merge: the imported call is the subject of the bench,
+  // and leaving a restored session's variants beside it would silently compare
+  // the trace against whatever the user last had open.
+  Object.assign(draft, starterDraft());
+  draft.variants = [variant];
+  draft.provenance = {
+    type: "trace",
+    label: t("aiObservability.playground.fromTrace", { id: handoff.sourceId }),
+  };
 }
 
 /** Entry params are read once. The URL is an entry address, not a save file. */

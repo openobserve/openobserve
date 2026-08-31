@@ -10590,6 +10590,10 @@
         "success": "Added to the dataset",
         "loadError": "Failed to load datasets",
         "error": "Failed to add this item to the dataset"
+      },
+      "playground": {
+        "button": "Open in Playground",
+        "hint": "Load this call's messages into the Playground to edit and re-run it"
       }
     },
     "discovery": {
@@ -11090,7 +11094,8 @@
           "absentSide": "Not present in this run"
         }
       },
-      "selectionCount": "{count} of 2 selected"
+      "selectionCount": "{count} of 2 selected",
+      "clearBaseline": "Clear baseline"
     },
     "datasets": {
       "listTitle": "Datasets",
@@ -11788,7 +11793,9 @@
       "sampleFullView": "Full View",
       "sampleBack": "Back to List",
       "sampleInput": "Input",
-      "sampleExpected": "Expected Output"
+      "sampleExpected": "Expected Output",
+      "fromTrace": "From trace span {id}",
+      "openInPlaygroundFailed": "Could not open this span in the Playground"
     }
   },
   "onlineEvals": {
