@@ -102,18 +102,14 @@ jobs:
           # 42 workspace crates while increasing the archive from ~1.1 to 3.1 GiB.
           shared-key: backend-debug-mimalloc-deps-v1
           add-job-id-key: false
-          # PR #14030 primes the isolated test key once. Remove this temporary
-          # writer after the cold-save/warm-restore comparison; normal PRs are read-only.
-          save-if: ${{ github.event.pull_request.number == 14030 }}
+          # The DB workflow's successful push:main build is the only writer.
+          save-if: false
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
 
       - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc
-
-      - name: Report Cargo target size
-        run: du -sh target target/debug || true
 
       # The consumers only execute this binary, so remove debug symbols from the
       # distribution copy before compressing and uploading it once.
