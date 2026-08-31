@@ -179,7 +179,24 @@ pub async fn get<C: ConnectionTrait>(
 }
 
 /// Inserts a variable and invalidates the org's cache.
+///
+/// Not for use inside a transaction — see [`insert_row`].
 pub async fn add<C: ConnectionTrait>(
+    conn: &C,
+    record: &SyntheticsVariableRecord,
+) -> Result<(), errors::Error> {
+    insert_row(conn, record).await?;
+    invalidate_and_publish(&record.org_id).await;
+    Ok(())
+}
+
+/// Inserts a variable without touching the cache.
+///
+/// What transactional callers use. [`add`] publishes a cluster-wide
+/// invalidation, and doing that inside a transaction is wrong twice: it fires
+/// once per row, and it announces a change that has not been committed and may
+/// yet roll back. Callers publish once, after the commit.
+pub async fn insert_row<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
 ) -> Result<(), errors::Error> {
@@ -198,10 +215,7 @@ pub async fn add<C: ConnectionTrait>(
         updated_at: Set(record.updated_at),
     };
     match Entity::insert(model).exec(conn).await {
-        Ok(_) => {
-            invalidate_and_publish(&record.org_id).await;
-            Ok(())
-        }
+        Ok(_) => Ok(()),
         Err(e) => match e.sql_err() {
             Some(SqlErr::UniqueConstraintViolation(_)) => Err(duplicate_name(&record.name)),
             _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
@@ -292,12 +306,23 @@ pub async fn delete<C: ConnectionTrait>(
     org_id: &str,
     id: &str,
 ) -> Result<bool, errors::Error> {
+    let removed = delete_row(conn, org_id, id).await?;
+    invalidate_and_publish(org_id).await;
+    Ok(removed)
+}
+
+/// Deletes a variable without touching the cache. The transactional twin of
+/// [`insert_row`], and for the same reason.
+pub async fn delete_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<bool, errors::Error> {
     let res = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
-    invalidate_and_publish(org_id).await;
     Ok(res.rows_affected > 0)
 }
 
