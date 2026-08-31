@@ -13229,6 +13229,16 @@
       "deleteSingleTitle": "Delete Check",
       "duplicateTitle": "Duplicate Check"
     },
+    "duplicate": {
+      "action": "Duplicate",
+      "body": "Copies all {n} variables from {name} into a new environment. Checks are not copied.",
+      "bodyWithSecrets": "Copies {n} variables from {name}. {secrets} secret(s) are copied without their values and must be set again. Checks are not copied.",
+      "confirm": "Duplicate",
+      "done": "Environment duplicated",
+      "failed": "Could not duplicate the environment",
+      "nameLabel": "New environment name",
+      "title": "Duplicate {name}"
+    },
     "empty": {
       "browserTests": "No browser tests found.",
       "checks": "No checks found. Adjust filters or create your first check."
@@ -13263,6 +13273,7 @@
       "subtitle": "Scope variables and secrets, and control who may manage them.",
       "title": "Environments",
       "updated": "Environment updated",
+      "usedByChecks": "Used by {n} checks",
       "variables": "Variables"
     },
     "evidence": {
@@ -14162,7 +14173,6 @@
       "all": "All",
       "browser": "Browser",
       "checks": "Checks",
-      "environments": "Environments",
       "http": "HTTP",
       "private": "Private Locations",
       "ssh": "SSH",
@@ -14275,7 +14285,8 @@
       "example": "Example",
       "exampleHint": "Shown wherever the value is withheld. Never put a real secret here.",
       "examplePlaceholder": "https://shop.example.com",
-      "globalSubtitle": "Values shared by every check, in every environment. Environment-scoped values live under Environments.",
+      "global": "Global",
+      "globalSubtitle": "Applies in every environment.",
       "kind": "Kind",
       "kindPlain": "Plain",
       "kindSecret": "Secret",
@@ -14290,6 +14301,7 @@
       "notSet": "Not set",
       "replace": "Replace",
       "saveFailed": "Could not save the variable",
+      "scope": "Scope",
       "scopeEnvironment": "This variable applies in {env} only.",
       "scopeGlobal": "This variable applies in every environment.",
       "searchPlaceholder": "Search variables",

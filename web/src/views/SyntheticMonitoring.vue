@@ -81,10 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="data-object" size="sm" />
           <span>{{ t("synthetics.tabs.variables") }}</span>
         </OTab>
-        <OTab name="environments">
-          <OIcon name="layers" size="sm" />
-          <span>{{ t("synthetics.tabs.environments") }}</span>
-        </OTab>
       </OTabs>
     </template>
     <!-- CONTENT AREA: sidebar + main -->
@@ -108,11 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="confirmDeleteLocation"
       />
 
-      <!-- ── VARIABLES TAB ── -->
+      <!-- ── VARIABLES TAB ── every scope, selected from its own rail -->
       <SyntheticsVariablesTab v-if="activeSection === 'variables'" />
-
-      <!-- ── ENVIRONMENTS TAB ── -->
-      <SyntheticsEnvironmentsTab v-if="activeSection === 'environments'" />
 
       <!-- RIGHT MAIN: filter bar + table -->
       <div v-if="activeSection === 'checks'" class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -451,7 +444,6 @@ import statusPagesService, {
   type PreviewResponse,
 } from "@/services/status_pages";
 import SyntheticsVariablesTab from "@/components/synthetics/variables/SyntheticsVariablesTab.vue";
-import SyntheticsEnvironmentsTab from "@/components/synthetics/variables/SyntheticsEnvironmentsTab.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
@@ -493,15 +485,10 @@ const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
 
 // ── API types ──────────────────────────────────────────────────────────
-// Variables and Environments are unconditional: unlike Private Locations they
-// are not feature-flagged, and a check can reference a shared variable on any
-// deployment.
-type SyntheticsSection =
-  | "checks"
-  | "private"
-  | "status-pages"
-  | "variables"
-  | "environments";
+// Variables is unconditional: unlike Private Locations it is not
+// feature-flagged, and a check can reference a shared variable on any
+// deployment. Environments live inside it, on the scope rail.
+type SyntheticsSection = "checks" | "private" | "status-pages" | "variables";
 
 interface ApiMonitorFrequency {
   type: string;
@@ -666,7 +653,6 @@ const initialSection = ((): SyntheticsSection => {
   if (s === "private" && privateLocationsEnabled.value) return "private";
   if (s === "status-pages") return "status-pages";
   if (s === "variables") return "variables";
-  if (s === "environments") return "environments";
   return "checks";
 })();
 const activeSection = ref<SyntheticsSection>(initialSection);

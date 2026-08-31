@@ -749,8 +749,13 @@ export interface SyntheticsVariable {
   description: string;
   example: string;
   tags: string[];
-  /** Whether a value is stored at all - the only thing the client learns about it. */
-  has_value: boolean;
+  /**
+   * A plain variable's value. Absent for a secret - the server's read DTO has
+   * no field to put one in, so it can never arrive here.
+   */
+  value?: string;
+  /** Whether a secret has a value stored. Absent for a plain variable. */
+  has_value?: boolean;
   /** Checks whose definition references `{{NAME}}`. Drives the deletion guard. */
   used_by_checks: number;
   owner?: string;
