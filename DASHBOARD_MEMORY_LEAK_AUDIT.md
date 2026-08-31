@@ -9,21 +9,27 @@
 
 ## 1. Executive summary
 
-Navigating the app leaks memory that garbage collection cannot reclaim. There
-are **two independent leaks**, not one:
-
-| Leak | Status |
+| Finding | Status |
 |---|---|
-| **A. Route-change leak** — every route change stranded the previous view's component tree | **FIXED** (0 nodes/iteration, was 650) |
-| **B. Dashboard-open leak** — opening a dashboard retains 5.71 MB / 2,697 DOM nodes | **NOT FIXED — cause not identified** |
+| **Route-change leak** — each navigation stranded the previous view's component tree | **FIXED** — 650 → **0** nodes/iteration |
+| Leaked IntersectionObservers / IndexedDB connections / `window "load"` listeners | **FIXED** — all **0** |
+| **Dashboard-open leak, "5.71 MB / 2,697 nodes per open"** | **DOES NOT EXIST** — it was a measurement artifact (§7.1) |
+| **`@tanstack/vue-form` leak** — streams 4,051 and logs 1,438 nodes/navigation | **REAL, OPEN** — now the largest leak in the app |
 
-Leak A was a discarded cleanup function: `onMounted(() => { …; return () => cleanup(); })`.
-Vue **ignores** the return value of `onMounted` — that is React's `useEffect`
-idiom. One orphaned `document` listener per navigation held its component's
-setup scope and, through a template ref, the whole detached page tree.
+The route-change leak was a discarded cleanup function:
+`onMounted(() => { …; return () => cleanup(); })`. Vue **ignores** what
+`onMounted` returns — that is React's `useEffect` idiom. One orphaned `document`
+listener per navigation held its component's setup scope and, through a template
+ref, the whole detached page tree.
 
-Leak B is separately reproducible, perfectly linear, and **still open**. It is
-the one users are reporting.
+**After the fixes, opening a dashboard leaks 0 DOM nodes.** Verified over 8
+consecutive opens on a production build: node count pinned at 8,452, live
+IntersectionObservers 0, IndexedDB connections flat at 7, heap growth
+decelerating (0.46 → 0.15 MB per open — caches settling, not linear growth).
+
+The remaining real leak is **not in dashboards**: `@tanstack/vue-form` discards
+the cleanup returned by `FormApi.mount()`, and it costs streams ~6× what the
+dashboard list ever did.
 
 ---
 
@@ -103,76 +109,58 @@ across `usePanelCache`, `usePanelDataLoader`, `PanelSchemaRenderer`,
 
 ---
 
-## 3. Leak B — dashboard open — STILL OPEN
+## 3. The dashboard-open leak was a measurement artifact
 
-**Reproducible and linear:** 5.71 MB and 2,697 DOM nodes per dashboard open,
-identical before and after every fix above. Six opens: 56.4 → 84.9 MB.
+For most of this investigation, opening a dashboard appeared to retain 5.71 MB
+and 2,697 DOM nodes, perfectly linearly. It does not.
 
-### What is known
+A forward BFS from the GC roots (the correct retainer algorithm — see §7.2)
+produced this path for every "leaked" `ViewDashboard` instance:
 
-- The DOM is **detached, not in-document**. In-document element count is
-  constant at 2,177 across opens while CDP's node count climbs — so this is
-  retention, not nodes accumulating in a container.
-- Anchored by **Vue VNodes** (`Object.el` ×46,579, `.anchor` ×10,007), i.e. by
-  retained component instances (`.subTree` / `.vnode` ×11,007 after 4 opens).
-- ~904 event listeners retained per open, riding on the detached DOM.
+```
+synthetic (GC roots) -> (Global handles) -> <N / DevTools console>
+  -> <div gs-id="panel-0"> -> .grid-stack-item-content -> ...
+  -> <symbol _vei> -> .onMouseover closure -> context -> ViewDashboard
+```
 
-### What has been ruled OUT
+`Global handles / DevTools console` pinning a panel div is a **Playwright
+`ElementHandle`**. The harness called `page.waitForSelector(".grid-stack-item")`
+on every dashboard open and never disposed the returned handle. Each handle
+pinned that panel's DOM and, through Vue's `_vei` event invoker, the entire
+`ViewDashboard` component tree.
 
-- Leaked `IntersectionObserver` / `ResizeObserver` / `MutationObserver` — zero
-  undisconnected on the dashboard-open path.
-- Leaked `window` / `document` listeners — zero growing on that path.
-- Uncleared `setInterval` — zero.
-- IndexedDB connections — fixed, flat.
-- The `traceMap` streaming layer — `TraceRecord: 1 → 0`.
-- Portal/teleport accumulation — in-document count is flat.
+Replacing it with `page.waitForFunction(...)`, which returns no handle, changed
+the result from 2,697 nodes/open to **0**.
 
-### Bisection: the leak has two independent halves
+This retroactively explains every anomaly in the investigation: the perfect
+linearity (one handle per open), no growth in listeners/observers/timers,
+vue-router bookkeeping being clean, ECharts disposing correctly yet nodes still
+"leaking", and the control arm reading 0 — it used `waitForFunction` only.
 
-Same dashboard, 4 iterations each, production build:
+**Lesson for future harnesses:** `waitForSelector`, `$`, `$$` and
+`evaluateHandle` all return handles that pin DOM until disposed. In a
+memory-measurement harness use `waitForFunction` or `locator().waitFor()`, or
+dispose every handle explicitly.
 
-| Variant | Nodes/open | Listeners/open |
-|---|---|---|
-| **A.** open + settle (panels mount, data renders) | 2,697 | 901 |
-| **B.** open + leave after 400 ms (no data) | **1,175** | 120 |
-| **C.** panels mount, search requests aborted | **1,230** | 100 |
+### Which measurements this invalidates
 
-B ≈ C, and both are ~45% of A. So:
+The artifact was present in **both arms** of the before/after #13970 comparison,
+so the relative improvement there is still directionally valid but the absolute
+per-open figures were inflated. The route-bisect and control measurements used
+`waitForFunction` only and are unaffected — including the 650 → 0 result for the
+route-change fix, and the streams/logs figures in §4.
 
-- **~1,200 nodes/open leak from the dashboard view shell alone**, with no panel
-  data and no charts rendered. This is `ViewDashboard` / `RenderDashboardCharts`
-  / variables / GridStack territory.
-- **~1,470 nodes and ~800 listeners/open** are added by rendering query results
-  — chart and table content.
+### Post-fix state, measured correctly
 
-These are separate bugs and can be fixed independently.
+Committed code, production build, 8 consecutive dashboard opens:
 
-### Why the heap analysis did not name the retainer
-
-Three approaches were tried and all failed; recording them so the next person
-does not repeat them:
-
-1. **Shortest-path BFS to a GC root** — terminates at V8-internal roots
-   (`Traced handles`, `Internalized strings`) that reference nearly everything.
-   Reports "no path" or a meaningless path.
-2. **Incoming-edge histogram of detached nodes** — surfaces the dead subtree's
-   own Vue internals (`Object.el`, `system / Context .instance`, `Object.ctx`,
-   `native_bind .i`) because excluding "dead component instances" does not
-   exclude the contexts and closures belonging to them.
-3. **Forward closure from detached DOM, then cross-edges into it** — the closure
-   absorbs 3.86 M of ~4 M nodes, because detached DOM reaches shared prototypes,
-   maps and code objects. Over-approximates to uselessness.
-
-A correct version needs dominator-tree computation (what Chrome DevTools'
-"Retained Size" column actually uses), not ad-hoc graph walks.
-
-### Recommended next step
-
-Either compute a proper dominator tree over the snapshot, or continue the
-empirical bisection into the shell: stub `GridStack.init`, then the variables
-manager, then the panel container, and see which removal collapses the
-~1,200 nodes/open. The listener/observer/timer avenues are already exhausted —
-`dash-listener-origins.mjs` reports **zero** growth in all three on this path.
+| Metric | Result |
+|---|---|
+| DOM nodes per open | **0** (pinned at 8,452) |
+| Live IntersectionObservers | **0** |
+| IndexedDB connections | flat at 7 |
+| JS heap per open | 0.43 MB, decelerating (0.46 → 0.15) — caches settling |
+| Event listeners per open | +30 — small, partly `@tanstack/vue-form` (§4) |
 
 ---
 
@@ -214,11 +202,15 @@ Measured before/after on production builds:
 
 | | Pre-#13970 | Current `main` | Change |
 |---|---|---|---|
-| MB per dashboard open | 10.69 | 5.68 | −47% |
-| DOM nodes per open | 8,147 | 2,697 | −67% |
+| MB per dashboard open* | 10.69 | 5.68 | −47% |
+| DOM nodes per open* | 8,147 | 2,697 | −67% |
 | Leaked observers / IDB / listeners | +3 / +3 / +15 | +3 / +3 / +15 | unchanged |
 
-**#13970 halved leak B without fixing any of its causes** — the same objects
+\* Both arms include the harness artifact of §3, so the *relative* change is
+meaningful but the absolute per-open numbers are inflated. The observer / IDB /
+listener counts are instrumented directly and are unaffected.
+
+**#13970 roughly halved the per-open cost without fixing any of its causes** — the same objects
 leaked at the same rate; what changed is how much each dragged with it (the
 `deep: true` watch removal being the likely bulk, matching `Dep` as the third
 largest heap grower at +277,976).
@@ -228,6 +220,9 @@ pre-PR `setupPanelObservers` created one observer and leaked 1/open; post-PR it
 creates two and still leaks exactly 1/open.
 
 All four defects in §2.2–§2.5 predate #13970 (files byte-identical across it).
+
+Note that with the artifact removed, the post-fix dashboard-open leak is 0 nodes,
+so what #13970 improved was largely load-time cost rather than retention.
 
 ---
 
