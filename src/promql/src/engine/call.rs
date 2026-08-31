@@ -27,65 +27,6 @@ use super::Engine;
 use crate::functions;
 
 impl Engine {
-    async fn call_expr_first_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.first().expect("Missing arg 0"))
-            .await
-    }
-
-    async fn call_expr_second_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(1).expect("Missing arg 1"))
-            .await
-    }
-
-    async fn call_expr_third_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(2).expect("Missing arg 2"))
-            .await
-    }
-
-    async fn call_expr_fourth_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(3).expect("Missing arg 3"))
-            .await
-    }
-
-    async fn call_expr_fifth_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(4).expect("Missing arg 4"))
-            .await
-    }
-
-    fn ensure_two_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() != 2 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn ensure_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() != 3 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn ensure_ge_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() < 3 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn ensure_five_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() != 5 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn parse_f64_else_err<T: Into<String>>(&self, value: &Value, err: T) -> Result<f64> {
-        match value {
-            Value::Float(f) => Ok(*f),
-            _ => Err(DataFusionError::NotImplemented(err.into())),
-        }
-    }
     pub(super) async fn call_expr(
         &mut self,
         func: &Function,
@@ -383,6 +324,66 @@ impl Engine {
             start.elapsed()
         );
         Ok(result)
+    }
+
+    async fn call_expr_first_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.first().expect("Missing arg 0"))
+            .await
+    }
+
+    async fn call_expr_second_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(1).expect("Missing arg 1"))
+            .await
+    }
+
+    async fn call_expr_third_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(2).expect("Missing arg 2"))
+            .await
+    }
+
+    async fn call_expr_fourth_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(3).expect("Missing arg 3"))
+            .await
+    }
+
+    async fn call_expr_fifth_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(4).expect("Missing arg 4"))
+            .await
+    }
+
+    fn ensure_two_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() != 2 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn ensure_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() != 3 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn ensure_ge_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() < 3 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn ensure_five_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() != 5 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn parse_f64_else_err<T: Into<String>>(&self, value: &Value, err: T) -> Result<f64> {
+        match value {
+            Value::Float(f) => Ok(*f),
+            _ => Err(DataFusionError::NotImplemented(err.into())),
+        }
     }
 }
 

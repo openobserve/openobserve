@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Pre-scan of the query AST that decides which label columns to load.
-//! Writes `label_selector`, `skip_labels`, and `disable_label_selector`.
+//! Writes `label_selector` and `disable_label_selector`.
 
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{
