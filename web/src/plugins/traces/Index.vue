@@ -1610,6 +1610,17 @@ const onJumpToPanelStreamData = (fromUs: number, toUs: number) => {
 };
 
 const onSelectTracesStream = () => {
+  // < md the stream selector lives inside the fields drawer — open it first,
+  // then focus the trigger once the drawer content has mounted.
+  if (isMobile.value) {
+    mobileFieldsOpen.value = true;
+    setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-test="log-search-index-list-select-stream"] button')
+        ?.click();
+    }, 300);
+    return;
+  }
   const trigger = document.querySelector<HTMLElement>(
     '[data-test="log-search-index-list-select-stream"] button',
   );

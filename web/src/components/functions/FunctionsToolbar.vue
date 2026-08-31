@@ -36,13 +36,15 @@
       />
     </template>
     <template #tabs>
-      <div class="o2-input flex h-full items-center gap-4">
+      <!-- < md the language toggle wraps to its own row: sharing the title row
+           pushed it off-screen. -->
+      <div class="o2-input flex h-full items-center gap-4 max-md:h-auto max-md:basis-full">
         <!-- Divider between the function name (header #title) and the language
              toggle — they are separate controls sharing one header row. h-full +
              the separator's own self-stretch span the full h-15 header row; my-2
              insets it to ~2.75rem, so it runs past the subtitle line ("Add
              Function") rather than stopping at the name. -->
-        <OSeparator vertical class="my-2" />
+        <OSeparator vertical class="my-2 max-md:hidden" />
         <!-- Transform-type (language) selector -->
         <div class="flex h-9 items-center gap-4">
           <!-- A segmented toggle rather than a radio group: the two languages are

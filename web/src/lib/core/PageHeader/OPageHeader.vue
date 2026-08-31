@@ -77,7 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            its toolbar compact, with the rest behind #actions-overflow, stays on
            one line. Without a floor min-w-0 lets this shrink towards nothing, so
            the actions never wrap and overlap the title instead. -->
-      <div class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-md:min-w-24">
+      <div
+        class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-md:min-w-24 max-md:flex-wrap"
+      >
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
@@ -153,9 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
+        <!-- < md inline tabs get their own full row: squeezed next to the title
+             they overflow the header instead of wrapping. -->
         <div
           v-if="hasTabs && !tabsBelow"
-          class="flex h-full min-w-0 flex-1 items-center max-md:flex-wrap"
+          class="flex h-full min-w-0 flex-1 items-center max-md:h-auto max-md:basis-full max-md:flex-wrap"
         >
           <slot name="tabs" />
         </div>
