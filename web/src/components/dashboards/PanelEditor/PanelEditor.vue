@@ -60,6 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.layout.splitter"
           :limits="splitterLimits"
           :style="splitterStyle"
+          class="max-md:relative"
+          :before-class="fieldListPaneClass"
           :disable="!dashboardPanelData.layout.showFieldList"
           separatorClass="field-list-separator"
           :separatorStyle="{
@@ -418,6 +420,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSplitter
           v-model="dashboardPanelData.layout.splitter"
           :limits="[0, 20]"
+          class="max-md:relative"
+          :before-class="fieldListPaneClass"
           :disable="!dashboardPanelData.layout.showFieldList"
           :style="{
             width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 3.125rem)',
@@ -1057,6 +1061,14 @@ const layoutPanelContainerStyle = computed(() => {
 });
 
 // Field list wrapper class - logs/build doesn't need padding-bottom
+// < md an open field list covers the row (like the config panel): sharing it
+// left ~180px where the always-visible +X/+Y actions covered the field names.
+const fieldListPaneClass = computed(() =>
+  isMobile.value && dashboardPanelData.layout.showFieldList
+    ? "max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:w-full!"
+    : "",
+);
+
 const fieldListWrapperClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return "w-full h-full";

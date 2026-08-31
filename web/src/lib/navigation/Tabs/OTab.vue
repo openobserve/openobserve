@@ -184,7 +184,7 @@ const heightClasses = computed<string>(() => {
         class="absolute inset-y-0 left-0 z-10 flex w-3 items-center justify-center transition-opacity duration-150"
         :class="
           isDraggable
-            ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing'
+            ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing max-md:opacity-50'
             : 'pointer-events-none opacity-0'
         "
         @mousedown="isDraggable && armDrag()"

@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  INACTIVE tabs, so it would read wrong on the open folder. -->
             <div
               v-if="tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID"
-              class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex"
+              class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex max-md:flex"
             >
               <ODropdown side="bottom" align="start">
                 <template #trigger>
