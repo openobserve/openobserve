@@ -457,7 +457,6 @@ pub(crate) fn synthetics_restart_required_changes(
         enabled,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
-        status_page_trust_proxy_headers,
         status_page_public_rpm,
         lambda_browser: _,
         lambda_net: _,
@@ -488,9 +487,7 @@ pub(crate) fn synthetics_restart_required_changes(
     if old.status_page_domain_verify_interval != *status_page_domain_verify_interval {
         changed.push("ZO_STATUS_PAGE_DOMAIN_VERIFY_INTERVAL");
     }
-    // Read live per request; no restart needed, so not reported here — bind
-    // them so the exhaustive match compiles.
-    let _ = status_page_trust_proxy_headers;
+    // Read live per request; no restart needed, so not reported here.
     let _ = status_page_public_rpm;
     changed
 }
@@ -931,15 +928,6 @@ pub struct Synthetics {
         help = "Seconds between custom-domain DNS ownership verification ticks."
     )]
     pub status_page_domain_verify_interval: u64,
-    /// Trust `X-Forwarded-For` for the public status-page password-attempt
-    /// limiter. Off by default: a spoofable header must not be the rate-limit
-    /// key unless a trusted proxy sets it.
-    #[env_config(
-        name = "ZO_STATUS_PAGE_TRUST_PROXY_HEADERS",
-        default = false,
-        help = "Trust X-Forwarded-For for the status-page password-attempt limiter (only behind a trusted proxy)."
-    )]
-    pub status_page_trust_proxy_headers: bool,
     /// Per-IP request budget per minute for the public status-page read routes
     /// (snapshot / page / badge / feed). Generous by default — thousands of a
     /// customer's employees can share one corporate NAT egress IP during an

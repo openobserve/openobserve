@@ -18,212 +18,139 @@
 //! nothing here may search, hit storage, or make cross-node calls: two
 //! indexed point-reads against the meta store, nothing else.
 //!
-//! Unknown, draft, and password-protected slugs all return one identical 404
-//! in the POC (password unlock is not built yet). Production adds the
-//! sharded in-process TTL cache and the per-IP limiter in front of these
-//! reads; their absence here changes cost, never content.
+//! Every route answers from the sharded in-process TTL cache and reads the
+//! meta store only on a miss; a password page's payload bypasses the cache (R-7).
 
 use std::{
-    sync::{LazyLock, RwLock},
+    collections::HashMap,
+    sync::{Arc, LazyLock, RwLock},
     time::{Duration, Instant},
 };
 
 use axum::{
     Json,
     body::Body,
-    extract::Path,
-    http::{StatusCode, header},
+    extract::{Extension, Path},
+    http::{HeaderMap, StatusCode, header},
     response::Response,
 };
-use infra::{db::get_orm_client_ro, table::status_pages as table};
+use config::axum::middlewares::RealIp;
+use infra::{
+    db::get_orm_client_ro,
+    table::{entity, status_pages as table},
+};
 
-/// The whole visitor UI for the POC: one self-contained page, no build step,
-/// no external assets, that fetches the snapshot JSON and renders it. The
-/// working module replaces this with the dedicated Vite entry from the design.
+/// The visitor UI: one self-contained page that fetches the snapshot JSON.
 const PAGE_HTML: &str = include_str!("status_page.html");
-
-/// In-process snapshot cache — the design's RENDER_CACHE idiom. Without it the
-/// handler does a Postgres read PER REQUEST, and the DB connection pool becomes
-/// the serialization point: a controlled load test measured p50 latency going
-/// from ~15ms at conc=1 to ~4.7s at conc=100 while `generated_at` proved the
-/// DATA was already cached — i.e. the data was cached but the read path was not.
-/// This closes that gap: one DB read per slug per TTL, everything else is an
-/// RwLock read of prebuilt bytes.
-///
-/// Sharded to keep the write lock (miss/refresh) off the read path of unrelated
-/// slugs. TTL matches the rebuilder cadence — a fresher value cannot exist.
+/// One DB read per slug per TTL; the load test showed the DB pool serializing at p50 4.7s
+/// otherwise.
 const CACHE_TTL: Duration = Duration::from_secs(30);
+/// Keeps the miss-time write lock off the read path of unrelated slugs.
 const CACHE_SHARDS: usize = 16;
-/// Hard per-shard entry cap. A sustained unique-slug spray keeps entries fresh
-/// (unexpired), so a TTL-only bound would grow unbounded — this caps total
-/// cache memory at CACHE_SHARDS * CACHE_MAX_PER_SHARD entries.
+/// Hard cap: a unique-slug spray keeps entries fresh, so the TTL alone would not bound memory.
 const CACHE_MAX_PER_SHARD: usize = 2048;
+const UNLOCK_COOKIE_TTL_SECS: i64 = 24 * 3600;
+/// Fixed name: the value already binds the slug, and echoing it would leak the slug on a custom
+/// domain.
+const UNLOCK_COOKIE_NAME: &str = "o2_sp_unlock";
+const AUTH_MAX_ATTEMPTS: u32 = 5;
+const AUTH_WINDOW: Duration = Duration::from_secs(60);
+const READ_WINDOW: Duration = Duration::from_secs(60);
+/// The limiter key when no `RealIp` was resolved: one bucket still bounds Argon2 CPU per slug
+/// (R-5).
+const SHARED_IP: &str = "shared";
 
-struct CacheEntry {
-    /// The prebuilt JSON body, or None for a negative (unknown/draft) entry.
-    body: Option<String>,
-    noindex: bool,
-    at: Instant,
-}
-
-type Shard = RwLock<std::collections::HashMap<String, CacheEntry>>;
 static CACHE: LazyLock<Vec<Shard>> = LazyLock::new(|| {
     (0..CACHE_SHARDS)
         .map(|_| RwLock::new(Default::default()))
         .collect()
 });
+/// Per-IP read-route counters.
+static READ_RPM: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
+/// Password attempts, keyed by "{ip}|{slug}".
+static AUTH_ATTEMPTS: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
 
-fn shard_for(slug: &str) -> &'static Shard {
-    let mut h: usize = 0;
-    for b in slug.bytes() {
-        h = h.wrapping_mul(31).wrapping_add(b as usize);
-    }
-    &CACHE[h % CACHE_SHARDS]
+type Counters = RwLock<HashMap<String, (u32, Instant)>>;
+type Shard = RwLock<HashMap<String, CacheEntry>>;
+
+/// What the cache knows about a slug; a password page's payload is never cached (R-7).
+#[derive(Clone)]
+enum Cached {
+    Public(Arc<PublicEntry>),
+    /// Public, but the rebuilder hasn't produced its first snapshot yet: shell only.
+    Unbuilt,
+    Password,
+    /// Unknown, draft, or feature off — negative-cached so a slug spray can't turn misses into DB
+    /// hits.
+    Missing,
 }
 
-// ── Per-IP read-plane limiter (the documented basic_routes gap) ──────────────
+struct CacheEntry {
+    kind: Cached,
+    at: Instant,
+}
 
-/// Sliding-ish per-IP counter for the read routes, keyed by "{ip}". Bounded.
-static READ_RPM: LazyLock<RwLock<std::collections::HashMap<String, (u32, Instant)>>> =
-    LazyLock::new(|| RwLock::new(Default::default()));
+/// The prebuilt snapshot JSON plus the two fields badge/feed need without re-parsing it.
+struct PublicEntry {
+    body: String,
+    noindex: bool,
+    name: String,
+    current: String,
+}
 
-/// True if this IP is over its per-minute budget. 0 rpm disables the limiter.
-fn read_rate_limited(headers: &axum::http::HeaderMap) -> bool {
-    let rpm = config::get_config().synthetics.status_page_public_rpm;
-    if rpm == 0 {
-        return false;
+#[derive(serde::Deserialize)]
+pub struct AuthBody {
+    password: String,
+}
+
+impl PublicEntry {
+    fn new(page: &entity::status_pages::Model, snap: entity::status_page_snapshots::Model) -> Self {
+        let body = format!(
+            "{{\"name\":{},\"brand_name\":{},\"accent_color\":{},\"logo_img\":{},\"current\":{},\"history\":{}}}",
+            serde_json::to_string(&page.name).unwrap_or_else(|_| "\"\"".into()),
+            serde_json::to_string(&page.brand_name).unwrap_or_else(|_| "null".into()),
+            serde_json::to_string(&page.accent_color).unwrap_or_else(|_| "null".into()),
+            serde_json::to_string(&page.logo_img).unwrap_or_else(|_| "null".into()),
+            snap.current,
+            snap.history
+        );
+        Self {
+            body,
+            noindex: page.noindex,
+            name: page.name.clone(),
+            current: snap.current,
+        }
     }
-    let ip = client_ip(headers);
-    let Ok(mut guard) = READ_RPM.write() else {
-        return false; // fail open on a poisoned lock
-    };
-    let now = Instant::now();
-    if guard.len() > 16384 {
-        guard.retain(|_, (_, at)| now.duration_since(*at) < Duration::from_secs(60));
-    }
-    let e = guard.entry(ip).or_insert((0, now));
-    if now.duration_since(e.1) >= Duration::from_secs(60) {
-        *e = (0, now);
-    }
-    e.0 += 1;
-    e.0 > rpm
 }
 
 /// GET /api/status_pages_public/{slug} — the snapshot JSON, cache-first.
-pub async fn snapshot(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> Response {
-    if read_rate_limited(&headers) {
+pub async fn snapshot(
+    Path(slug): Path<String>,
+    ip: Option<Extension<RealIp>>,
+    headers: HeaderMap,
+) -> Response {
+    if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    // R-7: password pages take a separate path that NEVER touches the shared
-    // public cache (cache is keyed by slug only; caching protected content
-    // there would serve it to unauthenticated visitors) and is served
-    // `no-store` after the unlock-cookie check.
-    if let Some(resp) = maybe_serve_password_page(&slug, &headers).await {
-        return resp;
-    }
-
-    let shard = shard_for(&slug);
-    // Fast path: a fresh cache hit is a read-lock and a clone, no DB, no await.
-    if let Ok(guard) = shard.read()
-        && let Some(e) = guard.get(&slug)
-        && e.at.elapsed() < CACHE_TTL
-    {
-        return match &e.body {
-            Some(body) => json_ok(body, e.noindex),
-            None => not_found(),
-        };
-    }
-
-    // Miss/stale: one DB read, then populate the cache (negative entry too, so
-    // a slug-spray cannot turn every miss into a DB hit).
-    let (body, noindex) = match load_public(&slug).await {
-        Some((page, snap)) => (
-            Some(format!(
-                "{{\"name\":{},\"brand_name\":{},\"accent_color\":{},\"logo_img\":{},\"current\":{},\"history\":{}}}",
-                serde_json::to_string(&page.name).unwrap_or_else(|_| "\"\"".into()),
-                serde_json::to_string(&page.brand_name).unwrap_or_else(|_| "null".into()),
-                serde_json::to_string(&page.accent_color).unwrap_or_else(|_| "null".into()),
-                serde_json::to_string(&page.logo_img).unwrap_or_else(|_| "null".into()),
-                snap.current,
-                snap.history
-            )),
-            page.noindex,
-        ),
-        None => (None, false),
-    };
-    if let Ok(mut guard) = shard.write() {
-        if guard.len() >= CACHE_MAX_PER_SHARD {
-            // First drop expired entries; if still at cap (a sustained
-            // unique-slug spray keeps everything fresh), evict the oldest so
-            // memory is HARD-bounded regardless of TTL (M-1: this plane has no
-            // rate limiter in front of it yet).
-            guard.retain(|_, e| e.at.elapsed() < CACHE_TTL);
-            while guard.len() >= CACHE_MAX_PER_SHARD {
-                if let Some(oldest) = guard
-                    .iter()
-                    .min_by_key(|(_, e)| e.at)
-                    .map(|(k, _)| k.clone())
-                {
-                    guard.remove(&oldest);
-                } else {
-                    break;
-                }
-            }
-        }
-        guard.insert(
-            slug.clone(),
-            CacheEntry {
-                body: body.clone(),
-                noindex,
-                at: Instant::now(),
-            },
-        );
-    }
-    match body {
-        Some(body) => json_ok(&body, noindex),
-        None => not_found(),
+    match resolve(&slug).await {
+        Cached::Public(e) => json_ok(&e.body, e.noindex),
+        Cached::Password => serve_password_page(&slug, &headers).await,
+        Cached::Unbuilt | Cached::Missing => not_found(),
     }
 }
 
-fn json_ok(body: &str, noindex: bool) -> Response {
-    let mut resp = Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/json")
-        .header(header::CACHE_CONTROL, "public, max-age=30")
-        .header("X-Content-Type-Options", "nosniff");
-    // The platform-wide `access-control-allow-credentials: true` (pentest
-    // finding, 2026-08-22) comes from `cors_layer()` above basic_routes and is
-    // INERT — ACAO is only emitted for allowlisted origins. Recorded, not
-    // silently patched (app-wide CORS change is out of this feature's scope).
-    if noindex {
-        resp = resp.header("X-Robots-Tag", "noindex");
-    }
-    resp.body(Body::from(body.to_owned()))
-        .unwrap_or_else(|_| not_found())
-}
-
-/// GET /status/{slug} — the minimal visitor page. The HTML is a static const,
-/// so this only needs to know the slug resolves to a public page; it reuses the
-/// snapshot cache's existence answer rather than doing its own DB read per hit
-/// (the load test showed the page degrading on the same curve as the API
-/// because it, too, hit the DB per request).
-pub async fn page(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> Response {
-    if read_rate_limited(&headers) {
+/// GET /status/{slug} — the static visitor shell; only the slug's kind is needed, and the cache has
+/// it.
+pub async fn page(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Response {
+    if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    // Serve the HTML shell for public (1) AND password (2) pages — for a
-    // password page the shell shows the password field, and the snapshot fetch
-    // is what enforces the gate. Draft/unknown → 404.
-    let vis = slug_visibility(&slug).await;
-    if vis != Some(1) && vis != Some(2) {
-        return not_found();
-    }
-    // A password page's shell must not be shared-cached lest a CDN key it in a
-    // way that interferes with the per-visitor unlock flow.
-    let cache = if vis == Some(2) {
-        "no-store, private"
-    } else {
-        "public, max-age=30"
+    // A password page's shell is never shared-cached lest a CDN interfere with the per-visitor
+    // unlock flow.
+    let cache = match resolve(&slug).await {
+        Cached::Public(_) | Cached::Unbuilt => "public, max-age=30",
+        Cached::Password => "no-store, private",
+        Cached::Missing => return not_found(),
     };
     Response::builder()
         .status(StatusCode::OK)
@@ -232,8 +159,7 @@ pub async fn page(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> R
         .header("X-Frame-Options", "DENY")
         .header("X-Content-Type-Options", "nosniff")
         .header("Referrer-Policy", "no-referrer")
-        // The page is fully self-contained (no external assets, no inline
-        // event handlers); a strict CSP is therefore free defense-in-depth.
+        // The page has no external assets or inline handlers, so a strict CSP is free defense-in-depth.
         .header(
             "Content-Security-Policy",
             "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; \
@@ -244,142 +170,29 @@ pub async fn page(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> R
         .unwrap_or_else(|_| not_found())
 }
 
-/// The visibility of a slug's page (0 draft, 1 public, 2 password), or None if
-/// the slug does not exist / the feature is off. One indexed point-read; the
-/// HTML shell is a static const so no snapshot read is needed here.
-async fn slug_visibility(slug: &str) -> Option<i32> {
-    let cfg = config::get_config();
-    if !cfg.synthetics.enabled {
-        return None;
-    }
-    let conn = get_orm_client_ro().await;
-    table::get_page_by_slug(conn, slug)
-        .await
-        .ok()
-        .flatten()
-        .map(|p| p.visibility)
-}
-
-/// Resolves a slug to a PUBLIC (visibility==1) page and its snapshot — the two
-/// point-reads on the cacheable public path. Draft (0) and password (2) return
-/// None here; password pages are served by `maybe_serve_password_page`.
-async fn load_public(
-    slug: &str,
-) -> Option<(
-    infra::table::entity::status_pages::Model,
-    infra::table::entity::status_page_snapshots::Model,
-)> {
-    let cfg = config::get_config();
-    if !cfg.synthetics.enabled {
-        return None;
-    }
-    let conn = get_orm_client_ro().await;
-    let page = table::get_page_by_slug(conn, slug).await.ok()??;
-    if page.visibility != 1 {
-        return None;
-    }
-    let snap = table::get_snapshot(conn, &page.id).await.ok()??;
-    Some((page, snap))
-}
-
-/// If `slug` is a password page (visibility==2), serve it ONLY with a valid
-/// unlock cookie, `no-store`, off the shared cache. Returns None if the slug is
-/// not a password page (the caller then takes the normal public path). A
-/// password page with no/invalid cookie returns the uniform 404 — the same
-/// response as an unknown slug, so a protected page's existence is not an
-/// oracle to anyone who hasn't unlocked it.
-async fn maybe_serve_password_page(
-    slug: &str,
-    headers: &axum::http::HeaderMap,
-) -> Option<Response> {
-    let cfg = config::get_config();
-    if !cfg.synthetics.enabled {
-        return None;
-    }
-    let conn = get_orm_client_ro().await;
-    let page = table::get_page_by_slug(conn, slug).await.ok().flatten()?;
-    if page.visibility != 2 {
-        return None; // not a password page — normal path handles it
-    }
-    let Some(hash) = page.password_hash.as_deref() else {
-        return Some(not_found());
-    };
-    if !has_valid_unlock(headers, slug, hash).await {
-        return Some(not_found()); // locked → uniform 404
-    }
-    let Some(snap) = table::get_snapshot(conn, &page.id).await.ok().flatten() else {
-        return Some(not_found());
-    };
-    let body = format!(
-        "{{\"name\":{},\"current\":{},\"history\":{}}}",
-        serde_json::to_string(&page.name).unwrap_or_else(|_| "\"\"".into()),
-        snap.current,
-        snap.history
-    );
-    Some(
-        Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/json")
-            // R-7: protected data is never shared-cached.
-            .header(header::CACHE_CONTROL, "no-store, private")
-            .header("X-Content-Type-Options", "nosniff")
-            .header("X-Robots-Tag", "noindex")
-            .body(Body::from(body))
-            .unwrap_or_else(|_| not_found()),
-    )
-}
-
-// ── Password unlock (R-5, R-7) ───────────────────────────────────────────────
-
-const UNLOCK_COOKIE_TTL_SECS: i64 = 24 * 3600;
-/// A single fixed name, not `o2_sp_{slug}`: the cookie *value* already binds
-/// and HMAC-verifies the slug (see `issue_unlock_cookie`), so the name doesn't
-/// need to repeat it — and on a custom domain the real slug never otherwise
-/// appears anywhere the visitor can see, so echoing it into a cookie name
-/// (visible in devtools) would undo that.
-const UNLOCK_COOKIE_NAME: &str = "o2_sp_unlock";
-/// Per-IP+slug password attempts allowed per window before lockout.
-const AUTH_MAX_ATTEMPTS: u32 = 5;
-const AUTH_WINDOW: Duration = Duration::from_secs(60);
-
-/// Attempt counters, keyed by "{ip}|{slug}". Bounded like the snapshot cache.
-static AUTH_ATTEMPTS: LazyLock<RwLock<std::collections::HashMap<String, (u32, Instant)>>> =
-    LazyLock::new(|| RwLock::new(Default::default()));
-
-#[derive(serde::Deserialize)]
-pub struct AuthBody {
-    password: String,
-}
-
-/// POST /api/status_pages_public/{slug}/auth — verify a password, set the
-/// unlock cookie. R-5: the per-IP+slug rate-limit is checked BEFORE the Argon2
-/// verify, so an attacker cannot drive unbounded expensive hashes. R-7: on a
-/// password page the response is never cached.
+/// POST /api/status_pages_public/{slug}/auth — verify a password, set the unlock cookie.
 pub async fn auth(
-    axum::extract::Path(slug): axum::extract::Path<String>,
-    headers: axum::http::HeaderMap,
+    Path(slug): Path<String>,
+    ip: Option<Extension<RealIp>>,
     Json(body): Json<AuthBody>,
 ) -> Response {
-    // R-5 STEP 1: rate-limit BEFORE any crypto.
-    let ip = client_ip(&headers);
+    // R-5: the per-IP+slug limit is checked before any Argon2 work so hashes can't be driven
+    // unbounded.
+    let ip = client_ip(ip.map(|e| e.0));
     if !attempt_allowed(&ip, &slug) {
         return too_many();
     }
-
-    // Resolve the page's stored hash (password pages only).
-    let cfg = config::get_config();
-    if !cfg.synthetics.enabled {
+    if !config::get_config().synthetics.enabled {
         return unauthorized();
     }
     let conn = get_orm_client_ro().await;
+    // Unknown slug and wrong password are the same 401.
     let Some(page) = table::get_page_by_slug(conn, &slug).await.ok().flatten() else {
-        return unauthorized(); // unknown slug: same 401 as wrong password
+        return unauthorized();
     };
     let (Some(hash), true) = (page.password_hash.as_deref(), page.visibility == 2) else {
         return unauthorized();
     };
-
-    // R-5 STEP 2: only now the expensive constant-time Argon2 verify.
     match openobserve_core::status_pages::verify_password(hash, &body.password) {
         Ok(true) => {
             let pwv = openobserve_core::status_pages::pw_version(hash);
@@ -405,121 +218,27 @@ pub async fn auth(
                 .body(Body::from("{\"ok\":true}"))
                 .unwrap_or_else(|_| unauthorized())
         }
-        // Wrong password OR malformed stored hash → the same clear-but-generic
-        // 401. (The gate already conceded the page exists by rendering, so a
-        // "wrong password" message is fine and serves the legitimate visitor.)
+        // The shell already conceded the page exists, so a plain "wrong password" is safe here.
         _ => unauthorized(),
     }
 }
 
-/// Client IP for the limiter: the socket is not plumbed to this handler, so we
-/// honor X-Forwarded-For ONLY when the operator opts in (spoofable header must
-/// not be trusted by default); otherwise all requests share one per-slug bucket
-/// — which still bounds the Argon2 CPU per slug, the property R-5 protects.
-fn client_ip(headers: &axum::http::HeaderMap) -> String {
-    if config::get_config()
-        .synthetics
-        .status_page_trust_proxy_headers
-        && let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
-        && let Some(first) = xff.split(',').next()
-    {
-        return first.trim().to_string();
-    }
-    "shared".to_string()
-}
-
-fn attempt_allowed(ip: &str, slug: &str) -> bool {
-    let key = format!("{ip}|{slug}");
-    let Ok(mut guard) = AUTH_ATTEMPTS.write() else {
-        return true; // fail open on a poisoned lock rather than lock everyone out
-    };
-    let now = Instant::now();
-    // Opportunistic cleanup so the map stays bounded.
-    if guard.len() > 8192 {
-        guard.retain(|_, (_, at)| now.duration_since(*at) < AUTH_WINDOW);
-    }
-    let entry = guard.entry(key).or_insert((0, now));
-    if now.duration_since(entry.1) >= AUTH_WINDOW {
-        *entry = (0, now);
-    }
-    if entry.0 >= AUTH_MAX_ATTEMPTS {
-        return false;
-    }
-    entry.0 += 1;
-    true
-}
-
-/// Does the request carry a valid unlock cookie for this password page?
-async fn has_valid_unlock(headers: &axum::http::HeaderMap, slug: &str, pw_hash: &str) -> bool {
-    let Some(cookies) = headers.get(header::COOKIE).and_then(|v| v.to_str().ok()) else {
-        return false;
-    };
-    let Some(val) = cookies
-        .split(';')
-        .find_map(|c| c.trim().strip_prefix(&format!("{UNLOCK_COOKIE_NAME}=")))
-    else {
-        return false;
-    };
-    let pwv = openobserve_core::status_pages::pw_version(pw_hash);
-    openobserve_core::status_pages::verify_unlock_cookie(val, slug, &pwv).await
-}
-
-fn unauthorized() -> Response {
-    Response::builder()
-        .status(StatusCode::UNAUTHORIZED)
-        .header(header::CACHE_CONTROL, "no-store")
-        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
-        .body(Body::from("Wrong password."))
-        .unwrap_or_default()
-}
-
-fn too_many() -> Response {
-    Response::builder()
-        .status(StatusCode::TOO_MANY_REQUESTS)
-        .header(header::CACHE_CONTROL, "no-store")
-        .header(header::RETRY_AFTER, "60")
-        .body(Body::from("Too many attempts. Try again in a minute."))
-        .unwrap_or_default()
-}
-
-// ── Badge (SVG) + Feed (Atom) ────────────────────────────────────────────────
-// CRITICAL (review): the textContent XSS guarantee is a DOM property that does
-// NOT carry to server-side SVG/XML string generation. Every interpolated field
-// MUST be XML-escaped here. Badges are scoped to a PUBLISHED page's overall
-// state only — never a raw check/monitor id (Uptime Kuma CVE-2026-32230).
-
-/// Minimal XML/SVG text escaping for interpolated values.
-fn xml_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&apos;"),
-            _ => out.push(c),
-        }
-    }
-    out
-}
-
-/// GET /api/status_pages_public/{slug}/badge.svg — a status badge for the
-/// PUBLIC page's overall state. Password pages get 404 (no badge leaks a
-/// protected page's state to an unauthenticated fetcher).
-pub async fn badge(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> Response {
-    if read_rate_limited(&headers) {
+// Badges are scoped to a PUBLISHED page's overall state only — never a raw check/monitor id (Uptime
+// Kuma CVE-2026-32230).
+/// GET /api/status_pages_public/{slug}/badge.svg — password pages get 404 so no badge leaks their
+/// state.
+pub async fn badge(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Response {
+    if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    let Some((_page, snap)) = load_public(&slug).await else {
+    let Cached::Public(e) = resolve(&slug).await else {
         return not_found();
     };
-    // Pull `overall` from the snapshot's `current` half.
     #[derive(serde::Deserialize)]
     struct Cur {
         overall: String,
     }
-    let overall = serde_json::from_str::<Cur>(&snap.current)
+    let overall = serde_json::from_str::<Cur>(&e.current)
         .map(|c| c.overall)
         .unwrap_or_else(|_| "unknown".into());
     let (label, color) = match overall.as_str() {
@@ -530,8 +249,6 @@ pub async fn badge(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> 
         "major_outage" => ("major outage", "#c03530"),
         _ => ("no data", "#7c8f99"),
     };
-    // Fixed template; the only interpolated values are our own controlled label
-    // and a hex color, but escape anyway as defense in depth.
     let label = xml_escape(label);
     let svg = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"148\" height=\"20\" role=\"img\" \
@@ -549,14 +266,13 @@ pub async fn badge(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> 
         .unwrap_or_else(|_| not_found())
 }
 
-/// GET /api/status_pages_public/{slug}/feed.xml — an Atom feed of the public
-/// page's notices. Every title/body is XML-escaped. Password pages: 404 (the
-/// signed-token variant for protected feeds is a Phase-2 item).
-pub async fn feed(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> Response {
-    if read_rate_limited(&headers) {
+/// GET /api/status_pages_public/{slug}/feed.xml — Atom feed of a public page's notices; password
+/// pages get 404.
+pub async fn feed(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Response {
+    if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    let Some((page, snap)) = load_public(&slug).await else {
+    let Cached::Public(e) = resolve(&slug).await else {
         return not_found();
     };
     #[derive(serde::Deserialize)]
@@ -571,21 +287,20 @@ pub async fn feed(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> R
         #[serde(default)]
         notices: Vec<Notice>,
     }
-    let notices = serde_json::from_str::<Cur>(&snap.current)
+    let notices = serde_json::from_str::<Cur>(&e.current)
         .map(|c| c.notices)
         .unwrap_or_default();
-
-    let title = xml_escape(&page.name);
+    let title = xml_escape(&e.name);
     let mut entries = String::new();
+    // textContent's XSS guarantee is a DOM property: server-side XML needs every field escaped
+    // here.
     for n in &notices {
-        // RFC3339-ish timestamp from epoch micros.
-        let secs = n.starts_at / 1_000_000;
         entries.push_str(&format!(
             "<entry><title>{}</title><summary>{}</summary>\
              <updated>{}</updated><category term=\"{}\"/></entry>",
             xml_escape(&n.title),
             xml_escape(&n.body),
-            iso8601(secs),
+            iso8601(n.starts_at / 1_000_000),
             xml_escape(&n.state),
         ));
     }
@@ -600,37 +315,6 @@ pub async fn feed(Path(slug): Path<String>, headers: axum::http::HeaderMap) -> R
         .header("X-Content-Type-Options", "nosniff")
         .body(Body::from(feed))
         .unwrap_or_else(|_| not_found())
-}
-
-/// Epoch seconds → a minimal UTC ISO-8601 string (no chrono dependency here).
-fn iso8601(secs: i64) -> String {
-    // days since epoch → civil date (Hinnant), plus HH:MM:SS.
-    let days = secs.div_euclid(86_400);
-    let rem = secs.rem_euclid(86_400);
-    let (h, mi, s) = (rem / 3600, (rem % 3600) / 60, rem % 60);
-    let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-    format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z")
-}
-
-/// One uniform 404 for unknown/draft/disabled — existence is not
-/// distinguishable from the outside.
-fn not_found() -> Response {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
-        .body(Body::from(
-            "This page doesn't exist or is no longer available.",
-        ))
-        .unwrap_or_default()
 }
 
 /// Runs ahead of all normal routing (see `create_app_router`'s top-level
@@ -656,26 +340,27 @@ pub async fn host_route_middleware(
         HostRouteDecision, resolve_host_route,
     };
 
-    let cfg = config::get_config();
-    if !cfg.synthetics.enabled {
+    if !config::get_config().synthetics.enabled {
         return next.run(request).await;
     }
     let Some(host) = host_header(request.headers()) else {
         return next.run(request).await;
     };
-    let path = request.uri().path();
-    match resolve_host_route(&host, path).await {
+    match resolve_host_route(&host, request.uri().path()).await {
         HostRouteDecision::Fallthrough => next.run(request).await,
         HostRouteDecision::NotConnected => domain_not_connected(),
         HostRouteDecision::Page {
             slug,
             is_snapshot_path,
         } => {
-            let headers = request.headers().clone();
+            let (parts, _) = request.into_parts();
+            // The RealIp layer sits outside this one, so the resolved visitor IP is already on the
+            // request.
+            let ip = parts.extensions.get::<RealIp>().copied().map(Extension);
             if is_snapshot_path {
-                snapshot(Path(slug), headers).await
+                snapshot(Path(slug), ip, parts.headers).await
             } else {
-                page(Path(slug), headers).await
+                page(Path(slug), ip).await
             }
         }
     }
@@ -689,8 +374,248 @@ pub async fn host_route_middleware(
     next.run(request).await
 }
 
+fn shard_for(slug: &str) -> &'static Shard {
+    let mut h: usize = 0;
+    for b in slug.bytes() {
+        h = h.wrapping_mul(31).wrapping_add(b as usize);
+    }
+    &CACHE[h % CACHE_SHARDS]
+}
+
+/// A fresh entry's kind, or None on a miss/expiry; a hit is a read lock and an Arc clone, no await.
+fn cache_get(slug: &str) -> Option<Cached> {
+    let guard = shard_for(slug).read().ok()?;
+    let e = guard.get(slug)?;
+    (e.at.elapsed() < CACHE_TTL).then(|| e.kind.clone())
+}
+
+fn cache_put(slug: &str, kind: Cached) {
+    let Ok(mut guard) = shard_for(slug).write() else {
+        return;
+    };
+    if guard.len() >= CACHE_MAX_PER_SHARD {
+        make_room(&mut guard);
+    }
+    guard.insert(
+        slug.to_owned(),
+        CacheEntry {
+            kind,
+            at: Instant::now(),
+        },
+    );
+}
+
+/// Drops expired entries, then the oldest, so memory stays hard-bounded regardless of TTL.
+fn make_room(shard: &mut HashMap<String, CacheEntry>) {
+    shard.retain(|_, e| e.at.elapsed() < CACHE_TTL);
+    while shard.len() >= CACHE_MAX_PER_SHARD {
+        let Some(oldest) = shard
+            .iter()
+            .min_by_key(|(_, e)| e.at)
+            .map(|(k, _)| k.clone())
+        else {
+            break;
+        };
+        shard.remove(&oldest);
+    }
+}
+
+/// The cache's answer for a slug, doing the miss-time DB reads at most once per TTL.
+async fn resolve(slug: &str) -> Cached {
+    if let Some(kind) = cache_get(slug) {
+        return kind;
+    }
+    let kind = load(slug).await;
+    cache_put(slug, kind.clone());
+    kind
+}
+
+/// The two point-reads behind a miss: the page by slug, then its snapshot for a public page.
+async fn load(slug: &str) -> Cached {
+    if !config::get_config().synthetics.enabled {
+        return Cached::Missing;
+    }
+    let conn = get_orm_client_ro().await;
+    let Some(page) = table::get_page_by_slug(conn, slug).await.ok().flatten() else {
+        return Cached::Missing;
+    };
+    match page.visibility {
+        2 => Cached::Password,
+        1 => match table::get_snapshot(conn, &page.id).await.ok().flatten() {
+            Some(snap) => Cached::Public(Arc::new(PublicEntry::new(&page, snap))),
+            None => Cached::Unbuilt,
+        },
+        _ => Cached::Missing,
+    }
+}
+
+/// R-7: the unlock check and both reads happen per request, off the cache, and the response is
+/// `no-store`.
+async fn serve_password_page(slug: &str, headers: &HeaderMap) -> Response {
+    // Locked visitors get the uniform 404 from the cache alone: a protected page's existence is not
+    // an oracle.
+    let Some(cookie) = unlock_cookie(headers) else {
+        return not_found();
+    };
+    let conn = get_orm_client_ro().await;
+    let Some(page) = table::get_page_by_slug(conn, slug).await.ok().flatten() else {
+        return not_found();
+    };
+    let (Some(hash), true) = (page.password_hash.as_deref(), page.visibility == 2) else {
+        return not_found();
+    };
+    let pwv = openobserve_core::status_pages::pw_version(hash);
+    if !openobserve_core::status_pages::verify_unlock_cookie(cookie, slug, &pwv).await {
+        return not_found();
+    }
+    let Some(snap) = table::get_snapshot(conn, &page.id).await.ok().flatten() else {
+        return not_found();
+    };
+    let body = format!(
+        "{{\"name\":{},\"current\":{},\"history\":{}}}",
+        serde_json::to_string(&page.name).unwrap_or_else(|_| "\"\"".into()),
+        snap.current,
+        snap.history
+    );
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::CACHE_CONTROL, "no-store, private")
+        .header("X-Content-Type-Options", "nosniff")
+        .header("X-Robots-Tag", "noindex")
+        .body(Body::from(body))
+        .unwrap_or_else(|_| not_found())
+}
+
+fn unlock_cookie(headers: &HeaderMap) -> Option<&str> {
+    let cookies = headers.get(header::COOKIE)?.to_str().ok()?;
+    let prefix = format!("{UNLOCK_COOKIE_NAME}=");
+    cookies
+        .split(';')
+        .find_map(|c| c.trim().strip_prefix(prefix.as_str()))
+}
+
+fn json_ok(body: &str, noindex: bool) -> Response {
+    let mut resp = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::CACHE_CONTROL, "public, max-age=30")
+        .header("X-Content-Type-Options", "nosniff");
+    // The platform-wide `access-control-allow-credentials: true` from `cors_layer()` is inert: ACAO
+    // only goes to allowlisted origins.
+    if noindex {
+        resp = resp.header("X-Robots-Tag", "noindex");
+    }
+    resp.body(Body::from(body.to_owned()))
+        .unwrap_or_else(|_| not_found())
+}
+
+/// The limiter key: the ingress-resolved `RealIp`, or one shared bucket when that layer isn't
+/// installed.
+fn client_ip(ip: Option<RealIp>) -> String {
+    ip.map_or_else(|| SHARED_IP.to_owned(), |ip| ip.0.to_string())
+}
+
+/// True if this IP is over its per-minute read budget; 0 rpm disables the limiter.
+fn read_rate_limited(ip: Option<RealIp>) -> bool {
+    let rpm = config::get_config().synthetics.status_page_public_rpm;
+    rpm != 0 && over_budget(&READ_RPM, client_ip(ip), READ_WINDOW, rpm)
+}
+
+fn attempt_allowed(ip: &str, slug: &str) -> bool {
+    !over_budget(
+        &AUTH_ATTEMPTS,
+        format!("{ip}|{slug}"),
+        AUTH_WINDOW,
+        AUTH_MAX_ATTEMPTS,
+    )
+}
+
+/// Counts one hit for `key` and reports whether the window's budget is exceeded; fails open on a
+/// poisoned lock.
+fn over_budget(counters: &Counters, key: String, window: Duration, max: u32) -> bool {
+    let Ok(mut guard) = counters.write() else {
+        return false;
+    };
+    let now = Instant::now();
+    // Opportunistic cleanup keeps the map bounded.
+    if guard.len() > 8192 {
+        guard.retain(|_, (_, at)| now.duration_since(*at) < window);
+    }
+    let e = guard.entry(key).or_insert((0, now));
+    if now.duration_since(e.1) >= window {
+        *e = (0, now);
+    }
+    e.0 = e.0.saturating_add(1);
+    e.0 > max
+}
+
+fn xml_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Epoch seconds → a minimal UTC ISO-8601 string (Hinnant's civil-from-days; no chrono dependency
+/// here).
+fn iso8601(secs: i64) -> String {
+    let days = secs.div_euclid(86_400);
+    let rem = secs.rem_euclid(86_400);
+    let (h, mi, s) = (rem / 3600, (rem % 3600) / 60, rem % 60);
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z")
+}
+
+fn unauthorized() -> Response {
+    Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .header(header::CACHE_CONTROL, "no-store")
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .body(Body::from("Wrong password."))
+        .unwrap_or_default()
+}
+
+fn too_many() -> Response {
+    Response::builder()
+        .status(StatusCode::TOO_MANY_REQUESTS)
+        .header(header::CACHE_CONTROL, "no-store")
+        .header(header::RETRY_AFTER, "60")
+        .body(Body::from("Too many attempts. Try again in a minute."))
+        .unwrap_or_default()
+}
+
+/// One uniform 404 for unknown/draft/locked/disabled — existence is not distinguishable from the
+/// outside.
+fn not_found() -> Response {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .body(Body::from(
+            "This page doesn't exist or is no longer available.",
+        ))
+        .unwrap_or_default()
+}
+
 #[cfg(feature = "enterprise")]
-fn host_header(headers: &axum::http::HeaderMap) -> Option<String> {
+fn host_header(headers: &HeaderMap) -> Option<String> {
     let host = headers.get(header::HOST)?.to_str().ok()?;
     Some(host.split(':').next().unwrap_or(host).to_ascii_lowercase())
 }
@@ -710,4 +635,158 @@ fn domain_not_connected() -> Response {
             "This domain isn't connected to a status page yet.",
         ))
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cache_control(resp: &Response) -> Option<&str> {
+        resp.headers()
+            .get(header::CACHE_CONTROL)
+            .and_then(|v| v.to_str().ok())
+    }
+
+    fn prime(slug: &str, kind: Cached, at: Instant) {
+        shard_for(slug)
+            .write()
+            .unwrap()
+            .insert(slug.to_owned(), CacheEntry { kind, at });
+    }
+
+    fn public_entry(body: &str) -> Cached {
+        Cached::Public(Arc::new(PublicEntry {
+            body: body.to_owned(),
+            noindex: true,
+            name: "Acme".to_owned(),
+            current: "{\"overall\":\"degraded\",\"notices\":[]}".to_owned(),
+        }))
+    }
+
+    async fn body_text(resp: Response) -> String {
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    // Synthetics is off in tests, so every DB-backed path answers "unknown": a 200 can only come
+    // from the cache.
+    #[tokio::test]
+    async fn page_shell_is_served_from_the_shard_cache() {
+        prime("t-page-public", public_entry("{}"), Instant::now());
+        let resp = page(Path("t-page-public".into()), None).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(cache_control(&resp), Some("public, max-age=30"));
+    }
+
+    #[tokio::test]
+    async fn password_page_shell_is_private_and_needs_no_db_read() {
+        prime("t-page-pw", Cached::Password, Instant::now());
+        let resp = page(Path("t-page-pw".into()), None).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(cache_control(&resp), Some("no-store, private"));
+    }
+
+    #[tokio::test]
+    async fn unbuilt_public_page_gets_the_shell_but_no_snapshot() {
+        prime("t-unbuilt", Cached::Unbuilt, Instant::now());
+        let shell = page(Path("t-unbuilt".into()), None).await;
+        assert_eq!(shell.status(), StatusCode::OK);
+        let snap = snapshot(Path("t-unbuilt".into()), None, HeaderMap::new()).await;
+        assert_eq!(snap.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn snapshot_is_served_from_the_shard_cache() {
+        prime(
+            "t-snap",
+            public_entry("{\"name\":\"Acme\"}"),
+            Instant::now(),
+        );
+        let resp = snapshot(Path("t-snap".into()), None, HeaderMap::new()).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(cache_control(&resp), Some("public, max-age=30"));
+        assert_eq!(
+            resp.headers().get("X-Robots-Tag").map(|v| v.as_bytes()),
+            Some(b"noindex".as_slice())
+        );
+        assert_eq!(body_text(resp).await, "{\"name\":\"Acme\"}");
+    }
+
+    #[tokio::test]
+    async fn locked_password_page_is_the_same_404_as_an_unknown_slug() {
+        prime("t-snap-pw", Cached::Password, Instant::now());
+        let locked = snapshot(Path("t-snap-pw".into()), None, HeaderMap::new()).await;
+        let unknown = snapshot(Path("t-nope".into()), None, HeaderMap::new()).await;
+        assert_eq!(locked.status(), StatusCode::NOT_FOUND);
+        assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+        assert_eq!(body_text(locked).await, body_text(unknown).await);
+    }
+
+    #[tokio::test]
+    async fn badge_and_feed_are_served_from_the_shard_cache() {
+        prime("t-badge", public_entry("{}"), Instant::now());
+        let badge = badge(Path("t-badge".into()), None).await;
+        assert_eq!(badge.status(), StatusCode::OK);
+        assert!(body_text(badge).await.contains(">degraded<"));
+        let feed = feed(Path("t-badge".into()), None).await;
+        assert_eq!(feed.status(), StatusCode::OK);
+        assert!(body_text(feed).await.contains("<title>Acme status</title>"));
+    }
+
+    #[tokio::test]
+    async fn expired_entries_are_reloaded_and_misses_are_negative_cached() {
+        let slug = "t-expired";
+        let stale = Instant::now() - CACHE_TTL - Duration::from_secs(1);
+        prime(slug, public_entry("{}"), stale);
+        assert!(cache_get(slug).is_none());
+        let resp = snapshot(Path(slug.into()), None, HeaderMap::new()).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert!(matches!(cache_get(slug), Some(Cached::Missing)));
+    }
+
+    #[test]
+    fn a_full_shard_makes_room_before_inserting() {
+        let mut shard = HashMap::new();
+        for i in 0..CACHE_MAX_PER_SHARD {
+            shard.insert(
+                format!("s{i}"),
+                CacheEntry {
+                    kind: Cached::Missing,
+                    at: Instant::now(),
+                },
+            );
+        }
+        make_room(&mut shard);
+        assert!(shard.len() < CACHE_MAX_PER_SHARD);
+    }
+
+    #[test]
+    fn limiter_key_comes_from_real_ip() {
+        let ip = RealIp("203.0.113.7".parse().unwrap());
+        assert_eq!(client_ip(Some(ip)), "203.0.113.7");
+        assert_eq!(client_ip(None), SHARED_IP);
+    }
+
+    #[test]
+    fn over_budget_allows_exactly_max_hits_per_window() {
+        let counters: Counters = RwLock::new(HashMap::new());
+        for _ in 0..3 {
+            assert!(!over_budget(&counters, "k".into(), AUTH_WINDOW, 3));
+        }
+        assert!(over_budget(&counters, "k".into(), AUTH_WINDOW, 3));
+        assert!(!over_budget(&counters, "other".into(), AUTH_WINDOW, 3));
+    }
+
+    #[test]
+    fn unlock_cookie_is_found_among_other_cookies() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::COOKIE,
+            "a=1; o2_sp_unlock=tok; b=2".parse().unwrap(),
+        );
+        assert_eq!(unlock_cookie(&headers), Some("tok"));
+        assert_eq!(unlock_cookie(&HeaderMap::new()), None);
+    }
 }
