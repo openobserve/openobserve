@@ -711,6 +711,61 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
+    /// `decide` returning `Warn` and `attach_rotation_warning` setting the header are each covered
+    /// above, but not the middleware step that joins them: dropping it would leave both green.
+    /// This one runs a real request through the layer and reads the header off the response.
+    #[tokio::test]
+    async fn a_warning_reaches_the_response_the_request_produced() {
+        use axum::{Router, body::Body, routing::get};
+        use common::infra::config::{SYSTEM_SETTINGS, USERS};
+        use config::{
+            META_ORG_ID,
+            meta::system_settings::{SystemSetting, keys},
+        };
+        use tower::ServiceExt;
+
+        let email = "warned@b.com";
+        let mut user = unflagged(email, 0);
+        // Against the wall clock, not the tests' fixed instant: the middleware reads `Utc::now()`,
+        // so a password dated 2023 is years expired and would be blocked rather than warned.
+        user.password_updated_at = Some((Utc::now() - TimeDelta::days(1)).timestamp_micros());
+        USERS.insert(email.to_string(), user);
+
+        // Seeding the settings cache keeps the policy read off the database. The key format is
+        // db::system_settings::cache_key's; a drift there fails this test rather than silencing it,
+        // since the read would then fall back to a policy with rotation off.
+        SYSTEM_SETTINGS.write().await.insert(
+            format!("org:{META_ORG_ID}:_:{}", keys::PASSWORD_POLICY),
+            SystemSetting::new_org(
+                META_ORG_ID,
+                keys::PASSWORD_POLICY,
+                serde_json::to_value(rotating(90, 90)).unwrap(),
+            ),
+        );
+
+        let app = Router::new()
+            .route("/default/streams", get(|| async { "ok" }))
+            .layer(axum::middleware::from_fn(password_policy_middleware))
+            .layer(axum::middleware::from_fn(|request, next| async move {
+                stub_auth("warned@b.com", request, next).await
+            }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/default/streams")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[ROTATION_WARNING_HEADER], "89");
+
+        USERS.remove(email);
+    }
+
     /// The unit tests above feed `decide` a path string directly, so they cannot catch the case
     /// where the middleware receives a different string than expected. This one routes a real
     /// request through `nest("/api", ..)` and asserts on what actually arrives.
