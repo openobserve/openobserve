@@ -2,6 +2,7 @@
 // Methods for Show Legends popup and table cell copy functionality
 // PR #9677: feat: dashboard copy legends and table cells
 
+const { expect } = require("@playwright/test");
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
 
 export default class DashboardLegendsCopy {
@@ -148,8 +149,13 @@ export default class DashboardLegendsCopy {
    * @returns {Promise<boolean>}
    */
   async isCopyAllInCopiedState() {
-    const label = await this.copyAllBtn.textContent();
-    return label.includes('Copied');
+    // The label is set by a clipboard .then() callback, so a single textContent() read races it.
+    try {
+      await expect(this.copyAllBtn).toContainText('Copied', { timeout: 10000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**

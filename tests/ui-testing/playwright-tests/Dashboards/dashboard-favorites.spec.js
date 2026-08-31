@@ -7,7 +7,8 @@ const testLogger = require("../utils/test-logger.js");
 
 export const test = base;
 
-test.describe.configure({ mode: "parallel" });
+// Favorites live in ONE per-user, org-wide settings row that every worker rewrites wholesale, so parallel tests lose each other's updates.
+test.describe.configure({ mode: "serial" });
 
 // Favorites are a per-user setting surfaced through a `__favorites__`
 // pseudo-folder in the rail — not a real backend folder. These tests cover the
@@ -17,9 +18,6 @@ test.describe.configure({ mode: "parallel" });
 //   3. bulk-deleting from Favorites left a ghost row in the source folder
 //      (folder navigation is cache-first)
 test.describe("dashboard favorites testcases", () => {
-  // Each test seeds its own folder + dashboard so shards can run in parallel
-  // without contending over shared favorites state (favorites are per-user,
-  // and the suite logs in as the same user).
   let pm;
   let folderName;
   let dashboardName;
