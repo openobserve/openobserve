@@ -794,6 +794,18 @@ impl FromRequest for AuthExtractor {
 
             // if let Some(auth_header) = req.headers().get("Authorization") {
             if !auth_str.is_empty() {
+                // module-level grant: org admins pass implicitly, everyone else
+                // needs an explicit `search_inspector` custom-role grant
+                if url_len == 3 && path_columns[1].eq("search") && path_columns[2].eq("profile") {
+                    return Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method: "GET".to_string(),
+                        o2_type: format!("search_inspector:_all_{org_id}"),
+                        org_id,
+                        bypass_check: false,
+                        parent_id: folder,
+                    });
+                }
                 if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                 || (method.eq("POST")
                     && url_len > 1
