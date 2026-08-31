@@ -100,12 +100,15 @@ async function submit() {
   try {
     const org = store.state.selectedOrganization.identifier;
     await syntheticsService.duplicateEnvironment(org, props.source.name, name.value.trim());
-    toast.success(t("synthetics.duplicate.done"));
     // The parent selects the new scope, so the user lands where they just made.
     emit("done", name.value.trim());
     emit("update:open", false);
+    toast({ variant: "success", message: t("synthetics.duplicate.done") });
   } catch (error: any) {
-    toast.error(error?.response?.data?.message ?? t("synthetics.duplicate.failed"));
+    toast({
+      variant: "error",
+      message: error?.response?.data?.message || t("synthetics.duplicate.failed"),
+    });
   } finally {
     saving.value = false;
   }

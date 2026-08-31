@@ -155,7 +155,10 @@ async function refresh() {
     environments.value = envRes.data ?? [];
     globals.value = globalRes.data ?? [];
   } catch (error: any) {
-    toast.error(error?.response?.data?.message ?? t("synthetics.variables.loadFailed"));
+    toast({
+      variant: "error",
+      message: error?.response?.data?.message || t("synthetics.variables.loadFailed"),
+    });
   } finally {
     loading.value = false;
   }
