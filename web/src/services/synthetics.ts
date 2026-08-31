@@ -261,6 +261,13 @@ const syntheticsService = {
       `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}?force=${force}`,
     ),
 
+  /** Copy an environment's variables into a new one. Checks are not copied. */
+  duplicateEnvironment: (orgIdentifier: string, env: string, name: string) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/duplicate`,
+      { name },
+    ),
+
   createEnvironmentVariable: (
     orgIdentifier: string,
     env: string,

@@ -68,13 +68,21 @@ already says which scope you are in, so there is no Environment column.
       <!-- A secret has no value to show: the server never sends one. The column
            carries presence instead, so "Set" is the strongest claim it makes. -->
       <template #cell-value="{ row }">
-        <span v-if="row.kind === 'secret'" class="text-muted-foreground font-mono">
+        <span
+          v-if="row.kind === 'secret'"
+          class="text-muted-foreground font-mono"
+          data-test="synthetics-variable-secret-value"
+        >
           ••••••
           {{ row.has_value ? t("synthetics.variables.set") : t("synthetics.variables.notSet") }}
         </span>
-        <span v-else class="text-muted-foreground">
-          {{ row.has_value ? t("synthetics.variables.set") : t("synthetics.variables.notSet") }}
-        </span>
+        <span
+          v-else
+          class="truncate font-mono"
+          :title="row.value"
+          data-test="synthetics-variable-plain-value"
+          >{{ row.value }}</span
+        >
       </template>
 
       <!-- Load-bearing: answers "what breaks if I change this?" and is the
@@ -201,7 +209,7 @@ export default defineComponent({
     /** Split destinations. Empty on the global tab means there is nowhere to split to. */
     environments: { type: Array as PropType<SyntheticsEnvironment[]>, default: () => [] },
   },
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const { t } = useI18nTyped();
     const store = useStore();
     const { confirm } = useConfirmDialog();
@@ -315,6 +323,10 @@ export default defineComponent({
         toast.error(error?.response?.data?.message ?? t("synthetics.variables.deleteFailed"));
       }
     }
+
+    // Exposed so the scope header's "Add Variable" opens this drawer rather
+    // than the list growing a second, duplicate one.
+    expose({ openCreate });
 
     return {
       t,
