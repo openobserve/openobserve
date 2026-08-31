@@ -71,9 +71,86 @@
       />
     </template>
 
+    <!-- Shared by every column, so they live here rather than being redrawn per
+         bench where the repetition implied per-bench values. Schema stays in the
+         column: a variant can run a provider that supports it beside one that
+         does not. -->
+    <div class="inline-flex items-stretch self-center">
+      <OButton
+        variant="outline"
+        size="xs"
+        icon-left="build"
+        class="rounded-s-default! rounded-e-none!"
+        data-test="ai-playground-tools-btn"
+        @click="openTool(null)"
+      >
+        {{
+          tools.length
+            ? t("aiObservability.playground.toolsCount", { count: tools.length })
+            : t("aiObservability.playground.tools")
+        }}
+      </OButton>
+      <ODropdown align="start" side="bottom">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="icon-xs-sq"
+            class="rounded-e-default! rounded-s-none! border-s-0"
+            :aria-label="t('aiObservability.playground.tools')"
+            data-test="ai-playground-tools-menu"
+          >
+            <OIcon name="arrow-drop-down" size="sm" />
+          </OButton>
+        </template>
+        <ODropdownItem
+          v-for="(tool, index) in tools"
+          :key="index"
+          icon-left="build"
+          :data-test="`ai-playground-tool-item-${index}`"
+          @select="openTool(index)"
+        >
+          {{ raw(tool.name) || t("aiObservability.playground.toolUnnamed") }}
+          <!-- `.stop` keeps the row's own select from firing and opening the
+               dialog for the tool that is being deleted. -->
+          <template #icon-right>
+            <OButton
+              variant="ghost-destructive"
+              size="icon-xs"
+              icon-left="delete"
+              class="ms-auto"
+              :aria-label="t('aiObservability.playground.removeTool')"
+              :data-test="`ai-playground-tool-remove-${index}`"
+              @click.stop="removeTool(index)"
+            />
+          </template>
+        </ODropdownItem>
+        <ODropdownItem v-if="!tools.length" disabled data-test="ai-playground-tools-none">
+          {{ t("aiObservability.playground.toolsEmpty") }}
+        </ODropdownItem>
+
+        <!-- Also here, not only on the split button's left half: someone who
+             opened the list to see what exists is already looking for the way to
+             add one, and the button that does it is behind them. -->
+        <OSeparator v-if="tools.length" />
+        <ODropdownItem icon-left="add" data-test="ai-playground-tool-add" @select="openTool(null)">
+          {{ t("aiObservability.playground.addTool") }}
+        </ODropdownItem>
+      </ODropdown>
+    </div>
+
+    <PlaygroundVariablesMenu
+      class="self-center"
+      :var-names="varNames"
+      :vars="vars"
+      :used="usedVarNames"
+      @set-var="(name, value) => emit('set-var', name, value)"
+      @remove-var="(name) => emit('remove-var', name)"
+    />
+
     <OButton
       variant="outline"
       size="xs"
+      icon-left="table-chart"
       class="self-center"
       data-test="ai-playground-sample-btn"
       @click="emit('sample')"
@@ -84,6 +161,13 @@
           : t("aiObservability.playground.sampleFromDataset")
       }}
     </OButton>
+
+    <PlaygroundToolsDialog
+      v-model:open="toolsOpen"
+      :tools="tools"
+      :index="toolIndex"
+      @apply="(next) => emit('set-tools', next)"
+    />
 
     <p
       v-if="usesExpectedToken"
@@ -96,29 +180,59 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { computed, ref } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import PlaygroundToolsDialog from "./PlaygroundToolsDialog.vue";
+import PlaygroundVariablesMenu from "./PlaygroundVariablesMenu.vue";
 import {
   EXPECTED_OUTPUT_TOKEN,
   type PlaygroundProvenance,
   type PlaygroundSample,
+  type PlaygroundTool,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 
 const props = defineProps<{
   varNames: string[];
   vars: Record<string, string>;
+  /** Referenced by at least one variant; the rest are declared but unused. */
+  usedVarNames: string[];
+  /** One list, shared by every column. */
+  tools: PlaygroundTool[];
   provenance: PlaygroundProvenance | null;
   sample: PlaygroundSample | null;
   stepping?: boolean;
 }>();
 
 const emit = defineEmits<{
+  "set-tools": [tools: PlaygroundTool[]];
+  "set-var": [name: string, value: string];
+  "remove-var": [name: string];
   sample: [];
   "step-sample": [delta: number];
   "clear-sample": [];
 }>();
+
+const toolsOpen = ref(false);
+const toolIndex = ref<number | null>(null);
+
+/** null defines a new tool; an index opens that one for viewing. */
+function openTool(index: number | null) {
+  toolIndex.value = index;
+  toolsOpen.value = true;
+}
+
+function removeTool(index: number) {
+  emit(
+    "set-tools",
+    props.tools.filter((_, at) => at !== index),
+  );
+}
 
 const { t } = useI18nTyped();
 

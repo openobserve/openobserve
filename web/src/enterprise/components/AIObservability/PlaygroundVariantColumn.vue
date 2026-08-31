@@ -50,9 +50,6 @@
             :var-names="varNames"
             :vars="vars"
             @change="(next) => emit('change', next)"
-            @set-tools="(tools: PlaygroundTool[]) => emit('set-tools', tools)"
-            @set-var="(name: string, value: string) => emit('set-var', name, value)"
-            @remove-var="(name: string) => emit('remove-var', name)"
           />
         </div>
       </template>
@@ -138,7 +135,6 @@ import PlaygroundVariantConfig from "./PlaygroundVariantConfig.vue";
 import PlaygroundVariantHeader from "./PlaygroundVariantHeader.vue";
 import type {
   PlaygroundCell,
-  PlaygroundTool,
   PlaygroundVariant,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 import type { Provider } from "@/services/online-evals.service";
@@ -177,9 +173,6 @@ const split = ref(60);
 
 const emit = defineEmits<{
   change: [variant: PlaygroundVariant];
-  "set-tools": [tools: PlaygroundTool[]];
-  "set-var": [name: string, value: string];
-  "remove-var": [name: string];
   run: [];
   duplicate: [];
   remove: [];

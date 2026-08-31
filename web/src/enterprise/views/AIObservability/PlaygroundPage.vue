@@ -174,9 +174,14 @@
         class="shrink-0"
         :var-names="varNames"
         :vars="draft.vars"
+        :used-var-names="usedVarNames"
+        :tools="draft.variants[0]?.tools ?? []"
         :provenance="draft.provenance"
         :sample="draft.sample"
         :stepping="sampleStepping"
+        @set-tools="setTools"
+        @set-var="setVar"
+        @remove-var="removeVar"
         @sample="sampleOpen = true"
         @step-sample="stepSample"
         @clear-sample="clearSample"
@@ -229,9 +234,6 @@
             :can-remove="draft.variants.length > 1"
             :can-duplicate="draft.variants.length < MAX_VARIANTS"
             @change="updateVariant"
-            @set-tools="setTools"
-            @set-var="setVar"
-            @remove-var="removeVar"
             @run="runVariant(variant.id)"
             @duplicate="duplicate(variant.id)"
             @remove="removeVariant(variant.id)"
@@ -375,6 +377,10 @@ const varNames = computed(() => {
   for (const name of Object.keys(draft.vars)) if (!names.includes(name)) names.push(name);
   return names;
 });
+
+/** Referenced by a message somewhere; the rest are declared and never read. */
+const usedVarNames = computed(() => extractVars(draft.variants));
+
 const totalCells = computed(() => draft.variants.length);
 
 const streamingVariants = computed(() =>

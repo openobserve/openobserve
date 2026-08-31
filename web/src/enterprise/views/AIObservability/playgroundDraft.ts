@@ -279,24 +279,6 @@ export function withFieldInserted(variant: PlaygroundVariant, field: string): Pl
   };
 }
 
-/**
- * Insert a token into `content` at the caret, returning the new content and
- * where the caret should land after it. Selected text is replaced.
- */
-export function insertTokenAt(
-  content: string,
-  token: string,
-  selectionStart: number,
-  selectionEnd: number,
-): { content: string; caret: number } {
-  const start = Math.max(0, Math.min(selectionStart, content.length));
-  const end = Math.max(start, Math.min(selectionEnd, content.length));
-  return {
-    content: content.slice(0, start) + token + content.slice(end),
-    caret: start + token.length,
-  };
-}
-
 // ── run keys and cells ────────────────────────────────────────────
 
 export function idleCell(): PlaygroundCell {
