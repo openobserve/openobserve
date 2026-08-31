@@ -123,11 +123,14 @@ async function submit() {
       props.variable.id,
       selected.value.map((r) => ({ environment: r.environment, value: r.value })),
     );
-    toast.success(t("synthetics.split.done"));
     emit("done");
     emit("update:open", false);
+    toast({ variant: "success", message: t("synthetics.split.done") });
   } catch (error: any) {
-    toast.error(error?.response?.data?.message ?? t("synthetics.split.failed"));
+    toast({
+      variant: "error",
+      message: error?.response?.data?.message || t("synthetics.split.failed"),
+    });
   }
 }
 </script>

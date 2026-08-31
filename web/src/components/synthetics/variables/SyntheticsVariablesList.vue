@@ -307,12 +307,15 @@ export default defineComponent({
       const org = store.state.selectedOrganization.identifier;
       try {
         await syntheticsService.promoteEnvironmentVariable(org, props.environment, row.id);
-        toast.success(t("synthetics.promote.done"));
         emit("refresh");
+        toast({ variant: "success", message: t("synthetics.promote.done") });
       } catch (error: any) {
         // The server names the conflicting environments, or explains why a
         // secret cannot leave one — both are written to be shown verbatim.
-        toast.error(error?.response?.data?.message ?? t("synthetics.promote.failed"));
+        toast({
+          variant: "error",
+          message: error?.response?.data?.message || t("synthetics.promote.failed"),
+        });
       }
     }
 
@@ -335,10 +338,13 @@ export default defineComponent({
         await (props.environment
           ? syntheticsService.deleteEnvironmentVariable(org, props.environment, row.id, force)
           : syntheticsService.deleteGlobalVariable(org, row.id, force));
-        toast.success(t("synthetics.variables.deleted"));
         emit("refresh");
+        toast({ variant: "success", message: t("synthetics.variables.deleted") });
       } catch (error: any) {
-        toast.error(error?.response?.data?.message ?? t("synthetics.variables.deleteFailed"));
+        toast({
+          variant: "error",
+          message: error?.response?.data?.message || t("synthetics.variables.deleteFailed"),
+        });
       }
     }
 

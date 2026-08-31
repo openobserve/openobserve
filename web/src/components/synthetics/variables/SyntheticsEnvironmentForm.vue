@@ -107,15 +107,22 @@ export default defineComponent({
         await (props.isEdit
           ? syntheticsService.updateEnvironment(org, props.data?.name ?? "", body)
           : syntheticsService.createEnvironment(org, body));
-        toast.success(
-          props.isEdit
-            ? t("synthetics.environments.updated")
-            : t("synthetics.environments.created"),
-        );
+        // Emit and close BEFORE the toast, for the same reason as the variable
+        // form: nothing cosmetic should sit between a completed save and the
+        // refresh that makes it visible.
         emit("update:list");
         handleClose();
+        toast({
+          variant: "success",
+          message: props.isEdit
+            ? t("synthetics.environments.updated")
+            : t("synthetics.environments.created"),
+        });
       } catch (error: any) {
-        toast.error(error?.response?.data?.message ?? t("synthetics.environments.saveFailed"));
+        toast({
+          variant: "error",
+          message: error?.response?.data?.message || t("synthetics.environments.saveFailed"),
+        });
       }
     }
 

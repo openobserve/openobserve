@@ -209,15 +209,23 @@ export default defineComponent({
             ? syntheticsService.updateGlobalVariable(org, id, payload)
             : syntheticsService.createGlobalVariable(org, payload));
         }
-        toast.success(
-          props.isEdit ? t("synthetics.variables.updated") : t("synthetics.variables.created"),
-        );
+        // Emit and close BEFORE the toast: these are the effects the user is
+        // waiting on, and nothing cosmetic should be able to prevent them.
         emit("update:list");
         handleClose();
+        toast({
+          variant: "success",
+          message: props.isEdit
+            ? t("synthetics.variables.updated")
+            : t("synthetics.variables.created"),
+        });
       } catch (error: any) {
         // The server's message names the conflict or the constraint, and is
         // written to be shown verbatim.
-        toast.error(error?.response?.data?.message ?? t("synthetics.variables.saveFailed"));
+        toast({
+          variant: "error",
+          message: error?.response?.data?.message || t("synthetics.variables.saveFailed"),
+        });
       }
     }
 
