@@ -24,9 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Filters live in the sub-nav band directly above the table. -->
     <template #subnav>
+      <!-- < md the filter band wraps; the search takes the leftover width. -->
       <div
         data-test="running-queries-filter-container"
-        class="px-page-edge flex items-center justify-start gap-3 py-2"
+        class="px-page-edge flex items-center justify-start gap-3 py-2 max-md:flex-wrap max-md:gap-2"
       >
         <OToggleGroup
           :model-value="selectedQueryTypeTab"
@@ -56,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSearchInput
           v-if="selectedSearchField == 'all'"
           v-model="filterQuery"
-          class="no-border o2-search-input"
+          class="no-border o2-search-input max-md:min-w-40 max-md:flex-1"
           :placeholder="t('queries.search')"
           data-test="running-queries-search-input"
         />

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- scape interval section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-md:grid-cols-1 max-md:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.scrapintervalLabel") }}
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Max Series Per Query section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-md:grid-cols-1 max-md:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.maxSeriesPerQueryLabel") }}
@@ -78,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Manage Theme section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-md:grid-cols-1 max-md:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.manageTheme") }}
             </span>
-            <div class="-ml-15 flex items-center gap-2">
+            <div class="-ml-15 flex items-center gap-2 max-md:ml-0 max-md:flex-wrap">
               <!-- Light Mode Theme -->
               <div
                 class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <div
-          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-md:grid-cols-1 max-md:gap-2"
         >
           <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("settings.customLogoText") }}
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Light Mode Logo -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-md:grid-cols-1 max-md:gap-2"
         >
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dark Mode Logo -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-md:grid-cols-1 max-md:gap-2"
         >
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
@@ -383,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Authoring banners needs far more room than a settings row, so the
              row is just the entry point into a drawer. -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-md:grid-cols-1 max-md:gap-2"
         >
           <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("announcements.settings.label") }}
