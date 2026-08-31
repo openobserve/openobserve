@@ -73,7 +73,7 @@ jobs:
       needs.check_changes.outputs.has_changes == 'true' &&
       (github.event_name != 'pull_request' ||
        contains(github.event.pull_request.labels.*.name, 'e2e'))
-    runs-on: ubicloud-standard-4
+    runs-on: ubicloud-standard-8
     permissions:
       contents: read
     steps:
